@@ -8,6 +8,7 @@ use alloc::{
     format,
     string::{String, ToString},
 };
+
 use secure_types::{secure, ExposeSecret, ExposeSecretMut, Secure, SecurePassword};
 
 #[test]
