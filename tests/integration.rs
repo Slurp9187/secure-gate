@@ -6,7 +6,7 @@ use alloc::{
     format,
     string::{String, ToString},
 };
-use secure_types::{secure, ExposeSecret, ExposeSecretMut, Secure, SecurePassword};
+use secure_gate::{secure, ExposeSecret, ExposeSecretMut, Secure, SecurePassword};
 #[test]
 fn test_basic() {
     let pw: Secure<String> = Secure::new("test".to_string());

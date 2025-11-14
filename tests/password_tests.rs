@@ -1,6 +1,6 @@
 #[cfg(feature = "zeroize")]
-use secure_types::SecretString;
-use secure_types::SecurePassword; // Import re-exported SecretString for init_with test
+use secure_gate::SecretString;
+use secure_gate::SecurePassword; // Import re-exported SecretString for init_with test
 
 #[test]
 fn test_secure_password_creation() {
@@ -88,7 +88,7 @@ fn test_finish_mut_noop() {
     // RENAMED: Reflects trait no-op (no downcast)
     // This tests the helper by ensuring finish_mut succeeds on Vec<String> without panic
 
-    use secure_types::Secure;
+    use secure_gate::Secure;
     let mut mixed: Secure<Vec<String>> = Secure::new(vec!["a".to_string(), "b".to_string()]);
     mixed.expose_mut().push("c".to_string()); // Triggers potential re-alloc
                                               // Note: Vec<String> won't shrink (no-op via default impl)

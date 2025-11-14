@@ -1,4 +1,4 @@
-use secure_types::{secure, Secure, SecureBytes, SecureStr};
+use secure_gate::{secure, Secure, SecureBytes, SecureStr};
 // NEW: Test macro array overload (e.g., for keys/nonces)
 #[test]
 fn test_macro_array() {
@@ -24,14 +24,14 @@ fn test_secure_str() {
 // NEW: Test fixed-size alias (e.g., SecureKey32)
 #[test]
 fn test_secure_key() {
-    let key: secure_types::SecureKey32 = [0u8; 32].into();
+    let key: secure_gate::SecureKey32 = [0u8; 32].into();
     assert_eq!(key.expose(), &[0u8; 32]);
 }
 // NEW: Serde round-trip (requires "serde" feature)
 #[cfg(feature = "serde")]
 #[test]
 fn test_serde_roundtrip() {
-    use secure_types::SecurePassword;
+    use secure_gate::SecurePassword;
     let original = "secret123";
     // FIXED: Use .into() for Secure<SecretString>
     let pw: SecurePassword = original.into();

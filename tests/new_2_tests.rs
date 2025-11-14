@@ -1,5 +1,5 @@
 #[cfg(feature = "zeroize")]
-use secure_types::Secure;
+use secure_gate::Secure;
 
 // NEW: Test finish_mut on String (shrink capacity post-mutation)
 #[cfg(feature = "zeroize")]
@@ -30,7 +30,7 @@ fn test_finish_mut_vec() {
 #[cfg(feature = "zeroize")]
 #[test]
 fn test_finish_mut_fixed_array() {
-    use secure_types::SecureKey32;
+    use secure_gate::SecureKey32;
 
     let mut key: SecureKey32 = [0xAA; 32].into();
     key.expose_mut().copy_from_slice(&[0u8; 32]); // "Mutate" (no alloc change)

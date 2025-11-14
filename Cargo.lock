@@ -49,7 +49,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "secure-types"
+name = "secure-gate"
 version = "0.1.0"
 dependencies = [
  "secrecy",

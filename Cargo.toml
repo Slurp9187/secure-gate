@@ -1,5 +1,5 @@
 [package]
-name = "secure-types"
+name = "secure-gate"
 version = "0.1.0"
 edition = "2021"
 description = "Zero-overhead, feature-gated secure wrappers for secrets"
