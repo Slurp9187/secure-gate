@@ -34,7 +34,6 @@ use core::any::Any;
 use alloc::string::ToString;
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{
-    any,
     convert::Infallible,
     fmt::{self, Debug},
     str::FromStr,
@@ -125,10 +124,20 @@ impl<T: ?Sized> Secure<T> {
     }
 }
 
+// #[cfg(feature = "zeroize")]
+// impl<T: Zeroize + ?Sized> Debug for Secure<T> {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         write!(f, "Secure<{}>([REDACTED])", any::type_name::<T>())
+//     }
+// }
+
+// Remove unused import: delete `any,` from core imports in secure_types.rs
 #[cfg(feature = "zeroize")]
 impl<T: Zeroize + ?Sized> Debug for Secure<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Secure<{}>([REDACTED])", any::type_name::<T>())
+        f.debug_struct("Secure")
+            .field("value", &"[REDACTED]")
+            .finish()
     }
 }
 

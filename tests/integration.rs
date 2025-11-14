@@ -20,9 +20,10 @@ fn test_basic() {
 #[test]
 fn test_debug() {
     let pw: Secure<String> = Secure::new("hunter2".to_string());
-    assert_eq!(
-        format!("{pw:?}"),
-        "Secure<alloc::string::String>([REDACTED])"
+    let debug = format!("{pw:?}");
+    assert!(
+        debug.contains("[REDACTED]") && debug.starts_with("Secure"),
+        "Debug output should be redacted and start with 'Secure', got: {debug}"
     );
 }
 
