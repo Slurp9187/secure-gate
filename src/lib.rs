@@ -37,6 +37,19 @@ use serde::{de, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 pub use secrecy::{ExposeSecret, ExposeSecretMut};
 
+// Helper trait (add near the top, after imports)
+use core::any::Any;
+
+trait AsAnyMut {
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
+impl<T: 'static> AsAnyMut for T {
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
 #[cfg(not(feature = "zeroize"))]
 /// Fallback `ExposeSecret` trait when `zeroize` feature is disabled.
 /// Provides explicit, auditable access to the inner secret value.
@@ -296,6 +309,20 @@ where
         S: Serializer,
     {
         self.expose().serialize(serializer)
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl<T: Zeroize + Sized + 'static> Secure<T> {
+    /// After mutations, call this to shrink capacity (for Vec/String) and zero excess.
+    /// Ensures no over-allocated leaks on drop.
+    pub fn finish_mut(&mut self) -> &mut T {
+        if let Some(v) = self.expose_mut().as_any_mut().downcast_mut::<Vec<u8>>() {
+            v.shrink_to_fit();
+        } else if let Some(s) = self.expose_mut().as_any_mut().downcast_mut::<String>() {
+            s.shrink_to_fit();
+        }
+        self.expose_mut()
     }
 }
 
