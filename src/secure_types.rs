@@ -167,10 +167,17 @@ impl<T: ?Sized> ExposeSecretMut<T> for Secure<T> {
     }
 }
 
+// #[cfg(feature = "zeroize")]
+// impl<T: Clone + Zeroize + Sized> Clone for Secure<T> {
+//     fn clone(&self) -> Self {
+//         Self::new(self.expose().clone())
+//     }
+// }
+
 #[cfg(feature = "zeroize")]
 impl<T: Clone + Zeroize + Sized> Clone for Secure<T> {
     fn clone(&self) -> Self {
-        Self::new(self.expose().clone())
+        Self::init_with(|| self.expose().clone())
     }
 }
 
