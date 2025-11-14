@@ -1,7 +1,7 @@
 // fuzz_targets/serde.rs — final clean version
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use secure_types::{Secure, SecurePassword};
+use secure_gate::{Secure, SecurePassword};
 
 fuzz_target!(|data: &[u8]| {
     // JSON deserialization from untrusted data

@@ -157,7 +157,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "secure-types"
+name = "secure-gate"
 version = "0.1.0"
 dependencies = [
  "secrecy",
@@ -166,13 +166,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "secure-types-fuzz"
+name = "secure-gate-fuzz"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
  "bincode",
  "libfuzzer-sys",
- "secure-types",
+ "secure-gate",
  "serde_json",
 ]
 

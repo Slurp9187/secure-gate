@@ -1,6 +1,6 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use secure_types::{Secure, SecureStr};
+use secure_gate::{Secure, SecureStr};
 
 fuzz_target!(|s: &str| {
     // Focus on SecureStr (the only alias with FromStr impl)
