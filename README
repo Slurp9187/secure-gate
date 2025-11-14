@@ -1,0 +1,9 @@
+## Zeroization Guarantees
+`Secure<T>` provides **best-effort memory zeroization** on drop/mutation via the `zeroize` crate:
+
+- **What It Does**: Explicitly overwrites secret bytes (up to `.len()` for dynamic types like `Vec`/`String`) using volatile operations that resist compiler optimization.
+- **Platform Coverage**: Works on all stable Rust targets (x86, ARM, RISC-V, etc.) via portable intrinsics. No guarantees against hardware leaks (e.g., cache side-channels)—use constant-time primitives alongside.
+- **Limitations**: Only affects the wrapped value; doesn't secure against copies, logs, or kernel dumps. For full protection, avoid extraction (`into_inner`) and use scoped `expose_mut()`.
+- **Fallback Mode**: Disabled without `zeroize` feature—treat as plain `Box<T>`.
+
+For details, see [zeroize docs](https://docs.rs/zeroize).
