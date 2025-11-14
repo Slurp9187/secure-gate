@@ -5,7 +5,7 @@
 /trash
 /trash*
 /version
-Cargo.lock
+# Cargo.lock
 *.bak
 *.draft
 *.py
