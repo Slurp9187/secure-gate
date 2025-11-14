@@ -23,22 +23,15 @@ use serde::{de, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-// FIXED: Import for downcast and deref_mut in finish_mut (under zeroize only)
+// FIXED: Imports for downcast in finish_mut (under zeroize only)
 #[cfg(feature = "zeroize")]
 use crate::private::SecretString;
 #[cfg(feature = "zeroize")]
 use core::ops::DerefMut;
 
-// Helper trait (add near the top, after imports)
-use alloc::string::ToString;
-use alloc::{boxed::Box, string::String, vec::Vec};
+// Helper trait (moved earlier for forward ref)
 #[cfg(feature = "zeroize")]
 use core::any::Any;
-use core::{
-    convert::Infallible,
-    fmt::{self, Debug},
-    str::FromStr,
-};
 #[cfg(feature = "zeroize")]
 trait AsAnyMut {
     fn as_any_mut(&mut self) -> &mut dyn Any;
@@ -49,6 +42,16 @@ impl<T: 'static> AsAnyMut for T {
         self
     }
 }
+
+// Other imports
+use alloc::string::ToString;
+use alloc::{boxed::Box, string::String, vec::Vec};
+use core::{
+    convert::Infallible,
+    fmt::{self, Debug},
+    str::FromStr,
+};
+
 #[cfg(not(feature = "zeroize"))]
 /// Fallback `ExposeSecret` trait when `zeroize` feature is disabled.
 /// Provides explicit, auditable access to the inner secret value.

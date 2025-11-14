@@ -81,3 +81,17 @@ fn test_secure_password_finish_mut_shrink_fallback() {
     pw.expose_mut().push_str("er");
     assert_eq!(pw.expose(), "shorter");
 }
+
+#[cfg(feature = "zeroize")]
+#[test]
+fn test_finish_mut_noop() {
+    // RENAMED: Reflects trait no-op (no downcast)
+    // This tests the helper by ensuring finish_mut succeeds on Vec<String> without panic
+
+    use secure_types::Secure;
+    let mut mixed: Secure<Vec<String>> = Secure::new(vec!["a".to_string(), "b".to_string()]);
+    mixed.expose_mut().push("c".to_string()); // Triggers potential re-alloc
+                                              // Note: Vec<String> won't shrink (no-op via default impl)
+    mixed.finish_mut(); // Should not panic (no match needed)
+    assert_eq!(mixed.expose().len(), 3);
+}
