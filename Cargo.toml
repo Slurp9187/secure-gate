@@ -1,0 +1,23 @@
+[package]
+name = "secure-types"
+version = "0.1.0"
+edition = "2021"
+description = "Zero-overhead, feature-gated secure wrappers for secrets"
+license = "MIT OR Apache-2.0"
+keywords = ["crypto", "security", "zeroize", "secrets", "no-std"]
+categories = ["cryptography", "no-std"]
+
+[dependencies]
+secrecy = { version = "0.8", optional = true, default-features = false, features = [
+  "alloc",
+] }
+zeroize = { version = "1.8", optional = true }
+serde = { version = "1.0", optional = true, features = ["derive"] }
+
+[features]
+# Security by default
+default = ["zeroize"]
+# Opt-in zeroization + secrecy
+zeroize = ["dep:secrecy", "dep:zeroize"]
+# Serde (gated behind zeroize)
+serde = ["zeroize", "dep:serde"]
