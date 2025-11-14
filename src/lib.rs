@@ -35,12 +35,16 @@ use serde::{de, Serialize, Serializer};
 pub use secrecy::{ExposeSecret, ExposeSecretMut};
 
 #[cfg(not(feature = "zeroize"))]
+/// Fallback `ExposeSecret` trait when `zeroize` feature is disabled.
+/// Provides explicit, auditable access to the inner secret value.
 pub trait ExposeSecret<T: ?Sized> {
     /// Expose the secret: auditable access point.
     fn expose_secret(&self) -> &T;
 }
 
 #[cfg(not(feature = "zeroize"))]
+/// Fallback `ExposeSecretMut` trait when `zeroize` feature is disabled.
+/// Provides explicit, auditable mutable access to the inner secret value.
 pub trait ExposeSecretMut<T: ?Sized> {
     /// Expose mutable secret.
     fn expose_secret_mut(&mut self) -> &mut T;
@@ -60,6 +64,8 @@ use core::{
 pub struct Secure<T: Zeroize + ?Sized>(SecretBox<T>);
 
 #[cfg(not(feature = "zeroize"))]
+/// Fallback secure wrapper when `zeroize` feature is disabled.
+/// Wraps the value in `Box<T>` for heap allocation without zeroization.
 pub struct Secure<T: ?Sized>(Box<T>);
 
 #[cfg(feature = "zeroize")]
