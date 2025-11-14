@@ -33,7 +33,7 @@ use core::ops::DerefMut;
 #[cfg(feature = "zeroize")]
 use core::any::Any;
 #[cfg(feature = "zeroize")]
-trait AsAnyMut {
+pub(crate) trait AsAnyMut {
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 #[cfg(feature = "zeroize")]
