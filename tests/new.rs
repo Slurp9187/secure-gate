@@ -52,14 +52,8 @@ fn test_serde_roundtrip() {
 fn test_zeroize_on_drop() {
     use zeroize::{DefaultIsZeroes, Zeroize};
 
-    #[derive(Clone, Copy, Debug)]
+    #[derive(Clone, Copy, Debug, Default)]
     struct CheckMe(u32);
-
-    impl Default for CheckMe {
-        fn default() -> Self {
-            Self(0)
-        }
-    }
 
     impl DefaultIsZeroes for CheckMe {}
 
