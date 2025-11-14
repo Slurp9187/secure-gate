@@ -19,6 +19,9 @@
 
 extern crate alloc;
 
+/// Ergonomic constructor macro.
+pub mod macros;
+
 #[cfg(feature = "zeroize")]
 use secrecy::SecretBox;
 
@@ -404,50 +407,3 @@ pub type SecureNonce12 = Secure<[u8; 12]>;
 pub type SecureNonce16 = Secure<[u8; 16]>;
 /// Secure 24-byte nonce.
 pub type SecureNonce24 = Secure<[u8; 24]>;
-
-/// Ergonomic constructor macro.
-#[macro_export]
-macro_rules! secure {
-    ($ty:ty, $expr:expr) => {
-        $crate::Secure::<$ty>::new($expr)
-    };
-    ($ty:ty, [$($val:expr),+ $(,)?]) => {
-        $crate::Secure::<$ty>::new([$($val),+])
-    };
-}
-
-/// From array sugar.
-macro_rules! impl_from_array {
-    ($($N:literal),*) => {$(
-        impl From<[u8; $N]> for Secure<[u8; $N]> {
-            fn from(arr: [u8; $N]) -> Self { Self::new(arr) }
-        }
-    )*}
-}
-impl_from_array!(12, 16, 24, 32, 64);
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_secure_password() {
-        let pw = secure!(String, "test".into());
-        assert_eq!(pw.expose(), "test");
-    }
-
-    #[test]
-    #[cfg(feature = "zeroize")]
-    fn test_init_with() {
-        let val = Secure::<u32>::init_with(|| 42u32);
-        assert_eq!(*val.expose(), 42);
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn test_deserialize() {
-        let json = r#""secret""#;
-        let pw: SecurePassword = serde_json::from_str(json).unwrap();
-        assert_eq!(pw.expose(), "secret");
-    }
-}
