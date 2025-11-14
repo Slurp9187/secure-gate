@@ -1,3 +1,7 @@
+// ==============================================================================================
+// tests/integration.rs
+// ==============================================================================================
+
 extern crate alloc;
 
 use alloc::{
@@ -16,7 +20,7 @@ fn test_basic() {
 fn test_debug() {
     let pw: Secure<String> = Secure::new("hunter2".to_string());
     assert_eq!(
-        format!("{:?}", pw),
+        format!("{pw:?}"),
         "Secure<alloc::string::String>([REDACTED])"
     );
 }

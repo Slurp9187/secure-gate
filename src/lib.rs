@@ -20,7 +20,7 @@
 extern crate alloc;
 
 #[cfg(feature = "zeroize")]
-use secrecy::{CloneableSecret, SecretBox};
+use secrecy::SecretBox;
 
 #[cfg(all(feature = "serde", feature = "zeroize"))]
 use secrecy::SerializableSecret;
@@ -100,13 +100,13 @@ impl<T: ?Sized> Secure<T> {
     /// Expose immutable reference.
     #[inline]
     pub fn expose(&self) -> &T {
-        &*self.0
+        &self.0
     }
 
     /// Expose mutable reference.
     #[inline]
     pub fn expose_mut(&mut self) -> &mut T {
-        &mut *self.0
+        &mut self.0
     }
 }
 
