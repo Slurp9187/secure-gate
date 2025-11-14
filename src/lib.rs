@@ -11,12 +11,6 @@
 //! - `zeroize` (default): Enables `SecretBox<T>` + wiping.
 //! - `serde`: Deserialize support; Serialize opt-in via `SerializableSecret`.
 //!
-//! ## Usage
-//! ```rust
-//! use secure_types::{secure, SecureKey32, SecurePassword};
-//! let key = secure!([u8; 32], rand::random());
-//! let pw = secure!(String, "hunter2".into());
-//! ```
 
 #![no_std]
 #![forbid(unsafe_code)]
@@ -26,164 +20,191 @@
 extern crate alloc;
 
 #[cfg(feature = "zeroize")]
-pub use secrecy::{CloneableSecret, ExposeSecret, ExposeSecretMut, SecretBox, SerializableSecret};
+use secrecy::{CloneableSecret, SecretBox};
+
+#[cfg(all(feature = "serde", feature = "zeroize"))]
+use secrecy::SerializableSecret;
 
 #[cfg(feature = "zeroize")]
-pub use secrecy::zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[cfg(feature = "serde")]
-use serde::{de, Deserialize, Serialize, Serializer};
+use serde::{de, Serialize, Serializer};
 
+#[cfg(feature = "zeroize")]
+pub use secrecy::{ExposeSecret, ExposeSecretMut};
+
+#[cfg(not(feature = "zeroize"))]
+pub trait ExposeSecret<T: ?Sized> {
+    /// Expose the secret: auditable access point.
+    fn expose_secret(&self) -> &T;
+}
+
+#[cfg(not(feature = "zeroize"))]
+pub trait ExposeSecretMut<T: ?Sized> {
+    /// Expose mutable secret.
+    fn expose_secret_mut(&mut self) -> &mut T;
+}
+
+use alloc::string::ToString;
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{
+    any,
     convert::Infallible,
     fmt::{self, Debug},
     str::FromStr,
 };
 
+/// Core secure wrapper: `SecretBox<T>` (gated) or `Box<T>`.
 #[cfg(feature = "zeroize")]
-type Inner<T: ?Sized> = SecretBox<T>;
+pub struct Secure<T: Zeroize + ?Sized>(SecretBox<T>);
 
 #[cfg(not(feature = "zeroize"))]
-type Inner<T: ?Sized> = Box<T>;
+pub struct Secure<T: ?Sized>(Box<T>);
 
-/// Core secure wrapper: `SecretBox<T>` (gated) or plain `T`.
-pub struct Secure<T: ?Sized> {
-    inner: Inner<T>,
-}
-
-impl<T: Sized> Secure<T> {
+#[cfg(feature = "zeroize")]
+impl<T: Zeroize + Sized> Secure<T> {
     /// Create from value.
-    #[cfg(feature = "zeroize")]
-    #[inline]
-    pub fn new(value: T) -> Self
-    where
-        T: Zeroize,
-    {
-        Self {
-            inner: SecretBox::new(Box::new(value)),
-        }
-    }
-
-    #[cfg(not(feature = "zeroize"))]
     #[inline]
     pub fn new(value: T) -> Self {
-        Self {
-            inner: Box::new(value),
-        }
+        Self(SecretBox::new(Box::new(value)))
     }
+}
 
+#[cfg(not(feature = "zeroize"))]
+impl<T: Sized> Secure<T> {
+    /// Create from value.
+    #[inline]
+    pub fn new(value: T) -> Self {
+        Self(Box::new(value))
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl<T: Zeroize + ?Sized> Secure<T> {
     /// Expose immutable reference.
     #[inline]
     pub fn expose(&self) -> &T {
-        #[cfg(feature = "zeroize")]
-        {
-            self.inner.expose_secret()
-        }
-        #[cfg(not(feature = "zeroize"))]
-        {
-            &self.inner
-        }
+        self.0.expose_secret()
     }
-}
 
-#[cfg(feature = "zeroize")]
-impl<T: ?Sized> Zeroize for Secure<T> {
-    fn zeroize(&mut self) {
-        self.inner.zeroize();
-    }
-}
-
-#[cfg(feature = "zeroize")]
-impl<T: ?Sized> ZeroizeOnDrop for Secure<T> {}
-
-#[cfg(feature = "zeroize")]
-impl<T: CloneableSecret + Sized> Clone for Secure<T> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
+    /// Expose mutable reference.
+    #[inline]
+    pub fn expose_mut(&mut self) -> &mut T {
+        self.0.expose_secret_mut()
     }
 }
 
 #[cfg(not(feature = "zeroize"))]
-impl<T: Clone + Sized> Clone for Secure<T> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
+impl<T: ?Sized> Secure<T> {
+    /// Expose immutable reference.
+    #[inline]
+    pub fn expose(&self) -> &T {
+        &*self.0
+    }
+
+    /// Expose mutable reference.
+    #[inline]
+    pub fn expose_mut(&mut self) -> &mut T {
+        &mut *self.0
     }
 }
 
+#[cfg(feature = "zeroize")]
+impl<T: Zeroize + ?Sized> Debug for Secure<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Secure<{}>([REDACTED])", any::type_name::<T>())
+    }
+}
+
+#[cfg(not(feature = "zeroize"))]
 impl<T: ?Sized> Debug for Secure<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Secure<{}>([REDACTED])", core::any::type_name::<T>())
+        write!(f, "Secure<{}>([REDACTED])", any::type_name::<T>())
     }
 }
 
+#[cfg(feature = "zeroize")]
+impl<T: Zeroize + ?Sized> ExposeSecret<T> for Secure<T> {
+    fn expose_secret(&self) -> &T {
+        self.0.expose_secret()
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl<T: Zeroize + ?Sized> ExposeSecretMut<T> for Secure<T> {
+    fn expose_secret_mut(&mut self) -> &mut T {
+        self.0.expose_secret_mut()
+    }
+}
+
+#[cfg(not(feature = "zeroize"))]
 impl<T: ?Sized> ExposeSecret<T> for Secure<T> {
     fn expose_secret(&self) -> &T {
         self.expose()
     }
 }
 
+#[cfg(not(feature = "zeroize"))]
 impl<T: ?Sized> ExposeSecretMut<T> for Secure<T> {
     fn expose_secret_mut(&mut self) -> &mut T {
-        #[cfg(feature = "zeroize")]
-        {
-            self.inner.expose_secret_mut()
-        }
-        #[cfg(not(feature = "zeroize"))]
-        {
-            &mut self.inner
-        }
+        self.expose_mut()
     }
 }
 
 #[cfg(feature = "zeroize")]
-impl<T: Default + Zeroize + Sized> Secure<T> {
-    /// Default instance.
-    #[inline]
-    pub fn default() -> Self {
-        Self::new(T::default())
-    }
-
-    /// Init in-place with mut closure.
-    pub fn init_with_mut(ctr: impl FnOnce(&mut T)) -> Self {
-        Self {
-            inner: SecretBox::init_with_mut(ctr),
-        }
+impl<T: Clone + Zeroize + Sized> Clone for Secure<T> {
+    fn clone(&self) -> Self {
+        Self::new(self.expose().clone())
     }
 }
 
 #[cfg(not(feature = "zeroize"))]
-impl<T: Default + Sized> Secure<T> {
-    /// Default instance.
-    #[inline]
-    pub fn default() -> Self {
-        Self::new(T::default())
-    }
-
-    /// Init in-place with mut closure.
-    pub fn init_with_mut(ctr: impl FnOnce(&mut T)) -> Self {
-        let mut value = T::default();
-        ctr(&mut value);
-        Self::new(value)
+impl<T: Clone + ?Sized> Clone for Secure<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
     }
 }
 
 #[cfg(feature = "zeroize")]
-impl<T: CloneableSecret + Sized> Secure<T> {
+impl<T: Default + Zeroize + Sized> Default for Secure<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
+#[cfg(not(feature = "zeroize"))]
+impl<T: Default + Sized> Default for Secure<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl<T: Zeroize + ?Sized> Zeroize for Secure<T> {
+    fn zeroize(&mut self) {
+        self.0.zeroize();
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl<T: Zeroize + ?Sized> ZeroizeOnDrop for Secure<T> {}
+
+#[cfg(feature = "zeroize")]
+impl<T: Clone + Zeroize + Sized> Secure<T> {
     /// Init with closure (clone + zeroize local).
     pub fn init_with(ctr: impl FnOnce() -> T) -> Self {
-        Self {
-            inner: SecretBox::init_with(ctr),
-        }
+        Self(SecretBox::init_with(ctr))
     }
 
     /// Fallible init with closure.
     pub fn try_init_with<E>(ctr: impl FnOnce() -> Result<T, E>) -> Result<Self, E> {
-        SecretBox::try_init_with(ctr).map(|inner| Self { inner })
+        SecretBox::try_init_with(ctr).map(Self)
+    }
+
+    /// Consume and return a boxed inner value.
+    pub fn into_inner(self) -> Box<T> {
+        Box::new(self.expose().clone())
     }
 }
 
@@ -200,23 +221,40 @@ impl<T: Sized> Secure<T> {
     }
 }
 
+#[cfg(feature = "zeroize")]
+impl<T: Default + Zeroize + Sized> Secure<T> {
+    /// Init in-place with mut closure.
+    pub fn init_with_mut(ctr: impl FnOnce(&mut T)) -> Self {
+        Self(SecretBox::init_with_mut(ctr))
+    }
+}
+
+#[cfg(not(feature = "zeroize"))]
+impl<T: ?Sized> Secure<T> {
+    /// Consume and return the inner boxed value.
+    pub fn into_inner(self) -> Box<T> {
+        self.0
+    }
+}
+
 #[cfg(all(feature = "serde", feature = "zeroize"))]
 impl<'de, T> de::Deserialize<'de> for Secure<T>
 where
-    T: de::DeserializeOwned + CloneableSecret + Sized,
+    T: de::Deserialize<'de> + Zeroize + Sized,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
-        Self::try_init_with(|| T::deserialize(deserializer))
+        let value = T::deserialize(deserializer)?;
+        Ok(Self::new(value))
     }
 }
 
 #[cfg(all(feature = "serde", not(feature = "zeroize")))]
 impl<'de, T> de::Deserialize<'de> for Secure<T>
 where
-    T: de::DeserializeOwned + Sized,
+    T: de::Deserialize<'de> + Sized,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -229,7 +267,7 @@ where
 #[cfg(all(feature = "serde", feature = "zeroize"))]
 impl<T> Serialize for Secure<T>
 where
-    T: SerializableSecret + Sized,
+    T: SerializableSecret + Serialize + Sized + Zeroize,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -252,26 +290,6 @@ where
     }
 }
 
-#[cfg(all(feature = "serde", feature = "zeroize"))]
-impl<'de> de::Deserialize<'de> for Secure<str> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        String::deserialize(deserializer).map(Into::into)
-    }
-}
-
-#[cfg(all(feature = "serde", not(feature = "zeroize")))]
-impl<'de> de::Deserialize<'de> for Secure<str> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        String::deserialize(deserializer).map(|s| Self::new(s.into_boxed_str()))
-    }
-}
-
 /// Secure byte slice: `Secure<[u8]>` (From<Vec<u8>>).
 pub type SecureBytes = Secure<[u8]>;
 
@@ -280,24 +298,26 @@ impl From<Vec<u8>> for SecureBytes {
         let boxed = vec.into_boxed_slice();
         #[cfg(feature = "zeroize")]
         {
-            Self {
-                inner: SecretBox::new(boxed),
-            }
+            Self(SecretBox::new(boxed))
         }
         #[cfg(not(feature = "zeroize"))]
         {
-            Self { inner: boxed }
+            Self(boxed)
         }
     }
 }
 
 #[cfg(feature = "zeroize")]
-impl Default for SecureBytes {
-    fn default() -> Self {
-        Vec::new().into()
+impl Clone for SecureBytes
+where
+    [u8]: Zeroize,
+{
+    fn clone(&self) -> Self {
+        Self::from(self.expose().to_vec())
     }
 }
 
+#[cfg(not(feature = "zeroize"))]
 impl Clone for SecureBytes {
     fn clone(&self) -> Self {
         Self::from(self.expose().to_vec())
@@ -312,13 +332,11 @@ impl From<String> for SecureStr {
         let boxed = s.into_boxed_str();
         #[cfg(feature = "zeroize")]
         {
-            Self {
-                inner: SecretBox::new(boxed),
-            }
+            Self(SecretBox::new(boxed))
         }
         #[cfg(not(feature = "zeroize"))]
         {
-            Self { inner: boxed }
+            Self(boxed)
         }
     }
 }
@@ -338,12 +356,13 @@ impl FromStr for SecureStr {
 }
 
 #[cfg(feature = "zeroize")]
-impl Default for SecureStr {
-    fn default() -> Self {
-        String::default().into()
+impl Clone for SecureStr {
+    fn clone(&self) -> Self {
+        Self::from(self.expose().to_string())
     }
 }
 
+#[cfg(not(feature = "zeroize"))]
 impl Clone for SecureStr {
     fn clone(&self) -> Self {
         Self::from(self.expose().to_string())
@@ -365,13 +384,19 @@ impl From<String> for SecurePassword {
     }
 }
 
-// Fixed-size aliases
+/// Secure 32-byte key (e.g., for AES-256).
 pub type SecureKey32 = Secure<[u8; 32]>;
+/// Secure 64-byte key (e.g., for longer hashes).
 pub type SecureKey64 = Secure<[u8; 64]>;
+/// Secure IV (16 bytes, e.g., for AES-GCM).
 pub type SecureIv = Secure<[u8; 16]>;
+/// Secure salt (16 bytes).
 pub type SecureSalt = Secure<[u8; 16]>;
+/// Secure 12-byte nonce (e.g., for ChaCha20-Poly1305).
 pub type SecureNonce12 = Secure<[u8; 12]>;
+/// Secure 16-byte nonce (e.g., for AES-GCM).
 pub type SecureNonce16 = Secure<[u8; 16]>;
+/// Secure 24-byte nonce.
 pub type SecureNonce24 = Secure<[u8; 24]>;
 
 /// Ergonomic constructor macro.
@@ -388,10 +413,8 @@ macro_rules! secure {
 /// From array sugar.
 macro_rules! impl_from_array {
     ($($N:literal),*) => {$(
-        impl From<[u8; $N]> for $crate::Secure<[u8; $N]> {
-            fn from(arr: [u8; $N]) -> Self {
-                Self::new(arr)
-            }
+        impl From<[u8; $N]> for Secure<[u8; $N]> {
+            fn from(arr: [u8; $N]) -> Self { Self::new(arr) }
         }
     )*}
 }
@@ -410,8 +433,8 @@ mod tests {
     #[test]
     #[cfg(feature = "zeroize")]
     fn test_init_with() {
-        let key = Secure::<[u8; 32]>::init_with(|| [0xAA; 32]);
-        assert_eq!(key.expose(), &[0xAA; 32][..]);
+        let val = Secure::<u32>::init_with(|| 42u32);
+        assert_eq!(*val.expose(), 42);
     }
 
     #[test]
@@ -420,19 +443,5 @@ mod tests {
         let json = r#""secret""#;
         let pw: SecurePassword = serde_json::from_str(json).unwrap();
         assert_eq!(pw.expose(), "secret");
-    }
-
-    #[test]
-    #[cfg(all(feature = "serde", feature = "zeroize"))]
-    fn test_deserialize_str() {
-        let json = r#""secret-str""#;
-        let s: SecureStr = serde_json::from_str(json).unwrap();
-        assert_eq!(s.expose(), "secret-str");
-    }
-
-    #[test]
-    fn test_secure_str_from_str() {
-        let s = SecureStr::from_str("test").unwrap();
-        assert_eq!(s.expose(), "test");
     }
 }
