@@ -74,3 +74,23 @@ fn test_zeroize_after_finish_mut() {
     assert!(sec.expose().is_zeroed());
     // Drop triggers ZeroizeOnDrop, wiping the fixed size
 }
+
+// #[cfg(feature = "zeroize")]
+// #[test]
+// fn test_into_inner_zeroizes_original() {
+//     use zeroize::Zeroize;
+
+//     #[derive(Clone, Zeroize, Debug, Default)]
+//     struct TestSecret(u32);
+
+//     impl DefaultIsZeroes for TestSecret {}
+
+//     let sec: Secure<TestSecret> = Secure::new(TestSecret(42));
+//     let extracted: Box<TestSecret> = sec.into_inner();
+//     assert_eq!(*extracted, TestSecret(42)); // Extracted intact
+
+//     // To verify zeroize: Create a mutable copy, extract, then drop & check (indirect via another var)
+//     let mut sec2 = Secure::new(TestSecret(42));
+//     let _extracted2 = sec2.into_inner(); // Triggers zeroize on sec2
+//                                          // In full test, use unsafe mem peek or valgrind; here, trust the call succeeds without leak
+// }

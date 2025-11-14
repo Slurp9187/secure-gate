@@ -216,11 +216,6 @@ impl<T: Clone + Zeroize + Sized> Secure<T> {
     pub fn try_init_with<E>(ctr: impl FnOnce() -> Result<T, E>) -> Result<Self, E> {
         SecretBox::try_init_with(ctr).map(Self)
     }
-
-    /// Consume and return a boxed inner value.
-    pub fn into_inner(self) -> Box<T> {
-        Box::new(self.expose().clone())
-    }
 }
 
 #[cfg(not(feature = "zeroize"))]
@@ -241,6 +236,22 @@ impl<T: Default + Zeroize + Sized> Secure<T> {
     /// Init in-place with mut closure.
     pub fn init_with_mut(ctr: impl FnOnce(&mut T)) -> Self {
         Self(SecretBox::init_with_mut(ctr))
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl<T: Clone + Zeroize + Sized> Secure<T> {
+    /// Extract the inner value as `Box<T>`, zeroizing the original wrapper.
+    ///
+    /// # Security Note
+    /// This clones the secret for extraction (unavoidable for ownership transfer).
+    /// The source is explicitly zeroized before return to mitigate leaks.
+    /// Use only for FFI/handover—re-wrap immediately in a new `Secure` if needed.
+    /// Prefer scoped `expose_mut()` for mutations to avoid extraction entirely.
+    pub fn into_inner(mut self) -> Box<T> {
+        let value = self.0.expose_secret().clone(); // Safe clone (preserves Zeroize if T implements)
+        self.0.zeroize(); // Explicit wipe of original (redundant with drop, but immediate)
+        Box::new(value)
     }
 }
 
