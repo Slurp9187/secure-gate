@@ -22,10 +22,13 @@ mod tests {
     #[test]
     fn test_finish_mut_string() {
         let mut pw: Secure<String> = Secure::new(String::with_capacity(10));
+        let initial_cap = pw.expose().capacity(); // e.g., 10
         pw.expose_mut().push_str("short");
         assert!(pw.expose().capacity() > pw.expose().len());
         pw.finish_mut();
         assert_eq!(pw.expose().capacity(), pw.expose().len());
+        // Note: Verifies shrink happened; no freed-zero check (impossible safely)
+        assert!(pw.expose().capacity() <= initial_cap); // Best-effort: <= original
     }
 
     #[test]

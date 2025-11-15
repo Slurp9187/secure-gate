@@ -293,8 +293,14 @@ where
 }
 #[cfg(feature = "zeroize")]
 impl<T: Zeroize + Sized + 'static> Secure<T> {
-    /// After mutations, call this to shrink capacity (for Vec/String) and zero excess.
-    /// Ensures no over-allocated leaks on drop.
+    /// After mutations, call this to shrink capacity (for `Vec<u8>`, `String`, `SecretString`) and
+    /// minimize potential leaks from excess allocation. Uses `shrink_to_fit()`—best-effort only;
+    /// does *not* guarantee zeroing of freed bytes (they may linger until overwritten by allocator/OS).
+    /// For dynamic types, zeroization on drop covers only up to `.len()`.
+    ///
+    /// # Security Note
+    /// Prefer avoiding large buffers with secrets, then truncating—create sized-from-start where possible.
+    /// No-op for fixed-size types (e.g., `[u8; 32]`).
     pub fn finish_mut(&mut self) -> &mut T {
         if let Some(v) = self.expose_mut().as_any_mut().downcast_mut::<Vec<u8>>() {
             v.shrink_to_fit();
