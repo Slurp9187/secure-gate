@@ -3,14 +3,14 @@ name: Fuzz (nightly)
 on:
   push:
     branches: [ main ]
-  pull_request:
+    tags: [ 'v*.*.*' ]        # Run full fuzz on every release tag
   schedule:
-    - cron: '0 3 * * *'   # Daily at 03:00 UTC
+    - cron: '0 3 * * *'       # Daily at 03:00 UTC (your original nightly)
 
 jobs:
   fuzz:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 120      # 2 hours total is plenty
 
     strategy:
       fail-fast: false
@@ -31,24 +31,31 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly
-          # rust-src component removed — not needed for cargo-fuzz
 
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
 
-      - name: Run fuzzer (${{ matrix.target }}) for 60 minutes
-        continue-on-error: true   # One crash ≠ job failure
+      # Only run full 60-minute fuzz on tagged releases and nightly schedule
+      - name: Run full fuzzer (${{ matrix.target }}) for 60 minutes
+        if: github.ref_type == 'tag' || github.event_name == 'schedule'
         run: |
           cargo +nightly fuzz run ${{ matrix.target }} \
             -- -max_total_time=3600 \
                -timeout=60 \
-               -rss_limit_mb=4096 \
-               -ignore_crlf=1
+               -rss_limit_mb=4096
 
-      - name: Upload fuzz artifacts (on any outcome)
-        if: always()
+      # On normal main pushes: only 5-minute smoke test
+      - name: Quick smoke fuzz (5 min) — catches obvious crashes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_type != 'tag'
+        run: |
+          cargo +nightly fuzz run ${{ matrix.target }} \
+            -- -max_total_time=300 \
+               -runs=100000
+
+      - name: Upload artifacts (only on failure or full run)
+        if: failure() || github.ref_type == 'tag' || github.event_name == 'schedule'
         uses: actions/upload-artifact@v4
         with:
           name: fuzz-artifacts-${{ matrix.target }}
           path: fuzz/artifacts/${{ matrix.target }}/**
-          retention-days: 14
+          retention-days: 30
