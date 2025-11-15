@@ -49,10 +49,9 @@ let bytes: Vec<u8> = token.into_inner();  // original zeroized immediately
 | `parsing` | `FromStr` parsing                                | 60 minutes         |
 | `debug`   | `Debug` redaction verification                   | 60 minutes         |
 | `mut`     | Unbounded `expose_mut()` mutation stress         | 60 minutes         |
-| `drop`    | Drop and zeroization safety                      | 60 minutes         |
 
-- 7 libFuzzer targets
-- 420 CPU minutes per nightly run (7 × 60 min)
+- 6 libFuzzer targets
+- 360 CPU minutes per nightly run (6 × 60 min)
 - Runs on GitHub Actions (ubuntu-latest, nightly toolchain)
 - `-rss_limit_mb=4096`, `-max_total_time=3600`, `-timeout=60`
 - Artifacts uploaded on every run
