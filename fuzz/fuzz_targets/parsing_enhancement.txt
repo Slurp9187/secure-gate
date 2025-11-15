@@ -11,6 +11,12 @@ fuzz_target!(|s: &str| {
         let _ = sec_str.expose().len();
         let _cloned = sec_str.clone();
         drop(_cloned);
+
+        // Improved: mutate + shrink to test realloc/zero
+        let mut mut_sec = SecureStr::from(s);
+        mut_sec.expose_mut().push('!');
+        mut_sec.finish_mut();
+        drop(mut_sec);
     }
 
     // Stress Sized fallback
