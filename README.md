@@ -1,4 +1,3 @@
-```markdown
 # secure-gate
 
 A zero-overhead, `no_std`-compatible secret wrapper with automatic zeroization.
@@ -77,4 +76,3 @@ For details, see [zeroize docs](https://docs.rs/zeroize).
 ## License
 
 Licensed under MIT OR Apache-2.0
-```
