@@ -25,6 +25,12 @@ use serde::{de, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+// #[cfg(not(feature = "zeroize"))]
+// use alloc::string::ToString;
+
+// #[cfg(feature = "zeroize")]
+use alloc::string::ToString;
+
 // Helper trait for downcast in finish_mut (under zeroize only)
 #[cfg(feature = "zeroize")]
 use core::any::Any;
@@ -40,10 +46,7 @@ impl<T: 'static> AsAnyMut for T {
 }
 
 // Other imports
-use alloc::string::String;
-#[cfg(not(feature = "zeroize"))]
-use alloc::string::ToString;
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{
     convert::Infallible,
     fmt::{self, Debug},
@@ -362,8 +365,6 @@ impl FromStr for SecureStr {
 #[cfg(feature = "zeroize")]
 impl Clone for SecureStr {
     fn clone(&self) -> Self {
-        use alloc::string::ToString;
-
         Self::from(self.expose().to_string())
     }
 }
@@ -378,22 +379,6 @@ impl Clone for SecureStr {
 /// Uses secrecy::SecretBox<str> under the hood
 #[cfg(feature = "zeroize")]
 pub type SecurePassword = Secure<SecretBox<str>>;
-
-// Add this to src/secure_types.rs, after the SecurePassword type alias
-
-#[cfg(feature = "zeroize")]
-impl From<&str> for SecurePassword {
-    fn from(s: &str) -> Self {
-        Self::new(SecretBox::new(s.into()))
-    }
-}
-
-#[cfg(feature = "zeroize")]
-impl From<String> for SecurePassword {
-    fn from(s: String) -> Self {
-        Self::new(SecretBox::new(s.into_boxed_str()))
-    }
-}
 
 /// Explicitly mutable password — only when you need to grow/append at runtime
 /// e.g. building credentials incrementally
@@ -417,6 +402,36 @@ impl From<&str> for SecurePassword {
 impl From<String> for SecurePassword {
     fn from(s: String) -> Self {
         Self::new(s)
+    }
+}
+
+/// From<&str> and From<String> for SecurePassword (zeroize mode, immutable)
+#[cfg(feature = "zeroize")]
+impl From<&str> for SecurePassword {
+    fn from(s: &str) -> Self {
+        Self::new(SecretBox::new(s.into()))
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl From<String> for SecurePassword {
+    fn from(s: String) -> Self {
+        Self::new(SecretBox::new(s.into_boxed_str()))
+    }
+}
+
+/// From<&str> and From<String> for SecurePasswordMut (zeroize mode, mutable)
+#[cfg(feature = "zeroize")]
+impl From<&str> for SecurePasswordMut {
+    fn from(s: &str) -> Self {
+        Self::new(SecretBox::new(Box::new(s.to_string())))
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl From<String> for SecurePasswordMut {
+    fn from(s: String) -> Self {
+        Self::new(SecretBox::new(Box::new(s)))
     }
 }
 
