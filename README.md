@@ -11,7 +11,7 @@ A zero-overhead, `no_std`-compatible secret wrapper with automatic zeroization.
 - **Safe & Ergonomic**: All public API in 100% safe Rust; `secure!` macro for quick construction; aliases like `SecurePassword` and `SecureKey32`.
 - **Redacted & Zeroized**: Automatic `Debug` redaction (`"[REDACTED]"`); best-effort zeroization on drop/mutation via `zeroize`.
 - **Serde-Ready**: Opt-in serialization of secrets (explicitly exposes the secret in serialized form, e.g., JSON strings; protect output bytes appropriately).
-- **Fuzz-Hardened**: 7 libFuzzer targets running 420 CPU minutes nightly—zero crashes/leaks after thousands of hours.
+- **Fuzz-Hardened**: 6 libFuzzer targets running 360 CPU minutes nightly—zero crashes/leaks after thousands of hours.
 
 ## Installation
 
@@ -25,7 +25,7 @@ secure-gate = "0.1"
 ## Usage
 
 ```rust
-use secure-gate::{SecurePassword, Secure};
+use secure_gate::{SecurePassword, Secure};
 
 let password: SecurePassword = "hunter2".into();  // zeroized on drop
 let key = Secure::<[u8; 32]>::new(rand::random());  // fixed-size key
@@ -81,6 +81,7 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 - **Platform Coverage**: Works on all stable Rust targets (x86, ARM, RISC-V, etc.) via portable intrinsics. No guarantees against hardware leaks (e.g., cache side-channels)—use constant-time primitives alongside.
 - **Limitations**: Only affects the wrapped value; doesn't secure against copies, logs, or kernel dumps. For full protection, avoid extraction (`into_inner`) and use scoped `expose_mut()`.
 - **finish_mut**: After mutations, call this to *reduce* excess capacity (for `Vec<u8>`, `String`, `SecretString`) via `shrink_to_fit()`. This is best-effort—some allocators may not shrink—and does *not* overwrite freed memory (old secrets may persist until allocator/OS reuse). Zeroization on drop still covers only the used portion (up to `.len()`).
+- **Dynamic Container Caveats**: For growable types like `Vec<u8>` or `String`, safe Rust cannot zero the full historical capacity (e.g., after `truncate` or realloc). Only the current slice up to `.len()` is overwritten on drop. Avoid patterns like filling a large buffer with secrets then truncating to small length—opt for fixed-size where possible or explicitly zero excess via `expose_mut().fill(0)` before shrinking.
 - **Fallback Mode**: Disabled without `zeroize` feature—treat as plain `Box<T>`.
 
 For details, see [zeroize docs](https://docs.rs/zeroize).
