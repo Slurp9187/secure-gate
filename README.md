@@ -25,7 +25,7 @@ secure-gate = "0.1"
 ## Usage
 
 ```rust
-use secure_gate::{SecurePassword, Secure};
+use secure-gate::{SecurePassword, Secure};
 
 let password: SecurePassword = "hunter2".into();  // zeroized on drop
 let key = Secure::<[u8; 32]>::new(rand::random());  // fixed-size key
@@ -33,7 +33,7 @@ let token = Secure::<Vec<u8>>::new(vec![...]);  // dynamic buffer
 
 // Scoped mutation (preferred)
 password.expose_mut().push_str("!!!");
-password.finish_mut();  // shrink + zero excess capacity
+password.finish_mut();  // reduce excess capacity via shrink_to_fit (best-effort; no scrub of freed memory)
 
 // Extraction (use sparingly)
 let bytes: Vec<u8> = token.into_inner();  // original zeroized immediately
@@ -80,6 +80,7 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 - **What It Does**: Explicitly overwrites secret bytes (up to `.len()` for dynamic types like `Vec`/`String`) using volatile operations that resist compiler optimization.
 - **Platform Coverage**: Works on all stable Rust targets (x86, ARM, RISC-V, etc.) via portable intrinsics. No guarantees against hardware leaks (e.g., cache side-channels)—use constant-time primitives alongside.
 - **Limitations**: Only affects the wrapped value; doesn't secure against copies, logs, or kernel dumps. For full protection, avoid extraction (`into_inner`) and use scoped `expose_mut()`.
+- **finish_mut**: After mutations, call this to *reduce* excess capacity (for `Vec<u8>`, `String`, `SecretString`) via `shrink_to_fit()`. This is best-effort—some allocators may not shrink—and does *not* overwrite freed memory (old secrets may persist until allocator/OS reuse). Zeroization on drop still covers only the used portion (up to `.len()`).
 - **Fallback Mode**: Disabled without `zeroize` feature—treat as plain `Box<T>`.
 
 For details, see [zeroize docs](https://docs.rs/zeroize).
