@@ -18,7 +18,11 @@ use zeroize::Zeroize;
 #[cfg(feature = "zeroize")]
 /// Newtype for String enabling safe cloning + zeroization.
 /// Use via SecurePassword alias.
-#[derive(Clone, Default, Zeroize, PartialEq, Debug)]
+///
+/// # Warning
+/// Direct use of `SecretString` is not recommended outside of testing.
+/// Always wrap in `Secure<SecretString>` for protection. `Debug` output is redacted.
+#[derive(Clone, Default, Zeroize, PartialEq)]
 pub struct SecretString(pub String);
 
 #[cfg(feature = "zeroize")]
@@ -32,6 +36,13 @@ impl From<String> for SecretString {
 impl From<&str> for SecretString {
     fn from(s: &str) -> Self {
         Self(s.to_string())
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl core::fmt::Debug for SecretString {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("SecretString([REDACTED])")
     }
 }
 

@@ -1,9 +1,9 @@
 // tests/zeroize.rs
-
 #[cfg(feature = "zeroize")]
 mod tests {
     use secure_gate::{SecretString, Secure, SecurePassword};
-    use zeroize::{DefaultIsZeroes, Zeroize};
+    use std::format;
+    use zeroize::{DefaultIsZeroes, Zeroize}; // For format! in redaction test (std for test convenience)
 
     #[test]
     fn test_clone_scoped_zeroize() {
@@ -136,6 +136,21 @@ mod tests {
         assert_eq!(*extracted, TestSecret(42));
         let sec2 = Secure::new(TestSecret(42));
         let _extracted2 = sec2.into_inner();
+    }
+
+    #[test]
+    fn test_secret_string_debug_redacted() {
+        let ss = SecretString::from("hunter2");
+        let debug = format!("{ss:?}");
+        assert_eq!(debug, "SecretString([REDACTED])");
+        // Confirm no leak even for special cases
+        let empty = SecretString::default();
+        let empty_debug = format!("{empty:?}");
+        assert_eq!(empty_debug, "SecretString([REDACTED])");
+        // Edge: Exact match to redacted string (should still redact, per fuzz logic)
+        let tricky = SecretString::from("[REDACTED]");
+        let tricky_debug = format!("{tricky:?}");
+        assert_eq!(tricky_debug, "SecretString([REDACTED])");
     }
 }
 

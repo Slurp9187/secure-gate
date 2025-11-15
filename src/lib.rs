@@ -54,5 +54,6 @@ impl From<String> for SecurePassword {
 }
 
 // Re-export SecretString for use in tests (avoids private module access)
+// Note: Direct use discouraged; Debug is redacted for safety.
 #[cfg(feature = "zeroize")]
 pub use private::SecretString;
