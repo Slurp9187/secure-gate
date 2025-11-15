@@ -2,11 +2,25 @@
 
 A zero-overhead, `no_std`-compatible secret wrapper with automatic zeroization.
 
+[![Crates.io](https://img.shields.io/crates/v/secure-gate.svg)](https://crates.io/crates/secure-gate)
+[![Documentation](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate)
+[![Fuzzing Status](https://github.com/YourName/secure-gate/actions/workflows/fuzz.yml/badge.svg)](https://github.com/YourName/secure-gate/actions/workflows/fuzz.yml)
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](#license)
+
 - `no_std` + `alloc` support
 - `zeroize` feature enabled by default
 - Redacted `Debug` output
 - `serde` support (opt-in)
 - All public API in safe Rust
+
+## Installation
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+secure-gate = "0.1"
+```
 
 ## Usage
 
@@ -60,6 +74,10 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 | `zeroize` | Enables `SecretBox<T>` + zeroization on drop (default) |
 | `serde`   | Adds `Serialize` / `Deserialize` impls              |
 
+## Auto-Gating Between Secure and Standard Modes
+
+A key feature is automatic gating: with the `zeroize` feature (default), `Secure<T>` uses `SecretBox<T>` for zeroization. When disabled, it falls back to plain `Box<T>` for minimal overhead in constrained environments. This ensures seamless compatibility without code changes.
+
 ## Zeroization Guarantees
 
 `Secure<T>` provides **best-effort memory zeroization** on drop/mutation via the `zeroize` crate:
@@ -70,6 +88,10 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 - **Fallback Mode**: Disabled without `zeroize` feature—treat as plain `Box<T>`.
 
 For details, see [zeroize docs](https://docs.rs/zeroize).
+
+## Contribution
+
+Contributions welcome! Please submit PRs with tests/fuzz targets. See [fuzzing docs](fuzz/README.md) for extending fuzz suite.
 
 ## License
 
