@@ -1,20 +1,17 @@
 #![no_main]
-use core::ops::DerefMut;
 use libfuzzer_sys::fuzz_target;
-use secure_gate::{Secure, SecurePassword}; // Enables deref_mut() for SecretString
+use secure_gate::{ExposeSecretMut, Secure, SecurePasswordMut};
 
 fuzz_target!(|data: &[u8]| {
     if data.is_empty() {
         return;
     }
-
-    // 1. SecurePassword: unbounded push/pop/clear/resize
-    let mut pw = SecurePassword::from("initial");
+    // 1. SecurePasswordMut: unbounded push/pop/clear/resize
+    let mut pw = SecurePasswordMut::from("initial");
     {
-        let inner = pw.expose_mut(); // &mut SecretString
-                                     // Fuzz arbitrary string mutations
+        let inner_str = pw.expose_mut().expose_secret_mut(); // &mut String
+                                                             // Fuzz arbitrary string mutations
         if let Ok(s) = core::str::from_utf8(data) {
-            let inner_str = inner.deref_mut(); // &mut String
             inner_str.clear();
             inner_str.push_str(s);
             inner_str.truncate(data.len() % 1000);
