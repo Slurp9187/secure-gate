@@ -2,10 +2,8 @@
 
 #[cfg(feature = "zeroize")]
 mod tests {
-    use secure_gate::{
-        secure, ExposeSecret, ExposeSecretMut, SecretString, Secure, SecurePassword,
-    };
-    use zeroize::{DefaultIsZeroes, Zeroize, ZeroizeOnDrop};
+    use secure_gate::{SecretString, Secure, SecurePassword};
+    use zeroize::{DefaultIsZeroes, Zeroize};
 
     #[test]
     fn test_clone_scoped_zeroize() {
