@@ -5,9 +5,7 @@ use alloc::{
     format,
     string::{String, ToString},
 };
-use secure_gate::{ExposeSecret, ExposeSecretMut, Secure};
-// use secure_gate::SecurePassword;
-// use secure_gate::secure;
+use secure_gate::{ExposeSecret, ExposeSecretMut, Secure, SecurePassword};
 
 #[test]
 fn test_basic() {
@@ -56,6 +54,12 @@ fn test_into_inner() {
     let pw: Secure<String> = Secure::new("value".to_string());
     let inner: Box<String> = pw.into_inner();
     assert_eq!(&*inner, "value");
+}
+
+#[test]
+fn test_alias() {
+    let pw: SecurePassword = "alias-test".into();
+    assert_eq!(pw.expose().as_str(), "alias-test");
 }
 
 #[test]

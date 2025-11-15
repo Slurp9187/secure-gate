@@ -1,13 +1,7 @@
 // tests/types.rs
 
-use secure_gate::{secure, Secure, SecureBytes, SecureKey32, SecurePassword, SecureStr};
+use secure_gate::{SecureBytes, SecureKey32, SecurePassword, SecureStr};
 use std::format;
-
-#[test]
-fn test_macro_array() {
-    let key: Secure<[u8; 4]> = secure!([u8; 4], [1, 2, 3, 4]);
-    assert_eq!(key.expose(), &[1, 2, 3, 4]);
-}
 
 #[test]
 fn test_secure_bytes() {

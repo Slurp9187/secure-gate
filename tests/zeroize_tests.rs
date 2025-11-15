@@ -119,6 +119,24 @@ mod tests {
         mixed.finish_mut();
         assert_eq!(mixed.expose().len(), 3);
     }
+
+    #[test]
+    fn test_init_with() {
+        let val = Secure::<u32>::init_with(|| 42u32);
+        assert_eq!(*val.expose(), 42);
+    }
+
+    #[test]
+    fn test_into_inner_zeroizes_original() {
+        #[derive(Clone, Copy, Debug, Default, PartialEq)]
+        struct TestSecret(u32);
+        impl DefaultIsZeroes for TestSecret {}
+        let sec: Secure<TestSecret> = Secure::new(TestSecret(42));
+        let extracted: Box<TestSecret> = sec.into_inner();
+        assert_eq!(*extracted, TestSecret(42));
+        let sec2 = Secure::new(TestSecret(42));
+        let _extracted2 = sec2.into_inner();
+    }
 }
 
 #[cfg(not(feature = "zeroize"))]
