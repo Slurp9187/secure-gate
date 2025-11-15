@@ -2,10 +2,11 @@
 // tests/types_tests.rs
 // =================================================================================
 
-use secrecy::ExposeSecret;
-use secrecy::ExposeSecretMut;
-use secure_gate::{SecureBytes, SecureKey32, SecurePassword, SecurePasswordMut, SecureStr};
-use std::format;
+#[cfg(feature = "zeroize")]
+use secrecy::{ExposeSecret, ExposeSecretMut};
+#[cfg(feature = "zeroize")]
+use secure_gate::SecurePasswordMut;
+use secure_gate::{SecureBytes, SecureKey32, SecurePassword, SecureStr};
 
 #[test]
 fn test_secure_bytes() {
@@ -29,12 +30,27 @@ fn test_secure_key() {
     assert_eq!(key.expose(), &[0u8; 32]);
 }
 
+// #[test]
+// fn test_secure_password_creation() {
+//     let pw1: SecurePassword = "test".into();
+//     assert_eq!(pw1.expose().expose_secret(), "test");
+//     let pw2: SecurePassword = "another".to_string().into();
+//     assert_eq!(pw2.expose().expose_secret(), "another");
+// }
+
+// Updated test_secure_password_creation (gate assert for fallback)
 #[test]
 fn test_secure_password_creation() {
     let pw1: SecurePassword = "test".into();
+    #[cfg(feature = "zeroize")]
     assert_eq!(pw1.expose().expose_secret(), "test");
+    #[cfg(not(feature = "zeroize"))]
+    assert_eq!(pw1.expose().as_str(), "test");
     let pw2: SecurePassword = "another".to_string().into();
+    #[cfg(feature = "zeroize")]
     assert_eq!(pw2.expose().expose_secret(), "another");
+    #[cfg(not(feature = "zeroize"))]
+    assert_eq!(pw2.expose().as_str(), "another");
 }
 
 #[test]
