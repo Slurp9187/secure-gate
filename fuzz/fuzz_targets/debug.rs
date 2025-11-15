@@ -1,6 +1,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use secure_gate::{Secure, SecurePassword};
+use std::format;
 
 fuzz_target!(|data: &[u8]| {
     // Skip empty or non-UTF8 inputs (avoids false negatives)
