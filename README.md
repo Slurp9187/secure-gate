@@ -87,7 +87,7 @@ For details, see [zeroize docs](https://docs.rs/zeroize).
 
 ## Contribution
 
-Contributions welcome! Please submit PRs with tests/fuzz targets. See for extending fuzz suite.
+Contributions welcome! Please submit PRs with tests/fuzz targets.
 
 ## License
 
