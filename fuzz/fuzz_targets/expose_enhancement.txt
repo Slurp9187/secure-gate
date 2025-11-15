@@ -1,6 +1,0 @@
-// Instead of:
-let pw_str = std::str::from_utf8(data).unwrap_or_default();
-
-// Better (more aggressive, catches more):
-let pw_str = String::from_utf8_lossy(data);
-let mut pw = SecurePassword::from(pw_str.as_ref());
