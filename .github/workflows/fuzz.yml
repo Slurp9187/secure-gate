@@ -10,7 +10,7 @@ on:
 jobs:
   fuzz:
     runs-on: ubuntu-latest
-    timeout-minutes: 360    # 6 hours max per run
+    timeout-minutes: 360    # 6 hours max total for the whole job
 
     strategy:
       fail-fast: false
@@ -37,14 +37,7 @@ jobs:
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
 
-      - name: Run fuzzer (${{ matrix.target }}) for 45 minutes
+      - name: Run fuzzer (${{ matrix.target }}) for 60 minutes
         run: |
           cargo +nightly fuzz run ${{ matrix.target }} \
-            -- -max_total_time=2700 -timeout=60
-
-      - name: Upload crash artifacts (if any)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: fuzz-crash-${{ matrix.target }}
-          path: fuzz/artifacts/${{ matrix.target }}/
+            -- -max_total_time=3600 -timeout=60 -rss_limit_mb=4096
