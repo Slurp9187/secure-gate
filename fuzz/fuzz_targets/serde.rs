@@ -2,7 +2,12 @@
 use libfuzzer_sys::fuzz_target;
 use secure_gate::{ExposeSecret, Secure, SecurePassword};
 
+const MAX_SIZE: usize = 1_000_000; // Limit input size to 1MB to prevent OOM
+
 fuzz_target!(|data: &[u8]| {
+    if data.len() > MAX_SIZE {
+        return; // Skip large inputs to avoid realloc/OOM
+    }
     // JSON deserialization from untrusted data
     if let Ok(pw) = serde_json::from_slice::<SecurePassword>(data) {
         let _ = pw.expose().expose_secret().len();
