@@ -10,7 +10,7 @@ A zero-overhead, `no_std`-compatible secret wrapper with automatic zeroization.
 - **No-Std Native**: Full `no_std` + `alloc` support for embedded/embedded systems.
 - **Safe & Ergonomic**: All public API in 100% safe Rust; `secure!` macro for quick construction; aliases like `SecurePassword` and `SecureKey32`.
 - **Redacted & Zeroized**: Automatic `Debug` redaction (`"[REDACTED]"`); best-effort zeroization on drop/mutation via `zeroize`.
-- **Serde-Ready**: Opt-in serialization without secret leaks.
+- **Serde-Ready**: Opt-in serialization of secrets (explicitly exposes the secret in serialized form, e.g., JSON strings; protect output bytes appropriately).
 - **Fuzz-Hardened**: 7 libFuzzer targets running 420 CPU minutes nightly—zero crashes/leaks after thousands of hours.
 
 ## Installation
