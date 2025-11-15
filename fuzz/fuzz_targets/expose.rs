@@ -14,8 +14,8 @@ fuzz_target!(|data: &[u8]| {
     sec.finish_mut(); // Shrink + zero excess
 
     // Fuzz SecurePassword (strings)
-    let pw_str = std::str::from_utf8(data).unwrap_or_default();
-    let mut pw = SecurePassword::from(pw_str);
+    let pw_str = String::from_utf8_lossy(data);
+    let mut pw = SecurePassword::from(pw_str.as_ref()); // FIXED: .as_ref() to &str
     *pw.expose_mut() = secure_gate::SecretString(pw_str.to_string()); // FIXED: Wrap in SecretString for From impl
     pw.finish_mut(); // Shrink string cap
     let _ = pw.expose().as_str(); // View coercion
