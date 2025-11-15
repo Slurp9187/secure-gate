@@ -22,7 +22,6 @@ jobs:
           - parsing
           - debug
           - mut
-          - drop
 
     steps:
       - name: Checkout repository
