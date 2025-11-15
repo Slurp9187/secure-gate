@@ -1,0 +1,36 @@
+#![no_main]
+use libfuzzer_sys::fuzz_target;
+use secure_gate::{Secure, SecureStr};
+
+fuzz_target!(|s: &str| {
+    // === Core SecureStr parsing (current public API) ===
+    let _ = s.parse::<SecureStr>();
+    let _ = SecureStr::from(s);
+
+    if let Ok(sec_str) = s.parse::<SecureStr>() {
+        let _ = sec_str.expose().len();
+        let _cloned = sec_str.clone();
+        drop(_cloned);
+    }
+
+    // Stress Sized fallback
+    let mut sized = Secure::new(s.to_string());
+    sized.finish_mut();
+
+    // Edge cases
+    if s.len() > 1000 { let _ = s.parse::<SecureStr>(); }
+    let _ = "".parse::<SecureStr>();
+    let _ = "hello world".parse::<SecureStr>();
+
+    // === FUTURE-PROOF: Test any FromStr impls added later ===
+    // These will panic or misbehave if broken — fuzzer will catch it
+    // Add more as you implement them
+    let _ = s.parse::<Secure<[u8; 32]>>();  // e.g. future hex key parsing
+    let _ = s.parse::<Secure<Vec<u8>>>();   // e.g. future base64/binary
+    let _ = s.parse::<Secure<String>>();
+
+    // Bonus: stress malformed long input
+    if s.len() > 5000 {
+        let _ = s.parse::<SecureStr>();
+    }
+});
