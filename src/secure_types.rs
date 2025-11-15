@@ -1,3 +1,7 @@
+// =================================================================================
+// src/secure_types.rs
+// =================================================================================
+
 //! # `secure-types` — Inspired by `secrecy`: Zero-overhead, feature-gated secrets
 //!
 //! A thin, `no_std`-friendly wrapper for sensitive data (keys, passwords, etc.).
@@ -12,24 +16,22 @@
 //! - `serde`: Deserialize support; Serialize opt-in via `SerializableSecret`.
 //!
 
-#[cfg(feature = "zeroize")]
-use secrecy::SecretBox;
 #[cfg(all(feature = "serde", feature = "zeroize"))]
 use secrecy::SerializableSecret;
 #[cfg(feature = "zeroize")]
-use secrecy::{ExposeSecret, ExposeSecretMut};
+use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 #[cfg(feature = "serde")]
 use serde::{de, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-// FIXED: Imports for downcast in finish_mut (under zeroize only)
-#[cfg(feature = "zeroize")]
-use crate::private::SecretString;
-#[cfg(feature = "zeroize")]
-use core::ops::DerefMut;
+// #[cfg(not(feature = "zeroize"))]
+// use alloc::string::ToString;
 
-// Helper trait (moved earlier for forward ref)
+// #[cfg(feature = "zeroize")]
+use alloc::string::ToString;
+
+// Helper trait for downcast in finish_mut (under zeroize only)
 #[cfg(feature = "zeroize")]
 use core::any::Any;
 #[cfg(feature = "zeroize")]
@@ -44,7 +46,6 @@ impl<T: 'static> AsAnyMut for T {
 }
 
 // Other imports
-use alloc::string::ToString;
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{
     convert::Infallible,
@@ -153,12 +154,6 @@ impl<T: ?Sized> ExposeSecretMut<T> for Secure<T> {
         self.expose_mut()
     }
 }
-// #[cfg(feature = "zeroize")]
-// impl<T: Clone + Zeroize + Sized> Clone for Secure<T> {
-// fn clone(&self) -> Self {
-// Self::new(self.expose().clone())
-// }
-// }
 #[cfg(feature = "zeroize")]
 impl<T: Clone + Zeroize + Sized> Clone for Secure<T> {
     fn clone(&self) -> Self {
@@ -293,7 +288,7 @@ where
 }
 #[cfg(feature = "zeroize")]
 impl<T: Zeroize + Sized + 'static> Secure<T> {
-    /// After mutations, call this to shrink capacity (for `Vec<u8>`, `String`, `SecretString`) and
+    /// After mutations, call this to shrink capacity (for `Vec<u8>`, `String`) and
     /// minimize potential leaks from excess allocation. Uses `shrink_to_fit()`—best-effort only;
     /// does *not* guarantee zeroing of freed bytes (they may linger until overwritten by allocator/OS).
     /// For dynamic types, zeroization on drop covers only up to `.len()`.
@@ -306,13 +301,6 @@ impl<T: Zeroize + Sized + 'static> Secure<T> {
             v.shrink_to_fit();
         } else if let Some(s) = self.expose_mut().as_any_mut().downcast_mut::<String>() {
             s.shrink_to_fit();
-        } else if let Some(ss) = self
-            .expose_mut()
-            .as_any_mut()
-            .downcast_mut::<SecretString>()
-        {
-            // Handle SecurePassword (SecretString wrapper)
-            ss.deref_mut().shrink_to_fit(); // Shrink inner String via DerefMut
         }
         self.expose_mut()
     }
@@ -386,7 +374,67 @@ impl Clone for SecureStr {
         Self::from(self.expose().to_string())
     }
 }
-/// REMOVED: Duplicate SecurePassword alias/impls (now in lib.rs only)
+
+/// Recommended for nearly all password use — immutable, zero-realloc, safest
+/// Uses secrecy::SecretBox<str> under the hood
+#[cfg(feature = "zeroize")]
+pub type SecurePassword = Secure<SecretBox<str>>;
+
+/// Explicitly mutable password — only when you need to grow/append at runtime
+/// e.g. building credentials incrementally
+#[cfg(feature = "zeroize")]
+pub type SecurePasswordMut = Secure<SecretBox<String>>;
+
+/// Fallback aliases when zeroize disabled
+#[cfg(not(feature = "zeroize"))]
+pub type SecurePassword = Secure<String>;
+
+/// Fallback `From` impls for `SecurePassword` when `zeroize` feature is disabled
+/// (treats as plain `Secure<String>`)
+#[cfg(not(feature = "zeroize"))]
+impl From<&str> for SecurePassword {
+    fn from(s: &str) -> Self {
+        Self::new(s.to_string())
+    }
+}
+
+#[cfg(not(feature = "zeroize"))]
+impl From<String> for SecurePassword {
+    fn from(s: String) -> Self {
+        Self::new(s)
+    }
+}
+
+/// From<&str> and From<String> for SecurePassword (zeroize mode, immutable)
+#[cfg(feature = "zeroize")]
+impl From<&str> for SecurePassword {
+    fn from(s: &str) -> Self {
+        Self::new(SecretBox::new(s.into()))
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl From<String> for SecurePassword {
+    fn from(s: String) -> Self {
+        Self::new(SecretBox::new(s.into_boxed_str()))
+    }
+}
+
+/// From<&str> and From<String> for SecurePasswordMut (zeroize mode, mutable)
+#[cfg(feature = "zeroize")]
+impl From<&str> for SecurePasswordMut {
+    fn from(s: &str) -> Self {
+        Self::new(SecretBox::new(Box::new(s.to_string())))
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl From<String> for SecurePasswordMut {
+    fn from(s: String) -> Self {
+        Self::new(SecretBox::new(Box::new(s)))
+    }
+}
+
 /// Secure 32-byte key (e.g., for AES-256).
 pub type SecureKey32 = Secure<[u8; 32]>;
 /// Secure 64-byte key (e.g., for longer hashes).

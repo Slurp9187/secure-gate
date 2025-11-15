@@ -1,4 +1,6 @@
-// tests/basic.rs
+// =================================================================================
+// tests/basic_tests.rs
+// =================================================================================
 
 extern crate alloc;
 use alloc::{
@@ -59,6 +61,9 @@ fn test_into_inner() {
 #[test]
 fn test_alias() {
     let pw: SecurePassword = "alias-test".into();
+    #[cfg(feature = "zeroize")]
+    assert_eq!(pw.expose().expose_secret(), "alias-test");
+    #[cfg(not(feature = "zeroize"))]
     assert_eq!(pw.expose().as_str(), "alias-test");
 }
 

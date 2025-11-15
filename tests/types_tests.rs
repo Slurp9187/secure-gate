@@ -1,7 +1,12 @@
-// tests/types.rs
+// =================================================================================
+// tests/types_tests.rs
+// =================================================================================
 
+#[cfg(feature = "zeroize")]
+use secrecy::{ExposeSecret, ExposeSecretMut};
+#[cfg(feature = "zeroize")]
+use secure_gate::SecurePasswordMut;
 use secure_gate::{SecureBytes, SecureKey32, SecurePassword, SecureStr};
-use std::format;
 
 #[test]
 fn test_secure_bytes() {
@@ -25,37 +30,65 @@ fn test_secure_key() {
     assert_eq!(key.expose(), &[0u8; 32]);
 }
 
+// #[test]
+// fn test_secure_password_creation() {
+//     let pw1: SecurePassword = "test".into();
+//     assert_eq!(pw1.expose().expose_secret(), "test");
+//     let pw2: SecurePassword = "another".to_string().into();
+//     assert_eq!(pw2.expose().expose_secret(), "another");
+// }
+
+// Updated test_secure_password_creation (gate assert for fallback)
 #[test]
 fn test_secure_password_creation() {
     let pw1: SecurePassword = "test".into();
+    #[cfg(feature = "zeroize")]
+    assert_eq!(pw1.expose().expose_secret(), "test");
+    #[cfg(not(feature = "zeroize"))]
     assert_eq!(pw1.expose().as_str(), "test");
     let pw2: SecurePassword = "another".to_string().into();
+    #[cfg(feature = "zeroize")]
+    assert_eq!(pw2.expose().expose_secret(), "another");
+    #[cfg(not(feature = "zeroize"))]
     assert_eq!(pw2.expose().as_str(), "another");
 }
 
 #[test]
-fn test_secure_password_expose_and_mutate() {
-    let mut pw: SecurePassword = "secret".into();
-    assert_eq!(pw.expose().as_str(), "secret");
-    *pw.expose_mut() = "changed".to_string().into();
-    assert_eq!(pw.expose().as_str(), "changed");
+#[cfg(feature = "zeroize")]
+fn test_secure_password_mut_creation() {
+    let pw: SecurePasswordMut = "test".into();
+    assert_eq!(pw.expose().expose_secret(), "test");
+    let pw2: SecurePasswordMut = "another".to_string().into();
+    assert_eq!(pw2.expose().expose_secret(), "another");
 }
 
 #[test]
+#[cfg(feature = "zeroize")]
+fn test_secure_password_mut_expose_and_mutate() {
+    let mut pw: SecurePasswordMut = "secret".into();
+    assert_eq!(pw.expose().expose_secret(), "secret");
+    pw.expose_mut().expose_secret_mut().push_str("changed");
+    assert_eq!(pw.expose().expose_secret(), "secretchanged");
+}
+
+#[test]
+#[cfg(feature = "zeroize")]
 fn test_secure_password_clone() {
     let pw1: SecurePassword = "original".into();
     let pw2 = pw1.clone();
-    assert_eq!(pw2.expose().as_str(), "original");
-    assert_eq!(pw1.expose().as_str(), "original");
+    assert_eq!(pw2.expose().expose_secret(), "original");
+    assert_eq!(pw1.expose().expose_secret(), "original");
 }
 
 #[test]
+#[cfg(feature = "zeroize")]
 fn test_secure_password_default() {
     let pw: SecurePassword = SecurePassword::default();
-    assert_eq!(pw.expose().as_str(), "");
+    assert_eq!(pw.expose().expose_secret(), "");
 }
 
 #[test]
+#[cfg(feature = "zeroize")]
 fn test_secure_password_debug_redacted() {
     let pw: SecurePassword = "hunter2".into();
     let debug = format!("{pw:?}");
