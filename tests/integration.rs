@@ -21,6 +21,7 @@ fn test_debug() {
         "Debug output should be redacted and start with 'Secure', got: {debug}"
     );
 }
+
 #[test]
 fn test_expose_secret() {
     let pw: Secure<String> = Secure::new("secret".to_string());
