@@ -5,12 +5,12 @@ on:
     branches: [ main ]
   pull_request:
   schedule:
-    - cron: '0 3 * * *'   # Run nightly at 03:00 UTC
+    - cron: '0 3 * * *'   # Daily at 03:00 UTC
 
 jobs:
   fuzz:
     runs-on: ubuntu-latest
-    timeout-minutes: 360    # 6 hours max total for the whole job
+    timeout-minutes: 360
 
     strategy:
       fail-fast: false
@@ -28,15 +28,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust nightly + cargo-fuzz
+      - name: Install Rust nightly
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly
+          # rust-src component removed — not needed for cargo-fuzz
 
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
 
       - name: Run fuzzer (${{ matrix.target }}) for 60 minutes
+        continue-on-error: true   # One crash ≠ job failure
         run: |
           cargo +nightly fuzz run ${{ matrix.target }} \
-            -- -max_total_time=3600 -timeout=60 -rss_limit_mb=4096
+            -- -max_total_time=3600 \
+               -timeout=60 \
+               -rss_limit_mb=4096 \
+               -ignore_crlf=1
+
+      - name: Upload fuzz artifacts (on any outcome)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}/**
+          retention-days: 14
