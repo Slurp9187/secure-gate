@@ -1,7 +1,8 @@
 // tests/zeroize.rs
 #[cfg(feature = "zeroize")]
 mod tests {
-    use secure_gate::{SecretString, Secure, SecurePassword};
+    use secrecy::SecretString;
+    use secure_gate::{Secure, SecurePassword};
     use std::format;
     use zeroize::{DefaultIsZeroes, Zeroize}; // For format! in redaction test (std for test convenience)
 
