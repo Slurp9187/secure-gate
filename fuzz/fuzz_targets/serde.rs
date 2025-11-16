@@ -16,12 +16,18 @@ fuzz_target!(|data: &[u8]| {
     let config = bincode::config::standard();
     // Bincode deserialization from untrusted data (inner Vec<u8>)
     if let Ok((vec, _)) = bincode::decode_from_slice::<Vec<u8>, _>(data, config) {
+        if vec.len() > MAX_SIZE {
+            return; // Skip oversized decoded data
+        }
         let sec = Secure::new(vec);
         let _ = sec.expose().len();
         drop(sec);
     }
     // Bincode deserialization from untrusted data (inner String for SecurePassword)
     if let Ok((str_inner, _)) = bincode::decode_from_slice::<String, _>(data, config) {
+        if str_inner.len() > MAX_SIZE {
+            return;
+        }
         let pw = SecurePassword::from(str_inner.as_str());
         let _ = pw.expose().expose_secret().len();
         drop(pw);
