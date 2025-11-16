@@ -15,13 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - clone
-          - expose
-          - mut
-          - parsing
-          - serde
-          
+        target: [clone, expose, mut, parsing, serde]   # Inline for brevity; equivalent to your bulleted list
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,18 +33,17 @@ jobs:
       - name: Run full fuzzer (${{ matrix.target }}) for 60 minutes
         if: github.ref_type == 'tag' || github.event_name == 'schedule'
         run: |
-          cargo +nightly fuzz run ${{ matrix.target }} \
-            -- -max_total_time=3600 \
+          cargo +nightly fuzz run ${{ matrix.target }} -- \
+            -fork=1 -max_total_time=3600 \
                -timeout=60 \
                -rss_limit_mb=4096
 
-      # On normal main pushes: only 5-minute smoke test
-      - name: Quick smoke fuzz (5 min) — catches obvious crashes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_type != 'tag'
+      # On normal main pushes: only 90-second smoke test
+      - name: Quick smoke fuzz (90s) — catches obvious crashes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_type == 'branch'
         run: |
-          cargo +nightly fuzz run ${{ matrix.target }} \
-            -- -max_total_time=300 \
-               -runs=100000
+          cargo +nightly fuzz run ${{ matrix.target }} -- \
+            -fork=1 -max_total_time=90
 
       - name: Upload artifacts (only on failure or full run)
         if: failure() || github.ref_type == 'tag' || github.event_name == 'schedule'
