@@ -7,11 +7,11 @@ A zero-overhead, `no_std`-compatible secret wrapper with automatic zeroization.
 `secure-gate` is designed for seamless, safe secret handling with **zero runtime overhead** when features are disabled. Core highlights:
 
 - **Auto-Gating**: Switches between `SecretBox<T>` + zeroization (default `zeroize` feature) and plain `Box<T>` fallback for minimal builds—no code changes required.
-- **No-Std Native**: Full `no_std` + `alloc` support for embedded/embedded systems.
+- **No-Std Native**: Full `no_std` + `alloc` support for embedded systems.
 - **Safe & Ergonomic**: All public API in 100% safe Rust; `secure!` macro for quick construction; aliases like `SecurePassword` (immutable default), `SecurePasswordMut` (mutable opt-in), and `SecureKey32`.
 - **Redacted & Zeroized**: Automatic `Debug` redaction (`"[REDACTED]"`); best-effort zeroization on drop/mutation via `zeroize`.
 - **Serde-Ready**: Opt-in serialization of secrets (explicitly exposes the secret in serialized form, e.g., JSON strings; protect output bytes appropriately).
-- **Fuzz-Hardened**: 6 libFuzzer targets running 360 CPU minutes nightly—zero crashes/leaks after thousands of hours.
+- **Fuzz-Hardened**: 6 libFuzzer targets running 360 CPU minutes nightly—all pass with no crashes/leaks after thousands of hours.
 
 ## Installation
 
@@ -19,7 +19,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-secure-gate = "0.2"
+secure-gate = "0.2.1"
 ```
 
 ## Usage
@@ -70,10 +70,12 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 
 ## Features
 
-| Feature   | Effect                                              |
-|-----------|-----------------------------------------------------|
-| `zeroize` | Enables `SecretBox<T>` + zeroization on drop (default) |
-| `serde`   | Adds `Serialize` / `Deserialize` impls              |
+| Feature       | Effect                                              |
+|---------------|-----------------------------------------------------|
+| `zeroize`     | Enables `SecretBox<T>` + zeroization on drop (default) |
+| `serde`       | Adds `Serialize` / `Deserialize` impls              |
+| `unsafe-wipe` | **Opt-in** fast zeroization for `Secure<String>` (no allocation, preserves len/cap; requires `zeroize`). Disables `#![forbid(unsafe_code)]` for this path—safe usage (only overwrites used buffer with zeros; null bytes valid UTF-8). Use for performance-critical secrets; stick to safe path otherwise. |
+| `full`        | Enables `zeroize` + `serde` + `unsafe-wipe`         |
 
 ## Zeroization Guarantees
 
@@ -84,6 +86,7 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 - **Limitations**: Only affects the wrapped value; doesn't secure against copies, logs, or kernel dumps. For full protection, avoid extraction (`into_inner`) and use scoped `expose_mut()`.
 - **finish_mut**: After mutations, call this to *reduce* excess capacity (for `Vec<u8>`, `String`) via `shrink_to_fit()`. This is best-effort—some allocators may not shrink—and does *not* overwrite freed memory (old secrets may persist until allocator/OS reuse). Zeroization on drop still covers only the used portion (up to `.len()`).
 - **Dynamic Container Caveats**: For growable types like `Vec<u8>` or `String`, safe Rust cannot zero the full historical capacity (e.g., after `truncate` or realloc). Only the current slice up to `.len()` is overwritten on drop. Avoid patterns like filling a large buffer with secrets then truncating to small length—opt for fixed-size where possible or explicitly zero excess via `expose_mut().fill(0)` before shrinking.
+- **Unsafe-Wipe Fast Path**: When enabled, `Secure<String>` uses `unsafe` for zero-allocation wiping (preserves len/cap)—safe for used buffer only. Null bytes are valid UTF-8; no invariants broken. Opt-in for performance (e.g., high-frequency secrets); safe path used otherwise (allocates temp zeros).
 - **Fallback Mode**: Disabled without `zeroize` feature—treat as plain `Box<T>`.
 
 For details, see [zeroize docs](https://docs.rs/zeroize).
