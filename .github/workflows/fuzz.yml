@@ -16,12 +16,12 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - expose
           - clone
-          - serde
-          - parsing
+          - expose
           - mut
-
+          - parsing
+          - serde
+          
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
