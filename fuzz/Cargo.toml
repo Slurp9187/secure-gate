@@ -23,13 +23,6 @@ zeroize = { version = "1.8", default-features = false, features = [
 zeroize = ["secure-gate/zeroize"]
 
 [[bin]]
-name = "expose"
-path = "fuzz_targets/expose.rs"
-test = false
-bench = false
-doc = false
-
-[[bin]]
 name = "clone"
 path = "fuzz_targets/clone.rs"
 test = false
@@ -37,8 +30,15 @@ bench = false
 doc = false
 
 [[bin]]
-name = "serde"
-path = "fuzz_targets/serde.rs"
+name = "expose"
+path = "fuzz_targets/expose.rs"
+test = false
+bench = false
+doc = false
+
+[[bin]]
+name = "mut"
+path = "fuzz_targets/mut.rs"
 test = false
 bench = false
 doc = false
@@ -51,8 +51,8 @@ bench = false
 doc = false
 
 [[bin]]
-name = "mut"
-path = "fuzz_targets/mut.rs"
+name = "serde"
+path = "fuzz_targets/serde.rs"
 test = false
 bench = false
 doc = false
