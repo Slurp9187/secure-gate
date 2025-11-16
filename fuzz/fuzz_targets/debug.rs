@@ -1,3 +1,5 @@
+// fuzz/fuzz_targets/debug.rs — full fixed file (replace the entire contents)
+
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use secure_gate::{Secure, SecurePassword};
