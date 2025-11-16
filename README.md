@@ -19,7 +19,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-secure-gate = "0.2.1"
+secure-gate = "0.2.2"
 ```
 
 ## Usage
