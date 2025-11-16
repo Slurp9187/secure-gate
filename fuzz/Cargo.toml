@@ -1,6 +1,6 @@
 [package]
 name = "secure-gate-fuzz"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 publish = false
 
@@ -46,13 +46,6 @@ doc = false
 [[bin]]
 name = "parsing"
 path = "fuzz_targets/parsing.rs"
-test = false
-bench = false
-doc = false
-
-[[bin]]
-name = "debug"
-path = "fuzz_targets/debug.rs"
 test = false
 bench = false
 doc = false

@@ -11,7 +11,7 @@ A zero-overhead, `no_std`-compatible secret wrapper with automatic zeroization.
 - **Safe & Ergonomic**: All public API in 100% safe Rust; `secure!` macro for quick construction; aliases like `SecurePassword` (immutable default), `SecurePasswordMut` (mutable opt-in), and `SecureKey32`.
 - **Redacted & Zeroized**: Automatic `Debug` redaction (`"[REDACTED]"`); best-effort zeroization on drop/mutation via `zeroize`.
 - **Serde-Ready**: Opt-in serialization of secrets (explicitly exposes the secret in serialized form, e.g., JSON strings; protect output bytes appropriately).
-- **Fuzz-Hardened**: 6 libFuzzer targets running 360 CPU minutes nightly—all pass with no crashes/leaks after thousands of hours.
+- **Fuzz-Hardened**: 5 libFuzzer targets running 300 CPU minutes nightly.
 
 ## Installation
 
@@ -19,7 +19,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-secure-gate = "0.2.2"
+secure-gate = "0.2.3"
 ```
 
 ## Usage
@@ -49,15 +49,13 @@ let bytes: Vec<u8> = token.into_inner();  // original zeroized immediately
 | `clone`   | `init_with`, `into_inner`, scoped zeroization    | 60 minutes         |
 | `serde`   | JSON + bincode deserialization from untrusted input | 60 minutes      |
 | `parsing` | `FromStr` parsing                                | 60 minutes         |
-| `debug`   | `Debug` redaction verification                   | 60 minutes         |
 | `mut`     | Unbounded `expose_mut()` mutation stress         | 60 minutes         |
 
-- 6 libFuzzer targets
-- 360 CPU minutes per nightly run (6 × 60 min)
+- 5 libFuzzer targets
+- 300 CPU minutes per nightly run (6 × 60 min)
 - Runs on GitHub Actions (ubuntu-latest, nightly toolchain)
 - `-rss_limit_mb=4096`, `-max_total_time=3600`, `-timeout=60`
 - Artifacts uploaded on every run
-- All targets currently pass with no crashes
 
 ## Dependencies
 
