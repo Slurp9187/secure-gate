@@ -2,7 +2,7 @@
 // src/lib.rs
 // =================================================================================
 #![no_std]
-#![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "unsafe-wipe"), forbid(unsafe_code))]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 extern crate alloc;

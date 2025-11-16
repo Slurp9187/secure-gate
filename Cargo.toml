@@ -22,4 +22,9 @@ serde_json = "1.0"
 default = ["zeroize"]
 zeroize = ["dep:secrecy", "dep:zeroize"]
 serde = ["dep:serde", "secrecy?/serde"]
-serde-zeroize = ["serde", "zeroize"]
+# Convenience: everything
+full = ["zeroize", "serde", "unsafe-wipe"]
+
+# Opt-in fast, unsafe zeroization for Secure<String>
+# Requires zeroize to be active
+unsafe-wipe = ["zeroize"]

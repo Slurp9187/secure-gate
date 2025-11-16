@@ -16,6 +16,7 @@
 //! - `serde`: Deserialize support; Serialize opt-in via `SerializableSecret`.
 //!
 
+use alloc::string::ToString;
 #[cfg(all(feature = "serde", feature = "zeroize"))]
 use secrecy::SerializableSecret;
 #[cfg(feature = "zeroize")]
@@ -24,12 +25,6 @@ use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 use serde::{de, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
-
-// #[cfg(not(feature = "zeroize"))]
-// use alloc::string::ToString;
-
-// #[cfg(feature = "zeroize")]
-use alloc::string::ToString;
 
 // Helper trait for downcast in finish_mut (under zeroize only)
 #[cfg(feature = "zeroize")]
@@ -178,12 +173,70 @@ impl<T: Default + Sized> Default for Secure<T> {
         Self::new(T::default())
     }
 }
+
+// Specific impl for Secure<Vec<u8>>
 #[cfg(feature = "zeroize")]
-impl<T: Zeroize + ?Sized> Zeroize for Secure<T> {
+impl Zeroize for Secure<Vec<u8>> {
     fn zeroize(&mut self) {
-        self.0.zeroize();
+        self.expose_mut().as_mut_slice().zeroize();
     }
 }
+
+// String safe fallback (zeroize-only, no unsafe-wipe)
+#[cfg(all(feature = "zeroize", not(feature = "unsafe-wipe")))]
+impl Zeroize for Secure<String> {
+    fn zeroize(&mut self) {
+        let len = self.expose().len();
+        let zeros = "\0".repeat(len);
+        self.expose_mut().replace_range(..len, &zeros);
+    }
+}
+
+// String unsafe full-cap (unsafe-wipe feature)
+#[cfg(feature = "unsafe-wipe")]
+impl Zeroize for Secure<String> {
+    fn zeroize(&mut self) {
+        use core::hint::black_box;
+
+        // Pre-fetch for borrow hygiene + timing poison
+        let original_len = self.expose().len();
+        let original_cap = self.expose().capacity();
+
+        black_box((original_len, original_cap));
+
+        let s = self.expose_mut();
+        // Std req: Unsafe call, but Secure pins/guarded
+        let vec = unsafe { s.as_mut_vec() };
+
+        // SAFETY: Own full alloc [0..cap]; bounded writes, no reallocs mid-wipe
+        unsafe {
+            use core::sync;
+
+            let ptr = vec.as_mut_ptr();
+            let len = vec.len();
+            let cap = vec.capacity();
+
+            // Invariant: Cap >= len (Secure's job to uphold)
+            debug_assert!(cap >= len, "Cap < len: Secure invariant broken");
+
+            // Unified full-wipe: Payload + slack in one bounded call
+            // Volatile via ptr API
+            // core::ptr::write_bytes(ptr, 0u8, cap);  // alternate wipe version
+            core::slice::from_raw_parts_mut(ptr, cap).zeroize(); // gold standard
+
+            // Dual defense: Opt-fence + mask
+            sync::atomic::compiler_fence(sync::atomic::Ordering::SeqCst);
+            // Shadow pad for var
+            let _dummy = [0u8; 1024];
+            black_box(&_dummy);
+        }
+
+        // Post-check: Drift detector
+        debug_assert_eq!(s.len(), original_len, "Len drifted");
+        debug_assert_eq!(s.capacity(), original_cap, "Cap drifted");
+    }
+}
+
 #[cfg(feature = "zeroize")]
 impl<T: Zeroize + ?Sized> ZeroizeOnDrop for Secure<T> {}
 #[cfg(feature = "zeroize")]
