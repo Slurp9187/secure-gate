@@ -26,8 +26,8 @@ fuzz_target!(|data: &[u8]| {
         let debug_pw = format!("{:?}", pw);
         assert!(debug_pw.contains("[REDACTED]"));
 
-        // Skip short strings and any substring of "[REDACTED]"
-        if pw_str.len() > 5 && !"[REDACTED]".contains(pw_str) {
+        // Skip if pw_str is a substring of the fixed redacted output
+        if !"Secure<[REDACTED]>".contains(pw_str) {
             assert!(!debug_pw.contains(pw_str));
         }
     }
