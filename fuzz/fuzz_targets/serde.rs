@@ -13,8 +13,8 @@ fuzz_target!(|data: &[u8]| {
         let _ = pw.expose().expose_secret().len();
         drop(pw);
     }
-    let config = bincode::config::standard();
-    // Bincode deserialization from untrusted data (inner Vec<u8>)
+    let config = bincode::config::standard().with_limit(1024 * 1024); // 1 MB max (adjust as needed)
+                                                                      // Bincode deserialization from untrusted data (inner Vec<u8>)
     if let Ok((vec, _)) = bincode::decode_from_slice::<Vec<u8>, _>(data, config) {
         if vec.len() > MAX_SIZE {
             return; // Skip oversized decoded data
