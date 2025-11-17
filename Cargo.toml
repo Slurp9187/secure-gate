@@ -1,6 +1,6 @@
 [package]
 name = "secure-gate"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 description = "Zero-overhead, feature-gated secure wrappers for secrets"
 repository = "https://github.com/Slurp9187/secure-gate"
