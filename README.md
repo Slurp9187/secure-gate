@@ -8,11 +8,11 @@ A zero-overhead, `no_std`-compatible secret wrapper with automatic zeroization.
 
 - **Auto-Gating**: Switches between `SecretBox<T>` + zeroization (default `zeroize` feature) and plain `Box<T>` fallback for minimal builds—no code changes required.
 - **No-Std Native**: Full `no_std` + `alloc` support for embedded systems.
-- **Safe & Ergonomic**: All public API in 100% safe Rust; `secure!` macro for quick construction; aliases like `SecurePassword` (immutable default), `SecurePasswordMut` (mutable opt-in), and `SecureKey32`.
+- **Safe & Ergonomic**: All public API in 100% safe Rust; `secure!` macro for quick construction; aliases like `SecurePassword` (immutable default), `SecurePasswordBuilder` (mutable opt-in), and `SecureKey32`.
 - **Redacted & Zeroized**: Automatic `Debug` redaction (`"[REDACTED]"`); best-effort zeroization on drop/mutation via `zeroize`.
 - **Serde-Ready**: Opt-in serialization of secrets (explicitly exposes the secret in serialized form, e.g., JSON strings; protect output bytes appropriately).
 - **Fuzz-Hardened**: 5 libFuzzer targets running 300 CPU minutes nightly.
-** - **Zero-Alloc Fixed Secrets**: Stack-only types for keys/nonces (default via `stack` feature) — no heap, cache-local, `#![no_global_oom]` friendly.**
+- **Zero-Alloc Fixed Secrets**: Stack-only types for keys/nonces (default via `stack` feature) — no heap, cache-local, `#![no_global_oom]` friendly.
 
 ## Installation
 
@@ -26,7 +26,7 @@ secure-gate = "0.3.1"
 ## Usage
 
 ```rust
-use secure_gate::{SecurePassword, SecurePasswordMut, Secure};
+use secure_gate::{SecurePassword, SecurePasswordBuilder, Secure};
 
 let password: SecurePassword = "hunter2".into();  // Immutable default, zeroized on drop
 
@@ -34,13 +34,18 @@ let key = Secure::<[u8; 32]>::new(rand::random());  // generic fixed-size (heap 
 let token = Secure::<Vec<u8>>::new(vec![...]);  // dynamic buffer
 
 // Scoped mutation (preferred for mutable cases)
-let mut pw_mut: SecurePasswordMut = SecurePasswordMut::new("base".to_string());
+let mut pw_mut: SecurePasswordBuilder = SecurePasswordBuilder::new("base".to_string());
 pw_mut.expose_mut().expose_secret_mut().push_str("!!!");
 pw_mut.finish_mut();  // reduce excess capacity via shrink_to_fit (best-effort; no scrub of freed memory)
+
+// Convert to immutable form (zeroizes the builder)
+let pw: SecurePassword = pw_mut.into_password();  // or .build()
 
 // Extraction (use sparingly)
 let bytes: Vec<u8> = token.into_inner();  // original zeroized immediately
 ```
+
+**Note:** `SecurePasswordMut` is deprecated in v0.3.1 — use `SecurePasswordBuilder` instead.
 
 ### Zero-Allocation Fixed-Size Secrets (Default)
 
@@ -70,18 +75,18 @@ Falls back to `Secure<[u8; N]>` if `stack` disabled. Ideal for crypto hot paths 
 | `parsing` | `FromStr` parsing                                | 60 minutes         |
 | `mut`     | Unbounded `expose_mut()` mutation stress         | 60 minutes         |
 
-- 5 libFuzzer targets
-- 300 CPU minutes per nightly run (6 × 60 min)
-- Runs on GitHub Actions (ubuntu-latest, nightly toolchain)
-- `-rss_limit_mb=4096`, `-max_total_time=3600`, `-timeout=60`
-- Artifacts uploaded on every run
+- 5 libFuzzer targets running nightly
+- 300 CPU minutes of continuous fuzzing on GitHub Actions
 
 ## Dependencies
 
 ```toml
 [dependencies]
 secrecy = { version = "0.10.3", optional = true, default-features = false }
-zeroize = { version = "1.8", optional = true, default-features = false, features = ["alloc", "zeroize_derive"] }
+zeroize = { version = "1.8", optional = true, default-features = false, features = [
+  "alloc",
+  "zeroize_derive",
+] }
 serde = { version = "1.0", features = ["derive"], optional = true }
 ```
 
@@ -93,7 +98,7 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 | **`stack`**   | **Zero-alloc fixed-size types** (`Zeroizing<[u8; N]>` for `SecureKey32` etc.; default) |
 | `serde`       | Adds `Serialize` / `Deserialize` impls              |
 | `unsafe-wipe` | **Opt-in** fast zeroization for `Secure<String>` (no allocation, preserves len/cap; requires `zeroize`). Disables `#![forbid(unsafe_code)]` for this path—safe usage (only overwrites used buffer with zeros; null bytes valid UTF-8). Use for performance-critical secrets; stick to safe path otherwise. |
-| `full`        | Enables `zeroize` + **`stack`** + `serde` + `unsafe-wipe`         |
+| `full`        | Enables `zeroize` + `serde` + `unsafe-wipe`         |
 
 ## Zeroization Guarantees
 
@@ -106,13 +111,17 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 - **Dynamic Container Caveats**: For growable types like `Vec<u8>` or `String`, safe Rust cannot zero the full historical capacity (e.g., after `truncate` or realloc). Only the current slice up to `.len()` is overwritten on drop. Avoid patterns like filling a large buffer with secrets then truncating to small length—opt for fixed-size where possible or explicitly zero excess via `expose_mut().fill(0)` before shrinking.
 - **Unsafe-Wipe Fast Path**: When enabled, `Secure<String>` uses `unsafe` for zero-allocation wiping (preserves len/cap)—safe for used buffer only. Null bytes are valid UTF-8; no invariants broken. Opt-in for performance (e.g., high-frequency secrets); safe path used otherwise (allocates temp zeros).
 - **Fallback Mode**: Disabled without `zeroize` feature—treat as plain `Box<T>`.
-** - **Stack Aliases Note**: Fixed-size types like `SecureKey32` use `Zeroizing<[u8; N]>` by default (via `stack` feature) for zero-overhead zeroization — same guarantees, no heap.**
+- **Stack Aliases Note**: Fixed-size types like `SecureKey32` use `Zeroizing<[u8; N]>` by default (via `stack` feature) for zero-overhead zeroization — same guarantees, no heap.
 
 For details, see [zeroize docs](https://docs.rs/zeroize).
 
 ## Contribution
 
 Contributions welcome! Please submit PRs with tests/fuzz targets.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
 
 ## License
 
