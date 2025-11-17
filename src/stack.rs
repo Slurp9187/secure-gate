@@ -42,7 +42,7 @@ impl<T: Zeroize + Sized> StackSecure<T> {
 #[cfg(feature = "zeroize")]
 impl<T: Zeroize + Sized> Debug for StackSecure<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "StackSecure<[REDACTED]>")
+        write!(f, "Secure<[REDACTED]>")
     }
 }
 
