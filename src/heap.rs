@@ -125,8 +125,15 @@ impl<T: Clone + Zeroize + Sized> Clone for HeapSecure<T> {
         Self::init_with(|| self.expose().clone())
     }
 }
+// #[cfg(not(feature = "zeroize"))]
+// impl<T: Clone + ?Sized> Clone for HeapSecure<T> {
+//     fn clone(&self) -> Self {
+//         Self(self.0.clone())
+//     }
+// }
+
 #[cfg(not(feature = "zeroize"))]
-impl<T: Clone + ?Sized> Clone for HeapSecure<T> {
+impl<T: Clone> Clone for HeapSecure<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
