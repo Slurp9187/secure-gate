@@ -5,7 +5,7 @@ on:
     branches: [ main ]
     tags: [ 'v*.*.*' ]        # Run full fuzz on every release tag
   schedule:
-    - cron: '0 3 * * *'       # Daily at 03:00 UTC (your original nightly)
+    - cron: '0 10 * * *'      # 3:00 AM MST (Arizona Time) = 10:00 UTC
 
 jobs:
   fuzz:
@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [clone, expose, mut, parsing, serde]   # Inline for brevity; equivalent to your bulleted list
+        target: [clone, expose, mut, parsing, serde]   # Inline for brevity
 
     steps:
       - name: Checkout repository
@@ -26,6 +26,9 @@ jobs:
         with:
           toolchain: nightly
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
 
@@ -33,6 +36,7 @@ jobs:
       - name: Run full fuzzer (${{ matrix.target }}) for 60 minutes
         if: github.ref_type == 'tag' || github.event_name == 'schedule'
         run: |
+          cargo +nightly fuzz cmin ${{ matrix.target }}  # Prune stale corpus (optional, <10s)
           cargo +nightly fuzz run ${{ matrix.target }} -- \
             -fork=1 -max_total_time=3600 \
                -timeout=60 \

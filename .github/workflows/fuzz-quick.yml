@@ -1,0 +1,46 @@
+name: Fuzz (quick smoke)
+
+on:
+  push:
+    branches: [ main ]
+    paths: ['fuzz/**', 'src/**', 'Cargo.toml']
+  pull_request:
+    paths: ['fuzz/**', 'src/**', 'Cargo.toml']
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10  # Quick runs finish fast
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [clone, expose, mut, parsing, serde]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+
+      - name: Quick smoke fuzz (90s) — catches obvious crashes
+        run: |
+          cargo +nightly fuzz run ${{ matrix.target }} -- \
+            -fork=1 -max_total_time=90
+
+      - name: Upload artifacts (only on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}/**
+          retention-days: 7  # Shorter for quick runs
