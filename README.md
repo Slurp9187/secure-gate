@@ -12,6 +12,7 @@ A zero-overhead, `no_std`-compatible secret wrapper with automatic zeroization.
 - **Redacted & Zeroized**: Automatic `Debug` redaction (`"[REDACTED]"`); best-effort zeroization on drop/mutation via `zeroize`.
 - **Serde-Ready**: Opt-in serialization of secrets (explicitly exposes the secret in serialized form, e.g., JSON strings; protect output bytes appropriately).
 - **Fuzz-Hardened**: 5 libFuzzer targets running 300 CPU minutes nightly.
+** - **Zero-Alloc Fixed Secrets**: Stack-only types for keys/nonces (default via `stack` feature) — no heap, cache-local, `#![no_global_oom]` friendly.**
 
 ## Installation
 
@@ -19,7 +20,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-secure-gate = "0.2.3"
+secure-gate = "**0.3.0**"
 ```
 
 ## Usage
@@ -29,7 +30,7 @@ use secure_gate::{SecurePassword, SecurePasswordMut, Secure};
 
 let password: SecurePassword = "hunter2".into();  // Immutable default, zeroized on drop
 
-let key = Secure::<[u8; 32]>::new(rand::random());  // fixed-size key
+let key = Secure::<[u8; 32]>::new(rand::random());  // generic fixed-size (heap for dynamic fallbacks)
 let token = Secure::<Vec<u8>>::new(vec![...]);  // dynamic buffer
 
 // Scoped mutation (preferred for mutable cases)
@@ -41,20 +42,25 @@ pw_mut.finish_mut();  // reduce excess capacity via shrink_to_fit (best-effort; 
 let bytes: Vec<u8> = token.into_inner();  // original zeroized immediately
 ```
 
-### Zero-allocation fixed-size secrets (`feature = "stack"`, enabled by default)
+### Zero-Allocation Fixed-Size Secrets (Default)
 
-For keys, nonces, IVs — use the new stack-only types:
+For keys/nonces/IVs, aliases like `SecureKey32` default to stack-only `Zeroizing<[u8; N]>` — no heap, deterministic, side-channel minimal:
 
 ```rust
-use secure_gate::stack::{Key32, key32, Nonce12};
+use secure_gate::{SecureKey32, SecureNonce12};
+use secure_gate::stack::{key32, nonce12};
 
-static AES256_KEY: Key32 = key32([0x42; 32]);           // const-friendly!
-let key: Key32 = Key32::new(rand::random());           // or from thread_rng
-let nonce: Nonce12 = Nonce12::new([0u8; 12]);
+static AES_KEY: SecureKey32 = key32([0x42; 32]);  // const-eligible!
+let key: SecureKey32 = SecureKey32::new(rand::random::<[u8; 32]>());  // from RNG
+let nonce: SecureNonce12 = nonce12([0u8; 12]);
 
-// No heap allocation, no side-channels, works with #![no_global_oom]
+// Access: deref to inner slice/array
+assert_eq!(&*key, &[0x42; 32]);
+```
 
-## Fuzzing Configuration
+Falls back to `Secure<[u8; N]>` if `stack` disabled. Ideal for crypto hot paths (rustls/ring-style).
+
+### Fuzzing Configuration
 
 | Target    | Description                                      | Runtime per CI run |
 |-----------|--------------------------------------------------|--------------------|
@@ -84,9 +90,10 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 | Feature       | Effect                                              |
 |---------------|-----------------------------------------------------|
 | `zeroize`     | Enables `SecretBox<T>` + zeroization on drop (default) |
+| **`stack`**   | **Zero-alloc fixed-size types** (`Zeroizing<[u8; N]>` for `SecureKey32` etc.; default) |
 | `serde`       | Adds `Serialize` / `Deserialize` impls              |
 | `unsafe-wipe` | **Opt-in** fast zeroization for `Secure<String>` (no allocation, preserves len/cap; requires `zeroize`). Disables `#![forbid(unsafe_code)]` for this path—safe usage (only overwrites used buffer with zeros; null bytes valid UTF-8). Use for performance-critical secrets; stick to safe path otherwise. |
-| `full`        | Enables `zeroize` + `serde` + `unsafe-wipe`         |
+| `full`        | Enables `zeroize` + **`stack`** + `serde` + `unsafe-wipe`         |
 
 ## Zeroization Guarantees
 
@@ -99,6 +106,7 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 - **Dynamic Container Caveats**: For growable types like `Vec<u8>` or `String`, safe Rust cannot zero the full historical capacity (e.g., after `truncate` or realloc). Only the current slice up to `.len()` is overwritten on drop. Avoid patterns like filling a large buffer with secrets then truncating to small length—opt for fixed-size where possible or explicitly zero excess via `expose_mut().fill(0)` before shrinking.
 - **Unsafe-Wipe Fast Path**: When enabled, `Secure<String>` uses `unsafe` for zero-allocation wiping (preserves len/cap)—safe for used buffer only. Null bytes are valid UTF-8; no invariants broken. Opt-in for performance (e.g., high-frequency secrets); safe path used otherwise (allocates temp zeros).
 - **Fallback Mode**: Disabled without `zeroize` feature—treat as plain `Box<T>`.
+** - **Stack Aliases Note**: Fixed-size types like `SecureKey32` use `Zeroizing<[u8; N]>` by default (via `stack` feature) for zero-overhead zeroization — same guarantees, no heap.**
 
 For details, see [zeroize docs](https://docs.rs/zeroize).
 
