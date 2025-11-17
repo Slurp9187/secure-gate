@@ -21,14 +21,14 @@ OUTPUT_TIMESTAMP_FORMAT = "%Y%m%d_%H%M%S"
 # Scan these base directories RECURSIVELY for *.rs
 # Each base is scanned fully — no overlapping subpaths
 RECURSIVE_BASES = [
-    "src",
-    "tests",
-    # "fuzz/fuzz_targets"
+    # "src",
+    # "tests",
+    "fuzz/fuzz_targets"
 ]
 
 ROOT_FILES = [
-    "Cargo.toml",
-    # "fuzz/Cargo.toml"
+    # "Cargo.toml",
+    "fuzz/Cargo.toml"
 ]
 
 # ===================================================================
