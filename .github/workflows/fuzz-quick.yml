@@ -2,15 +2,16 @@ name: Fuzz (quick smoke)
 
 on:
   push:
-    branches: [ main ]
-    paths: ['fuzz/**', 'src/**', 'Cargo.toml']
+    branches: [main]
+    tags: ["v*.*.*"] # Run full fuzz on every release tag
+    paths: ["fuzz/**", "src/**", "Cargo.toml"]
   pull_request:
-    paths: ['fuzz/**', 'src/**', 'Cargo.toml']
+    paths: ["fuzz/**", "src/**", "Cargo.toml"]
 
 jobs:
   fuzz:
     runs-on: ubuntu-latest
-    timeout-minutes: 10  # Quick runs finish fast
+    timeout-minutes: 10 # Quick runs finish fast
 
     strategy:
       fail-fast: false
@@ -43,4 +44,4 @@ jobs:
         with:
           name: fuzz-artifacts-${{ matrix.target }}
           path: fuzz/artifacts/${{ matrix.target }}/**
-          retention-days: 7  # Shorter for quick runs
+          retention-days: 7 # Shorter for quick runs

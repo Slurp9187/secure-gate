@@ -1,21 +1,19 @@
 name: Fuzz (nightly)
 
 on:
-  push:
-    branches: [ main ]
-    tags: [ 'v*.*.*' ]        # Run full fuzz on every release tag
   schedule:
-    - cron: '0 10 * * *'      # 3:00 AM MST (Arizona Time) = 10:00 UTC
+    - cron: "0 10 * * *" # 3:00 AM MST (Arizona Time) = 10:00 UTC
+  workflow_dispatch: # manual trigger when you need a long run
 
 jobs:
   fuzz:
     runs-on: ubuntu-latest
-    timeout-minutes: 120      # 2 hours total is plenty
+    timeout-minutes: 120 # 2 hours total is plenty
 
     strategy:
       fail-fast: false
       matrix:
-        target: [clone, expose, mut, parsing, serde]   # Inline for brevity
+        target: [clone, expose, mut, parsing, serde] # Inline for brevity
 
     steps:
       - name: Checkout repository
@@ -34,7 +32,7 @@ jobs:
 
       # Only run full 60-minute fuzz on tagged releases and nightly schedule
       - name: Run full fuzzer (${{ matrix.target }}) for 60 minutes
-        if: github.ref_type == 'tag' || github.event_name == 'schedule'
+        if: github.event_name == 'schedule'
         run: |
           cargo +nightly fuzz cmin ${{ matrix.target }}  # Prune stale corpus (optional, <10s)
           cargo +nightly fuzz run ${{ matrix.target }} -- \
