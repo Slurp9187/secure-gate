@@ -1,6 +1,6 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use secure_gate::{ExposeSecretMut, Secure, SecurePasswordMut};
+use secure_gate::{ExposeSecretMut, Secure, SecurePasswordBuilder}; // ← changed
 use zeroize::Zeroize;
 
 fuzz_target!(|data: &[u8]| {
@@ -9,9 +9,9 @@ fuzz_target!(|data: &[u8]| {
     }
 
     // ------------------------------------------------------------------
-    // 1. SecurePasswordMut — full String abuse + explicit zeroization
+    // 1. SecurePasswordBuilder — full String abuse + explicit zeroization
     // ------------------------------------------------------------------
-    let mut pw = SecurePasswordMut::from("hunter2");
+    let mut pw = SecurePasswordBuilder::from("hunter2"); // ← changed
     {
         let s = pw.expose_mut().expose_secret_mut();
 
