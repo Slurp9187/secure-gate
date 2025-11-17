@@ -14,9 +14,11 @@ use alloc::boxed::Box;
 use core::{convert::Infallible, str::FromStr};
 
 #[cfg(feature = "zeroize")]
-use crate::ExposeSecret;
+use crate::{ExposeSecret, ExposeSecretMut};
 #[cfg(feature = "zeroize")]
 use secrecy::SecretBox;
+#[cfg(feature = "zeroize")]
+use zeroize::Zeroize;
 
 /// Secure byte slice: `HeapSecure<[u8]>` (From<Vec<u8>>).
 pub type SecureBytes = HeapSecure<[u8]>;
@@ -81,6 +83,9 @@ impl Clone for SecureStr {
 #[cfg(feature = "zeroize")]
 pub type SecurePassword = HeapSecure<SecretBox<str>>;
 
+#[cfg(not(feature = "zeroize"))]
+pub type SecurePassword = HeapSecure<String>;
+
 #[cfg(feature = "zeroize")]
 impl From<&str> for SecurePassword {
     fn from(s: &str) -> Self {
@@ -95,28 +100,6 @@ impl From<String> for SecurePassword {
     }
 }
 
-/// Explicitly mutable password — only when you need to grow/append at runtime
-#[cfg(feature = "zeroize")]
-pub type SecurePasswordMut = HeapSecure<SecretBox<String>>;
-
-#[cfg(feature = "zeroize")]
-impl From<&str> for SecurePasswordMut {
-    fn from(s: &str) -> Self {
-        HeapSecure::new(SecretBox::new(Box::new(s.to_string())))
-    }
-}
-
-#[cfg(feature = "zeroize")]
-impl From<String> for SecurePasswordMut {
-    fn from(s: String) -> Self {
-        HeapSecure::new(SecretBox::new(Box::new(s)))
-    }
-}
-
-/// Fallback aliases when zeroize disabled
-#[cfg(not(feature = "zeroize"))]
-pub type SecurePassword = HeapSecure<String>;
-
 #[cfg(not(feature = "zeroize"))]
 impl From<&str> for SecurePassword {
     fn from(s: &str) -> Self {
@@ -128,6 +111,50 @@ impl From<&str> for SecurePassword {
 impl From<String> for SecurePassword {
     fn from(s: String) -> Self {
         HeapSecure::new(s)
+    }
+}
+
+/// Only when you need to build/append/pepper at runtime — preferred name
+#[cfg(feature = "zeroize")]
+pub type SecurePasswordBuilder = HeapSecure<SecretBox<String>>;
+
+#[cfg(not(feature = "zeroize"))]
+pub type SecurePasswordBuilder = HeapSecure<String>;
+
+#[cfg(feature = "zeroize")]
+impl From<&str> for SecurePasswordBuilder {
+    fn from(s: &str) -> Self {
+        HeapSecure::new(SecretBox::new(Box::new(s.to_string())))
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl From<String> for SecurePasswordBuilder {
+    fn from(s: String) -> Self {
+        HeapSecure::new(SecretBox::new(Box::new(s)))
+    }
+}
+
+/// Legacy alias — will be removed in 1.0.0
+#[deprecated(
+    since = "0.3.1",
+    note = "use SecurePasswordBuilder instead — clearer intent and matches the builder pattern"
+)]
+pub type SecurePasswordMut = SecurePasswordBuilder;
+
+#[cfg(feature = "zeroize")]
+impl SecurePasswordBuilder {
+    /// Convert into the immutable, zero-realloc form.
+    /// This is the moral equivalent of "freezing" the builder.
+    pub fn into_password(&mut self) -> SecurePassword {
+        let s: String = self.expose_secret().expose_secret().clone();
+        self.expose_mut().expose_secret_mut().zeroize();
+        SecurePassword::from(s)
+    }
+
+    /// Same as `into_password`, but named like the classic builder pattern.
+    pub fn build(&mut self) -> SecurePassword {
+        self.into_password()
     }
 }
 

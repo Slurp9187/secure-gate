@@ -1,12 +1,16 @@
-// =================================================================================
 // tests/types_tests.rs
-// =================================================================================
+//
+// Test type aliases and From impls for secure wrappers
+
+// Always-available aliases
+use secure_gate::{SecureBytes, SecureKey32, SecurePassword, SecureStr};
+
+// Feature-gated aliases (only imported when the feature is active)
+#[cfg(feature = "zeroize")]
+use secure_gate::SecurePasswordBuilder;
 
 #[cfg(feature = "zeroize")]
 use secrecy::{ExposeSecret, ExposeSecretMut};
-#[cfg(feature = "zeroize")]
-use secure_gate::SecurePasswordMut;
-use secure_gate::{SecureBytes, SecureKey32, SecurePassword, SecureStr};
 
 #[test]
 fn test_secure_bytes() {
@@ -30,45 +34,37 @@ fn test_secure_key() {
     #[cfg(feature = "stack")]
     assert_eq!(&*key, &[0u8; 32]); // Deref to inner for stack path
     #[cfg(not(feature = "stack"))]
-    assert_eq!(key.expose(), &[0u8; 32]); // Old Secure path
+    assert_eq!(key.expose(), &[0u8; 32]); // Heap fallback path
 }
 
-// #[test]
-// fn test_secure_password_creation() {
-//     let pw1: SecurePassword = "test".into();
-//     assert_eq!(pw1.expose().expose_secret(), "test");
-//     let pw2: SecurePassword = "another".to_string().into();
-//     assert_eq!(pw2.expose().expose_secret(), "another");
-// }
-
-// Updated test_secure_password_creation (gate assert for fallback)
 #[test]
 fn test_secure_password_creation() {
     let pw1: SecurePassword = "test".into();
     #[cfg(feature = "zeroize")]
     assert_eq!(pw1.expose().expose_secret(), "test");
     #[cfg(not(feature = "zeroize"))]
-    assert_eq!(pw1.expose().as_str(), "test");
+    assert_eq!(pw1.expose(), "test");
+
     let pw2: SecurePassword = "another".to_string().into();
     #[cfg(feature = "zeroize")]
     assert_eq!(pw2.expose().expose_secret(), "another");
     #[cfg(not(feature = "zeroize"))]
-    assert_eq!(pw2.expose().as_str(), "another");
+    assert_eq!(pw2.expose(), "another");
 }
 
 #[test]
 #[cfg(feature = "zeroize")]
-fn test_secure_password_mut_creation() {
-    let pw: SecurePasswordMut = "test".into();
+fn test_secure_password_builder_creation() {
+    let pw: SecurePasswordBuilder = "test".into();
     assert_eq!(pw.expose().expose_secret(), "test");
-    let pw2: SecurePasswordMut = "another".to_string().into();
+    let pw2: SecurePasswordBuilder = "another".to_string().into();
     assert_eq!(pw2.expose().expose_secret(), "another");
 }
 
 #[test]
 #[cfg(feature = "zeroize")]
-fn test_secure_password_mut_expose_and_mutate() {
-    let mut pw: SecurePasswordMut = "secret".into();
+fn test_secure_password_builder_expose_and_mutate() {
+    let mut pw: SecurePasswordBuilder = "secret".into();
     assert_eq!(pw.expose().expose_secret(), "secret");
     pw.expose_mut().expose_secret_mut().push_str("changed");
     assert_eq!(pw.expose().expose_secret(), "secretchanged");
@@ -96,4 +92,50 @@ fn test_secure_password_debug_redacted() {
     let pw: SecurePassword = "hunter2".into();
     let debug = format!("{pw:?}");
     assert!(debug.contains("[REDACTED]"), "Debug must redact: {debug}");
+}
+
+#[test]
+#[cfg(feature = "zeroize")]
+fn test_secure_password_builder_into_password() {
+    let mut builder: SecurePasswordBuilder = "base".into();
+    builder
+        .expose_mut()
+        .expose_secret_mut()
+        .push_str("appended");
+    let pw: SecurePassword = builder.into_password();
+    assert_eq!(pw.expose().expose_secret(), "baseappended");
+}
+
+#[test]
+#[cfg(feature = "zeroize")]
+fn test_secure_password_builder_build() {
+    let mut builder: SecurePasswordBuilder = "start".into();
+    builder.expose_mut().expose_secret_mut().push_str("end");
+    let pw: SecurePassword = builder.build();
+    assert_eq!(pw.expose().expose_secret(), "startend");
+}
+
+#[test]
+#[cfg(feature = "zeroize")]
+fn test_secure_password_builder_zeroize_after_into() {
+    let mut builder: SecurePasswordBuilder = "sensitive".into();
+
+    // Capture raw pointer to the underlying allocation before conversion
+    let ptr = builder.expose().expose_secret().as_ptr();
+    let len = builder.expose().expose_secret().len();
+
+    // Convert — this must zeroize the builder’s memory
+    let pw: SecurePassword = builder.into_password();
+
+    assert_eq!(pw.expose().expose_secret(), "sensitive");
+
+    // SAFETY: The allocation is still alive (owned by the dropped builder) and we only read.
+    // This is a white-box test acceptable for security-sensitive crates.
+    unsafe {
+        let slice = core::slice::from_raw_parts(ptr, len);
+        assert!(
+            slice.iter().all(|&b| b == 0),
+            "builder memory not zeroized after into_password"
+        );
+    }
 }
