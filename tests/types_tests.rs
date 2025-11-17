@@ -27,7 +27,10 @@ fn test_secure_str() {
 #[test]
 fn test_secure_key() {
     let key: SecureKey32 = [0u8; 32].into();
-    assert_eq!(key.expose(), &[0u8; 32]);
+    #[cfg(feature = "stack")]
+    assert_eq!(&*key, &[0u8; 32]); // Deref to inner for stack path
+    #[cfg(not(feature = "stack"))]
+    assert_eq!(key.expose(), &[0u8; 32]); // Old Secure path
 }
 
 // #[test]

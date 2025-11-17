@@ -488,17 +488,34 @@ impl From<String> for SecurePasswordMut {
     }
 }
 
+// =====================================================================
+// Fixed-size secret aliases — stack-only by default when feature = "stack"
+// =====================================================================
+
+#[cfg(feature = "stack")]
+pub use crate::stack::{
+    Iv as SecureIv, Key32 as SecureKey32, Key64 as SecureKey64, Nonce12 as SecureNonce12,
+    Nonce16 as SecureNonce16, Nonce24 as SecureNonce24, Salt as SecureSalt,
+};
+
+#[cfg(not(feature = "stack"))]
 /// Secure 32-byte key (e.g., for AES-256).
 pub type SecureKey32 = Secure<[u8; 32]>;
+#[cfg(not(feature = "stack"))]
 /// Secure 64-byte key (e.g., for longer hashes).
 pub type SecureKey64 = Secure<[u8; 64]>;
+#[cfg(not(feature = "stack"))]
 /// Secure IV (16 bytes, e.g., for AES-GCM).
 pub type SecureIv = Secure<[u8; 16]>;
+#[cfg(not(feature = "stack"))]
 /// Secure salt (16 bytes).
 pub type SecureSalt = Secure<[u8; 16]>;
+#[cfg(not(feature = "stack"))]
 /// Secure 12-byte nonce (e.g., for ChaCha20-Poly1305).
 pub type SecureNonce12 = Secure<[u8; 12]>;
+#[cfg(not(feature = "stack"))]
 /// Secure 16-byte nonce (e.g., for AES-GCM).
 pub type SecureNonce16 = Secure<[u8; 16]>;
+#[cfg(not(feature = "stack"))]
 /// Secure 24-byte nonce.
 pub type SecureNonce24 = Secure<[u8; 24]>;
