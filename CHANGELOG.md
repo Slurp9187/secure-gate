@@ -23,3 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release
 - Zero-overhead secure wrappers with optional `zeroize` and `stack` features
 - `Secure<T>`, `SecureBytes`, `SecureStr`, fixed-size key types, and password aliases
+
+## [0.3.2] - 2025-11-17
+### Changed
+- Moved `SecurePasswordMut` to `src/deprecated.rs` with proper module hygiene
+- Fixed `mut` fuzz target to use `SecurePasswordBuilder` (eliminates deprecation warnings in CI)
+- Minor documentation spelling fix (`deprecated` not `depreciated`)

@@ -9,6 +9,7 @@
 extern crate alloc;
 
 pub mod aliases;
+pub mod deprecated;
 pub mod heap;
 pub mod macros;
 pub mod stack;
