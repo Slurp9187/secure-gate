@@ -41,6 +41,19 @@ pw_mut.finish_mut();  // reduce excess capacity via shrink_to_fit (best-effort; 
 let bytes: Vec<u8> = token.into_inner();  // original zeroized immediately
 ```
 
+### Zero-allocation fixed-size secrets (`feature = "stack"`, enabled by default)
+
+For keys, nonces, IVs — use the new stack-only types:
+
+```rust
+use secure_gate::stack::{Key32, key32, Nonce12};
+
+static AES256_KEY: Key32 = key32([0x42; 32]);           // const-friendly!
+let key: Key32 = Key32::new(rand::random());           // or from thread_rng
+let nonce: Nonce12 = Nonce12::new([0u8; 12]);
+
+// No heap allocation, no side-channels, works with #![no_global_oom]
+
 ## Fuzzing Configuration
 
 | Target    | Description                                      | Runtime per CI run |

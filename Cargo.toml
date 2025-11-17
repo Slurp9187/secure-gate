@@ -22,8 +22,9 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = "1.0"
 
 [features]
-default = ["zeroize"]
+default = ["zeroize", "stack"]
 zeroize = ["dep:secrecy", "dep:zeroize"]
+stack = ["zeroize"]
 serde = ["dep:serde", "secrecy?/serde"]
 # Convenience: everything
 full = ["zeroize", "serde", "unsafe-wipe"]

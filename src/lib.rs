@@ -9,6 +9,10 @@ extern crate alloc;
 
 pub mod macros;
 pub mod secure_types;
+
+#[cfg(feature = "stack")]
+pub mod stack;
+
 pub use secure_types::*;
 
 // Re-export secrecy traits when zeroize is enabled
