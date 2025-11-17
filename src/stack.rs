@@ -2,6 +2,7 @@
 //
 // Zero-allocation, stack-only secret types
 
+#[cfg(feature = "zeroize")]
 use core::fmt::{self, Debug};
 
 #[cfg(feature = "zeroize")]
