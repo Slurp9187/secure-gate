@@ -1,10 +1,14 @@
 // src/heap.rs
 //
-// Define heap-backed secure wrapper with feature-gated zeroization
+// Heap-allocated secure wrapper with feature-gated zeroization
 
 #![cfg_attr(not(feature = "unsafe-wipe"), forbid(unsafe_code))]
 
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::boxed::Box;
+
+#[cfg(feature = "zeroize")]
+use alloc::{string::String, vec::Vec};
+
 use core::fmt::{self, Debug};
 
 #[cfg(all(feature = "serde", feature = "zeroize"))]
@@ -18,6 +22,9 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[cfg(feature = "zeroize")]
 use core::any::Any;
+
+#[cfg(not(feature = "zeroize"))]
+use crate::{ExposeSecret, ExposeSecretMut};
 
 #[cfg(feature = "zeroize")]
 pub(crate) trait AsAnyMut {
@@ -77,13 +84,13 @@ impl<T: ?Sized> HeapSecure<T> {
 #[cfg(feature = "zeroize")]
 impl<T: Zeroize + ?Sized> Debug for HeapSecure<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "HeapSecure<[REDACTED]>")
+        write!(f, "Secure<[REDACTED]>")
     }
 }
 #[cfg(not(feature = "zeroize"))]
 impl<T: ?Sized> Debug for HeapSecure<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "HeapSecure<[REDACTED]>")
+        write!(f, "Secure<[REDACTED]>")
     }
 }
 
@@ -285,5 +292,18 @@ impl<T: Zeroize + Sized + 'static> HeapSecure<T> {
             s.shrink_to_fit();
         }
         self.expose_mut()
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl<T: Zeroize + ?Sized> HeapSecure<T> {
+    pub fn new_unsized(boxed: Box<T>) -> Self {
+        Self(SecretBox::new(boxed))
+    }
+}
+#[cfg(not(feature = "zeroize"))]
+impl<T: ?Sized> HeapSecure<T> {
+    pub fn new_unsized(boxed: Box<T>) -> Self {
+        Self(boxed)
     }
 }
