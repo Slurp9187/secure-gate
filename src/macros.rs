@@ -1,3 +1,7 @@
+// src/macros.rs
+//
+// Ergonomic constructor macro + From impls
+
 use crate::Secure;
 
 /// Ergonomic constructor macro.
