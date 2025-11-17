@@ -1,6 +1,6 @@
 # Secure-Gate — Comprehensive Usage Reference
 
-**Version**: 0.2.3 · `no_std` + `alloc` · Zero-overhead fallbacks
+**Version**: 0.3.0 · `no_std` + `alloc` · Zero-overhead fallbacks
 
 ## Crate Features
 
