@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""
+package_it.py
+Creates three independent code packages:
+  • secure_gate_src_package   → Cargo.toml + src/** + tests/**
+  • secure_gate_tests_package → only tests/**
+  • secure_gate_fuzz_package  → only fuzz/**
+"""
+
+from datetime import datetime
+from pathlib import Path
+import sys
+
+# ========================== CONFIGURATION ==========================
+PROJECT_TITLE = "secure_gate"
+OUTPUT_DIR = "code_packages"
+ENCODING = "utf-8"
+TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
+OUTPUT_TIMESTAMP_FORMAT = "%Y%m%d_%H%M%S"
+
+# --------------------------------------------------------------------
+# AUTOMATIC PROJECT ROOT DETECTION
+# --------------------------------------------------------------------
+
+
+def find_project_root(start: Path | None = None) -> Path:
+    cur = Path(start or __file__).resolve().parent
+    while cur != cur.parent:
+        if (cur / "Cargo.toml").exists():
+            return cur
+        cur = cur.parent
+    return Path(start or __file__).resolve().parent
+
+
+# Default root (used when no override is given)
+PROJECT_ROOT = find_project_root()
+
+# --------------------------------------------------------------------
+# Package definitions
+# --------------------------------------------------------------------
+PACKAGES = [
+    {
+        "name": "secure_gate_src_package",
+        "root_files": ["Cargo.toml"],
+        "recursive_bases": ["src", "tests"],
+        "description": "Main library + integration tests",
+    },
+    {
+        "name": "secure_gate_tests_package",
+        "root_files": [],
+        "recursive_bases": ["tests"],
+        "description": "Integration tests only",
+    },
+    {
+        "name": "secure_gate_fuzz_package",
+        "root_files": ["fuzz/Cargo.toml"],
+        "recursive_bases": ["fuzz/fuzz_targets"],
+        "description": "Fuzzing targets",
+    },
+]
+
+# ===================================================================
+
+
+def format_timestamp(ts: float) -> str:
+    return datetime.fromtimestamp(ts).strftime(TIMESTAMP_FORMAT)[:-3]
+
+
+def format_output_timestamp() -> str:
+    return datetime.now().strftime(OUTPUT_TIMESTAMP_FORMAT)
+
+
+def add_file(contents: list[str], toc: list[str], file_path: Path, root: Path) -> None:
+    rel_path = file_path.relative_to(root).as_posix()
+    content = file_path.read_text(encoding=ENCODING)
+    ctime = format_timestamp(file_path.stat().st_ctime)
+    mtime = format_timestamp(file_path.stat().st_mtime)
+    idx = len(toc) + 1
+
+    header = (
+        f"\n\n\n================================================================================\n"
+        f"// SECTION {idx:03d}: {rel_path}\n"
+        f"// Created: {ctime}\n"
+        f"// Modified: {mtime}\n"
+        f"================================================================================\n"
+    )
+    contents.append(header + content.rstrip() + "\n")
+    toc.append(rel_path)
+
+
+def create_package(pkg_def: dict, root: Path) -> None:
+    name = pkg_def["name"]
+    description = pkg_def["description"]
+    out_dir = root / OUTPUT_DIR
+    out_dir.mkdir(exist_ok=True)
+    timestamp = format_output_timestamp()
+    output_path = out_dir / f"{name}_{timestamp}.txt"
+
+    file_contents: list[str] = []
+    toc_entries: list[str] = []
+    seen_paths = set()
+
+    # Root files
+    for f in pkg_def["root_files"]:
+        p = root / f
+        rel = p.relative_to(root).as_posix()
+        if p.is_file() and rel not in seen_paths:
+            add_file(file_contents, toc_entries, p, root)
+            seen_paths.add(rel)
+
+    # Recursive .rs files
+    for base in pkg_def["recursive_bases"]:
+        base_dir = root / base
+        if not base_dir.is_dir():
+            print(f"  Warning: Missing directory for {name}: {base_dir}")
+            continue
+        for rs_file in sorted(
+            base_dir.rglob("*.rs"),
+            key=lambda p: p.relative_to(root).as_posix().lower(),
+        ):
+            rel = rs_file.relative_to(root).as_posix()
+            if rel not in seen_paths:
+                add_file(file_contents, toc_entries, rs_file, root)
+                seen_paths.add(rel)
+
+    # TOC
+    toc_lines = [
+        "// ============================================================================\n",
+        "// Table of Contents\n",
+        "// ============================================================================\n",
+    ]
+    for i, entry in enumerate(toc_entries, 1):
+        toc_lines.append(f"// {i:03d}. {entry}\n")
+    if not toc_entries:
+        toc_lines.append("// (no files)\n")
+    toc_lines.append(
+        "// ============================================================================\n\n")
+
+    # Write file
+    with output_path.open("w", encoding=ENCODING) as f:
+        header_time = format_timestamp(datetime.now().timestamp())
+        f.write(
+            "// ============================================================================\n")
+        f.write(f"// {PROJECT_TITLE} – {description}\n")
+        f.write(f"// Package name: {name}\n")
+        f.write(f"// Generated by: {Path(__file__).name}\n")
+        f.write(f"// Timestamp: {header_time}\n")
+        f.write(
+            "// ============================================================================\n\n")
+        f.writelines(toc_lines)
+        f.writelines(file_contents)
+
+    print(f"  → {output_path.name}  ({len(file_contents)} files)")
+
+
+def package_all(root: Path = PROJECT_ROOT) -> None:
+    root = root.resolve()
+    print(f"Project root: {root}\n")
+
+    for pkg in PACKAGES:
+        print(f"Creating {pkg['name']} …")
+        create_package(pkg, root)
+
+    print(f"\nAll packages created in ./{OUTPUT_DIR}/")
+
+
+# ===================================================================
+if __name__ == "__main__":
+    # Allow manual override: python scripts/package_it.py /path/to/root
+    override_root: Path | None = None
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("--"):
+        override_root = Path(sys.argv[1]).resolve()
+
+    # Use override if provided, otherwise fall back to auto-detected root
+    effective_root = override_root or PROJECT_ROOT
+    if override_root:
+        print(f"Override root specified: {override_root}")
+
+    package_all(effective_root)
