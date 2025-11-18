@@ -1,6 +1,10 @@
+// fuzz/fuzz_targets/mut.rs
+//
+// Fuzz target stressing mutation, zeroization, and builder paths
+
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use secure_gate::{ExposeSecretMut, Secure, SecurePasswordBuilder}; // ← changed
+use secure_gate::{ExposeSecretMut, Secure, SecurePasswordBuilder};
 use zeroize::Zeroize;
 
 fuzz_target!(|data: &[u8]| {
@@ -11,11 +15,11 @@ fuzz_target!(|data: &[u8]| {
     // ------------------------------------------------------------------
     // 1. SecurePasswordBuilder — full String abuse + explicit zeroization
     // ------------------------------------------------------------------
-    let mut pw = SecurePasswordBuilder::from("hunter2"); // ← changed
-    {
-        let s = pw.expose_mut().expose_secret_mut();
+    let mut pw = SecurePasswordBuilder::from("hunter2");
 
-        // Feed raw bytes — lossy conversion ensures we always get a valid String
+    {
+        let s = pw.expose_secret_mut(); // ← correct: &mut String
+
         let text = String::from_utf8_lossy(data);
         s.clear();
         s.push_str(&text);
@@ -29,21 +33,24 @@ fuzz_target!(|data: &[u8]| {
             .unwrap_or(text.len());
         s.truncate(truncate_to);
 
-        // Bounded random appends (cap at 1000 to avoid OOM)
+        // Bounded random appends
         let append_count = (data[0] as usize % 150).min(1000);
         s.extend(std::iter::repeat('🚀').take(append_count));
     }
 
-    // 50/50 chance to explicitly zeroize inner — tests manual wipe path
+    // 50/50 chance to manually zeroize inner String
     if data[0] % 2 == 0 {
-        pw.expose_mut().expose_secret_mut().zeroize();
+        pw.expose_secret_mut().zeroize();
     }
 
-    // 50/50 chance to shrink excess capacity
+    // REMOVED: pw.finish_mut() — not available on SecurePasswordBuilder
+    // Instead: manual shrink_to_fit() is the correct way
     if data[0] % 4 == 0 {
-        let _ = pw.finish_mut();
+        pw.expose_secret_mut().shrink_to_fit();
     }
-    drop(pw);
+
+    // into_password() zeroizes the builder on success
+    let _ = pw.into_password();
 
     // ------------------------------------------------------------------
     // 2. Secure<Vec<u8>> — raw buffer torture
@@ -53,19 +60,18 @@ fuzz_target!(|data: &[u8]| {
         let v = bytes.expose_mut();
         v.clear();
         v.extend_from_slice(data);
-        // Cap maximum allocation to prevent OOM
         let new_size = v.len() + data.len().min(500_000);
         v.resize(new_size, 0xFF);
         v.truncate(data.len() % 3000);
         v.retain(|_| data[0] % 5 != 0);
     }
     if data[0] % 3 == 0 {
-        bytes.expose_mut().zeroize();
+        bytes.zeroize(); // direct zeroize() works
     }
     drop(bytes);
 
     // ------------------------------------------------------------------
-    // 3. Fixed-size keys (stack or heap) + clone isolation
+    // 3. Fixed-size keys + clone isolation
     // ------------------------------------------------------------------
     let mut key = Secure::<[u8; 32]>::new([0xAA; 32]);
     if !data.is_empty() {
@@ -76,7 +82,6 @@ fuzz_target!(|data: &[u8]| {
     if data.len() > 1 {
         clone.expose_mut()[0] = data[1];
     }
-    // Zeroize inner array (via Zeroize impl when available, e.g., with "stack")
     if data[0] % 7 == 0 {
         clone.expose_mut().zeroize();
     }
@@ -84,32 +89,29 @@ fuzz_target!(|data: &[u8]| {
     drop(clone);
 
     // ------------------------------------------------------------------
-    // 4. Nested secure types — test deep zeroization
+    // 4. Nested secure types
     // ------------------------------------------------------------------
     let mut nested = Secure::new(Secure::new(data.to_vec()));
     if data[0] % 11 == 0 {
-        // Chain to inner for zeroization
-        nested.expose_mut().expose_mut().zeroize();
+        nested.expose_mut().zeroize(); // zeroizes the inner Secure<Vec<u8>>
     }
     drop(nested);
 
     // ------------------------------------------------------------------
-    // 5. Additional edge cases for better coverage
+    // 5. Edge cases
     // ------------------------------------------------------------------
-    // Test with very small inputs
     if data.len() >= 2 {
         let mut small = Secure::<[u8; 2]>::new([data[0], data[1]]);
         small.expose_mut()[0] = data[0].wrapping_add(1);
         drop(small);
     }
-    // Test empty secure containers
+
     let mut empty_vec = Secure::<Vec<u8>>::new(Vec::new());
     if !data.is_empty() {
         empty_vec.expose_mut().push(data[0]);
     }
-    // Zeroize empty (tests len=0 path)
     if data[0] % 13 == 0 {
-        empty_vec.expose_mut().zeroize();
+        empty_vec.zeroize();
     }
     drop(empty_vec);
 });
