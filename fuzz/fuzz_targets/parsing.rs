@@ -4,61 +4,71 @@
 
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use secure_gate::{ExposeSecret, Secure, SecurePassword, SecureStr};
+use secure_gate::{ExposeSecret, Secure, SecureBytes, SecurePassword, SecureStr};
 
-// Safe UTF-8 conversion for byte fuzz inputs
-fn safe_str(data: &[u8]) -> Option<&str> {
-    std::str::from_utf8(data).ok()
-}
+const MAX_LEN: usize = 1_000_000; // Extreme alloc stress (1MB cap to avoid OOM)
 
 fuzz_target!(|data: &[u8]| {
-    // Skip non-UTF-8 to focus on str parsing
-    let s = if let Some(safe) = safe_str(data) {
-        safe
-    } else {
-        return;
-    };
+    if data.len() > MAX_LEN {
+        return; // OOM guard
+    }
 
-    // Core SecureStr parsing (infallible per source)
-    let _ = s.parse::<SecureStr>();
-    let _ = SecureStr::from(s);
+    // 1. Non-UTF-8 path: SecureBytes from arbitrary bytes (no filtering!)
+    let _bytes = SecureBytes::from(data.to_vec());
+    let _ = _bytes.expose().len(); // Force deref on raw bytes
 
-    // Post-parse stress: read-only + clone (SecureStr is immutable)
-    let sec_str = s.parse::<SecureStr>().unwrap(); // Infallible; unwrap safe
-    let _ = sec_str.expose().len(); // Deref/read
+    // 2. UTF-8 path: Attempt parse (graceful fail on invalid)
+    if let Ok(s) = std::str::from_utf8(data) {
+        // Core SecureStr parsing (infallible per source)
+        let _ = s.parse::<SecureStr>();
+        let _ = SecureStr::from(s);
 
-    // Clone + stress (tests to_string() + re-wrap zeroing)
-    let cloned = sec_str.clone();
-    let _ = cloned.expose().to_string(); // Light op: forces clone exposure
-    drop(cloned);
+        // Post-parse stress: read-only + clone
+        let sec_str = s.parse::<SecureStr>().unwrap(); // Safe unwrap
+        let _ = sec_str.expose().len();
 
-    // Mutation stress: Shift to sized Secure<String> (growable)
-    let mut sized_str = Secure::new(s.to_string());
-    // Varied mutations on exposed String
-    sized_str.expose_mut().push('!');
+        // Clone + to_string stress
+        let cloned = sec_str.clone();
+        let _ = cloned.expose().to_string();
+        drop(cloned);
+
+        // SecurePassword from valid &str
+        let pw: SecurePassword = s.into();
+        let _ = pw.expose_secret();
+
+        // Edge cases: empty/simple/unicode
+        let _ = "".parse::<SecureStr>();
+        let _ = "hello world".parse::<SecureStr>();
+        let _ = "😀🚀".parse::<SecureStr>();
+
+        // Alloc stress: long valid inputs
+        if s.len() > 1000 {
+            let _ = s.parse::<SecureStr>();
+        }
+        if s.len() > 5000 {
+            let _ = s.parse::<SecureStr>();
+        }
+    }
+
+    // 3. Mutation stress: Secure<String> on owned (lossy) data
+    let owned = String::from_utf8_lossy(data).to_string();
+    let mut sized_str = Secure::new(owned);
+    sized_str.expose_mut().push('!'); // Possible realloc
     sized_str.expose_mut().push_str("_fuzz");
-    sized_str.expose_mut().clear(); // Full truncate
-                                    // Shrink + zero excess (source: handles String)
-    let _ = sized_str.finish_mut(); // Returns &mut String post-shrink
+    sized_str.expose_mut().clear(); // Truncate to zero
+    let _ = sized_str.finish_mut(); // Shrink-to-fit + zero excess
 
-    // SecurePassword from &str (immutable path)
-    let pw: SecurePassword = s.into();
-    let _ = pw.expose_secret();
-
-    // Edge cases (infallible parses)
-    let _ = "".parse::<SecureStr>(); // Empty
-    let _ = "hello world".parse::<SecureStr>(); // Simple
-    let _ = "😀🚀".parse::<SecureStr>(); // Multi-byte Unicode
-
-    // Alloc stress: long inputs trigger Box<str> heap
-    if s.len() > 1000 {
-        let _ = s.parse::<SecureStr>();
-    }
-    if s.len() > 5000 {
-        let _ = s.parse::<SecureStr>();
+    // 4. Extreme alloc: Repeat parse on growing inputs (simulates exhaustion)
+    for i in 0..=10 {
+        // 10x stress, bounded
+        if data.len().saturating_mul(i as usize) > MAX_LEN {
+            break;
+        }
+        let repeated = vec![data; i.min(100)]; // Cap repeats to avoid OOM
+        let repeated_bytes = SecureBytes::from(repeated.concat());
+        let _ = repeated_bytes.expose().len();
     }
 
-    // Final sanity: re-parse (regression guard)
-    let final_check = s.parse::<SecureStr>();
-    drop(final_check);
+    // Final drop: Triggers zeroize on all
+    drop(sized_str);
 });
