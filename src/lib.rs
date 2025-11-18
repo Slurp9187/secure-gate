@@ -1,4 +1,4 @@
-// src/lib.rs
+// src/lib.rs (actual file name)
 //
 // Crate root with re-exports and trait definitions
 
@@ -9,15 +9,21 @@
 extern crate alloc;
 
 pub mod aliases;
+#[cfg(feature = "zeroize")]
 pub mod deprecated;
 pub mod heap;
 pub mod macros;
 pub mod stack;
+pub mod traits;
 
 pub use aliases::*;
 pub use heap::HeapSecure as Secure;
 #[cfg(feature = "stack")]
 pub use stack::*;
+
+#[allow(deprecated)]
+#[cfg(feature = "zeroize")]
+pub use deprecated::SecurePasswordMut;
 
 // Re-export secrecy traits when zeroize is enabled
 #[cfg(feature = "zeroize")]

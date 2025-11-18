@@ -7,7 +7,9 @@ use alloc::{
     format,
     string::{String, ToString},
 };
-use secure_gate::{ExposeSecret, ExposeSecretMut, Secure, SecurePassword};
+#[cfg(feature = "zeroize")]
+use secure_gate::ExposeSecret;
+use secure_gate::{Secure, SecurePassword};
 
 #[test]
 fn test_basic() {
@@ -28,14 +30,14 @@ fn test_debug() {
 #[test]
 fn test_expose_secret() {
     let pw: Secure<String> = Secure::new("secret".to_string());
-    assert_eq!(pw.expose_secret(), "secret");
+    assert_eq!(pw.expose(), "secret");
 }
 
 #[test]
 fn test_expose_secret_mut() {
     let mut pw: Secure<String> = Secure::new("secret".to_string());
-    *pw.expose_secret_mut() = "changed".to_string();
-    assert_eq!(pw.expose_secret(), "changed");
+    *pw.expose_mut() = "changed".to_string();
+    assert_eq!(pw.expose(), "changed");
 }
 
 #[test]

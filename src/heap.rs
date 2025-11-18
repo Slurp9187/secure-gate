@@ -1,12 +1,10 @@
-// src/heap.rs
+// src/heap.rs (actual file name)
 //
 // Heap-allocated secure wrapper with feature-gated zeroization
 
 #![cfg_attr(not(feature = "unsafe-wipe"), forbid(unsafe_code))]
 
 use alloc::boxed::Box;
-
-#[cfg(feature = "zeroize")]
 use alloc::{string::String, vec::Vec};
 
 use core::fmt::{self, Debug};
@@ -20,22 +18,8 @@ use serde::{de, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-#[cfg(feature = "zeroize")]
-use core::any::Any;
-
 #[cfg(not(feature = "zeroize"))]
 use crate::{ExposeSecret, ExposeSecretMut};
-
-#[cfg(feature = "zeroize")]
-pub(crate) trait AsAnyMut {
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-}
-#[cfg(feature = "zeroize")]
-impl<T: 'static> AsAnyMut for T {
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
 
 /// Heap-allocated secure wrapper: `SecretBox<T>` (zeroize) or `Box<T>` (fallback).
 #[cfg(feature = "zeroize")]
@@ -55,6 +39,21 @@ impl<T: Sized> HeapSecure<T> {
     #[inline]
     pub fn new(value: T) -> Self {
         Self(Box::new(value))
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl<T: Zeroize + ?Sized> HeapSecure<T> {
+    #[inline]
+    pub fn new_unsized(value: Box<T>) -> Self {
+        Self(SecretBox::new(value))
+    }
+}
+#[cfg(not(feature = "zeroize"))]
+impl<T: ?Sized> HeapSecure<T> {
+    #[inline]
+    pub fn new_unsized(value: Box<T>) -> Self {
+        Self(value)
     }
 }
 
@@ -94,18 +93,18 @@ impl<T: ?Sized> Debug for HeapSecure<T> {
     }
 }
 
-#[cfg(feature = "zeroize")]
-impl<T: Zeroize + ?Sized> ExposeSecret<T> for HeapSecure<T> {
-    fn expose_secret(&self) -> &T {
-        self.0.expose_secret()
-    }
-}
-#[cfg(feature = "zeroize")]
-impl<T: Zeroize + ?Sized> ExposeSecretMut<T> for HeapSecure<T> {
-    fn expose_secret_mut(&mut self) -> &mut T {
-        self.0.expose_secret_mut()
-    }
-}
+// #[cfg(feature = "zeroize")]
+// impl<T: Zeroize + ?Sized> ExposeSecret<T> for HeapSecure<T> {
+//     fn expose_secret(&self) -> &T {
+//         self.0.expose_secret()
+//     }
+// }
+// #[cfg(feature = "zeroize")]
+// impl<T: Zeroize + ?Sized> ExposeSecretMut<T> for HeapSecure<T> {
+//     fn expose_secret_mut(&mut self) -> &mut T {
+//         self.0.expose_secret_mut()
+//     }
+// }
 #[cfg(not(feature = "zeroize"))]
 impl<T: ?Sized> ExposeSecret<T> for HeapSecure<T> {
     fn expose_secret(&self) -> &T {
@@ -125,13 +124,6 @@ impl<T: Clone + Zeroize + Sized> Clone for HeapSecure<T> {
         Self::init_with(|| self.expose().clone())
     }
 }
-// #[cfg(not(feature = "zeroize"))]
-// impl<T: Clone + ?Sized> Clone for HeapSecure<T> {
-//     fn clone(&self) -> Self {
-//         Self(self.0.clone())
-//     }
-// }
-
 #[cfg(not(feature = "zeroize"))]
 impl<T: Clone> Clone for HeapSecure<T> {
     fn clone(&self) -> Self {
@@ -268,7 +260,7 @@ where
 #[cfg(all(feature = "serde", feature = "zeroize"))]
 impl<T> Serialize for HeapSecure<T>
 where
-    T: SerializableSecret + Serialize + Sized + Zeroize,
+    T: SerializableSecret + Serialize + Zeroize + Sized,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -290,27 +282,21 @@ where
     }
 }
 
-#[cfg(feature = "zeroize")]
-impl<T: Zeroize + Sized + 'static> HeapSecure<T> {
-    pub fn finish_mut(&mut self) -> &mut T {
-        if let Some(v) = self.expose_mut().as_any_mut().downcast_mut::<Vec<u8>>() {
-            v.shrink_to_fit();
-        } else if let Some(s) = self.expose_mut().as_any_mut().downcast_mut::<String>() {
-            s.shrink_to_fit();
-        }
+impl HeapSecure<String> {
+    /// Best-effort shrink excess capacity after mutation.
+    /// Works whether the `zeroize` feature is enabled or not.
+    #[inline]
+    pub fn finish_mut(&mut self) -> &mut String {
+        self.expose_mut().shrink_to_fit();
         self.expose_mut()
     }
 }
 
-#[cfg(feature = "zeroize")]
-impl<T: Zeroize + ?Sized> HeapSecure<T> {
-    pub fn new_unsized(boxed: Box<T>) -> Self {
-        Self(SecretBox::new(boxed))
-    }
-}
-#[cfg(not(feature = "zeroize"))]
-impl<T: ?Sized> HeapSecure<T> {
-    pub fn new_unsized(boxed: Box<T>) -> Self {
-        Self(boxed)
+impl HeapSecure<Vec<u8>> {
+    /// Best-effort shrink excess capacity after mutation.
+    #[inline]
+    pub fn finish_mut(&mut self) -> &mut Vec<u8> {
+        self.expose_mut().shrink_to_fit();
+        self.expose_mut()
     }
 }

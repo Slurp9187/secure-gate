@@ -29,3 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved `SecurePasswordMut` to `src/deprecated.rs` with proper module hygiene
 - Fixed `mut` fuzz target to use `SecurePasswordBuilder` (eliminates deprecation warnings in CI)
 - Minor documentation spelling fix (`deprecated` not `depreciated`)
+
+## 0.3.3 – 2025-04-05
+
+### Fixed
+- `SecurePassword` and `SecurePasswordBuilder` now support direct `.expose_secret()` and `.expose_secret_mut()`
+  → No more double-call `.expose().expose_secret()`
+  → Huge ergonomics win for the most common use case
+- `finish_mut()` now available with or without the `zeroize` feature

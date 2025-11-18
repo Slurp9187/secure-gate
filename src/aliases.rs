@@ -33,7 +33,8 @@ impl From<Vec<u8>> for SecureBytes {
 #[cfg(feature = "zeroize")]
 impl Clone for SecureBytes {
     fn clone(&self) -> Self {
-        Self::from(self.expose_secret().to_vec())
+        // Fixed: use .expose() instead of .expose_secret()
+        Self::from(self.expose().to_vec())
     }
 }
 #[cfg(not(feature = "zeroize"))]
@@ -69,7 +70,8 @@ impl FromStr for SecureStr {
 #[cfg(feature = "zeroize")]
 impl Clone for SecureStr {
     fn clone(&self) -> Self {
-        Self::from(self.expose_secret().to_string())
+        // Fixed: use .expose() instead of .expose_secret()
+        Self::from(self.expose().to_string())
     }
 }
 #[cfg(not(feature = "zeroize"))]
@@ -135,17 +137,17 @@ impl From<String> for SecurePasswordBuilder {
     }
 }
 
+// SecurePasswordBuilder::into_password – fixed
 #[cfg(feature = "zeroize")]
 impl SecurePasswordBuilder {
-    /// Convert into the immutable, zero-realloc form.
-    /// This is the moral equivalent of "freezing" the builder.
     pub fn into_password(&mut self) -> SecurePassword {
-        let s: String = self.expose_secret().expose_secret().clone();
-        self.expose_mut().expose_secret_mut().zeroize();
+        // Fixed: use the blanket impl from traits.rs
+        let s: String = self.expose_secret().clone();
+        // Optional: zeroize the builder (Drop will do it anyway)
+        self.expose_secret_mut().zeroize();
         SecurePassword::from(s)
     }
 
-    /// Same as `into_password`, but named like the classic builder pattern.
     pub fn build(&mut self) -> SecurePassword {
         self.into_password()
     }
