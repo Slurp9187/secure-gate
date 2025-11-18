@@ -20,23 +20,25 @@ fuzz_target!(|data: &[u8]| {
     vec_sec.expose_mut().extend_from_slice(b"fuzz");
     vec_sec.finish_mut();
 
-    // 2. Immutable byte/string slices
+    // 2. Immutable byte/string slices — SAFE version
     let _bytes: SecureBytes = data.to_vec().into();
-    let s = String::from_utf8_lossy(data);
-    let _str: SecureStr = s.as_ref().into();
 
-    // 3. SecurePassword – immutable str
-    let pw: SecurePassword = s.as_ref().into();
+    // CRITICAL FIX: Always own the string before converting to SecureStr
+    let owned_string = String::from_utf8_lossy(data).into_owned();
+    let _str: SecureStr = owned_string.as_str().into();
+
+    // 3. SecurePassword – immutable
+    let pw: SecurePassword = owned_string.as_str().into();
     let _ = pw.expose_secret();
 
-    // 4. SecurePasswordBuilder – the ONLY mutable string type
-    let mut builder = SecurePasswordBuilder::from(s.to_string());
+    // 4. SecurePasswordBuilder – mutable string path
+    let mut builder = SecurePasswordBuilder::from(owned_string.clone());
     {
         let inner = builder.expose_secret_mut();
         inner.push_str("fuzz");
         inner.push('X');
         inner.clear();
-        inner.push_str(&s);
+        inner.push_str(&owned_string);
         inner.truncate(inner.len().saturating_sub(1));
         if !inner.is_empty() {
             inner.insert(0, 'Y');
@@ -45,7 +47,7 @@ fuzz_target!(|data: &[u8]| {
     }
     let _final_pw = builder.into_password();
 
-    // 5. Fixed-size keys – fully safe for any input length
+    // 5. Fixed-size keys – fully safe
     let key_bytes = {
         let mut arr = [0u8; 32];
         let copy_len = core::cmp::min(data.len(), 32);
@@ -54,7 +56,6 @@ fuzz_target!(|data: &[u8]| {
     };
     let _key = secure!([u8; 32], key_bytes);
 
-    // Nonce12 is also fixed-size – safe version
     let nonce_bytes = {
         let mut arr = [0u8; 12];
         let copy_len = core::cmp::min(data.len(), 12);
