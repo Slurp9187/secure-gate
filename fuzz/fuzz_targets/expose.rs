@@ -39,7 +39,11 @@ fuzz_target!(|data: &[u8]| {
         inner.push('X');
         inner.clear();
         inner.push_str(&owned_string);
-        inner.truncate(inner.len().saturating_sub(1));
+        // Safe truncate: remove last char if possible
+        if !inner.is_empty() {
+            let last_char_len = inner.chars().next_back().map(|c| c.len_utf8()).unwrap_or(0);
+            inner.truncate(inner.len().saturating_sub(last_char_len));
+        }
         if !inner.is_empty() {
             inner.insert(0, 'Y');
         }
