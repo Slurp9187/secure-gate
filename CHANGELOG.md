@@ -37,3 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   → No more double-call `.expose().expose_secret()`
   → Huge ergonomics win for the most common use case
 - `finish_mut()` now available with or without the `zeroize` feature
+
+# [0.3.4] - 2025-11-18
+### Documentation
+- Update README with correct single-call `.expose_secret()` usage examples

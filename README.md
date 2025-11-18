@@ -33,7 +33,7 @@ No more `pw.expose().expose_secret()` double call!
 
 ```toml
 [dependencies]
-secure-gate = "0.3.3"
+secure-gate = "0.3.4"
 ```
 
 ## Quick Start
