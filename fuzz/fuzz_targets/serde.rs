@@ -5,27 +5,35 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use secure_gate::ExposeSecret;
-use secure_gate::{Secure, SecurePassword};
+use secure_gate::{ExposeSecret, Secure, SecurePassword};
 
-const MAX_SIZE: usize = 1_000_000; // Prevent OOM
+const MAX_INPUT: usize = 1_048_576; // 1 MiB — generous but OOM-safe
+const MAX_STRING: usize = 524_288; // 512 KiB — extra guard for String
 
 fuzz_target!(|data: &[u8]| {
-    if data.len() > MAX_SIZE {
-        return; // Skip huge inputs
+    // --------------------------------------------------------------
+    // 1. Hard OOM protection — reject anything too big up front
+    // --------------------------------------------------------------
+    if data.len() > MAX_INPUT {
+        return;
     }
 
-    // 1. JSON deserialization from untrusted data
+    // --------------------------------------------------------------
+    // 2. JSON → SecurePassword (most common real-world path)
+    // --------------------------------------------------------------
     if let Ok(pw) = serde_json::from_slice::<SecurePassword>(data) {
+        // Only read length — never expose the secret in fuzz target
         let _ = pw.expose_secret().len();
         drop(pw);
     }
 
-    // 2. Bincode deserialization from untrusted data (inner Vec<u8>)
-    if let Ok((vec, _)) =
-        bincode::decode_from_slice::<Vec<u8>, _>(data, bincode::config::standard())
-    {
-        if vec.len() > MAX_SIZE {
+    // --------------------------------------------------------------
+    // 3. Bincode → Vec<u8> → Secure<Vec<u8>>
+    // --------------------------------------------------------------
+    let config = bincode::config::standard().with_limit::<MAX_INPUT>();
+    if let Ok((vec, _)) = bincode::decode_from_slice::<Vec<u8>, _>(data, config) {
+        // Extra sanity — bincode can still produce huge Vecs on malformed data
+        if vec.len() > MAX_INPUT {
             return;
         }
         let sec = Secure::new(vec);
@@ -33,33 +41,36 @@ fuzz_target!(|data: &[u8]| {
         drop(sec);
     }
 
-    // 3. Bincode deserialization from untrusted data (inner String → SecurePassword)
-    if let Ok((str_inner, _)) =
-        bincode::decode_from_slice::<String, _>(data, bincode::config::standard())
-    {
-        if str_inner.len() > MAX_SIZE {
+    // --------------------------------------------------------------
+    // 4. Bincode → String → SecurePassword
+    // --------------------------------------------------------------
+    if let Ok((s, _)) = bincode::decode_from_slice::<String, _>(data, config) {
+        if s.len() > MAX_STRING {
             return;
         }
-        let pw = SecurePassword::from(str_inner.as_str());
+        let pw = SecurePassword::from(s.as_str());
         let _ = pw.expose_secret().len();
         drop(pw);
     }
 
-    // 4. Controlled round-trip (never leaks real secrets)
-    let pw = SecurePassword::from("fuzzme");
+    // --------------------------------------------------------------
+    // 5. Controlled round-trip sanity checks (never leaks real secrets)
+    // --------------------------------------------------------------
+    let pw = SecurePassword::from("hunter2");
+
+    // JSON round-trip
     if let Ok(json) = serde_json::to_string(pw.expose_secret()) {
         let _ = serde_json::from_str::<SecurePassword>(&json);
     }
 
-    // 5. Bincode round-trip for SecurePassword (via expose inner String)
-    let config = bincode::config::standard();
+    // Bincode round-trip via exposed String
     if let Ok(encoded) = bincode::encode_to_vec(pw.expose_secret().to_string(), config) {
         let _ = bincode::decode_from_slice::<String, _>(&encoded, config);
     }
 
-    // 6. Secure<Vec<u8>> round-trip
+    // Secure<Vec<u8>> round-trip
     let bytes = Secure::new(b"fuzzme".to_vec());
-    if let Ok(encoded) = bincode::encode_to_vec(bytes.expose().to_vec(), config) {
+    if let Ok(encoded) = bincode::encode_to_vec(bytes.expose(), config) {
         let _ = bincode::decode_from_slice::<Vec<u8>, _>(&encoded, config);
     }
 });
