@@ -1,6 +1,10 @@
+// fuzz/fuzz_targets/parsing.rs
+//
+// Fuzz target for all FromStr / parsing paths (infallible but allocation-heavy)
+
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use secure_gate::{Secure, SecureStr}; // Corrected: Direct from crate root (public re-exports)
+use secure_gate::{ExposeSecret, Secure, SecurePassword, SecureStr};
 
 // Safe UTF-8 conversion for byte fuzz inputs
 fn safe_str(data: &[u8]) -> Option<&str> {
@@ -15,7 +19,7 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
 
-    // === Core SecureStr parsing (infallible per source) ===
+    // Core SecureStr parsing (infallible per source)
     let _ = s.parse::<SecureStr>();
     let _ = SecureStr::from(s);
 
@@ -28,7 +32,7 @@ fuzz_target!(|data: &[u8]| {
     let _ = cloned.expose().to_string(); // Light op: forces clone exposure
     drop(cloned);
 
-    // === Mutation stress: Shift to sized Secure<String> (growable) ===
+    // Mutation stress: Shift to sized Secure<String> (growable)
     let mut sized_str = Secure::new(s.to_string());
     // Varied mutations on exposed String
     sized_str.expose_mut().push('!');
@@ -37,10 +41,14 @@ fuzz_target!(|data: &[u8]| {
                                     // Shrink + zero excess (source: handles String)
     let _ = sized_str.finish_mut(); // Returns &mut String post-shrink
 
-    // === Edge cases (infallible parses) ===
+    // SecurePassword from &str (immutable path)
+    let pw: SecurePassword = s.into();
+    let _ = pw.expose_secret();
+
+    // Edge cases (infallible parses)
     let _ = "".parse::<SecureStr>(); // Empty
-    let _ = "😀".parse::<SecureStr>(); // Unicode (tests to_string() in clone)
     let _ = "hello world".parse::<SecureStr>(); // Simple
+    let _ = "😀🚀".parse::<SecureStr>(); // Multi-byte Unicode
 
     // Alloc stress: long inputs trigger Box<str> heap
     if s.len() > 1000 {
@@ -48,18 +56,7 @@ fuzz_target!(|data: &[u8]| {
     }
     if s.len() > 5000 {
         let _ = s.parse::<SecureStr>();
-    } // Extreme
-
-    // === FUTURE-PROOF: Other FromStr impls ===
-    // Uncomment + add if let Ok when implemented (e.g., hex for SecureKey32)
-    /*
-    if let Ok(key) = s.parse::<Secure<[u8; 32]>>() {
-        let _ = key.expose().len(); // 32-byte stress
     }
-    if let Ok(bin) = s.parse::<Secure<Vec<u8>>>() {
-        drop(bin); // Binary alloc
-    }
-    */
 
     // Final sanity: re-parse (regression guard)
     let final_check = s.parse::<SecureStr>();
