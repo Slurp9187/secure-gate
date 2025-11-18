@@ -45,18 +45,23 @@ fuzz_target!(|data: &[u8]| {
     }
     let _final_pw = builder.into_password();
 
-    // 5. Fixed-size keys – SAFE version
-    let key_bytes = if data.len() >= 32 {
-        // Safe: only copy what actually exists, pad the rest with 0
+    // 5. Fixed-size keys – fully safe for any input length
+    let key_bytes = {
         let mut arr = [0u8; 32];
         let copy_len = core::cmp::min(data.len(), 32);
         arr[..copy_len].copy_from_slice(&data[..copy_len]);
         arr
-    } else {
-        [0u8; 32] // short input → zero-padded key
     };
     let _key = secure!([u8; 32], key_bytes);
-    let _nonce = secure!([u8; 12], [0u8; 12]);
+
+    // Nonce12 is also fixed-size – safe version
+    let nonce_bytes = {
+        let mut arr = [0u8; 12];
+        let copy_len = core::cmp::min(data.len(), 12);
+        arr[..copy_len].copy_from_slice(&data[..copy_len]);
+        arr
+    };
+    let _nonce = secure!([u8; 12], nonce_bytes);
 
     // 6. Clone / Default / into_inner
     let cloneable = Secure::<Vec<u8>>::new(vec![1, 2, 3]);
