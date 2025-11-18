@@ -2,7 +2,7 @@
 
 A zero-overhead, `no_std`-compatible secret wrapper with automatic zeroization.
 
-## 0.3.3 – New in this release (2025-11-18)
+## 0.3.4 – New in this release (2025-11-18)
 
 **The #1 ergonomics complaint is fixed!**
 
