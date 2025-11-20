@@ -1,7 +1,10 @@
 // tests/types_tests.rs
 // Updated for secure-gate 0.4.0 — fully modernized
 
-use secure_gate::{SecureBytes, SecureKey32, SecurePassword, SecurePasswordBuilder, SecureStr};
+#[cfg(feature = "zeroize")]
+use secure_gate::SecurePasswordBuilder;
+
+use secure_gate::{SecureBytes, SecureKey32, SecurePassword, SecureStr};
 
 #[cfg(feature = "zeroize")]
 use secrecy::{ExposeSecret, ExposeSecretMut};

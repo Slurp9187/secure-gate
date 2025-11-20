@@ -31,6 +31,7 @@ pub type SG<T> = SecureGate<T>;
 pub use aliases::*;
 
 // Legacy bridge — keeps every test and old user alive
+#[cfg(feature = "zeroize")]
 pub use deprecated::*;
 
 // Re-export secrecy traits when zeroize is enabled
