@@ -158,16 +158,21 @@ impl SecurePasswordBuilder {
 pub type SecureKey32 = SecureGate<[u8; 32]>;
 #[cfg(not(feature = "stack"))]
 pub type SecureKey64 = SecureGate<[u8; 64]>;
+
 #[cfg(not(feature = "stack"))]
-pub type SecureIv = SecureGate<[u8; 16]>;
+pub type SecureIv16 = SecureGate<[u8; 16]>;
 #[cfg(not(feature = "stack"))]
-pub type SecureSalt = SecureGate<[u8; 16]>;
+pub type SecureSalt16 = SecureGate<[u8; 16]>;
 #[cfg(not(feature = "stack"))]
 pub type SecureNonce12 = SecureGate<[u8; 12]>;
 #[cfg(not(feature = "stack"))]
 pub type SecureNonce16 = SecureGate<[u8; 16]>;
 #[cfg(not(feature = "stack"))]
 pub type SecureNonce24 = SecureGate<[u8; 24]>;
+#[cfg(not(feature = "stack"))]
+pub type SecureNonce96 = SecureGate<[u8; 12]>;
+#[cfg(not(feature = "stack"))]
+pub type SecureNonce128 = SecureGate<[u8; 16]>;
 
 // =====================================================================
 // Fixed-size secret aliases — stack when feature = "stack"
@@ -178,15 +183,31 @@ pub type SecureKey32 = Zeroizing<[u8; 32]>;
 #[cfg(feature = "stack")]
 pub type SecureKey64 = Zeroizing<[u8; 64]>;
 #[cfg(feature = "stack")]
-pub type SecureIv = Zeroizing<[u8; 16]>;
+pub type SecureIv16 = Zeroizing<[u8; 16]>;
 #[cfg(feature = "stack")]
-pub type SecureSalt = Zeroizing<[u8; 16]>;
+pub type SecureSalt16 = Zeroizing<[u8; 16]>;
 #[cfg(feature = "stack")]
 pub type SecureNonce12 = Zeroizing<[u8; 12]>;
 #[cfg(feature = "stack")]
 pub type SecureNonce16 = Zeroizing<[u8; 16]>;
 #[cfg(feature = "stack")]
 pub type SecureNonce24 = Zeroizing<[u8; 24]>;
+#[cfg(feature = "stack")]
+pub type SecureNonce96 = Zeroizing<[u8; 12]>;
+#[cfg(feature = "stack")]
+pub type SecureNonce128 = Zeroizing<[u8; 16]>;
+
+// =====================================================================
+// Deprecated aliases for backward compatibility (zeroize only)
+// =====================================================================
+
+#[cfg(feature = "zeroize")]
+#[deprecated(since = "0.4.1", note = "use SecureIv16 instead")]
+pub type SecureIv = SecureIv16;
+
+#[cfg(feature = "zeroize")]
+#[deprecated(since = "0.4.1", note = "use SecureSalt16 instead")]
+pub type SecureSalt = SecureSalt16;
 
 // Constructors for stack types
 #[cfg(feature = "stack")]
@@ -198,11 +219,11 @@ pub fn key64(bytes: [u8; 64]) -> SecureKey64 {
     Zeroizing::new(bytes)
 }
 #[cfg(feature = "stack")]
-pub fn iv(bytes: [u8; 16]) -> SecureIv {
+pub fn iv16(bytes: [u8; 16]) -> SecureIv16 {
     Zeroizing::new(bytes)
 }
 #[cfg(feature = "stack")]
-pub fn salt(bytes: [u8; 16]) -> SecureSalt {
+pub fn salt16(bytes: [u8; 16]) -> SecureSalt16 {
     Zeroizing::new(bytes)
 }
 #[cfg(feature = "stack")]
@@ -215,5 +236,13 @@ pub fn nonce16(bytes: [u8; 16]) -> SecureNonce16 {
 }
 #[cfg(feature = "stack")]
 pub fn nonce24(bytes: [u8; 24]) -> SecureNonce24 {
+    Zeroizing::new(bytes)
+}
+#[cfg(feature = "stack")]
+pub fn nonce96(bytes: [u8; 12]) -> SecureNonce96 {
+    Zeroizing::new(bytes)
+}
+#[cfg(feature = "stack")]
+pub fn nonce128(bytes: [u8; 16]) -> SecureNonce128 {
     Zeroizing::new(bytes)
 }
