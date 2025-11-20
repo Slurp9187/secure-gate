@@ -37,7 +37,7 @@ PROJECT_ROOT = find_project_root()
 PACKAGES = [
     {
         "suffix": "src",
-        "root_files": ["Cargo.toml"],
+        "root_files": ["Cargo.toml", "CHANGELOG.md", "README.md"],
         "include_dirs": ["src"],
         "file_pattern": "*.rs",
         "description": "Full library source + Cargo.toml",
