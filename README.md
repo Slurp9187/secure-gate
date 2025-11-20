@@ -1,35 +1,52 @@
 # secure-gate
 
-Zero-overhead, `no_std`-compatible secret wrappers with optional automatic zeroization.
+Zero-overhead, `no_std`-compatible secret wrappers with **configurable zeroization**.
 
-## 0.4.0 – 2025-11-20
+## v0.4.1 – 2025-11-20
 
-### What changed
-- Unified public API under a single generic type: `SecureGate<T>`  
-  (replaces the previous `HeapSecure` / `Secure<T>` naming)
-- The crate root now re-exports `SecureGate` and the short alias `SG<T>`
-- Fixed-size secrets now use `zeroize::Zeroizing` directly when the `stack` feature is enabled (no wrapper overhead)
-- All existing type aliases (`SecurePassword`, `SecureKey32`, `SecureNonce24`, constructors, etc.) remain unchanged
-- Legacy names (`Secure<T>`, `HeapSecure<T>`, etc.) are preserved via a `deprecated` module so 0.3.x code continues to compile (with deprecation warnings)
+### New in 0.4.1 – Configurable Zeroization Modes
 
-No breaking functionality changes — only renaming and internal cleanup.
+```rust
+use secure_gate::{SecureGate, ZeroizeMode};
+
+let pw = SecureGate::new("hunter2".to_string());                    // Safe mode (default)
+let pw_full = SecureGate::new_full_wipe("hunter2".to_string());     // Full wipe (incl. slack)
+let pw_pass = SecureGate::new_passthrough("hunter2".to_string());   // No extra wiping
+
+let pw_custom = SecureGate::with_mode("hunter2".to_string(), ZeroizeMode::Full);
+```
+
+- **`Safe`** (default) – wipes only used bytes (no `unsafe`)
+- **`Full`** – wipes **entire allocation** including spare capacity (`unsafe-wipe` feature)
+- **`Passthrough`** – relies only on inner type’s `Zeroize` impl
+
+Perfect for defense-in-depth, compliance, or performance trade-offs.
 
 ## Features
 
-- Zero runtime overhead when the `zeroize` feature is disabled (plain `Box<T>` fallback)
-- Full zeroization when `zeroize` is enabled (via `secrecy` + `zeroize`)
-- Zero-allocation fixed-size secrets via the `stack` feature (uses `Zeroizing` directly)
+| Feature        | Effect                                                                 |
+|----------------|------------------------------------------------------------------------|
+| `zeroize`      | Enables zeroization via `secrecy` + `zeroize` (on by default)          |
+| `stack`        | Zero-allocation fixed-size secrets using `Zeroizing<T>` (on by default)|
+| `unsafe-wipe`  | Enables `Full` zeroization mode (wipes spare capacity)                 |
+| `serde`        | Serialization support                                                  |
+| `full`         | All features above                                                     |
+
 - `no_std` + `alloc` compatible
-- Safe, ergonomic API with convenient aliases
-- `secure!` macro for easy construction
-- Optional `serde` support
+- Zero runtime overhead when `zeroize` is disabled
 - Redacted `Debug` output
+- Full test coverage including timing safety
 
 ## Installation
 
 ```toml
 [dependencies]
-secure-gate = "0.4.0"
+secure-gate = "0.4.1"
+```
+
+Enable full wiping:
+```toml
+secure-gate = { version = "0.4.1", features = ["unsafe-wipe"] }
 ```
 
 ## Quick Start
@@ -37,50 +54,57 @@ secure-gate = "0.4.0"
 ```rust
 use secure_gate::{SecureGate, SecurePassword, secure};
 
+// Immutable password (recommended)
 let pw: SecurePassword = "hunter2".into();
-assert_eq!(pw.expose_secret(), "hunter2");   // single call → &str
+assert_eq!(pw.expose_secret(), "hunter2");
 
+// Mutable builder
 let mut builder = SecurePasswordBuilder::from("base");
 builder.expose_secret_mut().push_str("pepper");
-let pw: SecurePassword = builder.into_password();
+let pw: SecurePassword = builder.build();
 
-let key = secure!([u8; 32], rand::random()); // fixed-size, stack-allocated when `stack` enabled
+// Fixed-size keys (stack-allocated when `stack` enabled)
+let key = secure!([u8; 32], rand::random::<[u8; 32]>());  // Zeroizing<[u8; 32]>
+let key = secure_gate::key32([0x42; 32]);                // same thing
 ```
 
-### Fixed-size constructors (available when the `stack` feature is enabled)
+### Accessors
 
 ```rust
-use secure_gate::{key32, nonce24};
-
-let aes_key = key32([0x42; 32]);     // Zeroizing<[u8; 32]>
-let nonce   = nonce24([0; 24]);      // Zeroizing<[u8; 24]>
+let secret: &str = gate.expose_secret();
+let secret: &mut String = gate.expose_secret_mut();
 ```
 
-## Feature matrix
+Use `.expose_secret()` — it's the canonical, zero-cost way.
 
-| Feature        | Effect                                                       |
-|----------------|--------------------------------------------------------------|
-| `zeroize`      | Enables zeroization + `SecretBox<T>` (on by default)         |
-| `stack`        | Zero-allocation fixed-size secrets (on by default)           |
-| `serde`        | Serialization support                                        |
-| `unsafe-wipe`  | Faster zeroization for `SecureGate<String>` (opt-in)         |
-| `full`         | All of the above                                             |
+## Why secure-gate?
 
-## Zeroization guarantees
-
-Same guarantees as the `zeroize` crate:
-- Secrets are overwritten on drop and explicit mutation
-- Stack-based fixed-size types are zeroized without heap allocation
-- `finish_mut()` reduces excess capacity where possible
-
-See the crate documentation for details and limitations.
+- **Zero overhead** when zeroization is disabled
+- **True stack allocation** for fixed-size keys
+- **Configurable wiping strategy** — from safe to paranoid
+- **No breaking changes** from 0.3.x → 0.4.x (deprecated aliases preserved)
+- **Extensively tested** including slack wiping, timing variance, and concurrency
 
 ## Migration from 0.3.x
 
-All public aliases and functionality remain available.  
-Only the internal generic type name changed from `Secure<T>` / `HeapSecure<T>` to `SecureGate<T>`.  
-Old names are provided through the `deprecated` module with compiler warnings.
+All your existing code continues to compile:
+```rust
+use secure_gate::SecurePassword;  // still works
+use secure_gate::Secure;          // deprecated but available
+```
+
+Only the underlying generic type changed:
+```rust
+// Old
+let s = HeapSecure::new("data".to_string());
+
+// New (recommended)
+let s = SecureGate::new("data".to_string());
+// or
+type SG<T> = SecureGate<T>;
+let s = SG::new("data".to_string());
+```
 
 ## License
 
-MIT OR Apache-2.0
+Dual-licensed under MIT OR Apache-2.0, at your option.
