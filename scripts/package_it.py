@@ -51,12 +51,12 @@ PACKAGES = [
         "recursive_bases": ["tests"],
         "description": "Integration tests only",
     },
-    {
-        "name": "secure_gate_fuzz_package",
-        "root_files": ["fuzz/Cargo.toml"],
-        "recursive_bases": ["fuzz/fuzz_targets"],
-        "description": "Fuzzing targets",
-    },
+    # {
+    #     "name": "secure_gate_fuzz_package",
+    #     "root_files": ["fuzz/Cargo.toml"],
+    #     "recursive_bases": ["fuzz/fuzz_targets"],
+    #     "description": "Fuzzing targets",
+    # },
 ]
 
 # ===================================================================
