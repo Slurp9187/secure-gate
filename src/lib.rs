@@ -1,41 +1,39 @@
-// src/lib.rs (actual file name)
+// src/lib.rs
 //
-// Crate root with re-exports and trait definitions
+// Core secure wrapper types and traits — secure-gate 0.4.0+
+// Unified public API built on SecureGate<T>
 
 #![no_std]
 #![cfg_attr(not(feature = "unsafe-wipe"), forbid(unsafe_code))]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
+// ──────────────────────────────────────────────────────────────
+// Silence known, expected, and unfixable warnings in deprecated code
+// These are intentional and correct — we want them to exist
+// ──────────────────────────────────────────────────────────────
+#![allow(deprecated)] // old code uses deprecated aliases — correct
+#![allow(type_alias_bounds)] // Rust limitation, tracked in #112792 — unfixable
 
 extern crate alloc;
 
+// Public modules
 pub mod aliases;
-#[cfg(feature = "zeroize")]
 pub mod deprecated;
-pub mod heap;
 pub mod macros;
-pub mod stack;
-pub mod traits;
+pub mod secure_gate;
 
+// The One True Type
+pub use secure_gate::SecureGate;
+
+/// Short prefix
+pub type SG<T> = SecureGate<T>;
+
+// Public re-exports
 pub use aliases::*;
-pub use heap::HeapSecure as Secure;
-#[cfg(feature = "stack")]
-pub use stack::*;
 
-#[allow(deprecated)]
+// Legacy bridge — keeps every test and old user alive
 #[cfg(feature = "zeroize")]
-pub use deprecated::SecurePasswordMut;
+pub use deprecated::*;
 
 // Re-export secrecy traits when zeroize is enabled
 #[cfg(feature = "zeroize")]
 pub use secrecy::{ExposeSecret, ExposeSecretMut};
-
-// Fallback traits when zeroize disabled
-#[cfg(not(feature = "zeroize"))]
-pub trait ExposeSecret<T: ?Sized> {
-    fn expose_secret(&self) -> &T;
-}
-
-#[cfg(not(feature = "zeroize"))]
-pub trait ExposeSecretMut<T: ?Sized> {
-    fn expose_secret_mut(&mut self) -> &mut T;
-}

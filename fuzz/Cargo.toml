@@ -18,9 +18,9 @@ zeroize = { version = "1.8", default-features = false, features = [
   "zeroize_derive",
 ] }
 
-
 [features]
 zeroize = ["secure-gate/zeroize"]
+serde = ["secure-gate/serde"]     # ← THIS LINE WAS MISSING
 
 [[bin]]
 name = "clone"

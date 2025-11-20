@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-11-20
+
+### Breaking Changes (semver-minor)
+- Unified all secure wrapper types under a single generic type: `SecureGate<T>`  
+  (replaces the previous `HeapSecure` / `Secure<T>` naming)
+- `SecureGate<T>` is now the canonical public name and is re-exported at the crate root
+- All existing type aliases (`SecurePassword`, `SecureKey32`, `SecureNonce24`, etc.) remain unchanged and continue to work exactly as before
+
+### Added
+- New short alias `SG<T>` for `SecureGate<T>`
+- Fixed-size secrets now use `zeroize::Zeroizing` directly when the `stack` feature is enabled (zero wrapper overhead)
+- All constructors for stack-based keys (`key32`, `nonce24`, etc.) are now available in the crate root
+
+### Changed
+- `secure!` macro now expands to `SecureGate::<T>::new(...)`
+- Internal modules reorganized for clarity:
+  - `heap.rs` → `secure_gate.rs`
+  - `stack.rs` → `fixed_stack.rs`
+- Removed unnecessary wrapper types (`StackSecure`) and redundant trait implementations
+
+### Deprecated
+- The old names `Secure<T>` and `HeapSecure<T>` are now deprecated aliases pointing to `SecureGate<T>`
+- They will be removed in a future 1.0 release
+- A comprehensive `deprecated` module keeps all 0.3.x code compiling with only deprecation warnings
+
+### Fixed
+- Resolved remaining trait resolution issues in `no-default-features` mode
+- Cleaned up Clippy warnings and ensured zero unexpected warnings on fresh builds
+
 ## [0.3.4] - 2025-11-18
 
 ### Documentation

@@ -1,61 +1,71 @@
 // fuzz/fuzz_targets/serde.rs
 //
 // Fuzz target for all serde (de)serialization paths — untrusted input!
+// Only active when the "serde" feature is enabled in the fuzz crate.
 
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use secure_gate::{ExposeSecret, Secure, SecurePassword};
+#[cfg(feature = "serde")]
+use secure_gate::{SecureGate, SecurePassword};
 
 const MAX_INPUT: usize = 1_048_576; // 1 MiB — OOM-safe
-const MAX_STRING: usize = 524_288; // 512 KiB — string guard
 
 fuzz_target!(|data: &[u8]| {
-    // 1. Hard OOM protection
+    // Hard OOM protection
     if data.len() > MAX_INPUT {
         return;
     }
 
-    // 2. JSON → SecurePassword
-    let _ = serde_json::from_slice::<SecurePassword>(data); // Force error paths too
-    if let Ok(pw) = serde_json::from_slice::<SecurePassword>(data) {
-        let _ = pw.expose_secret().len();
-        drop(pw);
-    }
-
-    // 3. Bincode → Vec<u8> → Secure<Vec<u8>>
-    let config = bincode::config::standard().with_limit::<MAX_INPUT>();
-    let _ = bincode::decode_from_slice::<Vec<u8>, _>(data, config); // Probe errors
-    if let Ok((vec, _)) = bincode::decode_from_slice::<Vec<u8>, _>(data, config) {
-        if vec.len() > MAX_INPUT {
-            return;
+    // -------------------------------------------------
+    // All serde-dependent code is inside these cfg blocks
+    // -------------------------------------------------
+    #[cfg(all(feature = "serde", feature = "zeroize"))]
+    {
+        // JSON → SecurePassword
+        let _ = serde_json::from_slice::<SecurePassword>(data);
+        if let Ok(pw) = serde_json::from_slice::<SecurePassword>(data) {
+            let _ = pw.expose().expose_secret().len();
+            drop(pw);
         }
-        let sec = Secure::new(vec);
-        let _ = sec.expose().len();
-        drop(sec);
-    }
 
-    // 4. Bincode → String → SecurePassword
-    let _ = bincode::decode_from_slice::<String, _>(data, config); // Probe errors
-    if let Ok((s, _)) = bincode::decode_from_slice::<String, _>(data, config) {
-        if s.len() > MAX_STRING {
-            return;
+        // Bincode → String → SecurePassword
+        let config = bincode::config::standard().with_limit::<MAX_INPUT>();
+        let _ = bincode::decode_from_slice::<String, _>(data, config);
+        if let Ok((s, _)) = bincode::decode_from_slice::<String, _>(data, config) {
+            let pw: SecurePassword = s.as_str().into();
+            let _ = pw.expose().expose_secret().len();
+            drop(pw);
         }
-        let pw = SecurePassword::from(s.as_str());
-        let _ = pw.expose_secret().len();
-        drop(pw);
     }
 
-    // 5. Large input stress: Simulate >1MB without OOM (repeat small chunks)
+    #[cfg(feature = "serde")]
+    {
+        // Bincode → Vec<u8> → SecureGate<Vec<u8>>
+        let config = bincode::config::standard().with_limit::<MAX_INPUT>();
+        let _ = bincode::decode_from_slice::<Vec<u8>, _>(data, config);
+        if let Ok((vec, _)) = bincode::decode_from_slice::<Vec<u8>, _>(data, config) {
+            if vec.len() > MAX_INPUT {
+                return;
+            }
+            let sec = SecureGate::new(vec);
+            let _ = sec.expose().len();
+            drop(sec);
+        }
+    }
+
+    // Large-input stress — still useful even without serde
     if data.len() >= 1024 {
-        // Only if non-trivial input
-        for i in 0..=5 {
-            // Bounded repeats
-            let large = vec![data; i + 1]; // Up to 6x (6MB sim, but capped below)
-            if large.concat().len() > MAX_INPUT * 2 {
+        for i in 1..=5 {
+            let repeated_len = data.len() * i as usize;
+            if repeated_len > MAX_INPUT * 2 {
                 break;
-            } // Edge without crash
-            let _ = serde_json::from_slice::<SecurePassword>(&large.concat());
+            }
+            let _large = data.repeat(i as usize);
+
+            // JSON stress only when serde is enabled
+            #[cfg(all(feature = "serde", feature = "zeroize"))]
+            let _ = serde_json::from_slice::<SecurePassword>(&_large);
         }
     }
 });
