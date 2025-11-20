@@ -6,6 +6,12 @@
 #![no_std]
 #![cfg_attr(not(feature = "unsafe-wipe"), forbid(unsafe_code))]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
+// ──────────────────────────────────────────────────────────────
+// Silence known, expected, and unfixable warnings in deprecated code
+// These are intentional and correct — we want them to exist
+// ──────────────────────────────────────────────────────────────
+#![allow(deprecated)] // old code uses deprecated aliases — correct
+#![allow(type_alias_bounds)] // Rust limitation, tracked in #112792 — unfixable
 
 extern crate alloc;
 
