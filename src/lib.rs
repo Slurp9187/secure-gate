@@ -21,9 +21,9 @@ pub use heap::HeapSecure as Secure;
 #[cfg(feature = "stack")]
 pub use stack::*;
 
-#[allow(deprecated)]
-#[cfg(feature = "zeroize")]
-pub use deprecated::SecurePasswordMut;
+// #[allow(deprecated)]
+// #[cfg(feature = "zeroize")]
+// pub use deprecated::SecurePasswordMut;
 
 // Re-export secrecy traits when zeroize is enabled
 #[cfg(feature = "zeroize")]
