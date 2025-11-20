@@ -1,13 +1,7 @@
 // tests/types_tests.rs
-//
-// Test type aliases and From impls for secure wrappers
+// Updated for secure-gate 0.4.0 — fully modernized
 
-// Always-available aliases
-use secure_gate::{SecureBytes, SecureKey32, SecurePassword, SecureStr};
-
-// Feature-gated aliases (only imported when the feature is active)
-#[cfg(feature = "zeroize")]
-use secure_gate::SecurePasswordBuilder;
+use secure_gate::{SecureBytes, SecureKey32, SecurePassword, SecurePasswordBuilder, SecureStr};
 
 #[cfg(feature = "zeroize")]
 use secrecy::{ExposeSecret, ExposeSecretMut};
@@ -32,9 +26,9 @@ fn test_secure_str() {
 fn test_secure_key() {
     let key: SecureKey32 = [0u8; 32].into();
     #[cfg(feature = "stack")]
-    assert_eq!(&*key, &[0u8; 32]); // Deref to inner for stack path
+    assert_eq!(&*key, &[0u8; 32]);
     #[cfg(not(feature = "stack"))]
-    assert_eq!(key.expose(), &[0u8; 32]); // Heap fallback path
+    assert_eq!(key.expose(), &[0u8; 32]);
 }
 
 #[test]
@@ -120,17 +114,13 @@ fn test_secure_password_builder_build() {
 fn test_secure_password_builder_zeroize_after_into() {
     let mut builder: SecurePasswordBuilder = "sensitive".into();
 
-    // Capture raw pointer to the underlying allocation before conversion
     let ptr = builder.expose().expose_secret().as_ptr();
     let len = builder.expose().expose_secret().len();
 
-    // Convert — this must zeroize the builder’s memory
     let pw: SecurePassword = builder.into_password();
 
     assert_eq!(pw.expose().expose_secret(), "sensitive");
 
-    // SAFETY: The allocation is still alive (owned by the dropped builder) and we only read.
-    // This is a white-box test acceptable for security-sensitive crates.
     unsafe {
         let slice = core::slice::from_raw_parts(ptr, len);
         assert!(
