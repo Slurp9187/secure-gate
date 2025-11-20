@@ -21,8 +21,25 @@ pub fn secure_new<T: zeroize::Zeroize>(value: T) -> crate::secure_gate::SecureGa
     crate::secure_gate::SecureGate::new(value)
 }
 
+// ---------------------------------------------------------------------
+// Active aliases (re-exported for backward compatibility)
+// ---------------------------------------------------------------------
+
 #[cfg(feature = "zeroize")]
 pub use crate::aliases::{
-    SecureBytes, SecureIv, SecureKey32, SecureKey64, SecureNonce12, SecureNonce16, SecureNonce24,
-    SecurePassword, SecurePasswordBuilder, SecureSalt, SecureStr,
+    SecureBytes, SecureIv16, SecureKey32, SecureKey64, SecureNonce12, SecureNonce128,
+    SecureNonce16, SecureNonce24, SecureNonce96, SecurePassword, SecurePasswordBuilder,
+    SecureSalt16, SecureStr,
 };
+
+// ---------------------------------------------------------------------
+// Deprecated aliases (proper warnings)
+// ---------------------------------------------------------------------
+
+#[cfg(feature = "zeroize")]
+#[deprecated(since = "0.4.1", note = "use SecureIv16 instead")]
+pub type SecureIv = SecureIv16;
+
+#[cfg(feature = "zeroize")]
+#[deprecated(since = "0.4.1", note = "use SecureSalt16 instead")]
+pub type SecureSalt = SecureSalt16;
