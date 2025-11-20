@@ -14,9 +14,11 @@ use alloc::boxed::Box;
 use core::{convert::Infallible, str::FromStr};
 
 #[cfg(feature = "zeroize")]
-use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
+use secrecy::ExposeSecret;
 #[cfg(feature = "zeroize")]
-use zeroize::Zeroize;
+use secrecy::SecretBox;
+#[cfg(feature = "zeroize")]
+use zeroize::{Zeroize, Zeroizing};
 
 /// Secure byte slice: SecureGate<[u8]>
 pub type SecureBytes = SecureGate<[u8]>;
@@ -100,7 +102,7 @@ impl From<String> for SecurePassword {
 
 #[cfg(not(feature = "zeroize"))]
 impl From<&str> for SecurePassword {
-    fn fromATM(s: &str) -> Self {
+    fn from(s: &str) -> Self {
         SecureGate::new(s.to_string())
     }
 }
@@ -133,11 +135,13 @@ impl From<String> for SecurePasswordBuilder {
     }
 }
 
+/// Critical fix: use expose() + expose_mut() on the SecretBox directly
 #[cfg(feature = "zeroize")]
 impl SecurePasswordBuilder {
     pub fn into_password(&mut self) -> SecurePassword {
-        let s: String = self.expose_secret().clone();
-        self.expose_secret_mut().zeroize();
+        let inner = self.expose_mut();
+        let s = inner.expose_secret().clone();
+        inner.zeroize();
         SecurePassword::from(s)
     }
 
@@ -170,16 +174,46 @@ pub type SecureNonce24 = SecureGate<[u8; 24]>;
 // =====================================================================
 
 #[cfg(feature = "stack")]
-pub type SecureKey32 = crate::fixed_stack::Key32;
+pub type SecureKey32 = Zeroizing<[u8; 32]>;
 #[cfg(feature = "stack")]
-pub type SecureKey64 = crate::fixed_stack::Key64;
+pub type SecureKey64 = Zeroizing<[u8; 64]>;
 #[cfg(feature = "stack")]
-pub type SecureIv = crate::fixed_stack::Iv;
+pub type SecureIv = Zeroizing<[u8; 16]>;
 #[cfg(feature = "stack")]
-pub type SecureSalt = crate::fixed_stack::Salt;
+pub type SecureSalt = Zeroizing<[u8; 16]>;
 #[cfg(feature = "stack")]
-pub type SecureNonce12 = crate::fixed_stack::Nonce12;
+pub type SecureNonce12 = Zeroizing<[u8; 12]>;
 #[cfg(feature = "stack")]
-pub type SecureNonce16 = crate::fixed_stack::Nonce16;
+pub type SecureNonce16 = Zeroizing<[u8; 16]>;
 #[cfg(feature = "stack")]
-pub type SecureNonce24 = crate::fixed_stack::Nonce24;
+pub type SecureNonce24 = Zeroizing<[u8; 24]>;
+
+// Constructors for stack types
+#[cfg(feature = "stack")]
+pub fn key32(bytes: [u8; 32]) -> SecureKey32 {
+    Zeroizing::new(bytes)
+}
+#[cfg(feature = "stack")]
+pub fn key64(bytes: [u8; 64]) -> SecureKey64 {
+    Zeroizing::new(bytes)
+}
+#[cfg(feature = "stack")]
+pub fn iv(bytes: [u8; 16]) -> SecureIv {
+    Zeroizing::new(bytes)
+}
+#[cfg(feature = "stack")]
+pub fn salt(bytes: [u8; 16]) -> SecureSalt {
+    Zeroizing::new(bytes)
+}
+#[cfg(feature = "stack")]
+pub fn nonce12(bytes: [u8; 12]) -> SecureNonce12 {
+    Zeroizing::new(bytes)
+}
+#[cfg(feature = "stack")]
+pub fn nonce16(bytes: [u8; 16]) -> SecureNonce16 {
+    Zeroizing::new(bytes)
+}
+#[cfg(feature = "stack")]
+pub fn nonce24(bytes: [u8; 24]) -> SecureNonce24 {
+    Zeroizing::new(bytes)
+}
