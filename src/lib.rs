@@ -1,6 +1,7 @@
-// src/lib.rs (actual file name)
+// src/lib.rs
 //
-// Crate root with re-exports and trait definitions
+// Core secure wrapper types and traits — secure-gate 0.4.0+
+// Unified public API built on SecureGate<T>
 
 #![no_std]
 #![cfg_attr(not(feature = "unsafe-wipe"), forbid(unsafe_code))]
@@ -8,34 +9,38 @@
 
 extern crate alloc;
 
+// Public modules
 pub mod aliases;
-#[cfg(feature = "zeroize")]
 pub mod deprecated;
-pub mod heap;
 pub mod macros;
-pub mod stack;
+pub mod secure_gate;
 pub mod traits;
 
+// The One True Type
+pub use secure_gate::SecureGate;
+
+/// Short prefix
+pub type SG<T> = SecureGate<T>;
+
+// Public re-exports
+// pub use crate::secure; // macro_export lives at crate root
 pub use aliases::*;
-pub use heap::HeapSecure as Secure;
+
+// Fixed-size stack secrets — only when feature = "stack"
 #[cfg(feature = "stack")]
-pub use stack::*;
+pub mod fixed_stack;
+#[cfg(feature = "stack")]
+pub mod fixed {
+    pub use crate::fixed_stack::*;
+}
 
-// #[allow(deprecated)]
-// #[cfg(feature = "zeroize")]
-// pub use deprecated::SecurePasswordMut;
+// Legacy bridge — keeps every test and old user alive
+pub use deprecated::*;
 
-// Re-export secrecy traits when zeroize is enabled
+// Re-export traits directly from secrecy when zeroize is on
 #[cfg(feature = "zeroize")]
 pub use secrecy::{ExposeSecret, ExposeSecretMut};
 
-// Fallback traits when zeroize disabled
+// Fallback traits when zeroize is off (from your original lib.rs)
 #[cfg(not(feature = "zeroize"))]
-pub trait ExposeSecret<T: ?Sized> {
-    fn expose_secret(&self) -> &T;
-}
-
-#[cfg(not(feature = "zeroize"))]
-pub trait ExposeSecretMut<T: ?Sized> {
-    fn expose_secret_mut(&mut self) -> &mut T;
-}
+pub use traits::{ExposeSecret, ExposeSecretMut};

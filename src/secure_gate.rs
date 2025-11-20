@@ -1,6 +1,8 @@
-// src/heap.rs (actual file name)
+// src/secure_gate.rs
 //
-// Heap-allocated secure wrapper with feature-gated zeroization
+// Unified secure wrapper – the new public name for 0.4.0+
+// Routes to secrecy::SecretBox<T> when zeroize is on, Box<T> when off.
+// Fixed-size types use fixed_stack.rs via aliases.
 
 #![cfg_attr(not(feature = "unsafe-wipe"), forbid(unsafe_code))]
 
@@ -21,21 +23,23 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 #[cfg(not(feature = "zeroize"))]
 use crate::{ExposeSecret, ExposeSecretMut};
 
-/// Heap-allocated secure wrapper: `SecretBox<T>` (zeroize) or `Box<T>` (fallback).
+/// Unified secure wrapper: `SecretBox<T>` (zeroize) or `Box<T>` (fallback).
+/// This is the new public name starting with secure-gate 0.4.0.
 #[cfg(feature = "zeroize")]
-pub struct HeapSecure<T: Zeroize + ?Sized>(SecretBox<T>);
+pub struct SecureGate<T: Zeroize + ?Sized>(SecretBox<T>);
+
 #[cfg(not(feature = "zeroize"))]
-pub struct HeapSecure<T: ?Sized>(Box<T>);
+pub struct SecureGate<T: ?Sized>(Box<T>);
 
 #[cfg(feature = "zeroize")]
-impl<T: Zeroize + Sized> HeapSecure<T> {
+impl<T: Zeroize + Sized> SecureGate<T> {
     #[inline]
     pub fn new(value: T) -> Self {
         Self(SecretBox::new(Box::new(value)))
     }
 }
 #[cfg(not(feature = "zeroize"))]
-impl<T: Sized> HeapSecure<T> {
+impl<T: Sized> SecureGate<T> {
     #[inline]
     pub fn new(value: T) -> Self {
         Self(Box::new(value))
@@ -43,14 +47,14 @@ impl<T: Sized> HeapSecure<T> {
 }
 
 #[cfg(feature = "zeroize")]
-impl<T: Zeroize + ?Sized> HeapSecure<T> {
+impl<T: Zeroize + ?Sized> SecureGate<T> {
     #[inline]
     pub fn new_unsized(value: Box<T>) -> Self {
         Self(SecretBox::new(value))
     }
 }
 #[cfg(not(feature = "zeroize"))]
-impl<T: ?Sized> HeapSecure<T> {
+impl<T: ?Sized> SecureGate<T> {
     #[inline]
     pub fn new_unsized(value: Box<T>) -> Self {
         Self(value)
@@ -58,7 +62,7 @@ impl<T: ?Sized> HeapSecure<T> {
 }
 
 #[cfg(feature = "zeroize")]
-impl<T: Zeroize + ?Sized> HeapSecure<T> {
+impl<T: Zeroize + ?Sized> SecureGate<T> {
     #[inline]
     pub fn expose(&self) -> &T {
         self.0.expose_secret()
@@ -69,7 +73,7 @@ impl<T: Zeroize + ?Sized> HeapSecure<T> {
     }
 }
 #[cfg(not(feature = "zeroize"))]
-impl<T: ?Sized> HeapSecure<T> {
+impl<T: ?Sized> SecureGate<T> {
     #[inline]
     pub fn expose(&self) -> &T {
         &self.0
@@ -81,78 +85,66 @@ impl<T: ?Sized> HeapSecure<T> {
 }
 
 #[cfg(feature = "zeroize")]
-impl<T: Zeroize + ?Sized> Debug for HeapSecure<T> {
+impl<T: Zeroize + ?Sized> Debug for SecureGate<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Secure<[REDACTED]>")
     }
 }
 #[cfg(not(feature = "zeroize"))]
-impl<T: ?Sized> Debug for HeapSecure<T> {
+impl<T: ?Sized> Debug for SecureGate<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Secure<[REDACTED]>")
     }
 }
 
-// #[cfg(feature = "zeroize")]
-// impl<T: Zeroize + ?Sized> ExposeSecret<T> for HeapSecure<T> {
-//     fn expose_secret(&self) -> &T {
-//         self.0.expose_secret()
-//     }
-// }
-// #[cfg(feature = "zeroize")]
-// impl<T: Zeroize + ?Sized> ExposeSecretMut<T> for HeapSecure<T> {
-//     fn expose_secret_mut(&mut self) -> &mut T {
-//         self.0.expose_secret_mut()
-//     }
-// }
 #[cfg(not(feature = "zeroize"))]
-impl<T: ?Sized> ExposeSecret<T> for HeapSecure<T> {
+impl<T: ?Sized> ExposeSecret<T> for SecureGate<T> {
     fn expose_secret(&self) -> &T {
         self.expose()
     }
 }
 #[cfg(not(feature = "zeroize"))]
-impl<T: ?Sized> ExposeSecretMut<T> for HeapSecure<T> {
+impl<T: ?Sized> ExposeSecretMut<T> for SecureGate<T> {
     fn expose_secret_mut(&mut self) -> &mut T {
         self.expose_mut()
     }
 }
 
 #[cfg(feature = "zeroize")]
-impl<T: Clone + Zeroize + Sized> Clone for HeapSecure<T> {
+impl<T: Clone + Zeroize + Sized> Clone for SecureGate<T> {
     fn clone(&self) -> Self {
         Self::init_with(|| self.expose().clone())
     }
 }
 #[cfg(not(feature = "zeroize"))]
-impl<T: Clone> Clone for HeapSecure<T> {
+impl<T: Clone> Clone for SecureGate<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
 #[cfg(feature = "zeroize")]
-impl<T: Default + Zeroize + Sized> Default for HeapSecure<T> {
+impl<T: Default + Zeroize + Sized> Default for SecureGate<T> {
     fn default() -> Self {
         Self::new(T::default())
     }
 }
 #[cfg(not(feature = "zeroize"))]
-impl<T: Default + Sized> Default for HeapSecure<T> {
+impl<T: Default + Sized> Default for SecureGate<T> {
     fn default() -> Self {
         Self::new(T::default())
     }
 }
 
 #[cfg(feature = "zeroize")]
-impl Zeroize for HeapSecure<Vec<u8>> {
+impl Zeroize for SecureGate<Vec<u8>> {
     fn zeroize(&mut self) {
         self.expose_mut().as_mut_slice().zeroize();
     }
 }
 
 #[cfg(all(feature = "zeroize", not(feature = "unsafe-wipe")))]
-impl Zeroize for HeapSecure<String> {
+impl Zeroize for SecureGate<String> {
     fn zeroize(&mut self) {
         let len = self.expose().len();
         let zeros = "\0".repeat(len);
@@ -161,7 +153,7 @@ impl Zeroize for HeapSecure<String> {
 }
 
 #[cfg(feature = "unsafe-wipe")]
-impl Zeroize for HeapSecure<String> {
+impl Zeroize for SecureGate<String> {
     fn zeroize(&mut self) {
         use core::hint::black_box;
         use core::sync;
@@ -189,10 +181,10 @@ impl Zeroize for HeapSecure<String> {
 }
 
 #[cfg(feature = "zeroize")]
-impl<T: Zeroize + ?Sized> ZeroizeOnDrop for HeapSecure<T> {}
+impl<T: Zeroize + ?Sized> ZeroizeOnDrop for SecureGate<T> {}
 
 #[cfg(feature = "zeroize")]
-impl<T: Clone + Zeroize + Sized> HeapSecure<T> {
+impl<T: Clone + Zeroize + Sized> SecureGate<T> {
     pub fn init_with(ctr: impl FnOnce() -> T) -> Self {
         Self(SecretBox::init_with(ctr))
     }
@@ -201,7 +193,7 @@ impl<T: Clone + Zeroize + Sized> HeapSecure<T> {
     }
 }
 #[cfg(not(feature = "zeroize"))]
-impl<T: Sized> HeapSecure<T> {
+impl<T: Sized> SecureGate<T> {
     pub fn init_with(ctr: impl FnOnce() -> T) -> Self {
         Self::new(ctr())
     }
@@ -211,14 +203,14 @@ impl<T: Sized> HeapSecure<T> {
 }
 
 #[cfg(feature = "zeroize")]
-impl<T: Default + Zeroize + Sized> HeapSecure<T> {
+impl<T: Default + Zeroize + Sized> SecureGate<T> {
     pub fn init_with_mut(ctr: impl FnOnce(&mut T)) -> Self {
         Self(SecretBox::init_with_mut(ctr))
     }
 }
 
 #[cfg(feature = "zeroize")]
-impl<T: Clone + Zeroize + Sized> HeapSecure<T> {
+impl<T: Clone + Zeroize + Sized> SecureGate<T> {
     pub fn into_inner(mut self) -> Box<T> {
         let value = self.0.expose_secret().clone();
         self.0.zeroize();
@@ -226,14 +218,15 @@ impl<T: Clone + Zeroize + Sized> HeapSecure<T> {
     }
 }
 #[cfg(not(feature = "zeroize"))]
-impl<T: ?Sized> HeapSecure<T> {
+impl<T: ?Sized> SecureGate<T> {
     pub fn into_inner(self) -> Box<T> {
         self.0
     }
 }
 
+// Serde impls — unchanged, just renamed type
 #[cfg(all(feature = "serde", feature = "zeroize"))]
-impl<'de, T> de::Deserialize<'de> for HeapSecure<T>
+impl<'de, T> de::Deserialize<'de> for SecureGate<T>
 where
     T: de::Deserialize<'de> + Zeroize + Sized,
 {
@@ -245,7 +238,7 @@ where
     }
 }
 #[cfg(all(feature = "serde", not(feature = "zeroize")))]
-impl<'de, T> de::Deserialize<'de> for HeapSecure<T>
+impl<'de, T> de::Deserialize<'de> for SecureGate<T>
 where
     T: de::Deserialize<'de> + Sized,
 {
@@ -258,7 +251,7 @@ where
 }
 
 #[cfg(all(feature = "serde", feature = "zeroize"))]
-impl<T> Serialize for HeapSecure<T>
+impl<T> Serialize for SecureGate<T>
 where
     T: SerializableSecret + Serialize + Zeroize + Sized,
 {
@@ -270,7 +263,7 @@ where
     }
 }
 #[cfg(all(feature = "serde", not(feature = "zeroize")))]
-impl<T> Serialize for HeapSecure<T>
+impl<T> Serialize for SecureGate<T>
 where
     T: Serialize + Sized,
 {
@@ -282,9 +275,7 @@ where
     }
 }
 
-impl HeapSecure<String> {
-    /// Best-effort shrink excess capacity after mutation.
-    /// Works whether the `zeroize` feature is enabled or not.
+impl SecureGate<String> {
     #[inline]
     pub fn finish_mut(&mut self) -> &mut String {
         self.expose_mut().shrink_to_fit();
@@ -292,8 +283,7 @@ impl HeapSecure<String> {
     }
 }
 
-impl HeapSecure<Vec<u8>> {
-    /// Best-effort shrink excess capacity after mutation.
+impl SecureGate<Vec<u8>> {
     #[inline]
     pub fn finish_mut(&mut self) -> &mut Vec<u8> {
         self.expose_mut().shrink_to_fit();

@@ -6,33 +6,23 @@
 
 // Old unified name – users wrote `Secure<T>`
 #[deprecated(since = "0.4.0", note = "use SecureGate<T> instead")]
-pub type Secure<T: zeroize::Zeroize> = crate::heap::HeapSecure<T>;
+pub type Secure<T: zeroize::Zeroize> = crate::secure_gate::SecureGate<T>;
 
 // Old heap wrapper name
 #[deprecated(since = "0.4.0", note = "use SecureGate<T> instead")]
-pub type HeapSecure<T: zeroize::Zeroize> = crate::heap::HeapSecure<T>;
+pub type HeapSecure<T: zeroize::Zeroize> = crate::secure_gate::SecureGate<T>;
 
 // Old constructor function
 #[deprecated(
     since = "0.4.0",
     note = "use the secure! macro or SecureGate::new instead"
 )]
-pub fn secure_new<T: zeroize::Zeroize>(value: T) -> crate::heap::HeapSecure<T> {
-    crate::heap::HeapSecure::new(value)
+pub fn secure_new<T: zeroize::Zeroize>(value: T) -> crate::secure_gate::SecureGate<T> {
+    crate::secure_gate::SecureGate::new(value)
 }
 
-// All old aliases – already constrained properly in aliases.rs
+// All old aliases – keep them alive
 pub use crate::aliases::{
     SecureBytes, SecureIv, SecureKey32, SecureKey64, SecureNonce12, SecureNonce16, SecureNonce24,
     SecurePassword, SecurePasswordBuilder, SecureSalt, SecureStr,
 };
-
-// Old module paths – point to current files
-pub mod heap {
-    pub use crate::heap::*;
-}
-
-#[cfg(feature = "stack")]
-pub mod stack {
-    pub use crate::stack::*;
-}

@@ -1,13 +1,13 @@
-// src/traits.rs – ONLY THE TWO CASES WE ACTUALLY USE
+// src/traits.rs
 
 #[cfg(feature = "zeroize")]
-use crate::heap::HeapSecure;
+use crate::secure_gate::SecureGate;
 #[cfg(feature = "zeroize")]
 use secrecy::{ExposeSecret, ExposeSecretMut};
 
-/// For SecurePassword: HeapSecure<SecretBox<str>>
+/// For SecurePassword: SecureGate<SecretBox<str>>
 #[cfg(feature = "zeroize")]
-impl ExposeSecret<str> for HeapSecure<secrecy::SecretBox<str>> {
+impl ExposeSecret<str> for SecureGate<secrecy::SecretBox<str>> {
     #[inline(always)]
     fn expose_secret(&self) -> &str {
         self.expose().expose_secret()
@@ -15,16 +15,16 @@ impl ExposeSecret<str> for HeapSecure<secrecy::SecretBox<str>> {
 }
 
 #[cfg(feature = "zeroize")]
-impl ExposeSecretMut<str> for HeapSecure<secrecy::SecretBox<str>> {
+impl ExposeSecretMut<str> for SecureGate<secrecy::SecretBox<str>> {
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut str {
         self.expose_mut().expose_secret_mut()
     }
 }
 
-/// For SecurePasswordBuilder: HeapSecure<SecretBox<String>>
+/// For SecurePasswordBuilder: SecureGate<SecretBox<String>>
 #[cfg(feature = "zeroize")]
-impl ExposeSecret<alloc::string::String> for HeapSecure<secrecy::SecretBox<alloc::string::String>> {
+impl ExposeSecret<alloc::string::String> for SecureGate<secrecy::SecretBox<alloc::string::String>> {
     #[inline(always)]
     fn expose_secret(&self) -> &alloc::string::String {
         self.expose().expose_secret()
@@ -33,7 +33,7 @@ impl ExposeSecret<alloc::string::String> for HeapSecure<secrecy::SecretBox<alloc
 
 #[cfg(feature = "zeroize")]
 impl ExposeSecretMut<alloc::string::String>
-    for HeapSecure<secrecy::SecretBox<alloc::string::String>>
+    for SecureGate<secrecy::SecretBox<alloc::string::String>>
 {
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut alloc::string::String {
