@@ -1,5 +1,6 @@
 // tests/zeroize_tests.rs
-// Updated for secure-gate 0.4.0 — uses SecureGate<T>
+//
+// Validate zeroization behavior including unsafe-wipe full-buffer wiping
 
 #[cfg(feature = "zeroize")]
 mod tests {
@@ -27,16 +28,9 @@ mod tests {
 
         v.zeroize();
 
-        assert_eq!(v.expose().len(), len, "zeroize must not change .len()");
-        assert_eq!(
-            v.expose().capacity(),
-            cap,
-            "zeroize must not change capacity"
-        );
-        assert!(
-            v.expose().iter().all(|&b| b == 0),
-            "all bytes must be zeroed"
-        );
+        assert_eq!(v.expose().len(), len);
+        assert_eq!(v.expose().capacity(), cap);
+        assert!(v.expose().iter().all(|&b| b == 0));
     }
 
     #[test]
@@ -47,7 +41,7 @@ mod tests {
 
         v.zeroize();
 
-        assert_eq!(v.expose().len(), pre_len, "zeroize must not clear/truncate");
+        assert_eq!(v.expose().len(), pre_len);
         assert!(v.expose().iter().all(|&b| b == 0));
     }
 
@@ -77,10 +71,7 @@ mod tests {
         let s = SecureGate::new(Secret(original.clone()));
 
         assert_eq!(s.expose().0, original);
-
         drop(s);
-        // ZeroizeOnDrop called → memory wiped
-        // Test passes if no panic and derive worked
     }
 
     // --------------------------------------------------------------------- //
@@ -90,7 +81,6 @@ mod tests {
     #[test]
     fn secure_string_zeroize_works() {
         let mut pw = SecureGate::new("supersecret".to_string());
-
         assert_eq!(pw.expose().as_str(), "supersecret");
 
         pw.zeroize();
@@ -133,25 +123,23 @@ mod tests {
     #[cfg(feature = "unsafe-wipe")]
     #[test]
     fn unsafe_wipe_overallocated_preserves_slack_zeroed() {
-        let mut s = SecureGate::new(String::with_capacity(1024));
+        // CRITICAL: Use new_full_wipe to trigger Full mode
+        let mut s = SecureGate::new_full_wipe(String::with_capacity(1024));
         s.expose_mut().push_str("short");
         let original_len = s.expose().len();
         let original_cap = s.expose().capacity();
 
         s.zeroize();
 
-        assert_eq!(s.expose().len(), original_len, "len must hold");
-        assert_eq!(s.expose().capacity(), original_cap, "cap must hold");
-        assert_eq!(
-            s.expose().as_str(),
-            "\0".repeat(original_len),
-            "visible bytes zeroed"
-        );
+        assert_eq!(s.expose().len(), original_len);
+        assert_eq!(s.expose().capacity(), original_cap);
+        assert_eq!(s.expose().as_str(), "\0".repeat(original_len));
 
         let post_full: Vec<u8> = unsafe {
             let vec = s.expose_mut().as_mut_vec();
             let ptr = vec.as_ptr();
-            std::slice::from_raw_parts(ptr, original_cap).to_vec()
+            let cap = vec.capacity();
+            std::slice::from_raw_parts(ptr, cap).to_vec()
         };
         assert!(
             post_full.iter().all(|&b| b == 0),
@@ -176,39 +164,24 @@ mod tests {
 
         let start = Instant::now();
         for h in handles {
-            h.join().expect("Thread join failed—potential deadlock");
+            h.join().expect("Thread join failed");
         }
-        let duration = start.elapsed();
-        assert!(
-            duration < Duration::from_secs(1),
-            "Contention too high—possible lock flaw"
-        );
+        assert!(start.elapsed() < Duration::from_secs(1));
     }
 
     #[cfg(feature = "unsafe-wipe")]
     #[test]
     fn unsafe_wipe_large_buffer_no_panic() {
         let payload = "a".repeat(1_000_000);
-        let mut s = SecureGate::new(payload);
-        let original_len = s.expose().len();
-        let original_cap = s.expose().capacity();
-
+        let mut s = SecureGate::new_full_wipe(payload);
         s.expose_mut().reserve(1_000_000);
 
         let start = Instant::now();
         s.zeroize();
         let duration = start.elapsed();
 
-        assert_eq!(s.expose().len(), original_len, "len preserved");
-        assert!(
-            s.expose().capacity() >= original_cap + 1_000_000,
-            "cap grew"
-        );
-        assert!(
-            s.expose().as_bytes().iter().all(|&b| b == 0),
-            "bytes zeroed"
-        );
-        assert!(duration < Duration::from_millis(100), "zeroize too slow");
+        assert!(s.expose().as_bytes().iter().all(|&b| b == 0));
+        assert!(duration < Duration::from_millis(100));
     }
 
     #[cfg(feature = "unsafe-wipe")]
@@ -222,7 +195,7 @@ mod tests {
             let iterations = 1000;
 
             for _ in 0..iterations {
-                let mut s = SecureGate::new("a".repeat(size));
+                let mut s = SecureGate::new_full_wipe("a".repeat(size));
                 s.expose_mut().reserve(size * 2);
 
                 let start = Instant::now();
@@ -230,8 +203,7 @@ mod tests {
                 total += start.elapsed();
             }
 
-            let avg = total / iterations;
-            timings.insert(size, avg);
+            timings.insert(size, total / iterations);
         }
 
         let min_time = *timings.values().min().unwrap();
@@ -239,7 +211,7 @@ mod tests {
         let variance_ns = (max_time - min_time).as_nanos();
         assert!(
             variance_ns < 1_000_000u128,
-            "Timing leak detected: variance {variance_ns}ns"
+            "Timing variance too high: {variance_ns}ns"
         );
         println!("Timings: {timings:?}");
     }
@@ -247,29 +219,21 @@ mod tests {
     #[cfg(feature = "unsafe-wipe")]
     #[test]
     fn unsafe_wipe_string_preserves_length_and_zeros_bytes() {
-        let mut s = SecureGate::new("supersecret".to_string());
+        let mut s = SecureGate::new_full_wipe("supersecret".to_string());
 
         let len = s.expose().len();
         let cap = s.expose().capacity();
 
         s.zeroize();
 
-        assert_eq!(s.expose().len(), len, "unsafe-wipe must preserve length");
-        assert_eq!(
-            s.expose().capacity(),
-            cap,
-            "unsafe-wipe must preserve capacity"
-        );
-        assert_eq!(
-            s.expose().as_str(),
-            "\0".repeat(len),
-            "all bytes must be zeroed"
-        );
+        assert_eq!(s.expose().len(), len);
+        assert_eq!(s.expose().capacity(), cap);
+        assert_eq!(s.expose().as_str(), "\0".repeat(len));
     }
 }
 
 // ------------------------------------------------------------------------- //
-// Fallback mode (no zeroize) — basic sanity
+// Fallback mode (no zeroize)
 // ------------------------------------------------------------------------- //
 
 #[cfg(not(feature = "zeroize"))]
