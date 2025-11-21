@@ -1,26 +1,28 @@
 # secure-gate
 
-Zero-overhead, `no_std`-compatible secret wrappers with **configurable zeroization**.
+**Experimental crate — under active development**
 
-## v0.4.1 – 2025-11-20
+Zero-overhead, `no_std`-compatible secret wrappers with configurable zeroization.
 
-### New in 0.4.1 – Configurable Zeroization Modes
+**Current status**: The crate is in an experimental phase. The public API is stabilizing, but breaking changes are still possible (especially in the 0.5.0 release). Use in production with caution.
 
-```rust
-use secure_gate::{SecureGate, ZeroizeMode};
+## v0.4.2 – 2025-11-20
 
-let pw = SecureGate::new("hunter2".to_string());                    // Safe mode (default)
-let pw_full = SecureGate::new_full_wipe("hunter2".to_string());     // Full wipe (incl. slack)
-let pw_pass = SecureGate::new_passthrough("hunter2".to_string());   // No extra wiping
+This release fixes a long-standing regression and brings the crate to a stable, fully-tested state.
 
-let pw_custom = SecureGate::with_mode("hunter2".to_string(), ZeroizeMode::Full);
-```
+### Fixed
+- #27: Restored `.expose_secret()` and `.expose_secret_mut()` on `SecurePassword` and `SecurePasswordBuilder`
+- `SecurePasswordBuilder` now supports full mutation and `.build()`
+- `SecureStackPassword` is now truly zero-heap using `zeroize::Zeroizing<[u8; 128]>`
+- All accessors work correctly under `--no-default-features`
 
-- **`Safe`** (default) – wipes only used bytes (no `unsafe`)
-- **`Full`** – wipes **entire allocation** including spare capacity (`unsafe-wipe` feature)
-- **`Passthrough`** – relies only on inner type’s `Zeroize` impl
+### Added
+- `expose_secret_bytes()` and `expose_secret_bytes_mut()` (gated behind `unsafe-wipe`)
+- Comprehensive regression test suite (`tests/password_tests.rs`) with 8+ guards
 
-Perfect for defense-in-depth, compliance, or performance trade-offs.
+### Improved
+- Zero warnings under `cargo clippy --all-features -- -D warnings`
+- All tests pass on every feature combination
 
 ## Features
 
@@ -28,25 +30,24 @@ Perfect for defense-in-depth, compliance, or performance trade-offs.
 |----------------|------------------------------------------------------------------------|
 | `zeroize`      | Enables zeroization via `secrecy` + `zeroize` (on by default)          |
 | `stack`        | Zero-allocation fixed-size secrets using `Zeroizing<T>` (on by default)|
-| `unsafe-wipe`  | Enables `Full` zeroization mode (wipes spare capacity)                 |
+| `unsafe-wipe`  | Enables full allocation wiping (including spare capacity)              |
 | `serde`        | Serialization support                                                  |
 | `full`         | All features above                                                     |
 
 - `no_std` + `alloc` compatible
-- Zero runtime overhead when `zeroize` is disabled
-- Redacted `Debug` output
-- Full test coverage including timing safety
+- Redacted `Debug` and `Serialize` output
+- Test coverage includes timing safety and slack wiping
 
 ## Installation
 
 ```toml
 [dependencies]
-secure-gate = "0.4.1"
+secure-gate = "0.4.2"
 ```
 
 Enable full wiping:
 ```toml
-secure-gate = { version = "0.4.1", features = ["unsafe-wipe"] }
+secure-gate = { version = "0.4.2", features = ["unsafe-wipe"] }
 ```
 
 ## Quick Start
@@ -54,7 +55,7 @@ secure-gate = { version = "0.4.1", features = ["unsafe-wipe"] }
 ```rust
 use secure_gate::{SecureGate, SecurePassword, secure};
 
-// Immutable password (recommended)
+// Immutable password
 let pw: SecurePassword = "hunter2".into();
 assert_eq!(pw.expose_secret(), "hunter2");
 
@@ -64,46 +65,37 @@ builder.expose_secret_mut().push_str("pepper");
 let pw: SecurePassword = builder.build();
 
 // Fixed-size keys (stack-allocated when `stack` enabled)
-let key = secure!([u8; 32], rand::random::<[u8; 32]>());  // Zeroizing<[u8; 32]>
-let key = secure_gate::key32([0x42; 32]);                // same thing
+let key = secure!([u8; 32], rand::random::<[u8; 32]>());
+let key = secure_gate::key32([0x42; 32]);
 ```
 
 ### Accessors
 
 ```rust
-let secret: &str = gate.expose_secret();
-let secret: &mut String = gate.expose_secret_mut();
+let s: &str = gate.expose_secret();           // password types
+let s: &mut String = gate.expose_secret_mut(); // builder only
+let raw: &T = gate.expose();                  // generic access
 ```
-
-Use `.expose_secret()` — it's the canonical, zero-cost way.
-
-## Why secure-gate?
-
-- **Zero overhead** when zeroization is disabled
-- **True stack allocation** for fixed-size keys
-- **Configurable wiping strategy** — from safe to paranoid
-- **No breaking changes** from 0.3.x → 0.4.x (deprecated aliases preserved)
-- **Extensively tested** including slack wiping, timing variance, and concurrency
 
 ## Migration from 0.3.x
 
-All your existing code continues to compile:
-```rust
-use secure_gate::SecurePassword;  // still works
-use secure_gate::Secure;          // deprecated but available
-```
+All existing code continues to compile via the `deprecated` module.  
+The underlying type has changed from `Secure<T>` / `HeapSecure<T>` to `SecureGate<T>`.
 
-Only the underlying generic type changed:
 ```rust
 // Old
 let s = HeapSecure::new("data".to_string());
 
-// New (recommended)
+// New
 let s = SecureGate::new("data".to_string());
-// or
 type SG<T> = SecureGate<T>;
 let s = SG::new("data".to_string());
 ```
+
+## Planned for 0.5.0
+
+The current API has overlapping accessor names (`.expose()` vs `.expose_secret()` etc.).  
+A future 0.5.0 release will simplify this significantly — likely removing the `expose_secret*` methods in favor of a cleaner, more consistent design.
 
 ## License
 
