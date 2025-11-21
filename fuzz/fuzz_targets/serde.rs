@@ -1,13 +1,15 @@
 // fuzz/fuzz_targets/serde.rs
 //
 // Fuzz target for all serde (de)serialization paths — untrusted input!
-// Only active when the "serde" feature is enabled in the fuzz crate.
 
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
 #[cfg(feature = "serde")]
-use secure_gate::{SecureGate, SecurePassword};
+use secure_gate::SecureGate;
+
+#[cfg(all(feature = "serde", feature = "zeroize"))]
+use secure_gate::{ExposeSecret, SecurePassword};
 
 const MAX_INPUT: usize = 1_048_576; // 1 MiB — OOM-safe
 
@@ -63,7 +65,7 @@ fuzz_target!(|data: &[u8]| {
             }
             let _large = data.repeat(i as usize);
 
-            // JSON stress only when serde is enabled
+            // JSON stress only when serde + zeroize are enabled
             #[cfg(all(feature = "serde", feature = "zeroize"))]
             let _ = serde_json::from_slice::<SecurePassword>(&_large);
         }
