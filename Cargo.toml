@@ -32,3 +32,6 @@ full = ["zeroize", "serde", "unsafe-wipe"]
 # Opt-in fast, unsafe zeroization for Secure<String>
 # Requires zeroize to be active
 unsafe-wipe = ["zeroize"]
+
+# NEW: expose alloc when any feature that needs it is enabled
+alloc = ["zeroize/alloc"]
