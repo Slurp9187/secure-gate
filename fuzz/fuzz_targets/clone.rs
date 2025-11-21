@@ -8,7 +8,7 @@ use libfuzzer_sys::fuzz_target;
 use secure_gate::SecureGate;
 
 #[cfg(feature = "zeroize")]
-use secure_gate::SecurePassword;
+use secure_gate::{ExposeSecret, SecurePassword};
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
 
@@ -98,12 +98,6 @@ fuzz_target!(|data: &[u8]| {
         if stress_clone.expose() != clone.expose() {
             return;
         }
-    }
-
-    // Test 7: into_inner extraction
-    let extracted = stress_clone.into_inner();
-    if *extracted != *clone.expose() {
-        return;
     }
 
     // Test 8: String handling (lossy UTF-8)
