@@ -40,7 +40,7 @@ pub enum ZeroizeMode {
 trait Wipable {
     fn safe_wipe(&mut self);
     #[cfg(feature = "unsafe-wipe")]
-    unsafe fn full_wipe(&mut self);
+    unsafe fn unsafe_full_wipe(&mut self);
 }
 
 #[cfg(feature = "zeroize")]
@@ -50,7 +50,7 @@ impl Wipable for Vec<u8> {
     }
 
     #[cfg(feature = "unsafe-wipe")]
-    unsafe fn full_wipe(&mut self) {
+    unsafe fn unsafe_full_wipe(&mut self) {
         use core::{hint::black_box, sync::atomic};
 
         let ptr = self.as_mut_ptr();
@@ -69,12 +69,16 @@ impl Wipable for Vec<u8> {
 #[cfg(feature = "zeroize")]
 impl Wipable for String {
     fn safe_wipe(&mut self) {
-        unsafe { self.as_mut_vec().safe_wipe() }
+        let len = self.len();
+        self.clear();
+        for _ in 0..len {
+            self.push('\0');
+        }
     }
 
     #[cfg(feature = "unsafe-wipe")]
-    unsafe fn full_wipe(&mut self) {
-        self.as_mut_vec().full_wipe()
+    unsafe fn unsafe_full_wipe(&mut self) {
+        self.as_mut_vec().unsafe_full_wipe();
     }
 }
 
@@ -142,7 +146,7 @@ impl Zeroize for SecureGate<Vec<u8>> {
         match self.mode {
             ZeroizeMode::Safe => self.expose_mut().safe_wipe(),
             #[cfg(feature = "unsafe-wipe")]
-            ZeroizeMode::Full => unsafe { self.expose_mut().full_wipe() },
+            ZeroizeMode::Full => unsafe { self.expose_mut().unsafe_full_wipe() },
             ZeroizeMode::Passthrough => {}
         }
     }
@@ -154,7 +158,7 @@ impl Zeroize for SecureGate<String> {
         match self.mode {
             ZeroizeMode::Safe => self.expose_mut().safe_wipe(),
             #[cfg(feature = "unsafe-wipe")]
-            ZeroizeMode::Full => unsafe { self.expose_mut().full_wipe() },
+            ZeroizeMode::Full => unsafe { self.expose_mut().unsafe_full_wipe() },
             ZeroizeMode::Passthrough => {}
         }
     }
