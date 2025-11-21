@@ -35,6 +35,10 @@ impl crate::SecurePassword {
         self.expose_secret().as_bytes()
     }
 
+    /// # Safety
+    ///
+    /// Returns a raw mutable byte slice of the secret password.
+    /// The caller **must not** create invalid UTF-8 data in the underlying string.
     #[cfg(feature = "unsafe-wipe")]
     #[inline(always)]
     pub unsafe fn expose_secret_bytes_mut(&mut self) -> &mut [u8] {
@@ -44,7 +48,8 @@ impl crate::SecurePassword {
         }
         #[cfg(not(feature = "zeroize"))]
         {
-            // SAFETY: as_mut_vec is unsafe, but only compiled when unsafe-wipe is on
+            // SAFETY: `String::as_mut_vec` is unsafe, but we only expose it when the
+            // user has explicitly enabled the `unsafe-wipe` feature.
             self.expose_mut().as_mut_vec().as_mut_slice()
         }
     }
@@ -64,6 +69,10 @@ impl crate::SecurePasswordBuilder {
         self.expose_mut().expose_secret_mut()
     }
 
+    /// # Safety
+    ///
+    /// Returns a raw mutable byte slice of the secret password being built.
+    /// The caller **must not** create invalid UTF-8 data.
     #[cfg(all(feature = "zeroize", feature = "unsafe-wipe"))]
     #[inline(always)]
     pub unsafe fn expose_secret_bytes_mut(&mut self) -> &mut [u8] {
