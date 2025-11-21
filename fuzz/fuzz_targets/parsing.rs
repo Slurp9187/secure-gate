@@ -8,7 +8,7 @@ use libfuzzer_sys::fuzz_target;
 use secure_gate::{SecureBytes, SecureGate, SecureStr};
 
 #[cfg(feature = "zeroize")]
-use secure_gate::SecurePassword;
+use secure_gate::{ExposeSecret, SecurePassword};
 
 const MAX_LEN: usize = 1_000_000; // 1MB cap to avoid OOM
 
