@@ -10,6 +10,7 @@
 
 extern crate alloc;
 
+#[cfg(feature = "zeroize")]
 use alloc::string::String;
 
 // Public modules

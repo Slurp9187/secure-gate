@@ -2,22 +2,32 @@
 //
 // Provide ergonomic direct accessors for SecurePassword and SecurePasswordBuilder
 
+#[cfg(feature = "zeroize")]
 use secrecy::{ExposeSecret, ExposeSecretMut};
 
-#[cfg(feature = "alloc")]
-use alloc::string::String;
-
-/// Zero-overhead inherent methods restoring the pre-0.4 single-call API
-/// plus commonly needed byte-slice helpers used by password hashing crates.
 impl crate::SecurePassword {
     #[inline(always)]
     pub fn expose_secret(&self) -> &str {
-        self.expose().expose_secret()
+        #[cfg(feature = "zeroize")]
+        {
+            self.expose().expose_secret()
+        }
+        #[cfg(not(feature = "zeroize"))]
+        {
+            self.expose().as_str()
+        }
     }
 
     #[inline(always)]
     pub fn expose_secret_mut(&mut self) -> &mut str {
-        self.expose_mut().expose_secret_mut()
+        #[cfg(feature = "zeroize")]
+        {
+            self.expose_mut().expose_secret_mut()
+        }
+        #[cfg(not(feature = "zeroize"))]
+        {
+            self.expose_mut().as_mut_str()
+        }
     }
 
     #[inline(always)]
@@ -28,32 +38,47 @@ impl crate::SecurePassword {
     #[cfg(feature = "unsafe-wipe")]
     #[inline(always)]
     pub unsafe fn expose_secret_bytes_mut(&mut self) -> &mut [u8] {
-        self.expose_secret_mut().as_bytes_mut()
+        #[cfg(feature = "zeroize")]
+        {
+            self.expose_secret_mut().as_bytes_mut()
+        }
+        #[cfg(not(feature = "zeroize"))]
+        {
+            // SAFETY: as_mut_vec is unsafe, but only compiled when unsafe-wipe is on
+            self.expose_mut().as_mut_vec().as_mut_slice()
+        }
     }
 
     #[cfg(not(feature = "unsafe-wipe"))]
     #[inline(always)]
     pub fn expose_secret_bytes_mut(&mut self) -> &mut [u8] {
-        panic!("mutable byte access requires the `unsafe-wipe` feature")
+        panic!("`expose_secret_bytes_mut` requires the `unsafe-wipe` feature")
     }
 }
 
 #[cfg(feature = "alloc")]
 impl crate::SecurePasswordBuilder {
+    #[cfg(feature = "zeroize")]
     #[inline(always)]
-    pub fn expose_secret_mut(&mut self) -> &mut String {
+    pub fn expose_secret_mut(&mut self) -> &mut alloc::string::String {
         self.expose_mut().expose_secret_mut()
     }
 
-    #[cfg(feature = "unsafe-wipe")]
+    #[cfg(all(feature = "zeroize", feature = "unsafe-wipe"))]
     #[inline(always)]
     pub unsafe fn expose_secret_bytes_mut(&mut self) -> &mut [u8] {
         self.expose_secret_mut().as_bytes_mut()
     }
 
-    #[cfg(not(feature = "unsafe-wipe"))]
+    #[cfg(not(all(feature = "zeroize", feature = "unsafe-wipe")))]
     #[inline(always)]
     pub fn expose_secret_bytes_mut(&mut self) -> &mut [u8] {
-        panic!("mutable byte access requires the `unsafe-wipe` feature")
+        panic!("`expose_secret_bytes_mut` requires the `unsafe-wipe` feature")
+    }
+
+    #[cfg(not(feature = "zeroize"))]
+    #[inline(always)]
+    pub fn expose_secret_mut(&mut self) -> &mut alloc::string::String {
+        self.expose_mut()
     }
 }
