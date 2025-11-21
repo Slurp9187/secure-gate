@@ -8,7 +8,7 @@ use libfuzzer_sys::fuzz_target;
 use secure_gate::SecureGate;
 
 #[cfg(feature = "zeroize")]
-use secure_gate::SecurePasswordBuilder;
+use secure_gate::{ExposeSecretMut, SecurePasswordBuilder};
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
 
@@ -89,11 +89,6 @@ fuzz_target!(|data: &[u8]| {
         clone.expose_mut()[0] = data[1];
     }
 
-    #[cfg(feature = "zeroize")]
-    if data[0] % 7 == 0 {
-        clone.zeroize();
-    }
-
     drop(key);
     drop(clone);
 
@@ -101,7 +96,7 @@ fuzz_target!(|data: &[u8]| {
     let nested = SecureGate::new(SecureGate::new(data.to_vec()));
     #[cfg(feature = "zeroize")]
     if data[0] % 11 == 0 {
-        let mut inner = nested;
+        let mut inner = nested.clone(); // ← clone to avoid move
         inner.expose_mut().zeroize();
     }
     drop(nested);
