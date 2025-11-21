@@ -8,9 +8,7 @@ use libfuzzer_sys::fuzz_target;
 use secure_gate::{SecureBytes, SecureGate, SecureStr};
 
 #[cfg(feature = "zeroize")]
-use secure_gate::{SecurePassword, SecurePasswordBuilder};
-#[cfg(feature = "zeroize")]
-use zeroize::Zeroize;
+use secure_gate::{ExposeSecret, ExposeSecretMut, SecurePassword, SecurePasswordBuilder};
 
 fuzz_target!(|data: &[u8]| {
     if data.is_empty() {
@@ -79,6 +77,9 @@ fuzz_target!(|data: &[u8]| {
     let cloneable = SecureGate::new(vec![1u8, 2, 3]);
     let _ = cloneable.clone();
     let _default = SecureGate::<String>::default();
+
+    // into_inner only exists when zeroize is enabled
+    #[cfg(feature = "zeroize")]
     let _inner: Box<Vec<u8>> = cloneable.into_inner();
 
     // 8. finish_mut() helpers
