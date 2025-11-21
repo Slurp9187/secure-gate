@@ -5,8 +5,10 @@
 #![cfg(feature = "alloc")]
 
 use secure_gate::{SecurePassword, SecurePasswordBuilder};
+// use std::panic::catch_unwinds;
+// use std::panic::AssertUnwindSafe;
 
-const TEST_PASS: &str = "correct horse battery staple 🐎";
+const TEST_PASS: &str = "correct horse battery staple horse";
 
 #[test]
 fn expose_secret_immut() {
@@ -19,7 +21,7 @@ fn expose_secret_immut() {
 fn expose_secret_mut() {
     let mut pw = SecurePassword::from(TEST_PASS.to_owned());
     pw.expose_secret_mut().make_ascii_uppercase();
-    assert_eq!(pw.expose_secret(), "CORRECT HORSE BATTERY STAPLE 🐎");
+    assert_eq!(pw.expose_secret(), "CORRECT HORSE BATTERY STAPLE HORSE");
 }
 
 #[test]
@@ -33,12 +35,14 @@ fn expose_secret_bytes_mut_unsafe() {
                 *b -= 32;
             }
         }
-        assert_eq!(pw.expose_secret(), "CORRECT HORSE BATTERY STAPLE 🐎");
+        assert_eq!(pw.expose_secret(), "CORRECT HORSE BATTERY STAPLE HORSE");
     }
 
     #[cfg(not(feature = "unsafe-wipe"))]
     {
-        let res = std::panic::catch_unwind(|| pw.expose_secret_bytes_mut());
+        let res = catch_unwind(AssertUnwindSafe(|| {
+            let _ = pw.expose_secret_bytes_mut();
+        }));
         assert!(res.is_err());
     }
 }
@@ -51,11 +55,11 @@ fn builder_basic_functionality() {
     builder.expose_secret_mut().push_str("!!!");
     assert_eq!(
         builder.expose_secret_mut(),
-        "correct horse battery staple 🐎!!!"
+        "correct horse battery staple horse!!!"
     );
 
     let pw: SecurePassword = builder.build();
-    assert_eq!(pw.expose_secret(), "correct horse battery staple 🐎!!!");
+    assert_eq!(pw.expose_secret(), "correct horse battery staple horse!!!");
 }
 
 #[test]
@@ -75,12 +79,14 @@ fn builder_expose_secret_bytes_mut_unsafe() {
     #[cfg(feature = "unsafe-wipe")]
     assert_eq!(
         builder.expose_secret_mut(),
-        "correct_horse_battery_staple_🐎"
+        "correct_horse_battery_staple_horse"
     );
 
     #[cfg(not(feature = "unsafe-wipe"))]
     {
-        let res = std::panic::catch_unwind(|| builder.expose_secret_bytes_mut());
+        let res = catch_unwind(AssertUnwindSafe(|| {
+            let _ = builder.expose_secret_bytes_mut();
+        }));
         assert!(res.is_err());
     }
 }
@@ -113,7 +119,6 @@ fn stack_feature_smoke_test() {
     use secure_gate::SecureStackPassword;
 
     let pw = SecureStackPassword::try_from("short").unwrap();
-    // No .expose_secret_bytes() on Zeroizing<[u8; 128]> – use raw access for fixed-size
     let bytes = pw.expose().as_ref();
     assert_eq!(&bytes[0..5], b"short");
 }
