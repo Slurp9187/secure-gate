@@ -1,7 +1,7 @@
 // tests/integration.rs
 // Final test suite — proves everything works
 
-use secure_gate_0_5_0::{fixed_alias, secure, Dynamic, Fixed};
+use secure_gate_0_5_0::{dynamic_alias, fixed_alias, secure, Dynamic, Fixed};
 
 #[test]
 fn basic_usage_and_deref() {
@@ -96,4 +96,13 @@ fn serde_dynamic_serializes() {
     let pw = Dynamic::<String>::new("hunter2".to_string());
     let json = serde_json::to_string(&pw).unwrap();
     assert_eq!(json, "\"hunter2\"");
+}
+
+#[test]
+fn dynamic_alias_works() {
+    dynamic_alias!(Password, String);
+    let mut pw: Password = Dynamic::new("hunter2".to_string());
+    assert_eq!(pw.len(), 7);
+    pw.push('!');
+    assert_eq!(&*pw, "hunter2!");
 }
