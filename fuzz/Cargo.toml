@@ -1,0 +1,72 @@
+[package]
+name = "secure-gate-fuzz"
+version = "0.1.1"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+secure-gate = { path = "../", features = [
+  "zeroize",
+] } # base zeroize always on for fuzzing
+arbitrary = { version = "1.3", features = ["derive"] }
+libfuzzer-sys = "0.4"
+serde_json = "1.0"
+bincode = "2.0"
+zeroize = { version = "1.8", default-features = false, features = [
+  "alloc",
+  "zeroize_derive",
+] }
+
+# Propagate every library feature exactly as defined
+[features]
+# Base required feature
+zeroize = ["secure-gate/zeroize"]
+
+# Optional library features
+stack = ["secure-gate/stack"]
+serde = ["secure-gate/serde"]
+unsafe-wipe = ["secure-gate/unsafe-wipe"]
+
+# Convenience: everything (matches library's `full`)
+full = ["secure-gate/full"]
+
+# Default for fuzz runs – enables everything for maximum coverage
+default = ["full"]
+
+[[bin]]
+name = "clone"
+path = "fuzz_targets/clone.rs"
+test = false
+bench = false
+doc = false
+
+[[bin]]
+name = "expose"
+path = "fuzz_targets/expose.rs"
+test = false
+bench = false
+doc = false
+
+[[bin]]
+name = "mut"
+path = "fuzz_targets/mut.rs"
+test = false
+bench = false
+doc = false
+
+[[bin]]
+name = "parsing"
+path = "fuzz_targets/parsing.rs"
+test = false
+bench = false
+doc = false
+
+[[bin]]
+name = "serde"
+path = "fuzz_targets/serde.rs"
+test = false
+bench = false
+doc = false
