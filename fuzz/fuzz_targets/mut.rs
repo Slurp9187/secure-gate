@@ -71,13 +71,14 @@ fuzz_target!(|data: &[u8]| {
         arr
     };
     let mut key = Fixed::new(key_arr);
-    let clone_arr = *key; // Copy the inner array for isolation test
+    let clone_arr = *key;
     if data.len() > 1 {
-        key[0] = data[1];
-    }
-    // Verify mutation didn't affect "clone" (since Fixed doesn't clone, we copied inner)
-    if clone_arr[0] != 0xAA {
-        panic!("Isolation failed");
+        // Mutate to a guaranteed different value using bitwise NOT ( !x != x for all u8)
+        key[0] = !key[0];
+        // Verify isolation: clone should remain unchanged
+        if clone_arr[0] == key[0] {
+            panic!("Isolation failed");
+        }
     }
     drop(key);
 
