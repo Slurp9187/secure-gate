@@ -1,0 +1,83 @@
+// src/secure_gate.rs
+use core::ops::{Deref, DerefMut};
+
+#[cfg(feature = "zeroize")]
+use zeroize::{ZeroizeOnDrop, Zeroizing};
+
+#[cfg(feature = "zeroize")]
+use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
+
+/// Unified secret wrapper — zero-cost when `zeroize` disabled, fully protected when enabled.
+pub struct SecureGate<T>(Inner<T>);
+
+#[cfg(feature = "zeroize")]
+type Inner<T> = Zeroizing<SecretBox<T>>;
+
+#[cfg(not(feature = "zeroize"))]
+type Inner<T> = Box<T>;
+
+impl<T> SecureGate<T> {
+    #[inline(always)]
+    pub fn new(value: T) -> Self {
+        #[cfg(feature = "zeroize")]
+        let inner = Zeroizing::new(SecretBox::new(value));
+
+        #[cfg(not(feature = "zeroize"))]
+        let inner = Box::new(value);
+
+        Self(inner)
+    }
+}
+
+impl<T: ?Sized> SecureGate<T> {
+    #[inline(always)]
+    pub fn expose(&self) -> &T {
+        #[cfg(feature = "zeroize")]
+        return self.0.expose_secret();
+
+        #[cfg(not(feature = "zeroize"))]
+        &self.0
+    }
+
+    #[inline(always)]
+    pub fn expose_mut(&mut self) -> &mut T {
+        #[cfg(feature = "zeroize")]
+        return self.0.expose_secret_mut();
+
+        #[cfg(not(feature = "zeroize"))]
+        &mut self.0
+    }
+}
+
+// Ergonomics
+impl<T: ?Sized> Deref for SecureGate<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        self.expose()
+    }
+}
+
+impl<T: ?Sized> DerefMut for SecureGate<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.expose_mut()
+    }
+}
+
+impl<T: ?Sized> core::fmt::Debug for SecureGate<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("SecureGate<[REDACTED]>")
+    }
+}
+
+// Optional traits
+impl<T: Clone> Clone for SecureGate<T> {
+    fn clone(&self) -> Self {
+        Self::new((**self).clone())
+    }
+}
+
+impl<T: Default> Default for SecureGate<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}

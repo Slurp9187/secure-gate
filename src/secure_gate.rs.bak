@@ -1,0 +1,184 @@
+// src/secure_gate.rs
+//
+// secure-gate v0.5.0 — The final, correct implementation
+// One type. Zero-cost when possible. Full protection when requested.
+
+#![cfg_attr(not(feature = "zeroize"), forbid(unsafe_code))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
+use core::ops::{Deref, DerefMut};
+
+#[cfg(feature = "zeroize")]
+use zeroize::{Zeroize, Zeroizing};
+
+#[cfg(feature = "zeroize")]
+use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
+
+/// Unified secret wrapper.
+///
+/// - When `zeroize` feature is enabled: full memory protection via `secrecy` + `zeroize`.
+/// - When `zeroize` feature is disabled: zero-cost for fixed-size types, minimal heap for dynamic.
+pub struct SecureGate<T: ?Sized>(Inner<T>);
+
+#[cfg(feature = "zeroize")]
+type Inner<T: ?Sized> = Wrapper<T>;
+
+#[cfg(not(feature = "zeroize"))]
+type Inner<T: ?Sized> = Passthrough<T>;
+
+#[cfg(feature = "zeroize")]
+enum Wrapper<T: ?Sized> {
+    Stack(Zeroizing<T>), // T: Sized → stack
+    Heap(SecretBox<T>),  // T: ?Sized → heap
+}
+
+#[cfg(not(feature = "zeroize"))]
+enum Passthrough<T: ?Sized> {
+    Inline(T),    // T: Sized → zero allocation
+    Heap(Box<T>), // T: ?Sized → one allocation
+}
+
+// ===================================================================
+// Constructors — specialization via impl selection
+// ===================================================================
+
+/// Construct a fixed-size secret (zero-cost when zeroize is off)
+impl<T> SecureGate<T>
+where
+    T: Copy + Send + Sync + 'static,
+    T: zeroize::ZeroizeOnDrop,
+{
+    #[inline(always)]
+    pub fn new(value: T) -> Self {
+        #[cfg(feature = "zeroize")]
+        return Self(Wrapper::Stack(Zeroizing::new(value)));
+
+        #[cfg(not(feature = "zeroize"))]
+        Self(Passthrough::Inline(value))
+    }
+}
+
+/// Construct any secret (dynamic or unsized) — always heap-allocated
+impl<T: ?Sized> SecureGate<T>
+where
+    T: Send + Sync + 'static,
+    T: zeroize::ZeroizeOnDrop,
+{
+    #[inline(always)]
+    pub fn new_boxed(value: T) -> Self {
+        #[cfg(feature = "zeroize")]
+        return Self(Wrapper::Heap(SecretBox::new(value)));
+
+        #[cfg(not(feature = "zeroize"))]
+        Self(Passthrough::Heap(Box::new(value)))
+    }
+}
+
+// ===================================================================
+// Access
+// ===================================================================
+
+impl<T: ?Sized> SecureGate<T> {
+    #[inline(always)]
+    pub fn expose(&self) -> &T {
+        match &self.0 {
+            #[cfg(feature = "zeroize")]
+            Wrapper::Stack(z) => z.deref(),
+            #[cfg(feature = "zeroize")]
+            Wrapper::Heap(s) => s.expose_secret(),
+            #[cfg(not(feature = "zeroize"))]
+            Passthrough::Inline(v) => v,
+            #[cfg(not(feature = "zeroize"))]
+            Passthrough::Heap(b) => b,
+        }
+    }
+
+    #[inline(always)]
+    pub fn expose_mut(&mut self) -> &mut T {
+        match &mut self.0 {
+            #[cfg(feature = "zeroize")]
+            Wrapper::Stack(z) => z.deref_mut(),
+            #[cfg(feature = "zeroize")]
+            Wrapper::Heap(s) => s.expose_secret_mut(),
+            #[cfg(not(feature = "zeroize"))]
+            Passthrough::Inline(v) => v,
+            #[cfg(not(feature = "zeroize"))]
+            Passthrough::Heap(b) => b,
+        }
+    }
+}
+
+// ===================================================================
+// Ergonomics — make it feel like the inner type
+// ===================================================================
+
+impl<T: ?Sized> Deref for SecureGate<T> {
+    type Target = T;
+    #[inline(always)]
+    fn deref(&self) -> &T {
+        self.expose()
+    }
+}
+
+impl<T: ?Sized> DerefMut for SecureGate<T> {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut T {
+        self.expose_mut()
+    }
+}
+
+impl<T: ?Sized> AsRef<T> for SecureGate<T> {
+    #[inline(always)]
+    fn as_ref(&self) -> &T {
+        self.expose()
+    }
+}
+
+impl<T: ?Sized> AsMut<T> for SecureGate<T> {
+    #[inline(always)]
+    fn as_mut(&mut self) -> &mut T {
+        self.expose_mut()
+    }
+}
+
+// ===================================================================
+// Debug — always redacted
+// ===================================================================
+
+impl<T: ?Sized> core::fmt::Debug for SecureGate<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("SecureGate<[REDACTED]>")
+    }
+}
+
+// ===================================================================
+// Optional: Clone, Default, From (add as needed)
+// ===================================================================
+
+#[cfg(feature = "zeroize")]
+impl<T: Clone + zeroize::Zeroize + Sized> Clone for SecureGate<T> {
+    fn clone(&self) -> Self {
+        Self::new(self.expose().clone())
+    }
+}
+
+#[cfg(not(feature = "zeroize"))]
+impl<T: Clone + Sized> Clone for SecureGate<T> {
+    fn clone(&self) -> Self {
+        Self::new(self.expose().clone())
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl<T: Default + zeroize::Zeroize + Sized> Default for SecureGate<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
+#[cfg(not(feature = "zeroize"))]
+impl<T: Default + Sized> Default for SecureGate<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}

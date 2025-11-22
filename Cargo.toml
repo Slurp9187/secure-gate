@@ -1,0 +1,18 @@
+[package]
+name = "secure_gate_0_5_0"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+secrecy = { version = "0.10", default-features = false, optional = true }
+zeroize = { version = "1.8", default-features = false, optional = true, features = [
+  "alloc",
+] }
+# serde = { version = "1.0", features = ["derive"], optional = true }
+
+# [dev-dependencies]
+# serde_json = "1.0"
+
+[features]
+default = ["zeroize"]
+zeroize = ["dep:zeroize", "dep:secrecy"]
