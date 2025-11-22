@@ -52,3 +52,38 @@ impl<T: ?Sized> Dynamic<T> {
         ExposeMut(&mut self.0)
     }
 }
+
+impl<T: ?Sized> Dynamic<T> {
+    pub fn into_inner(self) -> Box<T> {
+        self.0
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl<T: ?Sized + Clone + zeroize::Zeroize> Clone for Dynamic<T> {
+    fn clone(&self) -> Self {
+        Dynamic::new_boxed(self.0.clone())
+    }
+}
+#[cfg(not(feature = "zeroize"))]
+impl<T: ?Sized + Clone> Clone for Dynamic<T> {
+    fn clone(&self) -> Self {
+        Dynamic::new_boxed(self.0.clone())
+    }
+}
+
+// finish_mut
+impl Dynamic<String> {
+    pub fn finish_mut(&mut self) -> &mut String {
+        let s = &mut **self;
+        s.shrink_to_fit();
+        s
+    }
+}
+impl Dynamic<Vec<u8>> {
+    pub fn finish_mut(&mut self) -> &mut Vec<u8> {
+        let v = &mut **self;
+        v.shrink_to_fit();
+        v
+    }
+}

@@ -32,7 +32,6 @@ impl<T> core::fmt::Debug for Fixed<T> {
     }
 }
 
-// src/fixed.rs — add these methods
 impl<T> Fixed<T> {
     pub fn view(&self) -> Expose<'_, T> {
         Expose(&self.0)
@@ -40,6 +39,12 @@ impl<T> Fixed<T> {
 
     pub fn view_mut(&mut self) -> ExposeMut<'_, T> {
         ExposeMut(&mut self.0)
+    }
+}
+
+impl<T> Fixed<T> {
+    pub fn into_inner(self) -> T {
+        self.0
     }
 }
 
