@@ -42,7 +42,6 @@ impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
     }
 }
 
-// src/dynamic.rs — add these methods
 impl<T: ?Sized> Dynamic<T> {
     pub fn view(&self) -> Expose<'_, T> {
         Expose(&self.0)
