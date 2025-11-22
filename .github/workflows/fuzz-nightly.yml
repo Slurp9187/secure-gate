@@ -1,0 +1,58 @@
+name: Fuzz (nightly)
+
+on:
+  schedule:
+    - cron: "0 10 * * *" # 10:00 UTC = 3:00 AM MST
+  workflow_dispatch:
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240 # 4 hours total – gives each target ~45–48 min on 5-target matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [clone, expose, mut, parsing, serde]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rust-src
+
+      - name: Cache cargo registry + target dir
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+
+      # Full nightly run (60 minutes per target)
+      - name: Full fuzz run – ${{ matrix.target }} (60 min)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          cargo +nightly fuzz run ${{ matrix.target }} -- \
+            -fork=1 \
+            -max_total_time=3600 \
+            -timeout=60 \
+            -rss_limit_mb=8192 \
+            -runs=0
+
+      # Quick smoke test on main pushes (90 seconds)
+      - name: Quick smoke test – ${{ matrix.target }} (90 s)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          cargo +nightly fuzz run ${{ matrix.target }} -- \
+            -fork=1 \
+            -max_total_time=90
+
+      - name: Upload crash artifacts (on failure or full run)
+        if: failure() || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash-${{ matrix.target }}-${{ github.run_id }}
+          path: fuzz/artifacts/${{ matrix.target }}/**
+          retention-days: 30
