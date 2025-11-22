@@ -1,5 +1,7 @@
 // tests/integration.rs
-use secure_gate_0_5_0::{fixed_secret, secure, Dynamic, Fixed};
+// Final test suite — proves everything works
+
+use secure_gate_0_5_0::{fixed_alias, secure, Dynamic, Fixed};
 
 #[test]
 fn basic_usage_and_deref() {
@@ -28,7 +30,7 @@ fn fixed_is_truly_zero_cost() {
 
 #[test]
 fn macros_work_perfectly() {
-    fixed_secret!(MyKey, 32);
+    fixed_alias!(MyKey, 32); // ← updated
     let k1: MyKey = [42u8; 32].into();
     let k2 = MyKey::new([42u8; 32]);
     assert_eq!(k1.0, k2.0);
@@ -51,8 +53,8 @@ fn debug_is_redacted() {
     let key_pretty = format!("{key:#?}");
     let pw_pretty = format!("{pw:#?}");
 
-    assert!(key_pretty.contains("[REDACTED]"));
-    assert!(pw_pretty.contains("[REDACTED]"));
+    assert_eq!(key_pretty, "[REDACTED]");
+    assert_eq!(pw_pretty, "[REDACTED]");
 }
 
 #[test]
@@ -80,7 +82,7 @@ fn into_inner_extracts() {
 
 #[cfg(feature = "zeroize")]
 #[test]
-fn wrappers_forward_zeroize() {
+fn zeroize_on_drop_wipes() {
     use std::sync::atomic::{AtomicBool, Ordering};
     static WIPED: AtomicBool = AtomicBool::new(false);
 
@@ -95,23 +97,20 @@ fn wrappers_forward_zeroize() {
     }
 
     {
-        use zeroize::Zeroize;
-
-        let mut key = Fixed::new(MySecret([42u8; 32]));
-        let mut pw = Dynamic::new(MySecret([42u8; 32]));
-
-        // Manual zeroize — proves forwarding
-        key.zeroize();
-        pw.zeroize();
+        let _key = Fixed::new(MySecret([42u8; 32]));
+        let _pw = Dynamic::new(MySecret([42u8; 32]));
     }
 
-    assert!(WIPED.load(Ordering::SeqCst), "Forwarding not called");
+    assert!(
+        WIPED.load(Ordering::SeqCst),
+        "Zeroize was not called on drop"
+    );
 }
 
 #[cfg(feature = "serde")]
 #[test]
 fn serde_roundtrip_fixed() {
-    fixed_secret!(SerdeKey, 32);
+    fixed_alias!(SerdeKey, 32); // ← updated
     let key = SerdeKey::new([42u8; 32]);
     let json = serde_json::to_string(&key).unwrap();
     let key2: SerdeKey = serde_json::from_str(&json).unwrap();

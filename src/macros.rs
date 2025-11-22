@@ -14,8 +14,21 @@ macro_rules! secure {
 
 /// Define a fixed-size secret type alias.
 #[macro_export]
-macro_rules! fixed_secret {
+macro_rules! fixed_alias {
     ($name:ident, $size:literal) => {
         pub type $name = $crate::Fixed<[u8; $size]>;
+    };
+}
+
+/// Define a dynamic secret type alias.
+///
+/// ```
+/// dynamic_alias!(Password, String);
+/// let pw: Password = Dynamic::new("hunter2".to_string());
+/// ```
+#[macro_export]
+macro_rules! dynamic_alias {
+    ($name:ident, $ty:ty) => {
+        pub type $name = $crate::Dynamic<$ty>;
     };
 }
