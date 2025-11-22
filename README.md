@@ -1,33 +1,33 @@
 # secure-gate
-
 Zero-cost, `no_std`-compatible secure wrappers for secrets — stack for fixed-size, heap for dynamic.
-
-## Status
-
-**Current status**: The crate is in an experimental phase. The public API is stabilizing, but breaking changes are still expected in future minor releases. Use in production with caution. Community testing and critique encouraged — open issues for feedback on security, performance, or ergonomics. Fuzz targets implemented and passing on nightly CI (5 targets: `clone`, `expose`, `mut`, `parsing`, `serde`); no stability claims until full independent validation.
 
 ## Features
 
-| Feature   | Effect                              |
-|-----------|--------------------------------------|
-| `zeroize` | Enables wiping + auto-drop zeroing (on by default) |
-| `serde`   | Serialization support                |
+| Feature        | Effect                                                                 |
+|----------------|------------------------------------------------------------------------|
+| `zeroize`      | Enables zeroization via `secrecy` + `zeroize` (on by default)          |
+| `stack`        | Zero-allocation fixed-size secrets using `Zeroizing<T>` (on by default)|
+| `unsafe-wipe`  | Enables full allocation wiping (including spare capacity)             |
+| `serde`        | Serialization support                                                 |
+| `full`         | All features above                                                    |
 
-- `no_std` + `alloc` compatible  
-- Redacted `Debug`  
-- Full unit test coverage  
-- Continuous fuzz testing with libFuzzer (5 targets: `clone`, `expose`, `mut`, `parsing`, `serde`)  
-- All fuzz targets currently passing on nightly CI (as of 2025-11-22)
+- `no_std` + `alloc` compatible
+- Redacted `Debug` and `Serialize` output
+- Test coverage includes slack wiping and timing safety
 
-**Memory Safety Guarantees (when `zeroize` enabled)**  
-- `Fixed<T>` uses `zeroize::Zeroizing<T>` → stack-allocated, auto-zeroed on drop  
-- `Dynamic<T>` uses `secrecy::SecretBox<T>` → heap-allocated, leak-resistant  
-- `Vec<u8>` and `String` secrets are completely deallocated on drop or `zeroize()` (capacity drops to 0, buffer is freed) — stronger than spare-capacity wiping  
+## Memory Safety Guarantees (when `zeroize` enabled)
 
-**Internal Usage of Dependencies**  
-- `Fixed<T>` → `zeroize::Zeroizing<T>` (stack)  
-- `Dynamic<T>` → `secrecy::SecretBox<T>` (heap)  
-- Both implement `Zeroize` and `ZeroizeOnDrop` automatically when the `zeroize` feature is enabled
+- Fixed-size secrets (`Fixed<T>`) use `zeroize::Zeroizing<T>` — stack-allocated, auto-zeroed.
+- Dynamic secrets (`Dynamic<T>`) use `secrecy::SecretBox<T>` — heap-allocated, leak-resistant.
+- On drop or `zeroize()`, `Vec<u8>` and `String` secrets are **completely deallocated** (not just zeroed).
+  - Verified via unsafe inspection: capacity drops to 0, buffer is freed.
+  - Stronger than full-capacity wiping — no slack memory remains.
+
+## Internal Usage of Dependencies
+
+- `Fixed<T>` uses `zeroize::Zeroizing<T>` for stack-allocated, auto-zeroing fixed-size secrets.
+- `Dynamic<T>` uses `secrecy::SecretBox<T>` for heap-allocated, leak-protected dynamic secrets.
+- Both forward `ZeroizeOnDrop` and `Zeroize` for seamless integration.
 
 ## Installation
 
@@ -37,6 +37,7 @@ secure-gate = "0.5.0"
 ```
 
 With serde:
+
 ```toml
 secure-gate = { version = "0.5.0", features = ["serde"] }
 ```
@@ -49,18 +50,15 @@ use secure_gate::{Fixed, Dynamic, secure, fixed_alias};
 // Fixed-size key (stack when zeroize off)
 fixed_alias!(Aes256Key, 32);
 let key: Aes256Key = [0u8; 32].into();
-
 assert_eq!(key.len(), 32);
-key[0] = 1;  // DerefMut
+key[0] = 1; // DerefMut
 
 // Dynamic password (heap, full protection)
 let mut pw = Dynamic::<String>::new("hunter2".to_string());
-
 assert_eq!(pw.len(), 7);
-assert_eq!(&*pw, "hunter2");  // Deref
-
+assert_eq!(&*pw, "hunter2"); // Deref
 pw.push('!');
-pw.finish_mut();  // shrink_to_fit
+pw.finish_mut(); // shrink_to_fit
 
 // Macros
 let iv = secure!([u8; 16], [1u8; 16]);
@@ -72,6 +70,8 @@ assert_eq!(extracted, [1u8; 32]);
 ```
 
 ## Example Aliases
+
+Use `fixed_alias!` for fixed-size types and `dynamic_alias!` for dynamic types. These generate self-documenting aliases.
 
 ### Fixed-Size (Stack-Optimized)
 
@@ -91,6 +91,10 @@ fixed_alias!(XChaCha20Nonce24, 24);
 
 // Salts
 fixed_alias!(Salt16, 16);
+
+// Usage
+let key: Aes256Key = [0u8; 32].into();
+let iv = AesGcmIv12::new(rand::random::<[u8; 12]>());
 ```
 
 ### Dynamic-Size (Heap-Optimized)
@@ -105,20 +109,26 @@ dynamic_alias!(JwtSecret, String);
 // Byte vectors
 dynamic_alias!(Token, Vec<u8>);
 dynamic_alias!(Payload, Vec<u8>);
+
+// Usage
+let pw: Password = Dynamic::new("hunter2".to_string());
+let token: Token = Dynamic::new_boxed(Box::new(vec![0u8; 32]));
+assert_eq!(pw.len(), 7);
+pw.push('!'); // DerefMut
+assert_eq!(&*pw, "hunter2!");
 ```
 
 ## Migration from v0.4.3
 
-v0.5.0 is a clean break from the experimental v0.4.3 API.
+v0.5.0 is a clean break from v0.4.3's experimental API.
 
-| v0.4.3                         | v0.5.0 equivalent                                      |
-|--------------------------------|---------------------------------------------------------|
-| `SecureGate<T>`                | `Fixed<T>` (fixed-size) or `Dynamic<T>` (dynamic)      |
-| `SecurePassword` / `SecurePasswordBuilder` | `Dynamic<String>`                                      |
-| `expose_secret()` / `expose_secret_mut()` | direct `Deref` / `DerefMut` (`&*secret`, `&mut *secret`) |
-| `ZeroizeMode`, `unsafe-wipe`   | removed — safe, full wiping is the default              |
+- `SecureGate<T>` → `Fixed<T>` (fixed-size) or `Dynamic<T>` (dynamic).
+- `ZeroizeMode` / `new_full_wipe` → Removed; `zeroize` handles wiping.
+- `SecurePassword` → `Dynamic<String>`.
+- `expose_secret()` → `Deref` (e.g., `&*secret`).
+- `unsafe-wipe` → Removed; safe by default.
 
-Example:
+Example migration:
 
 ```rust
 // v0.4.3
@@ -127,8 +137,10 @@ pw.expose_secret_mut().push('!');
 
 // v0.5.0
 let mut pw = Dynamic::<String>::new("hunter2".to_string());
-pw.push('!');   // DerefMut
+pw.push('!');
 ```
+
+All v0.4.3 code breaks — this is intentional for the clean redesign.
 
 ## Changelog
 
