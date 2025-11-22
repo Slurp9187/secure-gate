@@ -13,6 +13,7 @@ on:
       - "fuzz/**"
       - "src/**"
       - "Cargo.toml"
+  workflow_dispatch: # manual trigger when you need a long run
 
 jobs:
   fuzz:
