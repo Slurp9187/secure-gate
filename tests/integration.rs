@@ -45,14 +45,14 @@ fn debug_is_redacted() {
     let key_debug = format!("{key:?}");
     let pw_debug = format!("{pw:?}");
 
-    assert_eq!(key_debug, "Fixed<[REDACTED]>");
-    assert_eq!(pw_debug, "Dynamic<[REDACTED]>");
+    assert_eq!(key_debug, "[REDACTED]");
+    assert_eq!(pw_debug, "[REDACTED]");
 
     let key_pretty = format!("{key:#?}");
     let pw_pretty = format!("{pw:#?}");
 
-    assert!(key_pretty.contains("Fixed<[REDACTED]>"));
-    assert!(pw_pretty.contains("Dynamic<[REDACTED]>"));
+    assert!(key_pretty.contains("[REDACTED]"));
+    assert!(pw_pretty.contains("[REDACTED]"));
 }
 
 #[test]

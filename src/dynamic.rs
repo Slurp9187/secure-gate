@@ -38,7 +38,7 @@ impl<T: ?Sized> DerefMut for Dynamic<T> {
 
 impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str("Dynamic<[REDACTED]>")
+        f.write_str("[REDACTED]")
     }
 }
 

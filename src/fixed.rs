@@ -28,7 +28,7 @@ impl<T> DerefMut for Fixed<T> {
 
 impl<T> core::fmt::Debug for Fixed<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str("Fixed<[REDACTED]>")
+        f.write_str("[REDACTED]")
     }
 }
 
