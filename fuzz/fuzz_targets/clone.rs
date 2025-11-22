@@ -1,34 +1,35 @@
 // fuzz/fuzz_targets/clone.rs
 //
-// Fuzz SecureGate<T> cloning, isolation, zeroization, and reallocation behavior
-
+// Fuzz Dynamic<T> cloning, isolation, zeroization, and reallocation behavior
+// (v0.5.0 – SecureGate and old password types are gone)
 #![no_main]
 use libfuzzer_sys::fuzz_target;
+use secure_gate_0_5_0::{Dynamic, Fixed};
 
-use secure_gate::SecureGate;
-
-#[cfg(feature = "zeroize")]
-use secure_gate::{ExposeSecret, SecurePassword};
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
 
 fuzz_target!(|data: &[u8]| {
     // Test 1: Empty container lifecycle and clone behavior
     {
-        let empty = SecureGate::new(Vec::<u8>::new());
+        let empty = Dynamic::<Vec<u8>>::new(Vec::new());
+        #[cfg(feature = "zeroize")]
         let cloned_empty = empty.clone();
-        if empty.expose().len() != cloned_empty.expose().len() {
+        #[cfg(not(feature = "zeroize"))]
+        let cloned_empty = empty.clone(); // Clone works even without zeroize now
+
+        if &*empty != &*cloned_empty {
             return;
         }
         drop(cloned_empty);
 
         #[cfg(feature = "zeroize")]
-        let mut empty = empty; // make mutable only when we need zeroize()
-        #[cfg(feature = "zeroize")]
-        empty.zeroize();
-
-        if !empty.expose().is_empty() {
-            return;
+        {
+            let mut empty = empty;
+            empty.zeroize();
+            if !empty.is_empty() {
+                return;
+            }
         }
     }
 
@@ -38,96 +39,83 @@ fuzz_target!(|data: &[u8]| {
 
     // Test 2: Basic isolation – clone mutation doesn’t affect original
     let original_data = data.to_vec();
-    let mut original = SecureGate::new(original_data.clone());
+    let mut original = Dynamic::<Vec<u8>>::new(original_data.clone());
     let mut clone = original.clone();
-    clone.expose_mut().push(0xFF);
 
-    if original.expose() != &original_data {
+    clone.push(0xFF);
+
+    if &*original != &original_data {
         return;
     }
-    if clone.expose().len() != original_data.len() + 1 {
+    if clone.len() != original_data.len() + 1 {
         return;
     }
-    if &clone.expose()[..original_data.len()] != &original_data[..] {
+    if &clone[..original_data.len()] != &original_data[..] {
         return;
     }
-    if clone.expose()[original_data.len()] != 0xFF {
+    if clone[original_data.len()] != 0xFF {
         return;
     }
 
     // Test 3: Original mutation doesn’t affect clone
-    original.expose_mut().push(0xAA);
-    if clone.expose().len() != original_data.len() + 1 {
+    original.push(0xAA);
+    if clone.len() != original_data.len() + 1 {
         return;
     }
 
     // Test 4: Zeroization verification on original
-    let pre_zero_len = original.expose().len();
+    let pre_zero_len = original.len();
     #[cfg(feature = "zeroize")]
     original.zeroize();
 
-    let exposed = original.expose();
     #[cfg(feature = "zeroize")]
-    if !exposed.iter().all(|&b| b == 0) {
-        return;
-    }
-    if exposed.len() != pre_zero_len {
+    if !original.iter().all(|&b| b == 0) || original.len() != pre_zero_len {
         return;
     }
 
     // Test 5: Clone remains intact after original zeroization
-    if clone.expose().len() != original_data.len() + 1 {
+    if clone.len() != original_data.len() + 1 {
         return;
     }
-    if &clone.expose()[..original_data.len()] != &original_data[..] {
-        return;
-    }
-    if clone.expose()[original_data.len()] != 0xFF {
+    if &clone[..original_data.len()] != &original_data[..] || clone[original_data.len()] != 0xFF {
         return;
     }
 
     // Test 6: Reallocation stress on a clone-of-clone
     let mut stress_clone = clone.clone();
     if let Some(new_cap) = stress_clone
-        .expose()
         .capacity()
         .checked_mul(2)
         .and_then(|v| v.checked_add(1))
     {
-        stress_clone.expose_mut().reserve(new_cap);
-        if stress_clone.expose() != clone.expose() {
+        stress_clone.reserve(new_cap);
+        if &*stress_clone != &*clone {
             return;
         }
     }
 
-    // Test 8: String handling (lossy UTF-8)
+    // Test 7: String handling (lossy UTF-8)
     let pw_str = String::from_utf8_lossy(data);
-    let secure_str: SecureGate<String> = SecureGate::new(pw_str.to_string());
+    let secure_str: Dynamic<String> = Dynamic::new(pw_str.to_string());
     let str_clone = secure_str.clone();
 
-    if secure_str.expose() != str_clone.expose() {
+    if &*secure_str != &*str_clone {
         return;
     }
-    if secure_str.expose() != pw_str.as_ref() {
+    if secure_str.as_str() != pw_str.as_ref() {
         return;
     }
 
-    // Test 9: SecurePassword alias cloning (zeroize feature only)
-    #[cfg(feature = "zeroize")]
-    {
-        let pw: SecurePassword = pw_str.as_ref().into();
-        let pw_clone = pw.clone();
-        if pw.expose().expose_secret() != pw_clone.expose().expose_secret() {
-            return;
-        }
-        drop(pw_clone);
-    }
+    // Test 8: Fixed-size secrets (no Clone, but we can still test construction)
+    let fixed_key = Fixed::new([0x42u8; 32]);
+    let _ = fixed_key.len(); // just touch it
 
     // Final cleanup – zeroize the remaining clone
     #[cfg(feature = "zeroize")]
     clone.zeroize();
+
     #[cfg(feature = "zeroize")]
-    if !clone.expose().iter().all(|&b| b == 0) {
+    if !clone.iter().all(|&b| b == 0) {
         return;
     }
 });
