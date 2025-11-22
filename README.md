@@ -47,6 +47,11 @@ Fuzz testing in progress — stability claims pending full validation.
 - Redacted `Debug`.
 - Test coverage includes zero-cost, forwarding, and drop behavior.
 
+**Internal Usage of Dependencies**:
+- `Fixed<T>` uses `zeroize::Zeroizing<T>` for stack-allocated, auto-zeroing fixed-size secrets.
+- `Dynamic<T>` uses `secrecy::SecretBox<T>` for heap-allocated, leak-protected dynamic secrets.
+- Both forward `ZeroizeOnDrop` and `Zeroize` for seamless integration.
+
 ## Installation
 
 ```toml
