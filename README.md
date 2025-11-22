@@ -13,6 +13,13 @@ Zero-cost, `no_std`-compatible secure wrappers for secrets — stack for fixed-s
 - Redacted `Debug`.
 - Test coverage includes zero-cost, wiping, ergonomics, serde, macros.
 
+**Memory Safety Guarantees (when `zeroize` enabled)**:
+- Fixed-size secrets (`Fixed<T>`) use `zeroize::Zeroizing<T>` — stack-allocated, auto-zeroed.
+- Dynamic secrets (`Dynamic<T>`) use `secrecy::SecretBox<T>` — heap-allocated, leak-resistant.
+- On drop or `zeroize()`, `Vec<u8>` and `String` secrets are **completely deallocated** (not just zeroed).
+  - Verified via unsafe inspection: capacity drops to 0, buffer is freed.
+  - Stronger than full-capacity wiping — no slack memory remains.
+
 **Internal Usage of Dependencies**:
 - `Fixed<T>` uses `zeroize::Zeroizing<T>` for stack-allocated, auto-zeroing fixed-size secrets.
 - `Dynamic<T>` uses `secrecy::SecretBox<T>` for heap-allocated, leak-protected dynamic secrets.
