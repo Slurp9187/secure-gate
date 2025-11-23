@@ -49,18 +49,6 @@ impl<T> Fixed<T> {
     }
 }
 
-// // From impls for common sizes (no orphan rule issue)
-// macro_rules! impl_from_array {
-//     ($($N:literal),*) => {$(
-//         impl From<[u8; $N]> for Fixed<[u8; $N]> {
-//             fn from(arr: [u8; $N]) -> Self {
-//                 Self::new(arr)
-//             }
-//         }
-//     )*}
-// }
-// impl_from_array!(12, 16, 24, 32, 64);
-
 impl<const N: usize> Fixed<[u8; N]> {
     /// Create from a slice. Panics if the slice has the wrong length.
     #[inline]

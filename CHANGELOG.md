@@ -5,6 +5,26 @@ All changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2025-11-24
+
+### Added
+- `fixed_alias!` types now support idiomatic construction via `From` and `.into()`
+  ```rust
+  fixed_alias!(Aes256Key, 32);
+
+  let key1 = Aes256Key::from(rng.gen());
+  let key2: Aes256Key = rng.gen().into();  // natural, zero-cost, idiomatic
+  ```
+- All `fixed_alias!` types automatically inherit `from_slice` and `From<[u8; N]>` from generic impls on `Fixed`
+
+### Changed
+- Removed inherent impls from `fixed_alias!` macro (now uses crate-level generic impls)
+  - Fixes orphan rule violations
+  - Cleaner, more maintainable code
+  - No behavior change for users
+
+This release completes the ergonomics vision: `fixed_alias!` types now feel like first-class, built-in secret types.
+
 ## [0.5.1] - 2025-11-23
 
 ### Added

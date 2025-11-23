@@ -10,13 +10,13 @@ Zero-cost, `no_std`-compatible wrappers for handling sensitive data in memory.
 
 ```toml
 [dependencies]
-secure-gate = "0.5.1"
+secure-gate = "0.5.2"
 ```
 
 With automatic zeroing (recommended for most use cases):
 
 ```toml
-secure-gate = { version = "0.5.1", features = ["zeroize"] }
+secure-gate = { version = "0.5.2", features = ["zeroize"] }
 ```
 
 ## Features
@@ -39,8 +39,12 @@ fixed_alias!(Nonce12, 12);
 dynamic_alias!(Password, String);
 
 // Construction
-let key: Aes256Key = secure!([u8; 32], rng.gen());
-let nonce: Nonce12 = secure!([u8; 12], rng.gen());
+let key = Aes256Key::from(rng.gen());           // clean and explicit
+let key2: Aes256Key = rng.gen().into();         // natural .into()
+let key3 = Aes256Key::new(rng.gen());           // classic style
+
+let nonce = Nonce12::from(rng.gen());
+let nonce2: Nonce12 = rng.gen().into();
 
 let mut password: Password = secure!(String, "hunter2".to_string());
 password.push('!');
@@ -70,12 +74,12 @@ let secret_vec = secure_gate::secure_zeroizing!(heap Vec<u8>, Box::new(secret_by
 ## Macros
 
 ```rust
-secure!([u8; 32], rng.gen())           // Fixed<[u8; 32]>
-secure!(String, "pw".into())           // Dynamic<String>
-secure!(Vec<u8>, data.to_vec())        // Dynamic<Vec<u8>>
+secure!([u8; 32], rng.gen())                    // Fixed<[u8; 32]>
+secure!(String, "pw".into())                    // Dynamic<String>
+secure!(Vec<u8>, data.to_vec())                 // Dynamic<Vec<u8>>
 
-secure_zeroizing!([u8; 32], key)       // FixedZeroizing<[u8; 32]> (zeroize feature)
-secure_zeroizing!(heap Vec<u8>, Box::new(data))  // DynamicZeroizing<Vec<u8>>
+secure_zeroizing!([u8; 32], key)                // FixedZeroizing<[u8; 32]> (zeroize feature)
+secure_zeroizing!(heap Vec<u8>, Box::new(data)) // DynamicZeroizing<Vec<u8>>
 
 fixed_alias!(MyKey, 32)
 dynamic_alias!(MySecret, Vec<u8>)
@@ -89,6 +93,10 @@ fixed_alias!(Aes256Key, 32);
 fixed_alias!(XChaCha20Nonce, 24);
 dynamic_alias!(Password, String);
 dynamic_alias!(JwtSigningKey, Vec<u8>);
+
+// Usage
+let key = Aes256Key::from(rng.gen());
+let key2: Aes256Key = rng.gen().into();
 ```
 
 ## Migration from v0.4.x

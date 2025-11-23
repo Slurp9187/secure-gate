@@ -105,3 +105,23 @@ fn macro_works_in_downstream_crates() {
     let _ = secure!([u8; 24], [0u8; 24]);
     let _ = secure!(String, "test".into());
 }
+
+#[test]
+fn fixed_alias_supports_from_and_into() {
+    fixed_alias!(AesKey, 32);
+    fixed_alias!(Nonce, 12);
+
+    // These are the beautiful, idiomatic patterns that actually work
+    let key1 = AesKey::from([42u8; 32]);
+    let key2: AesKey = [43u8; 32].into(); // .into() works!
+    let key3 = AesKey::new([44u8; 32]);
+
+    let nonce = Nonce::from([1u8; 12]);
+    let nonce2: Nonce = [2u8; 12].into();
+
+    assert_eq!(key1.0, [42u8; 32]);
+    assert_eq!(key2.0, [43u8; 32]);
+    assert_eq!(key3.0, [44u8; 32]);
+    assert_eq!(nonce.0, [1u8; 12]);
+    assert_eq!(nonce2.0, [2u8; 12]);
+}

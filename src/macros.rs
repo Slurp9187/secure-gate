@@ -32,7 +32,7 @@ macro_rules! secure_zeroizing {
     };
 }
 
-/// Define a fixed-size secret alias.
+/// Define a fixed-size secret alias with beautiful constructor syntax
 ///
 /// The alias gets useful methods automatically because `Fixed` implements them
 /// for all array sizes (see `src/fixed.rs`).
@@ -41,6 +41,9 @@ macro_rules! fixed_alias {
     ($name:ident, $size:literal) => {
         /// Fixed-size secret of exactly `$size` bytes.
         pub type $name = $crate::Fixed<[u8; $size]>;
+
+        // Only the type alias — no impls!
+        // All methods come from the generic impls in src/fixed.rs
     };
 }
 
