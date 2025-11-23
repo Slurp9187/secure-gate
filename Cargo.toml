@@ -19,8 +19,13 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [features]
 default = ["zeroize"]
 zeroize = ["dep:zeroize", "dep:secrecy"]
 serde = ["dep:serde"]
+
+[[bench]]
+name = "fixed_vs_raw"
+harness = false
