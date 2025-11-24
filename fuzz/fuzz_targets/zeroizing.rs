@@ -1,42 +1,54 @@
+// fuzz/fuzz_targets/zeroizing.rs
+//
+// Fuzz target for all zeroizing paths — FixedZeroizing, DynamicZeroizing, and drops
+// (v0.5.0 – use re-exports only)
 #![no_main]
+use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 
-use secure_gate::{Dynamic, DynamicZeroizing, Fixed, FixedZeroizing};
+use secrecy::ExposeSecret;
+use secure_gate_fuzz::arbitrary::{
+    FuzzDynamicString, FuzzDynamicVec, FuzzDynamicZeroizingString, FuzzDynamicZeroizingVec,
+    FuzzFixed32, FuzzFixedZeroizing32,
+}; // Private to fuzz — OK
 
 fuzz_target!(|data: &[u8]| {
-    if data.is_empty() {
-        return;
-    }
+    let mut u = arbitrary::Unstructured::new(data);
 
-    // ---------- FixedZeroizing<[u8; N]> ----------
-    // FixedZeroizing = Zeroizing<T> → use .as_ref() or direct indexing
-    for &n in &[16usize, 32, 64, 128, 256, 512, 1024] {
-        if data.len() < n {
-            continue;
-        }
-        let mut arr = [0u8; 1024];
-        arr[..n].copy_from_slice(&data[..n]);
-        let secret = FixedZeroizing::new(arr);
-        let _ = &secret[..n]; // ← safe, public, works
-        let _ = secret.as_ref(); // ← also public
-        drop(secret); // zeroized
-    }
+    let _fixed_32 = match FuzzFixed32::arbitrary(&mut u) {
+        Ok(f) => f.0,
+        Err(_) => return,
+    };
+    let fixed_zero_32 = match FuzzFixedZeroizing32::arbitrary(&mut u) {
+        Ok(f) => f.0,
+        Err(_) => return,
+    };
+    let _dyn_vec = match FuzzDynamicVec::arbitrary(&mut u) {
+        Ok(d) => d.0,
+        Err(_) => return,
+    };
+    let _dyn_str = match FuzzDynamicString::arbitrary(&mut u) {
+        Ok(d) => d.0,
+        Err(_) => return,
+    };
+    let dyn_zero_vec = match FuzzDynamicZeroizingVec::arbitrary(&mut u) {
+        Ok(d) => d.0,
+        Err(_) => return,
+    };
+    let dyn_zero_str = match FuzzDynamicZeroizingString::arbitrary(&mut u) {
+        Ok(d) => d.0,
+        Err(_) => return,
+    };
+
+    // ---------- FixedZeroizing ----------
+    let _ = &*fixed_zero_32;
+    drop(fixed_zero_32);
 
     // ---------- DynamicZeroizing<Vec<u8>> ----------
-    // DynamicZeroizing = SecretBox<T> → must use .expose_secret()
-    // But trait not in scope → so we bring it in from the dependency
-    use secrecy::ExposeSecret; // ← allowed in fuzz target, not part of your public API
-    let vec_secret = DynamicZeroizing::<Vec<u8>>::new(Box::new(data.to_vec()));
-    let _ = vec_secret.expose_secret().len();
-    drop(vec_secret);
+    let _ = dyn_zero_vec.expose_secret().len();
+    drop(dyn_zero_vec);
 
     // ---------- DynamicZeroizing<String> ----------
-    let s = String::from_utf8_lossy(data).to_string();
-    let str_secret = DynamicZeroizing::<String>::new(Box::new(s));
-    let _ = str_secret.expose_secret().len();
-    drop(str_secret);
-
-    // ---------- Non-zeroizing ----------
-    let _ = Fixed::<[u8; 32]>::new([0u8; 32]);
-    let _ = Dynamic::<Vec<u8>>::new(Box::new(data.to_vec()));
+    let _ = dyn_zero_str.expose_secret().len();
+    drop(dyn_zero_str);
 });
