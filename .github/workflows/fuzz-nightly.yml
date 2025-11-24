@@ -8,7 +8,7 @@ on:
 jobs:
   fuzz:
     runs-on: ubuntu-latest
-    timeout-minutes: 360 # increased from 240 → ~6h total (5 targets × 2 modes × ~60 min each)
+    timeout-minutes: 360 # increased from 240 to ~6h total (5 targets × 2 modes × ~60 min each)
     strategy:
       fail-fast: false
       matrix:
@@ -94,3 +94,86 @@ jobs:
           name: fuzz-crash-${{ matrix.target }}-${{ matrix.mode }}-${{ github.run_id }}
           path: fuzz/artifacts/${{ matrix.target }}/**
           retention-days: 30
+
+  # -----------------------------------------------------------------
+  # NEW: Fuzz Coverage + Minimal Corpus (weekly only)
+  # -----------------------------------------------------------------
+  coverage:
+    name: Fuzz Coverage + Minimal Corpus
+    runs-on: ubuntu-latest
+    needs: fuzz
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rust-src
+
+      - name: Cache cargo registry + target dir
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+
+      - name: Download all fresh corpora from nightly run
+        uses: actions/download-artifact@v4
+        with:
+          path: fuzz/artifacts
+          pattern: fuzz-crash-*
+
+      - name: Generate coverage reports (HTML + lcov)
+        run: |
+          mkdir -p coverage/html coverage/lcov
+
+          for target in clone expose mut parsing serde; do
+            echo "=== Generating coverage for $target ==="
+            # Use the normal-mode corpus (most complete)
+            corpus_dir=$(find fuzz/artifacts -path "*/fuzz-crash-$target-normal-*/$target/corpus" -type d | head -1)
+            if [ -z "$corpus_dir" ] || [ ! -d "$corpus_dir" ]; then
+              echo "Warning: No corpus found for $target, skipping"
+              continue
+            fi
+
+            # Fast coverage run using existing corpus
+            cargo fuzz coverage $target "$corpus_dir" -- -runs=200000
+
+            # HTML report
+            llvm-cov show \
+              --instr-profile=fuzz/coverage/$target/coverage.profdata \
+              --format=html \
+              --ignore-filename-regex='/.cargo|/rustc/' \
+              > coverage/html/$target.html
+
+            # lcov for Codecov
+            cargo fuzz coverage $target "$corpus_dir" --lcov --output-path coverage/lcov/$target.info
+          done
+
+      - name: Upload HTML coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-coverage-html-${{ github.run_id }}
+          path: coverage/html/
+          retention-days: 60
+
+      - name: Combine lcov files and upload to Codecov
+        run: |
+          find coverage/lcov -name "*.info" -exec cat {} \; > lcov.combined.info || true
+          sed -i '/SF:.*\/\.cargo\/registry\//d' lcov.combined.info 2>/dev/null || true
+          sed -i '/SF:.*rustc\//d' lcov.combined.info 2>/dev/null || true
+        if: success()
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: lcov.combined.info
+          flags: fuzz
+          name: fuzz-coverage
+          fail_ci_if_error: false
