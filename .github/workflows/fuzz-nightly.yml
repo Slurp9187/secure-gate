@@ -8,11 +8,26 @@ on:
 jobs:
   fuzz:
     runs-on: ubuntu-latest
-    timeout-minutes: 240 # 4 hours total – gives each target ~45–48 min on 5-target matrix
+    timeout-minutes: 360 # increased from 240 → ~6h total (5 targets × 2 modes × ~60 min each)
     strategy:
       fail-fast: false
       matrix:
         target: [clone, expose, mut, parsing, serde]
+        # normal = no sanitizer, asan = AddressSanitizer + LeakSanitizer
+        mode: [normal, asan]
+
+    env:
+      # Common sanitizer flags (ASan + LeakSanitizer + detect leaks)
+      SANITIZER_FLAGS: >-
+        -Zsanitizer=address
+        -Zsanitizer=leak
+        -Cdebuginfo=2
+      # libFuzzer options that play nicely with sanitizers
+      FUZZER_ARGS: >-
+        -fork=1
+        -timeout=60
+        -rss_limit_mb=8192
+        -runs=0
 
     steps:
       - name: Checkout repository
@@ -30,29 +45,52 @@ jobs:
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
 
-      # Full nightly run (60 minutes per target)
-      - name: Full fuzz run – ${{ matrix.target }} (60 min)
+      # -----------------------------------------------------------------
+      # Full nightly run – 60 minutes per target (normal + asan)
+      # -----------------------------------------------------------------
+      - name: Full fuzz run – ${{ matrix.target }} (${{ matrix.mode }})
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          RUSTFLAGS: ${{ matrix.mode == 'asan' && env.SANITIZER_FLAGS || '' }}
+          ASAN_OPTIONS: >-
+            detect_leaks=1
+            abort_on_error=1
+            symbolize=1
+            allocator_may_return_null=1
         run: |
-          cargo +nightly fuzz run ${{ matrix.target }} -- \
-            -fork=1 \
-            -max_total_time=3600 \
-            -timeout=60 \
-            -rss_limit_mb=8192 \
-            -runs=0
+          if [[ "${{ matrix.mode }}" == "asan" ]]; then
+            echo "Running with AddressSanitizer + LeakSanitizer"
+          else
+            echo "Running without sanitizers"
+          fi
 
-      # Quick smoke test on main pushes (90 seconds)
-      - name: Quick smoke test – ${{ matrix.target }} (90 s)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+          cargo +nightly fuzz run ${{ matrix.target }} -- \
+            ${{ env.FUZZER_ARGS }} \
+            -max_total_time=3600
+
+      # -----------------------------------------------------------------
+      # Quick smoke test on main pushes (90 seconds) – only normal mode
+      # -----------------------------------------------------------------
+      - name: Quick smoke test – ${{ matrix.target }} (normal only)
+        if: >
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          matrix.mode == 'normal'
         run: |
           cargo +nightly fuzz run ${{ matrix.target }} -- \
             -fork=1 \
             -max_total_time=90
 
+      # -----------------------------------------------------------------
+      # Upload crash artifacts (including sanitizer reports)
+      # -----------------------------------------------------------------
       - name: Upload crash artifacts (on failure or full run)
-        if: failure() || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        if: >
+          failure() ||
+          github.event_name == 'schedule' ||
+          github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: fuzz-crash-${{ matrix.target }}-${{ github.run_id }}
+          name: fuzz-crash-${{ matrix.target }}-${{ matrix.mode }}-${{ github.run_id }}
           path: fuzz/artifacts/${{ matrix.target }}/**
           retention-days: 30

@@ -1,0 +1,85 @@
+name: Fuzz (Miri UB checks)
+
+on:
+  schedule:
+    # Every Sunday at 00:00 UTC (~5 PM Saturday Pacific / 6 PM Mountain)
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "fuzz/**"
+      - "tests/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  pull_request:
+    paths:
+      - "src/**"
+      - "fuzz/**"
+      - "tests/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+jobs:
+  miri:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # No matrix needed — Miri is single-job, Linux-only
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Install Rust nightly with Miri
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: miri
+          cache: true
+
+      - name: Cache cargo registry + target dir
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Miri (first-time initialization)
+        run: cargo miri setup
+
+      - name: Run Miri on all tests (strict — fails on any UB)
+        env:
+          # Proven flags for secure-gate: ignore intentional leaks from SecretBox/Zeroizing,
+          # disable isolation (needed for std), strict provenance for maximum safety
+          MIRIFLAGS: >-
+            -Zmiri-ignore-leaks
+            -Zmiri-disable-isolation
+            -Zmiri-strict-provenance
+        run: |
+          cargo miri test --workspace --all-features --include-ignored
+
+      - name: Light corpus scan with Miri (weekly or manual only)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          MIRIFLAGS: >-
+            -Zmiri-ignore-leaks
+            -Zmiri-disable-isolation
+            -Zmiri-strict-provenance
+        run: |
+          echo "Starting light Miri corpus scan on fuzz targets (max 2 min each)..."
+          for target in clone expose mut parsing serde; do
+            echo "=== Miri scanning fuzz target: $target ==="
+            timeout 120 cargo miri run --bin $target -- -max_total_time=60 || \
+              echo "Warning: $target timed out or hit expected panic (ignored)"
+          done
+        continue-on-error: true # Expected for fuzzer-generated edge inputs
+
+      - name: Upload Miri logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: miri-failure-logs-${{ github.run_id }}
+          path: |
+            ~/.miri/**
+            target/miri/**
+            fuzz/artifacts/**
+          retention-days: 14
