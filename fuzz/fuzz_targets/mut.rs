@@ -13,6 +13,10 @@ use secure_gate_fuzz::arbitrary::{FuzzDynamicString, FuzzDynamicVec, FuzzFixed32
 use zeroize::Zeroize;
 
 fuzz_target!(|data: &[u8]| {
+    if data.is_empty() {
+        return;
+    }
+
     let mut u = arbitrary::Unstructured::new(data);
 
     let fixed_32 = match FuzzFixed32::arbitrary(&mut u) {

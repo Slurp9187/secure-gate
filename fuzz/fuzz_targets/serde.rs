@@ -19,6 +19,10 @@ use bincode;
 const MAX_INPUT: usize = 1_048_576; // 1 MiB -- OOM-safe
 
 fuzz_target!(|data: &[u8]| {
+    if data.is_empty() {
+        return;
+    }
+
     let mut u = arbitrary::Unstructured::new(data);
 
     let _fixed_32 = match FuzzFixed32::arbitrary(&mut u) {

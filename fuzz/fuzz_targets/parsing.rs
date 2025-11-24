@@ -12,6 +12,10 @@ use secure_gate_fuzz::arbitrary::{FuzzDynamicString, FuzzDynamicVec};
 const MAX_LEN: usize = 1_000_000; // 1MB cap to avoid OOM
 
 fuzz_target!(|data: &[u8]| {
+    if data.is_empty() {
+        return;
+    }
+
     let mut u = arbitrary::Unstructured::new(data);
 
     let dyn_vec = match FuzzDynamicVec::arbitrary(&mut u) {
