@@ -2,7 +2,7 @@
 use alloc::boxed::Box;
 use core::ops::{Deref, DerefMut};
 
-use crate::{Expose, ExposeMut};
+// use crate::{Expose, ExposeMut};
 
 pub struct Dynamic<T: ?Sized>(pub Box<T>); // ← pub field
 
@@ -43,12 +43,29 @@ impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
 }
 
 impl<T: ?Sized> Dynamic<T> {
-    pub fn view(&self) -> Expose<'_, T> {
-        Expose(&self.0)
+    #[inline(always)]
+    pub fn expose_secret(&self) -> &T {
+        &self.0
     }
 
-    pub fn view_mut(&mut self) -> ExposeMut<'_, T> {
-        ExposeMut(&mut self.0)
+    #[inline(always)]
+    pub fn expose_secret_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+
+    // Legacy → redirect to the new names
+    #[deprecated(since = "0.5.5", note = "use `expose_secret` instead")]
+    #[doc(hidden)]
+    #[inline(always)]
+    pub fn view(&self) -> &T {
+        self.expose_secret()
+    }
+
+    #[deprecated(since = "0.5.5", note = "use `expose_secret_mut` instead")]
+    #[doc(hidden)]
+    #[inline(always)]
+    pub fn view_mut(&mut self) -> &mut T {
+        self.expose_secret_mut()
     }
 }
 

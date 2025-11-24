@@ -6,7 +6,6 @@ extern crate alloc;
 
 // Core modules
 mod dynamic;
-mod expose;
 mod fixed;
 mod macros;
 
@@ -19,7 +18,6 @@ mod serde;
 
 // Public API
 pub use dynamic::Dynamic;
-pub use expose::{Expose, ExposeMut};
 pub use fixed::Fixed;
 
 // Zeroize integration (opt-in)
