@@ -48,14 +48,12 @@ jobs:
 
       - name: Run Miri on all tests (strict — fails on any UB)
         env:
-          # Proven flags for secure-gate: ignore intentional leaks from SecretBox/Zeroizing,
-          # disable isolation (needed for std), strict provenance for maximum safety
           MIRIFLAGS: >-
             -Zmiri-ignore-leaks
             -Zmiri-disable-isolation
             -Zmiri-strict-provenance
         run: |
-          cargo miri test --workspace --all-features --include-ignored
+          cargo miri test --workspace --all-features -- --include-ignored
 
       - name: Light corpus scan with Miri (weekly or manual only)
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
