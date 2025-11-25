@@ -88,7 +88,7 @@ fuzz_target!(|data: &[u8]| {
             panic!("Isolation failed");
         }
     }
-    drop(key);
+    // No need for explicit drop — Fixed<[u8; N]> implements Copy, so drop does nothing
 
     // 4. Nested secure types
     let nested = Dynamic::<Dynamic<Vec<u8>>>::new(Dynamic::new(data.to_vec()));
@@ -103,7 +103,7 @@ fuzz_target!(|data: &[u8]| {
     if data.len() >= 2 {
         let mut small = Fixed::new([data[0], data[1]]);
         small[0] = data[0].wrapping_add(1);
-        drop(small);
+        // No need for explicit drop — Fixed<[u8; N]> implements Copy, so drop does nothing
     }
 
     let mut empty_vec = Dynamic::<Vec<u8>>::new(Vec::new());
