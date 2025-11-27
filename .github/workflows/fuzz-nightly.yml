@@ -3,7 +3,7 @@ name: Fuzz (nightly – long running)
 
 on:
   schedule:
-    - cron: "0 10 * * *" # 10:00 UTC daily
+    - cron: "0 10 * * *" # every day at 10:00 UTC
   workflow_dispatch:
 
 permissions:
@@ -21,7 +21,7 @@ jobs:
         mode: [normal, asan]
 
     env:
-      # IMPORTANT: '--' tells cargo-fuzz to pass everything after it directly to libFuzzer
+      # '--' tells cargo-fuzz to pass everything after it to libFuzzer
       FUZZER_ARGS: >-
         -- -fork=1 -timeout=60 -rss_limit_mb=8192 -runs=0 -max_total_time=3500
 
@@ -35,7 +35,7 @@ jobs:
           toolchain: nightly
           components: rust-src
 
-      - name: Cache cargo & target dir
+      - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-fuzz
@@ -54,7 +54,6 @@ jobs:
           mkdir -p fuzz/corpus/{clone,expose,mut,parsing,serde,zeroizing}
           for dir in fuzz/corpus/*; do
             if [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
-              echo "Seeding initial inputs for $(basename "$dir")"
               printf 'fuzzme'           > "$dir/seed_basic"
               printf '\\x00\\x00\\x00\\x00' > "$dir/seed_zero"
               printf '\\xff\\xff\\xff\\xff'   > "$dir/seed_ff"
@@ -104,8 +103,11 @@ jobs:
           toolchain: nightly
           components: rust-src
 
-      - name: Install llvm-tools (required for llvm-cov)
+      - name: Install llvm-tools
         run: rustup component add llvm-tools-preview
+
+      - name: Add LLVM tools to PATH
+        run: echo "$(rustc --print sysroot)/bin" >> $GITHUB_PATH
 
       - name: Cache
         uses: Swatinem/rust-cache@v2
@@ -141,9 +143,6 @@ jobs:
               --format=html \
               --ignore-filename-regex='/.cargo|/rustc/' \
               --output-dir=coverage/html/$target
-
-            echo "Generated HTML files:"
-            ls -R coverage/html/$target || true
 
             cargo +nightly fuzz coverage $target "$corpus_dir" --lcov --output-path=coverage/lcov/$target.info
           done
