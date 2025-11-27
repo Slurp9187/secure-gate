@@ -21,7 +21,6 @@ jobs:
         mode: [normal, asan]
 
     env:
-      # '--' tells cargo-fuzz to pass everything after it to libFuzzer
       FUZZER_ARGS: >-
         -- -fork=1 -timeout=60 -rss_limit_mb=8192 -runs=0 -max_total_time=3500
 
@@ -49,7 +48,7 @@ jobs:
           path: fuzz/corpus/
           merge-multiple: true
 
-      - name: Seed minimal corpus (prevents instant exit)
+      - name: Seed minimal corpus
         run: |
           mkdir -p fuzz/corpus/{clone,expose,mut,parsing,serde,zeroizing}
           for dir in fuzz/corpus/*; do
@@ -103,6 +102,9 @@ jobs:
           toolchain: nightly
           components: rust-src
 
+      - name: Use nightly as default
+        run: rustup default nightly
+
       - name: Install llvm-tools
         run: rustup component add llvm-tools-preview
 
@@ -128,23 +130,19 @@ jobs:
           for target in clone expose mut parsing serde zeroizing; do
             corpus_dir=$(find fuzz/corpus -type d -name "fuzz-corpus-$target-normal-*" -print -quit)
             echo "Corpus dir for $target: $corpus_dir"
-
             if [ -z "$corpus_dir" ] || [ -z "$(ls -A "$corpus_dir")" ]; then
               echo "No corpus for $target, skipping coverage"
               continue
             fi
-
             echo "=== Generating coverage for $target ==="
-            cargo +nightly fuzz coverage $target "$corpus_dir" -- -runs=200000
-
+            cargo fuzz coverage $target "$corpus_dir" -- -runs=200000
             llvm-cov show \
               --instr-profile=fuzz/coverage/$target/coverage.profdata \
               --object fuzz/target/release/$target \
               --format=html \
               --ignore-filename-regex='/.cargo|/rustc/' \
               --output-dir=coverage/html/$target
-
-            cargo +nightly fuzz coverage $target "$corpus_dir" --lcov --output-path=coverage/lcov/$target.info
+            cargo fuzz coverage $target "$corpus_dir" --lcov --output-path=coverage/lcov/$target.info
           done
 
       - name: Upload HTML coverage
