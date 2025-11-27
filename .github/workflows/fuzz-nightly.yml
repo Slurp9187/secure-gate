@@ -13,21 +13,17 @@ permissions:
 jobs:
   fuzz:
     runs-on: ubuntu-latest
-    timeout-minutes: 400 # ~6.5 h total safety margin
+    timeout-minutes: 400
     strategy:
       fail-fast: false
       matrix:
         target: [clone, expose, mut, parsing, serde, zeroizing]
-        mode: [normal, asan] # normal = no sanitizer, asan = Address + Leak
+        mode: [normal, asan]
 
     env:
-      # libFuzzer flags that work well on GitHub runners
+      # IMPORTANT: '--' tells cargo-fuzz to pass everything after it directly to libFuzzer
       FUZZER_ARGS: >-
-        -fork=1
-        -timeout=60
-        -rss_limit_mb=8192
-        -runs=0
-        -max_total_time=3500   # ~58 min real fuzzing time (leaves margin)
+        -- -fork=1 -timeout=60 -rss_limit_mb=8192 -runs=0 -max_total_time=3500
 
     steps:
       - name: Checkout repository
@@ -59,11 +55,11 @@ jobs:
           for dir in fuzz/corpus/*; do
             if [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
               echo "Seeding initial inputs for $(basename "$dir")"
-              printf 'fuzzme'          > "$dir/seed_basic"
+              printf 'fuzzme'           > "$dir/seed_basic"
               printf '\\x00\\x00\\x00\\x00' > "$dir/seed_zero"
-              printf '\\xff\\xff\\xff\\xff' > "$dir/seed_ff"
-              printf 'A%.0s' {1..2000}  > "$dir/seed_long"
-              head -c 500 /dev/urandom  > "$dir/seed_random"
+              printf '\\xff\\xff\\xff\\xff'   > "$dir/seed_ff"
+              printf 'A%.0s' {1..2000}   > "$dir/seed_long"
+              head -c 500 /dev/urandom   > "$dir/seed_random"
             fi
           done
 
@@ -122,13 +118,12 @@ jobs:
         with:
           pattern: fuzz-corpus-*
           path: fuzz/corpus/
-          merge-multiple: false # IMPORTANT: False to preserve per-target dirs
+          merge-multiple: false
 
       - name: Generate HTML + lcov coverage
         run: |
           mkdir -p coverage/html coverage/lcov
           for target in clone expose mut parsing serde zeroizing; do
-            # Find the normal-mode corpus dir (e.g., fuzz-corpus-clone-normal-*)
             corpus_dir=$(find fuzz/corpus -type d -name "fuzz-corpus-$target-normal-*" -print -quit)
             echo "Corpus dir for $target: $corpus_dir"
 
@@ -148,7 +143,7 @@ jobs:
               --output-dir=coverage/html/$target
 
             echo "Generated HTML files:"
-            ls -R coverage/html/$target || echo "No HTML files generated (check llvm-cov errors above)"
+            ls -R coverage/html/$target || true
 
             cargo +nightly fuzz coverage $target "$corpus_dir" --lcov --output-path=coverage/lcov/$target.info
           done
@@ -159,4 +154,4 @@ jobs:
           name: fuzz-coverage-html-${{ github.run_id }}
           path: coverage/html/
           retention-days: 90
-          if-no-files-found: warn # OK if empty in early runs
+          if-no-files-found: warn
