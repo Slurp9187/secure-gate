@@ -72,8 +72,8 @@ jobs:
             if [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
               echo "Seeding initial inputs for $(basename "$dir")"
               printf 'fuzzme'          > "$dir/seed_basic"
-              printf '\x00\x00\x00\x00' > "$dir/seed_zero"
-              printf '\xff\xff\xff\xff' > "$dir/seed_ff"
+              printf '\\x00\\x00\\x00\\x00' > "$dir/seed_zero"
+              printf '\\xff\\xff\\xff\\xff' > "$dir/seed_ff"
               printf 'A%.0s' {1..2000}  > "$dir/seed_long"
               # A few random-ish bytes for variety
               head -c 500 /dev/urandom  > "$dir/seed_random"
@@ -86,16 +86,11 @@ jobs:
       - name: Fuzz – ${{ matrix.target }} (${{ matrix.mode }})
         env:
           # Enable sanitizers only for the "asan" matrix entry
-          RUSTFLAGS: ${{ 
-            matrix.mode == 'asan' && 
-            '-Zsanitizer=address -Zsanitizer=leak -Cdebuginfo=2' || 
-            '' 
-          }}
+          RUSTFLAGS: ${{ matrix.mode == 'asan' && '-Zsanitizer=address -Zsanitizer=leak -Cdebuginfo=2' || '' }}
           ASAN_OPTIONS: detect_leaks=1 abort_on_error=1 symbolize=1 allocator_may_return_null=1
         run: |
           echo "Starting 58-minute fuzz run for ${{ matrix.target }} (${{ matrix.mode }})"
-          cargo +nightly fuzz run ${{ matrix.target }} \
-            $FUZZER_ARGS
+          cargo +nightly fuzz run ${{ matrix.target }} $FUZZER_ARGS
 
       # --------------------------------------------------
       # ALWAYS upload the grown corpus (even on timeout/cancel)
