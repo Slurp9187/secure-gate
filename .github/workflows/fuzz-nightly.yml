@@ -3,7 +3,7 @@ name: Fuzz (nightly – long running)
 
 on:
   schedule:
-    - cron: "0 10 * * *" # 10:00 UTC daily
+    - cron: "0 10 * * *" # 10:00 UTC every day
   workflow_dispatch:
 
 permissions:
@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   fuzz:
+    name: ${{ matrix.target }} (${{ matrix.mode }})
     runs-on: ubuntu-latest
     timeout-minutes: 400
     strategy:
@@ -21,8 +22,18 @@ jobs:
         mode: [normal, asan]
 
     env:
-      # ~58 minutes of actual fuzzing per job
-      FUZZER_ARGS: "-fork=1 -timeout=60 -rss_limit_mb=8192 -runs=0 -max_total_time=3500"
+      # ~58 minutes of real fuzzing + a few seconds margin
+      FUZZER_ARGS: >-
+        -fork=1
+        -timeout=60
+        -rss_limit_mb=8192
+        -runs=0
+        -max_total_time=3500
+        -max_len=0
+        -only_ascii=0
+        -use_value_profile=1
+        -detect_leaks=0
+        -merge=0
 
     steps:
       - name: Checkout repository
@@ -33,14 +44,15 @@ jobs:
         with:
           toolchain: nightly
           components: rust-src
+          override: true
 
       - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
 
-      - name: Download previous corpora
+      - name: Download previous corpora (best effort)
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
@@ -48,7 +60,7 @@ jobs:
           path: fuzz/corpus-downloaded/
           merge-multiple: true
 
-      - name: Prepare per-target corpus directories
+      - name: Populate per-target corpus directories
         run: |
           mkdir -p fuzz/corpus
           for t in clone expose mut parsing serde zeroizing; do
@@ -65,16 +77,21 @@ jobs:
               printf 'fuzzme' > "$dir/seed_basic"
               printf '\x00\x00\x00\x00' > "$dir/seed_zero"
               printf '\xff\xff\xff\xff' > "$dir/seed_ff"
-              head -c 500 /dev/urandom > "$dir/seed_random"
+              head -c 1024 /dev/urandom > "$dir/seed_random"
             fi
           done
 
       - name: Fuzz – ${{ matrix.target }} (${{ matrix.mode }})
         env:
-          RUSTFLAGS: ${{ matrix.mode == 'asan' && '-Zsanitizer=address -Zsanitizer=leak -Cdebuginfo=2' || '' }}
-          ASAN_OPTIONS: detect_leaks=1 abort_on_error=1 symbolize=1 allocator_may_return_null=1
+          RUSTFLAGS: ${{ matrix.mode == 'asan' && '-Zsanitizer=address -Zsanitizer=leak -C debuginfo=2' || '' }}
+          ASAN_OPTIONS: >-
+            detect_leaks=1
+            abort_on_error=1
+            symbolize=1
+            allocator_may_return_null=1
+            print_stats=1
         run: |
-          echo "Fuzzing ${{ matrix.target }} (${{ matrix.mode }}) for ~58 minutes..."
+          echo "Fuzzing ${{ matrix.target }} (${{ matrix.mode }}) for ≈58 minutes…"
           cargo +nightly fuzz run ${{ matrix.target }} \
             fuzz/corpus/${{ matrix.target }} \
             -- \
@@ -86,10 +103,10 @@ jobs:
         with:
           name: fuzz-corpus-${{ matrix.target }}-${{ matrix.mode }}-${{ github.run_id }}
           path: fuzz/corpus/${{ matrix.target }}/
-          retention-days: 60
+          retention-days: 90
           if-no-files-found: error
 
-      - name: Upload crash artifacts
+      - name: Upload crashes (if any)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -118,9 +135,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
 
-      - name: Build fuzz targets (release)
+      - name: Build fuzz targets in release mode
         run: cargo +nightly fuzz build --release
 
       - name: Download all fresh corpora
@@ -130,7 +147,7 @@ jobs:
           path: fuzz/corpus-downloaded/
           merge-multiple: true
 
-      - name: Reconstruct per-target corpus directories
+      - name: Reconstruct corpus directories
         run: |
           mkdir -p fuzz/corpus
           for t in clone expose mut parsing serde zeroizing; do
@@ -138,41 +155,29 @@ jobs:
             find fuzz/corpus-downloaded -type f -name "*$t*" -exec cp {} "fuzz/corpus/$t/" \; 2>/dev/null || true
           done
 
-      - name: Generate HTML + lcov coverage
+      - name: Generate HTML + lcov coverage reports
         run: |
           mkdir -p coverage/html coverage/lcov
 
           for target in clone expose mut parsing serde zeroizing; do
-            echo "=== Coverage for $target ==="
+            echo "=== Generating coverage for $target ==="
+            corpus="fuzz/corpus/$target"
+            [ ! -d "$corpus" ] || [ -z "$(ls -A "$corpus")" ] && continue
 
-            corpus_dir="fuzz/corpus/$target"
-            if [ ! -d "$corpus_dir" ] || [ -z "$(ls -A "$corpus_dir")" ]; then
-              echo "No corpus for $target, skipping"
-              continue
-            fi
+            binary=$(find fuzz/target -type f -name "$target" -perm /a=x -print -quit)
+            [ -z "$binary" ] && { echo "Binary not found for $target"; continue; }
 
-            # Find the compiled binary (cargo-fuzz puts it in an arch sub-directory)
-            binary=$(find fuzz/target -type f -name "$target" -perm /a=x -print -quit 2>/dev/null || echo "")
-            if [ -z "$binary" ]; then
-              echo "Binary not found for $target"
-              continue
-            fi
-            echo "Using binary: $binary"
+            cargo +nightly fuzz coverage "$target" "$corpus" -- -runs=300000
 
-            # Run coverage collection
-            cargo +nightly fuzz coverage "$target" "$corpus_dir" -- -runs=200000
-
-            # HTML report
             llvm-cov show \
               --instr-profile="fuzz/coverage/$target/coverage.profdata" \
               --object="$binary" \
               --format=html \
-              --ignore-filename-regex='/.cargo|/rustc/|.*/libfuzzer_sys/.*' \
+              --ignore-filename-regex='/.cargo|/rustc/|.*/libfuzzer_sys/' \
               --output-dir="coverage/html/$target" \
-              || echo "llvm-cov HTML generation failed for $target (continuing)"
+              || true
 
-            # lcov report (optional)
-            cargo +nightly fuzz coverage "$target" "$corpus_dir" --lcov --output-path="coverage/lcov/$target.info" || true
+            cargo +nightly fuzz coverage "$target" "$corpus" --lcov --output-path="coverage/lcov/$target.info" || true
           done
 
       - name: Upload HTML coverage report
@@ -181,4 +186,3 @@ jobs:
           name: fuzz-coverage-html-${{ github.run_id }}
           path: coverage/html/
           retention-days: 90
-          if-no-files-found: warn
