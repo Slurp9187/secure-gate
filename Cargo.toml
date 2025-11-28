@@ -10,7 +10,6 @@ keywords = ["crypto", "no-std", "security", "zeroize"]
 categories = ["cryptography", "no-std", "data-structures"]
 
 [dependencies]
-# rand = { version = "0.9", optional = true, features = ["std", "os_rng"] }
 rand = { version = "0.9", optional = true }
 secrecy = { version = "0.10", default-features = false, optional = true }
 zeroize = { version = "1.8", default-features = false, optional = true, features = [
