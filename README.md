@@ -148,7 +148,7 @@ Overhead is **< 0.1 CPU cycles** — indistinguishable from raw arrays.
 
 ## Changelog
 
-[See CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/main/CHANGELOG.md)
+[CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/main/CHANGELOG.md)
 
 ## License
 
