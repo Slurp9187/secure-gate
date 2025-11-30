@@ -1,11 +1,7 @@
+#!/usr/bin/env python3
 """
-package_it.py – FINAL VERSION (timestamp prefix, clean names)
-
-Generates:
-  20251118_123456_secure_gate_src.txt
-  20251118_123456_secure_gate_tests.txt
-  20251118_123456_secure_gate_mod.txt
-  20251118_123456_secure_gate_fuzz.txt
+package_it.py – FINAL BULLETPROOF VERSION (2025)
+Safe, beautiful, sortable code packages – will never nuke your .git again.
 """
 
 from datetime import datetime
@@ -17,9 +13,26 @@ PROJECT_TITLE = "secure-gate"
 OUTPUT_DIR = "code_packages"
 ENCODING = "utf-8"
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
-OUTPUT_TIMESTAMP_FORMAT = "%Y%m%d_%H%M%S"   # ← sortable prefix
+OUTPUT_TIMESTAMP_FORMAT = "%Y%m%d_%H%M%S"
 
-# --------------------------------------------------------------------
+# ========================== SAFETY FIRST ==========================
+
+
+def die(msg: str):
+    print(f"FATAL: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+# Block any attempt to write into .git (even via symlinks)
+output_path = Path.cwd().resolve() / OUTPUT_DIR
+git_path = Path.cwd().resolve() / ".git"
+try:
+    if output_path.resolve().is_relative_to(git_path):
+        die("Refusing to run: output directory would land inside .git!")
+except Exception:
+    pass  # Windows sometimes throws on broken symlinks
+
+# =================================================================
 
 
 def find_project_root(start: Path | None = None) -> Path:
@@ -28,12 +41,12 @@ def find_project_root(start: Path | None = None) -> Path:
         if (cur / "Cargo.toml").exists():
             return cur
         cur = cur.parent
-    return Path(start or __file__).resolve().parent
+    die("Could not find project root (no Cargo.toml in parent directories)")
 
 
 PROJECT_ROOT = find_project_root()
 
-# --------------------------------------------------------------------
+# =================================================================
 PACKAGES = [
     {
         "suffix": "src",
@@ -65,7 +78,7 @@ PACKAGES = [
     },
 ]
 
-# ===================================================================
+# =================================================================
 
 
 def format_timestamp(ts: float) -> str:
@@ -102,7 +115,6 @@ def create_package(pkg_def: dict, root: Path, timestamp: str) -> None:
     out_dir = root / OUTPUT_DIR
     out_dir.mkdir(exist_ok=True)
 
-    # ← Timestamp first → perfect sorting!
     output_filename = f"{timestamp}_{PROJECT_TITLE}_{suffix}.txt"
     output_path = out_dir / output_filename
 
@@ -110,7 +122,7 @@ def create_package(pkg_def: dict, root: Path, timestamp: str) -> None:
     toc_entries: list[str] = []
     seen_paths = set()
 
-    # Root files (Cargo.toml etc.)
+    # Root files
     for f in pkg_def["root_files"]:
         p = root / f
         if p.is_file():
@@ -119,7 +131,7 @@ def create_package(pkg_def: dict, root: Path, timestamp: str) -> None:
                 add_file(file_contents, toc_entries, p, root)
                 seen_paths.add(rel)
 
-    # Recursive .rs (or mod.rs) files
+    # Recursive file collection
     for base_dir_name in pkg_def["include_dirs"]:
         base_dir = root / base_dir_name
         if not base_dir.exists():
@@ -131,7 +143,7 @@ def create_package(pkg_def: dict, root: Path, timestamp: str) -> None:
                 add_file(file_contents, toc_entries, rs_file, root)
                 seen_paths.add(rel)
 
-    # TOC
+    # Build TOC
     toc_lines = [
         "// ============================================================================\n",
         "// TABLE OF CONTENTS\n",
@@ -144,7 +156,7 @@ def create_package(pkg_def: dict, root: Path, timestamp: str) -> None:
     toc_lines.append(
         "// ============================================================================\n\n")
 
-    # Write file
+    # Write final file
     with output_path.open("w", encoding=ENCODING) as f:
         header_time = format_timestamp(datetime.now().timestamp())
         f.write(
@@ -157,7 +169,7 @@ def create_package(pkg_def: dict, root: Path, timestamp: str) -> None:
         f.writelines(toc_lines)
         f.writelines(file_contents)
 
-    print(f"  → {output_filename}  ({len(file_contents)} files)")
+    print(f"  → {output_filename}  ({len(file_contents)} sections)")
 
 
 def package_all(root: Path = PROJECT_ROOT) -> None:
@@ -167,21 +179,26 @@ def package_all(root: Path = PROJECT_ROOT) -> None:
     print(f"Timestamp prefix: {timestamp}\n")
 
     for pkg in PACKAGES:
-        print(f"Creating {PROJECT_TITLE}_{pkg['suffix']} ...")
+        print(f"Creating {PROJECT_TITLE}_{pkg['suffix']} package...")
         create_package(pkg, root, timestamp)
 
-    print(f"\nAll 4 packages created in ./{OUTPUT_DIR}/\n")
-    print("Files are chronologically sortable — perfect!")
+    print(f"\nAll packages created in ./{OUTPUT_DIR}/\n")
+    print("Done – your code is now beautifully archived and safe!")
 
 
-# ===================================================================
+# =================================================================
 if __name__ == "__main__":
     override_root: Path | None = None
     if len(sys.argv) > 1 and not sys.argv[1].startswith("--"):
         override_root = Path(sys.argv[1]).resolve()
+        if not override_root.exists():
+            die(f"Override root does not exist: {override_root}")
 
     effective_root = override_root or PROJECT_ROOT
     if override_root:
         print(f"Using override root: {override_root}\n")
+
+    if not (effective_root / "Cargo.toml").exists():
+        die(f"No Cargo.toml found in {effective_root} – are you in the right project?")
 
     package_all(effective_root)
