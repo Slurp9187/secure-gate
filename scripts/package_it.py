@@ -13,7 +13,7 @@ from pathlib import Path
 import sys
 
 # ========================== CONFIGURATION ==========================
-PROJECT_TITLE = "secure_gate"          # ← change to "secure_gate" when needed
+PROJECT_TITLE = "secure-gate"
 OUTPUT_DIR = "code_packages"
 ENCODING = "utf-8"
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
