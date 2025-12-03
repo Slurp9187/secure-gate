@@ -12,13 +12,13 @@ Zero-cost, `no_std`-compatible wrappers for handling sensitive data in memory.
 
 ```toml
 [dependencies]
-secure-gate = "0.5.9"
+secure-gate = "0.5.10"
 ```
 
 Recommended (maximum safety + ergonomics):
 
 ```toml
-secure-gate = { version = "0.5.9", features = ["zeroize", "rand", "conversions"] }
+secure-gate = { version = "0.5.10", features = ["zeroize", "rand", "conversions"] }
 ```
 
 ## Features

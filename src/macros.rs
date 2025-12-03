@@ -134,7 +134,6 @@ macro_rules! dynamic_alias {
     };
 }
 
-// (Your existing code + updated macro)
 #[macro_export]
 macro_rules! random_alias {
     ($name:ident, $size:literal) => {

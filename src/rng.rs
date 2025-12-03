@@ -35,7 +35,7 @@ thread_local! {
 
 /// Extension trait for generating cryptographically secure random values.
 ///
-/// Implemented for all `Fixed<[u8; N]>` types (including `fixed_alias!` types).
+/// Implemented for all `RandomBytes<N>` types (including `random_alias!` types).
 ///
 /// # Panics
 ///
@@ -68,6 +68,12 @@ pub trait SecureRandomExt {
     {
         Self::new()
     }
+
+    /// Generate random bytes and return as RandomHex.
+    #[cfg(all(feature = "rand", feature = "conversions"))]
+    fn random_hex() -> crate::RandomHex
+    where
+        Self: Sized;
 }
 
 /// Fresh cryptographically-secure random bytes of exactly `N` length.
@@ -121,5 +127,18 @@ impl<const N: usize> SecureRandomExt for RandomBytes<N> {
                 .expect("OsRng failed — this should never happen");
         });
         RandomBytes(crate::Fixed::new(bytes))
+    }
+
+    #[cfg(all(feature = "rand", feature = "conversions"))]
+    #[inline(always)]
+    fn random_hex() -> crate::RandomHex
+    where
+        Self: Sized,
+    {
+        use crate::conversions::SecureConversionsExt; // Import for to_hex
+        let secret = Self::new();
+        let hex_str = secret.expose_secret().to_hex();
+        let hex = crate::conversions::HexString::new(hex_str).expect("Generated hex is valid");
+        crate::conversions::RandomHex(hex)
     }
 }

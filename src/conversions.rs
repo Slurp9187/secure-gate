@@ -33,6 +33,9 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 #[cfg(feature = "conversions")]
 use base64::Engine;
 
+#[cfg(all(feature = "rand", feature = "conversions"))]
+use secrecy::ExposeSecret;
+
 // Loud deprecation bomb — impossible to miss if someone uses the old API
 #[cfg(all(feature = "conversions", not(doc)))]
 #[deprecated(
@@ -184,10 +187,67 @@ impl core::ops::Deref for HexString {
 }
 
 #[cfg(feature = "conversions")]
-use secrecy::ExposeSecret;
-#[cfg(feature = "conversions")]
 impl ExposeSecret<String> for HexString {
     fn expose_secret(&self) -> &String {
         self.0.expose_secret()
     }
+}
+
+/// Newtype for random hex strings — wraps HexString for freshness semantics.
+///
+/// Construction only via RNG → guarantees it's from random bytes.
+#[cfg(all(feature = "rand", feature = "conversions"))]
+#[derive(Clone, Debug, PartialEq)]
+pub struct RandomHex(pub HexString);
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+impl RandomHex {
+    /// Internal constructor — only from validated hex.
+    pub fn new(hex: HexString) -> Self {
+        Self(hex)
+    }
+
+    /// Decodes back to bytes (inherits from HexString).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.0.to_bytes()
+    }
+
+    /// Property: Original byte length (inherits).
+    pub fn byte_len(&self) -> usize {
+        self.0.byte_len()
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+impl core::ops::Deref for RandomHex {
+    type Target = HexString;
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+impl ExposeSecret<String> for RandomHex {
+    #[inline(always)]
+    fn expose_secret(&self) -> &String {
+        self.0.expose_secret()
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+#[test]
+fn random_hex_returns_randomhex() {
+    use crate::{random_alias, SecureRandomExt};
+
+    random_alias!(HexKey, 32);
+
+    let hex = HexKey::random_hex();
+    let _: RandomHex = hex;
+
+    assert_eq!(hex.expose_secret().len(), 64);
+    assert!(hex.expose_secret().chars().all(|c| c.is_ascii_hexdigit()));
+
+    let bytes_back = hex.to_bytes();
+    assert_eq!(bytes_back.len(), 32);
 }

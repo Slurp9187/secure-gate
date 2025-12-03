@@ -96,3 +96,6 @@ pub use rng::{RandomBytes, SecureRandomExt};
 // Conversions integration (opt-in)
 #[cfg(feature = "conversions")]
 pub use conversions::SecureConversionsExt;
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+pub use conversions::RandomHex;
