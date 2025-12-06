@@ -104,3 +104,19 @@ fn hex_string_validates_and_decodes() {
     let invalid = "a1b2c3d".to_string(); // Odd length
     assert!(HexString::new(invalid).is_err());
 }
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+#[test]
+fn random_hex_returns_randomhex() {
+    use secure_gate::fixed_alias_rng;
+
+    fixed_alias_rng!(HexKey, 32);
+
+    let hex: secure_gate::RandomHex = HexKey::random_hex();
+
+    assert_eq!(hex.expose_secret().len(), 64);
+    assert!(hex.expose_secret().chars().all(|c| c.is_ascii_hexdigit()));
+
+    let bytes_back = hex.to_bytes();
+    assert_eq!(bytes_back.len(), 32);
+}

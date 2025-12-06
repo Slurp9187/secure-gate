@@ -163,21 +163,3 @@ impl<const N: usize> crate::rng::FixedRng<N> {
         RandomHex::new(hex_string)
     }
 }
-
-// ───── Test now compiles ─────
-#[cfg(all(feature = "rand", feature = "conversions"))]
-#[test]
-fn random_hex_returns_randomhex() {
-    use crate::fixed_alias_rng;
-
-    fixed_alias_rng!(HexKey, 32);
-
-    // HexKey is just a type alias for FixedRng<32>
-    let hex: RandomHex = HexKey::random_hex();
-
-    assert_eq!(hex.expose_secret().len(), 64);
-    assert!(hex.expose_secret().chars().all(|c| c.is_ascii_hexdigit()));
-
-    let bytes_back = hex.to_bytes();
-    assert_eq!(bytes_back.len(), 32);
-}
