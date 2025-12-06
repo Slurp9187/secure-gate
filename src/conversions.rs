@@ -16,58 +16,51 @@ pub trait SecureConversionsExt {
     fn ct_eq(&self, other: &Self) -> bool;
 }
 
-// Implement for any borrowed byte slice — forces .expose_secret()!
 #[cfg(feature = "conversions")]
 impl SecureConversionsExt for [u8] {
     #[inline]
     fn to_hex(&self) -> String {
         hex::encode(self)
     }
-
     #[inline]
     fn to_hex_upper(&self) -> String {
         hex::encode_upper(self)
     }
-
     #[inline]
     fn to_base64url(&self) -> String {
         URL_SAFE_NO_PAD.encode(self)
     }
-
     #[inline]
     fn ct_eq(&self, other: &Self) -> bool {
         subtle::ConstantTimeEq::ct_eq(self, other).into()
     }
 }
 
-// Also support direct &[u8; N] (common in fixed aliases)
 #[cfg(feature = "conversions")]
 impl<const N: usize> SecureConversionsExt for [u8; N] {
     #[inline]
     fn to_hex(&self) -> String {
         hex::encode(self)
     }
-
     #[inline]
     fn to_hex_upper(&self) -> String {
         hex::encode_upper(self)
     }
-
     #[inline]
     fn to_base64url(&self) -> String {
         URL_SAFE_NO_PAD.encode(self)
     }
-
     #[inline]
     fn ct_eq(&self, other: &Self) -> bool {
-        // Just compare as slices — subtle implements ConstantTimeEq for &[u8]
         subtle::ConstantTimeEq::ct_eq(self.as_slice(), other.as_slice()).into()
     }
 }
 
-// HexString — unchanged, still stores lowercase
+// ─────────────────────────────────────────────────────────────────────────────
+// HexString — validated, lowercase hex wrapper
+// ─────────────────────────────────────────────────────────────────────────────
 #[cfg(feature = "conversions")]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)] // REMOVED PartialEq/Eq derive
 pub struct HexString(crate::Dynamic<String>);
 
 #[cfg(feature = "conversions")]
@@ -98,28 +91,43 @@ impl core::ops::Deref for HexString {
     }
 }
 
-#[cfg(feature = "conversions")]
+#[cfg(all(feature = "conversions", feature = "zeroize"))]
 impl secrecy::ExposeSecret<String> for HexString {
     fn expose_secret(&self) -> &String {
         self.0.expose_secret()
     }
 }
 
-// RandomHex — unchanged
+// Manual constant-time PartialEq (safe, since we're under conversions)
+#[cfg(feature = "conversions")]
+impl PartialEq for HexString {
+    fn eq(&self, other: &Self) -> bool {
+        self.0
+            .expose_secret()
+            .as_bytes()
+            .ct_eq(other.0.expose_secret().as_bytes())
+    }
+}
+
+#[cfg(feature = "conversions")]
+impl Eq for HexString {}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RandomHex — only constructible from fresh RNG
+// ─────────────────────────────────────────────────────────────────────────────
 #[cfg(all(feature = "rand", feature = "conversions"))]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RandomHex(pub HexString);
+#[derive(Clone, Debug)] // REMOVED PartialEq/Eq derive
+pub struct RandomHex(HexString);
 
 #[cfg(all(feature = "rand", feature = "conversions"))]
 impl RandomHex {
-    pub fn new(hex: HexString) -> Self {
+    pub(crate) fn new_fresh(hex: HexString) -> Self {
         Self(hex)
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
         self.0.to_bytes()
     }
-
     pub fn byte_len(&self) -> usize {
         self.0.byte_len()
     }
@@ -133,19 +141,33 @@ impl core::ops::Deref for RandomHex {
     }
 }
 
-#[cfg(all(feature = "rand", feature = "conversions"))]
+#[cfg(all(feature = "rand", feature = "conversions", feature = "zeroize"))]
 impl secrecy::ExposeSecret<String> for RandomHex {
     fn expose_secret(&self) -> &String {
         self.0.expose_secret()
     }
 }
 
+// Manual constant-time PartialEq (safe)
+#[cfg(all(feature = "rand", feature = "conversions"))]
+impl PartialEq for RandomHex {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0) // Delegates to HexString's ct_eq impl
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+impl Eq for RandomHex {}
+
 #[cfg(all(feature = "rand", feature = "conversions"))]
 impl<const N: usize> crate::rng::FixedRng<N> {
     pub fn random_hex() -> RandomHex {
-        let rng = Self::generate();
-        let bytes = rng.expose_secret();
-        let hex = hex::encode(bytes);
-        RandomHex(HexString(crate::Dynamic::new(hex)))
+        // Scoped block to limit the lifetime of the temporary FixedRng<N>
+        let hex = {
+            let fresh_rng = Self::generate(); // temporary owns the secret
+            hex::encode(fresh_rng.expose_secret()) // borrow only for encoding
+        }; // ← fresh_rng dropped here → zeroized immediately (if zeroize enabled)
+
+        RandomHex::new_fresh(HexString(crate::Dynamic::new(hex)))
     }
 }

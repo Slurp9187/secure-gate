@@ -1,7 +1,7 @@
 // ==========================================================================
 // tests/integration.rs
 // ==========================================================================
-// Core integration tests — no macro usage here
+// Core integration tests — no macro usage here, pure v0.6.0 API
 
 use secure_gate::{Dynamic, Fixed};
 
@@ -10,7 +10,9 @@ fn basic_usage_explicit_access() {
     let mut key = Fixed::new([0u8; 32]);
     let mut pw = Dynamic::<String>::new("hunter2".to_string());
 
+    // Fixed<[u8; N]> now has .len() and .is_empty()
     assert_eq!(key.len(), 32);
+    assert!(!key.is_empty());
     assert_eq!(pw.expose_secret().len(), 7);
     assert_eq!(pw.expose_secret(), "hunter2");
 
@@ -108,14 +110,18 @@ fn dynamic_deserialize_is_blocked_with_clear_error() {
     );
 }
 
+// REPLACED: fixed_as_ref_as_mut → explicit_access_for_byte_arrays
 #[test]
-fn fixed_as_ref_as_mut() {
+fn explicit_access_for_byte_arrays() {
     let mut key = Fixed::new([42u8; 32]);
-    let slice: &[u8] = key.as_ref();
+
+    // Immutable borrow – must be explicit
+    let slice: &[u8] = key.expose_secret();
     assert_eq!(slice.len(), 32);
     assert_eq!(slice[0], 42);
 
-    let mut_slice: &mut [u8] = key.as_mut();
+    // Mutable borrow – must be explicit
+    let mut_slice: &mut [u8] = key.expose_secret_mut();
     mut_slice[0] = 99;
     assert_eq!(key.expose_secret()[0], 99);
 }

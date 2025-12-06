@@ -60,20 +60,6 @@ impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
     }
 }
 
-impl<const N: usize> AsRef<[u8]> for Fixed<[u8; N]> {
-    #[inline(always)]
-    fn as_ref(&self) -> &[u8] {
-        self.expose_secret()
-    }
-}
-
-impl<const N: usize> AsMut<[u8]> for Fixed<[u8; N]> {
-    #[inline(always)]
-    fn as_mut(&mut self) -> &mut [u8] {
-        self.expose_secret_mut()
-    }
-}
-
 impl<T> fmt::Debug for Fixed<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("[REDACTED]")
