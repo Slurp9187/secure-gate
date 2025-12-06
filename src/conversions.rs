@@ -1,15 +1,3 @@
-// src/conversions.rs
-//! Ergonomic conversions for fixed-size secrets — **explicit exposure required**
-//!
-//! This module provides the [`SecureConversionsExt`] trait containing `.to_hex()`,
-//! `.to_hex_upper()`, `.to_base64url()`, and `.ct_eq()`.
-//!
-//! The trait is implemented **only on `&[u8]`**, meaning you **must** call
-//! `.expose_secret()` first. This guarantees every conversion site is loud,
-//! intentional, and visible in code reviews.
-//!
-//! Enabled via the `conversions` feature (zero impact when disabled).
-
 #[cfg(feature = "conversions")]
 use alloc::string::String;
 
@@ -21,13 +9,6 @@ use base64::Engine;
 #[cfg(all(feature = "rand", feature = "conversions"))]
 use secrecy::ExposeSecret;
 
-/// Extension trait for common secure conversions.
-///
-/// # Security
-///
-/// This trait is **intentionally** only implemented for `&[u8]`.
-/// There is **no** impl for `Fixed<T>` — this guarantees every conversion
-/// requires an explicit `.expose_secret()` call.
 pub trait SecureConversionsExt {
     fn to_hex(&self) -> String;
     fn to_hex_upper(&self) -> String;
@@ -36,7 +17,6 @@ pub trait SecureConversionsExt {
     fn ct_eq(&self, other: &Self) -> bool;
 }
 
-/// Core implementation — only on already-exposed bytes
 #[cfg(feature = "conversions")]
 impl SecureConversionsExt for [u8] {
     #[inline]
@@ -65,7 +45,6 @@ impl SecureConversionsExt for [u8] {
     }
 }
 
-// ───── Compile-time safety net ─────
 #[cfg(feature = "conversions")]
 trait _AssertNoImplForFixed {}
 #[cfg(feature = "conversions")]
@@ -74,7 +53,6 @@ impl<T> _AssertNoImplForFixed for T where T: SecureConversionsExt {}
 #[cfg(feature = "conversions")]
 impl<const N: usize> _AssertNoImplForFixed for crate::Fixed<[u8; N]> {}
 
-// ───── New: HexString newtype ─────
 #[cfg(feature = "conversions")]
 #[derive(Clone, Debug, PartialEq)]
 pub struct HexString(crate::Dynamic<String>);
@@ -114,7 +92,6 @@ impl ExposeSecret<String> for HexString {
     }
 }
 
-// ───── New: RandomHex newtype ─────
 #[cfg(all(feature = "rand", feature = "conversions"))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct RandomHex(pub HexString);
@@ -151,13 +128,11 @@ impl ExposeSecret<String> for RandomHex {
     }
 }
 
-// ───── FixedRng gets its own random_hex method ─────
 #[cfg(all(feature = "rand", feature = "conversions"))]
 impl<const N: usize> crate::rng::FixedRng<N> {
-    /// Generate a fresh random key and return it as a validated `RandomHex`.
     #[inline(always)]
     pub fn random_hex() -> RandomHex {
-        let rng = Self::rng(); // uses the correct .rng() constructor
+        let rng = Self::rng();
         let hex_str = rng.expose_secret().to_hex_lowercase();
         let hex_string = HexString::new(hex_str).expect("hex::encode always produces valid hex");
         RandomHex::new(hex_string)

@@ -1,8 +1,3 @@
-// src/macros.rs
-//! secure-gate 0.6.0 — The Final Macro System (3×2 Matrix)
-//! Pure type aliases only — all methods provided via blanket impls.
-
-/// Concrete fixed-size secret (e.g. Aes256Key, Nonce24)
 #[macro_export]
 macro_rules! fixed_alias {
     ($name:ident, $size:literal) => {
@@ -11,7 +6,6 @@ macro_rules! fixed_alias {
     };
 }
 
-/// Generic fixed-size secret base (e.g. SecureSpan<24>)
 #[macro_export]
 macro_rules! fixed_generic_alias {
     ($name:ident, $doc:literal) => {
@@ -24,7 +18,6 @@ macro_rules! fixed_generic_alias {
     };
 }
 
-/// Fixed-size RNG-only secret
 #[macro_export]
 macro_rules! fixed_alias_rng {
     ($name:ident, $size:literal) => {
@@ -33,7 +26,6 @@ macro_rules! fixed_alias_rng {
     };
 }
 
-/// Concrete heap secret (e.g. Password, JwtKey)
 #[macro_export]
 macro_rules! dynamic_alias {
     ($name:ident, $inner:ty) => {
@@ -42,7 +34,6 @@ macro_rules! dynamic_alias {
     };
 }
 
-/// Generic heap secret base
 #[macro_export]
 macro_rules! dynamic_generic_alias {
     ($name:ident, $inner:ty, $doc:literal) => {
@@ -58,7 +49,6 @@ macro_rules! dynamic_generic_alias {
     };
 }
 
-/// Dynamic RNG-only secret
 #[macro_export]
 macro_rules! dynamic_alias_rng {
     ($name:ident, $inner:ty) => {

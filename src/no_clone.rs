@@ -1,14 +1,3 @@
-// src/no_clone.rs
-//! Unconditional, compiler-enforced non-cloneable secret wrappers.
-//!
-//! These types are **never** `Clone` or `Copy` — under any feature combination.
-//! They exist solely to make accidental duplication of master keys, HSM seeds,
-//! or root passwords a **hard compiler error**.
-//!
-//! Use via `.no_clone()` — loud, intentional, and per-variable.
-//!
-//! This is the crown jewel of secure-gate 0.6.0.
-
 use core::fmt;
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
@@ -16,20 +5,14 @@ use core::ops::{Deref, DerefMut};
 extern crate alloc;
 use alloc::boxed::Box;
 
-/// Private marker to prevent `Clone`/`Copy` — stable Rust workaround for negative impls.
 #[doc(hidden)]
 pub enum PhantomNonClone {}
 
-/// Stack-allocated secret that can **never** be cloned or copied.
 pub struct FixedNoClone<T>(T, PhantomData<PhantomNonClone>);
 
-/// Heap-allocated secret that can **never** be cloned.
 pub struct DynamicNoClone<T: ?Sized>(Box<T>, PhantomData<PhantomNonClone>);
 
-// ───── Constructors ─────
-
 impl<T> FixedNoClone<T> {
-    /// Create a new non-cloneable fixed secret.
     #[inline(always)]
     pub const fn new(value: T) -> Self {
         FixedNoClone(value, PhantomData)
@@ -37,14 +20,11 @@ impl<T> FixedNoClone<T> {
 }
 
 impl<T: ?Sized> DynamicNoClone<T> {
-    /// Create a new non-cloneable dynamic secret from a boxed value.
     #[inline(always)]
     pub fn new(value: Box<T>) -> Self {
         DynamicNoClone(value, PhantomData)
     }
 }
-
-// ───── Core ergonomics (identical to Fixed/Dynamic) ─────
 
 impl<T> Deref for FixedNoClone<T> {
     type Target = T;
@@ -88,8 +68,6 @@ impl<T: ?Sized> fmt::Debug for DynamicNoClone<T> {
     }
 }
 
-// ───── Canonical secret access ─────
-
 impl<T> FixedNoClone<T> {
     #[inline(always)]
     pub fn expose_secret(&self) -> &T {
@@ -124,10 +102,7 @@ impl<T: ?Sized> DynamicNoClone<T> {
     }
 }
 
-// ───── Specialized helpers (finish_mut) ─────
-
 impl DynamicNoClone<String> {
-    /// Shrink capacity to exact length — eliminates slack.
     pub fn finish_mut(&mut self) -> &mut String {
         let s = &mut **self;
         s.shrink_to_fit();
@@ -136,15 +111,12 @@ impl DynamicNoClone<String> {
 }
 
 impl DynamicNoClone<Vec<u8>> {
-    /// Shrink capacity to exact length — eliminates slack.
     pub fn finish_mut(&mut self) -> &mut Vec<u8> {
         let v = &mut **self;
         v.shrink_to_fit();
         v
     }
 }
-
-// ───── Zeroize integration (only when enabled) ─────
 
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};

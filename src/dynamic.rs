@@ -1,29 +1,8 @@
-// src/dynamic.rs
-//! Heap-allocated secure wrappers for dynamic secrets.
-//!
-//! `Dynamic<T>` is a zero-cost wrapper around `Box<T>` that:
-//! - Prevents accidental cloning/leaking via `Debug` redaction.
-//! - Provides explicit access via `.expose_secret()` (canonical API).
-//! - Supports idiomatic `.into()` conversions from owned values.
-//! - Works seamlessly with [`dynamic_alias!`] for type aliases.
-//!
-//! # Examples
-//!
-//! ```
-//! use secure_gate::{dynamic_alias, Dynamic};
-//!
-//! dynamic_alias!(Password, String);
-//!
-//! let pw: Password = "hunter2".into();
-//! assert_eq!(pw.expose_secret(), "hunter2");
-//! ```
-
 extern crate alloc;
 
 use alloc::boxed::Box;
 use core::ops::{Deref, DerefMut};
 
-/// A zero-cost, heap-allocated wrapper for sensitive data.
 pub struct Dynamic<T: ?Sized>(pub Box<T>);
 
 impl<T: ?Sized> Dynamic<T> {
@@ -39,7 +18,30 @@ impl<T: ?Sized> Dynamic<T> {
     {
         Dynamic(value.into())
     }
+}
 
+impl<T: ?Sized> Deref for Dynamic<T> {
+    type Target = T;
+    #[inline(always)]
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<T: ?Sized> DerefMut for Dynamic<T> {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+}
+
+impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("[REDACTED]")
+    }
+}
+
+impl<T: ?Sized> Dynamic<T> {
     #[inline(always)]
     pub fn expose_secret(&self) -> &T {
         &self.0
@@ -70,28 +72,6 @@ impl<T: ?Sized> Dynamic<T> {
     }
 }
 
-impl<T: ?Sized> Deref for Dynamic<T> {
-    type Target = T;
-    #[inline(always)]
-    fn deref(&self) -> &T {
-        &self.0
-    }
-}
-
-impl<T: ?Sized> DerefMut for Dynamic<T> {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut T {
-        &mut self.0
-    }
-}
-
-impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str("[REDACTED]")
-    }
-}
-
-// Clone impls
 #[cfg(not(feature = "zeroize"))]
 impl<T: Clone> Clone for Dynamic<T> {
     #[inline(always)]
@@ -124,7 +104,6 @@ impl Dynamic<Vec<u8>> {
     }
 }
 
-// .into() ergonomics
 impl<T> From<T> for Dynamic<T>
 where
     T: Sized,
@@ -149,7 +128,6 @@ impl From<&str> for Dynamic<String> {
     }
 }
 
-// PartialEq and Eq
 impl<T: PartialEq + ?Sized> PartialEq for Dynamic<T> {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
@@ -158,3 +136,10 @@ impl<T: PartialEq + ?Sized> PartialEq for Dynamic<T> {
 }
 
 impl<T: Eq + ?Sized> Eq for Dynamic<T> {}
+
+impl<T> Dynamic<T> {
+    #[inline(always)]
+    pub fn no_clone(self) -> crate::DynamicNoClone<T> {
+        crate::DynamicNoClone::new(self.0)
+    }
+}

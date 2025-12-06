@@ -1,5 +1,3 @@
-// src/rng.rs — FINAL, CLEAN, CLIPPY-FREE
-
 use crate::{Dynamic, Fixed};
 use rand::rngs::OsRng;
 use rand::TryRngCore;
@@ -9,7 +7,6 @@ thread_local! {
     static OS_RNG: RefCell<OsRng> = const { RefCell::new(OsRng) };
 }
 
-/// Fixed-size random-only secret
 pub struct FixedRng<const N: usize>(Fixed<[u8; N]>);
 
 impl<const N: usize> FixedRng<N> {
@@ -51,7 +48,6 @@ impl<const N: usize> core::fmt::Debug for FixedRng<N> {
     }
 }
 
-/// Dynamic-size random-only secret — Vec<u8> only
 pub struct DynamicRng(Dynamic<Vec<u8>>);
 
 impl DynamicRng {
@@ -71,15 +67,11 @@ impl DynamicRng {
         &self.0 .0
     }
 
-    /// Returns the length of the secret in bytes.
     #[inline(always)]
     pub fn len(&self) -> usize {
         self.0 .0.len()
     }
 
-    /// Returns `true` if the secret has zero length.
-    ///
-    /// This is useful for consistency with `Vec<u8>` and other containers.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.0 .0.is_empty()

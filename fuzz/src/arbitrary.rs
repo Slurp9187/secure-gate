@@ -1,6 +1,3 @@
-// fuzz/src/arbitrary.rs
-//! Arbitrary implementations for fuzzing secure_gate types
-
 use arbitrary::{Arbitrary, Unstructured};
 use secure_gate::{Dynamic, Fixed};
 
