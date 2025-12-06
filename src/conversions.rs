@@ -21,15 +21,6 @@ use base64::Engine;
 #[cfg(all(feature = "rand", feature = "conversions"))]
 use secrecy::ExposeSecret;
 
-// Loud deprecation bomb — impossible to miss if someone uses the old API
-#[cfg(all(feature = "conversions", not(doc)))]
-#[deprecated(
-    since = "0.5.9",
-    note = "DIRECT CONVERSIONS BYPASS expose_secret() — USE .expose_secret().to_hex() ETC."
-)]
-#[doc(hidden)]
-const _DIRECT_CONVERSIONS_ARE_EVIL: () = ();
-
 /// Extension trait for common secure conversions.
 ///
 /// # Security
@@ -40,6 +31,7 @@ const _DIRECT_CONVERSIONS_ARE_EVIL: () = ();
 pub trait SecureConversionsExt {
     fn to_hex(&self) -> String;
     fn to_hex_upper(&self) -> String;
+    fn to_hex_lowercase(&self) -> String;
     fn to_base64url(&self) -> String;
     fn ct_eq(&self, other: &Self) -> bool;
 }
@@ -58,6 +50,11 @@ impl SecureConversionsExt for [u8] {
     }
 
     #[inline]
+    fn to_hex_lowercase(&self) -> String {
+        hex::encode(self).to_ascii_lowercase()
+    }
+
+    #[inline]
     fn to_base64url(&self) -> String {
         URL_SAFE_NO_PAD.encode(self)
     }
@@ -65,46 +62,6 @@ impl SecureConversionsExt for [u8] {
     #[inline]
     fn ct_eq(&self, other: &[u8]) -> bool {
         subtle::ConstantTimeEq::ct_eq(self, other).into()
-    }
-}
-
-/// Backward-compatibility shims — **deprecated**
-///
-/// Will be removed in v0.6.0.
-#[cfg(feature = "conversions")]
-impl<const N: usize> crate::Fixed<[u8; N]> {
-    #[deprecated(
-        since = "0.5.9",
-        note = "use `expose_secret().to_hex()` instead — makes secret exposure explicit"
-    )]
-    #[doc(hidden)]
-    #[inline(always)]
-    pub fn to_hex(&self) -> String {
-        self.expose_secret().to_hex()
-    }
-
-    #[deprecated(since = "0.5.9", note = "use `expose_secret().to_hex_upper()` instead")]
-    #[doc(hidden)]
-    #[inline(always)]
-    pub fn to_hex_upper(&self) -> String {
-        self.expose_secret().to_hex_upper()
-    }
-
-    #[deprecated(since = "0.5.9", note = "use `expose_secret().to_base64url()` instead")]
-    #[doc(hidden)]
-    #[inline(always)]
-    pub fn to_base64url(&self) -> String {
-        self.expose_secret().to_base64url()
-    }
-
-    #[deprecated(
-        since = "0.5.9",
-        note = "use `expose_secret().ct_eq(other.expose_secret())` instead"
-    )]
-    #[doc(hidden)]
-    #[inline(always)]
-    pub fn ct_eq(&self, other: &Self) -> bool {
-        self.expose_secret().ct_eq(other.expose_secret())
     }
 }
 
@@ -194,37 +151,31 @@ impl ExposeSecret<String> for RandomHex {
     }
 }
 
-// src/conversions.rs — add this block (replaces your current one)
+// ───── FixedRng gets its own random_hex method ─────
 #[cfg(all(feature = "rand", feature = "conversions"))]
 impl<const N: usize> crate::rng::FixedRng<N> {
-    /// Generate a fresh random key of this size and return it as a validated `RandomHex`.
-    ///
-    /// This is a **static method** — call it directly on the type:
-    ///
-    /// ```
-    /// fixed_alias_rng!(Aes256Key, 32);
-    /// let hex = Aes256Key::random_hex();  // Works perfectly!
-    /// ```
+    /// Generate a fresh random key and return it as a validated `RandomHex`.
     #[inline(always)]
     pub fn random_hex() -> RandomHex {
-        let rng = Self::rng(); // generates fresh random bytes
-        let hex_str = rng.expose_secret().to_hex();
-        let hex_string =
-            HexString::new(hex_str).expect("hex::encode always produces valid lowercase hex");
+        let rng = Self::rng(); // uses the correct .rng() constructor
+        let hex_str = rng.expose_secret().to_hex_lowercase();
+        let hex_string = HexString::new(hex_str).expect("hex::encode always produces valid hex");
         RandomHex::new(hex_string)
     }
 }
 
+// ───── Test now compiles ─────
 #[cfg(all(feature = "rand", feature = "conversions"))]
 #[test]
-fn random_hex_works_with_alias() {
+fn random_hex_returns_randomhex() {
     use crate::fixed_alias_rng;
 
     fixed_alias_rng!(HexKey, 32);
 
+    // HexKey is just a type alias for FixedRng<32>
     let hex: RandomHex = HexKey::random_hex();
 
-    assert_eq!(hex.expose_secret().len(), 64); // 32 bytes → 64 hex chars
+    assert_eq!(hex.expose_secret().len(), 64);
     assert!(hex.expose_secret().chars().all(|c| c.is_ascii_hexdigit()));
 
     let bytes_back = hex.to_bytes();
