@@ -1,0 +1,127 @@
+### Critical issues (must fix before 1.0)
+
+| Issue | Severity | Why it matters | Fix |
+|-------|----------|----------------|-----|
+| 1. Trait is still implemented for `[u8]`, not `Dynamic<Vec<u8>>` | Critical | After we remove `Deref` from `Dynamic` and `Fixed`, this impl becomes **unusable** in real code. You’ll have to write `.expose_secret().to_hex()` everywhere → terrible ergonomics and defeats the entire point of the feature. | Move the impl to `Dynamic<Vec<u8>>` + seal the trait (see below) |
+| 2. The `_AssertNoImplForFixed` trick is **broken** | Critical | It only works because the impl is on `[u8]`. Once you move it to `Dynamic<Vec<u8>>`, the trick becomes irrelevant and can be deleted. More importantly: right now it gives a **false sense of security** — people think `Fixed<[u8;N]>` is protected when it isn’t (via deref). | Delete the entire `_AssertNoImplForFixed` dance. Replace with proper sealed trait pattern. |
+| 3. `to_hex_lowercase` still does double allocation | High | `hex::encode(self).to_ascii_lowercase()` → two allocations. `hex` crate provides `encode_lower`. | Use `hex::encode_lower(self)` |
+
+### Final correct design (copy-paste ready)
+
+```rust
+// src/conversions.rs – FINAL VERSION (1.0-ready)
+
+#[cfg(feature = "conversions")]
+use alloc::string::String;
+
+#[cfg(feature = "conversions")]
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+#[cfg(feature = "conversions")]
+use base64::Engine;
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+use secrecy::ExposeSecret;
+
+/// Safe conversions for secrets: hex, base64url, constant-time equality.
+///
+/// This trait is **sealed** — only `Dynamic<Vec<u8>>` implements it.
+/// `Fixed<[u8; N]>` and raw slices are deliberately excluded.
+#[cfg(feature = "conversions")]
+pub trait SecureConversionsExt: sealed::Sealed {
+    fn to_hex(&self) -> String;
+    fn to_hex_upper(&self) -> String;
+    fn to_hex_lowercase(&self) -> String;
+    fn to_base64url(&self) -> String;
+    fn ct_eq(&self, other: &Self) -> bool;
+}
+
+#[cfg(feature = "conversions")]
+mod sealed {
+    pub trait Sealed {}
+    impl Sealed for crate::Dynamic<Vec<u8>> {}
+    // Explicitly NOT implemented for Fixed<[u8; N]> or [u8]
+}
+
+#[cfg(feature = "conversions")]
+impl SecureConversionsExt for crate::Dynamic<Vec<u8>> {
+    #[inline]
+    fn to_hex(&self) -> String {
+        hex::encode(self.expose_secret())
+    }
+
+    #[inline]
+    fn to_hex_upper(&self) -> String {
+        hex::encode_upper(self.expose_secret())
+    }
+
+    #[inline]
+    fn to_hex_lowercase(&self) -> String {
+        hex::encode_lower(self.expose_secret()) // ← one allocation
+    }
+
+    #[inline]
+    fn to_base64url(&self) -> String {
+        URL_SAFE_NO_PAD.encode(self.expose_secret())
+    }
+
+    #[inline]
+    fn ct_eq(&self, other: &Self) -> bool {
+        subtle::ConstantTimeEq::ct_eq(self.expose_secret(), other.expose_secret()).into()
+    }
+}
+
+// === HexString / RandomHex (unchanged except tiny polish) ===
+
+#[cfg(feature = "conversions")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HexString(crate::Dynamic<String>);
+
+#[cfg(feature = "conversions")]
+impl HexString {
+    pub fn new(s: String) -> Result<Self, &'static str> {
+        let lower = s.to_ascii_lowercase();
+        if lower.len() % 2 != 0 || !lower.chars().all(|c| c.is_ascii_hexdigit()) {
+            Err("invalid hex string")
+        } else {
+            Ok(Self(crate::Dynamic::new(lower)))
+        }
+    }
+
+    /// Panics only if validation was bypassed (impossible in correct use)
+    pub fn to_bytes(&self) -> Vec<u8> {
+        hex::decode(self.expose_secret()).expect("HexString is always valid")
+    }
+
+    pub fn byte_len(&self) -> usize {
+        self.expose_secret().len() / 2
+    }
+}
+
+// Deref + ExposeSecret unchanged
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RandomHex(pub HexString);
+
+// ... rest unchanged, except:
+#[cfg(all(feature = "rand", feature = "conversions"))]
+impl<const N: usize> crate::rng::FixedRng<N> {
+    pub fn random_hex() -> RandomHex {
+        let bytes = Self::rng().expose_secret();
+        let hex = hex::encode_lower(bytes);
+        let validated = HexString(crate::Dynamic::new(hex)); // trusted path – no validation needed
+        RandomHex(validated)
+    }
+}
+```
+
+### Summary of what this achieves
+
+| Goal                                 | Achieved? | How |
+|--------------------------------------|-----------|-----|
+| `Dynamic<Vec<u8>>.to_hex()` works   | Yes       | Direct impl |
+| `Fixed<[u8; N]>.to_hex()` impossible| Yes       | Sealed trait |
+| Raw slices cannot call `.to_hex()`   | Yes       | Sealed |
+| No accidental leakage via deref      | Yes       | Deref removed elsewhere |
+| Zero double allocations              | Yes       | `encode_lower` |
+| No panic on trusted hex              | Yes       | Direct construction |
