@@ -1,15 +1,18 @@
-use arbitrary::{Arbitrary, Unstructured};
-use secure_gate::{Dynamic, DynamicZeroizing, Fixed, FixedZeroizing}; // ← Updated
+// fuzz/src/arbitrary.rs
+//! Arbitrary implementations for fuzzing secure_gate types
 
-#[allow(dead_code)] // ← add this
+use arbitrary::{Arbitrary, Unstructured};
+use secure_gate::{Dynamic, Fixed};
+
+#[cfg(feature = "zeroize")]
+use secure_gate::{DynamicNoClone, FixedNoClone};
+
 #[derive(Debug)]
 pub struct FuzzFixed32(pub Fixed<[u8; 32]>);
 
-#[allow(dead_code)] // ← add this
 #[derive(Debug)]
 pub struct FuzzDynamicVec(pub Dynamic<Vec<u8>>);
 
-#[allow(dead_code)] // ← add this
 #[derive(Debug)]
 pub struct FuzzDynamicString(pub Dynamic<String>);
 
@@ -35,42 +38,39 @@ impl<'a> Arbitrary<'a> for FuzzDynamicString {
     }
 }
 
-// ... (keep existing)
-
-#[allow(dead_code)]
+#[cfg(feature = "zeroize")]
 #[derive(Debug)]
-pub struct FuzzFixedZeroizing32(pub FixedZeroizing<[u8; 32]>);
+pub struct FuzzFixedZeroizing32(pub FixedNoClone<[u8; 32]>);
 
-#[allow(dead_code)]
+#[cfg(feature = "zeroize")]
 #[derive(Debug)]
-pub struct FuzzDynamicZeroizingVec(pub DynamicZeroizing<Vec<u8>>);
+pub struct FuzzDynamicZeroizingVec(pub DynamicNoClone<Vec<u8>>);
 
-#[allow(dead_code)]
+#[cfg(feature = "zeroize")]
 #[derive(Debug)]
-pub struct FuzzDynamicZeroizingString(pub DynamicZeroizing<String>);
+pub struct FuzzDynamicZeroizingString(pub DynamicNoClone<String>);
 
+#[cfg(feature = "zeroize")]
 impl<'a> Arbitrary<'a> for FuzzFixedZeroizing32 {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
         let mut arr = [0u8; 32];
         u.fill_buffer(&mut arr)?;
-        Ok(FuzzFixedZeroizing32(FixedZeroizing::new(arr)))
+        Ok(FuzzFixedZeroizing32(FixedNoClone::new(arr)))
     }
 }
 
+#[cfg(feature = "zeroize")]
 impl<'a> Arbitrary<'a> for FuzzDynamicZeroizingVec {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
         let vec: Vec<u8> = Arbitrary::arbitrary(u)?;
-        Ok(FuzzDynamicZeroizingVec(DynamicZeroizing::new(Box::new(
-            vec,
-        ))))
+        Ok(FuzzDynamicZeroizingVec(DynamicNoClone::new(Box::new(vec))))
     }
 }
 
+#[cfg(feature = "zeroize")]
 impl<'a> Arbitrary<'a> for FuzzDynamicZeroizingString {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
         let s: String = Arbitrary::arbitrary(u)?;
-        Ok(FuzzDynamicZeroizingString(DynamicZeroizing::new(Box::new(
-            s,
-        ))))
+        Ok(FuzzDynamicZeroizingString(DynamicNoClone::new(Box::new(s))))
     }
 }
