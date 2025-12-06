@@ -2,6 +2,8 @@
 // src/macros.rs
 // ==========================================================================
 
+
+
 #[macro_export]
 macro_rules! fixed_alias {
     ($name:ident, $size:literal) => {
@@ -53,10 +55,3 @@ macro_rules! dynamic_generic_alias {
     };
 }
 
-#[macro_export]
-macro_rules! dynamic_alias_rng {
-    ($name:ident, $inner:ty) => {
-        #[doc = concat!("Random-only heap secret (", stringify!($inner), ")")]
-        pub type $name = $crate::rng::DynamicRng;
-    };
-}

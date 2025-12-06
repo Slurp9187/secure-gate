@@ -13,7 +13,8 @@ use base64::Engine;
 #[cfg(all(feature = "rand", feature = "conversions"))]
 use secrecy::ExposeSecret;
 
-pub trait SecureConversionsExt {
+#[cfg(feature = "conversions")]
+pub trait SecureConversionsExt: sealed::Sealed {
     fn to_hex(&self) -> String;
     fn to_hex_upper(&self) -> String;
     fn to_hex_lowercase(&self) -> String;
@@ -22,62 +23,64 @@ pub trait SecureConversionsExt {
 }
 
 #[cfg(feature = "conversions")]
-impl SecureConversionsExt for [u8] {
+mod sealed {
+    pub trait Sealed {}
+    impl Sealed for crate::Dynamic<Vec<u8>> {}
+}
+
+#[cfg(feature = "conversions")]
+impl SecureConversionsExt for crate::Dynamic<Vec<u8>> {
     #[inline]
     fn to_hex(&self) -> String {
-        hex::encode(self)
+        hex::encode(self.expose_secret())
     }
 
     #[inline]
     fn to_hex_upper(&self) -> String {
-        hex::encode_upper(self)
+        hex::encode_upper(self.expose_secret())
     }
 
     #[inline]
     fn to_hex_lowercase(&self) -> String {
-        hex::encode(self).to_ascii_lowercase()
+        hex::encode(self.expose_secret()).to_ascii_lowercase()
     }
 
     #[inline]
     fn to_base64url(&self) -> String {
-        URL_SAFE_NO_PAD.encode(self)
+        URL_SAFE_NO_PAD.encode(self.expose_secret())
     }
 
     #[inline]
-    fn ct_eq(&self, other: &[u8]) -> bool {
-        subtle::ConstantTimeEq::ct_eq(self, other).into()
+    fn ct_eq(&self, other: &Self) -> bool {
+        subtle::ConstantTimeEq::ct_eq(
+            self.expose_secret().as_slice(),
+            other.expose_secret().as_slice(),
+        )
+        .into()
     }
 }
 
 #[cfg(feature = "conversions")]
-trait _AssertNoImplForFixed {}
-#[cfg(feature = "conversions")]
-impl<T> _AssertNoImplForFixed for T where T: SecureConversionsExt {}
-
-#[cfg(feature = "conversions")]
-impl<const N: usize> _AssertNoImplForFixed for crate::Fixed<[u8; N]> {}
-
-#[cfg(feature = "conversions")]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HexString(crate::Dynamic<String>);
 
 #[cfg(feature = "conversions")]
 impl HexString {
     pub fn new(s: String) -> Result<Self, &'static str> {
-        let lower = s.to_lowercase();
+        let lower = s.to_ascii_lowercase();
         if lower.len() % 2 != 0 || !lower.chars().all(|c| c.is_ascii_hexdigit()) {
-            Err("Invalid hex: must be even length with 0-9a-fA-F chars")
+            Err("invalid hex string")
         } else {
             Ok(Self(crate::Dynamic::new(lower)))
         }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        hex::decode(self.expose_secret()).expect("Validated hex")
+        hex::decode(self.0.expose_secret()).expect("HexString is always valid")
     }
 
     pub fn byte_len(&self) -> usize {
-        self.expose_secret().len() / 2
+        self.0.expose_secret().len() / 2
     }
 }
 
@@ -97,7 +100,7 @@ impl ExposeSecret<String> for HexString {
 }
 
 #[cfg(all(feature = "rand", feature = "conversions"))]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RandomHex(pub HexString);
 
 #[cfg(all(feature = "rand", feature = "conversions"))]
@@ -134,11 +137,11 @@ impl ExposeSecret<String> for RandomHex {
 
 #[cfg(all(feature = "rand", feature = "conversions"))]
 impl<const N: usize> crate::rng::FixedRng<N> {
-    #[inline(always)]
     pub fn random_hex() -> RandomHex {
-        let rng = Self::rng();
-        let hex_str = rng.expose_secret().to_hex_lowercase();
-        let hex_string = HexString::new(hex_str).expect("hex::encode always produces valid hex");
-        RandomHex::new(hex_string)
+        let rng = Self::generate();
+        let bytes = rng.expose_secret();
+        let hex = hex::encode(bytes);
+        let validated = HexString(crate::Dynamic::new(hex));
+        RandomHex(validated)
     }
 }

@@ -6,15 +6,18 @@ mod tests {
     #[test]
     fn fixed_no_clone_cannot_be_cloned() {
         let _key = FixedNoClone::new([0u8; 32]);
-        // let _ = key.clone(); // ← compile error if uncommented
+        // _key.clone(); // compile error — correct
     }
 
     #[test]
     fn fixed_no_clone_has_full_api_parity() {
         let mut key = FixedNoClone::new([42u8; 32]);
+
+        // Use explicit exposure — this is intentional
         assert_eq!(key.expose_secret()[0], 42);
         key.expose_secret_mut()[0] = 99;
-        assert_eq!(key[0], 99);
+        assert_eq!(key.expose_secret()[0], 99);
+
         let raw: [u8; 32] = key.into_inner();
         assert_eq!(raw[0], 99);
     }
@@ -22,17 +25,31 @@ mod tests {
     #[test]
     fn from_fixed_to_no_clone_works() {
         let fixed = Fixed::new([1u8; 32]);
-        let no_clone = fixed.no_clone(); // ← now compiles!
+        let no_clone = fixed.no_clone();
         assert_eq!(no_clone.expose_secret()[0], 1);
-        // no_clone.clone(); // ← hard error
+        // no_clone.clone(); // compile error — correct
     }
 
     #[test]
     fn dynamic_no_clone_string() {
-        let mut pw: DynamicNoClone<String> = DynamicNoClone::new(Box::new("secret".into()));
-        pw.push_str("123");
-        assert_eq!(&*pw, "secret123");
+        let mut pw: DynamicNoClone<String> = DynamicNoClone::new(Box::new("secret".to_owned()));
+
+        // Must use expose_secret_mut() — no implicit Deref
+        pw.expose_secret_mut().push_str("123");
+        assert_eq!(pw.expose_secret(), "secret123");
+
         let s = pw.finish_mut();
         assert_eq!(s, "secret123");
+    }
+
+    #[test]
+    fn dynamic_no_clone_vec_u8() {
+        let mut data = DynamicNoClone::new(Box::new(vec![1, 2, 3]));
+
+        data.expose_secret_mut().push(42);
+        assert_eq!(data.expose_secret(), &[1, 2, 3, 42]);
+
+        let vec = *data.into_inner(); // deref the Box
+        assert_eq!(vec, vec![1, 2, 3, 42]);
     }
 }

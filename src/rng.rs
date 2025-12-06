@@ -15,40 +15,34 @@ pub struct FixedRng<const N: usize>(Fixed<[u8; N]>);
 
 impl<const N: usize> FixedRng<N> {
     #[inline(always)]
-    pub fn rng() -> Self {
+    pub fn generate() -> Self {
         let mut bytes = [0u8; N];
-        OS_RNG.with(|rng| {
-            rng.borrow_mut()
+        OS_RNG.with(|cell| {
+            cell.borrow_mut()
                 .try_fill_bytes(&mut bytes)
-                .expect("OsRng failed — this should never happen");
+                .expect("OsRng failed — this should never happen on supported platforms");
         });
-        Self(Fixed(bytes))
+        Self(Fixed::new(bytes))
     }
 
     #[inline(always)]
     pub fn expose_secret(&self) -> &[u8; N] {
         &self.0 .0
     }
-}
-
-impl<const N: usize> core::ops::Deref for FixedRng<N> {
-    type Target = Fixed<[u8; N]>;
     #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    pub const fn len(&self) -> usize {
+        N
     }
-}
 
-impl<const N: usize> core::ops::DerefMut for FixedRng<N> {
     #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+    pub const fn is_empty(&self) -> bool {
+        N == 0
     }
 }
 
 impl<const N: usize> core::fmt::Debug for FixedRng<N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str("[REDACTED_RANDOM]")
+        f.write_str("[REDACTED]")
     }
 }
 
@@ -56,49 +50,59 @@ pub struct DynamicRng(Dynamic<Vec<u8>>);
 
 impl DynamicRng {
     #[inline(always)]
-    pub fn rng(len: usize) -> Self {
+    pub fn generate(len: usize) -> Self {
         let mut bytes = vec![0u8; len];
-        OS_RNG.with(|rng| {
-            rng.borrow_mut()
+        OS_RNG.with(|cell| {
+            cell.borrow_mut()
                 .try_fill_bytes(&mut bytes)
-                .expect("OsRng failed — this should never happen");
+                .expect("OsRng failed — this should never happen on supported platforms");
         });
-        Self(Dynamic::new(bytes))
+        Self(Dynamic::from(bytes))
+    }
+
+    #[inline]
+    pub fn generate_string(len: usize) -> Dynamic<String> {
+        let mut s = String::with_capacity(len);
+        OS_RNG.with(|cell| {
+            let mut rng = cell.borrow_mut();
+            for _ in 0..len {
+                let byte = rng.try_next_u32().expect("OsRng failed") % 62;
+                let c = if byte < 10 {
+                    (b'0' + byte as u8) as char
+                } else if byte < 36 {
+                    (b'a' + (byte - 10) as u8) as char
+                } else {
+                    (b'A' + (byte - 36) as u8) as char
+                };
+                s.push(c);
+            }
+        });
+        Dynamic::from(s)
     }
 
     #[inline(always)]
     pub fn expose_secret(&self) -> &[u8] {
-        &self.0 .0
+        self.0.expose_secret()
     }
 
     #[inline(always)]
     pub fn len(&self) -> usize {
-        self.0 .0.len()
+        self.0.expose_secret().len()
     }
 
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.0 .0.is_empty()
+        self.0.expose_secret().is_empty()
     }
-}
 
-impl core::ops::Deref for DynamicRng {
-    type Target = Dynamic<Vec<u8>>;
     #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl core::ops::DerefMut for DynamicRng {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+    pub fn into_inner(self) -> Dynamic<Vec<u8>> {
+        self.0
     }
 }
 
 impl core::fmt::Debug for DynamicRng {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str("[REDACTED_RANDOM]")
+        f.write_str("[REDACTED]")
     }
 }
