@@ -3,7 +3,7 @@
 // Fuzz target for all parsing paths — Dynamic<String>, Dynamic<Vec<u8>>, and extreme allocation stress
 // (v0.5.0 – SecureStr, SecureBytes, SecurePassword, etc. are gone; use Dynamic<T> + Fixed<T>)
 #![no_main]
-use arbitrary::Arbitrary;
+use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
 use secure_gate::Dynamic;
@@ -16,7 +16,7 @@ fuzz_target!(|data: &[u8]| {
         return;
     }
 
-    let mut u = arbitrary::Unstructured::new(data);
+    let mut u = Unstructured::new(data);
 
     let dyn_vec = match FuzzDynamicVec::arbitrary(&mut u) {
         Ok(d) => d.0,
@@ -61,9 +61,9 @@ fuzz_target!(|data: &[u8]| {
     // 3. Mutation stress — lossy UTF-8 → owned String → Dynamic<String>
     let owned = s.clone(); // Reuse fuzzed string
     let mut dyn_str_mut = Dynamic::<String>::new(owned);
-    dyn_str_mut.push('!');
-    dyn_str_mut.push_str("_fuzz");
-    dyn_str_mut.clear();
+    dyn_str_mut.expose_secret_mut().push('!');
+    dyn_str_mut.expose_secret_mut().push_str("_fuzz");
+    dyn_str_mut.expose_secret_mut().clear();
     let _ = dyn_str_mut.finish_mut();
 
     // 4. Extreme allocation stress — repeated data
