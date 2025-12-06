@@ -1,7 +1,4 @@
-// ==========================================================================
 // src/conversions.rs
-// ==========================================================================
-
 #[cfg(feature = "conversions")]
 use alloc::string::String;
 
@@ -15,9 +12,12 @@ use secrecy::ExposeSecret;
 
 #[cfg(feature = "conversions")]
 pub trait SecureConversionsExt: sealed::Sealed {
+    /// Returns hex in lowercase (`a-f`)
     fn to_hex(&self) -> String;
+    /// Returns hex in uppercase (`A-F`)
     fn to_hex_upper(&self) -> String;
-    fn to_hex_lowercase(&self) -> String;
+    /// **Removed** — `to_hex()` is already lowercase
+    // fn to_hex_lowercase(&self) -> String;
     fn to_base64url(&self) -> String;
     fn ct_eq(&self, other: &Self) -> bool;
 }
@@ -32,17 +32,12 @@ mod sealed {
 impl SecureConversionsExt for crate::Dynamic<Vec<u8>> {
     #[inline]
     fn to_hex(&self) -> String {
-        hex::encode(self.expose_secret())
+        hex::encode(self.expose_secret()) // ← already lowercase
     }
 
     #[inline]
     fn to_hex_upper(&self) -> String {
         hex::encode_upper(self.expose_secret())
-    }
-
-    #[inline]
-    fn to_hex_lowercase(&self) -> String {
-        hex::encode(self.expose_secret()).to_ascii_lowercase()
     }
 
     #[inline]
@@ -60,6 +55,7 @@ impl SecureConversionsExt for crate::Dynamic<Vec<u8>> {
     }
 }
 
+// HexString always stores lowercase
 #[cfg(feature = "conversions")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HexString(crate::Dynamic<String>);
@@ -140,7 +136,7 @@ impl<const N: usize> crate::rng::FixedRng<N> {
     pub fn random_hex() -> RandomHex {
         let rng = Self::generate();
         let bytes = rng.expose_secret();
-        let hex = hex::encode(bytes);
+        let hex = hex::encode(bytes); // ← already lowercase
         let validated = HexString(crate::Dynamic::new(hex));
         RandomHex(validated)
     }
