@@ -4,8 +4,6 @@
 //! Only compiled when the `conversions` feature is enabled.
 
 #![cfg(feature = "conversions")]
-// Silence all deprecation warnings in this test module only
-#![allow(deprecated)]
 
 use secure_gate::{fixed_alias, SecureConversionsExt};
 
@@ -22,23 +20,12 @@ fn to_hex_and_to_hex_upper() {
     ];
     let key: TestKey = bytes.into();
 
-    // New correct API (primary path)
     assert_eq!(
         key.expose_secret().to_hex(),
         "deadbeef00112233445566778899aabbccddeeff0123456789abcdeffedcba98"
     );
     assert_eq!(
         key.expose_secret().to_hex_upper(),
-        "DEADBEEF00112233445566778899AABBCCDDEEFF0123456789ABCDEFFEDCBA98"
-    );
-
-    // Deprecated shims still work — we test them too!
-    assert_eq!(
-        key.to_hex(),
-        "deadbeef00112233445566778899aabbccddeeff0123456789abcdeffedcba98"
-    );
-    assert_eq!(
-        key.to_hex_upper(),
         "DEADBEEF00112233445566778899AABBCCDDEEFF0123456789ABCDEFFEDCBA98"
     );
 }
@@ -55,10 +42,6 @@ fn to_base64url() {
         key.expose_secret().to_base64url(),
         "-3zVf4OlpW3Cxy_QPqDg8KGyw9Tl9gcYKTpLXG1-j5A"
     );
-    assert_eq!(
-        key.to_base64url(),
-        "-3zVf4OlpW3Cxy_QPqDg8KGyw9Tl9gcYKTpLXG1-j5A"
-    );
 }
 
 #[test]
@@ -67,7 +50,6 @@ fn ct_eq_same_key() {
     let key2 = TestKey::from([1u8; 32]);
 
     assert!(key1.expose_secret().ct_eq(key2.expose_secret()));
-    assert!(key1.ct_eq(&key2)); // deprecated path
 }
 
 #[test]
@@ -80,8 +62,7 @@ fn ct_eq_different_keys() {
     let key3 = TestKey::from(bytes);
 
     assert!(!key1.expose_secret().ct_eq(key2.expose_secret()));
-    assert!(!key1.ct_eq(&key2)); // deprecated path still correct
-    assert!(!key1.ct_eq(&key3));
+    assert!(!key1.expose_secret().ct_eq(key3.expose_secret()));
 }
 
 #[test]
@@ -94,10 +75,6 @@ fn works_on_all_fixed_alias_sizes() {
 
     assert_eq!(nonce.expose_secret().to_base64url().len(), 32);
     assert_eq!(small.expose_secret().to_base64url().len(), 22);
-
-    // Deprecated paths also work
-    assert_eq!(nonce.to_hex().len(), 48);
-    assert_eq!(small.to_base64url().len(), 22);
 }
 
 #[test]
@@ -106,58 +83,15 @@ fn trait_is_available_on_fixed_alias_types() {
 
     let key = MyKey::from([0x42u8; 32]);
 
-    // New correct API
     let _ = key.expose_secret().to_hex();
     let _ = key.expose_secret().to_base64url();
     let _ = key.expose_secret().ct_eq(key.expose_secret());
-
-    // Deprecated API still compiles and works
-    let _ = key.to_hex();
-    let _ = key.to_base64url();
-    let _ = key.ct_eq(&key);
-}
-
-// ───── Compile-time guard: ensure the deprecated shims actually emit deprecation warnings ─────
-// If any #[deprecated] attribute is removed in the future, this test will FAIL TO COMPILE.
-
-// tests/conversions_tests.rs — put this at the very end
-
-// ───── Unbreakable deprecation guard — runs in CI, silent locally ─────
-// This test guarantees the deprecated shims actually emit warnings.
-// It runs automatically on GitHub Actions / gitlab-ci / etc., but is skipped during normal dev.
-
-#[cfg(all(feature = "conversions", not(debug_assertions)))]
-mod deprecation_must_be_enforced {
-    use secure_gate::fixed_alias;
-
-    fixed_alias!(SmokeKey, 32);
-
-    #[deny(deprecated)]
-    fn uses_deprecated_api() {
-        let key = SmokeKey::from([0u8; 32]);
-        let other = SmokeKey::from([1u8; 32]);
-
-        let _ = key.to_hex();
-        let _ = key.to_hex_upper();
-        let _ = key.to_base64url();
-        let _ = key.ct_eq(&other);
-    }
-
-    #[allow(deprecated)]
-    fn silenced() {
-        uses_deprecated_api();
-    }
-
-    #[test]
-    fn deprecations_are_active() {
-        silenced();
-    }
 }
 
 #[cfg(feature = "conversions")]
 #[test]
 fn hex_string_validates_and_decodes() {
-    use secure_gate::conversions::HexString;
+    use secure_gate::HexString;
     let valid = "a1b2c3d4e5f67890".to_string(); // 16 chars (8 bytes)
     let hex = HexString::new(valid).unwrap();
     assert_eq!(hex.expose_secret(), "a1b2c3d4e5f67890");
