@@ -15,9 +15,6 @@ libfuzzer-sys = "0.4"
 # Required for zeroize::Zeroize usage in fuzz targets
 zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
 
-# Optional – harmless, already pulled in by secure-gate
-secrecy = "0.10"
-
 [features]
 default = ["zeroize", "rand", "conversions"]
 

@@ -11,7 +11,6 @@ categories = ["cryptography", "no-std", "data-structures"]
 
 [dependencies]
 rand = { version = "0.9", optional = true }
-secrecy = { version = "0.10", default-features = false, optional = true }
 zeroize = { version = "1.8", default-features = false, optional = true, features = [
   "alloc",
   "zeroize_derive",
@@ -33,7 +32,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 default = ["zeroize"]
 
 # Core safety — almost everyone wants this
-zeroize = ["dep:zeroize", "dep:secrecy"]
+zeroize = ["dep:zeroize"]
 
 # Cryptographic randomness — opt-in
 rand = ["dep:rand"]
