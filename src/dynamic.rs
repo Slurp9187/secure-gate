@@ -59,7 +59,7 @@ impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
 
 // Clone impls — gated correctly
 #[cfg(not(feature = "zeroize"))]
-impl<T: Clone + ?Sized> Clone for Dynamic<T> {
+impl<T: Clone> Clone for Dynamic<T> {
     #[inline(always)]
     fn clone(&self) -> Self {
         Dynamic(self.0.clone())

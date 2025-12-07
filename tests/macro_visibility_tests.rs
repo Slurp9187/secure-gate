@@ -2,8 +2,10 @@
 // Exhaustive visibility testing for all secure-gate macros
 
 #![cfg(test)]
+#![cfg(feature = "rand")]
+use secure_gate::fixed_alias_rng;
 
-use secure_gate::{dynamic_alias, fixed_alias, fixed_alias_rng};
+use secure_gate::{dynamic_alias, fixed_alias};
 
 // ──────────────────────────────────────────────────────────────
 // Test visibility inside a nested module (so `super` is valid)

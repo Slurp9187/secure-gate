@@ -55,12 +55,6 @@ fn zero_length_works() {
     assert_eq!(dyn_zero.len(), 0);
 }
 
-#[test]
-fn generate_string_zero_length() {
-    let s = DynamicRng::generate_string(0);
-    assert!(s.expose_secret().is_empty());
-}
-
 // ct_eq returns false for different lengths (no panic)
 #[cfg(feature = "conversions")]
 #[test]

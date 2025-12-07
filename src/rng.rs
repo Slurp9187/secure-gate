@@ -60,33 +60,6 @@ impl DynamicRng {
         Self(Dynamic::from(bytes))
     }
 
-    /// Generate a random alphanumeric string (base62) of exact length.
-    ///
-    /// Uses unbiased rejection sampling — cryptographically sound.
-    pub fn generate_string(len: usize) -> Dynamic<String> {
-        let mut s = String::with_capacity(len);
-        for _ in 0..len {
-            let byte = loop {
-                let val = OsRng
-                    .try_next_u32()
-                    .expect("OsRng failed — this should never happen on supported platforms");
-                let candidate = val % 62;
-                if val < (u32::MAX / 62) * 62 {
-                    break candidate as u8;
-                }
-            };
-            let c = if byte < 10 {
-                (b'0' + byte) as char
-            } else if byte < 36 {
-                (b'a' + (byte - 10)) as char
-            } else {
-                (b'A' + (byte - 36)) as char
-            };
-            s.push(c);
-        }
-        Dynamic::from(s)
-    }
-
     /// Expose the secret bytes (read-only).
     #[inline(always)]
     pub fn expose_secret(&self) -> &[u8] {

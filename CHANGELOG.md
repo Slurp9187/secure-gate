@@ -8,39 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.6.0] - 2025-12-06
 
 ### Breaking Changes
-- **Removed `Deref`/`DerefMut` from `Fixed<T>`** — eliminates all silent borrowing of secret data.
+- Removed `Deref`/`DerefMut` from `Fixed<T>`.
 - Made the inner field of `Fixed<T>` private.
-- Removed all inherent conversion methods (`.to_hex()`, `.to_hex_upper()`, `.to_base64url()`, `.ct_eq()`) from `Fixed<[u8; N]>` and aliases.
-- `SecureConversionsExt` is now implemented **only** on raw `[u8]` and `[u8; N]` — every conversion now **requires** an explicit `.expose_secret()` call.
-- Removed all deprecated direct-conversion shims from the 0.5.x series.
-- Replaced `RandomBytes<N>` with `FixedRng<N>` — now a zero-cost newtype over `Fixed<[u8; N]>`.
-- **Removed the `serde` feature entirely** — serialization of secrets is now impossible by default. Users who need it must implement it themselves (5-line escape hatch provided in docs).
-- Switched RNG implementation to direct `rand::rngs::OsRng` usage — removed `thread_local!` + `RefCell`, resulting in cleaner, faster, and more future-proof code.
-- `DynamicRng::generate_string` now uses unbiased rejection sampling for base62 output.
+- Removed inherent conversion methods (`.to_hex()`, `.to_hex_upper()`, `.to_base64url()`, `.ct_eq()`) from `Fixed<[u8; N]>` and aliases.
+- Implemented `SecureConversionsExt` only on raw `[u8]` and `[u8; N]`, requiring explicit `.expose_secret()` for conversions.
+- Removed deprecated direct-conversion shims from 0.5.x.
+- Replaced `RandomBytes<N>` with `FixedRng<N>`, a newtype over `Fixed<[u8; N]>`.
+- Removed `serde` feature; serialization requires user implementation.
+- Switched RNG to direct `rand::rngs::OsRng` usage, removing `thread_local!` and `RefCell`.
 
 ### Added
 - `len()` and `is_empty()` on `Fixed<[u8; N]>`.
-- `HexString::new` now performs **zero extra heap allocations** — in-place lowercasing and validation, with immediate zeroization of rejected inputs when `zeroize` is enabled.
-- Compile-time negative impl guard preventing accidental `SecureConversionsExt` impls on wrapper types.
-- `rand_core = { version = "0.9", optional = true }` dependency (used internally by `rand`).
-- `FixedRng<N>::generate()` and `DynamicRng::generate()` now use direct `OsRng` calls — simpler, faster, no thread-local overhead.
+- `HexString::new` with zero extra allocations: in-place lowercasing, validation, and zeroization of rejected inputs under `zeroize`.
+- Compile-time negative impl guard for `SecureConversionsExt` on wrapper types.
+- `rand_core = { version = "0.9", optional = true }` dependency for `rand` feature.
+- Direct `OsRng` calls in `FixedRng<N>::generate()` and `DynamicRng::generate()`.
 
 ### Fixed
-- Lifetime bug in `FixedRng::<N>::random_hex()`.
-- Incorrect `ct_eq` bounds on fixed-size arrays (now correctly uses `.as_slice()`).
-- All tests and benchmarks updated to use explicit `.expose_secret()` — no more silent access anywhere.
-- Numerous internal cleanups and dead code removal.
+- Lifetime issue in `FixedRng::<N>::random_hex()`.
+- `ct_eq` bounds on fixed-size arrays, using `.as_slice()`.
+- Updated tests and benchmarks to explicit `.expose_secret()`.
+- Internal cleanups and dead code removal.
 
 ### Performance
-- Benchmark results show `Fixed<[u8; 32]> + .expose_secret()` is **statistically indistinguishable** from raw `[u8; 32]` access — even on a 2019 Intel i7-10510U.
-- Direct `OsRng` usage improved key generation throughput by ~8–10% compared to the previous `thread_local!` implementation.
-
-The crate now fully enforces that **every access to secret bytes is loud, intentional, and grep-able**.  
-No `Deref`, no indexing, no `serde`, no silent leaks — ever.
-
-`secure-gate v0.6.0` is the most secure, most auditable, and highest-performing secret wrapper in the Rust ecosystem.
-
-**Zero-cost achieved. Zero footguns remain.**
+- Benchmarks show `Fixed<[u8; 32]> + .expose_secret()` indistinguishable from raw `[u8; 32]` access on Intel i7-10510U (2019).
+- Direct `OsRng` usage increases key generation throughput by 8–10% over prior `thread_local!` implementation.
 
 ## [0.5.10] - 2025-12-02
 

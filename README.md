@@ -28,7 +28,7 @@ secure-gate = { version = "0.6.0", features = ["zeroize", "rand", "conversions"]
 
 | Feature       | Description                                                                                 |
 |---------------|---------------------------------------------------------------------------------------------|
-| `zeroize`     | Automatic memory wiping on drop — **strongly recommended**                                           |
+| `zeroize`     | Automatic memory wiping on drop — **strongly recommended**                                  |
 | `rand`        | `FixedRng<N>::generate()` + `fixed_alias_rng!` — type-safe, fresh randomness                |
 | `conversions` | `.to_hex()`, `.to_hex_upper()`, `.to_base64url()`, `.ct_eq()` + `HexString` / `RandomHex`   |
 
@@ -46,21 +46,24 @@ dynamic_alias!(Password, String);
 #[cfg(feature = "rand")]
 {
     fixed_alias_rng!(MasterKey, 32);
-    fixed_alias_rng!(Nonce,    24);
+    fixed_alias_rng!(Nonce, 24);
 
-    let key   = MasterKey::generate();     // FixedRng<32>
-    let nonce = Nonce::generate();         // FixedRng<24>
+    let key   = MasterKey::generate(); // FixedRng<32>
+    let nonce = Nonce::generate();     // FixedRng<24>
 
     #[cfg(feature = "conversions")]
-    let hex_pw = MasterKey::random_hex();  // RandomHex — only from RNG
+    let hex_token: RandomHex = MasterKey::random_hex(); // only from fresh RNG
 }
 
 // Secure conversions — explicit exposure is mandatory
-#[cfg(feature = "conversions")]
+#[cfg(all(feature = "rand", feature = "conversions"))]
 {
-    let hex  = key.expose_secret().to_hex();          // loud & intentional
-    let b64  = key.expose_secret().to_base64url();
-    let same = key.expose_secret().ct_eq(other.expose_secret());
+    let key   = MasterKey::generate();
+    let other = MasterKey::generate();
+
+    let hex  = key.expose_secret().to_hex();           // "a1b2c3d4..."
+    let b64  = key.expose_secret().to_base64url();     // URL-safe, no padding
+    let same = key.expose_secret().ct_eq(other.expose_secret()); // constant-time
 
     println!("Key (hex):       {hex}");
     println!("Key (Base64URL): {b64}");
@@ -77,14 +80,14 @@ assert_eq!(pw.expose_secret(), "hunter2");
 #[cfg(feature = "rand")]
 {
     fixed_alias_rng!(JwtSigningKey, 32);
-    fixed_alias_rng!(BackupCode,    16);
+ fixed_alias_rng!(BackupCode, 16);
 
-    let key  = JwtSigningKey::generate();   // FixedRng<32>
-    let code = BackupCode::generate();      // FixedRng<16>
+ let key  = JwtSigningKey::generate();   // FixedRng<32>
+ let code = BackupCode::generate();      // FixedRng<16>
 
-    #[cfg(feature = "conversions")]
-    let hex_code: RandomHex = BackupCode::random_hex();
-    println!("Backup code: {}", hex_code.expose_secret());
+ #[cfg(feature = "conversions")]
+ let hex_code: RandomHex = BackupCode::random_hex();
+ println!("Backup code: {}", hex_code.expose_secret());
 }
 ```
 
@@ -95,9 +98,11 @@ assert_eq!(pw.expose_secret(), "hunter2");
 ## Secure Conversions — `conversions` feature (v0.6.0)
 
 ```rust
-#[cfg(feature = "conversions")]
+#[cfg(all(feature = "rand", feature = "conversions"))]
 {
-    let key = Aes256Key::generate();
+    fixed_alias_rng!(Aes256Key, 32);
+    let key   = Aes256Key::generate();
+    let other = Aes256Key::generate();
 
     let hex  = key.expose_secret().to_hex();           // "a1b2c3d4..."
     let b64  = key.expose_secret().to_base64url();     // URL-safe, no padding
@@ -138,7 +143,7 @@ Benchmarked on:
 |---------------------------------------------|-------------------------------------|------------------------------------|
 | raw `[u8; 32]` access                       | 492.22 ps – 501.52 ps               | baseline                           |
 | `Fixed<[u8; 32]>` + `.expose_secret()`      | 476.92 ps – 487.12 ps               | −3.0 % to −23.9 %                   |
-| `fixed_alias! (RawKey)` explicit access     | 475.07 ps – 482.91 ps               | −3.4 % to −30.5 %                   |
+| `fixed_alias! (RawKey` explicit access     | 475.07 ps – 482.91 ps               | −3.4 % to −30.5 %                   |
 
 All implementations are statistically indistinguishable from raw arrays at the picosecond level — even on a 2019-era mobile CPU.  
 The explicit `.expose_secret()` path incurs **no measurable overhead**.
