@@ -203,6 +203,31 @@ where
     }
 }
 
+// Random generation — only available with `rand` feature
+#[cfg(feature = "rand")]
+impl Dynamic<Vec<u8>> {
+    /// Generate fresh random bytes of the specified length using the OS RNG.
+    ///
+    /// This is a convenience method that generates random bytes directly
+    /// without going through `DynamicRng`. Equivalent to:
+    /// `DynamicRng::generate(len).into_inner()`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use secure_gate::Dynamic;
+    /// let random: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
+    /// assert_eq!(random.len(), 64);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn generate_random(len: usize) -> Self {
+        crate::rng::DynamicRng::generate(len).into_inner()
+    }
+}
+
 // Zeroize integration
 #[cfg(feature = "zeroize")]
 impl<T: ?Sized + zeroize::Zeroize> zeroize::Zeroize for Dynamic<T> {

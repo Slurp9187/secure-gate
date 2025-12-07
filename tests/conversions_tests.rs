@@ -6,6 +6,9 @@
 use secure_gate::{dynamic_alias, HexString, RandomHex, SecureConversionsExt};
 // No more SecureConversionsExt import — we use it on the exposed secret
 
+#[cfg(feature = "rand")]
+use secure_gate::{Dynamic, Fixed, rng::{DynamicRng, FixedRng}};
+
 dynamic_alias!(TestKey, Vec<u8>);
 dynamic_alias!(Nonce, Vec<u8>);
 dynamic_alias!(SmallKey, Vec<u8>);
@@ -119,4 +122,28 @@ fn hex_string_accepts_uppercase() {
     let upper = "A1B2C3D4E5F67890".to_string();
     let hex = HexString::new(upper).unwrap();
     assert_eq!(hex.expose_secret(), "a1b2c3d4e5f67890");
+}
+
+#[cfg(feature = "rand")]
+#[test]
+fn fixed_rng_into_inner() {
+    let rng = FixedRng::<32>::generate();
+    let fixed: Fixed<[u8; 32]> = rng.into_inner();
+    assert_eq!(fixed.len(), 32);
+}
+
+#[cfg(feature = "rand")]
+#[test]
+fn fixed_rng_into_conversion() {
+    let rng = FixedRng::<32>::generate();
+    let fixed: Fixed<[u8; 32]> = rng.into();
+    assert_eq!(fixed.len(), 32);
+}
+
+#[cfg(feature = "rand")]
+#[test]
+fn dynamic_rng_into_conversion() {
+    let rng = DynamicRng::generate(64);
+    let dynamic: Dynamic<Vec<u8>> = rng.into();
+    assert_eq!(dynamic.len(), 64);
 }

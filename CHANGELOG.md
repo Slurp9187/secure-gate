@@ -9,6 +9,18 @@ That's a good start, but here's a more polished version that follows conventiona
 
 ## [0.6.1] - 2025-12-07
 
+### Added
+- **Ergonomic RNG conversions**: `FixedRng<N>` and `DynamicRng` can now be converted to `Fixed` and `Dynamic` via `.into()` or `.into_inner()`
+  ```rust
+  let key: Fixed<[u8; 32]> = FixedRng::<32>::generate().into();
+  let random: Dynamic<Vec<u8>> = DynamicRng::generate(64).into();
+  ```
+- **Convenience random generation methods**: Direct generation methods on `Fixed` and `Dynamic` for ergonomic random secret creation
+  ```rust
+  let key: Fixed<[u8; 32]> = Fixed::generate_random();
+  let random: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
+  ```
+
 ### Changed
 - **Macro visibility syntax**: All type alias macros (`fixed_alias!`, `fixed_alias_rng!`, `dynamic_alias!`, etc.) now require explicit visibility specification in line with standard Rust semantics. The automatic `pub` fallback has been removed.
 
@@ -24,22 +36,18 @@ fixed_alias!(MyPrivateKey, 32);       // Private type (no visibility modifier)
 fixed_alias!(pub(crate) Internal, 64); // Crate-visible type
 ```
 
+### Fixed
+- **Macro recursion**: Removed unnecessary recursive call in `dynamic_generic_alias!` macro, making it consistent with `fixed_generic_alias!` pattern
+
 ### Why
 - Improves consistency with Rust's explicit visibility philosophy
 - Eliminates surprising automatic behavior in macros  
 - Makes type visibility intentions clear and auditable
 - Removes redundant macro branches, simplifying implementation
+- Provides ergonomic conversion paths while preserving type-level security guarantees
 
 ### Migration
 Update macro invocations to explicitly specify visibility where needed. Add `pub` for types that should be publicly accessible.
-
-This version is clearer about:
-1. What changed (specific macros affected)
-2. Why it changed (design philosophy)  
-3. Migration path (what users need to do)
-4. Before/after examples for clarity
-
-The tone is professional and the information is complete without being overly technical.
 
 ## [0.6.0] - 2025-12-06
 

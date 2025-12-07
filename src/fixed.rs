@@ -231,6 +231,30 @@ impl<const N: usize> Fixed<[u8; N]> {
     }
 }
 
+// Random generation — only available with `rand` feature
+#[cfg(feature = "rand")]
+impl<const N: usize> Fixed<[u8; N]> {
+    /// Generate fresh random bytes using the OS RNG.
+    ///
+    /// This is a convenience method that generates random bytes directly
+    /// without going through `FixedRng`. Equivalent to:
+    /// `FixedRng::<N>::generate().into_inner()`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use secure_gate::Fixed;
+    /// let key: Fixed<[u8; 32]> = Fixed::generate_random();
+    /// # }
+    /// ```
+    #[inline]
+    pub fn generate_random() -> Self {
+        crate::rng::FixedRng::<N>::generate().into_inner()
+    }
+}
+
 // Zeroize integration
 #[cfg(feature = "zeroize")]
 impl<T: zeroize::Zeroize> zeroize::Zeroize for Fixed<T> {

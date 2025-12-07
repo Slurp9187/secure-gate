@@ -88,11 +88,54 @@ impl<const N: usize> FixedRng<N> {
     pub const fn is_empty(&self) -> bool {
         N == 0
     }
+
+    /// Consume the wrapper and return the inner `Fixed<[u8; N]>`.
+    ///
+    /// This transfers ownership without exposing the secret bytes.
+    /// The returned `Fixed` retains all security guarantees (zeroize, etc.).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use secure_gate::{Fixed, rng::FixedRng};
+    /// let random = FixedRng::<32>::generate();
+    /// let fixed: Fixed<[u8; 32]> = random.into_inner();
+    /// // Can now use fixed.expose_secret() as needed
+    /// # }
+    /// ```
+    #[inline(always)]
+    pub fn into_inner(self) -> Fixed<[u8; N]> {
+        self.0
+    }
 }
 
 impl<const N: usize> core::fmt::Debug for FixedRng<N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
+    }
+}
+
+impl<const N: usize> From<FixedRng<N>> for Fixed<[u8; N]> {
+    /// Convert a `FixedRng` to `Fixed`, transferring ownership.
+    ///
+    /// This preserves all security guarantees. The `FixedRng` type
+    /// ensures the value came from secure RNG, and this conversion
+    /// transfers that value to `Fixed` without exposing bytes.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use secure_gate::{Fixed, rng::FixedRng};
+    /// let key: Fixed<[u8; 32]> = FixedRng::<32>::generate().into();
+    /// # }
+    /// ```
+    #[inline(always)]
+    fn from(rng: FixedRng<N>) -> Self {
+        rng.into_inner()
     }
 }
 
@@ -165,5 +208,27 @@ impl DynamicRng {
 impl core::fmt::Debug for DynamicRng {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
+    }
+}
+
+impl From<DynamicRng> for Dynamic<Vec<u8>> {
+    /// Convert a `DynamicRng` to `Dynamic`, transferring ownership.
+    ///
+    /// This preserves all security guarantees. The `DynamicRng` type
+    /// ensures the value came from secure RNG, and this conversion
+    /// transfers that value to `Dynamic` without exposing bytes.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use secure_gate::{Dynamic, rng::DynamicRng};
+    /// let random: Dynamic<Vec<u8>> = DynamicRng::generate(64).into();
+    /// # }
+    /// ```
+    #[inline(always)]
+    fn from(rng: DynamicRng) -> Self {
+        rng.into_inner()
     }
 }

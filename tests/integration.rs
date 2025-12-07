@@ -114,3 +114,23 @@ fn rng_len_is_empty() {
     assert_eq!(empty.len(), 0);
     assert!(empty.is_empty());
 }
+
+#[cfg(feature = "rand")]
+#[test]
+fn fixed_generate_random() {
+    use secure_gate::Fixed;
+    let key: Fixed<[u8; 32]> = Fixed::generate_random();
+    assert_eq!(key.len(), 32);
+    // Verify it's actually random (not all zeros)
+    assert!(!key.expose_secret().iter().all(|&b| b == 0));
+}
+
+#[cfg(feature = "rand")]
+#[test]
+fn dynamic_generate_random() {
+    use secure_gate::Dynamic;
+    let random: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
+    assert_eq!(random.len(), 64);
+    // Verify it's actually random
+    assert!(!random.expose_secret().iter().all(|&b| b == 0));
+}

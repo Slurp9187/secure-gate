@@ -133,10 +133,7 @@ macro_rules! dynamic_generic_alias {
         $vis type $name = $crate::Dynamic<$inner>;
     };
     ($vis:vis $name:ident, $inner:ty) => {
-        $crate::dynamic_generic_alias!(
-            $vis $name,
-            $inner,
-            concat!("Secure heap-allocated ", stringify!($inner))
-        );
+        #[doc = concat!("Secure heap-allocated ", stringify!($inner))]
+        $vis type $name = $crate::Dynamic<$inner>;
     };
 }

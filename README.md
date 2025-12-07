@@ -82,7 +82,47 @@ assert_eq!(pw.expose_secret(), "hunter2");
 - **Guaranteed freshness** – `FixedRng<N>` can only be constructed via secure RNG  
 - **Zero-cost** – Newtype over `Fixed`, fully inlined  
 - **Explicit visibility** – All macros require clear visibility specification (`pub`, `pub(crate)`, or private)
-- `.generate()` is the canonical constructor (`.new()` is deliberately unavailable)  
+- `.generate()` is the canonical constructor (`.new()` is deliberately unavailable)
+
+### Converting RNG Types
+
+When you need to convert `FixedRng` or `DynamicRng` to their base types:
+
+```rust
+#[cfg(feature = "rand")]
+{
+    use secure_gate::{Fixed, Dynamic, rng::{FixedRng, DynamicRng}};
+    
+    // Convert FixedRng to Fixed (preserves security guarantees)
+    let key: Fixed<[u8; 32]> = FixedRng::<32>::generate().into();
+    // Or explicitly:
+    let key: Fixed<[u8; 32]> = FixedRng::<32>::generate().into_inner();
+    
+    // Convert DynamicRng to Dynamic
+    let random: Dynamic<Vec<u8>> = DynamicRng::generate(64).into();
+}
+```
+
+### Direct Random Generation
+
+For convenience, you can generate random secrets directly without going through `FixedRng`:
+
+```rust
+#[cfg(feature = "rand")]
+{
+    use secure_gate::{Fixed, Dynamic};
+    
+    // Direct generation (most ergonomic)
+    let key: Fixed<[u8; 32]> = Fixed::generate_random();
+    let random: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
+    
+    // Equivalent to:
+    // FixedRng::<32>::generate().into_inner()
+    // DynamicRng::generate(64).into_inner()
+}
+```
+
+**Note**: `FixedRng`/`DynamicRng` preserve the type-level guarantee that values came from RNG. Converting to `Fixed`/`Dynamic` loses that guarantee but enables mutation if needed.  
 
 ## Secure Conversions – `conversions` feature  
 ```rust  
@@ -151,6 +191,6 @@ The explicit `.expose_secret()` path incurs **no measurable overhead**.
 ## License  
 MIT OR Apache-2.0  
 
----  
-**v0.6.1 enforces explicit visibility in macros and removes all implicit behavior.**  
+---
+**v0.6.1 adds ergonomic RNG conversions and convenience methods while maintaining strict security guarantees.**  
 All secret access is explicit. No silent leaks remain.
