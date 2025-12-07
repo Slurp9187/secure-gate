@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced `RandomBytes<N>` with `FixedRng<N>`, a newtype over `Fixed<[u8; N]>`.
 - Removed `serde` feature; serialization requires user implementation.
 - Switched RNG to direct `rand::rngs::OsRng` usage, removing `thread_local!` and `RefCell`.
+- Removed all dependancies on `secrecy` as they were no longer necessary.
 
 ### Added
 - `len()` and `is_empty()` on `Fixed<[u8; N]>`.

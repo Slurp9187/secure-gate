@@ -184,13 +184,6 @@ impl core::ops::Deref for HexString {
     }
 }
 
-#[cfg(all(feature = "conversions", feature = "zeroize"))]
-impl secrecy::ExposeSecret<String> for HexString {
-    fn expose_secret(&self) -> &String {
-        self.0.expose_secret()
-    }
-}
-
 // Manual constant-time equality – prevents timing attacks on hex strings
 #[cfg(feature = "conversions")]
 impl PartialEq for HexString {
@@ -236,13 +229,6 @@ impl core::ops::Deref for RandomHex {
     type Target = HexString;
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-#[cfg(all(feature = "rand", feature = "conversions", feature = "zeroize"))]
-impl secrecy::ExposeSecret<String> for RandomHex {
-    fn expose_secret(&self) -> &String {
-        self.0.expose_secret()
     }
 }
 
