@@ -66,22 +66,53 @@ impl<T: ?Sized> fmt::Debug for DynamicNoClone<T> {
     }
 }
 
+// === Ergonomic helpers for common heap types ===
+
 impl DynamicNoClone<String> {
     pub fn finish_mut(&mut self) -> &mut String {
         let s = &mut *self.0;
         s.shrink_to_fit();
         s
     }
+
+    /// Returns the length of the secret string in bytes (UTF-8).
+    /// This is public metadata — does **not** expose the secret.
+    #[inline(always)]
+    pub const fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns true if the secret string is empty.
+    #[inline(always)]
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
-impl DynamicNoClone<Vec<u8>> {
-    pub fn finish_mut(&mut self) -> &mut Vec<u8> {
+impl<T> DynamicNoClone<Vec<T>> {
+    pub fn finish_mut(&mut self) -> &mut Vec<T> {
         let v = &mut *self.0;
         v.shrink_to_fit();
         v
     }
 
-    pub fn as_slice(&self) -> &[u8] {
+    /// Returns the length of the secret vector in elements.
+    /// This is public metadata — does **not** expose the secret.
+    #[inline(always)]
+    pub const fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns true if the secret vector is empty.
+    #[inline(always)]
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns a shared slice of the secret bytes.
+    /// Requires explicit intent — consistent with the crate's philosophy.
+    #[inline(always)]
+    pub fn as_slice(&self) -> &[T] {
         self.expose_secret()
     }
 }
