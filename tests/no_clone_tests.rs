@@ -21,8 +21,11 @@ mod tests {
         key.expose_secret_mut()[0] = 99;
         assert_eq!(key.expose_secret()[0], 99);
 
-        let raw: [u8; 32] = key.into_inner();
-        assert_eq!(raw[0], 99);
+        // All access must go through expose_secret() — security model enforced
+        // Verify first element changed, rest remain 42
+        assert_eq!(key.expose_secret()[0], 99);
+        assert_eq!(key.expose_secret()[1], 42);
+        assert_eq!(key.expose_secret()[31], 42);
     }
 
     #[test]
@@ -52,7 +55,7 @@ mod tests {
         data.expose_secret_mut().push(42);
         assert_eq!(data.expose_secret(), &[1, 2, 3, 42]);
 
-        let vec = *data.into_inner(); // deref the Box
-        assert_eq!(vec, vec![1, 2, 3, 42]);
+        // All access must go through expose_secret() — security model enforced
+        assert_eq!(data.expose_secret(), &vec![1, 2, 3, 42]);
     }
 }

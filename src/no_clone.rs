@@ -79,11 +79,6 @@ impl<T> FixedNoClone<T> {
         &mut self.0
     }
 
-    /// Consume and return the inner value.
-    #[inline(always)]
-    pub fn into_inner(self) -> T {
-        self.0
-    }
 }
 
 impl<T: ?Sized> DynamicNoClone<T> {
@@ -113,11 +108,6 @@ impl<T: ?Sized> DynamicNoClone<T> {
         &mut self.0
     }
 
-    /// Consume and return the inner `Box<T>`.
-    #[inline(always)]
-    pub fn into_inner(self) -> Box<T> {
-        self.0
-    }
 }
 
 impl<T> fmt::Debug for FixedNoClone<T> {

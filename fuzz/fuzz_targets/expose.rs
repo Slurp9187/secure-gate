@@ -47,13 +47,13 @@ fuzz_target!(|data: &[u8]| {
     let fixed_nonce = Fixed::new([0u8; 32]);
     let _ = fixed_nonce.expose_secret().len(); // ← fixed
 
-    // 5. Clone + into_inner
+    // 5. Clone — all access through expose_secret()
     let cloneable = Dynamic::<Vec<u8>>::new(vec![1u8, 2, 3]);
     let _ = cloneable.clone();
     let _default = Dynamic::<String>::new(String::new());
-
-    #[cfg(feature = "zeroize")]
-    let _inner: Box<Vec<u8>> = cloneable.into_inner();
+    
+    // All access must go through expose_secret() — security model enforced
+    let _inner_ref = cloneable.expose_secret();
 
     // 6. finish_mut helpers
     {

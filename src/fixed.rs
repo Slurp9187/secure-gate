@@ -93,24 +93,6 @@ impl<T> Fixed<T> {
         &mut self.0
     }
 
-    /// Consume the wrapper and return the inner value.
-    ///
-    /// Useful for passing secrets to functions that consume ownership.
-    ///
-    /// Note: If `zeroize` is enabled, prefer dropping the `Fixed` to ensure wiping.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use secure_gate::Fixed;
-    /// let secret = Fixed::new(42u32);
-    /// let inner = secret.into_inner();
-    /// assert_eq!(inner, 42);
-    /// ```
-    #[inline(always)]
-    pub fn into_inner(self) -> T {
-        self.0
-    }
 
     /// Convert to a non-cloneable variant.
     ///
