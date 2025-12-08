@@ -125,15 +125,6 @@ impl<T: ?Sized> fmt::Debug for DynamicNoClone<T> {
 // === Ergonomic helpers for common heap types ===
 
 impl DynamicNoClone<String> {
-    /// Get a mutable reference and shrink spare capacity.
-    ///
-    /// Similar to `Dynamic::finish_mut()`.
-    pub fn finish_mut(&mut self) -> &mut String {
-        let s = &mut *self.0;
-        s.shrink_to_fit();
-        s
-    }
-
     /// Returns the length of the secret string in bytes (UTF-8).
     #[inline(always)]
     pub const fn len(&self) -> usize {
@@ -148,13 +139,6 @@ impl DynamicNoClone<String> {
 }
 
 impl<T> DynamicNoClone<Vec<T>> {
-    /// Get a mutable reference and shrink spare capacity.
-    pub fn finish_mut(&mut self) -> &mut Vec<T> {
-        let v = &mut *self.0;
-        v.shrink_to_fit();
-        v
-    }
-
     /// Returns the length of the secret vector in elements.
     #[inline(always)]
     pub const fn len(&self) -> usize {

@@ -62,7 +62,7 @@ fuzz_target!(|data: &[u8]| {
                 s.push('🚀');
             }
         }
-        pw.finish_mut();
+        pw.expose_secret_mut().shrink_to_fit();
 
         if text.len() % 2 == 0 {
             pw.zeroize();
