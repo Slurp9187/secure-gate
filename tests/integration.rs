@@ -53,13 +53,12 @@ fn clone_dynamic_is_isolated() {
 }
 
 #[test]
-fn into_inner_extracts() {
+fn expose_secret_provides_access() {
     let key = Fixed::new([1u8; 32]);
-    assert_eq!(key.into_inner(), [1u8; 32]);
+    assert_eq!(*key.expose_secret(), [1u8; 32]);
 
     let pw = Dynamic::<String>::new("secret".to_string());
-    let boxed = pw.into_inner();
-    assert_eq!(&*boxed, "secret");
+    assert_eq!(pw.expose_secret(), "secret");
 }
 
 #[test]

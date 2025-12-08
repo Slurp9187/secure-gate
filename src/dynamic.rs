@@ -80,13 +80,6 @@ impl<T: ?Sized> Dynamic<T> {
         &mut self.0
     }
 
-    /// Consume the wrapper and return the inner `Box<T>`.
-    ///
-    /// Note: If `zeroize` is enabled, prefer dropping the `Dynamic` to ensure wiping.
-    #[inline(always)]
-    pub fn into_inner(self) -> Box<T> {
-        self.0
-    }
 
     /// Convert to a non-cloneable variant.
     ///

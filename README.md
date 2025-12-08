@@ -117,8 +117,8 @@ For convenience, you can generate random secrets directly without going through 
     let random: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
     
     // Equivalent to:
-    // FixedRng::<32>::generate().into_inner()
-    // DynamicRng::generate(64).into_inner()
+    // FixedRng::<32>::generate().into()  // or .into_inner() which returns Fixed
+    // DynamicRng::generate(64).into()    // or .into_inner() which returns Dynamic
 }
 ```
 
