@@ -2,6 +2,7 @@
 /target
 
 Cargo.lock
+SECURITY_AUDIT.md
 
 *.bak
 *.del
