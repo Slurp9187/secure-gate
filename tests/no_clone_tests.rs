@@ -44,8 +44,9 @@ mod tests {
         pw.expose_secret_mut().push_str("123");
         assert_eq!(pw.expose_secret(), "secret123");
 
-        let s = pw.finish_mut();
-        assert_eq!(s, "secret123");
+        // Shrink to fit using explicit exposure
+        pw.expose_secret_mut().shrink_to_fit();
+        assert_eq!(pw.expose_secret(), "secret123");
     }
 
     #[test]

@@ -124,12 +124,6 @@ impl<T: Clone + zeroize::Zeroize> Clone for Dynamic<T> {
 
 // === Ergonomic helpers for common heap types ===
 impl Dynamic<String> {
-    pub fn finish_mut(&mut self) -> &mut String {
-        let s = &mut *self.0;
-        s.shrink_to_fit();
-        s
-    }
-
     #[inline(always)]
     pub const fn len(&self) -> usize {
         self.0.len()
@@ -142,12 +136,6 @@ impl Dynamic<String> {
 }
 
 impl<T> Dynamic<Vec<T>> {
-    pub fn finish_mut(&mut self) -> &mut Vec<T> {
-        let v = &mut *self.0;
-        v.shrink_to_fit();
-        v
-    }
-
     #[inline(always)]
     pub const fn len(&self) -> usize {
         self.0.len()

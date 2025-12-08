@@ -7,7 +7,7 @@
 - `RandomHex` – Validated random hex string that can only be constructed from fresh RNG
 
 When the `zeroize` feature is enabled, secrets are automatically wiped on drop (including spare capacity).  
-**All access to secret bytes requires an explicit `.expose_secret()` call** – no silent leaks, no `Deref`, no hidden methods.
+**All access to secret bytes requires an explicit `.expose_secret()` call** – no silent leaks, no `Deref`, no hidden methods, no `into_inner()` bypasses.
 
 ## Installation  
 ```toml
@@ -141,7 +141,7 @@ For convenience, you can generate random secrets directly without going through 
 ```
 
 **Why `.expose_secret()` is required**  
-Every secret access is loud, grep-able, and auditable. There are **no** methods on the wrapper types that expose bytes directly.
+Every secret access is loud, grep-able, and auditable. There are **no** methods on the wrapper types that expose bytes directly. The security model is strictly enforced: `Fixed<T>`, `Dynamic<T>`, `FixedNoClone<T>`, and `DynamicNoClone<T>` do not provide `into_inner()` methods that would bypass the explicit exposure requirement. This ensures all secret access is traceable and prevents accidental security violations.
 
 ## Macros  
 ```rust
@@ -165,7 +165,7 @@ dynamic_alias!(pub Password, String);       // Public type
 | Type | Allocation | Auto-zero | Full wipe | Slack eliminated | Notes |  
 |-----------------|------------|-----------|-----------|------------------|---------------------------|  
 | `Fixed<T>` | Stack | Yes | Yes | Yes (no heap) | Zero-cost |  
-| `Dynamic<T>` | Heap | Yes | Yes | No (until drop) | Use `finish_mut()` |  
+| `Dynamic<T>` | Heap | Yes | Yes | No (until drop) | Use `expose_secret_mut().shrink_to_fit()` |  
 | `FixedRng<N>` | Stack | Yes | Yes | Yes | Fresh + type-safe |  
 | `RandomHex` | Heap | Yes | Yes | No (until drop) | Validated random hex |  
 
@@ -193,4 +193,4 @@ MIT OR Apache-2.0
 
 ---
 **v0.6.1 adds ergonomic RNG conversions and convenience methods while maintaining strict security guarantees.**  
-All secret access is explicit. No silent leaks remain.
+All secret access is explicit. No silent leaks remain. **Security fix**: Removed `into_inner()` from `Fixed`/`Dynamic` types to enforce the security model. Use `expose_secret()` or `expose_secret_mut()` for all secret access.

@@ -64,7 +64,7 @@ fuzz_target!(|data: &[u8]| {
     dyn_str_mut.expose_secret_mut().push('!');
     dyn_str_mut.expose_secret_mut().push_str("_fuzz");
     dyn_str_mut.expose_secret_mut().clear();
-    let _ = dyn_str_mut.finish_mut();
+    dyn_str_mut.expose_secret_mut().shrink_to_fit();
 
     // 4. Extreme allocation stress — repeated data
     let repeated_data = dyn_vec.expose_secret().clone();
