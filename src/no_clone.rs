@@ -99,7 +99,31 @@ impl<T> FixedNoClone<T> {
     pub fn expose_secret_mut(&mut self) -> &mut T {
         &mut self.0
     }
+}
 
+// Explicit zeroization — only available with `zeroize` feature
+#[cfg(feature = "zeroize")]
+impl<T: Zeroize> FixedNoClone<T> {
+    /// Explicitly zeroize the secret immediately.
+    ///
+    /// This is useful when you want to wipe memory before the value goes out of scope,
+    /// or when you want to make the zeroization intent explicit in the code.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "zeroize")]
+    /// # {
+    /// use secure_gate::FixedNoClone;
+    /// let mut key = FixedNoClone::new([42u8; 32]);
+    /// // ... use key ...
+    /// key.zeroize_now();  // Explicit wipe - makes intent clear
+    /// # }
+    /// ```
+    #[inline]
+    pub fn zeroize_now(&mut self) {
+        self.0.zeroize();
+    }
 }
 
 impl<T: ?Sized> DynamicNoClone<T> {
@@ -149,7 +173,31 @@ impl<T: ?Sized> DynamicNoClone<T> {
     pub fn expose_secret_mut(&mut self) -> &mut T {
         &mut self.0
     }
+}
 
+// Explicit zeroization — only available with `zeroize` feature
+#[cfg(feature = "zeroize")]
+impl<T: ?Sized + Zeroize> DynamicNoClone<T> {
+    /// Explicitly zeroize the secret immediately.
+    ///
+    /// This is useful when you want to wipe memory before the value goes out of scope,
+    /// or when you want to make the zeroization intent explicit in the code.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "zeroize")]
+    /// # {
+    /// use secure_gate::DynamicNoClone;
+    /// let mut password = DynamicNoClone::new(Box::new("secret".to_string()));
+    /// // ... use password ...
+    /// password.zeroize_now();  // Explicit wipe - makes intent clear
+    /// # }
+    /// ```
+    #[inline]
+    pub fn zeroize_now(&mut self) {
+        self.0.zeroize();
+    }
 }
 
 impl<T> fmt::Debug for FixedNoClone<T> {

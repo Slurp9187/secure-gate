@@ -689,3 +689,160 @@ fn fixed_max_reasonable_size() {
     assert_eq!(key.expose_secret()[1023], 0);
 }
 
+// ──────────────────────────────────────────────────────────────
+// zeroize_now() explicit zeroization
+// ──────────────────────────────────────────────────────────────
+
+#[cfg(feature = "zeroize")]
+#[test]
+fn fixed_zeroize_now() {
+    let mut key = Fixed::new([42u8; 32]);
+    assert_eq!(key.expose_secret()[0], 42);
+    
+    key.zeroize_now();
+    
+    // After zeroize_now, should be all zeros
+    assert!(key.expose_secret().iter().all(|&b| b == 0));
+    assert_eq!(key.len(), 32); // Length preserved
+}
+
+#[cfg(feature = "zeroize")]
+#[test]
+fn fixed_zeroize_now_preserves_length() {
+    let mut key = Fixed::new([0xFFu8; 64]);
+    let original_len = key.len();
+    
+    key.zeroize_now();
+    
+    assert_eq!(key.len(), original_len);
+    assert!(key.expose_secret().iter().all(|&b| b == 0));
+}
+
+#[cfg(feature = "zeroize")]
+#[test]
+fn fixed_zeroize_now_empty() {
+    let mut empty = Fixed::new([0u8; 0]);
+    empty.zeroize_now();
+    
+    assert_eq!(empty.len(), 0);
+    assert!(empty.is_empty());
+}
+
+// ──────────────────────────────────────────────────────────────
+// from_hex() and from_base64url() constructors
+// ──────────────────────────────────────────────────────────────
+
+#[cfg(feature = "conversions")]
+#[test]
+fn fixed_from_hex_valid() {
+    let key = Fixed::<[u8; 4]>::from_hex("deadbeef").unwrap();
+    assert_eq!(key.expose_secret(), &[0xde, 0xad, 0xbe, 0xef]);
+}
+
+#[cfg(feature = "conversions")]
+#[test]
+fn fixed_from_hex_uppercase() {
+    let key = Fixed::<[u8; 4]>::from_hex("DEADBEEF").unwrap();
+    assert_eq!(key.expose_secret(), &[0xde, 0xad, 0xbe, 0xef]);
+}
+
+#[cfg(feature = "conversions")]
+#[test]
+fn fixed_from_hex_mixed_case() {
+    let key = Fixed::<[u8; 4]>::from_hex("DeAdBeEf").unwrap();
+    assert_eq!(key.expose_secret(), &[0xde, 0xad, 0xbe, 0xef]);
+}
+
+#[cfg(feature = "conversions")]
+#[test]
+fn fixed_from_hex_invalid_char() {
+    let err = Fixed::<[u8; 4]>::from_hex("deadgbeef").unwrap_err();
+    assert_eq!(err, "invalid hex string");
+}
+
+#[cfg(feature = "conversions")]
+#[test]
+fn fixed_from_hex_wrong_length() {
+    let err = Fixed::<[u8; 4]>::from_hex("deadbe").unwrap_err();
+    assert_eq!(err, "hex string length mismatch");
+    
+    let err = Fixed::<[u8; 4]>::from_hex("deadbeef00").unwrap_err();
+    assert_eq!(err, "hex string length mismatch");
+}
+
+#[cfg(feature = "conversions")]
+#[test]
+fn fixed_from_hex_empty() {
+    let key = Fixed::<[u8; 0]>::from_hex("").unwrap();
+    assert_eq!(key.len(), 0);
+    assert!(key.is_empty());
+}
+
+#[cfg(feature = "conversions")]
+#[test]
+fn fixed_from_hex_32_bytes() {
+    let hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    let key = Fixed::<[u8; 32]>::from_hex(hex).unwrap();
+    assert_eq!(key.len(), 32);
+    assert_eq!(key.expose_secret()[0], 0x01);
+    assert_eq!(key.expose_secret()[31], 0xef);
+}
+
+#[cfg(feature = "conversions")]
+#[test]
+fn fixed_from_base64url_valid() {
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    use base64::Engine;
+    
+    let bytes = [0xde, 0xad, 0xbe, 0xef];
+    let b64 = URL_SAFE_NO_PAD.encode(bytes);
+    let key = Fixed::<[u8; 4]>::from_base64url(&b64).unwrap();
+    assert_eq!(key.expose_secret(), &bytes);
+}
+
+#[cfg(feature = "conversions")]
+#[test]
+fn fixed_from_base64url_wrong_length() {
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    use base64::Engine;
+    
+    let bytes = [0xde, 0xad, 0xbe, 0xef, 0x00];
+    let b64 = URL_SAFE_NO_PAD.encode(bytes);
+    let err = Fixed::<[u8; 4]>::from_base64url(&b64).unwrap_err();
+    assert_eq!(err, "base64url string length mismatch");
+}
+
+#[cfg(feature = "conversions")]
+#[test]
+fn fixed_from_base64url_invalid() {
+    let err = Fixed::<[u8; 4]>::from_base64url("invalid!").unwrap_err();
+    assert_eq!(err, "invalid base64url string");
+}
+
+#[cfg(feature = "conversions")]
+#[test]
+fn fixed_from_base64url_empty() {
+    let key = Fixed::<[u8; 0]>::from_base64url("").unwrap();
+    assert_eq!(key.len(), 0);
+    assert!(key.is_empty());
+}
+
+#[cfg(feature = "conversions")]
+#[test]
+fn fixed_from_hex_and_base64url_roundtrip() {
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    use base64::Engine;
+    
+    let original = [0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef];
+    
+    // Hex roundtrip
+    let hex = hex::encode(original);
+    let from_hex = Fixed::<[u8; 8]>::from_hex(&hex).unwrap();
+    assert_eq!(from_hex.expose_secret(), &original);
+    
+    // Base64url roundtrip
+    let b64 = URL_SAFE_NO_PAD.encode(original);
+    let from_b64 = Fixed::<[u8; 8]>::from_base64url(&b64).unwrap();
+    assert_eq!(from_b64.expose_secret(), &original);
+}
+

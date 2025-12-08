@@ -99,6 +99,31 @@ impl<T: ?Sized> Dynamic<T> {
     }
 }
 
+// Explicit zeroization — only available with `zeroize` feature
+#[cfg(feature = "zeroize")]
+impl<T: ?Sized + zeroize::Zeroize> Dynamic<T> {
+    /// Explicitly zeroize the secret immediately.
+    ///
+    /// This is useful when you want to wipe memory before the value goes out of scope,
+    /// or when you want to make the zeroization intent explicit in the code.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "zeroize")]
+    /// # {
+    /// use secure_gate::Dynamic;
+    /// let mut password = Dynamic::<String>::new("secret".to_string());
+    /// // ... use password ...
+    /// password.zeroize_now();  // Explicit wipe - makes intent clear
+    /// # }
+    /// ```
+    #[inline]
+    pub fn zeroize_now(&mut self) {
+        self.0.zeroize();
+    }
+}
+
 impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")

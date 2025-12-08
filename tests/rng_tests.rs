@@ -252,7 +252,16 @@ fn dynamic_rng_single_byte() {
     let rng = DynamicRng::generate(1);
     assert_eq!(rng.len(), 1);
     assert!(!rng.is_empty());
-    assert!(*rng.expose_secret() != [0u8]);
+    // Generate multiple times to verify randomness (single byte has 1/256 chance of being zero)
+    let mut found_non_zero = false;
+    for _ in 0..10 {
+        let test_rng = DynamicRng::generate(1);
+        if test_rng.expose_secret()[0] != 0 {
+            found_non_zero = true;
+            break;
+        }
+    }
+    assert!(found_non_zero, "Generated 10 single-byte values, all were zero (statistically very unlikely)");
 }
 
 #[test]

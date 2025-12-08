@@ -112,6 +112,31 @@ impl<T> Fixed<T> {
     }
 }
 
+// Explicit zeroization — only available with `zeroize` feature
+#[cfg(feature = "zeroize")]
+impl<T: zeroize::Zeroize> Fixed<T> {
+    /// Explicitly zeroize the secret immediately.
+    ///
+    /// This is useful when you want to wipe memory before the value goes out of scope,
+    /// or when you want to make the zeroization intent explicit in the code.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "zeroize")]
+    /// # {
+    /// use secure_gate::Fixed;
+    /// let mut key = Fixed::new([42u8; 32]);
+    /// // ... use key ...
+    /// key.zeroize_now();  // Explicit wipe - makes intent clear
+    /// # }
+    /// ```
+    #[inline]
+    pub fn zeroize_now(&mut self) {
+        self.0.zeroize();
+    }
+}
+
 // === Byte-array specific helpers ===
 
 impl<const N: usize> Fixed<[u8; N]> {
@@ -210,6 +235,78 @@ impl<const N: usize> Fixed<[u8; N]> {
     pub fn ct_eq(&self, other: &Self) -> bool {
         use crate::conversions::SecureConversionsExt;
         self.expose_secret().ct_eq(other.expose_secret())
+    }
+
+    /// Create a `Fixed` secret from a hex string.
+    ///
+    /// Returns `Err` if the hex string is invalid or doesn't match the expected length.
+    /// Available only when the `conversions` feature is enabled.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "conversions")]
+    /// # {
+    /// use secure_gate::Fixed;
+    /// let key = Fixed::<[u8; 4]>::from_hex("deadbeef")?;
+    /// assert_eq!(key.expose_secret(), &[0xde, 0xad, 0xbe, 0xef]);
+    /// # }
+    /// # Ok::<(), &'static str>(())
+    /// ```
+    pub fn from_hex(hex: &str) -> Result<Self, &'static str> {
+        let mut bytes = hex::decode(hex)
+            .map_err(|_| "invalid hex string")?;
+        
+        if bytes.len() != N {
+            #[cfg(feature = "zeroize")]
+            zeroize::Zeroize::zeroize(&mut bytes);
+            return Err("hex string length mismatch");
+        }
+        
+        let mut arr = [0u8; N];
+        arr.copy_from_slice(&bytes);
+        #[cfg(feature = "zeroize")]
+        zeroize::Zeroize::zeroize(&mut bytes); // Zeroize temporary Vec after copy
+        Ok(Self::new(arr))
+    }
+
+    /// Create a `Fixed` secret from a base64url string (no padding).
+    ///
+    /// Returns `Err` if the base64url string is invalid or doesn't match the expected length.
+    /// Available only when the `conversions` feature is enabled.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "conversions")]
+    /// # {
+    /// use secure_gate::Fixed;
+    /// use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    /// use base64::Engine;
+    /// let b64 = URL_SAFE_NO_PAD.encode([0xde, 0xad, 0xbe, 0xef]);
+    /// let key = Fixed::<[u8; 4]>::from_base64url(&b64)?;
+    /// assert_eq!(key.expose_secret(), &[0xde, 0xad, 0xbe, 0xef]);
+    /// # }
+    /// # Ok::<(), &'static str>(())
+    /// ```
+    pub fn from_base64url(b64: &str) -> Result<Self, &'static str> {
+        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        use base64::Engine;
+        
+        let mut bytes = URL_SAFE_NO_PAD.decode(b64)
+            .map_err(|_| "invalid base64url string")?;
+        
+        if bytes.len() != N {
+            #[cfg(feature = "zeroize")]
+            zeroize::Zeroize::zeroize(&mut bytes);
+            return Err("base64url string length mismatch");
+        }
+        
+        let mut arr = [0u8; N];
+        arr.copy_from_slice(&bytes);
+        #[cfg(feature = "zeroize")]
+        zeroize::Zeroize::zeroize(&mut bytes); // Zeroize temporary Vec after copy
+        Ok(Self::new(arr))
     }
 }
 

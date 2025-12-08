@@ -626,6 +626,61 @@ fn dynamic_no_clone_empty() {
 }
 
 // ──────────────────────────────────────────────────────────────
+// zeroize_now() explicit zeroization
+// ──────────────────────────────────────────────────────────────
+
+#[cfg(feature = "zeroize")]
+#[test]
+fn dynamic_zeroize_now_string() {
+    let mut password = Dynamic::<String>::new("secret".to_string());
+    assert_eq!(password.expose_secret(), "secret");
+    
+    password.zeroize_now();
+    
+    // After zeroize_now, String should be empty
+    assert!(password.is_empty());
+    assert_eq!(password.expose_secret(), "");
+}
+
+#[cfg(feature = "zeroize")]
+#[test]
+fn dynamic_zeroize_now_vec() {
+    let mut data = Dynamic::<Vec<u8>>::new(vec![42u8; 32]);
+    assert_eq!(data.len(), 32);
+    
+    data.zeroize_now();
+    
+    // After zeroize_now, Vec should be empty
+    assert!(data.is_empty());
+    assert_eq!(data.len(), 0);
+}
+
+#[cfg(feature = "zeroize")]
+#[test]
+fn dynamic_zeroize_now_empty() {
+    let mut empty_str = Dynamic::<String>::new("".to_string());
+    let mut empty_vec = Dynamic::<Vec<u8>>::new(Vec::new());
+    
+    empty_str.zeroize_now();
+    empty_vec.zeroize_now();
+    
+    assert!(empty_str.is_empty());
+    assert!(empty_vec.is_empty());
+}
+
+#[cfg(feature = "zeroize")]
+#[test]
+fn dynamic_zeroize_now_large() {
+    let mut large = Dynamic::<Vec<u8>>::new(vec![0xFFu8; 1024]);
+    assert_eq!(large.len(), 1024);
+    
+    large.zeroize_now();
+    
+    assert!(large.is_empty());
+    assert_eq!(large.len(), 0);
+}
+
+// ──────────────────────────────────────────────────────────────
 // Real-world integration scenarios
 // ──────────────────────────────────────────────────────────────
 
