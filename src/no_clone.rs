@@ -112,13 +112,13 @@ impl<T: ?Sized> DynamicNoClone<T> {
 
 impl<T> fmt::Debug for FixedNoClone<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("[REDACTED_NO_CLONE]")
+        f.write_str("[REDACTED]")
     }
 }
 
 impl<T: ?Sized> fmt::Debug for DynamicNoClone<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("[REDACTED_NO_CLONE]")
+        f.write_str("[REDACTED]")
     }
 }
 
