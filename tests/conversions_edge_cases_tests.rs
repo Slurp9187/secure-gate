@@ -116,6 +116,7 @@ fn random_hex_returns_randomhex() {
 
 #[test]
 fn ct_eq_different_lengths_returns_false() {
+    dynamic_alias!(TestKey, Vec<u8>);
     let a = TestKey::from(vec![0u8; 32]);
     let b = TestKey::from(vec![0u8; 64]);
     assert!(!a.expose_secret().ct_eq(b.expose_secret()));

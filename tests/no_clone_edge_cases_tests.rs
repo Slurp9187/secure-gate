@@ -720,3 +720,4 @@ fn dynamic_no_clone_vec_max_reasonable_size() {
     assert_eq!(data.expose_secret()[0], 42);
     assert_eq!(data.expose_secret()[1023], 42);
 }
+
