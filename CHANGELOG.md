@@ -5,27 +5,35 @@ All changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.2] - 2025-12-07
+## [0.6.2] - 2026-01-03
 
 ### Added
-
-- **New `ct-eq` feature**: Constant-time equality operations can now be used independently of format conversions
-  - `ct_eq()` is now gated by the `ct-eq` feature (semantically correct)
-  - Users can enable just `ct-eq` if they only need constant-time comparisons without hex/base64 encoding
+- **Opt-In Cloning**: Introduced `CloneableSecret` trait for explicit, safe duplication of secrets (requires `zeroize` feature).
+  - Allows cloning only for types that implement `CloneableSecret` + `Zeroize`.
+  - Blanket impls for primitives (`u8`, `i32`, etc.) and fixed arrays (`[T; N]`).
+  - Users can opt-in for custom types, ensuring cloned secrets are zeroized.
+- **Fallible RNG Generation**: Added `try_generate()` methods to `FixedRng<N>` and `DynamicRng` returning `Result<Self, rand::Error>` instead of panicking.
+  - Direct `try_generate_random()` on `Fixed` and `Dynamic` for convenience.
+- **Base64 Support**: Added `Base64String` wrapper in `conversions`, with validation, decoding (`to_bytes()`), and constant-time equality (gated behind `ct-eq`).
+  - Mirrors `HexString`—validates URL-safe no-pad base64, zeroizes invalid input.
+- **TryFrom for Fixed**: Made `Fixed<[u8; N]>::from_slice` fallible via `impl TryFrom<&[u8]> for Fixed<[u8; N]>` with `FromSliceError` for length mismatches.
+  - `from_slice` now uses `TryFrom` internally for backward compatibility (still panics, but easily made fallible).
+- **Dynamic Conversions**: Added `impl From<&str> for Dynamic<String>` and `impl From<&[u8]> for Dynamic<Vec<u8>>` for easier construction.
 
 ### Changed
-
-- **`conversions` feature now includes `ct-eq` as a dependency**: Backward compatible - existing code using `features = ["conversions"]` continues to work
-  - `conversions` feature automatically enables `ct-eq` via dependency
-  - All format conversion methods (`.to_hex()`, `.to_hex_upper()`, `.to_base64url()`) remain in `conversions`
-  - `ct_eq()` is now semantically separated but still available via `conversions`
+- **Conversions Feature**: Extended to include Base64 support, independent `ct-eq` (still bundled for convenience).
+- **Cloning Model**: Switched from opt-out (`NoClone` wrappers) to opt-in via `CloneableSecret`.
+  - Removed `NoClone` types and `no_clone()` methods—use base types directly.
+- **FromSlice Behavior**: Panicking `from_slice` now delegates to `TryFrom` for consistent error handling.
 
 ### Fixed
+- **Feature Gating**: `CloneableSecret` trait, blanket impls, and Clone impls gated behind `zeroize` feature to prevent unresolved deps in non-zeroize builds.
+- **Doc-Tests**: All examples compile in all configs (`--all-features`, `--no-default-features`, `--doc`).
+- **Compilation Errors**: Resolved duplicates/conflicts in error types and trait bounds.
 
-- **CRITICAL**: Fixed `zeroize::Zeroize` import in `conversions.rs` to be conditional on `zeroize` feature
-  - Previously, the import was gated by `conversions` only, which would cause compilation failure when `conversions` was enabled without `zeroize`
-  - Now uses fully qualified path `zeroize::Zeroize::zeroize()` in the conditional block
-  - This allows `conversions` feature to work correctly with or without `zeroize` enabled
+### Removed
+- `NoClone` types (`DynamicNoClone`, `FixedNoClone`) and `no_clone()` methods—replaced by opt-in `CloneableSecret`.
+
 
 ## [0.6.1] - 2025-12-07
 
