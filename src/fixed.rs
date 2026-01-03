@@ -237,6 +237,25 @@ impl<const N: usize> Fixed<[u8; N]> {
     pub fn generate_random() -> Self {
         crate::rng::FixedRng::<N>::generate().into_inner()
     }
+
+    /// Try to generate random bytes for Fixed.
+    ///
+    /// Returns an error if the RNG fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use secure_gate::Fixed;
+    /// let key: Result<Fixed<[u8; 32]>, rand::Error> = Fixed::try_generate_random();
+    /// assert!(key.is_ok());
+    /// # }
+    /// ```
+    #[inline]
+    pub fn try_generate_random() -> Result<Self, rand::Error> {
+        crate::rng::FixedRng::<N>::try_generate().map(|rng| rng.into_inner())
+    }
 }
 
 // Zeroize integration

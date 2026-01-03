@@ -60,6 +60,27 @@ impl<const N: usize> FixedRng<N> {
         Self(Fixed::new(bytes))
     }
 
+    /// Try to generate fresh random bytes using the OS RNG.
+    ///
+    /// Returns an error if the RNG fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use secure_gate::rng::FixedRng;
+    /// let random: Result<FixedRng<32>, rand::Error> = FixedRng::try_generate();
+    /// assert!(random.is_ok());
+    /// # }
+    /// ```
+    pub fn try_generate() -> Result<Self, rand::Error> {
+        let mut bytes = [0u8; N];
+        OsRng
+            .try_fill_bytes(&mut bytes)
+            .map(|_| Self(Fixed::new(bytes)))
+    }
+
     /// Expose the random bytes for read-only access.
     ///
     /// # Example
@@ -178,6 +199,27 @@ impl DynamicRng {
             .try_fill_bytes(&mut bytes)
             .expect("OsRng failed — this should never happen on supported platforms");
         Self(Dynamic::from(bytes))
+    }
+
+    /// Try to generate fresh random bytes of the specified length.
+    ///
+    /// Returns an error if the RNG fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use secure_gate::rng::DynamicRng;
+    /// let random: Result<DynamicRng, rand::Error> = DynamicRng::try_generate(64);
+    /// assert!(random.is_ok());
+    /// # }
+    /// ```
+    pub fn try_generate(len: usize) -> Result<Self, rand::Error> {
+        let mut bytes = vec![0u8; len];
+        OsRng
+            .try_fill_bytes(&mut bytes)
+            .map(|_| Self(Dynamic::from(bytes)))
     }
 
     /// Expose the random bytes for read-only access.

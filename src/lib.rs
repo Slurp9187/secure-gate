@@ -90,3 +90,5 @@ pub use conversions::SecureConversionsExt;
 
 #[cfg(all(feature = "rand", feature = "conversions"))]
 pub use conversions::RandomHex;
+
+pub use fixed::FromSliceError;

@@ -190,6 +190,25 @@ impl Dynamic<Vec<u8>> {
     pub fn generate_random(len: usize) -> Self {
         crate::rng::DynamicRng::generate(len).into_inner()
     }
+
+    /// Try to generate random bytes for Dynamic.
+    ///
+    /// Returns an error if the RNG fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use secure_gate::Dynamic;
+    /// let random: Result<Dynamic<Vec<u8>>, rand::Error> = Dynamic::try_generate_random(64);
+    /// assert!(random.is_ok());
+    /// # }
+    /// ```
+    #[inline]
+    pub fn try_generate_random(len: usize) -> Result<Self, rand::Error> {
+        crate::rng::DynamicRng::try_generate(len).map(|rng| rng.into_inner())
+    }
 }
 
 // Zeroize integration
