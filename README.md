@@ -133,7 +133,7 @@ For non-panic scenarios:
 #[cfg(feature = "rand")]
 {
     use secure_gate::random::{FixedRng, DynamicRng};
-    use rand_core::OsError;
+    use rand::rand_core::OsError;
 
     let key: Result<FixedRng<32>, OsError> = FixedRng::try_generate();
     let random: Result<DynamicRng, OsError> = DynamicRng::try_generate(64);

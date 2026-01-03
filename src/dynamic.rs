@@ -7,7 +7,7 @@ extern crate alloc;
 use alloc::boxed::Box;
 
 #[cfg(feature = "rand")]
-use rand_core::OsError;
+use rand::rand_core::OsError;
 
 /// Heap-allocated secure secret wrapper.
 ///
@@ -216,13 +216,14 @@ impl Dynamic<Vec<u8>> {
     /// # #[cfg(feature = "rand")]
     /// # {
     /// use secure_gate::Dynamic;
-    /// let random: Result<Dynamic<Vec<u8>>, rand_core::OsError> = Dynamic::try_generate_random(64);
+    /// let random: Result<Dynamic<Vec<u8>>, rand::rand_core::OsError> = Dynamic::try_generate_random(64);
     /// assert!(random.is_ok());
     /// # }
     /// ```
     #[inline]
     pub fn try_generate_random(len: usize) -> Result<Self, OsError> {
-        crate::random::DynamicRng::try_generate(len).map(|rng: crate::random::DynamicRng| rng.into_inner())
+        crate::random::DynamicRng::try_generate(len)
+            .map(|rng: crate::random::DynamicRng| rng.into_inner())
     }
 }
 

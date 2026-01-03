@@ -3,9 +3,9 @@
 // ==========================================================================
 
 use crate::{Dynamic, Fixed};
+use rand::rand_core::OsError;
 use rand::rngs::OsRng;
 use rand::TryRngCore;
-use rand_core::OsError;
 
 /// Fixed-length cryptographically secure random value.
 ///
@@ -71,7 +71,7 @@ impl<const N: usize> FixedRng<N> {
     /// # #[cfg(feature = "rand")]
     /// # {
     /// use secure_gate::random::FixedRng;
-    /// let random: Result<FixedRng<32>, rand_core::OsError> = FixedRng::try_generate();
+    /// let random: Result<FixedRng<32>, rand::rand_core::OsError> = FixedRng::try_generate();
     /// assert!(random.is_ok());
     /// # }
     /// ```
@@ -254,7 +254,7 @@ impl DynamicRng {
     /// # #[cfg(feature = "rand")]
     /// # {
     /// use secure_gate::random::DynamicRng;
-    /// let random: Result<DynamicRng, rand_core::OsError> = DynamicRng::try_generate(64);
+    /// let random: Result<DynamicRng, rand::rand_core::OsError> = DynamicRng::try_generate(64);
     /// assert!(random.is_ok());
     /// # }
     /// ```

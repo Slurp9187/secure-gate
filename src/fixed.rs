@@ -6,7 +6,7 @@ use core::convert::TryFrom;
 use core::fmt;
 
 #[cfg(feature = "rand")]
-use rand_core::OsError;
+use rand::rand_core::OsError;
 
 /// Stack-allocated secure secret wrapper.
 ///
@@ -246,15 +246,15 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// # #[cfg(feature = "rand")]
     /// # {
     /// use secure_gate::Fixed;
-    /// let key: Result<Fixed<[u8; 32]>, rand_core::OsError> = Fixed::try_generate_random();
+    /// let key: Result<Fixed<[u8; 32]>, rand::rand_core::OsError> = Fixed::try_generate_random();
     /// assert!(key.is_ok());
     /// # }
     /// ```
     #[inline]
     pub fn try_generate_random() -> Result<Self, OsError> {
-        crate::random::FixedRng::<N>::try_generate().map(|rng: crate::random::FixedRng<N>| rng.into_inner())
+        crate::random::FixedRng::<N>::try_generate()
+            .map(|rng: crate::random::FixedRng<N>| rng.into_inner())
     }
-
 }
 
 // Zeroize integration

@@ -11,6 +11,8 @@ categories = ["cryptography", "no-std", "data-structures"]
 
 [dependencies]
 rand = { version = "0.9", optional = true }
+getrandom = { version = "0.2", optional = true }
+
 zeroize = { version = "1.7", default-features = false, optional = true, features = [
   "alloc",
   "zeroize_derive",
@@ -21,8 +23,6 @@ hex = { version = "0.4", optional = true, features = ["alloc"] }
 base64 = { version = "0.21.7", optional = true }
 subtle = { version = "2.5", optional = true }
 
-getrandom = { version = "0.2", optional = true }
-rand_core = { version = "0.9", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
@@ -31,16 +31,25 @@ criterion = { version = "0.5", features = ["html_reports"] }
 # Features
 # ──────────────────────────────────────────────────────────────
 [features]
-default = ["encoding", "rand", "zeroize"]
+# Default features: Essential for basic secure secret handling (RNG and zeroing)
+default = ["rand", "zeroize"]
 
+# Encoding: Secure conversions (hex/base64) for displaying or serializing secrets without leaks
 encoding = ["encoding-hex", "encoding-base64"]
+# Hex encoding support (uses the 'hex' crate)
 encoding-hex = ["dep:hex"]
+# Base64 encoding support (uses the 'base64' crate)
 encoding-base64 = ["dep:base64"]
 
+# ct-eq: Constant-time equality checks (prevents timing attacks in comparisons; uses 'subtle' crate)
 ct-eq = ["dep:subtle"]
-rand = ["dep:rand", "dep:getrandom", "dep:rand_core"]
+# rand: Random number generation for securely creating secrets (uses rand with getrandom for seeding; rand_core is transitive)
+rand = ["dep:rand", "dep:getrandom"]
+# zeroize: Secure zeroing of secrets on drop or explicit calls (uses 'zeroize' crate with alloc and derives)
 zeroize = ["dep:zeroize"]
 
+# full: Meta-feature enabling all optional features for a complete, batteries-included setup
+full = ["encoding", "rand", "zeroize", "ct-eq"]
 
 [[bench]]
 name = "fixed_vs_raw"
