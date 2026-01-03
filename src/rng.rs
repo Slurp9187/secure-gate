@@ -4,7 +4,7 @@
 
 use crate::{Dynamic, Fixed};
 use rand::rngs::OsRng;
-use rand::TryRngCore;
+use rand::RngCore;
 
 /// Fixed-length cryptographically secure random value.
 ///

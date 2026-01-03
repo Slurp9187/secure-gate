@@ -10,15 +10,15 @@ keywords = ["crypto", "no-std", "security", "zeroize"]
 categories = ["cryptography", "no-std", "data-structures"]
 
 [dependencies]
-rand = { version = "0.9", optional = true }
-zeroize = { version = "1.8", default-features = false, optional = true, features = [
+rand = { version = "0.8", optional = true }
+zeroize = { version = "1.7", default-features = false, optional = true, features = [
   "alloc",
   "zeroize_derive",
 ] }
 
 # `hex` and `base64` are only used by `conversions`. `subtle` is used by both `conversions` and `ct-eq`.
 hex = { version = "0.4", optional = true, features = ["alloc"] }
-base64 = { version = "0.22", optional = true }
+base64 = { version = "0.21", optional = true }
 subtle = { version = "2.5", optional = true }
 
 [dev-dependencies]

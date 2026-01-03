@@ -4,7 +4,10 @@
 
 // Allow unsafe_code when conversions is enabled (needed for hex string validation)
 // but forbid it when neither conversions nor zeroize is enabled
-#![cfg_attr(not(any(feature = "zeroize", feature = "conversions")), forbid(unsafe_code))]
+#![cfg_attr(
+    not(any(feature = "zeroize", feature = "conversions")),
+    forbid(unsafe_code)
+)]
 
 #[cfg(feature = "conversions")]
 use alloc::string::String;
@@ -205,8 +208,9 @@ impl core::ops::Deref for HexString {
     }
 }
 
-// Manual constant-time equality – prevents timing attacks on hex strings
-#[cfg(feature = "conversions")]
+// Constant-time equality for hex strings – prevents timing attacks when ct-eq enabled
+#[cfg(all(feature = "conversions", feature = "ct-eq"))]
+#[cfg(all(feature = "conversions", feature = "ct-eq"))]
 impl PartialEq for HexString {
     fn eq(&self, other: &Self) -> bool {
         self.0
@@ -216,7 +220,25 @@ impl PartialEq for HexString {
     }
 }
 
-#[cfg(feature = "conversions")]
+#[cfg(all(feature = "conversions", not(feature = "ct-eq")))]
+impl PartialEq for HexString {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
+
+#[cfg(all(feature = "conversions", feature = "ct-eq"))]
+impl Eq for HexString {}
+
+// Fallback: Standard string equality when ct-eq not enabled (secure enough for validation)
+#[cfg(all(feature = "conversions", not(feature = "ct-eq")))]
+impl PartialEq for HexString {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
+
+#[cfg(all(feature = "conversions", not(feature = "ct-eq")))]
 impl Eq for HexString {}
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -256,7 +278,7 @@ impl core::ops::Deref for RandomHex {
 #[cfg(all(feature = "rand", feature = "conversions"))]
 impl PartialEq for RandomHex {
     fn eq(&self, other: &Self) -> bool {
-        self.0.eq(&other.0)
+        self.0 == other.0
     }
 }
 
