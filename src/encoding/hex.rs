@@ -3,13 +3,9 @@
 // ==========================================================================
 
 #![cfg(feature = "encoding-hex")]
-
 // Allow unsafe_code when zeroize is enabled (needed for hex string validation)
 // but forbid it otherwise
-#![cfg_attr(
-    not(feature = "zeroize"),
-    forbid(unsafe_code)
-)]
+#![cfg_attr(not(feature = "zeroize"), forbid(unsafe_code))]
 
 use alloc::string::String;
 use hex;
@@ -17,9 +13,7 @@ use hex;
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]
     {
-        // SAFETY: String's internal buffer is valid for writes of its current length
-        let vec = unsafe { s.as_mut_vec() };
-        zeroize::Zeroize::zeroize(vec);
+        zeroize::Zeroize::zeroize(s);
     }
     #[cfg(not(feature = "zeroize"))]
     {
@@ -76,9 +70,9 @@ impl HexString {
         }
 
         // Work directly on the underlying bytes – no copies
-        let bytes = unsafe { s.as_mut_vec() };
+        let mut bytes = s.into_bytes();
         let mut valid = true;
-        for b in bytes.iter_mut() {
+        for b in &mut bytes {
             match *b {
                 b'A'..=b'F' => *b += 32, // 'A' → 'a'
                 b'a'..=b'f' | b'0'..=b'9' => {}
@@ -87,8 +81,10 @@ impl HexString {
         }
 
         if valid {
+            s = String::from_utf8(bytes).expect("valid UTF-8 after hex normalization");
             Ok(Self(crate::Dynamic::new(s)))
         } else {
+            s = String::from_utf8(bytes).unwrap_or_default();
             zeroize_input(&mut s);
             Err("invalid hex string")
         }
@@ -143,16 +139,7 @@ impl PartialEq for HexString {
 #[cfg(feature = "encoding-hex")]
 impl Eq for HexString {}
 
-// Fallback: Standard string equality when ct-eq not enabled (secure enough for validation)
-#[cfg(all(feature = "encoding-hex", not(feature = "ct-eq")))]
-impl PartialEq for HexString {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.expose_secret() == other.0.expose_secret()
-    }
-}
 
-#[cfg(all(feature = "encoding-hex", not(feature = "ct-eq")))]
-impl Eq for HexString {}
 
 impl core::fmt::Debug for HexString {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

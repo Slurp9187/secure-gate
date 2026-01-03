@@ -3,14 +3,8 @@
 // ==========================================================================
 
 #![cfg(feature = "encoding-base64")]
-
-// Allow unsafe_code when zeroize is enabled (not needed here, but consistent)
 // but forbid it otherwise
-#![cfg_attr(
-    not(feature = "zeroize"),
-    forbid(unsafe_code)
-)]
-
+#![cfg_attr(not(feature = "zeroize"), forbid(unsafe_code))]
 use alloc::string::String;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -18,9 +12,7 @@ use base64::Engine;
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]
     {
-        // SAFETY: String's internal buffer is valid for writes of its current length
-        let vec = unsafe { s.as_mut_vec() };
-        zeroize::Zeroize::zeroize(vec);
+        zeroize::Zeroize::zeroize(s);
     }
     #[cfg(not(feature = "zeroize"))]
     {
@@ -70,7 +62,7 @@ impl Base64String {
     /// ```
     pub fn new(mut s: String) -> Result<Self, &'static str> {
         // Validate in-place: check for invalid chars and that it can actually be decoded
-        let bytes = unsafe { s.as_mut_vec() };
+        let bytes = s.as_bytes();
         let mut valid = true;
 
         // Check character validity
@@ -111,8 +103,8 @@ impl Base64String {
         let len = self.0.expose_secret().len();
         let full_groups = len / 4;
         let rem = len % 4;
-        full_groups * 3 +
-            match rem {
+        full_groups * 3
+            + match rem {
                 0 => 0,
                 2 => 1,
                 3 => 2,
