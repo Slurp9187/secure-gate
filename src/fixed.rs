@@ -171,6 +171,7 @@ impl<T> fmt::Debug for Fixed<T> {
     }
 }
 
+/// Error for slice length mismatches in TryFrom impls.
 #[derive(Debug)]
 pub struct FromSliceError(pub &'static str);
 
@@ -182,12 +183,6 @@ impl<T: crate::CloneableSecret> Clone for Fixed<T> {
         Self(self.0.clone())
     }
 }
-
-/// Error for slice length mismatches in TryFrom impls.
-
-// === Byte-array specific helpers ===
-// REMOVED: Copy impl for Fixed<[u8; N]>
-// Implicit copying of secrets is a footgun — duplication must be intentional.
 
 // Constant-time equality — only available with `ct-eq` feature
 #[cfg(feature = "ct-eq")]

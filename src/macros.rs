@@ -40,6 +40,10 @@ macro_rules! fixed_alias {
         #[doc = concat!("Fixed-size secure secret (", $size, " bytes)")]
         $vis type $name = $crate::Fixed<[u8; $size]>;
     };
+    ($name:ident, $size:literal) => {
+        #[doc = concat!("Fixed-size secure secret (", $size, " bytes)")]
+        type $name = $crate::Fixed<[u8; $size]>;
+    };
 }
 
 /// Creates a generic (const-sized) fixed secure buffer type.
@@ -81,6 +85,7 @@ macro_rules! fixed_generic_alias {
 ///
 /// # Examples
 ///
+/// Public alias:
 /// ```
 /// # #[cfg(feature = "rand")]
 /// # {
@@ -90,11 +95,25 @@ macro_rules! fixed_generic_alias {
 /// assert_eq!(key.len(), 32);
 /// # }
 /// ```
+///
+/// Private alias:
+/// ```
+/// # #[cfg(feature = "rand")]
+/// # {
+/// use secure_gate::fixed_alias_rng;
+/// fixed_alias_rng!(PrivateKey, 32); // No visibility modifier = private
+/// let key = PrivateKey::generate();
+/// # }
+/// ```
 #[macro_export]
 macro_rules! fixed_alias_rng {
     ($vis:vis $name:ident, $size:literal) => {
         #[doc = concat!("Random-only fixed-size secret (", $size, " bytes)")]
         $vis type $name = $crate::rng::FixedRng<$size>;
+    };
+    ($name:ident, $size:literal) => {
+        #[doc = concat!("Random-only fixed-size secret (", $size, " bytes)")]
+        type $name = $crate::rng::FixedRng<$size>;
     };
 }
 
@@ -102,17 +121,29 @@ macro_rules! fixed_alias_rng {
 ///
 /// # Examples
 ///
+/// Public alias:
 /// ```
 /// use secure_gate::dynamic_alias;
 /// dynamic_alias!(pub Password, String);
 /// let pw: Password = "hunter2".into();
 /// assert_eq!(pw.expose_secret(), "hunter2");
 /// ```
+///
+/// Private alias:
+/// ```
+/// use secure_gate::dynamic_alias;
+/// dynamic_alias!(SecretString, String); // No visibility modifier = private
+/// let secret = SecretString::new("hidden".to_string());
+/// ```
 #[macro_export]
 macro_rules! dynamic_alias {
     ($vis:vis $name:ident, $inner:ty) => {
         #[doc = concat!("Secure heap-allocated ", stringify!($inner))]
         $vis type $name = $crate::Dynamic<$inner>;
+    };
+    ($name:ident, $inner:ty) => {
+        #[doc = concat!("Secure heap-allocated ", stringify!($inner))]
+        type $name = $crate::Dynamic<$inner>;
     };
 }
 

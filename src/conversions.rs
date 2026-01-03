@@ -115,6 +115,12 @@ impl<const N: usize> SecureConversionsExt for [u8; N] {
 // HexString — validated, lowercase hex wrapper
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// A validated, zeroized-on-failure lowercase hex string wrapper.
+///
+/// Ensures the contained string is always valid lowercase hexadecimal.
+/// Invalid inputs are zeroized (if `zeroize` feature is enabled) before rejection.
+///
+/// Use this for secure storage and transmission of hex-encoded secrets.
 #[cfg(feature = "conversions")]
 #[derive(Debug)]
 pub struct HexString(crate::Dynamic<String>);
@@ -245,6 +251,12 @@ impl Eq for HexString {}
 // Base64String — validated, URL-safe base64 wrapper
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// A validated, zeroized-on-failure URL-safe base64 string wrapper (no padding).
+///
+/// Ensures the contained string is always valid URL-safe base64 without padding.
+/// Invalid inputs are zeroized (if `zeroize` feature is enabled) before rejection.
+///
+/// Use this for secure storage and transmission of base64-encoded secrets.
 #[cfg(feature = "conversions")]
 #[derive(Debug)]
 pub struct Base64String(crate::Dynamic<String>);
@@ -342,13 +354,15 @@ impl core::ops::Deref for Base64String {
         &self.0
     }
 }
-#[cfg(all(feature = "conversions", not(feature = "ct-eq")))]
-impl Eq for HexString {}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RandomHex — only constructible from fresh RNG
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// A validated hex string guaranteed to come from fresh RNG.
+///
+/// Ensures the contained hex is always valid and represents random bytes generated securely.
+/// Invalid constructions are not possible; only created via `FixedRng::random_hex()`.
 #[cfg(all(feature = "rand", feature = "conversions"))]
 #[derive(Debug)]
 pub struct RandomHex(HexString);

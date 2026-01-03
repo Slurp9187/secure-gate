@@ -107,11 +107,17 @@ impl From<&[u8]> for Dynamic<Vec<u8>> {
 
 // === Ergonomic helpers for common heap types ===
 impl Dynamic<String> {
+    /// Returns the length of the string in bytes.
+    ///
+    /// This is safe public metadata — does not expose the secret.
     #[inline(always)]
     pub const fn len(&self) -> usize {
         self.0.len()
     }
 
+    /// Returns `true` if the string is empty (zero bytes).
+    ///
+    /// This is safe public metadata — does not expose the secret.
     #[inline(always)]
     pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -119,11 +125,17 @@ impl Dynamic<String> {
 }
 
 impl<T> Dynamic<Vec<T>> {
+    /// Returns the number of elements in the vector.
+    ///
+    /// This is safe public metadata — does not expose the secret.
     #[inline(always)]
     pub const fn len(&self) -> usize {
         self.0.len()
     }
 
+    /// Returns `true` if the vector is empty (zero elements).
+    ///
+    /// This is safe public metadata — does not expose the secret.
     #[inline(always)]
     pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
