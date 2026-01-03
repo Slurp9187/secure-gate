@@ -1,6 +1,6 @@
 [package]
 name = "secure-gate"
-version = "0.6.2"
+version = "0.7.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Zero-cost secure wrappers for secrets — stack for fixed, heap for dynamic"
@@ -18,7 +18,7 @@ zeroize = { version = "1.7", default-features = false, optional = true, features
   "zeroize_derive",
 ] }
 
-# `hex` and `base64` are only used by `conversions`. `subtle` is used by both `conversions` and `ct-eq`.
+# `hex` and `base64` are only used by encoding features. `subtle` is used by `ct-eq`.
 hex = { version = "0.4", optional = true, features = ["alloc"] }
 base64 = { version = "0.21.7", optional = true }
 subtle = { version = "2.5", optional = true }
