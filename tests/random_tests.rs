@@ -69,8 +69,8 @@ fn ct_eq_different_lengths() {
     assert!(!a_inner.ct_eq(&b_inner));
 }
 
-#[test]
 #[cfg(feature = "zeroize")]
+#[test]
 fn zeroize_trait_is_available() {
     use secure_gate::Fixed;
     use zeroize::Zeroize;
