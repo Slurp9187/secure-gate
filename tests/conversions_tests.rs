@@ -242,3 +242,55 @@ fn base64string_validation_stricter() {
     // Actually, let me check what happens if I try to decode during validation.
     // That might be the right approach - do the character check first (fast), then try decode.
 }
+
+/// Test that byte_len() never overestimates (unlike the old approximate formula)
+#[cfg(feature = "conversions")]
+#[test]
+fn base64_byte_len_no_overestimation() {
+    let test_cases = vec![
+        ("SGVsbG8", 5),       // 7 chars: old formula would give 6, new gives 5
+        ("SGVsbG93YQ", 7),    // 10 chars: old formula would give 8, new gives 7
+        ("SGVsbG93b3JsZA", 10), // 14 chars: old formula would give 11, new gives 10
+    ];
+
+    for (input, expected_exact) in test_cases {
+        let b64 = secure_gate::conversions::Base64String::new(input.to_string()).unwrap();
+        let byte_len = b64.byte_len();
+        let actual_len = b64.to_bytes().len();
+
+        assert_eq!(byte_len, expected_exact, "Should be exact, not overestimated");
+        assert_eq!(byte_len, actual_len, "Should match actual decoded length");
+    }
+}
+
+/// Test byte_len() against the old approximate formula to show improvement
+#[cfg(feature = "conversions")]
+#[test]
+fn base64_byte_len_vs_old_formula() {
+    fn old_approximate_formula(len: usize) -> usize {
+        (len * 3 + 3) / 4
+    }
+
+    let test_inputs = vec![
+        "SGVsbG8",           // 7 chars
+        "SGVsbG93YQ",        // 10 chars
+        "SGVsbG93b3JsZA",    // 14 chars
+        "SGVs",              // 4 chars (should be same)
+        "SGVsbG93",          // 8 chars (should be same)
+    ];
+
+    for input in test_inputs {
+        let b64 = secure_gate::conversions::Base64String::new(input.to_string()).unwrap();
+        let exact_len = b64.byte_len();
+        let approximate_len = old_approximate_formula(input.len());
+
+        // Exact should be <= approximate (never overestimate)
+        assert!(exact_len <= approximate_len,
+            "Exact len {} should be <= approximate {} for input '{}'",
+            exact_len, approximate_len, input);
+
+        // And exact should match actual
+        assert_eq!(exact_len, b64.to_bytes().len(),
+            "Exact len should match actual decoded length");
+    }
+}

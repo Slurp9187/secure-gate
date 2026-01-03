@@ -216,7 +216,6 @@ impl core::ops::Deref for HexString {
 
 // Constant-time equality for hex strings – prevents timing attacks when ct-eq enabled
 #[cfg(all(feature = "conversions", feature = "ct-eq"))]
-#[cfg(all(feature = "conversions", feature = "ct-eq"))]
 impl PartialEq for HexString {
     fn eq(&self, other: &Self) -> bool {
         self.0
@@ -325,11 +324,21 @@ impl Base64String {
             .expect("Base64String is always valid")
     }
 
-    /// Number of bytes the decoded base64 string represents.
+    /// Exact number of bytes the decoded base64 string represents.
     pub const fn byte_len(&self) -> usize {
-        // Approximate: base64 is ~4/3 size, but exact depends on padding
-        // For no-pad, len * 3 / 4, rounded up
-        (self.0.expose_secret().len() * 3 + 3) / 4
+        let len = self.0.expose_secret().len();
+        let full_groups = len / 4;
+        let rem = len % 4;
+        full_groups * 3 +
+            match rem {
+                0 => 0,
+                2 => 1,
+                3 => 2,
+                // rem == 1 is impossible due to Base64String validation
+                // (no-pad base64 cannot represent 1 extra byte cleanly)
+                1 => 0, // unreachable due to validation
+                _ => 0, // other values impossible for len % 4
+            }
     }
 }
 

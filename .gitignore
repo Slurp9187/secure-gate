@@ -1,4 +1,5 @@
 /code_packages
+/docs
 /target
 
 Cargo.lock
