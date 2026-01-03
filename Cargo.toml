@@ -31,7 +31,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 # Features
 # ──────────────────────────────────────────────────────────────
 [features]
-default = ["encoding", "rand"]
+default = ["encoding", "rand", "zeroize"]
 
 encoding = ["encoding-hex", "encoding-base64"]
 encoding-hex = ["dep:hex"]

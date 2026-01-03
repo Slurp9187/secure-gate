@@ -132,10 +132,11 @@ For non-panic scenarios:
 ```rust
 #[cfg(feature = "rand")]
 {
-    use secure_gate::rng::{FixedRng, DynamicRng};
+    use secure_gate::random::{FixedRng, DynamicRng};
+    use rand_core::OsError;
 
-    let key: Result<FixedRng<32>, rand::Error> = FixedRng::try_generate();
-    let random: Result<DynamicRng, rand::Error> = DynamicRng::try_generate(64);
+    let key: Result<FixedRng<32>, OsError> = FixedRng::try_generate();
+    let random: Result<DynamicRng, OsError> = DynamicRng::try_generate(64);
 }
 ```
 
@@ -143,7 +144,7 @@ For non-panic scenarios:
 ```rust
 #[cfg(feature = "rand")]
 {
-    use secure_gate::{Fixed, Dynamic, rng::{FixedRng, DynamicRng}};
+    use secure_gate::{Fixed, Dynamic, random::{FixedRng, DynamicRng}};
 
     let key: Fixed<[u8; 32]> = FixedRng::<32>::generate().into();
     let random: Dynamic<Vec<u8>> = DynamicRng::generate(64).into();

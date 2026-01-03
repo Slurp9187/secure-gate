@@ -7,7 +7,6 @@ use rand::rngs::OsRng;
 use rand::TryRngCore;
 use rand_core::OsError;
 
-
 /// Fixed-length cryptographically secure random value.
 ///
 /// This is a newtype over `Fixed<[u8; N]>` that enforces construction only via secure RNG.
@@ -204,8 +203,6 @@ impl<const N: usize> From<FixedRng<N>> for Fixed<[u8; N]> {
     }
 }
 
-
-
 /// Heap-allocated cryptographically secure random bytes.
 ///
 /// This is a newtype over `Dynamic<Vec<u8>>` for semantic clarity.
@@ -257,7 +254,7 @@ impl DynamicRng {
     /// # #[cfg(feature = "rand")]
     /// # {
     /// use secure_gate::random::DynamicRng;
-    /// let random: Result<DynamicRng, rand::Error> = DynamicRng::try_generate(64);
+    /// let random: Result<DynamicRng, rand_core::OsError> = DynamicRng::try_generate(64);
     /// assert!(random.is_ok());
     /// # }
     /// ```
