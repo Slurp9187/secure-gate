@@ -7,7 +7,10 @@ use secure_gate::{dynamic_alias, HexString, SecureConversionsExt};
 // No more SecureConversionsExt import — we use it on the exposed secret
 
 #[cfg(feature = "rand")]
-use secure_gate::{Dynamic, Fixed, rng::{DynamicRng, FixedRng}};
+use secure_gate::{
+    rng::{DynamicRng, FixedRng},
+    Dynamic, Fixed,
+};
 
 #[cfg(all(feature = "rand", feature = "conversions"))]
 use secure_gate::RandomHex;

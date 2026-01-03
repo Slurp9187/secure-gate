@@ -20,6 +20,7 @@ pub use fixed::Fixed;
 
 // ── Cloneable secret marker (opt-in for safe duplication) ────────────
 
+#[cfg(feature = "zeroize")]
 /// Marker trait for secrets that are safe to clone (e.g., primitives, fixed arrays).
 ///
 /// Implement this for custom types that can be duplicated without security risk.
@@ -28,25 +29,40 @@ pub trait CloneableSecret: Clone + zeroize::Zeroize {
     // Pure marker, no methods
 }
 
+#[cfg(feature = "zeroize")]
 // Blanket impls for primitives (safe to clone for secrets like keys or nonces)
 impl CloneableSecret for i8 {}
+#[cfg(feature = "zeroize")]
 impl CloneableSecret for i16 {}
+#[cfg(feature = "zeroize")]
 impl CloneableSecret for i32 {}
+#[cfg(feature = "zeroize")]
 impl CloneableSecret for i64 {}
+#[cfg(feature = "zeroize")]
 impl CloneableSecret for i128 {}
+#[cfg(feature = "zeroize")]
 impl CloneableSecret for isize {}
 
+#[cfg(feature = "zeroize")]
 impl CloneableSecret for u8 {}
+#[cfg(feature = "zeroize")]
 impl CloneableSecret for u16 {}
+#[cfg(feature = "zeroize")]
 impl CloneableSecret for u32 {}
+#[cfg(feature = "zeroize")]
 impl CloneableSecret for u64 {}
+#[cfg(feature = "zeroize")]
 impl CloneableSecret for u128 {}
+#[cfg(feature = "zeroize")]
 impl CloneableSecret for usize {}
 
+#[cfg(feature = "zeroize")]
 impl CloneableSecret for bool {}
+#[cfg(feature = "zeroize")]
 impl CloneableSecret for char {}
 
 // Blanket for fixed arrays of cloneable secrets (e.g., [u8; 32] AES keys)
+#[cfg(feature = "zeroize")]
 impl<T: CloneableSecret, const N: usize> CloneableSecret for [T; N] {}
 
 // NoClone wrappers removed (replaced by opt-in cloning on base types)

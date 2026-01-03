@@ -96,6 +96,15 @@ impl<T: ?Sized + crate::CloneableSecret> Clone for Dynamic<T> {
     }
 }
 
+// === Additional conversions ===
+
+impl From<&[u8]> for Dynamic<Vec<u8>> {
+    #[inline(always)]
+    fn from(slice: &[u8]) -> Self {
+        Self::new(slice.to_vec())
+    }
+}
+
 // === Ergonomic helpers for common heap types ===
 impl Dynamic<String> {
     #[inline(always)]

@@ -2,6 +2,7 @@
 // src/fixed.rs
 // ==========================================================================
 
+use core::convert::TryFrom;
 use core::fmt;
 
 /// Stack-allocated secure secret wrapper.
@@ -116,6 +117,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// Create from a byte slice of exactly `N` bytes.
     ///
     /// Panics if the slice length does not match `N`.
+    /// For fallible construction, use `TryFrom<&[u8]>` instead.
     ///
     /// # Example
     ///
@@ -127,10 +129,21 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// ```
     #[inline]
     pub fn from_slice(bytes: &[u8]) -> Self {
-        assert_eq!(bytes.len(), N, "slice length mismatch");
-        let mut arr = [0u8; N];
-        arr.copy_from_slice(&bytes[..N]);
-        Self::new(arr)
+        Self::try_from(bytes).expect("slice length mismatch")
+    }
+}
+
+impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
+    type Error = FromSliceError;
+
+    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
+        if slice.len() != N {
+            Err(FromSliceError("slice length mismatch"))
+        } else {
+            let mut arr = [0u8; N];
+            arr.copy_from_slice(slice);
+            Ok(Self::new(arr))
+        }
     }
 }
 
@@ -158,6 +171,9 @@ impl<T> fmt::Debug for Fixed<T> {
     }
 }
 
+#[derive(Debug)]
+pub struct FromSliceError(pub &'static str);
+
 // Opt-in Clone — only for types marked CloneableSecret (default no-clone)
 #[cfg(feature = "zeroize")]
 impl<T: crate::CloneableSecret> Clone for Fixed<T> {
@@ -167,6 +183,9 @@ impl<T: crate::CloneableSecret> Clone for Fixed<T> {
     }
 }
 
+/// Error for slice length mismatches in TryFrom impls.
+
+// === Byte-array specific helpers ===
 // REMOVED: Copy impl for Fixed<[u8; N]>
 // Implicit copying of secrets is a footgun — duplication must be intentional.
 

@@ -6,3 +6,6 @@ Cargo.lock
 *.bak
 *.del
 *.mute
+
+*.errors
+*.log

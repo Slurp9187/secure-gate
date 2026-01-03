@@ -241,13 +241,109 @@ impl PartialEq for HexString {
 #[cfg(all(feature = "conversions", not(feature = "ct-eq")))]
 impl Eq for HexString {}
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Base64String — validated, URL-safe base64 wrapper
+// ─────────────────────────────────────────────────────────────────────────────
+
 #[cfg(feature = "conversions")]
-impl Clone for HexString {
-    fn clone(&self) -> Self {
-        let cloned_string = self.0.expose_secret().clone();
-        HexString(crate::Dynamic::new(cloned_string))
+#[derive(Debug)]
+pub struct Base64String(crate::Dynamic<String>);
+
+#[cfg(feature = "conversions")]
+impl Base64String {
+    /// Create a new `Base64String` from a `String`, validating it as URL-safe base64 (no padding).
+    ///
+    /// The input `String` is consumed. If validation fails and the `zeroize` feature
+    /// is enabled, the rejected bytes are zeroized before the error is returned.
+    ///
+    /// Validation rules:
+    /// - Valid URL-safe base64 characters (A-Z, a-z, 0-9, -, _)
+    /// - No padding ('=' not allowed, as we use no-pad)
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err("invalid base64 string")` if validation fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "conversions")]
+    /// # {
+    /// use secure_gate::conversions::Base64String;
+    /// let valid = Base64String::new("SGVsbG8".to_string()).unwrap();
+    /// assert_eq!(valid.expose_secret(), "SGVsbG8");
+    /// # }
+    /// ```
+    pub fn new(mut s: String) -> Result<Self, &'static str> {
+        // Validate in-place: check for invalid chars, no padding
+        let bytes = unsafe { s.as_mut_vec() };
+        let mut valid = true;
+        for &b in bytes.iter() {
+            match b {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' => {}
+                _ => valid = false,
+            }
+        }
+
+        if valid {
+            Ok(Self(crate::Dynamic::new(s)))
+        } else {
+            zeroize_input(&mut s);
+            Err("invalid base64 string")
+        }
+    }
+
+    /// Decode the validated base64 string back into raw bytes.
+    ///
+    /// Panics if the internal string is somehow invalid (impossible under correct usage).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        URL_SAFE_NO_PAD
+            .decode(self.0.expose_secret())
+            .expect("Base64String is always valid")
+    }
+
+    /// Number of bytes the decoded base64 string represents.
+    pub const fn byte_len(&self) -> usize {
+        // Approximate: base64 is ~4/3 size, but exact depends on padding
+        // For no-pad, len * 3 / 4, rounded up
+        (self.0.expose_secret().len() * 3 + 3) / 4
     }
 }
+
+// Constant-time equality for base64 strings – prevents timing attacks when ct-eq enabled
+#[cfg(all(feature = "conversions", feature = "ct-eq"))]
+impl PartialEq for Base64String {
+    fn eq(&self, other: &Self) -> bool {
+        self.0
+            .expose_secret()
+            .as_bytes()
+            .ct_eq(other.0.expose_secret().as_bytes())
+    }
+}
+
+#[cfg(all(feature = "conversions", feature = "ct-eq"))]
+impl Eq for Base64String {}
+
+// Fallback: Standard string equality when ct-eq not enabled (secure enough for validation)
+#[cfg(all(feature = "conversions", not(feature = "ct-eq")))]
+impl PartialEq for Base64String {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
+
+#[cfg(all(feature = "conversions", not(feature = "ct-eq")))]
+impl Eq for Base64String {}
+
+#[cfg(feature = "conversions")]
+impl core::ops::Deref for Base64String {
+    type Target = crate::Dynamic<String>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+#[cfg(all(feature = "conversions", not(feature = "ct-eq")))]
+impl Eq for HexString {}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RandomHex — only constructible from fresh RNG
@@ -256,6 +352,14 @@ impl Clone for HexString {
 #[cfg(all(feature = "rand", feature = "conversions"))]
 #[derive(Debug)]
 pub struct RandomHex(HexString);
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+impl Clone for RandomHex {
+    fn clone(&self) -> Self {
+        let cloned_string = self.0 .0.expose_secret().clone();
+        RandomHex(HexString(crate::Dynamic::new(cloned_string)))
+    }
+}
 
 #[cfg(all(feature = "rand", feature = "conversions"))]
 impl RandomHex {

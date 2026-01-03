@@ -1,3 +1,5 @@
+#![cfg(feature = "zeroize")]
+
 use secure_gate::{CloneableSecret, Fixed};
 use zeroize;
 
