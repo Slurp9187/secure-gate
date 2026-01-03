@@ -2,7 +2,6 @@
 // src/encoding/hex.rs
 // ==========================================================================
 
-#![cfg(feature = "encoding-hex")]
 // Allow unsafe_code when zeroize is enabled (needed for hex string validation)
 // but forbid it otherwise
 #![cfg_attr(not(feature = "zeroize"), forbid(unsafe_code))]
@@ -138,8 +137,6 @@ impl PartialEq for HexString {
 
 #[cfg(feature = "encoding-hex")]
 impl Eq for HexString {}
-
-
 
 impl core::fmt::Debug for HexString {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

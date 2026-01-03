@@ -6,7 +6,6 @@
 #![cfg(feature = "ct-eq")]
 
 #[cfg(test)]
-
 mod tests {
     use secure_gate::eq::ConstantTimeEq;
 

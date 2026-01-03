@@ -1,7 +1,6 @@
 #![cfg(feature = "zeroize")]
 
 use secure_gate::{CloneableSecret, Fixed};
-use zeroize;
 
 #[test]
 fn fixed_arrays_can_be_cloned() {

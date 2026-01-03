@@ -92,7 +92,7 @@ impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
 
 // Clone impl — opt-in only when T is CloneableSecret
 #[cfg(feature = "zeroize")]
-impl<T: ?Sized + crate::CloneableSecret> Clone for Dynamic<T> {
+impl<T: crate::CloneableSecret> Clone for Dynamic<T> {
     #[inline(always)]
     fn clone(&self) -> Self {
         Dynamic(self.0.clone())

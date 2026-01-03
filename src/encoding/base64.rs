@@ -2,7 +2,6 @@
 // src/encoding/base64.rs
 // ==========================================================================
 
-#![cfg(feature = "encoding-base64")]
 // but forbid it otherwise
 #![cfg_attr(not(feature = "zeroize"), forbid(unsafe_code))]
 use alloc::string::String;
