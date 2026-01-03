@@ -24,7 +24,7 @@ pub use fixed::Fixed;
 ///
 /// Implement this for custom types that can be duplicated without security risk.
 /// Blanket impls provided for common safe types; others must opt-in.
-pub trait CloneableSecret: Clone {
+pub trait CloneableSecret: Clone + zeroize::Zeroize {
     // Pure marker, no methods
 }
 

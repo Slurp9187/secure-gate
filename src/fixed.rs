@@ -160,7 +160,7 @@ impl<T> fmt::Debug for Fixed<T> {
 
 // Opt-in Clone — only for types marked CloneableSecret (default no-clone)
 #[cfg(feature = "zeroize")]
-impl<T: crate::CloneableSecret + zeroize::Zeroize> Clone for Fixed<T> {
+impl<T: crate::CloneableSecret> Clone for Fixed<T> {
     #[inline(always)]
     fn clone(&self) -> Self {
         Self(self.0.clone())
