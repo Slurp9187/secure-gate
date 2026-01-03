@@ -37,11 +37,11 @@
 #[macro_export]
 macro_rules! fixed_alias {
     ($vis:vis $name:ident, $size:literal) => {
-        #[doc = concat!("Fixed-size secure secret (", $size, " bytes)")]
+        #[doc = concat!("Fixed-size secure secret (", stringify!($size), " bytes)")]
         $vis type $name = $crate::Fixed<[u8; $size]>;
     };
     ($name:ident, $size:literal) => {
-        #[doc = concat!("Fixed-size secure secret (", $size, " bytes)")]
+        #[doc = concat!("Fixed-size secure secret (", stringify!($size), " bytes)")]
         type $name = $crate::Fixed<[u8; $size]>;
     };
 }
