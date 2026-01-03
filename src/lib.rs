@@ -85,6 +85,9 @@ pub use rng::{DynamicRng, FixedRng};
 #[cfg(feature = "conversions")]
 pub use conversions::HexString;
 
+#[cfg(feature = "conversions")]
+pub use conversions::Base64String;
+
 #[cfg(any(feature = "conversions", feature = "ct-eq"))]
 pub use conversions::SecureConversionsExt;
 

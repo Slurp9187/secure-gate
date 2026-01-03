@@ -1,36 +1,37 @@
-# secure-gate  
+# secure-gate
+
 **Zero-cost, `no_std`-compatible wrappers for sensitive data with enforced explicit exposure.**
 
-- `Fixed<T>` – Stack-allocated, zero-cost wrapper  
-- `Dynamic<T>` – Heap-allocated wrapper with full `.into()` ergonomics  
-- `FixedRng<N>` – Cryptographically secure random bytes of exact length N  
-- `RandomHex` – Validated random hex string that can only be constructed from fresh RNG  
-- `HexString` – Validated lowercase hex wrapper  
-- `Base64String` – Validated URL-safe base64 (no-pad) wrapper  
+- `Fixed<T>` – Stack-allocated, zero-cost wrapper
+- `Dynamic<T>` – Heap-allocated wrapper with full `.into()` ergonomics
+- `FixedRng<N>` – Cryptographically secure random bytes of exact length N
+- `RandomHex` – Validated random hex string that can only be constructed from fresh RNG
+- `HexString` – Validated lowercase hex wrapper
+- `Base64String` – Validated URL-safe base64 (no-pad) wrapper
 
 When the `zeroize` feature is enabled, secrets are automatically wiped on drop (including spare capacity).  
-**All access to secret bytes requires an explicit `.expose_secret()` call** – no silent leaks, no `Deref`, no hidden methods, no `into_inner()` bypasses.  
+**All access to secret bytes requires an explicit `.expose_secret()` call** – no silent leaks, no `Deref`, no hidden methods, no `into_inner()` bypasses.
 
-Cloning is opt-in via the `CloneableSecret` trait, preventing accidental duplication of secrets.  
+Cloning is opt-in via the `CloneableSecret` trait, preventing accidental duplication of secrets.
 
-## Installation  
+## Installation
 ```toml
 [dependencies]
 secure-gate = "0.6.2"
 ```
 
-**Recommended (maximum safety + ergonomics):**  
+**Recommended (maximum safety + ergonomics):**
 ```toml
 secure-gate = { version = "0.6.2", features = ["zeroize", "rand", "conversions"] }
 ```
 
-## Features  
-| Feature | Description |  
-|---------------|---------------------------------------------------------------------------------------------|  
-| `zeroize` | Automatic memory wiping on drop + opt-in cloning via `CloneableSecret` – **strongly recommended** |  
-| `rand` | RNG generation: `FixedRng<N>::generate()`, `DynamicRng::generate()`, fallible `try_generate()` |  
-| `ct-eq` | `.ct_eq()` – constant-time equality comparison |  
-| `conversions` | `.to_hex()`, `.to_hex_upper()`, `.to_base64url()` + `HexString`, `Base64String`, `RandomHex` |  
+## Features
+| Feature | Description |
+|---------------|---------------------------------------------------------------------------------------------|
+| `zeroize` | Automatic memory wiping on drop + opt-in cloning via `CloneableSecret` – **strongly recommended** |
+| `rand` | RNG generation: `FixedRng<N>::generate()`, `DynamicRng::generate()`, fallible `try_generate()` |
+| `ct-eq` | `.ct_eq()` – constant-time equality comparison |
+| `conversions` | `.to_hex()`, `.to_hex_upper()`, `.to_base64url()` + `HexString`, `Base64String`, `RandomHex` |
 
 Works in `no_std` + `alloc`. Only pay for what you use.
 
@@ -38,11 +39,8 @@ Works in `no_std` + `alloc`. Only pay for what you use.
 ```rust
 use secure_gate::{fixed_alias, dynamic_alias};
 
-#[cfg(feature = "zeroize")]
-use secure_gate::CloneableSecret;
-
-fixed_alias!(pub Aes256Key, 32);
-dynamic_alias!(pub Password, String);
+fixed_alias!(pub Aes256Key, 32);       // Explicit visibility required
+dynamic_alias!(pub Password, String);   // Explicit visibility required
 
 // Cloning is opt-in (requires zeroize feature)
 #[cfg(feature = "zeroize")]
@@ -58,19 +56,23 @@ assert_eq!(pw.expose_secret(), "hunter2");
 #[cfg(feature = "rand")]
 {
     use secure_gate::fixed_alias_rng;
-    fixed_alias_rng!(pub MasterKey, 32);
-    let key = MasterKey::generate();      // Fresh randomness
+
+    fixed_alias_rng!(pub MasterKey, 32);  // Explicit visibility required
+    fixed_alias_rng!(pub Nonce, 24);      // Explicit visibility required
+    let key = MasterKey::generate();      // FixedRng<32>
+    let nonce = Nonce::generate();        // FixedRng<24>
 
     #[cfg(feature = "conversions")]
     {
         use secure_gate::RandomHex;
-        let hex: RandomHex = MasterKey::random_hex(); // Only from RNG
+
+        let hex_token: RandomHex = MasterKey::random_hex(); // Only from fresh RNG
     }
 }
 ```
 
-## Opt-In Cloning  
-Cloning is disabled by default to prevent accidental duplication. Enable it explicitly:  
+## Opt-In Cloning
+Cloning is disabled by default to prevent accidental duplication. Enable it explicitly:
 
 ```rust
 #[cfg(feature = "zeroize")]
@@ -95,74 +97,77 @@ Cloning is disabled by default to prevent accidental duplication. Enable it expl
 }
 ```
 
-- **Why opt-in?** Prevents unsafe duplications (e.g., multiple copies in memory). Only primitives/arrays get blanket impls; dynamic types require explicit opt-in.  
-- **Requires `zeroize`**: Ensures cloned copies are wiped on drop.  
+- **Why opt-in?** Prevents unsafe duplications (e.g., multiple copies in memory). Only primitives/arrays get blanket impls; dynamic types require explicit opt-in.
+- **Requires `zeroize`**: Ensures cloned copies are wiped on drop.
 
-## Type-Safe Randomness  
+## Type-Safe Randomness
 ```rust
 #[cfg(feature = "rand")]
 {
     use secure_gate::fixed_alias_rng;
 
-    fixed_alias_rng!(pub JwtSigningKey, 32);   
-    fixed_alias_rng!(pub BackupCode, 16);       
-    let key = JwtSigningKey::generate();        
-    let code = BackupCode::generate();          
+    fixed_alias_rng!(pub JwtSigningKey, 32);   // Explicit visibility required
+    fixed_alias_rng!(pub BackupCode, 16);       // Explicit visibility required
+    let key = JwtSigningKey::generate();        // FixedRng<32>
+    let code = BackupCode::generate();          // FixedRng<16>
 
     #[cfg(feature = "conversions")]
     {
         use secure_gate::RandomHex;
+
         let hex_code: RandomHex = BackupCode::random_hex();
         println!("Backup code: {}", hex_code.expose_secret());
     }
 }
 ```
 
-- **Guaranteed freshness** – `FixedRng<N>` only constructed via secure RNG.  
-- **Zero-cost** – Newtype over `Fixed`, fully inlined.  
-- **Explicit visibility** – All macros require clear visibility (`pub`, `pub(crate)`, private).  
-- `.generate()` is the canonical constructor (`.new()` unavailable).  
+- **Guaranteed freshness** – `FixedRng<N>` can only be constructed via secure RNG.
+- **Zero-cost** – Newtype over `Fixed`, fully inlined.
+- **Explicit visibility** – All macros require clear visibility specification (`pub`, `pub(crate)`, or private)
+- `.generate()` is the canonical constructor (`.new()` unavailable).
 
 ### Fallible RNG Generation
-For non-panic scenarios:  
+For non-panic scenarios:
 
 ```rust
 #[cfg(feature = "rand")]
 {
     use secure_gate::rng::{FixedRng, DynamicRng};
-    
+
     let key: Result<FixedRng<32>, rand::Error> = FixedRng::try_generate();
     let random: Result<DynamicRng, rand::Error> = DynamicRng::try_generate(64);
 }
 ```
 
-### Converting RNG Types  
+### Converting RNG Types
 ```rust
 #[cfg(feature = "rand")]
 {
     use secure_gate::{Fixed, Dynamic, rng::{FixedRng, DynamicRng}};
-    
+
     let key: Fixed<[u8; 32]> = FixedRng::<32>::generate().into();
     let random: Dynamic<Vec<u8>> = DynamicRng::generate(64).into();
 }
 ```
 
-### Direct Random Generation  
+### Direct Random Generation
 ```rust
+use secure_gate::{Fixed, Dynamic};
+
 #[cfg(feature = "rand")]
 {
-    use secure_gate::{Fixed, Dynamic};
     let key: Fixed<[u8; 32]> = Fixed::generate_random();  // Fallible: Fixed::try_generate_random()
     let random: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
 }
 ```
 
-## Secure Conversions – `conversions` feature  
-```rust  
+**Note**: `FixedRng`/`DynamicRng` preserve the type-level guarantee that values came from RNG. Converting to `Fixed`/`Dynamic` loses that guarantee but enables mutation if needed.
+
+## Secure Conversions – `conversions` feature
+```rust
 #[cfg(feature = "conversions")]
 {
-    use secure_gate::{HexString, SecureConversionsExt};
-    use secure_gate::conversions::Base64String;
+    use secure_gate::{HexString, Base64String, SecureConversionsExt};
 
     let bytes = [0u8; 16];
     let hex: String = bytes.to_hex();  // "0000..." (requires .expose_secret() on secrets)
@@ -180,9 +185,9 @@ For non-panic scenarios:
 }
 ```
 
-- `HexString`/`Base64String`: Validated, zeroized on invalid input.  
-- All conversions require `.expose_secret()` for secret wrappers.  
-- `ct_eq()` independent via `ct-eq` feature.  
+- `HexString`/`Base64String`: Validated, zeroized on invalid input.
+- All conversions require `.expose_secret()` for secret wrappers.
+- `ct_eq()` independent via `ct-eq` feature.
 
 ## Fallible Construction (TryFrom)
 For error-handling in strict environments:
@@ -191,46 +196,48 @@ For error-handling in strict environments:
 use secure_gate::{Fixed, FromSliceError};
 
 // Panics on mismatch (for backward compat)
+let fixed: Fixed<[u8; 4]> = Fixed::from_slice(&[1u8, 2, 3, 4]);
+
 // Returns Result on mismatch
-let fixed: Fixed<[u8; 4]> = Fixed::try_from(&[1u8, 2, 3, 4] as &[u8]).unwrap();
+let fixed: Fixed<[u8; 4]> = Fixed::<[u8; 4]>::try_from(&[1u8, 2, 3, 4] as &[u8]).unwrap();
 let error: FromSliceError = Fixed::<[u8; 4]>::try_from(&[1u8, 2] as &[u8]).unwrap_err();
 ```
 
-## Macros  
+## Macros
 ```rust
 use secure_gate::{fixed_alias, dynamic_alias};
 
-fixed_alias!(pub Aes256Key, 32);           
-fixed_alias!(private_key, 32);             
-fixed_alias!(pub(crate) InternalKey, 64);  
+fixed_alias!(pub Aes256Key, 32);
+fixed_alias!(private_key, 32);
+fixed_alias!(pub(crate) InternalKey, 64);
 
-dynamic_alias!(pub Password, String);       
+dynamic_alias!(pub Password, String);
 
 #[cfg(feature = "rand")]
 {
     use secure_gate::fixed_alias_rng;
-    fixed_alias_rng!(pub MasterKey, 32);    
+    fixed_alias_rng!(pub MasterKey, 32);
 }
 ```
 
-## Memory Guarantees (`zeroize` enabled)  
-| Type | Allocation | Auto-zero | Full wipe | Slack eliminated |  
-|-----------------|------------|-----------|-----------|------------------|  
-| `Fixed<T>` | Stack | Yes | Yes | Yes (no heap) |  
-| `Dynamic<T>` | Heap | Yes | Yes | No (until drop) |  
-| `FixedRng<N>` | Stack | Yes | Yes | Yes |  
-| `RandomHex` | Heap | Yes | Yes | No (until drop) |  
-| `HexString` | Heap | Yes (on invalid) | Yes | No (until drop) |  
-| `Base64String` | Heap | Yes (on invalid) | Yes | No (until drop) |  
+## Memory Guarantees (`zeroize` enabled)
+| Type | Allocation | Auto-zero | Full wipe | Slack eliminated | Notes |
+|-----------------|------------|-----------|-----------|------------------|---------------------------|
+| `Fixed<T>` | Stack | Yes | Yes | Yes (no heap) | Zero-cost |
+| `Dynamic<T>` | Heap | Yes | Yes | No (until drop) | Use `expose_secret_mut().shrink_to_fit()` |
+| `FixedRng<N>` | Stack | Yes | Yes | Yes | Fresh + type-safe |
+| `RandomHex` | Heap | Yes | Yes | No (until drop) | Validated random hex |
+| `HexString` | Heap | Yes (on invalid) | Yes | No (until drop) | Validated hex |
+| `Base64String` | Heap | Yes (on invalid) | Yes | No (until drop) | Validated base64 |
 
-## Performance  
-Zero-cost wrappers. Benchmarks show no measurable overhead vs raw arrays.  
+## Performance
+Zero-cost wrappers. Benchmarks show no measurable overhead vs raw arrays.
 
-## Changelog  
-[CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/main/CHANGELOG.md)  
+## Changelog
+[CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/main/CHANGELOG.md)
 
-## License  
-MIT OR Apache-2.0  
+## License
+MIT OR Apache-2.0
 
----  
+---
 **Explicit access, opt-in cloning, fallible operations—secure by design.**
