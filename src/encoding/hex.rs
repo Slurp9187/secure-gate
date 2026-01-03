@@ -64,7 +64,7 @@ impl HexString {
     /// ```
     pub fn new(mut s: String) -> Result<Self, &'static str> {
         // Fast early check – hex strings must have even length
-        if s.len() % 2 != 0 {
+        if !s.len().is_multiple_of(2) {
             zeroize_input(&mut s);
             return Err("invalid hex string");
         }
