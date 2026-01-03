@@ -4,7 +4,7 @@
 
 // Allow unsafe_code when conversions or zeroize is enabled (conversions needs it for hex validation)
 #![cfg_attr(
-    not(any(feature = "zeroize", feature = "conversions")),
+    not(any(feature = "zeroize", any(feature = "encoding-hex", feature = "encoding-base64"))),
     forbid(unsafe_code)
 )]
 #![doc = include_str!("../README.md")]
@@ -77,8 +77,8 @@ pub mod random;
 #[cfg(feature = "ct-eq")]
 pub mod eq;
 
-#[cfg(any(feature = "encoding-hex", feature = "encoding-base64"))]
 pub mod encoding;
+
 
 // ── Feature-gated re-exports ─────────────────────────────────────────
 #[cfg(feature = "rand")]
@@ -91,9 +91,8 @@ pub use encoding::hex::HexString;
 pub use encoding::base64::Base64String;
 
 #[cfg(any(feature = "encoding-hex", feature = "encoding-base64"))]
-pub use encoding::SecretEncodingExt;
+pub use encoding::SecureConversionsExt;
 
-#[cfg(all(feature = "rand", feature = "conversions"))]
-pub use random::RandomHex;
+
 
 pub use fixed::FromSliceError;

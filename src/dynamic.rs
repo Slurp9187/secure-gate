@@ -6,6 +6,9 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 
+#[cfg(feature = "rand")]
+use rand_core::OsError;
+
 /// Heap-allocated secure secret wrapper.
 ///
 /// This is a thin wrapper around `Box<T>` with enforced explicit exposure.
@@ -172,7 +175,7 @@ where
 {
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
-        use crate::conversions::SecureConversionsExt;
+        use crate::eq::ConstantTimeEq;
         self.expose_secret()
             .as_ref()
             .ct_eq(other.expose_secret().as_ref())
@@ -200,7 +203,7 @@ impl Dynamic<Vec<u8>> {
     /// ```
     #[inline]
     pub fn generate_random(len: usize) -> Self {
-        crate::rng::DynamicRng::generate(len).into_inner()
+        crate::random::DynamicRng::generate(len).into_inner()
     }
 
     /// Try to generate random bytes for Dynamic.
@@ -213,13 +216,13 @@ impl Dynamic<Vec<u8>> {
     /// # #[cfg(feature = "rand")]
     /// # {
     /// use secure_gate::Dynamic;
-    /// let random: Result<Dynamic<Vec<u8>>, rand::Error> = Dynamic::try_generate_random(64);
+    /// let random: Result<Dynamic<Vec<u8>>, rand_core::OsError> = Dynamic::try_generate_random(64);
     /// assert!(random.is_ok());
     /// # }
     /// ```
     #[inline]
-    pub fn try_generate_random(len: usize) -> Result<Self, rand::Error> {
-        crate::rng::DynamicRng::try_generate(len).map(|rng| rng.into_inner())
+    pub fn try_generate_random(len: usize) -> Result<Self, OsError> {
+        crate::random::DynamicRng::try_generate(len).map(|rng: crate::random::DynamicRng| rng.into_inner())
     }
 }
 

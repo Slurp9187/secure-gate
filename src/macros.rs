@@ -108,12 +108,12 @@ macro_rules! fixed_generic_alias {
 #[macro_export]
 macro_rules! fixed_alias_rng {
     ($vis:vis $name:ident, $size:literal) => {
-        #[doc = concat!("Random-only fixed-size secret (", $size, " bytes)")]
-        $vis type $name = $crate::rng::FixedRng<$size>;
+        #[doc = concat!("Random-only fixed-size secret (", stringify!($size), " bytes)")]
+        $vis type $name = $crate::random::FixedRng<$size>;
     };
     ($name:ident, $size:literal) => {
-        #[doc = concat!("Random-only fixed-size secret (", $size, " bytes)")]
-        type $name = $crate::rng::FixedRng<$size>;
+        #[doc = concat!("Random-only fixed-size secret (", stringify!($size), " bytes)")]
+        type $name = $crate::random::FixedRng<$size>;
     };
 }
 

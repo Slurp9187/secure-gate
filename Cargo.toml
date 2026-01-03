@@ -10,7 +10,7 @@ keywords = ["crypto", "no-std", "security", "zeroize"]
 categories = ["cryptography", "no-std", "data-structures"]
 
 [dependencies]
-rand = { version = "0.8", optional = true }
+rand = { version = "0.9", optional = true }
 zeroize = { version = "1.7", default-features = false, optional = true, features = [
   "alloc",
   "zeroize_derive",
@@ -18,8 +18,11 @@ zeroize = { version = "1.7", default-features = false, optional = true, features
 
 # `hex` and `base64` are only used by `conversions`. `subtle` is used by both `conversions` and `ct-eq`.
 hex = { version = "0.4", optional = true, features = ["alloc"] }
-base64 = { version = "0.21", optional = true }
+base64 = { version = "0.21.7", optional = true }
 subtle = { version = "2.5", optional = true }
+
+getrandom = { version = "0.2", optional = true }
+rand_core = { version = "0.9", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
@@ -28,23 +31,15 @@ criterion = { version = "0.5", features = ["html_reports"] }
 # Features
 # ──────────────────────────────────────────────────────────────
 [features]
-# Keep exactly this — perfect balance
-default = ["zeroize"]
+default = ["encoding", "rand"]
 
-# Core safety — almost everyone wants this
-zeroize = ["dep:zeroize"]
+encoding = ["encoding-hex", "encoding-base64"]
+encoding-hex = ["dep:hex"]
+encoding-base64 = ["dep:base64"]
 
-# Cryptographic randomness — opt-in
-rand = ["dep:rand"]
-
-# Constant-time equality comparison — opt-in
 ct-eq = ["dep:subtle"]
-
-# Ergonomic conversions — opt-in, very popular
-conversions = ["dep:hex", "dep:base64", "ct-eq"]
-
-# Convenience super-set — recommended in docs
-full = ["zeroize", "rand", "conversions"]
+rand = ["dep:rand", "dep:getrandom", "dep:rand_core"]
+zeroize = ["dep:zeroize"]
 
 
 [[bench]]

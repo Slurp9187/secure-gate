@@ -4,8 +4,9 @@
 
 use crate::{Dynamic, Fixed};
 use rand::rngs::OsRng;
-use rand::RngCore;
-use hex;
+use rand::TryRngCore;
+use rand_core::OsError;
+
 
 /// Fixed-length cryptographically secure random value.
 ///
@@ -71,11 +72,11 @@ impl<const N: usize> FixedRng<N> {
     /// # #[cfg(feature = "rand")]
     /// # {
     /// use secure_gate::random::FixedRng;
-    /// let random: Result<FixedRng<32>, rand::Error> = FixedRng::try_generate();
+    /// let random: Result<FixedRng<32>, rand_core::OsError> = FixedRng::try_generate();
     /// assert!(random.is_ok());
     /// # }
     /// ```
-    pub fn try_generate() -> Result<Self, rand::Error> {
+    pub fn try_generate() -> Result<Self, OsError> {
         let mut bytes = [0u8; N];
         OsRng
             .try_fill_bytes(&mut bytes)
@@ -139,6 +140,48 @@ impl<const N: usize> core::fmt::Debug for FixedRng<N> {
     }
 }
 
+#[cfg(all(feature = "rand", feature = "encoding-hex"))]
+impl<const N: usize> FixedRng<N> {
+    /// Consume self and return the random bytes as a validated hex string.
+    ///
+    /// The raw bytes are zeroized immediately after encoding.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-hex"))]
+    /// # {
+    /// use secure_gate::random::FixedRng;
+    /// let hex = FixedRng::<16>::generate().into_hex();
+    /// println!("random hex: {}", hex.expose_secret());
+    /// # }
+    /// ```
+    pub fn into_hex(self) -> crate::encoding::hex::HexString {
+        use hex;
+        let hex = hex::encode(self.expose_secret());
+        crate::encoding::hex::HexString::new_unchecked(hex)
+    }
+
+    /// Encode to hex without consuming self, for cases where raw is still needed briefly.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-hex"))]
+    /// # {
+    /// use secure_gate::random::FixedRng;
+    /// let rng = FixedRng::<16>::generate();
+    /// let hex = rng.to_hex();
+    /// // Use rng for something else here
+    /// # }
+    /// ```
+    pub fn to_hex(&self) -> crate::encoding::hex::HexString {
+        use hex;
+        let hex = hex::encode(self.expose_secret());
+        crate::encoding::hex::HexString::new_unchecked(hex)
+    }
+}
+
 impl<const N: usize> From<FixedRng<N>> for Fixed<[u8; N]> {
     /// Convert a `FixedRng` to `Fixed`, transferring ownership.
     ///
@@ -161,73 +204,7 @@ impl<const N: usize> From<FixedRng<N>> for Fixed<[u8; N]> {
     }
 }
 
-#[cfg(all(feature = "rand", feature = "conversions"))]
-pub struct RandomHex(crate::encoding::hex::HexString);
 
-#[cfg(all(feature = "rand", feature = "conversions"))]
-impl Clone for RandomHex {
-    fn clone(&self) -> Self {
-        let cloned_string = self.0 .0.expose_secret().clone();
-        RandomHex(crate::encoding::hex::HexString(crate::Dynamic::new(cloned_string)))
-    }
-}
-
-#[cfg(all(feature = "rand", feature = "conversions"))]
-impl RandomHex {
-    pub(crate) fn new_fresh(hex: crate::encoding::hex::HexString) -> Self {
-        Self(hex)
-    }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        self.0.to_bytes()
-    }
-
-    pub const fn byte_len(&self) -> usize {
-        self.0.byte_len()
-    }
-}
-
-#[cfg(all(feature = "rand", feature = "conversions"))]
-impl core::ops::Deref for RandomHex {
-    type Target = crate::encoding::hex::HexString;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[cfg(all(feature = "rand", feature = "conversions"))]
-impl PartialEq for RandomHex {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-#[cfg(all(feature = "rand", feature = "conversions"))]
-impl Eq for RandomHex {}
-
-#[cfg(all(feature = "rand", feature = "conversions"))]
-impl<const N: usize> crate::random::FixedRng<N> {
-    /// Generate a fresh random value and immediately return it as a validated,
-    /// lower-case hex string.
-    ///
-    /// The intermediate random bytes are zeroized as soon as the hex string is created.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use secure_gate::{fixed_alias_rng, random::RandomHex};
-    /// fixed_alias_rng!(BackupCode, 16);
-    /// let hex: RandomHex = BackupCode::random_hex();
-    /// println!("backup code: {}", hex.expose_secret());
-    /// ```
-    pub fn random_hex() -> RandomHex {
-        let hex = {
-            let fresh_rng = Self::generate();
-            hex::encode(fresh_rng.expose_secret())
-        }; // fresh_rng dropped and zeroized here
-        RandomHex::new_fresh(crate::encoding::hex::HexString::new_unchecked(hex))
-    }
-}
 
 /// Heap-allocated cryptographically secure random bytes.
 ///
@@ -284,7 +261,7 @@ impl DynamicRng {
     /// assert!(random.is_ok());
     /// # }
     /// ```
-    pub fn try_generate(len: usize) -> Result<Self, rand::Error> {
+    pub fn try_generate(len: usize) -> Result<Self, OsError> {
         let mut bytes = vec![0u8; len];
         OsRng
             .try_fill_bytes(&mut bytes)

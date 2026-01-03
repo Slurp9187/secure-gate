@@ -2,6 +2,8 @@
 // src/encoding/hex.rs
 // ==========================================================================
 
+#![cfg(feature = "encoding-hex")]
+
 // Allow unsafe_code when zeroize is enabled (needed for hex string validation)
 // but forbid it otherwise
 #![cfg_attr(
@@ -142,12 +144,18 @@ impl PartialEq for HexString {
 impl Eq for HexString {}
 
 // Fallback: Standard string equality when ct-eq not enabled (secure enough for validation)
-#[cfg(all(feature = "encoding-hex", not(feature = "ct-eq"))]
+#[cfg(all(feature = "encoding-hex", not(feature = "ct-eq")))]
 impl PartialEq for HexString {
     fn eq(&self, other: &Self) -> bool {
         self.0.expose_secret() == other.0.expose_secret()
     }
 }
 
-#[cfg(all(feature = "encoding-hex", not(feature = "ct-eq"))]
+#[cfg(all(feature = "encoding-hex", not(feature = "ct-eq")))]
 impl Eq for HexString {}
+
+impl core::fmt::Debug for HexString {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("[REDACTED]")
+    }
+}

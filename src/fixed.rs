@@ -5,6 +5,9 @@
 use core::convert::TryFrom;
 use core::fmt;
 
+#[cfg(feature = "rand")]
+use rand_core::OsError;
+
 /// Stack-allocated secure secret wrapper.
 ///
 /// This is a zero-cost wrapper for fixed-size secrets like byte arrays or primitives.
@@ -205,7 +208,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// ```
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
-        use crate::conversions::SecureConversionsExt;
+        use crate::eq::ConstantTimeEq;
         self.expose_secret().ct_eq(other.expose_secret())
     }
 }
@@ -230,7 +233,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// ```
     #[inline]
     pub fn generate_random() -> Self {
-        crate::rng::FixedRng::<N>::generate().into_inner()
+        crate::random::FixedRng::<N>::generate().into_inner()
     }
 
     /// Try to generate random bytes for Fixed.
@@ -243,14 +246,15 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// # #[cfg(feature = "rand")]
     /// # {
     /// use secure_gate::Fixed;
-    /// let key: Result<Fixed<[u8; 32]>, rand::Error> = Fixed::try_generate_random();
+    /// let key: Result<Fixed<[u8; 32]>, rand_core::OsError> = Fixed::try_generate_random();
     /// assert!(key.is_ok());
     /// # }
     /// ```
     #[inline]
-    pub fn try_generate_random() -> Result<Self, rand::Error> {
-        crate::rng::FixedRng::<N>::try_generate().map(|rng| rng.into_inner())
+    pub fn try_generate_random() -> Result<Self, OsError> {
+        crate::random::FixedRng::<N>::try_generate().map(|rng: crate::random::FixedRng<N>| rng.into_inner())
     }
+
 }
 
 // Zeroize integration

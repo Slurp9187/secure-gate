@@ -2,6 +2,8 @@
 // src/encoding/base64.rs
 // ==========================================================================
 
+#![cfg(feature = "encoding-base64")]
+
 // Allow unsafe_code when zeroize is enabled (not needed here, but consistent)
 // but forbid it otherwise
 #![cfg_attr(
@@ -138,19 +140,25 @@ impl PartialEq for Base64String {
 impl Eq for Base64String {}
 
 // Fallback: Standard string equality when ct-eq not enabled (secure enough for validation)
-#[cfg(all(feature = "encoding-base64", not(feature = "ct-eq"))]
+#[cfg(all(feature = "encoding-base64", not(feature = "ct-eq")))]
 impl PartialEq for Base64String {
     fn eq(&self, other: &Self) -> bool {
         self.0.expose_secret() == other.0.expose_secret()
     }
 }
 
-#[cfg(all(feature = "encoding-base64", not(feature = "ct-eq"))]
+#[cfg(all(feature = "encoding-base64", not(feature = "ct-eq")))]
 impl Eq for Base64String {}
 
 impl core::ops::Deref for Base64String {
     type Target = crate::Dynamic<String>;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl core::fmt::Debug for Base64String {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("[REDACTED]")
     }
 }
