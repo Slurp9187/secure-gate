@@ -2,7 +2,7 @@
 // src/lib.rs
 // ==========================================================================
 
-// Allow unsafe_code when conversions or zeroize is enabled (conversions needs it for hex validation)
+// Allow unsafe_code when encoding or zeroize is enabled (encoding needs it for hex validation)
 #![cfg_attr(
     not(any(
         feature = "zeroize",
@@ -51,6 +51,6 @@ pub use encoding::hex::HexString;
 pub use encoding::base64::Base64String;
 
 #[cfg(any(feature = "encoding-hex", feature = "encoding-base64"))]
-pub use encoding::SecureConversionsExt;
+pub use encoding::SecureEncodingExt;
 
 pub use fixed::FromSliceError;

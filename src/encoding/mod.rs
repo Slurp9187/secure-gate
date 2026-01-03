@@ -16,9 +16,11 @@ pub mod hex;
 use ::hex as hex_crate;
 
 #[cfg(feature = "encoding-base64")]
+use ::base64 as base64_crate;
+#[cfg(feature = "encoding-base64")]
+use base64_crate::Engine;
+#[cfg(feature = "encoding-base64")]
 pub mod base64;
-
-
 
 /// Extension trait for safe, explicit encoding of secret byte data to strings.
 ///
@@ -28,9 +30,9 @@ pub mod base64;
 /// # Example
 ///
 /// ```
-/// # #[cfg(feature = "conversions")]
+/// # #[cfg(feature = "encoding")]
 /// # {
-/// # use secure_gate::{fixed_alias, encoding::SecureConversionsExt};
+/// # use secure_gate::{fixed_alias, encoding::SecureEncodingExt};
 /// # fixed_alias!(Aes256Key, 32);
 /// # let key = Aes256Key::from([0x42u8; 32]);
 /// # let hex = key.expose_secret().to_hex();         // → "424242..."
@@ -40,7 +42,7 @@ pub mod base64;
 /// ```
 // Trait is available when any encoding feature is enabled
 #[cfg(any(feature = "encoding-hex", feature = "encoding-base64"))]
-pub trait SecureConversionsExt {
+pub trait SecureEncodingExt {
     /// Encode secret bytes as lowercase hexadecimal.
     #[cfg(feature = "encoding-hex")]
     fn to_hex(&self) -> alloc::string::String;
@@ -48,10 +50,14 @@ pub trait SecureConversionsExt {
     /// Encode secret bytes as uppercase hexadecimal.
     #[cfg(feature = "encoding-hex")]
     fn to_hex_upper(&self) -> alloc::string::String;
+
+    /// Encode secret bytes as URL-safe base64 (no padding).
+    #[cfg(feature = "encoding-base64")]
+    fn to_base64url(&self) -> alloc::string::String;
 }
 
 #[cfg(feature = "encoding-hex")]
-impl SecureConversionsExt for [u8] {
+impl SecureEncodingExt for [u8] {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
     fn to_hex(&self) -> alloc::string::String {
@@ -62,10 +68,16 @@ impl SecureConversionsExt for [u8] {
     fn to_hex_upper(&self) -> alloc::string::String {
         hex_crate::encode_upper(self)
     }
+    #[cfg(feature = "encoding-base64")]
+    #[inline(always)]
+    fn to_base64url(&self) -> alloc::string::String {
+        use ::base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        URL_SAFE_NO_PAD.encode(self)
+    }
 }
 
 #[cfg(feature = "encoding-hex")]
-impl<const N: usize> SecureConversionsExt for [u8; N] {
+impl<const N: usize> SecureEncodingExt for [u8; N] {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
     fn to_hex(&self) -> alloc::string::String {
@@ -76,5 +88,12 @@ impl<const N: usize> SecureConversionsExt for [u8; N] {
     #[inline(always)]
     fn to_hex_upper(&self) -> alloc::string::String {
         hex_crate::encode_upper(self)
+    }
+
+    #[cfg(feature = "encoding-base64")]
+    #[inline(always)]
+    fn to_base64url(&self) -> alloc::string::String {
+        use ::base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        URL_SAFE_NO_PAD.encode(self)
     }
 }

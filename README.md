@@ -5,7 +5,6 @@
 - `Fixed<T>` – Stack-allocated, zero-cost wrapper
 - `Dynamic<T>` – Heap-allocated wrapper with full `.into()` ergonomics
 - `FixedRng<N>` – Cryptographically secure random bytes of exact length N
-- `RandomHex` – Validated random hex string that can only be constructed from fresh RNG
 - `HexString` – Validated lowercase hex wrapper
 - `Base64String` – Validated URL-safe base64 (no-pad) wrapper
 
@@ -22,7 +21,7 @@ secure-gate = "0.6.2"
 
 **Recommended (maximum safety + ergonomics):**
 ```toml
-secure-gate = { version = "0.6.2", features = ["zeroize", "rand", "conversions"] }
+secure-gate = { version = "0.6.2", features = ["zeroize", "rand", "encoding"] }
 ```
 
 ## Features
@@ -31,7 +30,7 @@ secure-gate = { version = "0.6.2", features = ["zeroize", "rand", "conversions"]
 | `zeroize` | Automatic memory wiping on drop + opt-in cloning via `CloneableSecret` – **strongly recommended** |
 | `rand` | RNG generation: `FixedRng<N>::generate()`, `DynamicRng::generate()`, fallible `try_generate()` |
 | `ct-eq` | `.ct_eq()` – constant-time equality comparison |
-| `conversions` | `.to_hex()`, `.to_hex_upper()`, `.to_base64url()` + `HexString`, `Base64String`, `RandomHex` |
+| `encoding` | `.to_hex()`, `.to_hex_upper()`, `.to_base64url()` + `HexString`, `Base64String` |
 
 Works in `no_std` + `alloc`. Only pay for what you use.
 
@@ -62,12 +61,7 @@ assert_eq!(pw.expose_secret(), "hunter2");
     let key = MasterKey::generate();      // FixedRng<32>
     let nonce = Nonce::generate();        // FixedRng<24>
 
-    #[cfg(feature = "conversions")]
-    {
-        use secure_gate::RandomHex;
-
-        let hex_token: RandomHex = MasterKey::random_hex(); // Only from fresh RNG
-    }
+    // Hex encoding available via `FixedRng::generate().into_hex()`
 }
 ```
 
@@ -111,11 +105,9 @@ Cloning is disabled by default to prevent accidental duplication. Enable it expl
     let key = JwtSigningKey::generate();        // FixedRng<32>
     let code = BackupCode::generate();          // FixedRng<16>
 
-    #[cfg(feature = "conversions")]
+    #[cfg(feature = "encoding-hex")]
     {
-        use secure_gate::RandomHex;
-
-        let hex_code: RandomHex = BackupCode::random_hex();
+        let hex_code = BackupCode::generate().into_hex();
         println!("Backup code: {}", hex_code.expose_secret());
     }
 }
@@ -164,11 +156,11 @@ use secure_gate::{Fixed, Dynamic};
 
 **Note**: `FixedRng`/`DynamicRng` preserve the type-level guarantee that values came from RNG. Converting to `Fixed`/`Dynamic` loses that guarantee but enables mutation if needed.
 
-## Secure Conversions – `conversions` feature
+## Secure Encoding – `encoding` feature
 ```rust
-#[cfg(feature = "conversions")]
+#[cfg(feature = "encoding")]
 {
-    use secure_gate::{HexString, Base64String, SecureConversionsExt};
+    use secure_gate::{HexString, Base64String, SecureEncodingExt};
 
     let bytes = [0u8; 16];
     let hex: String = bytes.to_hex();  // "0000..." (requires .expose_secret() on secrets)
@@ -182,7 +174,10 @@ use secure_gate::{Fixed, Dynamic};
 
     // Constant-time eq
     #[cfg(feature = "ct-eq")]
-    let same = bytes.ct_eq(&[1u8; 16]);  // False, constant-time
+    {
+        use secure_gate::eq::ConstantTimeEq;
+        let same = bytes.ct_eq(&[1u8; 16]);  // False, constant-time
+    }
 }
 ```
 
@@ -227,7 +222,6 @@ dynamic_alias!(pub Password, String);
 | `Fixed<T>` | Stack | Yes | Yes | Yes (no heap) | Zero-cost |
 | `Dynamic<T>` | Heap | Yes | Yes | No (until drop) | Use `expose_secret_mut().shrink_to_fit()` |
 | `FixedRng<N>` | Stack | Yes | Yes | Yes | Fresh + type-safe |
-| `RandomHex` | Heap | Yes | Yes | No (until drop) | Validated random hex |
 | `HexString` | Heap | Yes (on invalid) | Yes | No (until drop) | Validated hex |
 | `Base64String` | Heap | Yes (on invalid) | Yes | No (until drop) | Validated base64 |
 
