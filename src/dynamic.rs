@@ -80,7 +80,6 @@ impl<T: ?Sized> Dynamic<T> {
         &mut self.0
     }
 
-
     /// Convert to a non-cloneable variant.
     ///
     /// Prevents accidental cloning of the secret.

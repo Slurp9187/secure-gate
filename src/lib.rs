@@ -3,7 +3,10 @@
 // ==========================================================================
 
 // Allow unsafe_code when conversions or zeroize is enabled (conversions needs it for hex validation)
-#![cfg_attr(not(any(feature = "zeroize", feature = "conversions")), forbid(unsafe_code))]
+#![cfg_attr(
+    not(any(feature = "zeroize", feature = "conversions")),
+    forbid(unsafe_code)
+)]
 #![doc = include_str!("../README.md")]
 
 extern crate alloc;

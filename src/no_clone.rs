@@ -78,7 +78,6 @@ impl<T> FixedNoClone<T> {
     pub fn expose_secret_mut(&mut self) -> &mut T {
         &mut self.0
     }
-
 }
 
 impl<T: ?Sized> DynamicNoClone<T> {
@@ -107,7 +106,6 @@ impl<T: ?Sized> DynamicNoClone<T> {
     pub fn expose_secret_mut(&mut self) -> &mut T {
         &mut self.0
     }
-
 }
 
 impl<T> fmt::Debug for FixedNoClone<T> {
