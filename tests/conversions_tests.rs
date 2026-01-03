@@ -153,3 +153,71 @@ fn dynamic_rng_into_conversion() {
     let dynamic: Dynamic<Vec<u8>> = rng.into();
     assert_eq!(dynamic.len(), 64);
 }
+
+#[test]
+fn base64string_validation_stricter() {
+    // Test valid cases - these should all decode successfully
+
+    // Test valid cases - these should all decode successfully
+    let valid_cases = vec![
+        ("", 0),              // Empty string
+        ("SGVs", 3),          // 4 chars -> 3 bytes ("Hel")
+        ("SGVsbG8", 5),       // 7 chars -> 5 bytes ("Hello")
+        ("SGVsbG93b3JsZA", 10), // 14 chars -> 10 bytes
+        ("_3zVf4OlpW3Cxy_QPqDg8KGyw9Tl9gcYKTpLXG1-j5A", 32), // 43 chars -> 32 bytes
+    ];
+
+    for (input, expected_bytes) in valid_cases {
+        let b64 = secure_gate::conversions::Base64String::new(input.to_string())
+            .expect(&format!("'{}' should be valid", input));
+        assert_eq!(b64.expose_secret(), input);
+        let bytes = b64.to_bytes();
+        assert_eq!(bytes.len(), expected_bytes, "Wrong byte length for '{}'", input);
+    }
+
+    // Test invalid cases - these should be rejected
+    let invalid_cases = vec![
+        "S",           // 1 char - 6-bit remainder
+        "SG",          // 2 chars - invalid last symbol
+        "SGV",         // 3 chars - invalid last symbol
+        "SGVsb",       // 5 chars - 6-bit remainder
+        "SGVsbG",      // 6 chars - invalid last symbol
+        "SGVsbG8=",    // Contains padding
+        "SGVsbG8!",    // Invalid character
+        "SGVsbG8\n",   // Invalid character (newline)
+        "SGVsbG8\t",   // Invalid character (tab)
+        "SGVsbG8 ",    // Invalid character (space)
+    ];
+
+    for input in invalid_cases {
+        let result = secure_gate::conversions::Base64String::new(input.to_string());
+        assert!(result.is_err(), "'{}' should be invalid but was accepted", input);
+    }
+
+    // Based on the above, valid lengths are those that can actually be decoded
+    // It seems like any length is potentially valid as long as the base64 decoding succeeds
+    // But that would require actually trying to decode, which defeats the purpose of validation
+
+    // Actually, let me check what the base64 crate documentation says about no-pad...
+    // For no-pad, it seems lengths that are not multiples of 4 can still be valid
+    // Let me adjust the validation to actually try decoding instead of length check
+
+    // Wait, but that would be expensive. Let me see if there's a pattern.
+    // From the output above:
+    // len%4 == 0: can be valid or invalid
+    // len%4 == 1: invalid (6-bit remainder)
+    // len%4 == 2: invalid (last symbol issues)
+    // len%4 == 3: invalid (last symbol issues)
+    // But "SGVsbG8" (len=7, 7%4=3) decoded successfully!
+
+    // Let me check the base64 crate source or documentation...
+    // Actually, for URL_SAFE_NO_PAD, it allows lengths that are not multiples of 4
+    // as long as the last group can be properly decoded.
+
+    // So my length check was wrong. Let me remove it and just check characters.
+    // But then how do I prevent the panic? The audit says to_bytes() will panic if invalid.
+    // Maybe I need to actually try decoding in validation?
+
+    // Actually, let me check what happens if I try to decode during validation.
+    // That might be the right approach - do the character check first (fast), then try decode.
+}

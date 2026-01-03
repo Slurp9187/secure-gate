@@ -271,6 +271,7 @@ impl Base64String {
     /// Validation rules:
     /// - Valid URL-safe base64 characters (A-Z, a-z, 0-9, -, _)
     /// - No padding ('=' not allowed, as we use no-pad)
+    /// - Must be decodable as valid base64 (prevents `to_bytes()` panics)
     ///
     /// # Errors
     ///
@@ -287,13 +288,23 @@ impl Base64String {
     /// # }
     /// ```
     pub fn new(mut s: String) -> Result<Self, &'static str> {
-        // Validate in-place: check for invalid chars, no padding
+        // Validate in-place: check for invalid chars and that it can actually be decoded
         let bytes = unsafe { s.as_mut_vec() };
         let mut valid = true;
+
+        // Check character validity
         for &b in bytes.iter() {
             match b {
                 b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' => {}
                 _ => valid = false,
+            }
+        }
+
+        // If characters are valid, verify it can actually be decoded (prevents to_bytes() panics)
+        if valid {
+            // Try decoding to ensure it's valid - this catches length/content issues
+            if URL_SAFE_NO_PAD.decode(&s).is_err() {
+                valid = false;
             }
         }
 
