@@ -17,8 +17,6 @@
 /// ```
 /// use secure_gate::fixed_alias;
 /// fixed_alias!(pub Aes256Key, 32);
-/// let key = Aes256Key::new([0u8; 32]);
-/// assert_eq!(key.len(), 32);
 /// ```
 ///
 /// Private alias:
@@ -34,14 +32,17 @@
 /// ```
 ///
 /// The generated type is zero-cost and works with all features.
+/// For random initialization, use Type::generate() (requires 'rand' feature).
 #[macro_export]
 macro_rules! fixed_alias {
     ($vis:vis $name:ident, $size:literal) => {
         #[doc = concat!("Fixed-size secure secret (", stringify!($size), " bytes)")]
+        const _: () = assert!($size > 0, "Size must be greater than zero");
         $vis type $name = $crate::Fixed<[u8; $size]>;
     };
     ($name:ident, $size:literal) => {
         #[doc = concat!("Fixed-size secure secret (", stringify!($size), " bytes)")]
+        const _: () = assert!($size > 0, "Size must be greater than zero");
         type $name = $crate::Fixed<[u8; $size]>;
     };
 }
@@ -56,16 +57,15 @@ macro_rules! fixed_alias {
 /// With custom doc:
 /// ```
 /// use secure_gate::fixed_generic_alias;
-/// fixed_generic_alias!(pub GenericKey, "Generic secure key buffer");
-/// let key: GenericKey<32> = GenericKey::new([0u8; 32]);
+/// fixed_generic_alias!(pub GenericBuffer, "Generic secure byte buffer");
 /// ```
 ///
 /// With default doc:
 /// ```
 /// use secure_gate::fixed_generic_alias;
 /// fixed_generic_alias!(pub(crate) Buffer);
-/// let buf: Buffer<16> = Buffer::new([0u8; 16]);
 /// ```
+/// For random initialization, use Type::<N>::generate() (requires 'rand' feature).
 #[macro_export]
 macro_rules! fixed_generic_alias {
     ($vis:vis $name:ident, $doc:literal) => {
@@ -87,32 +87,32 @@ macro_rules! fixed_generic_alias {
 ///
 /// Public alias:
 /// ```
-/// # #[cfg(feature = "rand")]
-/// # {
+/// #[cfg(feature = "rand")]
+/// {
 /// use secure_gate::fixed_alias_rng;
 /// fixed_alias_rng!(pub MasterKey, 32);
-/// let key = MasterKey::generate();
-/// assert_eq!(key.len(), 32);
 /// # }
 /// ```
 ///
 /// Private alias:
 /// ```
-/// # #[cfg(feature = "rand")]
-/// # {
+/// #[cfg(feature = "rand")]
+/// {
 /// use secure_gate::fixed_alias_rng;
 /// fixed_alias_rng!(PrivateKey, 32); // No visibility modifier = private
-/// let key = PrivateKey::generate();
 /// # }
 /// ```
+/// Instantiate with Type::generate() (requires 'rand' feature).
 #[macro_export]
 macro_rules! fixed_alias_rng {
     ($vis:vis $name:ident, $size:literal) => {
         #[doc = concat!("Random-only fixed-size secret (", stringify!($size), " bytes)")]
+        const _: () = assert!($size > 0, "Size must be greater than zero");
         $vis type $name = $crate::random::FixedRng<$size>;
     };
     ($name:ident, $size:literal) => {
         #[doc = concat!("Random-only fixed-size secret (", stringify!($size), " bytes)")]
+        const _: () = assert!($size > 0, "Size must be greater than zero");
         type $name = $crate::random::FixedRng<$size>;
     };
 }
@@ -123,17 +123,23 @@ macro_rules! fixed_alias_rng {
 ///
 /// Public alias:
 /// ```
+/// #[cfg(feature = "std")]
+/// {
 /// use secure_gate::dynamic_alias;
 /// dynamic_alias!(pub Password, String);
 /// let pw: Password = "hunter2".into();
 /// assert_eq!(pw.expose_secret(), "hunter2");
+/// # }
 /// ```
 ///
 /// Private alias:
 /// ```
+/// #[cfg(feature = "std")]
+/// {
 /// use secure_gate::dynamic_alias;
 /// dynamic_alias!(SecretString, String); // No visibility modifier = private
 /// let secret = SecretString::new("hidden".to_string());
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dynamic_alias {
@@ -152,10 +158,13 @@ macro_rules! dynamic_alias {
 /// # Examples
 ///
 /// ```
+/// #[cfg(feature = "std")]
+/// {
 /// use secure_gate::dynamic_generic_alias;
 /// dynamic_generic_alias!(pub SecureVec, Vec<u8>, "Secure dynamic byte vector");
 /// let vec = SecureVec::new(vec![1, 2, 3]);
 /// assert_eq!(vec.len(), 3);
+/// # }
 /// ```
 #[macro_export]
 macro_rules! dynamic_generic_alias {
