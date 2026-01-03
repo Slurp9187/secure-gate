@@ -1,10 +1,11 @@
 // ==========================================================================
-// src/rng.rs
+// src/random.rs
 // ==========================================================================
 
 use crate::{Dynamic, Fixed};
 use rand::rngs::OsRng;
 use rand::RngCore;
+use hex;
 
 /// Fixed-length cryptographically secure random value.
 ///
@@ -19,7 +20,7 @@ use rand::RngCore;
 /// ```
 /// # #[cfg(feature = "rand")]
 /// # {
-/// use secure_gate::rng::FixedRng;
+/// use secure_gate::random::FixedRng;
 /// let random: FixedRng<32> = FixedRng::generate();
 /// assert_eq!(random.len(), 32);
 /// # }
@@ -47,7 +48,7 @@ impl<const N: usize> FixedRng<N> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::rng::FixedRng;
+    /// use secure_gate::random::FixedRng;
     /// let random = FixedRng::<16>::generate();
     /// assert!(!random.is_empty());
     /// # }
@@ -69,7 +70,7 @@ impl<const N: usize> FixedRng<N> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::rng::FixedRng;
+    /// use secure_gate::random::FixedRng;
     /// let random: Result<FixedRng<32>, rand::Error> = FixedRng::try_generate();
     /// assert!(random.is_ok());
     /// # }
@@ -88,7 +89,7 @@ impl<const N: usize> FixedRng<N> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::rng::FixedRng;
+    /// use secure_gate::random::FixedRng;
     /// let random = FixedRng::<4>::generate();
     /// let bytes = random.expose_secret();
     /// # }
@@ -120,7 +121,7 @@ impl<const N: usize> FixedRng<N> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::{Fixed, rng::FixedRng};
+    /// use secure_gate::{Fixed, random::FixedRng};
     /// let random = FixedRng::<32>::generate();
     /// let fixed: Fixed<[u8; 32]> = random.into_inner();
     /// // Can now use fixed.expose_secret() as needed
@@ -150,13 +151,81 @@ impl<const N: usize> From<FixedRng<N>> for Fixed<[u8; N]> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::{Fixed, rng::FixedRng};
+    /// use secure_gate::{Fixed, random::FixedRng};
     /// let key: Fixed<[u8; 32]> = FixedRng::<32>::generate().into();
     /// # }
     /// ```
     #[inline(always)]
     fn from(rng: FixedRng<N>) -> Self {
         rng.into_inner()
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+pub struct RandomHex(crate::encoding::hex::HexString);
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+impl Clone for RandomHex {
+    fn clone(&self) -> Self {
+        let cloned_string = self.0 .0.expose_secret().clone();
+        RandomHex(crate::encoding::hex::HexString(crate::Dynamic::new(cloned_string)))
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+impl RandomHex {
+    pub(crate) fn new_fresh(hex: crate::encoding::hex::HexString) -> Self {
+        Self(hex)
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.0.to_bytes()
+    }
+
+    pub const fn byte_len(&self) -> usize {
+        self.0.byte_len()
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+impl core::ops::Deref for RandomHex {
+    type Target = crate::encoding::hex::HexString;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+impl PartialEq for RandomHex {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+impl Eq for RandomHex {}
+
+#[cfg(all(feature = "rand", feature = "conversions"))]
+impl<const N: usize> crate::random::FixedRng<N> {
+    /// Generate a fresh random value and immediately return it as a validated,
+    /// lower-case hex string.
+    ///
+    /// The intermediate random bytes are zeroized as soon as the hex string is created.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use secure_gate::{fixed_alias_rng, random::RandomHex};
+    /// fixed_alias_rng!(BackupCode, 16);
+    /// let hex: RandomHex = BackupCode::random_hex();
+    /// println!("backup code: {}", hex.expose_secret());
+    /// ```
+    pub fn random_hex() -> RandomHex {
+        let hex = {
+            let fresh_rng = Self::generate();
+            hex::encode(fresh_rng.expose_secret())
+        }; // fresh_rng dropped and zeroized here
+        RandomHex::new_fresh(crate::encoding::hex::HexString::new_unchecked(hex))
     }
 }
 
@@ -172,7 +241,7 @@ impl<const N: usize> From<FixedRng<N>> for Fixed<[u8; N]> {
 /// ```
 /// # #[cfg(feature = "rand")]
 /// # {
-/// use secure_gate::rng::DynamicRng;
+/// use secure_gate::random::DynamicRng;
 /// let random = DynamicRng::generate(64);
 /// assert_eq!(random.len(), 64);
 /// # }
@@ -189,7 +258,7 @@ impl DynamicRng {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::rng::DynamicRng;
+    /// use secure_gate::random::DynamicRng;
     /// let random = DynamicRng::generate(128);
     /// # }
     /// ```
@@ -210,7 +279,7 @@ impl DynamicRng {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::rng::DynamicRng;
+    /// use secure_gate::random::DynamicRng;
     /// let random: Result<DynamicRng, rand::Error> = DynamicRng::try_generate(64);
     /// assert!(random.is_ok());
     /// # }
@@ -265,7 +334,7 @@ impl From<DynamicRng> for Dynamic<Vec<u8>> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::{Dynamic, rng::DynamicRng};
+    /// use secure_gate::{Dynamic, random::DynamicRng};
     /// let random: Dynamic<Vec<u8>> = DynamicRng::generate(64).into();
     /// # }
     /// ```

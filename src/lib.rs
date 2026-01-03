@@ -72,26 +72,28 @@ mod macros;
 
 // ── Feature-gated modules (zero compile-time cost when disabled) ─────
 #[cfg(feature = "rand")]
-pub mod rng;
+pub mod random;
 
-// conversions module is needed for ct-eq feature (SecureConversionsExt trait)
-#[cfg(any(feature = "conversions", feature = "ct-eq"))]
-pub mod conversions;
+#[cfg(feature = "ct-eq")]
+pub mod eq;
+
+#[cfg(any(feature = "encoding-hex", feature = "encoding-base64"))]
+pub mod encoding;
 
 // ── Feature-gated re-exports ─────────────────────────────────────────
 #[cfg(feature = "rand")]
-pub use rng::{DynamicRng, FixedRng};
+pub use random::{DynamicRng, FixedRng};
 
-#[cfg(feature = "conversions")]
-pub use conversions::HexString;
+#[cfg(feature = "encoding-hex")]
+pub use encoding::hex::HexString;
 
-#[cfg(feature = "conversions")]
-pub use conversions::Base64String;
+#[cfg(feature = "encoding-base64")]
+pub use encoding::base64::Base64String;
 
-#[cfg(any(feature = "conversions", feature = "ct-eq"))]
-pub use conversions::SecureConversionsExt;
+#[cfg(any(feature = "encoding-hex", feature = "encoding-base64"))]
+pub use encoding::SecretEncodingExt;
 
 #[cfg(all(feature = "rand", feature = "conversions"))]
-pub use conversions::RandomHex;
+pub use random::RandomHex;
 
 pub use fixed::FromSliceError;
