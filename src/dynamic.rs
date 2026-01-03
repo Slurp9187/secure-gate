@@ -79,23 +79,6 @@ impl<T: ?Sized> Dynamic<T> {
     pub fn expose_secret_mut(&mut self) -> &mut T {
         &mut self.0
     }
-
-    /// Convert to a non-cloneable variant.
-    ///
-    /// Prevents accidental cloning of the secret.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use secure_gate::{Dynamic, DynamicNoClone};
-    /// let secret = Dynamic::<String>::new("no copy".to_string());
-    /// let no_clone: DynamicNoClone<String> = secret.no_clone();
-    /// assert_eq!(no_clone.expose_secret(), "no copy");
-    /// ```
-    #[inline(always)]
-    pub fn no_clone(self) -> crate::DynamicNoClone<T> {
-        crate::DynamicNoClone::new(self.0)
-    }
 }
 
 impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
@@ -104,17 +87,9 @@ impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
     }
 }
 
-// Clone impls — gated correctly
-#[cfg(not(feature = "zeroize"))]
-impl<T: Clone> Clone for Dynamic<T> {
-    #[inline(always)]
-    fn clone(&self) -> Self {
-        Dynamic(self.0.clone())
-    }
-}
-
+// Clone impl — opt-in only when T is CloneableSecret
 #[cfg(feature = "zeroize")]
-impl<T: Clone + zeroize::Zeroize> Clone for Dynamic<T> {
+impl<T: ?Sized + crate::CloneableSecret + zeroize::Zeroize> Clone for Dynamic<T> {
     #[inline(always)]
     fn clone(&self) -> Self {
         Dynamic(self.0.clone())

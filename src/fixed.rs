@@ -92,24 +92,6 @@ impl<T> Fixed<T> {
     pub fn expose_secret_mut(&mut self) -> &mut T {
         &mut self.0
     }
-
-
-    /// Convert to a non-cloneable variant.
-    ///
-    /// This prevents accidental cloning of the secret.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use secure_gate::Fixed;
-    /// let secret = Fixed::new([1u8; 32]);
-    /// let no_clone = secret.no_clone();
-    /// // no_clone cannot be cloned
-    /// ```
-    #[inline(always)]
-    pub fn no_clone(self) -> crate::FixedNoClone<T> {
-        crate::FixedNoClone::new(self.0)
-    }
 }
 
 // === Byte-array specific helpers ===
@@ -176,8 +158,9 @@ impl<T> fmt::Debug for Fixed<T> {
     }
 }
 
-// Explicit Clone only — no implicit Copy
-impl<T: Clone> Clone for Fixed<T> {
+// Opt-in Clone — only for types marked CloneableSecret (default no-clone)
+#[cfg(feature = "zeroize")]
+impl<T: crate::CloneableSecret + zeroize::Zeroize> Clone for Fixed<T> {
     #[inline(always)]
     fn clone(&self) -> Self {
         Self(self.0.clone())

@@ -3,7 +3,7 @@
 // ==========================================================================
 // Core integration tests — pure v0.6.0 API
 
-use secure_gate::{Dynamic, DynamicNoClone, Fixed};
+use secure_gate::{Dynamic, Fixed};
 
 #[test]
 fn basic_usage_explicit_access() {
@@ -40,19 +40,6 @@ fn debug_is_redacted() {
 }
 
 #[test]
-fn clone_dynamic_is_isolated() {
-    let pw1 = Dynamic::<String>::new("original".to_string());
-    let pw2 = pw1.clone();
-
-    let mut pw1_mut = pw1.clone();
-    pw1_mut.expose_secret_mut().push('!');
-
-    assert_eq!(pw1.expose_secret(), "original");
-    assert_eq!(pw2.expose_secret(), "original");
-    assert_eq!(pw1_mut.expose_secret(), "original!");
-}
-
-#[test]
 fn expose_secret_provides_access() {
     let key = Fixed::new([1u8; 32]);
     assert_eq!(*key.expose_secret(), [1u8; 32]);
@@ -81,17 +68,6 @@ fn dynamic_len_is_empty() {
     assert!(!pw.is_empty());
 
     let empty: Dynamic<String> = "".into();
-    assert_eq!(empty.len(), 0);
-    assert!(empty.is_empty());
-}
-
-#[test]
-fn dynamic_no_clone_len_is_empty() {
-    let pw: DynamicNoClone<String> = DynamicNoClone::new(Box::new("hunter2".to_string()));
-    assert_eq!(pw.len(), 7);
-    assert!(!pw.is_empty());
-
-    let empty: DynamicNoClone<String> = DynamicNoClone::new(Box::new("".to_string()));
     assert_eq!(empty.len(), 0);
     assert!(empty.is_empty());
 }

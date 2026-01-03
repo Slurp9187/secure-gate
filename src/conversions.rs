@@ -116,7 +116,7 @@ impl<const N: usize> SecureConversionsExt for [u8; N] {
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[cfg(feature = "conversions")]
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct HexString(crate::Dynamic<String>);
 
 #[cfg(feature = "conversions")]
@@ -241,12 +241,20 @@ impl PartialEq for HexString {
 #[cfg(all(feature = "conversions", not(feature = "ct-eq")))]
 impl Eq for HexString {}
 
+#[cfg(feature = "conversions")]
+impl Clone for HexString {
+    fn clone(&self) -> Self {
+        let cloned_string = self.0.expose_secret().clone();
+        HexString(crate::Dynamic::new(cloned_string))
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // RandomHex — only constructible from fresh RNG
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[cfg(all(feature = "rand", feature = "conversions"))]
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct RandomHex(HexString);
 
 #[cfg(all(feature = "rand", feature = "conversions"))]
