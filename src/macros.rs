@@ -37,12 +37,12 @@
 macro_rules! fixed_alias {
     ($vis:vis $name:ident, $size:literal) => {
         #[doc = concat!("Fixed-size secure secret (", stringify!($size), " bytes)")]
-        const _: () = assert!($size > 0, "Size must be greater than zero");
+        const _: () = { let _ = [(); $size][0]; };
         $vis type $name = $crate::Fixed<[u8; $size]>;
     };
     ($name:ident, $size:literal) => {
         #[doc = concat!("Fixed-size secure secret (", stringify!($size), " bytes)")]
-        const _: () = assert!($size > 0, "Size must be greater than zero");
+        const _: () = { let _ = [(); $size][0]; };
         type $name = $crate::Fixed<[u8; $size]>;
     };
 }
@@ -107,12 +107,12 @@ macro_rules! fixed_generic_alias {
 macro_rules! fixed_alias_rng {
     ($vis:vis $name:ident, $size:literal) => {
         #[doc = concat!("Random-only fixed-size secret (", stringify!($size), " bytes)")]
-        const _: () = assert!($size > 0, "Size must be greater than zero");
+        const _: () = { let _ = [(); $size][0]; };
         $vis type $name = $crate::random::FixedRng<$size>;
     };
     ($name:ident, $size:literal) => {
         #[doc = concat!("Random-only fixed-size secret (", stringify!($size), " bytes)")]
-        const _: () = assert!($size > 0, "Size must be greater than zero");
+        const _: () = { let _ = [(); $size][0]; };
         type $name = $crate::random::FixedRng<$size>;
     };
 }

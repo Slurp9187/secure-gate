@@ -26,6 +26,25 @@ fn fixed_alias_basics() {
     assert_eq!(k.expose_secret().len(), 32);
 }
 
+#[test]
+fn non_zero_size_validation() {
+    // Valid minimal size
+    fixed_alias!(MinimalKey, 1);
+    let k: MinimalKey = [42u8].into();
+    assert_eq!(k.len(), 1);
+
+    #[cfg(feature = "rand")]
+    {
+        fixed_alias_rng!(MinimalRngKey, 1);
+        let rk = MinimalRngKey::generate();
+        assert_eq!(rk.len(), 1);
+        assert_ne!(*rk.expose_secret(), [0u8; 1]); // Not zeroed
+    }
+
+    // Compile-fail test: Uncomment to verify (should fail build)
+    // fixed_alias!(ZeroKey, 0);  // Expected: Compile error
+}
+
 // ──────────────────────────────────────────────────────────────
 // Dynamic (heap) alias
 // ──────────────────────────────────────────────────────────────
