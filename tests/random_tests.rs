@@ -78,3 +78,58 @@ fn zeroize_trait_is_available() {
     key.zeroize();
     assert_eq!(key.expose_secret(), &[0u8; 32]);
 }
+
+#[test]
+fn try_generate_success() {
+    // Test try_generate variants work without errors
+    let fixed: FixedRng<16> = FixedRng::try_generate().unwrap();
+    assert_eq!(fixed.len(), 16);
+
+    let dynamic: DynamicRng = DynamicRng::try_generate(32).unwrap();
+    assert_eq!(dynamic.len(), 32);
+}
+
+#[test]
+fn into_inner_and_conversions() {
+    // Test into_inner preserves data without exposing
+    let fixed_rng = FixedRng::<8>::generate();
+    let fixed_inner: secure_gate::Fixed<[u8; 8]> = fixed_rng.into_inner();
+    assert_eq!(fixed_inner.len(), 8);
+
+    // Test From conversion
+    let fixed_rng2 = FixedRng::<8>::generate();
+    let fixed_converted: secure_gate::Fixed<[u8; 8]> = fixed_rng2.into();
+    assert_eq!(fixed_converted.len(), 8);
+
+    let dynamic_rng = DynamicRng::generate(16);
+    let dynamic_inner: secure_gate::Dynamic<Vec<u8>> = dynamic_rng.into_inner();
+    assert_eq!(dynamic_inner.len(), 16);
+
+    // Test From conversion for dynamic
+    let dynamic_rng2 = DynamicRng::generate(16);
+    let dynamic_converted: secure_gate::Dynamic<Vec<u8>> = dynamic_rng2.into();
+    assert_eq!(dynamic_converted.len(), 16);
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn hex_methods_work() {
+    // Test to_hex (non-consuming)
+    let rng = FixedRng::<4>::generate();
+    let hex = rng.to_hex();
+    assert_eq!(hex.byte_len(), 4);
+    assert!(hex.expose_secret().chars().all(|c| c.is_ascii_hexdigit()));
+
+    // Test into_hex (consuming)
+    let rng2 = FixedRng::<4>::generate();
+    let owned_hex = rng2.into_hex();
+    assert_eq!(owned_hex.byte_len(), 4);
+    assert!(owned_hex
+        .expose_secret()
+        .chars()
+        .all(|c| c.is_ascii_hexdigit()));
+
+    // Basic round-trip check (hex decodes back)
+    let bytes = owned_hex.to_bytes();
+    assert_eq!(bytes.len(), 4);
+}
