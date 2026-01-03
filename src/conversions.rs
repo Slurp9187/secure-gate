@@ -374,11 +374,27 @@ impl core::ops::Deref for Base64String {
 ///
 /// Ensures the contained hex is always valid and represents random bytes generated securely.
 /// Invalid constructions are not possible; only created via `FixedRng::random_hex()`.
+///
+/// # Cloning Behavior
+///
+/// Unlike most secret types in this crate, `RandomHex` implements `Clone` as a deliberate design
+/// choice. This allows duplicating random secrets in memory for use cases like:
+/// - Backup codes and recovery tokens
+/// - TOTP secrets that need to be displayed/stored in multiple formats
+/// - Hex-encoded keys that may need to be copied for display purposes
+///
+/// While this slightly contradicts the "opt-in cloning only for safe types" philosophy, it's
+/// considered acceptable for display-oriented hex tokens since:
+/// - Copies are still zeroized on drop (no memory leaks)
+/// - The data is already exposed as displayable hex (not raw binary secrets)
+/// - Use cases typically involve short-lived copies for user presentation
 #[cfg(all(feature = "rand", feature = "conversions"))]
 #[derive(Debug)]
 pub struct RandomHex(HexString);
 
 #[cfg(all(feature = "rand", feature = "conversions"))]
+// RandomHex implements Clone manually, unlike other secret types.
+// This is a deliberate design choice for display tokens - see struct docs.
 impl Clone for RandomHex {
     fn clone(&self) -> Self {
         let cloned_string = self.0 .0.expose_secret().clone();

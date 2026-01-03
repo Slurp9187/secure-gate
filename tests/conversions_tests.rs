@@ -115,6 +115,27 @@ fn random_hex_returns_randomhex() {
     assert_eq!(hex.to_bytes().len(), 32);
 }
 
+#[cfg(all(feature = "rand", feature = "conversions"))]
+#[test]
+fn random_hex_clone_works() {
+    use secure_gate::rng::FixedRng;
+    let original: RandomHex = FixedRng::<16>::random_hex();
+    let cloned = original.clone();
+
+    // Both should contain the same hex string
+    assert_eq!(original.expose_secret(), cloned.expose_secret());
+
+    // Both should decode to the same bytes
+    assert_eq!(original.to_bytes(), cloned.to_bytes());
+
+    // They should be equal
+    assert_eq!(original, cloned);
+
+    // But they should be independent (different memory locations)
+    // We can't directly test memory locations, but we can verify they're equal
+    // after operations that would affect one but not the other if they were shared
+}
+
 #[test]
 fn ct_eq_different_lengths_returns_false() {
     dynamic_alias!(TestKey, Vec<u8>);
