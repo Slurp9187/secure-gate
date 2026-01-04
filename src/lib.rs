@@ -50,6 +50,9 @@ pub use encoding::hex::HexString;
 #[cfg(feature = "encoding-base64")]
 pub use encoding::base64::Base64String;
 
+#[cfg(feature = "encoding-bech32")]
+pub use encoding::bech32::Bech32String;
+
 #[cfg(any(feature = "encoding-hex", feature = "encoding-base64"))]
 pub use encoding::SecureEncodingExt;
 

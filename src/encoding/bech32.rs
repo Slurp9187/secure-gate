@@ -51,9 +51,13 @@ impl Bech32String {
         match bech32::decode(&s) {
             Ok((hrp, data)) => {
                 // Check against allowed HRPs
-                if matches!(hrp.as_str(), "age" | "age1pq" | "age-secret-key-1" | "age-secret-key-pq-") {
+                if matches!(
+                    hrp.as_str(),
+                    "age" | "age1pq" | "age-secret-key-1" | "age-secret-key-pq-"
+                ) {
                     // Normalize to lowercase
-                    let normalized = bech32::encode::<Bech32>(hrp, &data).expect("re-encoding valid bech32 should succeed");
+                    let normalized = bech32::encode::<Bech32>(hrp, &data)
+                        .expect("re-encoding valid bech32 should succeed");
                     Ok(Self(crate::Dynamic::new(normalized)))
                 } else {
                     zeroize_input(&mut s);
@@ -79,18 +83,25 @@ impl Bech32String {
     ///
     /// Panics if the internal string is somehow invalid (impossible under correct usage).
     pub fn decode_secret_to_bytes(&self) -> Vec<u8> {
-        let (_, data) = bech32::decode(self.0.expose_secret()).expect("Bech32String is always valid");
+        let (_, data) =
+            bech32::decode(self.0.expose_secret()).expect("Bech32String is always valid");
         data
     }
 
     /// Number of bytes the decoded Bech32 string represents.
     pub fn byte_len(&self) -> usize {
-        self.decode_secret_to_bytes().len()
+        let s = self.expose_secret();
+        let sep_pos = s.find('1').expect("valid bech32 has '1' separator");
+        let data_part_len = s.len() - sep_pos - 1; // everything after '1'
+        let data_chars = data_part_len - 6; // drop checksum (always 6 chars)
+        (data_chars * 5) / 8
     }
 
     /// The Human-Readable Part of the Bech32 string.
     pub fn hrp(&self) -> Hrp {
-        bech32::decode(self.0.expose_secret()).expect("Bech32String is always valid").0
+        bech32::decode(self.0.expose_secret())
+            .expect("Bech32String is always valid")
+            .0
     }
 
     /// Whether this Bech32 string is for a post-quantum age key (PQ variant).
