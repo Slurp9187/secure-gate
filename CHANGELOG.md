@@ -13,34 +13,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Custom types can implement the trait.
 - Fallible RNG methods: `try_generate()` on `FixedRng<N>` and `DynamicRng`, returning `Result<Self, rand::Error>`.
   - Corresponding `try_generate_random()` methods on `Fixed` and `Dynamic`.
-- `Base64String` wrapper in `encoding::base64` with validation, `.to_bytes()`, and constant-time equality (when `ct-eq` enabled).
+- `Base64String` wrapper in `encoding::base64` with validation, `decode_secret_to_bytes()`, and constant-time equality (when `ct-eq` enabled).
   - Validates URL-safe no-pad base64; invalid inputs are zeroed when `zeroize` enabled.
 - `into_hex()` (consuming) and `to_hex()` (borrowing) methods on `FixedRng<N>` (requires `encoding-hex`).
 - `eq` module with `ConstantTimeEq` trait and inherent `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
 - Fallible construction: `impl TryFrom<&[u8]> for Fixed<[u8; N]>` with `FromSliceError`.
   - `from_slice` now delegates to `TryFrom` (panics for compatibility).
 - Conversions: `From<&str>` for `Dynamic<String>` and `From<&[u8]>` for `Dynamic<Vec<u8>>`.
-- Explicit methods on `HexString` and `Base64String`: `.expose_secret() -> &str`, `.len()`, `.is_empty()`.
-- `Bech32String` wrapper in `encoding::bech32` for age keys, with validation for age-relevant HRPs (e.g., "age", "age-secret-key-1"), `.to_bytes()` (5-to-8 bit conversion), constant-time equality, and zeroing of invalid inputs.
+- Explicit methods on `HexString` and `Base64String`: `.expose_secret() -> &String`, `.len()`, `.is_empty()`, `.byte_len()`.
+- `Bech32String` wrapper in `encoding::bech32` for age-compatible keys.
+  - Validation for age-relevant HRPs (`age`, `age1pq`, `age-secret-key-1`, `age-secret-key-pq-`).
+  - Accepts uppercase input (normalised to lowercase).
+  - Provides `decode_secret_to_bytes()`, non-allocating `byte_len()`, `hrp()`, `is_postquantum()`, constant-time equality, and zeroing of invalid inputs (when `zeroize` enabled).
+- Granular `encoding-bech32` feature and inclusion in meta-feature `encoding`.
 
 ### Changed
 - Refactored encoding system:
   - Replaced `conversions` module/feature with modular `encoding`.
-  - Split into `encoding::hex` and `encoding::base64` submodules.
-  - Granular features: `encoding` enables both `encoding-hex` and `encoding-base64`.
+  - Split into `encoding::hex`, `encoding::base64`, and `encoding::bech32` submodules.
+  - Granular features: `encoding` now enables `encoding-hex`, `encoding-base64`, and `encoding-bech32`.
   - Trait is now `SecureEncodingExt`.
   - Removed `RandomHex` type; replaced with `FixedRng<N>` hex methods.
 - Cloning model: switched to opt-in via `CloneableSecret`.
 - `from_slice` on fixed byte arrays now uses fallible `TryFrom` internally.
 - Renamed `rng` module to `random`.
-- Encoding wrappers (`HexString`, `Base64String`): removed `Deref` implementations for consistent explicit access.
-- `Base64String`: simplified validation using engine-based decoding for better performance and accuracy.
-- `expose_secret()` on `HexString` and `Base64String` now returns `&String` for API consistency.
+- Encoding wrappers (`HexString`, `Base64String`, `Bech32String`):
+  - Removed `Deref` implementations for consistent explicit access.
+  - Unified decode method to `decode_secret_to_bytes()` returning raw `Vec<u8>`.
+  - `expose_secret()` now returns `&String` for API consistency.
+  - Added non-allocating `byte_len()` implementations.
+- `Base64String`: simplified validation using single engine-based decode check.
 
 ### Fixed
 - Feature gating for `CloneableSecret` and related impls (requires `zeroize`).
 - Doc-test compatibility across all feature configurations.
 - Resolved compilation conflicts in error types and trait bounds.
+- `Bech32String` `byte_len()` now allocation-free.
 
 ### Removed
 - `NoClone` wrapper types and `no_clone()` methods.
