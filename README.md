@@ -19,13 +19,13 @@ Cloning is opt-in via the `CloneableSecret` trait.
 
 ```toml
 [dependencies]
-secure-gate = "0.7.0-rc.1"
+secure-gate = "0.7.0-rc.2"
 ```
 
 Recommended configuration:
 
 ```toml
-secure-gate = { version = "0.7.0-rc.1", features = ["full"] }
+secure-gate = { version = "0.7.0-rc.2", features = ["full"] }
 ```
 
 ## Features
@@ -207,7 +207,7 @@ The wrappers add no runtime overhead compared to raw types in benchmarks.
 
 ## Changelog
 
-[CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/v070rc1/CHANGELOG.md)
+[CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/v070rc/CHANGELOG.md)
 
 ## License
 

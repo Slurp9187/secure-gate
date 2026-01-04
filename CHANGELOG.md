@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `from_slice` now delegates to `TryFrom` (panics for compatibility).
 - Conversions: `From<&str>` for `Dynamic<String>` and `From<&[u8]>` for `Dynamic<Vec<u8>>`.
 - Explicit methods on `HexString` and `Base64String`: `.expose_secret() -> &str`, `.len()`, `.is_empty()`.
+- `Bech32String` wrapper in `encoding::bech32` for age keys, with validation for age-relevant HRPs (e.g., "age", "age-secret-key-1"), `.to_bytes()` (5-to-8 bit conversion), constant-time equality, and zeroing of invalid inputs.
 
 ### Changed
 - Refactored encoding system:
@@ -33,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `from_slice` on fixed byte arrays now uses fallible `TryFrom` internally.
 - Renamed `rng` module to `random`.
 - Encoding wrappers (`HexString`, `Base64String`): removed `Deref` implementations for consistent explicit access.
+- `Base64String`: simplified validation using engine-based decoding for better performance and accuracy.
+- `expose_secret()` on `HexString` and `Base64String` now returns `&String` for API consistency.
 
 ### Fixed
 - Feature gating for `CloneableSecret` and related impls (requires `zeroize`).

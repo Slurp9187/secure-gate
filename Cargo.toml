@@ -1,10 +1,10 @@
 [package]
 name = "secure-gate"
-version = "0.7.0-rc.1"
+version = "0.7.0-rc.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Zero-cost secure wrappers for secrets — stack for fixed, heap for dynamic"
-repository = "https://github.com/Slurp9187/secure-gate/tree/v070rc1"
+repository = "https://github.com/Slurp9187/secure-gate/tree/v070rc"
 documentation = "https://docs.rs/secure-gate"
 keywords = ["crypto", "no-std", "security", "zeroize"]
 categories = ["cryptography", "no-std", "data-structures"]
