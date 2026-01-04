@@ -31,8 +31,8 @@ criterion = { version = "0.5", features = ["html_reports"] }
 # Features
 # ──────────────────────────────────────────────────────────────
 [features]
-# Default features: Essential for basic secure secret handling (RNG and zeroing)
-default = ["rand", "zeroize"]
+# Default features: Essential for basic secure secret handling (RNG, zeroing, and constant-time equality)
+default = ["rand", "zeroize", "ct-eq"]
 
 # Encoding: Secure conversions (hex/base64) for displaying or serializing secrets without leaks
 encoding = ["encoding-hex", "encoding-base64"]
