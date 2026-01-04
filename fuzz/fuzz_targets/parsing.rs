@@ -32,7 +32,7 @@ fuzz_target!(|data: &[u8]| {
     }
 
     // 1. Dynamic<Vec<u8>> — raw arbitrary bytes (no UTF-8 required)
-    let dyn_bytes = dyn_vec.clone();
+    let dyn_bytes: Dynamic<Vec<u8>> = Dynamic::new(dyn_vec.expose_secret().clone());
     let _ = dyn_bytes.expose_secret().len(); // ← explicit
 
     // 2. UTF-8 path — only if valid
@@ -41,7 +41,7 @@ fuzz_target!(|data: &[u8]| {
     let _ = dyn_str_new.expose_secret().len(); // ← explicit
 
     // Stress: clone + to_string
-    let cloned = dyn_str_new.clone();
+    let cloned: Dynamic<String> = Dynamic::new(dyn_str_new.expose_secret().clone());
     let _ = cloned.expose_secret().to_string();
     drop(cloned);
 

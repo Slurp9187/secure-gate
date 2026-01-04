@@ -8,7 +8,7 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-secure-gate = { path = "../", features = ["zeroize", "rand", "conversions"] }
+secure-gate = { path = "../", features = ["zeroize", "rand", "encoding"] }
 arbitrary = { version = "1.3", features = ["derive"] }
 libfuzzer-sys = "0.4"
 
@@ -16,18 +16,12 @@ libfuzzer-sys = "0.4"
 zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
 
 [features]
-default = ["zeroize", "rand", "conversions"]
+default = ["zeroize", "rand", "encoding"]
 
 zeroize = ["secure-gate/zeroize"]
 rand = ["secure-gate/rand"]
-conversions = ["secure-gate/conversions"]
-
-[[bin]]
-name = "clone"
-path = "fuzz_targets/clone.rs"
-test = false
-bench = false
-doc = false
+encoding = ["secure-gate/encoding"]
+# conversions = ["secure-gate/conversions"]
 
 [[bin]]
 name = "expose"

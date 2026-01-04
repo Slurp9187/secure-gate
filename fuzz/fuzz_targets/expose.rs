@@ -28,7 +28,7 @@ fuzz_target!(|data: &[u8]| {
     };
 
     // 1. Growable Vec<u8>
-    let mut vec_dyn = dyn_vec.clone();
+    let mut vec_dyn: Dynamic<Vec<u8>> = Dynamic::new(dyn_vec.expose_secret().clone());
     vec_dyn.expose_secret_mut().reverse();
     vec_dyn.expose_secret_mut().truncate(data.len().min(64));
     vec_dyn.expose_secret_mut().extend_from_slice(b"fuzz");
@@ -39,7 +39,7 @@ fuzz_target!(|data: &[u8]| {
     fixed_key.expose_secret_mut()[0] = 0xFF;
 
     // 3. String handling
-    let mut dyn_str_mut = dyn_str.clone();
+    let mut dyn_str_mut: Dynamic<String> = Dynamic::new(dyn_str.expose_secret().clone());
     dyn_str_mut.expose_secret_mut().push('!');
 
     // 4. Fixed-size nonce
@@ -49,9 +49,9 @@ fuzz_target!(|data: &[u8]| {
 
     // 5. Clone — all access through expose_secret()
     let cloneable = Dynamic::<Vec<u8>>::new(vec![1u8, 2, 3]);
-    let _ = cloneable.clone();
+
     let _default = Dynamic::<String>::new(String::new());
-    
+
     // All access must go through expose_secret() — security model enforced
     let _inner_ref = cloneable.expose_secret();
 

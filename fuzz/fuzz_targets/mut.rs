@@ -39,7 +39,7 @@ fuzz_target!(|data: &[u8]| {
     // 1. Dynamic<String> — full mutation torture + explicit zeroize
     #[cfg(feature = "zeroize")]
     {
-        let mut pw = dyn_str.clone();
+        let mut pw: Dynamic<String> = Dynamic::new(dyn_str.expose_secret().clone());
         let text = pw.expose_secret().clone();
 
         {
@@ -77,7 +77,7 @@ fuzz_target!(|data: &[u8]| {
     }
 
     // 2. Dynamic<Vec<u8>> — raw buffer abuse
-    let mut bytes = dyn_vec.clone();
+    let mut bytes: Dynamic<Vec<u8>> = Dynamic::new(dyn_vec.expose_secret().clone());
     {
         let v = bytes.expose_secret_mut();
         v.clear();
@@ -108,7 +108,8 @@ fuzz_target!(|data: &[u8]| {
     let nested = Dynamic::<Dynamic<Vec<u8>>>::new(Dynamic::new(data.to_vec()));
     #[cfg(feature = "zeroize")]
     if data[0] % 11 == 0 {
-        let mut inner = nested.clone();
+        let mut inner: Dynamic<Dynamic<Vec<u8>>> =
+            Dynamic::new(Dynamic::new(nested.expose_secret().expose_secret().clone()));
         inner.zeroize();
     }
     drop(nested);
