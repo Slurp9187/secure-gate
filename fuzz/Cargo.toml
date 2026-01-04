@@ -21,7 +21,6 @@ default = ["zeroize", "rand", "encoding"]
 zeroize = ["secure-gate/zeroize"]
 rand = ["secure-gate/rand"]
 encoding = ["secure-gate/encoding"]
-# conversions = ["secure-gate/conversions"]
 
 [[bin]]
 name = "expose"

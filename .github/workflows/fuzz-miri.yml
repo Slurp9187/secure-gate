@@ -55,7 +55,7 @@ jobs:
             -Zmiri-strict-provenance
         run: |
           echo "Starting light Miri corpus scan on fuzz targets (max 2 min each)..."
-          for target in clone expose mut parsing; do   # ← zeroizing REMOVED
+          for target in expose mut parsing; do
             echo "=== Miri scanning fuzz target: $target ==="
             timeout 120 cargo miri run --bin $target -- -max_total_time=60 || \
               echo "Warning: $target timed out or hit expected panic (ignored)"

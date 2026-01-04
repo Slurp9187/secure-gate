@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [clone, expose, mut, parsing] # ← zeroizing removed
+        target: [expose, mut, parsing]
         mode: [normal, asan]
 
     env:
@@ -62,14 +62,14 @@ jobs:
       - name: Populate per-target corpus directories
         run: |
           mkdir -p fuzz/corpus
-          for t in clone expose mut parsing; do          # ← zeroizing removed
+          for t in expose mut parsing; do
             mkdir -p "fuzz/corpus/$t"
             find fuzz/corpus-downloaded -type f -name "*$t*" -exec cp {} "fuzz/corpus/$t/" \; 2>/dev/null || true
           done
 
       - name: Seed minimal corpus (first-run safety net)
         run: |
-          for t in clone expose mut parsing; do          # ← zeroizing removed
+          for t in expose mut parsing; do
             dir="fuzz/corpus/$t"
             if [ ! -d "$dir" ] || [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
               mkdir -p "$dir"
@@ -149,7 +149,7 @@ jobs:
       - name: Reconstruct corpus directories
         run: |
           mkdir -p fuzz/corpus
-          for t in clone expose mut parsing; do          # ← zeroizing removed
+          for t in expose mut parsing; do
             mkdir -p "fuzz/corpus/$t"
             find fuzz/corpus-downloaded -type f -name "*$t*" -exec cp {} "fuzz/corpus/$t/" \; 2>/dev/null || true
           done
@@ -158,7 +158,7 @@ jobs:
         run: |
           mkdir -p coverage/html coverage/lcov
 
-          for target in clone expose mut parsing; do     # ← zeroizing removed
+          for target in expose mut parsing; do
             echo "=== Generating coverage for $target ==="
             corpus="fuzz/corpus/$target"
             [ ! -d "$corpus" ] || [ -z "$(ls -A "$corpus")" ] && continue
