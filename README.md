@@ -1,64 +1,62 @@
 # secure-gate
 
-**Zero-cost, `no_std`-compatible wrappers for sensitive data with enforced explicit exposure.**
+`no_std`-compatible wrappers for sensitive data with explicit exposure requirements.
 
-- `Fixed<T>` – Stack-allocated, zero-cost wrapper
-- `Dynamic<T>` – Heap-allocated wrapper with full `.into()` ergonomics
-- `FixedRng<N>` – Cryptographically secure random bytes of exact length N
-- `DynamicRng` – Heap-allocated cryptographically secure random bytes
-- `HexString` – Validated lowercase hex wrapper
-- `Base64String` – Validated URL-safe base64 (no-pad) wrapper
+- `Fixed<T>` — Stack-allocated wrapper
+- `Dynamic<T>` — Heap-allocated wrapper
+- `FixedRng<N>` — Cryptographically secure random bytes of fixed length N
+- `DynamicRng` — Heap-allocated cryptographically secure random bytes
+- `HexString` — Validated lowercase hexadecimal string wrapper
+- `Base64String` — Validated URL-safe base64 string wrapper (no padding)
 
-When the `zeroize` feature is enabled, secrets are automatically wiped on drop (including spare capacity).
+With the `zeroize` feature enabled, memory containing secrets is zeroed on drop, including spare capacity where applicable.
 
-**All access to secret bytes requires an explicit `.expose_secret()` call** – no silent leaks, no `Deref`, no hidden methods.
+Access to secret data requires an explicit `.expose_secret()` call. There are no `Deref` implementations or other implicit access paths.
 
-Cloning is opt-in via the `CloneableSecret` trait, preventing accidental duplication of secrets.
+Cloning is opt-in via the `CloneableSecret` trait.
 
 ## Installation
 
 ```toml
 [dependencies]
-secure-gate = "0.7.0"
+secure-gate = "0.7.0-rc.1"
 ```
 
-**Recommended (maximum safety + ergonomics):**
+Recommended configuration:
 
 ```toml
-secure-gate = { version = "0.7.0", features = ["full"] }
+secure-gate = { version = "0.7.0-rc.1", features = ["full"] }
 ```
 
 ## Features
 
 | Feature            | Description                                                                 |
 |--------------------|-----------------------------------------------------------------------------|
-| `zeroize`          | Automatic memory wiping on drop + opt-in cloning via `CloneableSecret` – **strongly recommended** |
-| `rand`             | RNG generation: `FixedRng<N>::generate()`, `DynamicRng::generate()`, fallible `try_generate()` |
-| `ct-eq`            | `.ct_eq()` – constant-time equality comparison                             |
+| `zeroize`          | Memory zeroing on drop and opt-in cloning via `CloneableSecret`             |
+| `rand`             | Random generation (`FixedRng<N>::generate()`, `DynamicRng::generate()`)    |
+| `ct-eq`            | Constant-time equality comparison                                          |
 | `encoding`         | Encoding support (`encoding-hex` + `encoding-base64`)                       |
-| `encoding-hex`     | `.to_hex()`, `.to_hex_upper()`, `HexString`, `FixedRng::into_hex()`        |
-| `encoding-base64`  | `Base64String` (no `.to_base64url()` extension yet – use direct encoding)  |
-| `full`             | All features above for batteries-included usage                             |
+| `encoding-hex`     | Hex encoding, `HexString`, `FixedRng` hex methods                          |
+| `encoding-base64`  | `Base64String`                                                             |
+| `full`             | All optional features                                                      |
 
-Works in `no_std` + `alloc`. Only pay for what you use.
+The crate is `no_std`-compatible with `alloc`. Features are optional and add no overhead when unused.
 
 ## Quick Start
 
 ```rust
 use secure_gate::{fixed_alias, dynamic_alias};
 
-fixed_alias!(pub Aes256Key, 32);     // Explicit visibility required
-dynamic_alias!(pub Password, String); // Explicit visibility required
+fixed_alias!(pub Aes256Key, 32);
+dynamic_alias!(pub Password, String);
 
-// Heap secrets – unchanged ergonomics
 let pw: Password = "hunter2".into();
 assert_eq!(pw.expose_secret(), "hunter2");
 
-// Cloning is opt-in (requires zeroize feature)
 #[cfg(feature = "zeroize")]
 {
     let key1: Aes256Key = Aes256Key::new([0u8; 32]);
-    let key2 = key1.clone(); // Works—arrays impl CloneableSecret by default
+    let key2 = key1.clone();
 }
 
 #[cfg(feature = "rand")]
@@ -68,12 +66,12 @@ assert_eq!(pw.expose_secret(), "hunter2");
     fixed_alias_rng!(pub MasterKey, 32);
     fixed_alias_rng!(pub Nonce, 24);
 
-    let key = MasterKey::generate(); // FixedRng<32>
-    let nonce = Nonce::generate();   // FixedRng<24>
+    let key = MasterKey::generate();
+    let nonce = Nonce::generate();
 
     #[cfg(feature = "encoding-hex")]
     {
-        let hex = key.into_hex(); // Consumes key, zeroizes raw bytes
+        let hex = key.into_hex();
         println!("key hex: {}", hex.expose_secret());
     }
 }
@@ -81,31 +79,28 @@ assert_eq!(pw.expose_secret(), "hunter2");
 
 ## Opt-In Cloning
 
-Cloning is disabled by default to prevent accidental duplication. Enable it explicitly:
+Cloning is not implemented by default. It is enabled only for types that implement `CloneableSecret` (requires the `zeroize` feature).
 
 ```rust
 #[cfg(feature = "zeroize")]
 {
     use secure_gate::{CloneableSecret, Fixed};
 
-    // Primitives/arrays: Built-in CloneableSecret
     let key1: Fixed<[u8; 32]> = Fixed::new([1u8; 32]);
-    let key2 = key1.clone(); // OK
+    let key2 = key1.clone();
 
-    // Custom types: Opt-in manually
     #[derive(Clone, zeroize::Zeroize)]
     struct MyKey([u8; 16]);
     impl CloneableSecret for MyKey {}
 
     let my_key: Fixed<MyKey> = Fixed::new(MyKey([0u8; 16]));
-    let copy = my_key.clone(); // OK
+    let copy = my_key.clone();
 }
 ```
 
-- **Why opt-in?** Prevents unsafe duplications. Only primitives/arrays get blanket impls.
-- **Requires `zeroize`**: Ensures cloned copies are wiped on drop.
+Blanket implementations exist for primitives and fixed-size arrays.
 
-## Type-Safe Randomness
+## Randomness
 
 ```rust
 #[cfg(feature = "rand")]
@@ -120,28 +115,27 @@ Cloning is disabled by default to prevent accidental duplication. Enable it expl
 
     #[cfg(feature = "encoding-hex")]
     {
-        let hex_code = code.into_hex(); // Raw bytes zeroized immediately
+        let hex_code = code.into_hex();
         println!("Backup code: {}", hex_code.expose_secret());
     }
 }
 ```
 
-- **Guaranteed freshness** – `FixedRng<N>` can only be constructed via secure RNG.
-- **Zero-cost** – Newtype over `Fixed`, fully inlined.
-- `.generate()` is the canonical constructor.
+`FixedRng<N>` can only be constructed via cryptographically secure RNG.
 
-### Direct Random Generation
+Direct generation is also available:
 
 ```rust
 #[cfg(feature = "rand")]
 {
     use secure_gate::{Fixed, Dynamic};
+
     let key: Fixed<[u8; 32]> = Fixed::generate_random();
     let random: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
 }
 ```
 
-## Secure Encoding
+## Encoding
 
 ```rust
 #[cfg(feature = "encoding-hex")]
@@ -149,7 +143,7 @@ Cloning is disabled by default to prevent accidental duplication. Enable it expl
     use secure_gate::{encoding::hex::HexString, encoding::SecureEncodingExt};
 
     let bytes = [0u8; 16];
-    let hex: String = bytes.to_hex();            // lowercase
+    let hex: String = bytes.to_hex();
     let hex_upper: String = bytes.to_hex_upper();
 
     let validated = HexString::new("deadbeef".to_string()).unwrap();
@@ -165,22 +159,22 @@ Cloning is disabled by default to prevent accidental duplication. Enable it expl
 }
 ```
 
-- All encoding requires `.expose_secret()` on secret wrappers.
-- `HexString`/`Base64String` validate input and zeroize on failure (with `zeroize`).
+Encoding functions require explicit `.expose_secret()`. Invalid inputs to `HexString::new` and `Base64String::new` are zeroed when the `zeroize` feature is enabled.
 
-## Constant-Time Equality (`ct-eq`)
+## Constant-Time Equality
 
 ```rust
 #[cfg(feature = "ct-eq")]
 {
     use secure_gate::Fixed;
+
     let a = Fixed::<[u8; 32]>::generate_random();
     let b = Fixed::<[u8; 32]>::generate_random();
     assert!(a.ct_eq(&a));
 }
 ```
 
-Inherent `.ct_eq()` on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
+Available on `Fixed<[u8; N]>` and `Dynamic<T>` where `T: AsRef<[u8]>`.
 
 ## Macros
 
@@ -199,17 +193,17 @@ dynamic_alias!(pub Password, String);
 
 ## Memory Guarantees (`zeroize` enabled)
 
-| Type            | Allocation | Auto-zero | Full wipe | Slack eliminated | Notes                  |
-|-----------------|------------|-----------|-----------|------------------|------------------------|
-| `Fixed<T>`      | Stack      | Yes       | Yes       | Yes (no heap)    | Zero-cost              |
-| `Dynamic<T>`    | Heap       | Yes       | Yes       | No (until drop)  | Use `shrink_to_fit()`  |
-| `FixedRng<N>`   | Stack      | Yes       | Yes       | Yes              | Fresh + type-safe      |
-| `HexString`     | Heap       | Yes (invalid) | Yes   | No (until drop)  | Validated hex          |
-| `Base64String`  | Heap       | Yes (invalid) | Yes   | No (until drop)  | Validated base64       |
+| Type          | Allocation | Auto-zero | Full wipe | Slack eliminated | Notes                  |
+|---------------|------------|-----------|-----------|------------------|------------------------|
+| `Fixed<T>`    | Stack      | Yes       | Yes       | Yes (no heap)    |                        |
+| `Dynamic<T>`  | Heap       | Yes       | Yes       | No (until drop)  | Use `shrink_to_fit()` |
+| `FixedRng<N>` | Stack      | Yes       | Yes       | Yes              |                        |
+| `HexString`   | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated hex          |
+| `Base64String`| Heap       | Yes (invalid input) | Yes | No (until drop) | Validated base64       |
 
 ## Performance
 
-Zero-cost wrappers. Benchmarks show no measurable overhead vs raw arrays.
+The wrappers add no runtime overhead compared to raw types in benchmarks.
 
 ## Changelog
 
@@ -218,7 +212,3 @@ Zero-cost wrappers. Benchmarks show no measurable overhead vs raw arrays.
 ## License
 
 MIT OR Apache-2.0
-
----
-
-**Explicit access, opt-in cloning, freshness guarantees—secure by design.**

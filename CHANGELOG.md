@@ -5,42 +5,43 @@ All changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.0] - 2026-01-03
+## [0.7.0] - 2026-01-04
+
 ### Added
-- **Opt-In Cloning**: Introduced `CloneableSecret` trait for explicit, safe duplication of secrets (requires `zeroize` feature).
-  - Allows cloning only for types that implement `CloneableSecret` + `Zeroize`.
-  - Blanket impls for primitives (`u8`, `i32`, etc.) and fixed arrays (`[T; N]`).
-  - Users can opt-in for custom types, ensuring cloned secrets are zeroized.
-- **Fallible RNG Generation**: Added `try_generate()` methods to `FixedRng<N>` and `DynamicRng` returning `Result<Self, rand::Error>` instead of panicking.
-  - Direct `try_generate_random()` on `Fixed` and `Dynamic` for convenience.
-- **Base64 Support**: Added `Base64String` wrapper in `encoding::base64`, with validation, decoding (`to_bytes()`), and constant-time equality (gated behind `ct-eq`).
-  - Mirrors `HexString`—validates URL-safe no-pad base64, zeroizes invalid input.
-- **Safe Hex from RNG**: Added `into_hex()` (consuming) and `to_hex()` (non-consuming) methods on `FixedRng<N>` (requires `encoding-hex`).
-  - Raw random bytes are zeroized immediately when using `into_hex()`.
-- **Constant-Time Equality Module**: New `eq` module with `ConstantTimeEq` trait on raw bytes + inherent `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
-- **TryFrom for Fixed**: Made `Fixed<[u8; N]>::from_slice` fallible via `impl TryFrom<&[u8]> for Fixed<[u8; N]>` with `FromSliceError` for length mismatches.
-  - `from_slice` now uses `TryFrom` internally for backward compatibility (still panics, but easily made fallible).
-- **Dynamic Conversions**: Added `impl From<&str> for Dynamic<String>` and `impl From<&[u8]> for Dynamic<Vec<u8>>` for easier construction.
+- `CloneableSecret` trait for opt-in cloning of secrets (requires `zeroize` feature).
+  - Implemented for primitives (`u8`, `i32`, etc.) and fixed arrays (`[T; N]`).
+  - Custom types can implement the trait.
+- Fallible RNG methods: `try_generate()` on `FixedRng<N>` and `DynamicRng`, returning `Result<Self, rand::Error>`.
+  - Corresponding `try_generate_random()` methods on `Fixed` and `Dynamic`.
+- `Base64String` wrapper in `encoding::base64` with validation, `.to_bytes()`, and constant-time equality (when `ct-eq` enabled).
+  - Validates URL-safe no-pad base64; invalid inputs are zeroed when `zeroize` enabled.
+- `into_hex()` (consuming) and `to_hex()` (borrowing) methods on `FixedRng<N>` (requires `encoding-hex`).
+- `eq` module with `ConstantTimeEq` trait and inherent `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
+- Fallible construction: `impl TryFrom<&[u8]> for Fixed<[u8; N]>` with `FromSliceError`.
+  - `from_slice` now delegates to `TryFrom` (panics for compatibility).
+- Conversions: `From<&str>` for `Dynamic<String>` and `From<&[u8]>` for `Dynamic<Vec<u8>>`.
+- Explicit methods on `HexString` and `Base64String`: `.expose_secret() -> &str`, `.len()`, `.is_empty()`.
 
 ### Changed
-- **Major Refactor – Encoding System**: Replaced monolithic `conversions` module/feature with modular `encoding` crate feature.
+- Refactored encoding system:
+  - Replaced `conversions` module/feature with modular `encoding`.
   - Split into `encoding::hex` and `encoding::base64` submodules.
-  - Granular features: `encoding` = [`encoding-hex`, `encoding-base64`].
-  - Trait renamed to `Secure_ENCODINGExt` (still requires explicit `.expose_secret()`).
-  - Removed `RandomHex` wrapper type – replaced with direct `FixedRng<N>::into_hex()`.
-- **Cloning Model**: Switched from opt-out (`NoClone` wrappers) to opt-in via `CloneableSecret`.
-  - Removed `NoClone` types and `no_clone()` methods—use base types directly.
-- **FromSlice Behavior**: Panicking `from_slice` now delegates to `TryFrom` for consistent error handling.
-- **Random Module**: Renamed `rng` → `random` for clarity.
+  - Granular features: `encoding` enables both `encoding-hex` and `encoding-base64`.
+  - Trait is now `SecureEncodingExt`.
+  - Removed `RandomHex` type; replaced with `FixedRng<N>` hex methods.
+- Cloning model: switched to opt-in via `CloneableSecret`.
+- `from_slice` on fixed byte arrays now uses fallible `TryFrom` internally.
+- Renamed `rng` module to `random`.
+- Encoding wrappers (`HexString`, `Base64String`): removed `Deref` implementations for consistent explicit access.
 
 ### Fixed
-- **Feature Gating**: `CloneableSecret` trait, blanket impls, and Clone impls gated behind `zeroize` feature to prevent unresolved deps in non-zeroize builds.
-- **Doc-Tests**: All examples compile in all configs (`--all-features`, `--no-default-features`, `--doc`).
-- **Compilation Errors**: Resolved duplicates/conflicts in error types and trait bounds.
+- Feature gating for `CloneableSecret` and related impls (requires `zeroize`).
+- Doc-test compatibility across all feature configurations.
+- Resolved compilation conflicts in error types and trait bounds.
 
 ### Removed
-- `NoClone` types (`DynamicNoClone`, `FixedNoClone`) and `no_clone()` methods—replaced by opt-in `CloneableSecret`.
-- `RandomHex` type – superseded by `FixedRng<N>::into_hex()`.
+- `NoClone` wrapper types and `no_clone()` methods.
+- `RandomHex` type.
 
 ## [0.6.1] - 2025-12-07
 
