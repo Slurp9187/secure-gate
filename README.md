@@ -33,12 +33,12 @@ secure-gate = { version = "0.7.0-rc.1", features = ["full"] }
 | Feature            | Description                                                                 |
 |--------------------|-----------------------------------------------------------------------------|
 | `zeroize`          | Memory zeroing on drop and opt-in cloning via `CloneableSecret`             |
-| `rand`             | Random generation (`FixedRng<N>::generate()`, `DynamicRng::generate()`)    |
-| `ct-eq`            | Constant-time equality comparison                                          |
+| `rand`             | Random generation (`FixedRng<N>::generate()`, `DynamicRng::generate()`)     |
+| `ct-eq`            | Constant-time equality comparison                                           |
 | `encoding`         | Encoding support (`encoding-hex` + `encoding-base64`)                       |
-| `encoding-hex`     | Hex encoding, `HexString`, `FixedRng` hex methods                          |
-| `encoding-base64`  | `Base64String`                                                             |
-| `full`             | All optional features                                                      |
+| `encoding-hex`     | Hex encoding, `HexString`, `FixedRng` hex methods                           |
+| `encoding-base64`  | `Base64String`                                                              |
+| `full`             | All optional features                                                       |
 
 The crate is `no_std`-compatible with `alloc`. Features are optional and add no overhead when unused.
 
