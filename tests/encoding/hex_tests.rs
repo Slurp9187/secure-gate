@@ -8,6 +8,8 @@
 #[cfg(feature = "encoding-hex")]
 use secure_gate::{fixed_alias_rng, HexString};
 
+use hex;
+
 #[cfg(feature = "encoding-hex")]
 #[cfg(feature = "rand")]
 #[test]
@@ -74,4 +76,56 @@ fn hexstring_empty() {
 fn hexstring_odd_length_fails() {
     let err = HexString::new("abc".to_string()).unwrap_err();
     assert_eq!(err, "invalid hex string");
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn hexstring_rejects_more_invalid_chars() {
+    // Test invalid characters beyond 'g'
+    let s = "dead!".to_string(); // '!' invalid
+    let err = HexString::new(s).unwrap_err();
+    assert_eq!(err, "invalid hex string");
+
+    let s = "beef@".to_string(); // '@' invalid
+    let err = HexString::new(s).unwrap_err();
+    assert_eq!(err, "invalid hex string");
+
+    let s = "cafe\n".to_string(); // newline invalid
+    let err = HexString::new(s).unwrap_err();
+    assert_eq!(err, "invalid hex string");
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn hexstring_byte_len_longer() {
+    // Test byte_len for a longer string
+    let s = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff".to_string(); // 64 chars
+    let hex = HexString::new(s).unwrap();
+    assert_eq!(hex.byte_len(), 32);
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn hexstring_round_trip() {
+    // Test that decoding and re-encoding matches
+    let original_bytes = vec![0x12, 0x34, 0x56, 0x78, 0xab, 0xcd, 0xef, 0x00];
+    let hex_str = hex::encode(&original_bytes);
+    let hex = HexString::new(hex_str).unwrap();
+    let decoded = hex.decode_secret_to_bytes();
+    assert_eq!(decoded, original_bytes);
+}
+
+#[cfg(all(feature = "encoding-hex", feature = "ct-eq"))]
+#[test]
+fn hexstring_constant_time_eq() {
+    let s1 = "deadbeef".to_string();
+    let s2 = "deadbeef".to_string();
+    let hex1 = HexString::new(s1).unwrap();
+    let hex2 = HexString::new(s2).unwrap();
+    assert_eq!(hex1, hex2);
+
+    // Test unequal
+    let s3 = "beefdead".to_string();
+    let hex3 = HexString::new(s3).unwrap();
+    assert_ne!(hex1, hex3);
 }

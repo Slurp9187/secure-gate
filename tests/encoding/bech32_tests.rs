@@ -42,3 +42,24 @@ fn bech32string_rejects_invalid_hrp() {
     let err = Bech32String::new(s).unwrap_err();
     assert_eq!(err, "invalid bech32 string");
 }
+
+
+
+
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bech32string_rejects_valid_bech32_with_disallowed_hrp() {
+    // Test valid Bech32 strings from BIP-173 that have HRPs not in our allowed list
+    let valid_but_disallowed = [
+        "A12UEL5L",  // HRP: "a"
+        "a12uel5l",  // HRP: "a" lowercase
+        "an83characterlonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1tt5tgs",  // HRP: "an83..."
+        "abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw",  // HRP: "abcdef1"
+    ];
+
+    for s in valid_but_disallowed {
+        let err = Bech32String::new(s.to_string()).unwrap_err();
+        assert_eq!(err, "invalid bech32 string", "Failed for: {}", s);
+    }
+}
