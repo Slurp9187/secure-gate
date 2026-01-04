@@ -23,7 +23,7 @@ fn into_hex_via_alias() {
         .all(|c: char| c.is_ascii_hexdigit()));
     assert!(hex.expose_secret().chars().all(|c: char| !c.is_uppercase()));
 
-    let bytes = hex.to_bytes();
+    let bytes = hex.decode_secret_to_bytes();
     assert_eq!(bytes.len(), 32);
 }
 
@@ -56,7 +56,7 @@ fn hexstring_valid_parsing() {
     assert_eq!(hex.expose_secret(), "deadbeef");
     assert_eq!(hex.byte_len(), 4);
 
-    let bytes = hex.to_bytes();
+    let bytes = hex.decode_secret_to_bytes();
     assert_eq!(bytes, vec![0xde, 0xad, 0xbe, 0xef]);
 }
 
@@ -66,7 +66,7 @@ fn hexstring_empty() {
     let hex = HexString::new("".to_string()).unwrap();
     assert_eq!(hex.expose_secret(), "");
     assert_eq!(hex.byte_len(), 0);
-    assert_eq!(hex.to_bytes(), Vec::<u8>::new());
+    assert_eq!(hex.decode_secret_to_bytes(), Vec::<u8>::new());
 }
 
 #[cfg(feature = "encoding-hex")]

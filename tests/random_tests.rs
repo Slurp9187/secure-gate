@@ -130,6 +130,6 @@ fn hex_methods_work() {
         .all(|c| c.is_ascii_hexdigit()));
 
     // Basic round-trip check (hex decodes back)
-    let bytes = owned_hex.to_bytes();
+    let bytes = owned_hex.decode_secret_to_bytes();
     assert_eq!(bytes.len(), 4);
 }

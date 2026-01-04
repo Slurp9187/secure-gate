@@ -30,7 +30,7 @@ fn zeroize_input(s: &mut String) {
 /// # use secure_gate::encoding::base64::Base64String;
 /// let valid = Base64String::new("SGVsbG8".to_string()).unwrap();
 /// assert_eq!(valid.expose_secret(), "SGVsbG8");
-/// let bytes = valid.to_bytes(); // Vec<u8> of "Hello"
+/// let bytes = valid.decode_secret_to_bytes(); // Vec<u8> of "Hello"
 /// ```
 pub struct Base64String(crate::Dynamic<String>);
 
@@ -80,7 +80,7 @@ impl Base64String {
     /// Decode the validated base64 string back into raw bytes.
     ///
     /// Panics if the internal string is somehow invalid (impossible under correct usage).
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn decode_secret_to_bytes(&self) -> Vec<u8> {
         URL_SAFE_NO_PAD
             .decode(self.0.expose_secret())
             .expect("Base64String is always valid")

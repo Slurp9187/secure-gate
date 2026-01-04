@@ -20,7 +20,7 @@ fn into_base64_via_alias() {
     // URL-safe base64, no padding
     assert!(b64.expose_secret().chars().all(|c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
 
-    let bytes = b64.to_bytes();
+    let bytes = b64.decode_secret_to_bytes();
     assert_eq!(bytes.len(), 32);
 }
 
@@ -47,7 +47,7 @@ fn base64string_valid_parsing() {
     assert_eq!(b64.len(), 7);
     assert_eq!(b64.byte_len(), 5);
 
-    let bytes = b64.to_bytes();
+    let bytes = b64.decode_secret_to_bytes();
     assert_eq!(bytes, b"Hello");
 }
 
@@ -59,7 +59,7 @@ fn base64string_empty() {
     assert_eq!(b64.len(), 0);
     assert_eq!(b64.byte_len(), 0);
     assert!(b64.is_empty());
-    assert_eq!(b64.to_bytes(), Vec::<u8>::new());
+    assert_eq!(b64.decode_secret_to_bytes(), Vec::<u8>::new());
 }
 
 #[cfg(feature = "encoding-base64")]

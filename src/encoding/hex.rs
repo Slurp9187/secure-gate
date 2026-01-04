@@ -33,7 +33,7 @@ fn zeroize_input(s: &mut String) {
 /// # use secure_gate::encoding::hex::HexString;
 /// let valid = HexString::new("deadbeef".to_string()).unwrap();
 /// assert_eq!(valid.expose_secret(), "deadbeef");
-/// let bytes = valid.to_bytes(); // Vec<u8> of [0xde, 0xad, 0xbe, 0xef]
+/// let bytes = valid.decode_secret_to_bytes(); // Vec<u8> of [0xde, 0xad, 0xbe, 0xef]
 /// ```
 pub struct HexString(crate::Dynamic<String>);
 
@@ -99,7 +99,7 @@ impl HexString {
     /// Decode the validated hex string back into raw bytes.
     ///
     /// Panics if the internal string is somehow invalid (impossible under correct usage).
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn decode_secret_to_bytes(&self) -> Vec<u8> {
         hex::decode(self.0.expose_secret()).expect("HexString is always valid")
     }
 

@@ -78,14 +78,14 @@ impl Bech32String {
     /// Decode the validated Bech32 string back into raw bytes (5-to-8 bit conversion).
     ///
     /// Panics if the internal string is somehow invalid (impossible under correct usage).
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn decode_secret_to_bytes(&self) -> Vec<u8> {
         let (_, data) = bech32::decode(self.0.expose_secret()).expect("Bech32String is always valid");
         data
     }
 
     /// Number of bytes the decoded Bech32 string represents.
     pub fn byte_len(&self) -> usize {
-        self.to_bytes().len()
+        self.decode_secret_to_bytes().len()
     }
 
     /// The Human-Readable Part of the Bech32 string.

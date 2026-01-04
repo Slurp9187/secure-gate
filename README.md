@@ -147,7 +147,7 @@ Direct generation is also available:
     let hex_upper: String = bytes.to_hex_upper();
 
     let validated = HexString::new("deadbeef".to_string()).unwrap();
-    let decoded = validated.to_bytes();
+    let decoded = validated.decode_secret_to_bytes();
 }
 
 #[cfg(feature = "encoding-base64")]
@@ -155,7 +155,7 @@ Direct generation is also available:
     use secure_gate::encoding::base64::Base64String;
 
     let validated = Base64String::new("SGVsbG8".to_string()).unwrap();
-    let decoded = validated.to_bytes();
+    let decoded = validated.decode_secret_to_bytes();
 }
 ```
 
