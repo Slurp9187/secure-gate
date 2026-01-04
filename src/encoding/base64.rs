@@ -72,6 +72,7 @@ impl Base64String {
     /// Internal constructor for trusted base64 strings (e.g., from RNG).
     ///
     /// Skips validation – caller must ensure the string is valid base64.
+    #[allow(dead_code)]
     pub(crate) fn new_unchecked(s: String) -> Self {
         Self(crate::Dynamic::new(s))
     }

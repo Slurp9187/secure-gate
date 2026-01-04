@@ -28,7 +28,6 @@ fn zeroize_input(s: &mut String) {
 /// Supports age-relevant HRPs: "age", "age1pq", "age-secret-key-1", "age-secret-key-pq-".
 /// Accepts uppercase input (as from age/rage), normalizes to lowercase.
 ///
-
 pub struct Bech32String(crate::Dynamic<String>);
 
 impl Bech32String {
@@ -71,6 +70,7 @@ impl Bech32String {
     /// Internal constructor for trusted Bech32 strings (e.g., from validated sources).
     ///
     /// Skips validation – caller must ensure the string is valid Bech32 with allowed HRP.
+    #[allow(dead_code)]
     pub(crate) fn new_unchecked(s: String) -> Self {
         Self(crate::Dynamic::new(s))
     }
