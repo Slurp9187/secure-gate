@@ -135,6 +135,7 @@ Cloning is disabled by default to prevent accidental duplication. Enable it expl
 ```rust
 #[cfg(feature = "rand")]
 {
+    use secure_gate::{Fixed, Dynamic};
     let key: Fixed<[u8; 32]> = Fixed::generate_random();
     let random: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
 }
@@ -172,6 +173,7 @@ Cloning is disabled by default to prevent accidental duplication. Enable it expl
 ```rust
 #[cfg(feature = "ct-eq")]
 {
+    use secure_gate::Fixed;
     let a = Fixed::<[u8; 32]>::generate_random();
     let b = Fixed::<[u8; 32]>::generate_random();
     assert!(a.ct_eq(&a));
