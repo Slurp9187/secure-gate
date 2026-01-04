@@ -249,7 +249,7 @@ The explicit `.expose_secret()` path incurs **no measurable overhead**.
 
 ## Changelog
 
-[CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/main/CHANGELOG.md)
+[CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/v070rc1/CHANGELOG.md)
 
 ## License
 
