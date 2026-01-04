@@ -108,22 +108,22 @@ impl HexString {
         self.0.expose_secret().len() / 2
     }
 
-    /// Primary way to access the validated string.
+    /// Primary way to access the validated string — now returns &String for consistency
     #[inline(always)]
-    pub fn expose_secret(&self) -> &str {
-        self.0.expose_secret().as_str()
+    pub const fn expose_secret(&self) -> &String {
+        self.0.expose_secret()
     }
 
-    /// Length of the encoded string (in characters).
+    /// Length of the encoded string (in characters) — delegate directly
     #[inline(always)]
-    pub fn len(&self) -> usize {
-        self.0.expose_secret().len()
+    pub const fn len(&self) -> usize {
+        self.0.len()
     }
 
-    /// Whether the encoded string is empty.
+    /// Whether the encoded string is empty — delegate directly
     #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.0.expose_secret().is_empty()
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 

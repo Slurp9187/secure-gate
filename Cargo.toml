@@ -18,9 +18,10 @@ zeroize = { version = "1.7", default-features = false, optional = true, features
   "zeroize_derive",
 ] }
 
-# `hex` and `base64` are only used by encoding features. `subtle` is used by `ct-eq`.
+# `hex`, `base64`, and `bech32` are only used by encoding features. `subtle` is used by `ct-eq`.
 hex = { version = "0.4", optional = true, features = ["alloc"] }
 base64 = { version = "0.21.7", optional = true }
+bech32 = { version = "0.11", default-features = false, optional = true, features = ["alloc"] }
 subtle = { version = "2.5", optional = true }
 
 
@@ -35,11 +36,13 @@ criterion = { version = "0.5", features = ["html_reports"] }
 default = ["rand", "zeroize", "ct-eq"]
 
 # Encoding: Secure conversions (hex/base64) for displaying or serializing secrets without leaks
-encoding = ["encoding-hex", "encoding-base64"]
+encoding = ["encoding-hex", "encoding-base64", "encoding-bech32"]
 # Hex encoding support (uses the 'hex' crate)
 encoding-hex = ["dep:hex"]
 # Base64 encoding support (uses the 'base64' crate)
 encoding-base64 = ["dep:base64"]
+# Bech32 encoding support (uses the 'bech32' crate)
+encoding-bech32 = ["dep:bech32"]
 
 # ct-eq: Constant-time equality checks (prevents timing attacks in comparisons; uses 'subtle' crate)
 ct-eq = ["dep:subtle"]

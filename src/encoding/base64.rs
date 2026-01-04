@@ -59,33 +59,21 @@ impl Base64String {
     /// assert_eq!(valid.expose_secret(), "SGVsbG8");
     /// # }
     /// ```
-    pub fn new(mut s: String) -> Result<Self, &'static str> {
-        // Validate in-place: check for invalid chars and that it can actually be decoded
-        let bytes = s.as_bytes();
-        let mut valid = true;
-
-        // Check character validity
-        for &b in bytes.iter() {
-            match b {
-                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' => {}
-                _ => valid = false,
-            }
-        }
-
-        // If characters are valid, verify it can actually be decoded (prevents to_bytes() panics)
-        if valid {
-            // Try decoding to ensure it's valid - this catches length/content issues
-            if URL_SAFE_NO_PAD.decode(&s).is_err() {
-                valid = false;
-            }
-        }
-
-        if valid {
+    pub fn new(s: String) -> Result<Self, &'static str> {
+        if URL_SAFE_NO_PAD.decode(&s).is_ok() {
             Ok(Self(crate::Dynamic::new(s)))
         } else {
+            let mut s = s;
             zeroize_input(&mut s);
             Err("invalid base64 string")
         }
+    }
+
+    /// Internal constructor for trusted base64 strings (e.g., from RNG).
+    ///
+    /// Skips validation – caller must ensure the string is valid base64.
+    pub(crate) fn new_unchecked(s: String) -> Self {
+        Self(crate::Dynamic::new(s))
     }
 
     /// Decode the validated base64 string back into raw bytes.
@@ -100,64 +88,53 @@ impl Base64String {
     /// Exact number of bytes the decoded base64 string represents.
     #[inline(always)]
     pub fn byte_len(&self) -> usize {
-        let len = self.0.expose_secret().len();
-        let full_groups = len / 4;
-        let rem = len % 4;
-        full_groups * 3
-            + match rem {
-                0 => 0,
-                2 => 1,
-                3 => 2,
-                // rem == 1 is impossible due to Base64String validation
-                // (no-pad base64 cannot represent 1 extra byte cleanly)
-                1 => 0, // unreachable due to validation
-                _ => 0, // other values impossible for len % 4
-            }
+        let len = self.len();
+        (len / 4) * 3 +
+        (len % 4 == 2) as usize +
+        (len % 4 == 3) as usize * 2
     }
 
     /// Primary way to access the validated string.
     #[inline(always)]
-    pub fn expose_secret(&self) -> &str {
-        self.0.expose_secret().as_str()
+    pub const fn expose_secret(&self) -> &String {
+        self.0.expose_secret()
     }
 
     /// Length of the encoded string (in characters).
     #[inline(always)]
-    pub fn len(&self) -> usize {
-        self.0.expose_secret().len()
+    pub const fn len(&self) -> usize {
+        self.0.len()
     }
 
     /// Whether the encoded string is empty.
     #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.0.expose_secret().is_empty()
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
+
+
 
 // Constant-time equality for base64 strings – prevents timing attacks when ct-eq enabled
-#[cfg(all(feature = "encoding-base64", feature = "ct-eq"))]
+#[cfg(feature = "encoding-base64")]
 impl PartialEq for Base64String {
     fn eq(&self, other: &Self) -> bool {
-        use crate::eq::ConstantTimeEq;
-        self.0
-            .expose_secret()
-            .as_bytes()
-            .ct_eq(other.0.expose_secret().as_bytes())
+        #[cfg(feature = "ct-eq")]
+        {
+            use crate::eq::ConstantTimeEq;
+            self.0
+                .expose_secret()
+                .as_bytes()
+                .ct_eq(other.0.expose_secret().as_bytes())
+        }
+        #[cfg(not(feature = "ct-eq"))]
+        {
+            self.0.expose_secret() == other.0.expose_secret()
+        }
     }
 }
 
-#[cfg(all(feature = "encoding-base64", feature = "ct-eq"))]
-impl Eq for Base64String {}
-
-// Fallback: Standard string equality when ct-eq not enabled (secure enough for validation)
-#[cfg(all(feature = "encoding-base64", not(feature = "ct-eq")))]
-impl PartialEq for Base64String {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.expose_secret() == other.0.expose_secret()
-    }
-}
-
-#[cfg(all(feature = "encoding-base64", not(feature = "ct-eq")))]
+#[cfg(feature = "encoding-base64")]
 impl Eq for Base64String {}
 
 impl core::fmt::Debug for Base64String {
