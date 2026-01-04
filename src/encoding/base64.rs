@@ -98,7 +98,8 @@ impl Base64String {
     }
 
     /// Exact number of bytes the decoded base64 string represents.
-    pub const fn byte_len(&self) -> usize {
+    #[inline(always)]
+    pub fn byte_len(&self) -> usize {
         let len = self.0.expose_secret().len();
         let full_groups = len / 4;
         let rem = len % 4;
@@ -112,6 +113,24 @@ impl Base64String {
                 1 => 0, // unreachable due to validation
                 _ => 0, // other values impossible for len % 4
             }
+    }
+
+    /// Primary way to access the validated string.
+    #[inline(always)]
+    pub fn expose_secret(&self) -> &str {
+        self.0.expose_secret().as_str()
+    }
+
+    /// Length of the encoded string (in characters).
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.0.expose_secret().len()
+    }
+
+    /// Whether the encoded string is empty.
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.0.expose_secret().is_empty()
     }
 }
 
@@ -140,13 +159,6 @@ impl PartialEq for Base64String {
 
 #[cfg(all(feature = "encoding-base64", not(feature = "ct-eq")))]
 impl Eq for Base64String {}
-
-impl core::ops::Deref for Base64String {
-    type Target = crate::Dynamic<String>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 
 impl core::fmt::Debug for Base64String {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

@@ -104,15 +104,26 @@ impl HexString {
     }
 
     /// Number of bytes the decoded hex string represents.
-    pub const fn byte_len(&self) -> usize {
+    pub fn byte_len(&self) -> usize {
         self.0.expose_secret().len() / 2
     }
-}
 
-impl core::ops::Deref for HexString {
-    type Target = crate::Dynamic<String>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    /// Primary way to access the validated string.
+    #[inline(always)]
+    pub fn expose_secret(&self) -> &str {
+        self.0.expose_secret().as_str()
+    }
+
+    /// Length of the encoded string (in characters).
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.0.expose_secret().len()
+    }
+
+    /// Whether the encoded string is empty.
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.0.expose_secret().is_empty()
     }
 }
 
