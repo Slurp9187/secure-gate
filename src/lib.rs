@@ -21,12 +21,13 @@ mod fixed;
 pub use dynamic::Dynamic;
 pub use fixed::Fixed;
 
-// ── Cloning module ───────────────────────────────────────────────────
-pub mod clone;
-
 // ── Cloneable secret marker (opt-in for safe duplication) ────────────
 #[cfg(feature = "zeroize")]
-pub use clone::CloneableSecret;
+pub use cloneable::CloneableSecret;
+#[cfg(feature = "zeroize")]
+pub mod cloneable;
+#[cfg(feature = "zeroize")]
+pub use cloneable::{CloneableArray, CloneableString, CloneableVec};
 
 // ── Macros (always available) ────────────────────────────────────────
 mod macros;

@@ -1,6 +1,6 @@
 #![cfg(feature = "zeroize")]
 
-use secure_gate::{CloneableSecret, Fixed};
+use secure_gate::{CloneableArray, CloneableSecret, CloneableString, CloneableVec, Fixed};
 
 #[test]
 fn fixed_arrays_can_be_cloned() {
@@ -43,5 +43,61 @@ fn cloned_fixed_are_independent() {
     assert_eq!(cloned.expose_secret()[0], 1);
 }
 
-// Note: Dynamic<String> cloning is not allowed by default (String !impl CloneableSecret)
-// so no test for that—its a compile error.
+#[test]
+fn cloneable_array_cloning() {
+    let arr: CloneableArray<32> = [0x42u8; 32].into();
+    let cloned = arr.clone();
+    assert_eq!(arr.expose_inner(), cloned.expose_inner());
+}
+
+#[test]
+fn cloneable_array_independence() {
+    let original: CloneableArray<4> = [0u8; 4].into();
+    let mut cloned = original.clone();
+
+    cloned.expose_inner_mut()[0] = 1;
+
+    assert_eq!(original.expose_inner()[0], 0);
+    assert_eq!(cloned.expose_inner()[0], 1);
+}
+
+#[test]
+fn cloneable_string_cloning() {
+    let s: CloneableString = "secret".into();
+    let cloned = s.clone();
+    assert_eq!(s.expose_inner(), cloned.expose_inner());
+}
+
+#[test]
+fn cloneable_string_mutability() {
+    let mut s: CloneableString = "base".into();
+    s.expose_inner_mut().push_str(" appended");
+    assert_eq!(s.expose_inner(), "base appended");
+
+    let cloned = s.clone();
+    assert_eq!(cloned.expose_inner(), "base appended");
+}
+
+#[test]
+fn cloneable_vec_cloning() {
+    let v: CloneableVec = vec![1u8, 2, 3].into();
+    let cloned = v.clone();
+    assert_eq!(v.expose_inner(), cloned.expose_inner());
+}
+
+#[test]
+fn cloneable_vec_mutability_and_independence() {
+    let mut v: CloneableVec = vec![1u8, 2, 3].into();
+    v.expose_inner_mut().push(4);
+    assert_eq!(v.expose_inner(), &[1, 2, 3, 4]);
+
+    let cloned = v.clone();
+    assert_eq!(cloned.expose_inner(), &[1, 2, 3, 4]);
+
+    v.expose_inner_mut().push(5);
+    assert_eq!(v.expose_inner(), &[1, 2, 3, 4, 5]);
+    assert_eq!(cloned.expose_inner(), &[1, 2, 3, 4]); // independent
+}
+
+// Note: Raw Dynamic<String> cloning is still not allowed (String !impl CloneableSecret),
+// but CloneableString provides a safe wrapper for cloning string secrets.
