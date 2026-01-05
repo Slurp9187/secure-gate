@@ -3,7 +3,9 @@
 
 #![cfg(test)]
 
-use secure_gate::{fixed_alias, fixed_alias_rng};
+use secure_gate::fixed_alias;
+#[cfg(feature = "rand")]
+use secure_gate::fixed_alias_rng;
 
 // ──────────────────────────────────────────────────────────────
 // Basic fixed-size alias (no rand)
