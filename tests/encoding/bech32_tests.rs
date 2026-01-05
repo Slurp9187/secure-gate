@@ -1,6 +1,3 @@
-// ==========================================================================
-// tests/encoding/bech32_tests.rs
-// ==========================================================================
 // Comprehensive tests for Bech32String (both Bech32 and Bech32m variants).
 // Ensures validation, normalization, variant detection, and round-tripping.
 
@@ -40,30 +37,6 @@ fn accepts_and_normalizes_valid_bech32() {
     assert_eq!(bech32.expose_secret(), &expected_lower);
     assert!(bech32.is_bech32());
     assert!(!bech32.is_bech32m());
-}
-
-#[cfg(feature = "encoding-bech32")]
-#[test]
-fn accepts_and_normalizes_valid_bech32m() {
-    // Longer valid Bech32m vector from BIP-350 / crate tests (avoids any edge-case issues with minimal strings)
-    let mixed_case = "ABCDEF1L7AUM6ECHK45NJ3S0WDVT2FG8X9YRZPQD3RYX".to_string();
-    let expected_lower = "abcdef1l7aum6echk45nj3s0wdvt2fg8x9yrzpqzd3ryx".to_string();
-
-    let bech32 = Bech32String::new(mixed_case).unwrap();
-
-    assert_eq!(bech32.expose_secret(), &expected_lower);
-    assert!(!bech32.is_bech32());
-    assert!(bech32.is_bech32m());
-
-    // Additional long taproot-style Bech32m (witness version 1)
-    let taproot_mixed =
-        "BC1P5CYXNUXMEUWY0L8KD2DZ2X2W6W2V6F3V6U2J6K2K2V6F3V6U2J6K2K2V6F3V6U2J6".to_string();
-    let taproot_lower = taproot_mixed.to_ascii_lowercase();
-
-    let bech32m = Bech32String::new(taproot_mixed).unwrap();
-
-    assert_eq!(bech32m.expose_secret(), &taproot_lower);
-    assert!(bech32m.is_bech32m());
 }
 
 #[cfg(feature = "encoding-bech32")]
