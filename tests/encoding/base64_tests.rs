@@ -5,8 +5,8 @@
 
 #![cfg(test)]
 
-use secure_gate::{fixed_alias_rng, Base64String, SecureEncodingExt};
 use base64::Engine;
+use secure_gate::{fixed_alias_rng, Base64String, SecureEncodingExt};
 
 #[cfg(feature = "encoding-base64")]
 #[cfg(feature = "rand")]
@@ -19,7 +19,10 @@ fn into_base64_via_alias() {
     let b64 = Base64String::new(b64_str).unwrap();
 
     // URL-safe base64, no padding
-    assert!(b64.expose_secret().chars().all(|c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+    assert!(b64
+        .expose_secret()
+        .chars()
+        .all(|c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
 
     let bytes = b64.decode_secret_to_bytes();
     assert_eq!(bytes.len(), 32);
@@ -123,4 +126,13 @@ fn base64string_case_sensitive() {
     let b64 = Base64String::new(encoded).unwrap();
     let decoded = b64.decode_secret_to_bytes();
     assert_eq!(decoded, original_bytes);
+}
+
+#[cfg(all(feature = "encoding-base64", feature = "rand"))]
+#[test]
+fn rng_base64_integration() {
+    use secure_gate::random::FixedRng;
+    let rng = FixedRng::<32>::generate();
+    let b64 = rng.into_base64();
+    assert_eq!(b64.decode_secret_to_bytes().len(), 32);
 }

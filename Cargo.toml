@@ -19,7 +19,7 @@ zeroize = { version = "1.7", default-features = false, optional = true, features
 
 # `hex`, `base64`, and `bech32` are only used by encoding features. `subtle` is used by `ct-eq`.
 hex = { version = "0.4", optional = true, features = ["alloc"] }
-base64 = { version = "0.21", optional = true }
+base64 = { version = "0.22", optional = true }
 bech32 = { version = "0.11", default-features = false, optional = true, features = ["alloc"] }
 subtle = { version = "2.5", optional = true }
 

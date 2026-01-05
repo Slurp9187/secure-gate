@@ -1,4 +1,38 @@
-//! Cryptographically secure random value generation (gated behind “rand”).
+//! Cryptographically secure random value generation with encoding conveniences (gated behind “rand” and encoding features).
+//!
+//! Provides `FixedRng` and `DynamicRng` types for generating fresh random bytes.
+//! Includes built-in methods for encoding to Hex, Base64, Bech32, and Bech32m strings
+//! without exposing secret bytes.
+//!
+//! # Examples
+//!
+//! Generate and encode random bytes:
+//! ```
+//! # #[cfg(all(feature = "rand", feature = "encoding-hex"))]
+//! # {
+//! use secure_gate::random::FixedRng;
+//! let hex = FixedRng::<32>::generate().into_hex();
+//! # }
+//! ```
+//!
+//! Use with Base64:
+//! ```
+//! # #[cfg(all(feature = "rand", feature = "encoding-base64"))]
+//! # {
+//! use secure_gate::random::FixedRng;
+//! let base64 = FixedRng::<32>::generate().into_base64();
+//! # }
+//! ```
+//!
+//! Encode to Bech32 or Bech32m:
+//! ```
+//! # #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+//! # {
+//! use secure_gate::random::FixedRng;
+//! let bech32 = FixedRng::<32>::generate().into_bech32("example");
+//! let bech32m = FixedRng::<32>::generate().into_bech32m("example");
+//! # }
+//! ```
 // ==========================================================================
 // src/random.rs
 // ==========================================================================
@@ -8,12 +42,14 @@ use rand::rand_core::OsError;
 use rand::rngs::OsRng;
 use rand::TryRngCore;
 
-/// Fixed-length cryptographically secure random value.
+/// Fixed-length cryptographically secure random value with encoding methods.
 ///
 /// This is a newtype over `Fixed<[u8; N]>` that enforces construction only via secure RNG.
 /// Guarantees freshness — cannot be created from arbitrary bytes.
 ///
 /// Requires the "rand" feature.
+///
+/// Supports direct encoding to Hex, Base64, Bech32, and Bech32m via convenience methods.
 ///
 /// # Examples
 ///
@@ -182,6 +218,165 @@ impl<const N: usize> FixedRng<N> {
     }
 }
 
+#[cfg(all(feature = "rand", feature = "encoding-base64"))]
+impl<const N: usize> FixedRng<N> {
+    /// Consume self and return the random bytes as a validated base64 string.
+    ///
+    /// The raw bytes are zeroized immediately after encoding.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-base64"))]
+    /// # {
+    /// use secure_gate::random::FixedRng;
+    /// let base64 = FixedRng::<16>::generate().into_base64();
+    /// println!("random base64: {}", base64.expose_secret());
+    /// # }
+    /// ```
+    pub fn into_base64(self) -> crate::encoding::base64::Base64String {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+        let encoded = URL_SAFE_NO_PAD.encode(self.expose_secret());
+        crate::encoding::base64::Base64String::new_unchecked(encoded)
+    }
+
+    /// Encode to base64 without consuming self, for cases where raw is still needed briefly.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-base64"))]
+    /// # {
+    /// use secure_gate::random::FixedRng;
+    /// let rng = FixedRng::<16>::generate();
+    /// let base64 = rng.to_base64();
+    /// // Use rng for something else here
+    /// # }
+    /// ```
+    pub fn to_base64(&self) -> crate::encoding::base64::Base64String {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+        let encoded = URL_SAFE_NO_PAD.encode(self.expose_secret());
+        crate::encoding::base64::Base64String::new_unchecked(encoded)
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+impl<const N: usize> FixedRng<N> {
+    /// Consume self and return the random bytes as a validated Bech32 string with the specified HRP.
+    ///
+    /// The raw bytes are zeroized immediately after encoding.
+    ///
+    /// # Panics
+    ///
+    /// Panics if encoding fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+    /// # {
+    /// use secure_gate::random::FixedRng;
+    /// let bech32 = FixedRng::<16>::generate().into_bech32("test");
+    /// println!("random bech32: {}", bech32.expose_secret());
+    /// # }
+    /// ```
+    pub fn into_bech32(self, hrp: &str) -> crate::encoding::bech32::Bech32String {
+        use bech32::{Bech32, Hrp};
+        let hrp = Hrp::parse(hrp).unwrap();
+        let data = crate::encoding::bech32::convert_bits(self.expose_secret(), 8, 5, true).unwrap();
+        let encoded = bech32::encode::<Bech32>(hrp, &data).expect("encoding failed");
+        crate::encoding::bech32::Bech32String::new_unchecked(
+            encoded,
+            crate::encoding::bech32::EncodingVariant::Bech32,
+        )
+    }
+
+    /// Encode to Bech32 without consuming self, for cases where raw is still needed briefly.
+    ///
+    /// # Panics
+    ///
+    /// Panics if encoding fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+    /// # {
+    /// use secure_gate::random::FixedRng;
+    /// let rng = FixedRng::<16>::generate();
+    /// let bech32 = rng.to_bech32("test");
+    /// // Use rng for something else here
+    /// # }
+    /// ```
+    pub fn to_bech32(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
+        use bech32::{Bech32, Hrp};
+        let hrp = Hrp::parse(hrp).unwrap();
+        let data = crate::encoding::bech32::convert_bits(self.expose_secret(), 8, 5, true).unwrap();
+        let encoded = bech32::encode::<Bech32>(hrp, &data).expect("encoding failed");
+        crate::encoding::bech32::Bech32String::new_unchecked(
+            encoded,
+            crate::encoding::bech32::EncodingVariant::Bech32,
+        )
+    }
+
+    /// Consume self and return the random bytes as a validated Bech32m string with the specified HRP.
+    ///
+    /// The raw bytes are zeroized immediately after encoding.
+    ///
+    /// # Panics
+    ///
+    /// Panics if encoding fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+    /// # {
+    /// use secure_gate::random::FixedRng;
+    /// let bech32m = FixedRng::<16>::generate().into_bech32m("test");
+    /// println!("random bech32m: {}", bech32m.expose_secret());
+    /// # }
+    /// ```
+    pub fn into_bech32m(self, hrp: &str) -> crate::encoding::bech32::Bech32String {
+        use bech32::{Bech32m, Hrp};
+        let hrp = Hrp::parse(hrp).unwrap();
+        let data = crate::encoding::bech32::convert_bits(self.expose_secret(), 8, 5, true).unwrap();
+        let encoded = bech32::encode::<Bech32m>(hrp, &data).expect("encoding failed");
+        crate::encoding::bech32::Bech32String::new_unchecked(
+            encoded,
+            crate::encoding::bech32::EncodingVariant::Bech32m,
+        )
+    }
+
+    /// Encode to Bech32m without consuming self, for cases where raw is still needed briefly.
+    ///
+    /// # Panics
+    ///
+    /// Panics if encoding fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+    /// # {
+    /// use secure_gate::random::FixedRng;
+    /// let rng = FixedRng::<16>::generate();
+    /// let bech32m = rng.to_bech32m("test");
+    /// // Use rng for something else here
+    /// # }
+    /// ```
+    pub fn to_bech32m(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
+        use bech32::{Bech32m, Hrp};
+        let hrp = Hrp::parse(hrp).unwrap();
+        let data = crate::encoding::bech32::convert_bits(self.expose_secret(), 8, 5, true).unwrap();
+        let encoded = bech32::encode::<Bech32m>(hrp, &data).expect("encoding failed");
+        crate::encoding::bech32::Bech32String::new_unchecked(
+            encoded,
+            crate::encoding::bech32::EncodingVariant::Bech32m,
+        )
+    }
+}
+
 impl<const N: usize> From<FixedRng<N>> for Fixed<[u8; N]> {
     /// Convert a `FixedRng` to `Fixed`, transferring ownership.
     ///
@@ -204,23 +399,7 @@ impl<const N: usize> From<FixedRng<N>> for Fixed<[u8; N]> {
     }
 }
 
-/// Heap-allocated cryptographically secure random bytes.
-///
-/// This is a newtype over `Dynamic<Vec<u8>>` for semantic clarity.
-/// Like `FixedRng`, guarantees freshness via RNG construction.
-///
-/// Requires the "rand" feature.
-///
-/// # Examples
-///
-/// ```
-/// # #[cfg(feature = "rand")]
-/// # {
-/// use secure_gate::random::DynamicRng;
-/// let random = DynamicRng::generate(64);
-/// assert_eq!(random.len(), 64);
-/// # }
-/// ```
+/// Heap-allocated cryptographically secure random bytes with encoding methods.
 pub struct DynamicRng(Dynamic<Vec<u8>>);
 
 impl DynamicRng {
@@ -294,6 +473,207 @@ impl DynamicRng {
 impl core::fmt::Debug for DynamicRng {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+impl DynamicRng {
+    /// Consume self and return the random bytes as a validated Bech32 string with the specified HRP.
+    ///
+    /// The raw bytes are zeroized immediately after encoding.
+    ///
+    /// # Panics
+    ///
+    /// Panics if encoding fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+    /// # {
+    /// use secure_gate::random::DynamicRng;
+    /// let bech32 = DynamicRng::generate(16).into_bech32("test");
+    /// println!("random bech32: {}", bech32.expose_secret());
+    /// # }
+    /// ```
+    pub fn into_bech32(self, hrp: &str) -> crate::encoding::bech32::Bech32String {
+        use bech32::{Bech32, Hrp};
+        let hrp = Hrp::parse(hrp).unwrap();
+        let data = crate::encoding::bech32::convert_bits(self.expose_secret(), 8, 5, true).unwrap();
+        let encoded = bech32::encode::<Bech32>(hrp, &data).expect("encoding failed");
+        crate::encoding::bech32::Bech32String::new_unchecked(
+            encoded,
+            crate::encoding::bech32::EncodingVariant::Bech32,
+        )
+    }
+
+    /// Encode to Bech32 without consuming self, for cases where raw is still needed briefly.
+    ///
+    /// # Panics
+    ///
+    /// Panics if encoding fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+    /// # {
+    /// use secure_gate::random::DynamicRng;
+    /// let rng = DynamicRng::generate(16);
+    /// let bech32 = rng.to_bech32("test");
+    /// // Use rng for something else here
+    /// # }
+    /// ```
+    pub fn to_bech32(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
+        use bech32::{Bech32, Hrp};
+        let hrp = Hrp::parse(hrp).unwrap();
+        let data = crate::encoding::bech32::convert_bits(self.expose_secret(), 8, 5, true).unwrap();
+        let encoded = bech32::encode::<Bech32>(hrp, &data).expect("encoding failed");
+        crate::encoding::bech32::Bech32String::new_unchecked(
+            encoded,
+            crate::encoding::bech32::EncodingVariant::Bech32,
+        )
+    }
+
+    /// Consume self and return the random bytes as a validated Bech32m string with the specified HRP.
+    ///
+    /// The raw bytes are zeroized immediately after encoding.
+    ///
+    /// # Panics
+    ///
+    /// Panics if encoding fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+    /// # {
+    /// use secure_gate::random::DynamicRng;
+    /// let bech32m = DynamicRng::generate(16).into_bech32m("test");
+    /// println!("random bech32m: {}", bech32m.expose_secret());
+    /// # }
+    /// ```
+    pub fn into_bech32m(self, hrp: &str) -> crate::encoding::bech32::Bech32String {
+        use bech32::{Bech32m, Hrp};
+        let hrp = Hrp::parse(hrp).unwrap();
+        let data = crate::encoding::bech32::convert_bits(self.expose_secret(), 8, 5, true).unwrap();
+        let encoded = bech32::encode::<Bech32m>(hrp, &data).expect("encoding failed");
+        crate::encoding::bech32::Bech32String::new_unchecked(
+            encoded,
+            crate::encoding::bech32::EncodingVariant::Bech32m,
+        )
+    }
+
+    /// Encode to Bech32m without consuming self, for cases where raw is still needed briefly.
+    ///
+    /// # Panics
+    ///
+    /// Panics if encoding fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+    /// # {
+    /// use secure_gate::random::DynamicRng;
+    /// let rng = DynamicRng::generate(16);
+    /// let bech32m = rng.to_bech32m("test");
+    /// // Use rng for something else here
+    /// # }
+    /// ```
+    pub fn to_bech32m(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
+        use bech32::{Bech32m, Hrp};
+        let hrp = Hrp::parse(hrp).unwrap();
+        let data = crate::encoding::bech32::convert_bits(self.expose_secret(), 8, 5, true).unwrap();
+        let encoded = bech32::encode::<Bech32m>(hrp, &data).expect("encoding failed");
+        crate::encoding::bech32::Bech32String::new_unchecked(
+            encoded,
+            crate::encoding::bech32::EncodingVariant::Bech32m,
+        )
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "encoding-hex"))]
+impl DynamicRng {
+    /// Consume self and return the random bytes as a validated hex string.
+    ///
+    /// The raw bytes are zeroized immediately after encoding.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-hex"))]
+    /// # {
+    /// use secure_gate::random::DynamicRng;
+    /// let hex = DynamicRng::generate(16).into_hex();
+    /// println!("random hex: {}", hex.expose_secret());
+    /// # }
+    /// ```
+    pub fn into_hex(self) -> crate::encoding::hex::HexString {
+        use hex;
+        let hex = hex::encode(self.expose_secret());
+        crate::encoding::hex::HexString::new_unchecked(hex)
+    }
+
+    /// Encode to hex without consuming self, for cases where raw is still needed briefly.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-hex"))]
+    /// # {
+    /// use secure_gate::random::DynamicRng;
+    /// let rng = DynamicRng::generate(16);
+    /// let hex = rng.to_hex();
+    /// // Use rng for something else here
+    /// # }
+    /// ```
+    pub fn to_hex(&self) -> crate::encoding::hex::HexString {
+        use hex;
+        let hex = hex::encode(self.expose_secret());
+        crate::encoding::hex::HexString::new_unchecked(hex)
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "encoding-base64"))]
+impl DynamicRng {
+    /// Consume self and return the random bytes as a validated base64 string.
+    ///
+    /// The raw bytes are zeroized immediately after encoding.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-base64"))]
+    /// # {
+    /// use secure_gate::random::DynamicRng;
+    /// let base64 = DynamicRng::generate(16).into_base64();
+    /// println!("random base64: {}", base64.expose_secret());
+    /// # }
+    /// ```
+    pub fn into_base64(self) -> crate::encoding::base64::Base64String {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+        let encoded = URL_SAFE_NO_PAD.encode(self.expose_secret());
+        crate::encoding::base64::Base64String::new_unchecked(encoded)
+    }
+
+    /// Encode to base64 without consuming self, for cases where raw is still needed briefly.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "rand", feature = "encoding-base64"))]
+    /// # {
+    /// use secure_gate::random::DynamicRng;
+    /// let rng = DynamicRng::generate(16);
+    /// let base64 = rng.to_base64();
+    /// // Use rng for something else here
+    /// # }
+    /// ```
+    pub fn to_base64(&self) -> crate::encoding::base64::Base64String {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+        let encoded = URL_SAFE_NO_PAD.encode(self.expose_secret());
+        crate::encoding::base64::Base64String::new_unchecked(encoded)
     }
 }
 

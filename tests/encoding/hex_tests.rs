@@ -129,3 +129,12 @@ fn hexstring_constant_time_eq() {
     let hex3 = HexString::new(s3).unwrap();
     assert_ne!(hex1, hex3);
 }
+
+#[cfg(all(feature = "encoding-hex", feature = "rand"))]
+#[test]
+fn rng_hex_integration() {
+    use secure_gate::random::FixedRng;
+    let rng = FixedRng::<32>::generate();
+    let hex = rng.into_hex();
+    assert_eq!(hex.decode_secret_to_bytes().len(), 32);
+}
