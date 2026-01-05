@@ -1,16 +1,37 @@
-// tests/macros_visibility_tests.rs
-// Exhaustive visibility testing for all secure-gate macros
+// secure-gate/tests/macros/fixed_macros_tests.rs
+// Tests for fixed-size alias macros and their visibility.
 
 #![cfg(test)]
-#![cfg(feature = "rand")]
-use secure_gate::fixed_alias_rng;
 
-use secure_gate::{dynamic_alias, fixed_alias};
+use secure_gate::{fixed_alias, fixed_alias_rng};
 
 // ──────────────────────────────────────────────────────────────
-// Test visibility inside a nested module (so `super` is valid)
+// Basic fixed-size alias (no rand)
 // ──────────────────────────────────────────────────────────────
-mod visibility_module {
+#[test]
+fn fixed_alias_basics() {
+    fixed_alias!(MyKey, 32);
+
+    let k: MyKey = [0u8; 32].into();
+    assert_eq!(k.len(), 32);
+    assert_eq!(k.expose_secret().len(), 32);
+}
+
+#[test]
+fn non_zero_size_validation() {
+    // Valid minimal size
+    fixed_alias!(MinimalKey, 1);
+    let k: MinimalKey = [42u8].into();
+    assert_eq!(k.len(), 1);
+
+    // Compile-fail test: Uncomment to verify (should fail build)
+    // fixed_alias!(ZeroKey, 0);  // Expected: Compile error
+}
+
+// ──────────────────────────────────────────────────────────────
+// Visibility tests for fixed aliases
+// ──────────────────────────────────────────────────────────────
+mod vis {
     use super::*;
 
     // These are only visible to parent (`super`) or crate
@@ -22,7 +43,7 @@ mod visibility_module {
     fixed_alias!(ModulePrivateKey, 64);
 
     #[test]
-    fn can_use_all_defined_keys() {
+    fn visibility_works() {
         let _c: CrateKey = [0u8; 32].into();
         let _p: ParentKey = [0u8; 16].into();
         let _cp: CratePathKey = [0u8; 48].into();
@@ -33,23 +54,17 @@ mod visibility_module {
     }
 }
 
-// ──────────────────────────────────────────────────────────────
-// From the parent scope, we can access `pub(in super)` and `pub(crate)`
-// ──────────────────────────────────────────────────────────────
 #[test]
-fn parent_can_access_child_pub_in_super() {
-    // This compiles — we are the `super` of `visibility_module`
-    let _k: visibility_module::ParentKey = [0u8; 16].into();
-    let _c: visibility_module::CrateKey = [0u8; 32].into();
-    let _cp: visibility_module::CratePathKey = [0u8; 48].into();
+fn parent_can_access_pub_in_super() {
+    // This compiles — we are the `super` of `vis`
+    let _k: vis::ParentKey = [0u8; 16].into();
+    let _c: vis::CrateKey = [0u8; 32].into();
+    let _cp: vis::CratePathKey = [0u8; 48].into();
 
     // This would NOT compile:
-    // let _m: visibility_module::ModulePrivateKey = ...; // private → inaccessible
+    // let _m: vis::ModulePrivateKey = ...; // private → inaccessible
 }
 
-// ──────────────────────────────────────────────────────────────
-// Test default (pub) and private visibility in root
-// ──────────────────────────────────────────────────────────────
 fixed_alias!(pub GlobalKey, 96);
 fixed_alias!(RootPrivateKey, 128); // no pub → private to this file
 
@@ -60,7 +75,7 @@ fn root_visibility_works() {
 }
 
 // ──────────────────────────────────────────────────────────────
-// RNG and Dynamic aliases with visibility
+// RNG visibility tests for fixed aliases
 // ──────────────────────────────────────────────────────────────
 #[cfg(feature = "rand")]
 mod rng_vis {
@@ -84,25 +99,4 @@ fn parent_can_access_rng_pub_in_super() {
     let _n = rng_vis::ParentRngKey::generate();
     let _k = rng_vis::CrateRngKey::generate();
     assert_eq!(_n.len(), 24);
-}
-
-mod dynamic_vis {
-    use super::*;
-
-    dynamic_alias!(pub(crate) CratePass, String);
-    dynamic_alias!(pub(in super) ParentToken, Vec<u8>);
-
-    #[test]
-    fn dynamic_visibility_works() {
-        let _p: CratePass = "secret".into();
-        let _t: ParentToken = vec![9; 10].into();
-        assert_eq!(_p.len(), 6);
-        assert_eq!(_t.len(), 10);
-    }
-}
-
-#[test]
-fn parent_can_access_dynamic_pub_in_super() {
-    let _t: dynamic_vis::ParentToken = vec![1].into();
-    let _p: dynamic_vis::CratePass = "ok".into();
 }
