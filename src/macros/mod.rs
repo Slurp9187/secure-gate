@@ -1,2 +1,2 @@
-pub mod dynamic_macros;
-pub mod fixed_macros;
+pub mod dynamic;
+pub mod fixed;
