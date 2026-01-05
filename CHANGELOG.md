@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Convenience methods: `.expose_inner()` / `.expose_inner_mut()` on `CloneableString` and `CloneableVec`.
   - `init_with` and `try_init_with` constructors on `CloneableString` and `CloneableVec` to minimize temporary stack exposure when reading secrets from user input.
   - Encouraged pattern: semantic type aliases (e.g., `pub type CloneablePassword = CloneableString;`).
-- `CloneableSecret` trait for opt-in cloning of secrets (requires `zeroize` feature).
+- `CloneableSecretMarker` trait for opt-in cloning of secrets (requires `zeroize` feature).
   - Implemented for primitives (`u8`, `i32`, etc.) and fixed arrays (`[T; N]`).
   - Custom types can implement the trait.
 - Fallible RNG methods: `try_generate()` on `FixedRng<N>` and `DynamicRng`, returning `Result<Self, rand::Error>`.
@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Granular features: `encoding` now enables `encoding-hex`, `encoding-base64`, and `encoding-bech32`.
   - Trait is now `SecureEncodingExt`.
   - Removed `RandomHex` type; replaced with `FixedRng<N>` hex methods.
-- Cloning model: switched to opt-in via `CloneableSecret`, now centered on pre-baked primitives for maximum ergonomics and safety.
+- Cloning model: switched to opt-in via `CloneableSecretMarker`, now centered on pre-baked primitives for maximum ergonomics and safety.
   - All cloneable types are distinctly typed from non-cloneable counterparts — no accidental mixing.
 - `from_slice` on fixed byte arrays now uses fallible `TryFrom` internally.
 - Renamed `rng` module to `random`.
@@ -54,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Base64String`: simplified validation using single engine-based decode check.
 
 ### Fixed
-- Feature gating for `CloneableSecret` and related impls (requires `zeroize`).
+- Feature gating for `CloneableSecretMarker` and related impls (requires `zeroize`).
 - Doc-test compatibility across all feature configurations.
 - Resolved compilation conflicts in error types and trait bounds.
 - `Bech32String` `byte_len()` now allocation-free.

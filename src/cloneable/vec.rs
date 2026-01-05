@@ -7,7 +7,7 @@ use zeroize::Zeroize;
 pub struct CloneableVecInner(Vec<u8>);
 
 #[cfg(feature = "zeroize")]
-impl crate::CloneableSecret for CloneableVecInner {}
+impl crate::CloneableSecretMarker for CloneableVecInner {}
 
 #[cfg(feature = "zeroize")]
 pub type CloneableVec = Dynamic<CloneableVecInner>;

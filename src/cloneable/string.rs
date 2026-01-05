@@ -7,7 +7,7 @@ use zeroize::Zeroize;
 pub struct CloneableStringInner(String);
 
 #[cfg(feature = "zeroize")]
-impl crate::CloneableSecret for CloneableStringInner {}
+impl crate::CloneableSecretMarker for CloneableStringInner {}
 
 #[cfg(feature = "zeroize")]
 pub type CloneableString = Dynamic<CloneableStringInner>;

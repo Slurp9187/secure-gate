@@ -65,7 +65,7 @@ macro_rules! fixed_alias {
 /// use secure_gate::fixed_generic_alias;
 /// fixed_generic_alias!(pub(crate) Buffer);
 /// ```
-/// For random initialization, use Type::<N>::generate() (requires 'rand' feature).
+/// For random initialization, use `Type::<N>::generate()` (requires 'rand' feature).
 #[macro_export]
 macro_rules! fixed_generic_alias {
     ($vis:vis $name:ident, $doc:literal) => {

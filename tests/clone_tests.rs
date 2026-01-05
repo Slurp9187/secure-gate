@@ -1,6 +1,6 @@
 #![cfg(feature = "zeroize")]
 
-use secure_gate::{CloneableArray, CloneableSecret, CloneableString, CloneableVec, Fixed};
+use secure_gate::{CloneableArray, CloneableSecretMarker, CloneableString, CloneableVec, Fixed};
 
 #[test]
 fn fixed_arrays_can_be_cloned() {
@@ -18,7 +18,7 @@ fn primitives_can_be_cloned() {
 
 #[derive(Clone)]
 struct MyKey([u8; 16]);
-impl CloneableSecret for MyKey {}
+impl CloneableSecretMarker for MyKey {}
 impl zeroize::Zeroize for MyKey {
     fn zeroize(&mut self) {
         zeroize::Zeroize::zeroize(&mut self.0);
@@ -129,5 +129,5 @@ fn cloneable_vec_try_init_with() {
     assert!(err.is_err());
 }
 
-// Note: Raw Dynamic<String> cloning is still not allowed (String !impl CloneableSecret),
+// Note: Raw Dynamic<String> cloning is still not allowed (String !impl CloneableSecretMarker),
 // but CloneableString provides a safe wrapper for cloning string secrets.

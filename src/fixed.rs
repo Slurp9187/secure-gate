@@ -178,9 +178,9 @@ impl<T> fmt::Debug for Fixed<T> {
 #[derive(Debug)]
 pub struct FromSliceError(pub &'static str);
 
-// Opt-in Clone — only for types marked CloneableSecret (default no-clone)
+// Opt-in Clone — only for types marked CloneableSecretMarker (default no-clone)
 #[cfg(feature = "zeroize")]
-impl<T: crate::CloneableSecret> Clone for Fixed<T> {
+impl<T: crate::CloneableSecretMarker> Clone for Fixed<T> {
     #[inline(always)]
     fn clone(&self) -> Self {
         Self(self.0.clone())

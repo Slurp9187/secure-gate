@@ -7,42 +7,42 @@
 /// (e.g., primitives, fixed arrays; avoid heap-allocated types like `Vec` or `String`).
 /// It's re-exported at the crate root for convenience.
 #[cfg(feature = "zeroize")]
-pub trait CloneableSecret: Clone + zeroize::Zeroize {
+pub trait CloneableSecretMarker: Clone + zeroize::Zeroize {
     // Pure marker, no methods
 }
 
 #[cfg(feature = "zeroize")]
 // Blanket impls for primitives (safe to clone for secrets like keys or nonces)
-impl CloneableSecret for i8 {}
+impl CloneableSecretMarker for i8 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecret for i16 {}
+impl CloneableSecretMarker for i16 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecret for i32 {}
+impl CloneableSecretMarker for i32 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecret for i64 {}
+impl CloneableSecretMarker for i64 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecret for i128 {}
+impl CloneableSecretMarker for i128 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecret for isize {}
+impl CloneableSecretMarker for isize {}
 
 #[cfg(feature = "zeroize")]
-impl CloneableSecret for u8 {}
+impl CloneableSecretMarker for u8 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecret for u16 {}
+impl CloneableSecretMarker for u16 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecret for u32 {}
+impl CloneableSecretMarker for u32 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecret for u64 {}
+impl CloneableSecretMarker for u64 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecret for u128 {}
+impl CloneableSecretMarker for u128 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecret for usize {}
+impl CloneableSecretMarker for usize {}
 
 #[cfg(feature = "zeroize")]
-impl CloneableSecret for bool {}
+impl CloneableSecretMarker for bool {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecret for char {}
+impl CloneableSecretMarker for char {}
 
 // Blanket for fixed arrays of cloneable secrets (e.g., [u8; 32] AES keys)
 #[cfg(feature = "zeroize")]
-impl<T: CloneableSecret, const N: usize> CloneableSecret for [T; N] {}
+impl<T: CloneableSecretMarker, const N: usize> CloneableSecretMarker for [T; N] {}

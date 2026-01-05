@@ -7,7 +7,7 @@ use zeroize::Zeroize;
 pub struct CloneableArrayInner<const N: usize>([u8; N]);
 
 #[cfg(feature = "zeroize")]
-impl<const N: usize> crate::CloneableSecret for CloneableArrayInner<N> {}
+impl<const N: usize> crate::CloneableSecretMarker for CloneableArrayInner<N> {}
 
 #[cfg(feature = "zeroize")]
 pub type CloneableArray<const N: usize> = Fixed<CloneableArrayInner<N>>;

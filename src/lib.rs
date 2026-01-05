@@ -23,7 +23,7 @@ pub use fixed::Fixed;
 
 // ── Cloneable secret marker (opt-in for safe duplication) ────────────
 #[cfg(feature = "zeroize")]
-pub use cloneable::CloneableSecret;
+pub use cloneable::CloneableSecretMarker;
 #[cfg(feature = "zeroize")]
 pub mod cloneable;
 #[cfg(feature = "zeroize")]
