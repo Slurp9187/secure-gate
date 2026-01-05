@@ -17,12 +17,12 @@ Cloning is opt-in via the `CloneableSecret` trait.
 ## Installation
 ```toml
 [dependencies]
-secure-gate = "0.7.2.rc.2"
+secure-gate = "0.7.0-rc.2"
 ```
 
 Recommended configuration:
 ```toml
-secure-gate = { version = "0.7.2.rc.2", features = ["full"] }
+secure-gate = { version = "0.7.0-rc.2", features = ["full"] }
 ```
 
 ## Features
@@ -38,6 +38,20 @@ secure-gate = { version = "0.7.2.rc.2", features = ["full"] }
 | `full`             | All optional features                                                       |
 
 The crate is `no_std`-compatible with `alloc`. Features are optional and add no overhead when unused.
+
+## Security Model & Design Philosophy
+
+`secure-gate` prioritizes **auditability** and explicitness over implicit convenience.
+
+Every access to secret material — even inside the crate itself — goes through a method named `.expose_secret()` (or `.expose_secret_mut()`). This is deliberate:
+
+- Makes every exposure site grep-able and obvious in code reviews
+- Prevents accidental silent leaks or hidden bypasses
+- Ensures consistent reasoning about secret lifetimes and memory handling
+
+These calls are `#[inline(always)] const fn` reborrows — the optimizer elides them completely. There is **zero runtime cost**.
+
+It's intentional "theatre" for humans and auditors, but free for the machine. Clarity of purpose wins over micro-optimizations.
 
 ## Quick Start
 ```rust
