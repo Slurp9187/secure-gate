@@ -65,7 +65,6 @@ impl CloneableString {
     /// Fallible version of `init_with`.
     ///
     /// Useful when construction can fail (e.g., I/O errors).
-    #[must_use]
     pub fn try_init_with<F, E>(constructor: F) -> Result<Self, E>
     where
         F: FnOnce() -> Result<String, E>,

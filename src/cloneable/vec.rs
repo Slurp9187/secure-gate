@@ -54,7 +54,6 @@ impl CloneableVec {
     }
 
     /// Fallible version of `init_with`.
-    #[must_use]
     pub fn try_init_with<F, E>(constructor: F) -> Result<Self, E>
     where
         F: FnOnce() -> Result<Vec<u8>, E>,
