@@ -193,7 +193,7 @@ impl Bech32String {
 #[cfg(all(feature = "encoding-bech32", feature = "ct-eq"))]
 impl PartialEq for Bech32String {
     fn eq(&self, other: &Self) -> bool {
-        use crate::eq::ConstantTimeEq;
+        use crate::ct_eq::ConstantTimeEq;
         self.inner
             .expose_secret()
             .as_bytes()

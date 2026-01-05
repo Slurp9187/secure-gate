@@ -175,7 +175,7 @@ where
 {
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
-        use crate::eq::ConstantTimeEq;
+        use crate::ct_eq::ConstantTimeEq;
         self.expose_secret()
             .as_ref()
             .ct_eq(other.expose_secret().as_ref())

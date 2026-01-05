@@ -90,9 +90,7 @@ impl Base64String {
     #[inline(always)]
     pub fn byte_len(&self) -> usize {
         let len = self.len();
-        (len / 4) * 3 +
-        (len % 4 == 2) as usize +
-        (len % 4 == 3) as usize * 2
+        (len / 4) * 3 + (len % 4 == 2) as usize + (len % 4 == 3) as usize * 2
     }
 
     /// Primary way to access the validated string.
@@ -114,15 +112,13 @@ impl Base64String {
     }
 }
 
-
-
 // Constant-time equality for base64 strings – prevents timing attacks when ct-eq enabled
 #[cfg(feature = "encoding-base64")]
 impl PartialEq for Base64String {
     fn eq(&self, other: &Self) -> bool {
         #[cfg(feature = "ct-eq")]
         {
-            use crate::eq::ConstantTimeEq;
+            use crate::ct_eq::ConstantTimeEq;
             self.0
                 .expose_secret()
                 .as_bytes()

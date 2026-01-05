@@ -1,6 +1,6 @@
 //! Constant-time equality comparison (gated behind “ct-eq”).
 // ==========================================================================
-// src/eq.rs
+// src/ct_eq.rs
 // ==========================================================================
 
 #[cfg(feature = "ct-eq")]
@@ -11,7 +11,7 @@
 /// # Examples
 ///
 /// ```
-/// # use secure_gate::eq::ConstantTimeEq;
+/// use secure_gate::ct_eq::ConstantTimeEq;
 /// let a = [1u8, 2u8];
 /// let b = [1u8, 2u8];
 /// assert!(a.ct_eq(&b));

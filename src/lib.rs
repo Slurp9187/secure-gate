@@ -37,7 +37,7 @@ mod macros;
 pub mod random;
 
 #[cfg(feature = "ct-eq")]
-pub mod eq;
+pub mod ct_eq;
 
 pub mod encoding;
 

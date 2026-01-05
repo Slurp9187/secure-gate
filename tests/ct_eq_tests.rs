@@ -7,7 +7,7 @@
 
 #[cfg(test)]
 mod tests {
-    use secure_gate::eq::ConstantTimeEq;
+    use secure_gate::ct_eq::ConstantTimeEq;
 
     #[test]
     fn slice_ct_eq_basic() {

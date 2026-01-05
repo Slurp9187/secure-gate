@@ -131,7 +131,7 @@ impl HexString {
 #[cfg(all(feature = "encoding-hex", feature = "ct-eq"))]
 impl PartialEq for HexString {
     fn eq(&self, other: &Self) -> bool {
-        use crate::eq::ConstantTimeEq;
+        use crate::ct_eq::ConstantTimeEq;
         self.0
             .expose_secret()
             .as_bytes()
