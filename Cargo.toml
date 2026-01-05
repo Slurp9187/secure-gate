@@ -11,7 +11,6 @@ categories = ["cryptography", "no-std", "data-structures"]
 
 [dependencies]
 rand = { version = "0.9", optional = true }
-getrandom = { version = "0.2", optional = true }
 
 zeroize = { version = "1.7", default-features = false, optional = true, features = [
   "alloc",
@@ -47,7 +46,7 @@ encoding-bech32 = ["dep:bech32"]
 # ct-eq: Constant-time equality checks (prevents timing attacks in comparisons; uses 'subtle' crate)
 ct-eq = ["dep:subtle"]
 # rand: Random number generation for securely creating secrets (uses rand with getrandom for seeding; rand_core is transitive)
-rand = ["dep:rand", "dep:getrandom"]
+rand = ["dep:rand"]
 # zeroize: Secure zeroing of secrets on drop or explicit calls (uses 'zeroize' crate with alloc and derives)
 zeroize = ["dep:zeroize"]
 
