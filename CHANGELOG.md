@@ -6,8 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.7.0] - 2026-01-04
-
 ### Added
+- **Opt-in cloning overhaul** (requires `zeroize` feature):
+  - New pre-baked cloneable primitives for zero-boilerplate common cases:
+    - `CloneableArray<const N: usize>` — cloneable fixed-size stack secret (`[u8; N]`)
+    - `CloneableString` — cloneable heap-allocated text secret (`String`)
+    - `CloneableVec` — cloneable heap-allocated binary secret (`Vec<u8>`)
+  - Organized in `src/cloneable/` module with submodules `array`, `string`, and `vec`.
+  - Convenience methods: `.expose_inner()` / `.expose_inner_mut()` on `CloneableString` and `CloneableVec`.
+  - `init_with` and `try_init_with` constructors on `CloneableString` and `CloneableVec` to minimize temporary stack exposure when reading secrets from user input.
+  - Encouraged pattern: semantic type aliases (e.g., `pub type CloneablePassword = CloneableString;`).
 - `CloneableSecret` trait for opt-in cloning of secrets (requires `zeroize` feature).
   - Implemented for primitives (`u8`, `i32`, etc.) and fixed arrays (`[T; N]`).
   - Custom types can implement the trait.
@@ -34,7 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Granular features: `encoding` now enables `encoding-hex`, `encoding-base64`, and `encoding-bech32`.
   - Trait is now `SecureEncodingExt`.
   - Removed `RandomHex` type; replaced with `FixedRng<N>` hex methods.
-- Cloning model: switched to opt-in via `CloneableSecret`.
+- Cloning model: switched to opt-in via `CloneableSecret`, now centered on pre-baked primitives for maximum ergonomics and safety.
+  - All cloneable types are distinctly typed from non-cloneable counterparts — no accidental mixing.
 - `from_slice` on fixed byte arrays now uses fallible `TryFrom` internally.
 - Renamed `rng` module to `random`.
 - Encoding wrappers (`HexString`, `Base64String`, `Bech32String`):
