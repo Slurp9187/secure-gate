@@ -25,7 +25,7 @@
 #![cfg_attr(not(feature = "zeroize"), forbid(unsafe_code))]
 
 use alloc::string::String;
-use bech32::{Bech32, Bech32m, Hrp};
+use bech32::{Bech32, Hrp};
 
 pub(crate) fn convert_bits(
     data: &[u8],

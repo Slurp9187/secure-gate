@@ -12,5 +12,3 @@ Cargo.lock
 
 *.errors
 *.log
-
-audit_report.md
