@@ -38,7 +38,7 @@ secure-gate = { version = "0.7.0-rc.2", features = ["full"] }
 | `encoding`         | All encoding support (`encoding-hex`, `encoding-base64`, `encoding-bech32`) |
 | `encoding-hex`     | Hex encoding, `HexString`, `FixedRng` hex methods                           |
 | `encoding-base64`  | `Base64String`                                                              |
-| `encoding-bech32`  | `Bech32String` (age-compatible Bech32 keys)                                 |
+| `encoding-bech32`  | `Bech32String` (Bech32 and Bech32m variants)                              |
 | `full`             | All optional features                                                       |
 
 The crate is `no_std`-compatible with `alloc`. Features are optional and add no overhead when unused.
@@ -83,15 +83,26 @@ assert_eq!(pw.expose_secret(), "hunter2");
     use secure_gate::fixed_alias_rng;
 
     fixed_alias_rng!(pub MasterKey, 32);
-    fixed_alias_rng!(pub Nonce, 24);
-
-    let key = MasterKey::generate();
-    let nonce = Nonce::generate();
 
     #[cfg(feature = "encoding-hex")]
     {
+        let key = MasterKey::generate();
         let hex = key.into_hex();
         println!("key hex: {}", hex.expose_secret());
+    }
+
+    #[cfg(feature = "encoding-base64")]
+    {
+        let key = MasterKey::generate();
+        let base64 = key.into_base64();
+        println!("key base64: {}", base64.expose_secret());
+    }
+
+    #[cfg(feature = "encoding-bech32")]
+    {
+        let key = MasterKey::generate();
+        let bech32 = key.into_bech32("example");
+        println!("key bech32: {}", bech32.expose_secret());
     }
 }
 ```
@@ -172,12 +183,19 @@ The temporary is cloned to the heap and zeroized immediately.
     fixed_alias_rng!(pub BackupCode, 16);
 
     let key = JwtSigningKey::generate();
-    let code = BackupCode::generate();
 
     #[cfg(feature = "encoding-hex")]
     {
+        let code = BackupCode::generate();
         let hex_code = code.into_hex();
         println!("Backup code: {}", hex_code.expose_secret());
+    }
+
+    #[cfg(feature = "encoding-base64")]
+    {
+        let code = BackupCode::generate();
+        let base64_code = code.into_base64();
+        println!("Backup code: {}", base64_code.expose_secret());
     }
 }
 ```
@@ -221,7 +239,8 @@ Direct generation is also available:
 {
     use secure_gate::encoding::bech32::Bech32String;
 
-    // See the rustdoc for Bech32String for detailed usage and validation rules.
+    // Supports both Bech32 and Bech32m variants generically
+    // See rustdoc for detailed usage and validation rules
 }
 ```
 

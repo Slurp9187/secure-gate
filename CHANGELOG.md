@@ -24,15 +24,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Base64String` wrapper in `encoding::base64` with validation, `decode_secret_to_bytes()`, and constant-time equality (when `ct-eq` enabled).
   - Validates URL-safe no-pad base64; invalid inputs are zeroed when `zeroize` enabled.
 - `into_hex()` (consuming) and `to_hex()` (borrowing) methods on `FixedRng<N>` (requires `encoding-hex`).
+- `into_hex()` (consuming) and `to_hex()` (borrowing) methods on `DynamicRng` (requires `encoding-hex`).
+- `into_base64()` (consuming) and `to_base64()` (borrowing) methods on `FixedRng<N>` and `DynamicRng` (requires `encoding-base64`).
+- `into_bech32(hrp)` and `to_bech32(hrp)` methods on `FixedRng<N>` and `DynamicRng` (requires `encoding-bech32`).
+- `into_bech32m(hrp)` and `to_bech32m(hrp)` methods on `FixedRng<N>` and `DynamicRng` (requires `encoding-bech32`).
 - `eq` module with `ConstantTimeEq` trait and inherent `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
 - Fallible construction: `impl TryFrom<&[u8]> for Fixed<[u8; N]>` with `FromSliceError`.
   - `from_slice` now delegates to `TryFrom` (panics for compatibility).
 - Conversions: `From<&str>` for `Dynamic<String>` and `From<&[u8]>` for `Dynamic<Vec<u8>>`.
 - Explicit methods on `HexString` and `Base64String`: `.expose_secret() -> &String`, `.len()`, `.is_empty()`, `.byte_len()`.
-- `Bech32String` wrapper in `encoding::bech32` for age-compatible keys.
-  - Validation for age-relevant HRPs (`age`, `age1pq`, `age-secret-key-1`, `age-secret-key-pq-`).
+- `Bech32String` wrapper in `encoding::bech32`.
+  - Generic support for both Bech32 and Bech32m variants (no protocol-specific HRP restrictions).
+  - Variant detection with `variant()`, `is_bech32()`, `is_bech32m()` methods.
   - Accepts uppercase input (normalised to lowercase).
-  - Provides `decode_secret_to_bytes()`, non-allocating `byte_len()`, `hrp()`, `is_postquantum()`, constant-time equality, and zeroing of invalid inputs (when `zeroize` enabled).
+  - Provides `decode_secret_to_bytes()`, non-allocating `byte_len()`, `hrp()`, constant-time equality, and zeroing of invalid inputs (when `zeroize` enabled).
 - Granular `encoding-bech32` feature and inclusion in meta-feature `encoding`.
 
 ### Changed
@@ -42,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Granular features: `encoding` now enables `encoding-hex`, `encoding-base64`, and `encoding-bech32`.
   - Trait is now `SecureEncodingExt`.
   - Removed `RandomHex` type; replaced with `FixedRng<N>` hex methods.
+  - `Bech32String` now supports both Bech32 and Bech32m variants generically (removed age-specific HRP restrictions and variant detection).
 - Cloning model: switched to opt-in via `CloneableSecretMarker`, now centered on pre-baked primitives for maximum ergonomics and safety.
   - All cloneable types are distinctly typed from non-cloneable counterparts — no accidental mixing.
 - `from_slice` on fixed byte arrays now uses fallible `TryFrom` internally.
