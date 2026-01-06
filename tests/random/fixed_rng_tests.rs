@@ -3,8 +3,12 @@
 
 #![cfg(feature = "rand")]
 
-use secure_gate::encoding::{base64::Base64String, hex::HexString};
+#[cfg(feature = "encoding-base64")]
+use secure_gate::encoding::base64::Base64String;
+#[cfg(feature = "encoding-hex")]
+use secure_gate::encoding::hex::HexString;
 use secure_gate::random::FixedRng;
+#[cfg(any(feature = "encoding-hex", feature = "encoding-base64", feature = "encoding-bech32"))]
 use secure_gate::SecureEncodingExt;
 
 #[test]
