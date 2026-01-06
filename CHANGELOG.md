@@ -5,7 +5,7 @@ All changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.0] - 2026-01-04
+## [0.7.0] - 2026-01-05
 ### Added
 - **Opt-in cloning overhaul** (requires `zeroize` feature):
   - New pre-baked cloneable primitives for zero-boilerplate common cases:
@@ -23,12 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Corresponding `try_generate_random()` methods on `Fixed` and `Dynamic`.
 - `Base64String` wrapper in `encoding::base64` with validation, `decode_secret_to_bytes()`, and constant-time equality (when `ct-eq` enabled).
   - Validates URL-safe no-pad base64; invalid inputs are zeroed when `zeroize` enabled.
-- `into_hex()` (consuming) and `to_hex()` (borrowing) methods on `FixedRng<N>` (requires `encoding-hex`).
-- `into_hex()` (consuming) and `to_hex()` (borrowing) methods on `DynamicRng` (requires `encoding-hex`).
+- `into_hex()` (consuming) and `to_hex()` (borrowing) methods on `FixedRng<N>` and `DynamicRng` (requires `encoding-hex`).
 - `into_base64()` (consuming) and `to_base64()` (borrowing) methods on `FixedRng<N>` and `DynamicRng` (requires `encoding-base64`).
-- `into_bech32(hrp)` and `to_bech32(hrp)` methods on `FixedRng<N>` and `DynamicRng` (requires `encoding-bech32`).
-- `into_bech32m(hrp)` and `to_bech32m(hrp)` methods on `FixedRng<N>` and `DynamicRng` (requires `encoding-bech32`).
-- `eq` module with `ConstantTimeEq` trait and inherent `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
+- `into_bech32(hrp)` / `to_bech32(hrp)` and `into_bech32m(hrp)` / `to_bech32m(hrp)` methods on `FixedRng<N>` and `DynamicRng` (requires `encoding-bech32`).
+- `ct_eq` module with `ConstantTimeEq` trait and inherent `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
 - Fallible construction: `impl TryFrom<&[u8]> for Fixed<[u8; N]>` with `FromSliceError`.
   - `from_slice` now delegates to `TryFrom` (panics for compatibility).
 - Conversions: `From<&str>` for `Dynamic<String>` and `From<&[u8]>` for `Dynamic<Vec<u8>>`.
@@ -36,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Bech32String` wrapper in `encoding::bech32`.
   - Generic support for both Bech32 and Bech32m variants (no protocol-specific HRP restrictions).
   - Variant detection with `variant()`, `is_bech32()`, `is_bech32m()` methods.
-  - Accepts uppercase input (normalised to lowercase).
+  - Accepts mixed-case input (normalized to lowercase for canonical storage).
   - Provides `decode_secret_to_bytes()`, non-allocating `byte_len()`, `hrp()`, constant-time equality, and zeroing of invalid inputs (when `zeroize` enabled).
 - Granular `encoding-bech32` feature and inclusion in meta-feature `encoding`.
 
@@ -45,10 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaced `conversions` module/feature with modular `encoding`.
   - Split into `encoding::hex`, `encoding::base64`, and `encoding::bech32` submodules.
   - Granular features: `encoding` now enables `encoding-hex`, `encoding-base64`, and `encoding-bech32`.
-  - Trait is now `SecureEncodingExt`.
-  - Removed `RandomHex` type; replaced with `FixedRng<N>` hex methods.
-  - `Bech32String` now supports both Bech32 and Bech32m variants generically (removed age-specific HRP restrictions and variant detection).
-- Cloning model: switched to opt-in via `CloneableSecretMarker`, now centered on pre-baked primitives for maximum ergonomics and safety.
+  - Trait renamed to `SecureEncodingExt`.
+  - Removed `RandomHex` type; replaced with direct methods on `FixedRng<N>` and `DynamicRng`.
+  - `Bech32String` now fully generic for Bech32/Bech32m with mixed-case acceptance and canonical lowercase storage.
+- Cloning model: switched to opt-in via `CloneableSecretMarker`, centered on pre-baked primitives for maximum ergonomics and safety.
   - All cloneable types are distinctly typed from non-cloneable counterparts — no accidental mixing.
 - `from_slice` on fixed byte arrays now uses fallible `TryFrom` internally.
 - Renamed `rng` module to `random`.
@@ -64,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Doc-test compatibility across all feature configurations.
 - Resolved compilation conflicts in error types and trait bounds.
 - `Bech32String` `byte_len()` now allocation-free.
+- Bech32/Bech32m variant detection and normalization robustness.
 
 ### Removed
 - `NoClone` wrapper types and `no_clone()` methods.
