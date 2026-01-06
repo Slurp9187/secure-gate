@@ -1,4 +1,3 @@
-```markdown
 # secure-gate
 `no_std`-compatible wrappers for sensitive data with explicit exposure requirements.
 - `Fixed<T>` - Stack-allocated wrapper
@@ -17,11 +16,11 @@ Cloning is opt-in and only available under the `zeroize` feature.
 ## Installation
 ```toml
 [dependencies]
-secure-gate = "0.7.0-rc.3"
+secure-gate = "v0.7.0-rc.4"
 ```
 Recommended configuration:
 ```toml
-secure-gate = { version = "0.7.0-rc.3", features = ["full"] }
+secure-gate = { version = "v0.7.0-rc.4", features = ["full"] }
 ```
 ## Features
 | Feature | Description |
@@ -239,6 +238,3 @@ The wrappers add no runtime overhead compared to raw types in benchmarks.
 [[CHANGELOG.md]](https://github.com/Slurp9187/secure-gate/blob/v070rc/CHANGELOG.md)
 ## License
 MIT OR Apache-2.0
-```
-
-
