@@ -129,5 +129,20 @@ fn cloneable_vec_try_init_with() {
     assert!(err.is_err());
 }
 
+#[test]
+fn cloneable_array_init_with() {
+    let arr = CloneableArray::<3>::init_with(|| [1u8, 2, 3]);
+    assert_eq!(arr.expose_inner(), &[1, 2, 3]);
+}
+
+#[test]
+fn cloneable_array_try_init_with() {
+    let arr = CloneableArray::<3>::try_init_with(|| Ok::<[u8; 3], &str>([1u8, 2, 3])).unwrap();
+    assert_eq!(arr.expose_inner(), &[1, 2, 3]);
+
+    let err: Result<CloneableArray<3>, &str> = CloneableArray::<3>::try_init_with(|| Err("fail"));
+    assert!(err.is_err());
+}
+
 // Note: Raw Dynamic<String> cloning is still not allowed (String !impl CloneableSecretMarker),
 // but CloneableString provides a safe wrapper for cloning string secrets.

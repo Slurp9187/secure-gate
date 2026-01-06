@@ -126,10 +126,18 @@ When reading secrets from user input (e.g., passwords), use `init_with`/`try_ini
 ```rust
 #[cfg(feature = "zeroize")]
 {
-    use secure_gate::CloneableString;
+    use secure_gate::{CloneableString, CloneableVec, CloneableArray};
     let pw = CloneableString::init_with(|| {
         // Read from terminal, network, etc.
         "hunter2".to_string()
+    });
+    let seed = CloneableVec::init_with(|| {
+        // Read binary data...
+        vec![0u8; 64]
+    });
+    let key = CloneableArray::<32>::init_with(|| {
+        // Read fixed-size data...
+        [0u8; 32]
     });
     // Or fallible:
     let pw = CloneableString::try_init_with(|| {
