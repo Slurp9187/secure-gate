@@ -75,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `NoClone` wrapper types and `no_clone()` methods.
 - `RandomHex` type.
+- `Dynamic::new_boxed()` method (redundant with `From<Box<T>>` impl).
 
 ## [0.6.1] - 2025-12-07
 
