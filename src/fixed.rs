@@ -174,6 +174,17 @@ impl<T> fmt::Debug for Fixed<T> {
     }
 }
 
+// Regular equality — fallback when ct-eq feature is disabled
+#[cfg(not(feature = "ct-eq"))]
+impl<T: PartialEq> PartialEq for Fixed<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.expose_secret() == other.expose_secret()
+    }
+}
+
+#[cfg(not(feature = "ct-eq"))]
+impl<T: Eq> Eq for Fixed<T> {}
+
 /// Error for slice length mismatches in TryFrom impls.
 #[derive(Debug)]
 pub struct FromSliceError(pub &'static str);
