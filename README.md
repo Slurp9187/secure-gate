@@ -10,9 +10,9 @@
 - `HexString` - Validated lowercase hexadecimal string wrapper
 - `Base64String` - Validated URL-safe base64 string wrapper (no padding)
 - `Bech32String` - Validated Bech32/Bech32m string wrapper
-With the `zeroize` feature enabled, memory containing secrets is zeroed on drop, including spare capacity where applicable.
-Access to secret data requires an explicit `.expose_secret()` call. There are no `Deref` implementations or other implicit access paths.
-Cloning is opt-in and only available under the `zeroize` feature.
+  With the `zeroize` feature enabled, memory containing secrets is zeroed on drop, including spare capacity where applicable.
+  Access to secret data requires an explicit `.expose_secret()` call. There are no `Deref` implementations or other implicit access paths.
+  Cloning is opt-in and only available under the `zeroize` feature.
 ## Installation
 ```toml
 [dependencies]
@@ -40,8 +40,8 @@ Every access to secret material - even inside the crate itself - goes through a 
 - Makes every exposure site grep-able and obvious in code reviews
 - Prevents accidental silent leaks or hidden bypasses
 - Ensures consistent reasoning about secret lifetimes and memory handling
-These calls are `#[inline(always)] const fn` reborrows - the optimizer elides them completely. There is **zero runtime cost**.
-It's intentional "theatre" for humans and auditors, but free for the machine. Clarity of purpose wins over micro-optimizations.
+  These calls are `#[inline(always)] const fn` reborrows - the optimizer elides them completely. There is **zero runtime cost**.
+  It's intentional "theatre" for humans and auditors, but free for the machine. Clarity of purpose wins over micro-optimizations.
 ## Quick Start
 ```rust
 use secure_gate::{fixed_alias, dynamic_alias};
