@@ -16,11 +16,11 @@ Cloning is opt-in and only available under the `zeroize` feature.
 ## Installation
 ```toml
 [dependencies]
-secure-gate = "0.7.0-rc.2"
+secure-gate = "0.7.0-rc.3"
 ```
 Recommended configuration:
 ```toml
-secure-gate = { version = "0.7.0-rc.2", features = ["full"] }
+secure-gate = { version = "0.7.0-rc.3", features = ["full"] }
 ```
 ## Features
 | Feature | Description |
