@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 #[cfg(feature = "encoding-base64")]
 pub mod base64_tests;
 // #[cfg(feature = "encoding-bech32")]
