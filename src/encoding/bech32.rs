@@ -26,9 +26,15 @@ use alloc::string::String;
 use bech32::primitives::decode::UncheckedHrpstring;
 use bech32::{Bech32, Bech32m, Hrp};
 
+/// The encoding variant used for Bech32 strings.
+///
+/// Bech32 and Bech32m are two similar but incompatible encoding variants.
+/// Bech32m provides stronger error detection and is preferred for new applications.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EncodingVariant {
+    /// Original Bech32 encoding variant.
     Bech32,
+    /// Improved Bech32m encoding variant with stronger error detection.
     Bech32m,
 }
 
@@ -64,7 +70,12 @@ fn detect_variant(s: &str) -> EncodingVariant {
 /// Validated Bech32/Bech32m string wrapper for secret data.
 ///
 /// This struct ensures the contained string is a valid Bech32 or Bech32m encoding.
-/// It lowercases the input for canonical storage.
+/// It lowercases the input for canonical storage and tracks which variant was detected.
+///
+/// # Fields
+///
+/// * `inner` - The validated and normalized Bech32/Bech32m string
+/// * `variant` - Whether this uses Bech32 or Bech32m encoding
 pub struct Bech32String {
     pub(crate) inner: crate::Dynamic<String>,
     pub(crate) variant: EncodingVariant,

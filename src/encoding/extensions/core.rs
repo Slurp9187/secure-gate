@@ -21,11 +21,12 @@ use ::bech32::{self};
 /// # Example
 ///
 /// ```
+/// # #[cfg(feature = "encoding-hex")]
+/// # {
 /// use secure_gate::SecureEncodingExt;
 /// let bytes = [0x42u8; 32];
 /// let hex = bytes.to_hex(); // → "424242..."
-/// let b64 = bytes.to_base64url(); // URL-safe, no padding
-/// let b32 = bytes.to_bech32m("example"); // Bech32m with HRP
+/// # }
 /// ```
 #[cfg(any(
     feature = "encoding-hex",

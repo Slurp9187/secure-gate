@@ -80,7 +80,7 @@ impl<'a> core::ops::Deref for HexStringView<'a> {
 #[cfg(feature = "encoding-hex")]
 impl<'a> core::fmt::Debug for HexStringView<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(self.0)
+        f.write_str("[REDACTED]")
     }
 }
 

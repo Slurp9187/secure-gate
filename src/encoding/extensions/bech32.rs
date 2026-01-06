@@ -185,7 +185,7 @@ impl<'a> core::ops::Deref for Bech32StringView<'a> {
 #[cfg(feature = "encoding-bech32")]
 impl<'a> core::fmt::Debug for Bech32StringView<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(self.0)
+        f.write_str("[REDACTED]")
     }
 }
 

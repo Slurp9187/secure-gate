@@ -86,7 +86,7 @@ impl<'a> core::ops::Deref for Base64StringView<'a> {
 #[cfg(feature = "encoding-base64")]
 impl<'a> core::fmt::Debug for Base64StringView<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(self.0)
+        f.write_str("[REDACTED]")
     }
 }
 
