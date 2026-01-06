@@ -4,6 +4,7 @@
 /target
 
 *conflict*
+*# Name clash*
 
 Cargo.lock
 
