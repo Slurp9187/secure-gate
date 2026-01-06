@@ -55,6 +55,6 @@ pub use encoding::base64::Base64String;
 pub use encoding::bech32::Bech32String;
 
 #[cfg(any(feature = "encoding-hex", feature = "encoding-base64"))]
-pub use encoding::SecureEncodingExt;
+pub use crate::encoding::traits::SecureEncodingExt;
 
 pub use fixed::FromSliceError;

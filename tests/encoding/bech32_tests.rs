@@ -5,6 +5,7 @@
 #![cfg(test)]
 
 use secure_gate::encoding::bech32::Bech32String;
+use secure_gate::SecureEncodingExt;
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
@@ -35,7 +36,7 @@ fn accepts_and_normalizes_valid_bech32() {
 
     let bech32 = Bech32String::new(mixed_case).unwrap();
 
-    assert_eq!(bech32.expose_secret(), &expected_lower);
+    assert_eq!(*bech32.expose_secret(), expected_lower);
     assert!(bech32.is_bech32());
     assert!(!bech32.is_bech32m());
 }
@@ -60,7 +61,7 @@ fn accepts_and_normalizes_valid_bech32m() {
         let mixed_case = mixed.to_string();
         let bech32 = Bech32String::new(mixed_case).unwrap();
 
-        assert_eq!(bech32.expose_secret(), expected_lower);
+        assert_eq!(*bech32.expose_secret(), expected_lower);
         assert!(!bech32.is_bech32());
         assert!(
             bech32.is_bech32m(),
@@ -76,7 +77,7 @@ fn accepts_and_normalizes_valid_bech32m() {
 
     let bech32m = Bech32String::new(taproot_mixed).unwrap();
 
-    assert_eq!(bech32m.expose_secret(), &taproot_lower);
+    assert_eq!(*bech32m.expose_secret(), taproot_lower);
     assert!(bech32m.is_bech32m());
 }
 
@@ -114,18 +115,18 @@ fn rng_into_bech32_variant_detection_and_round_trip() {
     let rng = FixedRng::<16>::generate();
     let raw_bytes = rng.expose_secret().to_vec();
 
-    let b32 = rng.to_bech32("test");
+    let b32 = rng.expose_secret().to_bech32("test");
     let parsed = Bech32String::new(b32.expose_secret().clone()).unwrap();
     assert!(parsed.is_bech32());
-    assert_eq!(parsed.decode_secret_to_bytes(), raw_bytes);
+    assert_eq!(parsed.expose_secret().to_bytes(), raw_bytes);
 
     let rng_m = FixedRng::<16>::generate();
     let raw_bytes_m = rng_m.expose_secret().to_vec();
 
-    let b32m = rng_m.to_bech32m("test");
+    let b32m = rng_m.expose_secret().to_bech32m("test");
     let parsed_m = Bech32String::new(b32m.expose_secret().clone()).unwrap();
     assert!(parsed_m.is_bech32m());
-    assert_eq!(parsed_m.decode_secret_to_bytes(), raw_bytes_m);
+    assert_eq!(parsed_m.expose_secret().to_bytes(), raw_bytes_m);
 }
 
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
@@ -139,7 +140,7 @@ fn rng_into_bech32_consuming_round_trip() {
     let b32 = rng.into_bech32("example");
     assert!(b32.is_bech32());
     assert_eq!(b32.byte_len(), 32);
-    assert_eq!(b32.decode_secret_to_bytes(), raw_bytes);
+    assert_eq!(b32.into_bytes(), raw_bytes);
 
     let rng_m = FixedRng::<32>::generate();
     let raw_bytes_m = rng_m.expose_secret().to_vec();
@@ -147,7 +148,7 @@ fn rng_into_bech32_consuming_round_trip() {
     let b32m = rng_m.into_bech32m("example");
     assert!(b32m.is_bech32m());
     assert_eq!(b32m.byte_len(), 32);
-    assert_eq!(b32m.decode_secret_to_bytes(), raw_bytes_m);
+    assert_eq!(b32m.into_bytes(), raw_bytes_m);
 }
 
 #[cfg(all(feature = "encoding-bech32", feature = "ct-eq"))]

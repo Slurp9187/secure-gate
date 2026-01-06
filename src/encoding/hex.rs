@@ -35,7 +35,7 @@ fn zeroize_input(s: &mut String) {
 /// assert_eq!(valid.expose_secret(), "deadbeef");
 /// let bytes = valid.decode_secret_to_bytes(); // Vec<u8> of [0xde, 0xad, 0xbe, 0xef]
 /// ```
-pub struct HexString(crate::Dynamic<String>);
+pub struct HexString(pub(crate) crate::Dynamic<String>);
 
 impl HexString {
     /// Create a new `HexString` from a `String`, validating it in-place.
@@ -96,22 +96,9 @@ impl HexString {
         Self(crate::Dynamic::new(s))
     }
 
-    /// Decode the validated hex string back into raw bytes.
-    ///
-    /// Panics if the internal string is somehow invalid (impossible under correct usage).
-    pub fn decode_secret_to_bytes(&self) -> Vec<u8> {
-        hex::decode(self.0.expose_secret()).expect("HexString is always valid")
-    }
-
     /// Number of bytes the decoded hex string represents.
     pub fn byte_len(&self) -> usize {
         self.0.expose_secret().len() / 2
-    }
-
-    /// Primary way to access the validated string — now returns &String for consistency
-    #[inline(always)]
-    pub const fn expose_secret(&self) -> &String {
-        self.0.expose_secret()
     }
 
     /// Length of the encoded string (in characters) — delegate directly

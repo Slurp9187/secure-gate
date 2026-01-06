@@ -32,7 +32,7 @@ fn zeroize_input(s: &mut String) {
 /// assert_eq!(valid.expose_secret(), "SGVsbG8");
 /// let bytes = valid.decode_secret_to_bytes(); // Vec<u8> of "Hello"
 /// ```
-pub struct Base64String(crate::Dynamic<String>);
+pub struct Base64String(pub(crate) crate::Dynamic<String>);
 
 impl Base64String {
     /// Create a new `Base64String` from a `String`, validating it as URL-safe base64 (no padding).
@@ -77,26 +77,11 @@ impl Base64String {
         Self(crate::Dynamic::new(s))
     }
 
-    /// Decode the validated base64 string back into raw bytes.
-    ///
-    /// Panics if the internal string is somehow invalid (impossible under correct usage).
-    pub fn decode_secret_to_bytes(&self) -> Vec<u8> {
-        URL_SAFE_NO_PAD
-            .decode(self.0.expose_secret())
-            .expect("Base64String is always valid")
-    }
-
     /// Exact number of bytes the decoded base64 string represents.
     #[inline(always)]
     pub fn byte_len(&self) -> usize {
         let len = self.len();
         (len / 4) * 3 + (len % 4 == 2) as usize + (len % 4 == 3) as usize * 2
-    }
-
-    /// Primary way to access the validated string.
-    #[inline(always)]
-    pub const fn expose_secret(&self) -> &String {
-        self.0.expose_secret()
     }
 
     /// Length of the encoded string (in characters).

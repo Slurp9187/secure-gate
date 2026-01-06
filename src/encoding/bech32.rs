@@ -66,8 +66,8 @@ fn detect_variant(s: &str) -> EncodingVariant {
 /// This struct ensures the contained string is a valid Bech32 or Bech32m encoding.
 /// It lowercases the input for canonical storage.
 pub struct Bech32String {
-    inner: crate::Dynamic<String>,
-    variant: EncodingVariant,
+    pub(crate) inner: crate::Dynamic<String>,
+    pub(crate) variant: EncodingVariant,
 }
 
 impl Bech32String {
@@ -101,13 +101,6 @@ impl Bech32String {
         }
     }
 
-    /// Decode the validated string back into raw payload bytes.
-    pub fn decode_secret_to_bytes(&self) -> Vec<u8> {
-        let (_, data) =
-            bech32::decode(self.inner.expose_secret()).expect("Bech32String is always valid");
-        data
-    }
-
     /// Exact number of bytes the decoded payload represents (allocation-free).
     pub fn byte_len(&self) -> usize {
         let s = self.expose_secret();
@@ -137,12 +130,6 @@ impl Bech32String {
     /// Check if this is Bech32m-encoded.
     pub fn is_bech32m(&self) -> bool {
         self.variant == EncodingVariant::Bech32m
-    }
-
-    /// Primary way to access the validated, normalized string.
-    #[inline(always)]
-    pub const fn expose_secret(&self) -> &String {
-        self.inner.expose_secret()
     }
 
     /// Length of the encoded string (in characters).

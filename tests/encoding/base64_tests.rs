@@ -24,7 +24,7 @@ fn into_base64_via_alias() {
         .chars()
         .all(|c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
 
-    let bytes = b64.decode_secret_to_bytes();
+    let bytes = b64.into_bytes();
     assert_eq!(bytes.len(), 32);
 }
 
@@ -62,11 +62,11 @@ fn base64string_new_rejects_invalid() {
 fn base64string_valid_parsing() {
     let s = "SGVsbG8".to_string(); // "Hello"
     let b64 = Base64String::new(s).unwrap();
-    assert_eq!(b64.expose_secret(), "SGVsbG8");
+    assert_eq!(&*b64.expose_secret(), "SGVsbG8");
     assert_eq!(b64.len(), 7);
     assert_eq!(b64.byte_len(), 5);
 
-    let bytes = b64.decode_secret_to_bytes();
+    let bytes = b64.into_bytes();
     assert_eq!(bytes, b"Hello");
 }
 
@@ -74,11 +74,11 @@ fn base64string_valid_parsing() {
 #[test]
 fn base64string_empty() {
     let b64 = Base64String::new("".to_string()).unwrap();
-    assert_eq!(b64.expose_secret(), "");
+    assert_eq!(&*b64.expose_secret(), "");
     assert_eq!(b64.len(), 0);
     assert_eq!(b64.byte_len(), 0);
     assert!(b64.is_empty());
-    assert_eq!(b64.decode_secret_to_bytes(), Vec::<u8>::new());
+    assert_eq!(b64.into_bytes(), Vec::<u8>::new());
 }
 
 #[cfg(feature = "encoding-base64")]
@@ -124,7 +124,7 @@ fn base64string_case_sensitive() {
     let original_bytes = b"Hello";
     let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(original_bytes);
     let b64 = Base64String::new(encoded).unwrap();
-    let decoded = b64.decode_secret_to_bytes();
+    let decoded = b64.into_bytes();
     assert_eq!(decoded, original_bytes);
 }
 
@@ -134,5 +134,5 @@ fn rng_base64_integration() {
     use secure_gate::random::FixedRng;
     let rng = FixedRng::<32>::generate();
     let b64 = rng.into_base64();
-    assert_eq!(b64.decode_secret_to_bytes().len(), 32);
+    assert_eq!(b64.into_bytes().len(), 32);
 }

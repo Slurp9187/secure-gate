@@ -25,7 +25,7 @@ fn into_hex_via_alias() {
         .all(|c: char| c.is_ascii_hexdigit()));
     assert!(hex.expose_secret().chars().all(|c: char| !c.is_uppercase()));
 
-    let bytes = hex.decode_secret_to_bytes();
+    let bytes = hex.into_bytes();
     assert_eq!(bytes.len(), 32);
 }
 
@@ -46,7 +46,7 @@ fn hexstring_new_rejects_invalid() {
 fn hexstring_new_in_place_lowercase() {
     let s = "DEADBEEF".to_string();
     let hex = HexString::new(s).unwrap();
-    assert_eq!(hex.expose_secret(), "deadbeef");
+    assert_eq!(*hex.expose_secret(), "deadbeef");
     assert_eq!(hex.byte_len(), 4);
 }
 
@@ -55,10 +55,10 @@ fn hexstring_new_in_place_lowercase() {
 fn hexstring_valid_parsing() {
     let s = "deadbeef".to_string();
     let hex = HexString::new(s).unwrap();
-    assert_eq!(hex.expose_secret(), "deadbeef");
+    assert_eq!(*hex.expose_secret(), "deadbeef");
     assert_eq!(hex.byte_len(), 4);
 
-    let bytes = hex.decode_secret_to_bytes();
+    let bytes = hex.into_bytes();
     assert_eq!(bytes, vec![0xde, 0xad, 0xbe, 0xef]);
 }
 
@@ -66,9 +66,9 @@ fn hexstring_valid_parsing() {
 #[test]
 fn hexstring_empty() {
     let hex = HexString::new("".to_string()).unwrap();
-    assert_eq!(hex.expose_secret(), "");
+    assert_eq!(*hex.expose_secret(), "");
     assert_eq!(hex.byte_len(), 0);
-    assert_eq!(hex.decode_secret_to_bytes(), Vec::<u8>::new());
+    assert_eq!(hex.into_bytes(), Vec::<u8>::new());
 }
 
 #[cfg(feature = "encoding-hex")]
@@ -111,7 +111,7 @@ fn hexstring_round_trip() {
     let original_bytes = vec![0x12, 0x34, 0x56, 0x78, 0xab, 0xcd, 0xef, 0x00];
     let hex_str = hex::encode(&original_bytes);
     let hex = HexString::new(hex_str).unwrap();
-    let decoded = hex.decode_secret_to_bytes();
+    let decoded = hex.into_bytes();
     assert_eq!(decoded, original_bytes);
 }
 
@@ -136,5 +136,5 @@ fn rng_hex_integration() {
     use secure_gate::random::FixedRng;
     let rng = FixedRng::<32>::generate();
     let hex = rng.into_hex();
-    assert_eq!(hex.decode_secret_to_bytes().len(), 32);
+    assert_eq!(hex.into_bytes().len(), 32);
 }

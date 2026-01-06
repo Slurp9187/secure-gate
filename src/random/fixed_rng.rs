@@ -4,17 +4,6 @@ use rand::rand_core::OsError;
 use rand::rngs::OsRng;
 use rand::TryRngCore;
 
-#[cfg(any(feature = "encoding-hex", feature = "encoding-base64"))]
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32"
-))]
-use bech32::{Bech32, Bech32m, Hrp};
-#[cfg(feature = "encoding-hex")]
-use hex;
-
 /// Fixed-length cryptographically secure random value with encoding methods.
 ///
 /// This is a newtype over `Fixed<[u8; N]>` that enforces construction only via secure RNG.
@@ -146,103 +135,6 @@ impl<const N: usize> FixedRng<N> {
 impl<const N: usize> core::fmt::Debug for FixedRng<N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
-    }
-}
-
-#[cfg(all(feature = "rand", feature = "encoding-bech32"))]
-impl<const N: usize> FixedRng<N> {
-    /// Consume self and return the random bytes as a validated Bech32 string with the specified HRP.
-    ///
-    /// The raw bytes are zeroized immediately after encoding (via drop of `self`).
-    ///
-    /// # Panics
-    ///
-    /// Panics if the HRP is invalid or encoding fails (should never happen for valid random bytes).
-    pub fn into_bech32(self, hrp: &str) -> crate::encoding::bech32::Bech32String {
-        let hrp = Hrp::parse(hrp).expect("invalid HRP");
-        let encoded = bech32::encode::<Bech32>(hrp, self.expose_secret())
-            .expect("encoding valid random bytes cannot fail");
-
-        crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32,
-        )
-    }
-
-    /// Borrow and encode to Bech32 (raw bytes remain available).
-    pub fn to_bech32(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
-        let hrp = Hrp::parse(hrp).expect("invalid HRP");
-        let encoded = bech32::encode::<Bech32>(hrp, self.expose_secret())
-            .expect("encoding valid random bytes cannot fail");
-
-        crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32,
-        )
-    }
-
-    /// Consume self and return the random bytes as a validated Bech32m string with the specified HRP.
-    ///
-    /// The raw bytes are zeroized immediately after encoding (via drop of `self`).
-    ///
-    /// # Panics
-    ///
-    /// Panics if the HRP is invalid or encoding fails (should never happen for valid random bytes).
-    pub fn into_bech32m(self, hrp: &str) -> crate::encoding::bech32::Bech32String {
-        let hrp = Hrp::parse(hrp).expect("invalid HRP");
-        let encoded = bech32::encode::<Bech32m>(hrp, self.expose_secret())
-            .expect("encoding valid random bytes cannot fail");
-
-        crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32m,
-        )
-    }
-
-    /// Borrow and encode to Bech32m (raw bytes remain available).
-    pub fn to_bech32m(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
-        let hrp = Hrp::parse(hrp).expect("invalid HRP");
-        let encoded = bech32::encode::<Bech32m>(hrp, self.expose_secret())
-            .expect("encoding valid random bytes cannot fail");
-
-        crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32m,
-        )
-    }
-}
-
-#[cfg(all(feature = "rand", feature = "encoding-hex"))]
-impl<const N: usize> FixedRng<N> {
-    /// Consume self and return the random bytes as a validated hex string.
-    ///
-    /// The raw bytes are zeroized immediately after encoding.
-    pub fn into_hex(self) -> crate::encoding::hex::HexString {
-        let hex_str = hex::encode(self.expose_secret());
-        crate::encoding::hex::HexString::new_unchecked(hex_str)
-    }
-
-    /// Encode to hex without consuming self, for cases where raw is still needed briefly.
-    pub fn to_hex(&self) -> crate::encoding::hex::HexString {
-        let hex_str = hex::encode(self.expose_secret());
-        crate::encoding::hex::HexString::new_unchecked(hex_str)
-    }
-}
-
-#[cfg(all(feature = "rand", feature = "encoding-base64"))]
-impl<const N: usize> FixedRng<N> {
-    /// Consume self and return the random bytes as a validated base64 string.
-    ///
-    /// The raw bytes are zeroized immediately after encoding.
-    pub fn into_base64(self) -> crate::encoding::base64::Base64String {
-        let encoded = URL_SAFE_NO_PAD.encode(self.expose_secret());
-        crate::encoding::base64::Base64String::new_unchecked(encoded)
-    }
-
-    /// Encode to base64 without consuming self, for cases where raw is still needed briefly.
-    pub fn to_base64(&self) -> crate::encoding::base64::Base64String {
-        let encoded = URL_SAFE_NO_PAD.encode(self.expose_secret());
-        crate::encoding::base64::Base64String::new_unchecked(encoded)
     }
 }
 
