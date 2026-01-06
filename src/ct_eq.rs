@@ -1,4 +1,17 @@
-//! Constant-time equality comparison (gated behind “ct-eq”).
+//! Constant-time equality comparison for cryptographic secrets (gated behind "ct-eq").
+//!
+//! This module provides the [`ConstantTimeEq`] trait, which performs equality
+//! comparisons in constant time to prevent timing attacks. Regular equality
+//! operations can take different amounts of time depending on the data,
+//! potentially leaking information about secret values.
+//!
+//! Uses the `subtle` crate for secure, constant-time implementations.
+//!
+//! # Security Warning
+//!
+//! Always use `ct_eq()` instead of `==` when comparing cryptographic secrets,
+//! authentication tokens, or other sensitive data that should not leak through
+//! timing differences.
 // ==========================================================================
 // src/ct_eq.rs
 // ==========================================================================
@@ -6,15 +19,33 @@
 #[cfg(feature = "ct-eq")]
 /// Trait for constant-time equality comparison to prevent timing attacks.
 ///
-/// Implemented for byte arrays and slices. Uses `subtle` crate for secure comparison.
+/// This trait provides equality comparison that takes the same amount of time
+/// regardless of the input values, preventing attackers from using timing
+/// differences to learn about secret data.
+///
+/// Implemented for byte slices and fixed-size byte arrays.
+/// Uses the `subtle` crate's secure constant-time comparison.
+///
+/// # Security
+///
+/// Regular `==` comparison can short-circuit early when bytes differ,
+/// creating timing differences that leak information. This trait ensures
+/// all comparisons take constant time.
 ///
 /// # Examples
 ///
+/// Basic usage:
 /// ```
+/// # #[cfg(feature = "ct-eq")]
+/// # {
 /// use secure_gate::ct_eq::ConstantTimeEq;
-/// let a = [1u8, 2u8];
-/// let b = [1u8, 2u8];
-/// assert!(a.ct_eq(&b));
+/// let a = [1u8, 2u8, 3u8];
+/// let b = [1u8, 2u8, 3u8];
+/// let c = [1u8, 5u8, 3u8];
+///
+/// assert!(a.ct_eq(&b));  // true
+/// assert!(!a.ct_eq(&c)); // false, but takes same time as true case
+/// # }
 /// ```
 pub trait ConstantTimeEq {
     /// Compare two values in constant time.
