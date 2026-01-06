@@ -1,4 +1,12 @@
-//! Cloneable secret primitives (gated behind "zeroize").
+//! Cloneable secret primitives for handling sensitive data that can be safely duplicated.
+//!
+//! This module provides types that wrap sensitive data (arrays, vectors, and strings)
+//! in a way that allows controlled cloning while ensuring the data is properly zeroized
+//! when dropped. These types are only available when the "zeroize" feature is enabled.
+//!
+//! The types in this module implement the [`CloneableSecretMarker`] trait, which ensures
+//! that only types safe for secret duplication are used. This prevents accidental leaks
+//! of sensitive data through unsafe cloning operations.
 #[cfg(feature = "zeroize")]
 pub mod array;
 #[cfg(feature = "zeroize")]
