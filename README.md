@@ -1,15 +1,16 @@
+```markdown
 # secure-gate
 `no_std`-compatible wrappers for sensitive data with explicit exposure requirements.
-- `Fixed<T>` — Stack-allocated wrapper
-- `Dynamic<T>` — Heap-allocated wrapper
-- `FixedRng<N>` — Cryptographically secure random bytes of fixed length N
-- `DynamicRng` — Heap-allocated cryptographically secure random bytes
-- `CloneableArray<const N: usize>` — Cloneable fixed-size stack secret (`[u8; N]`)
-- `CloneableString` — Cloneable heap-allocated text secret (`String`)
-- `CloneableVec` — Cloneable heap-allocated binary secret (`Vec<u8>`)
-- `HexString` — Validated lowercase hexadecimal string wrapper
-- `Base64String` — Validated URL-safe base64 string wrapper (no padding)
-- `Bech32String` — Validated Bech32 string wrapper (for age keys, etc.)
+- `Fixed<T>` - Stack-allocated wrapper
+- `Dynamic<T>` - Heap-allocated wrapper
+- `FixedRng<N>` - Cryptographically secure random bytes of fixed length N
+- `DynamicRng` - Heap-allocated cryptographically secure random bytes
+- `CloneableArray<const N: usize>` - Cloneable fixed-size stack secret (`[u8; N]`)
+- `CloneableString` - Cloneable heap-allocated text secret (`String`)
+- `CloneableVec` - Cloneable heap-allocated binary secret (`Vec<u8>`)
+- `HexString` - Validated lowercase hexadecimal string wrapper
+- `Base64String` - Validated URL-safe base64 string wrapper (no padding)
+- `Bech32String` - Validated Bech32/Bech32m string wrapper
 With the `zeroize` feature enabled, memory containing secrets is zeroed on drop, including spare capacity where applicable.
 Access to secret data requires an explicit `.expose_secret()` call. There are no `Deref` implementations or other implicit access paths.
 Cloning is opt-in and only available under the `zeroize` feature.
@@ -36,11 +37,11 @@ secure-gate = { version = "0.7.0-rc.3", features = ["full"] }
 The crate is `no_std`-compatible with `alloc`. Features are optional and add no overhead when unused.
 ## Security Model & Design Philosophy
 `secure-gate` prioritizes **auditability** and explicitness over implicit convenience.
-Every access to secret material — even inside the crate itself — goes through a method named `.expose_secret()` (or `.expose_secret_mut()`). This is deliberate:
+Every access to secret material - even inside the crate itself - goes through a method named `.expose_secret()` (or `.expose_secret_mut()`). This is deliberate:
 - Makes every exposure site grep-able and obvious in code reviews
 - Prevents accidental silent leaks or hidden bypasses
 - Ensures consistent reasoning about secret lifetimes and memory handling
-These calls are `#[inline(always)] const fn` reborrows — the optimizer elides them completely. There is **zero runtime cost**.
+These calls are `#[inline(always)] const fn` reborrows - the optimizer elides them completely. There is **zero runtime cost**.
 It's intentional "theatre" for humans and auditors, but free for the machine. Clarity of purpose wins over micro-optimizations.
 ## Quick Start
 ```rust
@@ -77,9 +78,12 @@ assert_eq!(pw.expose_secret(), "hunter2");
     }
     #[cfg(feature = "encoding-bech32")]
     {
-        let key = MasterKey::generate();
-        let bech32 = key.into_bech32("example");
+        let key1 = MasterKey::generate();
+        let bech32 = key1.into_bech32("example");
         println!("key bech32: {}", bech32.expose_secret());
+        let key2 = MasterKey::generate();
+        let bech32m = key2.into_bech32m("example");
+        println!("key bech32m: {}", bech32m.expose_secret());
     }
 }
 ```
@@ -187,8 +191,14 @@ Direct generation is also available:
 #[cfg(feature = "encoding-bech32")]
 {
     use secure_gate::encoding::bech32::Bech32String;
-    // Supports both Bech32 and Bech32m variants generically
-    // See rustdoc for detailed usage and validation rules
+
+    // Bech32 (e.g., Bitcoin segwit)
+    let bech32 = Bech32String::new("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4".to_string()).unwrap();
+    assert!(bech32.is_bech32());
+
+    // Bech32m (e.g., age keys)
+    let bech32m = Bech32String::new("abc14w46h2at4w46h2at4w46h2at4w46h2at958ngu".to_string()).unwrap();
+    assert!(bech32m.is_bech32m());
 }
 ```
 Encoding functions require explicit `.expose_secret()`. Invalid inputs to the `.new()` constructors are zeroed when the `zeroize` feature is enabled.
@@ -222,10 +232,13 @@ dynamic_alias!(pub Password, String);
 | `FixedRng<N>` | Stack | Yes | Yes | Yes | |
 | `HexString` | Heap | Yes (invalid input) | Yes | No (until drop) | Validated hex |
 | `Base64String` | Heap | Yes (invalid input) | Yes | No (until drop) | Validated base64 |
-| `Bech32String` | Heap | Yes (invalid input) | Yes | No (until drop) | Validated Bech32 |
+| `Bech32String` | Heap | Yes (invalid input) | Yes | No (until drop) | Validated Bech32/Bech32m |
 ## Performance
 The wrappers add no runtime overhead compared to raw types in benchmarks.
 ## Changelog
-[[CHANGELOG.md]](<https://github.com/Slurp9187/secure-gate/blob/v070rc/CHANGELOG.md>)
+[[CHANGELOG.md]](https://github.com/Slurp9187/secure-gate/blob/v070rc/CHANGELOG.md)
 ## License
 MIT OR Apache-2.0
+```
+
+
