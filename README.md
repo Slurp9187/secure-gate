@@ -1,5 +1,7 @@
 # secure-gate
+
 `no_std`-compatible wrappers for sensitive data with explicit exposure requirements.
+
 - `Fixed<T>` - Stack-allocated wrapper
 - `Dynamic<T>` - Heap-allocated wrapper
 - `FixedRng<N>` - Cryptographically secure random bytes of fixed length N
@@ -13,36 +15,48 @@
   With the `zeroize` feature enabled, memory containing secrets is zeroed on drop, including spare capacity where applicable.
   Access to secret data requires an explicit `.expose_secret()` call. There are no `Deref` implementations or other implicit access paths.
   Cloning is opt-in and only available under the `zeroize` feature.
+
 ## Installation
+
 ```toml
 [dependencies]
-secure-gate = "0.7.0-rc.4"
+secure-gate = "0.7.0-rc.5"
 ```
+
 Recommended configuration:
+
 ```toml
-secure-gate = { version = "0.7.0-rc.4", features = ["full"] }
+secure-gate = { version = "0.7.0-rc.5", features = ["full"] }
 ```
+
 ## Features
-| Feature | Description |
-|--------------------|-----------------------------------------------------------------------------|
-| `zeroize` | Memory zeroing on drop and opt-in cloning via pre-baked cloneable types |
-| `rand` | Random generation (`FixedRng<N>::generate()`, `DynamicRng::generate()`) |
-| `ct-eq` | Constant-time equality comparison |
-| `encoding` | All encoding support (`encoding-hex`, `encoding-base64`, `encoding-bech32`) |
-| `encoding-hex` | Hex encoding, `HexString`, `FixedRng` hex methods |
-| `encoding-base64` | `Base64String` |
+
+| Feature           | Description                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| `zeroize`         | Memory zeroing on drop and opt-in cloning via pre-baked cloneable types                   |
+| `rand`            | Random generation (`FixedRng<N>::generate()`, `DynamicRng::generate()`)                   |
+| `ct-eq`           | Constant-time equality comparison                                                         |
+| `encoding`        | All encoding support (`encoding-hex`, `encoding-base64`, `encoding-bech32`)               |
+| `encoding-hex`    | Hex encoding, `HexString`, `FixedRng` hex methods                                         |
+| `encoding-base64` | `Base64String`                                                                            |
 | `encoding-bech32` | `Bech32String` (Bech32 and Bech32m variants; supports mixed-case input, stores lowercase) |
-| `full` | All optional features |
+| `full`            | All optional features                                                                     |
+
 The crate is `no_std`-compatible with `alloc`. Features are optional and add no overhead when unused.
+
 ## Security Model & Design Philosophy
+
 `secure-gate` prioritizes **auditability** and explicitness over implicit convenience.
 Every access to secret material - even inside the crate itself - goes through a method named `.expose_secret()` (or `.expose_secret_mut()`). This is deliberate:
+
 - Makes every exposure site grep-able and obvious in code reviews
 - Prevents accidental silent leaks or hidden bypasses
 - Ensures consistent reasoning about secret lifetimes and memory handling
   These calls are `#[inline(always)] const fn` reborrows - the optimizer elides them completely. There is **zero runtime cost**.
   It's intentional "theatre" for humans and auditors, but free for the machine. Clarity of purpose wins over micro-optimizations.
+
 ## Quick Start
+
 ```rust
 use secure_gate::{fixed_alias, dynamic_alias};
 fixed_alias!(pub Aes256Key, 32);
@@ -86,7 +100,9 @@ assert_eq!(pw.expose_secret(), "hunter2");
     }
 }
 ```
+
 ## Opt-In Cloning
+
 Cloning is available **only** when the `zeroize` feature is enabled.
 The crate provides three ready-to-use cloneable primitives (zero boilerplate):
 | Type | Allocation | Inner Data | Typical Use Case |
@@ -94,6 +110,7 @@ The crate provides three ready-to-use cloneable primitives (zero boilerplate):
 | `CloneableArray<const N: usize>` | Stack | `[u8; N]` | Fixed-size keys/nonces |
 | `CloneableString` | Heap | `String` | Passwords, tokens, API keys |
 | `CloneableVec` | Heap | `Vec<u8>` | Seeds, variable-length binary |
+
 ```rust
 #[cfg(feature = "zeroize")]
 {
@@ -109,8 +126,11 @@ The crate provides three ready-to-use cloneable primitives (zero boilerplate):
     assert_eq!(pw.expose_inner(), "hunter2!");
 }
 ```
+
 ### Semantic Aliases (Recommended)
+
 For better readability, create type aliases:
+
 ```rust
 #[cfg(feature = "zeroize")]
 {
@@ -120,9 +140,13 @@ For better readability, create type aliases:
     pub type CloneableSeed = CloneableVec;
 }
 ```
+
 These are zero-cost and make intent crystal clear.
+
 ### Minimizing Stack Exposure
+
 When reading secrets from user input (e.g., passwords), use `init_with`/`try_init_with` to reduce temporary stack exposure:
+
 ```rust
 #[cfg(feature = "zeroize")]
 {
@@ -145,8 +169,11 @@ When reading secrets from user input (e.g., passwords), use `init_with`/`try_ini
     }).unwrap();
 }
 ```
+
 The temporary is cloned to the heap and zeroized immediately.
+
 ## Randomness
+
 ```rust
 #[cfg(feature = "rand")]
 {
@@ -168,8 +195,10 @@ The temporary is cloned to the heap and zeroized immediately.
     }
 }
 ```
+
 `FixedRng<N>` can only be constructed via cryptographically secure RNG.
 Direct generation is also available:
+
 ```rust
 #[cfg(feature = "rand")]
 {
@@ -178,7 +207,9 @@ Direct generation is also available:
     let random: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
 }
 ```
+
 ## Encoding
+
 ```rust
 #[cfg(feature = "encoding-hex")]
 {
@@ -208,8 +239,11 @@ Direct generation is also available:
     assert!(bech32m.is_bech32m());
 }
 ```
+
 Encoding functions require explicit `.expose_secret()`. Invalid inputs to the `.new()` constructors are zeroed when the `zeroize` feature is enabled.
+
 ## Constant-Time Equality
+
 ```rust
 #[cfg(feature = "ct-eq")]
 {
@@ -219,8 +253,11 @@ Encoding functions require explicit `.expose_secret()`. Invalid inputs to the `.
     assert!(a.ct_eq(&a));
 }
 ```
+
 Available on `Fixed<[u8; N]>` and `Dynamic<T>` where `T: AsRef<[u8]>`.
+
 ## Macros
+
 ```rust
 use secure_gate::{fixed_alias, dynamic_alias};
 fixed_alias!(pub Aes256Key, 32);
@@ -231,18 +268,26 @@ dynamic_alias!(pub Password, String);
     fixed_alias_rng!(pub MasterKey, 32);
 }
 ```
+
 ## Memory Guarantees (`zeroize` enabled)
-| Type | Allocation | Auto-zero | Full wipe | Slack eliminated | Notes |
-|-------------------|------------|-----------|-----------|------------------|------------------------|
-| `Fixed<T>` | Stack | Yes | Yes | Yes (no heap) | |
-| `Dynamic<T>` | Heap | Yes | Yes | No (until drop) | Use `shrink_to_fit()` |
-| `FixedRng<N>` | Stack | Yes | Yes | Yes | |
-| `HexString` | Heap | Yes (invalid input) | Yes | No (until drop) | Validated hex |
-| `Base64String` | Heap | Yes (invalid input) | Yes | No (until drop) | Validated base64 |
-| `Bech32String` | Heap | Yes (invalid input) | Yes | No (until drop) | Validated Bech32/Bech32m |
+
+| Type           | Allocation | Auto-zero           | Full wipe | Slack eliminated | Notes                    |
+| -------------- | ---------- | ------------------- | --------- | ---------------- | ------------------------ |
+| `Fixed<T>`     | Stack      | Yes                 | Yes       | Yes (no heap)    |                          |
+| `Dynamic<T>`   | Heap       | Yes                 | Yes       | No (until drop)  | Use `shrink_to_fit()`    |
+| `FixedRng<N>`  | Stack      | Yes                 | Yes       | Yes              |                          |
+| `HexString`    | Heap       | Yes (invalid input) | Yes       | No (until drop)  | Validated hex            |
+| `Base64String` | Heap       | Yes (invalid input) | Yes       | No (until drop)  | Validated base64         |
+| `Bech32String` | Heap       | Yes (invalid input) | Yes       | No (until drop)  | Validated Bech32/Bech32m |
+
 ## Performance
+
 The wrappers add no runtime overhead compared to raw types in benchmarks.
+
 ## Changelog
+
 [[CHANGELOG.md]](https://github.com/Slurp9187/secure-gate/blob/v070rc/CHANGELOG.md)
+
 ## License
+
 MIT OR Apache-2.0

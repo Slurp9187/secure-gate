@@ -5,8 +5,10 @@ All changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.0] - 2026-01-05
+## [0.7.0] - 2026-01-06
+
 ### Added
+
 - **Opt-in cloning overhaul** (requires `zeroize` feature):
   - New pre-baked cloneable primitives for zero-boilerplate common cases:
     - `CloneableArray<const N: usize>` — cloneable fixed-size stack secret (`[u8; N]`)
@@ -14,18 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `CloneableVec` — cloneable heap-allocated binary secret (`Vec<u8>`)
   - Organized in `src/cloneable/` module with submodules `array`, `string`, and `vec`.
   - Convenience methods: `.expose_inner()` / `.expose_inner_mut()` on `CloneableString` and `CloneableVec`.
-  - `init_with` and `try_init_with` constructors on `CloneableString` and `CloneableVec` to minimize temporary stack exposure when reading secrets from user input.
+  - `init_with` and `try_init_with` constructors on all cloneable types (`CloneableArray`, `CloneableString`, `CloneableVec`) to minimize temporary stack exposure when reading secrets from user input.
   - Encouraged pattern: semantic type aliases (e.g., `pub type CloneablePassword = CloneableString;`).
 - `CloneableSecretMarker` trait for opt-in cloning of secrets (requires `zeroize` feature).
   - Implemented for primitives (`u8`, `i32`, etc.) and fixed arrays (`[T; N]`).
   - Custom types can implement the trait.
 - Fallible RNG methods: `try_generate()` on `FixedRng<N>` and `DynamicRng`, returning `Result<Self, rand::Error>`.
   - Corresponding `try_generate_random()` methods on `Fixed` and `Dynamic`.
-- `Base64String` wrapper in `encoding::base64` with validation, `decode_secret_to_bytes()`, and constant-time equality (when `ct-eq` enabled).
+- `Base64String` wrapper in `encoding::base64` with validation, `into_bytes()`, and constant-time equality (when `ct-eq` enabled).
   - Validates URL-safe no-pad base64; invalid inputs are zeroed when `zeroize` enabled.
 - `into_hex()` (consuming) and `to_hex()` (borrowing) methods on `FixedRng<N>` and `DynamicRng` (requires `encoding-hex`).
-- `into_base64()` (consuming) and `to_base64()` (borrowing) methods on `FixedRng<N>` and `DynamicRng` (requires `encoding-base64`).
+- `into_base64()` (consuming) and `to_base64url()` (borrowing) methods on `FixedRng<N>` and `DynamicRng` (requires `encoding-base64`).
 - `into_bech32(hrp)` / `to_bech32(hrp)` and `into_bech32m(hrp)` / `to_bech32m(hrp)` methods on `FixedRng<N>` and `DynamicRng` (requires `encoding-bech32`).
+- Borrowing encoding methods (`to_hex()`, `to_hex_upper()`, `to_base64url()`, `to_bech32()`, `to_bech32m()`) available on any `&[u8]` via `SecureEncodingExt`.
 - `ct_eq` module with `ConstantTimeEq` trait and inherent `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
 - Fallible construction: `impl TryFrom<&[u8]> for Fixed<[u8; N]>` with `FromSliceError`.
   - `from_slice` now delegates to `TryFrom` (panics for compatibility).
@@ -35,10 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Generic support for both Bech32 and Bech32m variants (no protocol-specific HRP restrictions).
   - Variant detection with `variant()`, `is_bech32()`, `is_bech32m()` methods.
   - Accepts mixed-case input (normalized to lowercase for canonical storage).
-  - Provides `decode_secret_to_bytes()`, non-allocating `byte_len()`, `hrp()`, constant-time equality, and zeroing of invalid inputs (when `zeroize` enabled).
+  - Provides `into_bytes()`, non-allocating `byte_len()`, `hrp()`, constant-time equality, and zeroing of invalid inputs (when `zeroize` enabled).
 - Granular `encoding-bech32` feature and inclusion in meta-feature `encoding`.
 
 ### Changed
+
 - Refactored encoding system:
   - Replaced `conversions` module/feature with modular `encoding`.
   - Split into `encoding::hex`, `encoding::base64`, and `encoding::bech32` submodules.
@@ -52,19 +56,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed `rng` module to `random`.
 - Encoding wrappers (`HexString`, `Base64String`, `Bech32String`):
   - Removed `Deref` implementations for consistent explicit access.
-  - Unified decode method to `decode_secret_to_bytes()` returning raw `Vec<u8>`.
+  - Unified decode method to `into_bytes()` returning raw `Vec<u8>` (renamed from `decode_secret_to_bytes()`).
   - `expose_secret()` now returns `&String` for API consistency.
   - Added non-allocating `byte_len()` implementations.
+  - Refactored encoding traits into `extensions` module with borrowing view types (`HexStringView`, `Base64StringView`, `Bech32StringView`).
 - `Base64String`: simplified validation using single engine-based decode check.
 
 ### Fixed
+
 - Feature gating for `CloneableSecretMarker` and related impls (requires `zeroize`).
 - Doc-test compatibility across all feature configurations.
 - Resolved compilation conflicts in error types and trait bounds.
 - `Bech32String` `byte_len()` now allocation-free.
 - Bech32/Bech32m variant detection and normalization robustness.
+- Performance: Removed unnecessary clone in `CloneableArray` constructor.
 
 ### Removed
+
 - `NoClone` wrapper types and `no_clone()` methods.
 - `RandomHex` type.
 
