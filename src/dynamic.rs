@@ -28,6 +28,14 @@ use rand::rand_core::OsError;
 /// assert_eq!(secret.expose_secret(), "hunter2");
 /// ```
 ///
+/// With already-boxed values:
+/// ```
+/// use secure_gate::Dynamic;
+/// let boxed_secret = Box::new("hunter2".to_string());
+/// let secret: Dynamic<String> = boxed_secret.into(); // or Dynamic::from(boxed_secret)
+/// assert_eq!(secret.expose_secret(), "hunter2");
+/// ```
+///
 /// Mutable access:
 /// ```
 /// use secure_gate::Dynamic;
@@ -48,14 +56,6 @@ use rand::rand_core::OsError;
 pub struct Dynamic<T: ?Sized>(Box<T>);
 
 impl<T: ?Sized> Dynamic<T> {
-    /// Wrap an already-boxed value.
-    ///
-    /// Zero-cost — just wraps the `Box`.
-    #[inline(always)]
-    pub fn new_boxed(value: Box<T>) -> Self {
-        Dynamic(value)
-    }
-
     /// Wrap a value by boxing it.
     ///
     /// Uses `Into<Box<T>>` for flexibility.
