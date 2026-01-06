@@ -106,6 +106,18 @@ fn hexstring_byte_len_longer() {
 
 #[cfg(feature = "encoding-hex")]
 #[test]
+fn hexstring_very_long_string() {
+    // 1024 bytes → 2048 hex chars
+    let long_bytes = vec![0xABu8; 1024];
+    let hex_str = hex::encode(&long_bytes);
+    let hex = HexString::new(hex_str).unwrap();
+    assert_eq!(hex.byte_len(), 1024);
+    assert_eq!(hex.len(), 2048);
+    assert_eq!(hex.into_bytes(), long_bytes);
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
 fn hexstring_round_trip() {
     // Test that decoding and re-encoding matches
     let original_bytes = vec![0x12, 0x34, 0x56, 0x78, 0xab, 0xcd, 0xef, 0x00];

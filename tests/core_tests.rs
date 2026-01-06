@@ -121,3 +121,38 @@ fn dynamic_generate_random() {
     // Verify it's actually random
     assert!(!random.expose_secret().iter().all(|&b| b == 0));
 }
+
+// === FromSliceError handling ===
+#[test]
+fn from_slice_error_on_mismatch() {
+    use secure_gate::{Fixed, FromSliceError};
+
+    let short: &[u8] = &[1, 2];
+    let long: &[u8] = &[1, 2, 3, 4];
+
+    let err_short: Result<Fixed<[u8; 3]>, FromSliceError> = Fixed::try_from(short);
+    assert!(matches!(err_short, Err(FromSliceError("slice length mismatch"))));
+
+    let err_long: Result<Fixed<[u8; 3]>, FromSliceError> = Fixed::try_from(long);
+    assert!(matches!(err_long, Err(FromSliceError("slice length mismatch"))));
+
+    // Successful case for comparison
+    let ok: Fixed<[u8; 3]> = Fixed::try_from(&[1, 2, 3][..]).unwrap();
+    assert_eq!(ok.expose_secret(), &[1, 2, 3]);
+}
+
+#[test]
+#[should_panic(expected = "slice length mismatch")]
+fn from_slice_panic_on_mismatch() {
+    let bytes: &[u8] = &[1, 2];
+    let _panic = Fixed::<[u8; 3]>::from_slice(bytes);
+}
+
+// === Dynamic<Vec<u8>> from slice ===
+#[test]
+fn dynamic_vec_from_slice() {
+    let slice: &[u8] = b"hello world";
+    let dyn_vec: Dynamic<Vec<u8>> = slice.into();
+    assert_eq!(dyn_vec.expose_secret(), b"hello world");
+    assert_eq!(dyn_vec.len(), 11);
+}

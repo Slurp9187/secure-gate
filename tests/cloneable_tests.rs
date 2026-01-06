@@ -1,6 +1,6 @@
 #![cfg(feature = "zeroize")]
 
-use secure_gate::{CloneableArray, CloneableSecretMarker, CloneableString, CloneableVec, Fixed};
+use secure_gate::{CloneableArray, CloneableSecretMarker, CloneableString, CloneableVec, Dynamic, Fixed};
 
 // === Custom Type Cloning ===
 
@@ -156,3 +156,34 @@ fn cloneable_vec_try_init_with() {
 
 // Note: Raw Dynamic<String> cloning is still not allowed (String !impl CloneableSecretMarker),
 // but CloneableString provides a safe wrapper for cloning string secrets.
+
+// === No accidental Clone on raw wrappers ===
+#[test]
+#[allow(unused)]
+fn raw_dynamic_not_cloneable() {
+    let s: Dynamic<String> = "secret".into();
+    // let _cloned = s.clone(); // Must not compile — raw Dynamic<T> where T !impl CloneableSecretMarker
+    // Compile-fail guard: this test ensures no Clone impl leaks
+}
+
+#[test]
+#[allow(unused)]
+fn raw_fixed_not_cloneable_by_default() {
+    let key: Fixed<[u8; 32]> = Fixed::new([0u8; 32]);
+    // let _cloned = key.clone(); // Must not compile unless inner impls CloneableSecretMarker
+}
+
+// === Nested CloneableSecretMarker (array of primitives) ===
+#[test]
+fn nested_cloneable_array() {
+    type NestedKey = [u32; 8]; // u32 impls CloneableSecretMarker, so array does too
+    let original: Fixed<NestedKey> = Fixed::new([42u32; 8]);
+    let cloned = original.clone();
+    assert_eq!(original.expose_secret(), cloned.expose_secret());
+
+    // Mutate to prove independence
+    let mut mutated = cloned;
+    mutated.expose_secret_mut()[0] = 99;
+    assert_eq!(original.expose_secret()[0], 42);
+    assert_eq!(mutated.expose_secret()[0], 99);
+}

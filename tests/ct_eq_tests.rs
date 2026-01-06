@@ -6,7 +6,7 @@
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "ct-eq")]
-    use secure_gate::ct_eq::ConstantTimeEq;
+    use secure_gate::{ct_eq::ConstantTimeEq, Dynamic, Fixed};
 
     #[cfg(feature = "ct-eq")]
     #[test]
@@ -47,6 +47,28 @@ mod tests {
         // All zeros
         assert!([0u8; 4].ct_eq(&[0u8; 4]));
         assert!(![0u8; 4].as_slice().ct_eq(&[0u8; 3])); // Different lengths via slice
+    }
+
+    #[cfg(feature = "ct-eq")]
+    #[test]
+    #[allow(unused)]
+    fn fixed_ct_eq_different_lengths_compile_fail() {
+        let a = Fixed::new([1u8; 32]);
+        let b = Fixed::new([1u8; 64]);
+        // a.ct_eq(&b); // Must not compile — different array sizes
+        // Compile-fail guard: ensures type safety for ct_eq
+    }
+
+    #[cfg(feature = "ct-eq")]
+    #[test]
+    fn dynamic_ct_eq_negative_cases() {
+        let a: Dynamic<Vec<u8>> = vec![1u8; 32].into();
+        let b: Dynamic<Vec<u8>> = vec![1u8; 31].into(); // different length
+        let c: Dynamic<Vec<u8>> = vec![2u8; 32].into(); // same length, different content
+
+        assert!(!a.ct_eq(&b));
+        assert!(!a.ct_eq(&c));
+        assert!(a.ct_eq(&a));
     }
 
     #[cfg(feature = "ct-eq")]

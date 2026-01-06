@@ -88,3 +88,46 @@ fn into_inner_and_conversions() {
     let dynamic_converted: secure_gate::Dynamic<Vec<u8>> = dynamic_rng2.into();
     assert_eq!(dynamic_converted.len(), 16);
 }
+
+// === Compile-fail test: No direct FixedRng construction from bytes ===
+// ✅ IMPLEMENTED: This security invariant is now properly tested!
+//    See: tests/compile_fail_tests.rs and tests/compile-fail/fixed_rng_no_construction.rs
+//
+// SECURITY REQUIREMENT (now tested):
+// FixedRng represents freshly-generated cryptographically-secure random bytes.
+// It should ONLY be creatable through cryptographically secure random generation.
+// Allowing direct construction from arbitrary byte arrays would violate the
+// "freshness invariant" - the guarantee that FixedRng values are always
+// the result of secure random generation, not user-provided or predictable data.
+//
+// If FixedRng could be constructed from bytes, attackers could:
+// - Use predictable values (all zeros, known patterns)
+// - Reuse values across different contexts
+// - Bypass entropy requirements
+// - Create non-random "random" values for cryptographic operations
+//
+// COMPILE-FAIL TESTING:
+// Using trybuild, we verify that these constructions fail to compile:
+// - FixedRng::new([0u8; 32]) does NOT compile
+// - [0u8; 32].into() does NOT convert to FixedRng<32>
+// - FixedRng::from([0u8; 32]) does NOT exist
+//
+// This test serves as:
+// 1. Documentation of the security requirement
+// 2. Regression prevention if someone accidentally adds these methods
+// 3. Reference to the actual compile-fail test implementation
+#[test]
+#[allow(unused)]
+fn fixed_rng_no_arbitrary_construction() {
+    // This test now references the real compile-fail test in:
+    // tests/compile_fail_tests.rs -> tests/compile-fail/fixed_rng_no_construction.rs
+
+    // Only these secure generation methods should exist:
+    let _good = FixedRng::<32>::generate();           // ✅ Cryptographically secure
+    let _also_good = FixedRng::<32>::try_generate();  // ✅ Cryptographically secure
+
+    // The compile-fail test ensures these constructions fail:
+    // let _bad = FixedRng::<32>::new([0u8; 32]);      // ❌ Would violate freshness invariant
+    // let _bad2: FixedRng<32> = [0u8; 32].into();     // ❌ Would violate freshness invariant
+    // let _bad3 = FixedRng::<32>::from([0u8; 32]);    // ❌ Would violate freshness invariant
+}

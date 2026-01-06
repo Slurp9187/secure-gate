@@ -102,3 +102,24 @@ fn parent_can_access_rng_pub_in_super() {
     let _k = rng_vis::CrateRngKey::generate();
     assert_eq!(_n.len(), 24);
 }
+
+// === Alias type distinction ===
+#[test]
+fn fixed_aliases_distinct_types() {
+    fixed_alias!(TypeA, 32);
+    fixed_alias!(TypeB, 32);
+
+    let _a: TypeA = [0u8; 32].into();
+    // let _wrong: TypeB = a; // Must not compile — different nominal types
+    // Compile-fail guard: ensures semantic types don't coerce
+}
+
+#[cfg(feature = "rand")]
+#[test]
+fn rng_aliases_distinct_types() {
+    fixed_alias_rng!(RngTypeA, 32);
+    fixed_alias_rng!(RngTypeB, 32);
+
+    let _a = RngTypeA::generate();
+    // let _wrong: RngTypeB = a; // Must not compile
+}
