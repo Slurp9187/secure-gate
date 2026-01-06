@@ -27,7 +27,6 @@ use ::bech32::{self, Bech32, Bech32m, Hrp};
 /// let b64 = bytes.to_base64url(); // URL-safe, no padding
 /// let b32 = bytes.to_bech32m("example"); // Bech32m with HRP
 /// ```
-// Trait is available when any encoding feature is enabled
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",
@@ -66,35 +65,37 @@ impl SecureEncodingExt for [u8] {
     fn to_hex(&self) -> alloc::string::String {
         hex_crate::encode(self)
     }
+
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
     fn to_hex_upper(&self) -> alloc::string::String {
         hex_crate::encode_upper(self)
     }
+
     #[cfg(feature = "encoding-base64")]
     #[inline(always)]
     fn to_base64url(&self) -> alloc::string::String {
         URL_SAFE_NO_PAD.encode(self)
     }
+
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
     fn to_bech32(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
         let hrp = bech32::Hrp::parse(hrp).expect("invalid HRP");
         let encoded =
             bech32::encode::<bech32::Bech32>(hrp, self).expect("encoding valid bytes cannot fail");
-
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32,
         )
     }
+
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
     fn to_bech32m(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
         let hrp = bech32::Hrp::parse(hrp).expect("invalid HRP");
         let encoded =
             bech32::encode::<bech32::Bech32m>(hrp, self).expect("encoding valid bytes cannot fail");
-
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32m,
@@ -132,7 +133,6 @@ impl<const N: usize> SecureEncodingExt for [u8; N] {
         let hrp = bech32::Hrp::parse(hrp).expect("invalid HRP");
         let encoded =
             bech32::encode::<bech32::Bech32>(hrp, self).expect("encoding valid bytes cannot fail");
-
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32,
@@ -145,13 +145,16 @@ impl<const N: usize> SecureEncodingExt for [u8; N] {
         let hrp = bech32::Hrp::parse(hrp).expect("invalid HRP");
         let encoded =
             bech32::encode::<bech32::Bech32m>(hrp, self).expect("encoding valid bytes cannot fail");
-
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32m,
         )
     }
 }
+
+// ========================================
+// Consuming (into_) methods on RNG types
+// ========================================
 
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
 impl crate::DynamicRng {
@@ -166,7 +169,6 @@ impl crate::DynamicRng {
         let hrp = Hrp::parse(hrp).expect("invalid HRP");
         let encoded = bech32::encode::<Bech32>(hrp, self.expose_secret())
             .expect("encoding valid random bytes cannot fail");
-
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32,
@@ -184,7 +186,6 @@ impl crate::DynamicRng {
         let hrp = Hrp::parse(hrp).expect("invalid HRP");
         let encoded = bech32::encode::<Bech32m>(hrp, self.expose_secret())
             .expect("encoding valid random bytes cannot fail");
-
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32m,
@@ -227,7 +228,6 @@ impl<const N: usize> crate::FixedRng<N> {
         let hrp = Hrp::parse(hrp).expect("invalid HRP");
         let encoded = bech32::encode::<Bech32>(hrp, self.expose_secret())
             .expect("encoding valid random bytes cannot fail");
-
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32,
@@ -245,7 +245,6 @@ impl<const N: usize> crate::FixedRng<N> {
         let hrp = Hrp::parse(hrp).expect("invalid HRP");
         let encoded = bech32::encode::<Bech32m>(hrp, self.expose_secret())
             .expect("encoding valid random bytes cannot fail");
-
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32m,
@@ -274,6 +273,132 @@ impl<const N: usize> crate::FixedRng<N> {
         crate::encoding::base64::Base64String::new_unchecked(encoded)
     }
 }
+
+// ========================================
+// Borrowing (to_) methods on RNG types
+// ========================================
+
+#[cfg(all(feature = "rand", feature = "encoding-hex"))]
+impl<const N: usize> crate::FixedRng<N> {
+    /// Borrow and encode the random bytes as a validated lowercase hex string (allocates).
+    ///
+    /// The original secret remains intact and usable.
+    pub fn to_hex(&self) -> crate::encoding::hex::HexString {
+        let hex_str = hex_crate::encode(self.expose_secret());
+        crate::encoding::hex::HexString::new_unchecked(hex_str)
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "encoding-hex"))]
+impl crate::DynamicRng {
+    /// Borrow and encode the random bytes as a validated lowercase hex string (allocates).
+    ///
+    /// The original secret remains intact and usable.
+    pub fn to_hex(&self) -> crate::encoding::hex::HexString {
+        let hex_str = hex_crate::encode(self.expose_secret());
+        crate::encoding::hex::HexString::new_unchecked(hex_str)
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "encoding-base64"))]
+impl<const N: usize> crate::FixedRng<N> {
+    /// Borrow and encode the random bytes as a validated base64 string (allocates).
+    ///
+    /// The original secret remains intact and usable.
+    pub fn to_base64(&self) -> crate::encoding::base64::Base64String {
+        let encoded = URL_SAFE_NO_PAD.encode(self.expose_secret());
+        crate::encoding::base64::Base64String::new_unchecked(encoded)
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "encoding-base64"))]
+impl crate::DynamicRng {
+    /// Borrow and encode the random bytes as a validated base64 string (allocates).
+    ///
+    /// The original secret remains intact and usable.
+    pub fn to_base64(&self) -> crate::encoding::base64::Base64String {
+        let encoded = URL_SAFE_NO_PAD.encode(self.expose_secret());
+        crate::encoding::base64::Base64String::new_unchecked(encoded)
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+impl<const N: usize> crate::FixedRng<N> {
+    /// Borrow and encode the random bytes as a validated Bech32 string with the specified HRP (allocates).
+    ///
+    /// The original secret remains intact and usable.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HRP is invalid (should be validated externally if needed).
+    pub fn to_bech32(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
+        let hrp = Hrp::parse(hrp).expect("invalid HRP");
+        let encoded = bech32::encode::<Bech32>(hrp, self.expose_secret())
+            .expect("encoding valid bytes cannot fail");
+        crate::encoding::bech32::Bech32String::new_unchecked(
+            encoded,
+            crate::encoding::bech32::EncodingVariant::Bech32,
+        )
+    }
+
+    /// Borrow and encode the random bytes as a validated Bech32m string with the specified HRP (allocates).
+    ///
+    /// The original secret remains intact and usable.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HRP is invalid (should be validated externally if needed).
+    pub fn to_bech32m(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
+        let hrp = Hrp::parse(hrp).expect("invalid HRP");
+        let encoded = bech32::encode::<Bech32m>(hrp, self.expose_secret())
+            .expect("encoding valid bytes cannot fail");
+        crate::encoding::bech32::Bech32String::new_unchecked(
+            encoded,
+            crate::encoding::bech32::EncodingVariant::Bech32m,
+        )
+    }
+}
+
+#[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+impl crate::DynamicRng {
+    /// Borrow and encode the random bytes as a validated Bech32 string with the specified HRP (allocates).
+    ///
+    /// The original secret remains intact and usable.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HRP is invalid (should be validated externally if needed).
+    pub fn to_bech32(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
+        let hrp = Hrp::parse(hrp).expect("invalid HRP");
+        let encoded = bech32::encode::<Bech32>(hrp, self.expose_secret())
+            .expect("encoding valid bytes cannot fail");
+        crate::encoding::bech32::Bech32String::new_unchecked(
+            encoded,
+            crate::encoding::bech32::EncodingVariant::Bech32,
+        )
+    }
+
+    /// Borrow and encode the random bytes as a validated Bech32m string with the specified HRP (allocates).
+    ///
+    /// The original secret remains intact and usable.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HRP is invalid (should be validated externally if needed).
+    pub fn to_bech32m(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
+        let hrp = Hrp::parse(hrp).expect("invalid HRP");
+        let encoded = bech32::encode::<Bech32m>(hrp, self.expose_secret())
+            .expect("encoding valid bytes cannot fail");
+        crate::encoding::bech32::Bech32String::new_unchecked(
+            encoded,
+            crate::encoding::bech32::EncodingVariant::Bech32m,
+        )
+    }
+}
+
+// ========================================
+// View types and their implementations
+// ========================================
 
 /// View struct for exposed hex strings, allowing decoding without direct access.
 #[cfg(feature = "encoding-hex")]
@@ -281,44 +406,9 @@ pub struct HexStringView<'a>(pub(crate) &'a String);
 
 #[cfg(feature = "encoding-hex")]
 impl<'a> HexStringView<'a> {
-    /// Decode the validated hex string into raw bytes.
+    /// Decode the validated hex string into raw bytes (allocates).
     pub fn to_bytes(&self) -> Vec<u8> {
-        hex_crate::decode(self.0).expect("HexString is always valid")
-    }
-}
-
-/// View struct for exposed base64 strings, allowing decoding without direct access.
-#[cfg(feature = "encoding-base64")]
-pub struct Base64StringView<'a>(pub(crate) &'a String);
-
-#[cfg(feature = "encoding-base64")]
-impl<'a> Base64StringView<'a> {
-    /// Decode the validated base64 string into raw bytes.
-    pub fn to_bytes(&self) -> Vec<u8> {
-        URL_SAFE_NO_PAD
-            .decode(self.0)
-            .expect("Base64String is always valid")
-    }
-}
-
-/// View struct for exposed Bech32 strings, allowing decoding without direct access.
-#[cfg(feature = "encoding-bech32")]
-pub struct Bech32StringView<'a>(pub(crate) &'a String);
-
-#[cfg(feature = "encoding-bech32")]
-impl<'a> Bech32StringView<'a> {
-    /// Decode the validated Bech32 string into raw bytes.
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let (_, data) = bech32::decode(self.0).expect("Bech32String is always valid");
-        data
-    }
-}
-
-#[cfg(feature = "encoding-hex")]
-impl<'a> core::ops::Deref for Bech32StringView<'a> {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        self.0.as_str()
+        hex_crate::decode(self.0.as_str()).expect("HexString is always valid")
     }
 }
 
@@ -332,13 +422,6 @@ impl<'a> core::ops::Deref for HexStringView<'a> {
 
 #[cfg(feature = "encoding-hex")]
 impl<'a> core::fmt::Debug for HexStringView<'a> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(self.0)
-    }
-}
-
-#[cfg(feature = "encoding-base64")]
-impl<'a> core::fmt::Debug for Base64StringView<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(self.0)
     }
@@ -358,6 +441,35 @@ impl<'a> core::cmp::PartialEq<&str> for HexStringView<'a> {
     }
 }
 
+/// View struct for exposed base64 strings, allowing decoding without direct access.
+#[cfg(feature = "encoding-base64")]
+pub struct Base64StringView<'a>(pub(crate) &'a String);
+
+#[cfg(feature = "encoding-base64")]
+impl<'a> Base64StringView<'a> {
+    /// Decode the validated base64 string into raw bytes (allocates).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        URL_SAFE_NO_PAD
+            .decode(self.0.as_str())
+            .expect("Base64String is always valid")
+    }
+}
+
+#[cfg(feature = "encoding-base64")]
+impl<'a> core::ops::Deref for Base64StringView<'a> {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_str()
+    }
+}
+
+#[cfg(feature = "encoding-base64")]
+impl<'a> core::fmt::Debug for Base64StringView<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
 #[cfg(feature = "encoding-base64")]
 impl<'a> core::fmt::Display for Base64StringView<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -369,6 +481,27 @@ impl<'a> core::fmt::Display for Base64StringView<'a> {
 impl<'a> core::cmp::PartialEq<&str> for Base64StringView<'a> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
+    }
+}
+
+/// View struct for exposed Bech32 strings, allowing decoding without direct access.
+#[cfg(feature = "encoding-bech32")]
+pub struct Bech32StringView<'a>(pub(crate) &'a String);
+
+#[cfg(feature = "encoding-bech32")]
+impl<'a> Bech32StringView<'a> {
+    /// Decode the validated Bech32/Bech32m string into raw bytes (allocates).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let (_, data) = bech32::decode(self.0.as_str()).expect("Bech32String is always valid");
+        data
+    }
+}
+
+#[cfg(feature = "encoding-bech32")]
+impl<'a> core::ops::Deref for Bech32StringView<'a> {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_str()
     }
 }
 
@@ -393,31 +526,24 @@ impl<'a> core::cmp::PartialEq<&str> for Bech32StringView<'a> {
     }
 }
 
-#[cfg(feature = "encoding-bech32")]
-impl<'a> core::ops::Deref for Base64StringView<'a> {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        self.0.as_str()
-    }
-}
+// ========================================
+// expose_secret → view implementations
+// ========================================
 
-// Impl expose_secret for HexString to return view
 #[cfg(feature = "encoding-hex")]
 impl crate::encoding::hex::HexString {
-    pub fn expose_secret(&'_ self) -> HexStringView<'_> {
+    pub fn expose_secret(&self) -> HexStringView<'_> {
         HexStringView(self.0.expose_secret())
     }
 }
 
-// Impl expose_secret for Base64String to return view
 #[cfg(feature = "encoding-base64")]
 impl crate::encoding::base64::Base64String {
-    pub fn expose_secret(&'_ self) -> Base64StringView<'_> {
+    pub fn expose_secret(&self) -> Base64StringView<'_> {
         Base64StringView(self.0.expose_secret())
     }
 }
 
-// Impl expose_secret for Bech32String to return view
 #[cfg(feature = "encoding-bech32")]
 impl crate::encoding::bech32::Bech32String {
     pub fn expose_secret(&self) -> Bech32StringView<'_> {
@@ -425,7 +551,9 @@ impl crate::encoding::bech32::Bech32String {
     }
 }
 
-// Consuming decode variants for secure zeroization of encoded forms
+// ========================================
+// Consuming decode (into_bytes) for secure zeroization
+// ========================================
 
 #[cfg(feature = "encoding-hex")]
 impl crate::encoding::hex::HexString {
@@ -447,7 +575,7 @@ impl crate::encoding::base64::Base64String {
 
 #[cfg(feature = "encoding-bech32")]
 impl crate::encoding::bech32::Bech32String {
-    /// Decode the validated Bech32 string into raw bytes, consuming and zeroizing the wrapper.
+    /// Decode the validated Bech32/Bech32m string into raw bytes, consuming and zeroizing the wrapper.
     pub fn into_bytes(self) -> Vec<u8> {
         let (_, data) =
             bech32::decode(self.expose_secret().0.as_str()).expect("Bech32String is always valid");
