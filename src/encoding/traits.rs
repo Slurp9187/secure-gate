@@ -346,7 +346,7 @@ impl<'a> core::ops::Deref for Bech32StringView<'a> {
 // Impl expose_secret for HexString to return view
 #[cfg(feature = "encoding-hex")]
 impl crate::encoding::hex::HexString {
-    pub fn expose_secret(&self) -> HexStringView {
+    pub fn expose_secret(&'_ self) -> HexStringView<'_> {
         HexStringView(self.0.expose_secret())
     }
 }
@@ -354,7 +354,7 @@ impl crate::encoding::hex::HexString {
 // Impl expose_secret for Base64String to return view
 #[cfg(feature = "encoding-base64")]
 impl crate::encoding::base64::Base64String {
-    pub fn expose_secret(&self) -> Base64StringView {
+    pub fn expose_secret(&'_ self) -> Base64StringView<'_> {
         Base64StringView(self.0.expose_secret())
     }
 }
@@ -362,7 +362,7 @@ impl crate::encoding::base64::Base64String {
 // Impl expose_secret for Bech32String to return view
 #[cfg(feature = "encoding-bech32")]
 impl crate::encoding::bech32::Bech32String {
-    pub fn expose_secret(&self) -> Bech32StringView {
+    pub fn expose_secret(&self) -> Bech32StringView<'_> {
         Bech32StringView(self.inner.expose_secret())
     }
 }
@@ -392,7 +392,7 @@ impl crate::encoding::bech32::Bech32String {
     /// Decode the validated Bech32 string into raw bytes, consuming and zeroizing the wrapper.
     pub fn into_bytes(self) -> Vec<u8> {
         let (_, data) =
-            bech32::decode(&**self.expose_secret()).expect("Bech32String is always valid");
+            bech32::decode(&self.expose_secret()).expect("Bech32String is always valid");
         data
     }
 }

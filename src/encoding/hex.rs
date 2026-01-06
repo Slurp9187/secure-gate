@@ -7,7 +7,6 @@
 #![cfg_attr(not(feature = "zeroize"), forbid(unsafe_code))]
 
 use alloc::string::String;
-use hex;
 
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]

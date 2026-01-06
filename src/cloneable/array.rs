@@ -48,7 +48,7 @@ impl<const N: usize> CloneableArray<N> {
         F: FnOnce() -> [u8; N],
     {
         let mut tmp = constructor();
-        let secret = Self::from(tmp.clone());
+        let secret = Self::from(tmp);
         tmp.zeroize();
         secret
     }
@@ -59,7 +59,7 @@ impl<const N: usize> CloneableArray<N> {
         F: FnOnce() -> Result<[u8; N], E>,
     {
         let mut tmp = constructor()?;
-        let secret = Self::from(tmp.clone());
+        let secret = Self::from(tmp);
         tmp.zeroize();
         Ok(secret)
     }
