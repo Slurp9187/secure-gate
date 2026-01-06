@@ -1,9 +1,11 @@
 // ==========================================================================
-// tests/integration.rs
+// tests/core_tests.rs
 // ==========================================================================
 // Core integration tests — pure v0.6.0 API
 
 use secure_gate::{Dynamic, Fixed};
+
+// === Basic Functionality ===
 
 #[test]
 fn basic_usage_explicit_access() {
@@ -19,14 +21,27 @@ fn basic_usage_explicit_access() {
     key.expose_secret_mut()[0] = 1;
 
     assert_eq!(pw.expose_secret(), "hunter2!");
-    assert_eq!(key.expose_secret()[0], 1); // ← fixed: proper assert_eq!
+    assert_eq!(key.expose_secret()[0], 1);
 }
+
+#[test]
+fn expose_secret_provides_access() {
+    let key = Fixed::new([1u8; 32]);
+    assert_eq!(*key.expose_secret(), [1u8; 32]);
+
+    let pw = Dynamic::<String>::new("secret".to_string());
+    assert_eq!(pw.expose_secret(), "secret");
+}
+
+// === Memory Layout ===
 
 #[test]
 fn fixed_is_truly_zero_cost() {
     let key = Fixed::new([0u8; 32]);
     assert_eq!(core::mem::size_of_val(&key), 32);
 }
+
+// === Security Features ===
 
 #[test]
 fn debug_is_redacted() {
@@ -39,14 +54,7 @@ fn debug_is_redacted() {
     assert_eq!(format!("{pw:#?}"), "[REDACTED]");
 }
 
-#[test]
-fn expose_secret_provides_access() {
-    let key = Fixed::new([1u8; 32]);
-    assert_eq!(*key.expose_secret(), [1u8; 32]);
-
-    let pw = Dynamic::<String>::new("secret".to_string());
-    assert_eq!(pw.expose_secret(), "secret");
-}
+// === Byte Array Access ===
 
 #[test]
 fn explicit_access_for_byte_arrays() {
@@ -60,6 +68,8 @@ fn explicit_access_for_byte_arrays() {
     mut_slice[0] = 99;
     assert_eq!(key.expose_secret()[0], 99);
 }
+
+// === Length and Size Methods ===
 
 #[test]
 fn dynamic_len_is_empty() {
@@ -89,6 +99,8 @@ fn rng_len_is_empty() {
     assert_eq!(empty.len(), 0);
     assert!(empty.is_empty());
 }
+
+// === Random Generation ===
 
 #[cfg(feature = "rand")]
 #[test]

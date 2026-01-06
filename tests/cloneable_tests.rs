@@ -2,19 +2,7 @@
 
 use secure_gate::{CloneableArray, CloneableSecretMarker, CloneableString, CloneableVec, Fixed};
 
-#[test]
-fn fixed_arrays_can_be_cloned() {
-    let key1: Fixed<[u8; 32]> = Fixed::new([0x42u8; 32]);
-    let key2 = key1.clone();
-    assert_eq!(key1.expose_secret(), key2.expose_secret());
-}
-
-#[test]
-fn primitives_can_be_cloned() {
-    let fixed_u32: Fixed<u32> = Fixed::new(12345);
-    let cloned = fixed_u32.clone();
-    assert_eq!(*fixed_u32.expose_secret(), *cloned.expose_secret());
-}
+// === Custom Type Cloning ===
 
 #[derive(Clone)]
 struct MyKey([u8; 16]);
@@ -32,6 +20,22 @@ fn custom_type_cloneable_secret_enables_cloning() {
     assert_eq!(key.expose_secret().0, cloned.expose_secret().0);
 }
 
+// === Basic Fixed Cloning ===
+
+#[test]
+fn fixed_arrays_can_be_cloned() {
+    let key1: Fixed<[u8; 32]> = Fixed::new([0x42u8; 32]);
+    let key2 = key1.clone();
+    assert_eq!(key1.expose_secret(), key2.expose_secret());
+}
+
+#[test]
+fn primitives_can_be_cloned() {
+    let fixed_u32: Fixed<u32> = Fixed::new(12345);
+    let cloned = fixed_u32.clone();
+    assert_eq!(*fixed_u32.expose_secret(), *cloned.expose_secret());
+}
+
 #[test]
 fn cloned_fixed_are_independent() {
     let original: Fixed<[u8; 4]> = Fixed::new([0u8; 4]);
@@ -42,6 +46,8 @@ fn cloned_fixed_are_independent() {
     assert_eq!(original.expose_secret()[0], 0);
     assert_eq!(cloned.expose_secret()[0], 1);
 }
+
+// === CloneableArray Tests ===
 
 #[test]
 fn cloneable_array_cloning() {
@@ -62,6 +68,23 @@ fn cloneable_array_independence() {
 }
 
 #[test]
+fn cloneable_array_init_with() {
+    let arr = CloneableArray::<3>::init_with(|| [1u8, 2, 3]);
+    assert_eq!(arr.expose_inner(), &[1, 2, 3]);
+}
+
+#[test]
+fn cloneable_array_try_init_with() {
+    let arr = CloneableArray::<3>::try_init_with(|| Ok::<[u8; 3], &str>([1u8, 2, 3])).unwrap();
+    assert_eq!(arr.expose_inner(), &[1, 2, 3]);
+
+    let err: Result<CloneableArray<3>, &str> = CloneableArray::<3>::try_init_with(|| Err("fail"));
+    assert!(err.is_err());
+}
+
+// === CloneableString Tests ===
+
+#[test]
 fn cloneable_string_cloning() {
     let s: CloneableString = "secret".into();
     let cloned = s.clone();
@@ -77,6 +100,23 @@ fn cloneable_string_mutability() {
     let cloned = s.clone();
     assert_eq!(cloned.expose_inner(), "base appended");
 }
+
+#[test]
+fn cloneable_string_init_with() {
+    let s = CloneableString::init_with(|| "secret".to_string());
+    assert_eq!(s.expose_inner(), "secret");
+}
+
+#[test]
+fn cloneable_string_try_init_with() {
+    let s = CloneableString::try_init_with(|| Ok::<String, &str>("secret".to_string())).unwrap();
+    assert_eq!(s.expose_inner(), "secret");
+
+    let err: Result<CloneableString, &str> = CloneableString::try_init_with(|| Err("fail"));
+    assert!(err.is_err());
+}
+
+// === CloneableVec Tests ===
 
 #[test]
 fn cloneable_vec_cloning() {
@@ -100,21 +140,6 @@ fn cloneable_vec_mutability_and_independence() {
 }
 
 #[test]
-fn cloneable_string_init_with() {
-    let s = CloneableString::init_with(|| "secret".to_string());
-    assert_eq!(s.expose_inner(), "secret");
-}
-
-#[test]
-fn cloneable_string_try_init_with() {
-    let s = CloneableString::try_init_with(|| Ok::<String, &str>("secret".to_string())).unwrap();
-    assert_eq!(s.expose_inner(), "secret");
-
-    let err: Result<CloneableString, &str> = CloneableString::try_init_with(|| Err("fail"));
-    assert!(err.is_err());
-}
-
-#[test]
 fn cloneable_vec_init_with() {
     let v = CloneableVec::init_with(|| vec![1u8, 2, 3]);
     assert_eq!(v.expose_inner(), &[1, 2, 3]);
@@ -126,21 +151,6 @@ fn cloneable_vec_try_init_with() {
     assert_eq!(v.expose_inner(), &[1, 2, 3]);
 
     let err: Result<CloneableVec, &str> = CloneableVec::try_init_with(|| Err("fail"));
-    assert!(err.is_err());
-}
-
-#[test]
-fn cloneable_array_init_with() {
-    let arr = CloneableArray::<3>::init_with(|| [1u8, 2, 3]);
-    assert_eq!(arr.expose_inner(), &[1, 2, 3]);
-}
-
-#[test]
-fn cloneable_array_try_init_with() {
-    let arr = CloneableArray::<3>::try_init_with(|| Ok::<[u8; 3], &str>([1u8, 2, 3])).unwrap();
-    assert_eq!(arr.expose_inner(), &[1, 2, 3]);
-
-    let err: Result<CloneableArray<3>, &str> = CloneableArray::<3>::try_init_with(|| Err("fail"));
     assert!(err.is_err());
 }
 
