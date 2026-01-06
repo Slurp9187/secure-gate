@@ -61,7 +61,7 @@ fn accepts_and_normalizes_valid_bech32m() {
         let mixed_case = mixed.to_string();
         let bech32 = Bech32String::new(mixed_case).unwrap();
 
-        assert_eq!(*bech32.expose_secret(), expected_lower);
+        assert_eq!(bech32.expose_secret(), expected_lower);
         assert!(!bech32.is_bech32());
         assert!(
             bech32.is_bech32m(),
@@ -116,7 +116,7 @@ fn rng_into_bech32_variant_detection_and_round_trip() {
     let raw_bytes = rng.expose_secret().to_vec();
 
     let b32 = rng.expose_secret().to_bech32("test");
-    let parsed = Bech32String::new(b32.expose_secret().clone()).unwrap();
+    let parsed = Bech32String::new(b32.expose_secret().to_string()).unwrap();
     assert!(parsed.is_bech32());
     assert_eq!(parsed.expose_secret().to_bytes(), raw_bytes);
 
@@ -124,7 +124,7 @@ fn rng_into_bech32_variant_detection_and_round_trip() {
     let raw_bytes_m = rng_m.expose_secret().to_vec();
 
     let b32m = rng_m.expose_secret().to_bech32m("test");
-    let parsed_m = Bech32String::new(b32m.expose_secret().clone()).unwrap();
+    let parsed_m = Bech32String::new(b32m.expose_secret().to_string()).unwrap();
     assert!(parsed_m.is_bech32m());
     assert_eq!(parsed_m.expose_secret().to_bytes(), raw_bytes_m);
 }

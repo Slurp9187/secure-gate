@@ -30,7 +30,7 @@ fn zeroize_input(s: &mut String) {
 /// # use secure_gate::encoding::base64::Base64String;
 /// let valid = Base64String::new("SGVsbG8".to_string()).unwrap();
 /// assert_eq!(valid.expose_secret(), "SGVsbG8");
-/// let bytes = valid.decode_secret_to_bytes(); // Vec<u8> of "Hello"
+/// let bytes = valid.into_bytes(); // Vec<u8> of "Hello"
 /// ```
 pub struct Base64String(pub(crate) crate::Dynamic<String>);
 
@@ -57,6 +57,7 @@ impl Base64String {
     /// use secure_gate::encoding::base64::Base64String;
     /// let valid = Base64String::new("SGVsbG8".to_string()).unwrap();
     /// assert_eq!(valid.expose_secret(), "SGVsbG8");
+    /// let bytes = valid.into_bytes(); // Vec<u8> of "Hello"
     /// # }
     /// ```
     pub fn new(s: String) -> Result<Self, &'static str> {

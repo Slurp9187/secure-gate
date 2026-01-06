@@ -182,18 +182,18 @@ Direct generation is also available:
 ```rust
 #[cfg(feature = "encoding-hex")]
 {
-    use secure_gate::{encoding::hex::HexString, encoding::SecureEncodingExt};
+    use secure_gate::{encoding::hex::HexString, SecureEncodingExt};
     let bytes = [0u8; 16];
     let hex: String = bytes.to_hex();
     let hex_upper: String = bytes.to_hex_upper();
     let validated = HexString::new("deadbeef".to_string()).unwrap();
-    let decoded = validated.decode_secret_to_bytes();
+    let decoded = validated.into_bytes();
 }
 #[cfg(feature = "encoding-base64")]
 {
     use secure_gate::encoding::base64::Base64String;
     let validated = Base64String::new("SGVsbG8".to_string()).unwrap();
-    let decoded = validated.decode_secret_to_bytes();
+    let decoded = validated.into_bytes();
 }
 #[cfg(feature = "encoding-bech32")]
 {

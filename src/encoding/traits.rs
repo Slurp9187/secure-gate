@@ -21,16 +21,11 @@ use ::bech32::{self, Bech32, Bech32m, Hrp};
 /// # Example
 ///
 /// ```
-/// # #[cfg(feature = "encoding")]
-/// # {
-/// # use secure_gate::{fixed_alias, encoding::SecureEncodingExt};
-/// # fixed_alias!(Aes256Key, 32);
-/// # let key = Aes256Key::from([0x42u8; 32]);
-/// # let hex = key.expose_secret().to_hex();         // → "424242..."
-/// # let b64 = key.expose_secret().to_base64url();   // URL-safe, no padding
-/// # let b32 = key.expose_secret().to_bech32("example"); // Bech32 with HRP
-/// # assert_eq!(hex, "4242424242424242424242424242424242424242424242424242424242424242");
-/// # }
+/// use secure_gate::SecureEncodingExt;
+/// let bytes = [0x42u8; 32];
+/// let hex = bytes.to_hex(); // → "424242..."
+/// let b64 = bytes.to_base64url(); // URL-safe, no padding
+/// let b32 = bytes.to_bech32m("example"); // Bech32m with HRP
 /// ```
 // Trait is available when any encoding feature is enabled
 #[cfg(any(
@@ -320,26 +315,89 @@ impl<'a> Bech32StringView<'a> {
 }
 
 #[cfg(feature = "encoding-hex")]
-impl<'a> core::ops::Deref for HexStringView<'a> {
-    type Target = String;
+impl<'a> core::ops::Deref for Bech32StringView<'a> {
+    type Target = str;
     fn deref(&self) -> &Self::Target {
-        self.0
+        self.0.as_str()
+    }
+}
+
+#[cfg(feature = "encoding-hex")]
+impl<'a> core::ops::Deref for HexStringView<'a> {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_str()
+    }
+}
+
+#[cfg(feature = "encoding-hex")]
+impl<'a> core::fmt::Debug for HexStringView<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.0)
     }
 }
 
 #[cfg(feature = "encoding-base64")]
-impl<'a> core::ops::Deref for Base64StringView<'a> {
-    type Target = String;
-    fn deref(&self) -> &Self::Target {
-        self.0
+impl<'a> core::fmt::Debug for Base64StringView<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+#[cfg(feature = "encoding-hex")]
+impl<'a> core::fmt::Display for HexStringView<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+#[cfg(feature = "encoding-hex")]
+impl<'a> core::cmp::PartialEq<&str> for HexStringView<'a> {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
+#[cfg(feature = "encoding-base64")]
+impl<'a> core::fmt::Display for Base64StringView<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+#[cfg(feature = "encoding-base64")]
+impl<'a> core::cmp::PartialEq<&str> for Base64StringView<'a> {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
     }
 }
 
 #[cfg(feature = "encoding-bech32")]
-impl<'a> core::ops::Deref for Bech32StringView<'a> {
-    type Target = String;
+impl<'a> core::fmt::Debug for Bech32StringView<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+#[cfg(feature = "encoding-bech32")]
+impl<'a> core::fmt::Display for Bech32StringView<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+#[cfg(feature = "encoding-bech32")]
+impl<'a> core::cmp::PartialEq<&str> for Bech32StringView<'a> {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
+#[cfg(feature = "encoding-bech32")]
+impl<'a> core::ops::Deref for Base64StringView<'a> {
+    type Target = str;
     fn deref(&self) -> &Self::Target {
-        self.0
+        self.0.as_str()
     }
 }
 
@@ -373,7 +431,7 @@ impl crate::encoding::bech32::Bech32String {
 impl crate::encoding::hex::HexString {
     /// Decode the validated hex string into raw bytes, consuming and zeroizing the wrapper.
     pub fn into_bytes(self) -> Vec<u8> {
-        hex_crate::decode(&*self.expose_secret()).expect("HexString is always valid")
+        hex_crate::decode(self.expose_secret().0.as_str()).expect("HexString is always valid")
     }
 }
 
@@ -382,7 +440,7 @@ impl crate::encoding::base64::Base64String {
     /// Decode the validated base64 string into raw bytes, consuming and zeroizing the wrapper.
     pub fn into_bytes(self) -> Vec<u8> {
         URL_SAFE_NO_PAD
-            .decode(&*self.expose_secret())
+            .decode(self.expose_secret().0.as_str())
             .expect("Base64String is always valid")
     }
 }
@@ -392,7 +450,7 @@ impl crate::encoding::bech32::Bech32String {
     /// Decode the validated Bech32 string into raw bytes, consuming and zeroizing the wrapper.
     pub fn into_bytes(self) -> Vec<u8> {
         let (_, data) =
-            bech32::decode(&self.expose_secret()).expect("Bech32String is always valid");
+            bech32::decode(self.expose_secret().0.as_str()).expect("Bech32String is always valid");
         data
     }
 }

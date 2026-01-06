@@ -62,7 +62,7 @@ fn base64string_new_rejects_invalid() {
 fn base64string_valid_parsing() {
     let s = "SGVsbG8".to_string(); // "Hello"
     let b64 = Base64String::new(s).unwrap();
-    assert_eq!(&*b64.expose_secret(), "SGVsbG8");
+    assert_eq!(b64.expose_secret(), "SGVsbG8");
     assert_eq!(b64.len(), 7);
     assert_eq!(b64.byte_len(), 5);
 
@@ -74,7 +74,7 @@ fn base64string_valid_parsing() {
 #[test]
 fn base64string_empty() {
     let b64 = Base64String::new("".to_string()).unwrap();
-    assert_eq!(&*b64.expose_secret(), "");
+    assert_eq!(b64.expose_secret(), "");
     assert_eq!(b64.len(), 0);
     assert_eq!(b64.byte_len(), 0);
     assert!(b64.is_empty());

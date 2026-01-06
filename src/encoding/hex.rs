@@ -32,7 +32,7 @@ fn zeroize_input(s: &mut String) {
 /// # use secure_gate::encoding::hex::HexString;
 /// let valid = HexString::new("deadbeef".to_string()).unwrap();
 /// assert_eq!(valid.expose_secret(), "deadbeef");
-/// let bytes = valid.decode_secret_to_bytes(); // Vec<u8> of [0xde, 0xad, 0xbe, 0xef]
+/// let bytes = valid.into_bytes(); // Vec<u8> of [0xde, 0xad, 0xbe, 0xef]
 /// ```
 pub struct HexString(pub(crate) crate::Dynamic<String>);
 

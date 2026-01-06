@@ -101,22 +101,25 @@ impl Bech32String {
         }
     }
 
+    #[cfg(feature = "encoding-bech32")]
     /// Exact number of bytes the decoded payload represents (allocation-free).
     pub fn byte_len(&self) -> usize {
-        let s = self.expose_secret();
+        let s = self.inner.expose_secret().as_str();
         let sep_pos = s.find('1').expect("valid bech32 has '1' separator");
         let data_part_len = s.len() - sep_pos - 1;
         let data_chars = data_part_len - 6; // subtract checksum
         (data_chars * 5) / 8
     }
 
+    #[cfg(feature = "encoding-bech32")]
     /// The Human-Readable Part (HRP) of the string.
     pub fn hrp(&self) -> Hrp {
-        let (hrp, _) =
-            bech32::decode(self.inner.expose_secret()).expect("Bech32String is always valid");
+        let (hrp, _) = bech32::decode(self.inner.expose_secret().as_str())
+            .expect("Bech32String is always valid");
         hrp
     }
 
+    #[cfg(feature = "encoding-bech32")]
     /// Get the detected encoding variant.
     pub fn variant(&self) -> EncodingVariant {
         self.variant

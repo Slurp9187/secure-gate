@@ -46,7 +46,7 @@ fn hexstring_new_rejects_invalid() {
 fn hexstring_new_in_place_lowercase() {
     let s = "DEADBEEF".to_string();
     let hex = HexString::new(s).unwrap();
-    assert_eq!(*hex.expose_secret(), "deadbeef");
+    assert_eq!(hex.expose_secret(), "deadbeef");
     assert_eq!(hex.byte_len(), 4);
 }
 
@@ -55,7 +55,7 @@ fn hexstring_new_in_place_lowercase() {
 fn hexstring_valid_parsing() {
     let s = "deadbeef".to_string();
     let hex = HexString::new(s).unwrap();
-    assert_eq!(*hex.expose_secret(), "deadbeef");
+    assert_eq!(hex.expose_secret(), "deadbeef");
     assert_eq!(hex.byte_len(), 4);
 
     let bytes = hex.into_bytes();
@@ -66,7 +66,7 @@ fn hexstring_valid_parsing() {
 #[test]
 fn hexstring_empty() {
     let hex = HexString::new("".to_string()).unwrap();
-    assert_eq!(*hex.expose_secret(), "");
+    assert_eq!(hex.expose_secret(), "");
     assert_eq!(hex.byte_len(), 0);
     assert_eq!(hex.into_bytes(), Vec::<u8>::new());
 }
