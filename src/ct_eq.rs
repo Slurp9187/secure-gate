@@ -1,6 +1,6 @@
 //! Constant-time equality comparison for cryptographic secrets (gated behind "ct-eq").
 //!
-//! This module provides the [`ConstantTimeEq`] trait, which performs equality
+//! This module provides the ConstantTimeEq trait, which performs equality
 //! comparisons in constant time to prevent timing attacks. Regular equality
 //! operations can take different amounts of time depending on the data,
 //! potentially leaking information about secret values.
