@@ -20,4 +20,4 @@ pub mod base64;
 #[cfg(feature = "encoding-bech32")]
 pub mod bech32;
 
-pub mod traits;
+pub mod extensions;
