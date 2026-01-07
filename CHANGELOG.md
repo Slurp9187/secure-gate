@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ct_eq` module with `ConstantTimeEq` trait and inherent `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
 - Fallible construction: `impl TryFrom<&[u8]> for Fixed<[u8; N]>` with `FromSliceError`.
   - `from_slice` now delegates to `TryFrom` (panics for compatibility).
+- Compile-fail testing infrastructure using `trybuild` for security invariant verification.
 - Conversions: `From<&str>` for `Dynamic<String>` and `From<&[u8]>` for `Dynamic<Vec<u8>>`.
 - Explicit methods on `HexString` and `Base64String`: `.expose_secret() -> &String`, `.len()`, `.is_empty()`, `.byte_len()`.
 - `Bech32String` wrapper in `encoding::bech32`.
@@ -70,6 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Bech32String` `byte_len()` now allocation-free.
 - Bech32/Bech32m variant detection and normalization robustness.
 - Performance: Removed unnecessary clone in `CloneableArray` constructor.
+- **FromSliceError enhancement**: Now includes actual vs expected lengths for better developer experience.
+- **Security documentation**: Prominent warnings in encoding modules about zeroize feature requirements for secure wiping of invalid inputs.
 
 ### Removed
 
