@@ -37,8 +37,13 @@ pub struct Base64String(pub(crate) crate::Dynamic<String>);
 impl Base64String {
     /// Create a new `Base64String` from a `String`, validating it as URL-safe base64 (no padding).
     ///
-    /// The input `String` is consumed. If validation fails and the `zeroize` feature
-    /// is enabled, the rejected bytes are zeroized before the error is returned.
+    /// The input `String` is consumed.
+    ///
+    /// # Security Note
+    ///
+    /// **Invalid inputs are only securely zeroized if the `zeroize` feature is enabled.**
+    /// Without `zeroize`, rejected bytes may remain in memory until the `String` is dropped
+    /// normally. Enable the `zeroize` feature for secure wiping of invalid inputs.
     ///
     /// Validation rules:
     /// - Valid URL-safe base64 characters (A-Z, a-z, 0-9, -, _)

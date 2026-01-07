@@ -141,7 +141,7 @@ impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
 
     fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
         if slice.len() != N {
-            Err(FromSliceError("slice length mismatch"))
+            Err(FromSliceError::new(slice.len(), N))
         } else {
             let mut arr = [0u8; N];
             arr.copy_from_slice(slice);
@@ -187,7 +187,32 @@ impl<T: Eq> Eq for Fixed<T> {}
 
 /// Error for slice length mismatches in TryFrom impls.
 #[derive(Debug)]
-pub struct FromSliceError(pub &'static str);
+pub struct FromSliceError {
+    pub actual_len: usize,
+    pub expected_len: usize,
+}
+
+impl FromSliceError {
+    /// Create a new FromSliceError with the actual and expected lengths.
+    pub fn new(actual_len: usize, expected_len: usize) -> Self {
+        Self {
+            actual_len,
+            expected_len,
+        }
+    }
+}
+
+impl core::fmt::Display for FromSliceError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "slice length mismatch: expected {} bytes, got {} bytes",
+            self.expected_len, self.actual_len
+        )
+    }
+}
+
+impl core::error::Error for FromSliceError {}
 
 // Opt-in Clone — only for types marked CloneableSecretMarker (default no-clone)
 #[cfg(feature = "zeroize")]

@@ -39,8 +39,13 @@ pub struct HexString(pub(crate) crate::Dynamic<String>);
 impl HexString {
     /// Create a new `HexString` from a `String`, validating it in-place.
     ///
-    /// The input `String` is consumed. If validation fails and the `zeroize` feature
-    /// is enabled, the rejected bytes are zeroized before the error is returned.
+    /// The input `String` is consumed.
+    ///
+    /// # Security Note
+    ///
+    /// **Invalid inputs are only securely zeroized if the `zeroize` feature is enabled.**
+    /// Without `zeroize`, rejected bytes may remain in memory until the `String` is dropped
+    /// normally. Enable the `zeroize` feature for secure wiping of invalid inputs.
     ///
     /// Validation rules:
     /// - Even length

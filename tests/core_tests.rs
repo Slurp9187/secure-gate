@@ -131,10 +131,24 @@ fn from_slice_error_on_mismatch() {
     let long: &[u8] = &[1, 2, 3, 4];
 
     let err_short: Result<Fixed<[u8; 3]>, FromSliceError> = Fixed::try_from(short);
-    assert!(matches!(err_short, Err(FromSliceError("slice length mismatch"))));
+    match err_short {
+        Err(e) => {
+            assert_eq!(e.actual_len, 2);
+            assert_eq!(e.expected_len, 3);
+            assert_eq!(e.to_string(), "slice length mismatch: expected 3 bytes, got 2 bytes");
+        }
+        _ => panic!("Expected error"),
+    }
 
     let err_long: Result<Fixed<[u8; 3]>, FromSliceError> = Fixed::try_from(long);
-    assert!(matches!(err_long, Err(FromSliceError("slice length mismatch"))));
+    match err_long {
+        Err(e) => {
+            assert_eq!(e.actual_len, 4);
+            assert_eq!(e.expected_len, 3);
+            assert_eq!(e.to_string(), "slice length mismatch: expected 3 bytes, got 4 bytes");
+        }
+        _ => panic!("Expected error"),
+    }
 
     // Successful case for comparison
     let ok: Fixed<[u8; 3]> = Fixed::try_from(&[1, 2, 3][..]).unwrap();

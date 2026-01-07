@@ -19,7 +19,8 @@
 //! # Security Features
 //!
 //! All encoding wrappers implement secure practices:
-//! - Invalid inputs are zeroized when the `zeroize` feature is enabled
+//! - **Security**: Invalid inputs are only zeroized when the `zeroize` feature is enabled.
+//!   Without `zeroize`, rejected secrets may remain in memory until normal drop.
 //! - Constant-time equality prevents timing attacks (with `ct-eq`)
 //! - Memory is securely zeroized when wrappers are dropped
 //! - Debug output shows `[REDACTED]` to prevent accidental exposure

@@ -85,7 +85,12 @@ impl Bech32String {
     /// Create a new `Bech32String` from a `String`, validating and normalizing it.
     ///
     /// Accepts mixed-case input (normalized to lowercase for storage).
-    /// Rejected inputs are zeroized when the `zeroize` feature is enabled.
+    ///
+    /// # Security Note
+    ///
+    /// **Invalid inputs are only securely zeroized if the `zeroize` feature is enabled.**
+    /// Without `zeroize`, rejected bytes may remain in memory until the `String` is dropped
+    /// normally. Enable the `zeroize` feature for secure wiping of invalid inputs.
     pub fn new(mut s: String) -> Result<Self, &'static str> {
         s.make_ascii_lowercase();
 
