@@ -20,13 +20,13 @@
 
 ```toml
 [dependencies]
-secure-gate = "0.7.0-rc.5"
+secure-gate = "0.7.0"
 ```
 
 Recommended configuration:
 
 ```toml
-secure-gate = { version = "0.7.0-rc.5", features = ["full"] }
+secure-gate = { version = "0.7.0", features = ["full"] }
 ```
 
 ## Features
@@ -286,7 +286,7 @@ The wrappers add no runtime overhead compared to raw types in benchmarks.
 
 ## Changelog
 
-[[CHANGELOG.md]](https://github.com/Slurp9187/secure-gate/blob/v070rc/CHANGELOG.md)
+[[CHANGELOG.md]](https://github.com/Slurp9187/secure-gate/blob/main/CHANGELOG.md)
 
 ## License
 
