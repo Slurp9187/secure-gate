@@ -10,7 +10,7 @@
 #[cfg(feature = "zeroize")]
 pub mod array;
 #[cfg(feature = "zeroize")]
-pub mod secret_marker;
+pub mod marker;
 #[cfg(feature = "zeroize")]
 pub mod string;
 #[cfg(feature = "zeroize")]
@@ -19,7 +19,7 @@ pub mod vec;
 #[cfg(feature = "zeroize")]
 pub use array::CloneableArray;
 #[cfg(feature = "zeroize")]
-pub use secret_marker::CloneableSecretMarker;
+pub use marker::CloneableSecretMarker;
 #[cfg(feature = "zeroize")]
 pub use string::CloneableString;
 #[cfg(feature = "zeroize")]
