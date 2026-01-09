@@ -12,9 +12,9 @@
 - `HexString` - Validated lowercase hexadecimal string wrapper
 - `Base64String` - Validated URL-safe base64 string wrapper (no padding)
 - `Bech32String` - Validated Bech32/Bech32m string wrapper
-  With the `zeroize` feature enabled, memory containing secrets is zeroed on drop, including spare capacity where applicable.
+  Memory containing secrets is zeroed on drop, including spare capacity where applicable. (enabled by default)
   Access to secret data requires an explicit `.expose_secret()` call. There are no `Deref` implementations or other implicit access paths.
-  Cloning is opt-in and only available under the `zeroize` feature.
+  Cloning is opt-in (enabled by default).
 
 ## Installation
 
@@ -22,6 +22,8 @@
 [dependencies]
 secure-gate = "0.7.0"
 ```
+
+The basic configuration includes the `zeroize` feature by default for secure memory handling.
 
 Recommended configuration:
 
@@ -33,7 +35,7 @@ secure-gate = { version = "0.7.0", features = ["full"] }
 
 | Feature           | Description                                                                               |
 | ----------------- | ----------------------------------------------------------------------------------------- |
-| `zeroize`         | Memory zeroing on drop and opt-in cloning via pre-baked cloneable types                   |
+| `zeroize` (default) | Memory zeroing on drop and opt-in cloning via pre-baked cloneable types                   |
 | `rand`            | Random generation (`FixedRng<N>::generate()`, `DynamicRng::generate()`)                   |
 | `ct-eq`           | Constant-time equality comparison                                                         |
 | `encoding`        | All encoding support (`encoding-hex`, `encoding-base64`, `encoding-bech32`)               |

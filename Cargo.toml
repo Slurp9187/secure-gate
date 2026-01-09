@@ -33,7 +33,7 @@ trybuild = "1.0.114"
 # ──────────────────────────────────────────────────────────────
 [features]
 # Default features: Essential for basic secure secret handling (RNG, zeroing, and constant-time equality)
-default = ["rand", "zeroize", "ct-eq"]
+default = ["zeroize"]
 
 # Encoding: Secure conversions (hex/base64) for displaying or serializing secrets without leaks
 encoding = ["encoding-hex", "encoding-base64", "encoding-bech32"]
