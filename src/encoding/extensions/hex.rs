@@ -6,7 +6,7 @@ use ::hex as hex_crate;
 // ========================================
 
 #[cfg(all(feature = "rand", feature = "encoding-hex"))]
-impl crate::DynamicRng {
+impl crate::DynamicRandom {
     /// Consume self and return the random bytes as a validated hex string.
     ///
     /// The raw bytes are zeroized immediately after encoding.
@@ -17,7 +17,7 @@ impl crate::DynamicRng {
 }
 
 #[cfg(all(feature = "rand", feature = "encoding-hex"))]
-impl<const N: usize> crate::FixedRng<N> {
+impl<const N: usize> crate::FixedRandom<N> {
     /// Consume self and return the random bytes as a validated hex string.
     ///
     /// The raw bytes are zeroized immediately after encoding.
@@ -32,7 +32,7 @@ impl<const N: usize> crate::FixedRng<N> {
 // ========================================
 
 #[cfg(all(feature = "rand", feature = "encoding-hex"))]
-impl<const N: usize> crate::FixedRng<N> {
+impl<const N: usize> crate::FixedRandom<N> {
     /// Borrow and encode the random bytes as a validated lowercase hex string (allocates).
     ///
     /// The original secret remains intact and usable.
@@ -43,7 +43,7 @@ impl<const N: usize> crate::FixedRng<N> {
 }
 
 #[cfg(all(feature = "rand", feature = "encoding-hex"))]
-impl crate::DynamicRng {
+impl crate::DynamicRandom {
     /// Borrow and encode the random bytes as a validated lowercase hex string (allocates).
     ///
     /// The original secret remains intact and usable.

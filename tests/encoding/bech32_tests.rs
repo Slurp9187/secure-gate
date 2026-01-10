@@ -110,9 +110,9 @@ fn metadata_methods() {
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
 #[test]
 fn rng_into_bech32_variant_detection_and_round_trip() {
-    use secure_gate::random::FixedRng;
+    use secure_gate::random::FixedRandom;
 
-    let rng = FixedRng::<16>::generate();
+    let rng = FixedRandom::<16>::generate();
     let raw_bytes = rng.expose_secret().to_vec();
 
     let b32 = rng.expose_secret().to_bech32("test");
@@ -120,7 +120,7 @@ fn rng_into_bech32_variant_detection_and_round_trip() {
     assert!(parsed.is_bech32());
     assert_eq!(parsed.expose_secret().to_bytes(), raw_bytes);
 
-    let rng_m = FixedRng::<16>::generate();
+    let rng_m = FixedRandom::<16>::generate();
     let raw_bytes_m = rng_m.expose_secret().to_vec();
 
     let b32m = rng_m.expose_secret().to_bech32m("test");
@@ -132,9 +132,9 @@ fn rng_into_bech32_variant_detection_and_round_trip() {
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
 #[test]
 fn rng_into_bech32_consuming_round_trip() {
-    use secure_gate::random::FixedRng;
+    use secure_gate::random::FixedRandom;
 
-    let rng = FixedRng::<32>::generate();
+    let rng = FixedRandom::<32>::generate();
     let raw_bytes = rng.expose_secret().to_vec();
 
     let b32 = rng.into_bech32("example");
@@ -142,7 +142,7 @@ fn rng_into_bech32_consuming_round_trip() {
     assert_eq!(b32.byte_len(), 32);
     assert_eq!(b32.into_bytes(), raw_bytes);
 
-    let rng_m = FixedRng::<32>::generate();
+    let rng_m = FixedRandom::<32>::generate();
     let raw_bytes_m = rng_m.expose_secret().to_vec();
 
     let b32m = rng_m.into_bech32m("example");

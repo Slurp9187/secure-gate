@@ -199,8 +199,8 @@ impl Dynamic<Vec<u8>> {
     /// Generate fresh random bytes of the specified length using the OS RNG.
     ///
     /// This is a convenience method that generates random bytes directly
-    /// without going through `DynamicRng`. Equivalent to:
-    /// `DynamicRng::generate(len).into_inner()`
+    /// without going through `DynamicRandom`. Equivalent to:
+    /// `DynamicRandom::generate(len).into_inner()`
     ///
     /// # Example
     ///
@@ -214,7 +214,7 @@ impl Dynamic<Vec<u8>> {
     /// ```
     #[inline]
     pub fn generate_random(len: usize) -> Self {
-        crate::random::DynamicRng::generate(len).into_inner()
+        crate::random::DynamicRandom::generate(len).into_inner()
     }
 
     /// Try to generate random bytes for Dynamic.
@@ -233,8 +233,8 @@ impl Dynamic<Vec<u8>> {
     /// ```
     #[inline]
     pub fn try_generate_random(len: usize) -> Result<Self, OsError> {
-        crate::random::DynamicRng::try_generate(len)
-            .map(|rng: crate::random::DynamicRng| rng.into_inner())
+        crate::random::DynamicRandom::try_generate(len)
+            .map(|rng: crate::random::DynamicRandom| rng.into_inner())
     }
 }
 

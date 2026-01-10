@@ -1,3 +1,3 @@
-pub mod dynamic_rng_tests;
-pub mod fixed_rng_tests;
+pub mod dynamic_random_tests;
+pub mod fixed_random_tests;
 pub mod general_random_tests;

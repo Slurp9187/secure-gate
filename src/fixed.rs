@@ -255,8 +255,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// Generate fresh random bytes using the OS RNG.
     ///
     /// This is a convenience method that generates random bytes directly
-    /// without going through `FixedRng`. Equivalent to:
-    /// `FixedRng::<N>::generate().into_inner()`
+    /// without going through `FixedRandom`. Equivalent to:
+    /// `FixedRandom::<N>::generate().into_inner()`
     ///
     /// # Example
     ///
@@ -269,7 +269,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// ```
     #[inline]
     pub fn generate_random() -> Self {
-        crate::random::FixedRng::<N>::generate().into_inner()
+        crate::random::FixedRandom::<N>::generate().into_inner()
     }
 
     /// Try to generate random bytes for Fixed.
@@ -288,8 +288,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// ```
     #[inline]
     pub fn try_generate_random() -> Result<Self, OsError> {
-        crate::random::FixedRng::<N>::try_generate()
-            .map(|rng: crate::random::FixedRng<N>| rng.into_inner())
+        crate::random::FixedRandom::<N>::try_generate()
+            .map(|rng: crate::random::FixedRandom<N>| rng.into_inner())
     }
 }
 

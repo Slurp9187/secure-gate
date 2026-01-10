@@ -6,7 +6,7 @@ use ::bech32::{self, Bech32, Bech32m, Hrp};
 // ========================================
 
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
-impl crate::DynamicRng {
+impl crate::DynamicRandom {
     /// Consume self and return the random bytes as a validated Bech32 string with the specified HRP.
     ///
     /// The raw bytes are zeroized immediately after encoding (via drop of `self`).
@@ -43,7 +43,7 @@ impl crate::DynamicRng {
 }
 
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
-impl<const N: usize> crate::FixedRng<N> {
+impl<const N: usize> crate::FixedRandom<N> {
     /// Consume self and return the random bytes as a validated Bech32 string with the specified HRP.
     ///
     /// The raw bytes are zeroized immediately after encoding (via drop of `self`).
@@ -84,7 +84,7 @@ impl<const N: usize> crate::FixedRng<N> {
 // ========================================
 
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
-impl<const N: usize> crate::FixedRng<N> {
+impl<const N: usize> crate::FixedRandom<N> {
     /// Borrow and encode the random bytes as a validated Bech32 string with the specified HRP (allocates).
     ///
     /// The original secret remains intact and usable.
@@ -121,7 +121,7 @@ impl<const N: usize> crate::FixedRng<N> {
 }
 
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
-impl crate::DynamicRng {
+impl crate::DynamicRandom {
     /// Borrow and encode the random bytes as a validated Bech32 string with the specified HRP (allocates).
     ///
     /// The original secret remains intact and usable.

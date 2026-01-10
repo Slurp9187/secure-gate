@@ -1,4 +1,4 @@
-// secure-gate/src/random/dynamic_rng.rs
+// secure-gate/src/random/dynamic_random.rs
 use crate::Dynamic;
 use rand::rand_core::OsError;
 use rand::rngs::OsRng;
@@ -7,7 +7,7 @@ use rand::TryRngCore;
 /// Heap-allocated cryptographically secure random bytes with encoding methods.
 ///
 /// This is a newtype over `Dynamic<Vec<u8>>` for semantic clarity.
-/// Like `FixedRng`, guarantees freshness via RNG construction.
+/// Like `FixedRandom`, guarantees freshness via RNG construction.
 ///
 /// Requires the "rand" feature.
 ///
@@ -18,14 +18,14 @@ use rand::TryRngCore;
 /// ```
 /// # #[cfg(feature = "rand")]
 /// # {
-/// use secure_gate::random::DynamicRng;
-/// let random = DynamicRng::generate(64);
+/// use secure_gate::random::DynamicRandom;
+/// let random = DynamicRandom::generate(64);
 /// assert_eq!(random.len(), 64);
 /// # }
 /// ```
-pub struct DynamicRng(Dynamic<Vec<u8>>);
+pub struct DynamicRandom(Dynamic<Vec<u8>>);
 
-impl DynamicRng {
+impl DynamicRandom {
     /// Generate fresh random bytes of the specified length.
     ///
     /// Panics if the RNG fails.
@@ -35,8 +35,8 @@ impl DynamicRng {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::random::DynamicRng;
-    /// let random = DynamicRng::generate(128);
+    /// use secure_gate::random::DynamicRandom;
+    /// let random = DynamicRandom::generate(128);
     /// # }
     /// ```
     pub fn generate(len: usize) -> Self {
@@ -56,8 +56,8 @@ impl DynamicRng {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::random::DynamicRng;
-    /// let random: Result<DynamicRng, rand::rand_core::OsError> = DynamicRng::try_generate(64);
+    /// use secure_gate::random::DynamicRandom;
+    /// let random: Result<DynamicRandom, rand::rand_core::OsError> = DynamicRandom::try_generate(64);
     /// assert!(random.is_ok());
     /// # }
     /// ```
@@ -93,16 +93,16 @@ impl DynamicRng {
     }
 }
 
-impl core::fmt::Debug for DynamicRng {
+impl core::fmt::Debug for DynamicRandom {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
     }
 }
 
-impl From<DynamicRng> for Dynamic<Vec<u8>> {
-    /// Convert a `DynamicRng` to `Dynamic`, transferring ownership.
+impl From<DynamicRandom> for Dynamic<Vec<u8>> {
+    /// Convert a `DynamicRandom` to `Dynamic`, transferring ownership.
     ///
-    /// This preserves all security guarantees. The `DynamicRng` type
+    /// This preserves all security guarantees. The `DynamicRandom` type
     /// ensures the value came from secure RNG, and this conversion
     /// transfers that value to `Dynamic` without exposing bytes.
     ///
@@ -111,12 +111,12 @@ impl From<DynamicRng> for Dynamic<Vec<u8>> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::{Dynamic, random::DynamicRng};
-    /// let random: Dynamic<Vec<u8>> = DynamicRng::generate(64).into();
+    /// use secure_gate::{Dynamic, random::DynamicRandom};
+    /// let random: Dynamic<Vec<u8>> = DynamicRandom::generate(64).into();
     /// # }
     /// ```
     #[inline(always)]
-    fn from(rng: DynamicRng) -> Self {
+    fn from(rng: DynamicRandom) -> Self {
         rng.into_inner()
     }
 }

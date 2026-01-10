@@ -52,7 +52,7 @@ pub mod encoding;
 
 /// Re-exports for convenient access to feature-gated types.
 #[cfg(feature = "rand")]
-pub use random::{DynamicRng, FixedRng};
+pub use random::{DynamicRandom, FixedRandom};
 
 #[cfg(feature = "encoding-hex")]
 pub use encoding::hex::HexString;

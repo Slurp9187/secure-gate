@@ -6,13 +6,13 @@
 #![cfg(test)]
 
 use base64::Engine;
-use secure_gate::{fixed_alias_rng, Base64String, SecureEncodingExt};
+use secure_gate::{fixed_alias_random, Base64String, SecureEncodingExt};
 
 #[cfg(feature = "encoding-base64")]
 #[cfg(feature = "rand")]
 #[test]
 fn into_base64_via_alias() {
-    fixed_alias_rng!(Base64Key, 32);
+    fixed_alias_random!(Base64Key, 32);
 
     let key = Base64Key::generate();
     let b64_str = key.expose_secret().to_base64url();
@@ -131,8 +131,8 @@ fn base64string_case_sensitive() {
 #[cfg(all(feature = "encoding-base64", feature = "rand"))]
 #[test]
 fn rng_base64_integration() {
-    use secure_gate::random::FixedRng;
-    let rng = FixedRng::<32>::generate();
+    use secure_gate::random::FixedRandom;
+    let rng = FixedRandom::<32>::generate();
     let b64 = rng.into_base64();
     assert_eq!(b64.into_bytes().len(), 32);
 }

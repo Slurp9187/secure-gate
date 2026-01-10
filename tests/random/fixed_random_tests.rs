@@ -1,5 +1,5 @@
-// secure-gate/tests/random/fixed_rng_tests.rs
-// Tests specific to FixedRng functionality.
+// secure-gate/tests/random/fixed_random_tests.rs
+// Tests specific to FixedRandom functionality.
 
 #![cfg(feature = "rand")]
 
@@ -7,14 +7,18 @@
 use secure_gate::encoding::base64::Base64String;
 #[cfg(feature = "encoding-hex")]
 use secure_gate::encoding::hex::HexString;
-use secure_gate::random::FixedRng;
-#[cfg(any(feature = "encoding-hex", feature = "encoding-base64", feature = "encoding-bech32"))]
+use secure_gate::random::FixedRandom;
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
 use secure_gate::SecureEncodingExt;
 
 #[test]
-fn raw_fixed_rng_works() {
-    let a = FixedRng::<32>::generate();
-    let b = FixedRng::<32>::generate();
+fn raw_fixed_random_works() {
+    let a = FixedRandom::<32>::generate();
+    let b = FixedRandom::<32>::generate();
     assert_ne!(a.expose_secret(), b.expose_secret());
     assert_eq!(a.len(), 32);
 }
@@ -23,7 +27,7 @@ fn raw_fixed_rng_works() {
 #[test]
 fn hex_methods_work() {
     // Test to_hex (non-consuming)
-    let rng = FixedRng::<4>::generate();
+    let rng = FixedRandom::<4>::generate();
     let hex = HexString::new(rng.expose_secret().to_hex()).unwrap();
     assert_eq!(hex.byte_len(), 4);
     assert!(hex
@@ -32,7 +36,7 @@ fn hex_methods_work() {
         .all(|c: char| c.is_ascii_hexdigit()));
 
     // Test into_hex (consuming)
-    let rng2 = FixedRng::<4>::generate();
+    let rng2 = FixedRandom::<4>::generate();
     let owned_hex = rng2.into_hex();
     assert_eq!(owned_hex.byte_len(), 4);
     assert!(owned_hex
@@ -48,7 +52,7 @@ fn hex_methods_work() {
 #[cfg(all(feature = "rand", feature = "encoding-base64"))]
 #[test]
 fn base64_roundtrip() {
-    let rng = FixedRng::<32>::generate();
+    let rng = FixedRandom::<32>::generate();
     let encoded = Base64String::new(rng.expose_secret().to_base64url()).unwrap();
     assert_eq!(
         encoded.expose_secret().to_bytes(),
@@ -60,7 +64,7 @@ fn base64_roundtrip() {
 #[test]
 fn base64_methods_work() {
     // Test to_base64 (non-consuming)
-    let rng = FixedRng::<4>::generate();
+    let rng = FixedRandom::<4>::generate();
     let base64 = Base64String::new(rng.expose_secret().to_base64url()).unwrap();
     assert_eq!(base64.byte_len(), 4);
     // Valid URL-safe base64 chars
@@ -70,7 +74,7 @@ fn base64_methods_work() {
         .all(|c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
 
     // Test into_base64 (consuming)
-    let rng2 = FixedRng::<4>::generate();
+    let rng2 = FixedRandom::<4>::generate();
     let owned_base64 = rng2.into_base64();
     assert_eq!(owned_base64.byte_len(), 4);
     assert!(owned_base64
@@ -86,7 +90,7 @@ fn base64_methods_work() {
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
 #[test]
 fn bech32_variants_roundtrip() {
-    let rng = FixedRng::<32>::generate();
+    let rng = FixedRandom::<32>::generate();
     let b32 = rng.expose_secret().to_bech32("test");
     assert!(b32.is_bech32());
     assert_eq!(b32.expose_secret().to_bytes(), rng.expose_secret().to_vec());
@@ -103,7 +107,7 @@ fn bech32_variants_roundtrip() {
 #[test]
 fn bech32_methods_work() {
     // Test various sizes
-    let rng16 = FixedRng::<16>::generate();
+    let rng16 = FixedRandom::<16>::generate();
     let b32_16 = rng16.expose_secret().to_bech32("example");
     assert!(b32_16.is_bech32());
     assert_eq!(b32_16.into_bytes().len(), 16);
@@ -113,12 +117,12 @@ fn bech32_methods_work() {
     assert_eq!(b32m_16.into_bytes().len(), 16);
 
     // Test into_* (consuming)
-    let rng32 = FixedRng::<32>::generate();
+    let rng32 = FixedRandom::<32>::generate();
     let owned_b32 = rng32.into_bech32("hrp");
     assert!(owned_b32.is_bech32());
     assert_eq!(owned_b32.into_bytes().len(), 32);
 
-    let rng32m = FixedRng::<32>::generate();
+    let rng32m = FixedRandom::<32>::generate();
     let owned_b32m = rng32m.into_bech32m("hrp");
     assert!(owned_b32m.is_bech32m());
     assert_eq!(owned_b32m.into_bytes().len(), 32);

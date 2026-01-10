@@ -1,7 +1,7 @@
 // secure-gate/src/random/mod.rs
 //! Cryptographically secure random value generation with encoding conveniences (gated behind “rand” and encoding features).
 //!
-//! Provides `FixedRng` and `DynamicRng` types for generating fresh random bytes.
+//! Provides `FixedRandom` and `DynamicRandom` types for generating fresh random bytes.
 //! Includes built-in methods for encoding to Hex, Base64, Bech32, and Bech32m strings
 //! without exposing secret bytes.
 //!
@@ -11,8 +11,8 @@
 //! ```
 //! # #[cfg(all(feature = "rand", feature = "encoding-hex"))]
 //! # {
-//! use secure_gate::random::FixedRng;
-//! let hex = FixedRng::<32>::generate().into_hex();
+//! use secure_gate::random::FixedRandom;
+//! let hex = FixedRandom::<32>::generate().into_hex();
 //! # }
 //! ```
 //!
@@ -20,8 +20,8 @@
 //! ```
 //! # #[cfg(all(feature = "rand", feature = "encoding-base64"))]
 //! # {
-//! use secure_gate::random::FixedRng;
-//! let base64 = FixedRng::<32>::generate().into_base64();
+//! use secure_gate::random::FixedRandom;
+//! let base64 = FixedRandom::<32>::generate().into_base64();
 //! # }
 //! ```
 //!
@@ -29,15 +29,15 @@
 //! ```
 //! # #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
 //! # {
-//! use secure_gate::random::FixedRng;
-//! let bech32 = FixedRng::<32>::generate().into_bech32("example");
-//! let bech32m = FixedRng::<32>::generate().into_bech32m("example");
+//! use secure_gate::random::FixedRandom;
+//! let bech32 = FixedRandom::<32>::generate().into_bech32("example");
+//! let bech32m = FixedRandom::<32>::generate().into_bech32m("example");
 //! # }
 //! ```
 
-pub mod dynamic_rng;
-pub mod fixed_rng;
+pub mod dynamic_random;
+pub mod fixed_random;
 
 // Re-export for API compatibility
-pub use dynamic_rng::DynamicRng;
-pub use fixed_rng::FixedRng;
+pub use dynamic_random::DynamicRandom;
+pub use fixed_random::FixedRandom;

@@ -5,7 +5,7 @@
 
 use secure_gate::fixed_alias;
 #[cfg(feature = "rand")]
-use secure_gate::fixed_alias_rng;
+use secure_gate::fixed_alias_random;
 
 // ──────────────────────────────────────────────────────────────
 // Basic fixed-size alias (no rand)
@@ -83,8 +83,8 @@ fn root_visibility_works() {
 mod rng_vis {
     use super::*;
 
-    fixed_alias_rng!(pub(crate) CrateRngKey, 32);
-    fixed_alias_rng!(pub(in super) ParentRngKey, 24);
+    fixed_alias_random!(pub(crate) CrateRngKey, 32);
+    fixed_alias_random!(pub(in super) ParentRngKey, 24);
 
     #[test]
     fn rng_visibility_works() {
@@ -117,8 +117,8 @@ fn fixed_aliases_distinct_types() {
 #[cfg(feature = "rand")]
 #[test]
 fn rng_aliases_distinct_types() {
-    fixed_alias_rng!(RngTypeA, 32);
-    fixed_alias_rng!(RngTypeB, 32);
+    fixed_alias_random!(RngTypeA, 32);
+    fixed_alias_random!(RngTypeB, 32);
 
     let _a = RngTypeA::generate();
     // let _wrong: RngTypeB = a; // Must not compile

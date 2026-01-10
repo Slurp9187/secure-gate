@@ -4,8 +4,8 @@
 
 - `Fixed<T>` - Stack-allocated wrapper
 - `Dynamic<T>` - Heap-allocated wrapper
-- `FixedRng<N>` - Cryptographically secure random bytes of fixed length N
-- `DynamicRng` - Heap-allocated cryptographically secure random bytes
+- `FixedRandom<N>` - Cryptographically secure random bytes of fixed length N
+- `DynamicRandom` - Heap-allocated cryptographically secure random bytes
 - `CloneableArray<const N: usize>` - Cloneable fixed-size stack secret (`[u8; N]`)
 - `CloneableString` - Cloneable heap-allocated text secret (`String`)
 - `CloneableVec` - Cloneable heap-allocated binary secret (`Vec<u8>`)
@@ -36,10 +36,10 @@ secure-gate = { version = "0.7.0", features = ["full"] }
 | Feature           | Description                                                                               |
 | ----------------- | ----------------------------------------------------------------------------------------- |
 | `zeroize` (default) | Memory zeroing on drop and opt-in cloning via pre-baked cloneable types                   |
-| `rand`            | Random generation (`FixedRng<N>::generate()`, `DynamicRng::generate()`)                   |
+| `rand`            | Random generation (`FixedRandom<N>::generate()`, `DynamicRandom::generate()`)                   |
 | `ct-eq`           | Constant-time equality comparison                                                         |
 | `encoding`        | All encoding support (`encoding-hex`, `encoding-base64`, `encoding-bech32`)               |
-| `encoding-hex`    | Hex encoding, `HexString`, `FixedRng` hex methods                                         |
+| `encoding-hex`    | Hex encoding, `HexString`, `FixedRandom` hex methods                                         |
 | `encoding-base64` | `Base64String`                                                                            |
 | `encoding-bech32` | `Bech32String` (Bech32 and Bech32m variants; supports mixed-case input, stores lowercase) |
 | `full`            | All optional features                                                                     |
@@ -77,8 +77,8 @@ assert_eq!(pw.expose_secret(), "hunter2");
 }
 #[cfg(feature = "rand")]
 {
-    use secure_gate::fixed_alias_rng;
-    fixed_alias_rng!(pub MasterKey, 32);
+    use secure_gate::fixed_alias_random;
+    fixed_alias_random!(pub MasterKey, 32);
     #[cfg(feature = "encoding-hex")]
     {
         let key = MasterKey::generate();
@@ -179,9 +179,9 @@ The temporary is cloned to the heap and zeroized immediately.
 ```rust
 #[cfg(feature = "rand")]
 {
-    use secure_gate::fixed_alias_rng;
-    fixed_alias_rng!(pub JwtSigningKey, 32);
-    fixed_alias_rng!(pub BackupCode, 16);
+    use secure_gate::fixed_alias_random;
+    fixed_alias_random!(pub JwtSigningKey, 32);
+    fixed_alias_random!(pub BackupCode, 16);
     let key = JwtSigningKey::generate();
     #[cfg(feature = "encoding-hex")]
     {
@@ -198,7 +198,7 @@ The temporary is cloned to the heap and zeroized immediately.
 }
 ```
 
-`FixedRng<N>` can only be constructed via cryptographically secure RNG.
+`FixedRandom<N>` can only be constructed via cryptographically secure RNG.
 Direct generation is also available:
 
 ```rust
@@ -266,8 +266,8 @@ fixed_alias!(pub Aes256Key, 32);
 dynamic_alias!(pub Password, String);
 #[cfg(feature = "rand")]
 {
-    use secure_gate::fixed_alias_rng;
-    fixed_alias_rng!(pub MasterKey, 32);
+    use secure_gate::fixed_alias_random;
+    fixed_alias_random!(pub MasterKey, 32);
 }
 ```
 
@@ -277,7 +277,7 @@ dynamic_alias!(pub Password, String);
 | -------------- | ---------- | ------------------- | --------- | ---------------- | ------------------------ |
 | `Fixed<T>`     | Stack      | Yes                 | Yes       | Yes (no heap)    |                          |
 | `Dynamic<T>`   | Heap       | Yes                 | Yes       | No (until drop)  | Use `shrink_to_fit()`    |
-| `FixedRng<N>`  | Stack      | Yes                 | Yes       | Yes              |                          |
+| `FixedRandom<N>`  | Stack      | Yes                 | Yes       | Yes              |                          |
 | `HexString`    | Heap       | Yes (invalid input) | Yes       | No (until drop)  | Validated hex            |
 | `Base64String` | Heap       | Yes (invalid input) | Yes       | No (until drop)  | Validated base64         |
 | `Bech32String` | Heap       | Yes (invalid input) | Yes       | No (until drop)  | Validated Bech32/Bech32m |

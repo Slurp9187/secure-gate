@@ -85,17 +85,17 @@ fn dynamic_len_is_empty() {
 #[cfg(feature = "rand")]
 #[test]
 fn rng_len_is_empty() {
-    use secure_gate::{DynamicRng, FixedRng};
+    use secure_gate::{DynamicRandom, FixedRandom};
 
-    let rng: FixedRng<32> = FixedRng::generate();
+    let rng: FixedRandom<32> = FixedRandom::generate();
     assert_eq!(rng.len(), 32);
     assert!(!rng.is_empty());
 
-    let dyn_rng: DynamicRng = DynamicRng::generate(64);
+    let dyn_rng: DynamicRandom = DynamicRandom::generate(64);
     assert_eq!(dyn_rng.len(), 64);
     assert!(!dyn_rng.is_empty());
 
-    let empty: DynamicRng = DynamicRng::generate(0);
+    let empty: DynamicRandom = DynamicRandom::generate(0);
     assert_eq!(empty.len(), 0);
     assert!(empty.is_empty());
 }
@@ -135,7 +135,10 @@ fn from_slice_error_on_mismatch() {
         Err(e) => {
             assert_eq!(e.actual_len, 2);
             assert_eq!(e.expected_len, 3);
-            assert_eq!(e.to_string(), "slice length mismatch: expected 3 bytes, got 2 bytes");
+            assert_eq!(
+                e.to_string(),
+                "slice length mismatch: expected 3 bytes, got 2 bytes"
+            );
         }
         _ => panic!("Expected error"),
     }
@@ -145,7 +148,10 @@ fn from_slice_error_on_mismatch() {
         Err(e) => {
             assert_eq!(e.actual_len, 4);
             assert_eq!(e.expected_len, 3);
-            assert_eq!(e.to_string(), "slice length mismatch: expected 3 bytes, got 4 bytes");
+            assert_eq!(
+                e.to_string(),
+                "slice length mismatch: expected 3 bytes, got 4 bytes"
+            );
         }
         _ => panic!("Expected error"),
     }

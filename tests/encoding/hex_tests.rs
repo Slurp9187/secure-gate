@@ -6,7 +6,7 @@
 #![cfg(test)]
 
 #[cfg(feature = "encoding-hex")]
-use secure_gate::{fixed_alias_rng, HexString};
+use secure_gate::{fixed_alias_random, HexString};
 
 use hex;
 
@@ -14,7 +14,7 @@ use hex;
 #[cfg(feature = "rand")]
 #[test]
 fn into_hex_via_alias() {
-    fixed_alias_rng!(HexKey, 32);
+    fixed_alias_random!(HexKey, 32);
 
     let hex = HexKey::generate().into_hex();
 
@@ -145,8 +145,8 @@ fn hexstring_constant_time_eq() {
 #[cfg(all(feature = "encoding-hex", feature = "rand"))]
 #[test]
 fn rng_hex_integration() {
-    use secure_gate::random::FixedRng;
-    let rng = FixedRng::<32>::generate();
+    use secure_gate::random::FixedRandom;
+    let rng = FixedRandom::<32>::generate();
     let hex = rng.into_hex();
     assert_eq!(hex.into_bytes().len(), 32);
 }

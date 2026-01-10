@@ -1,4 +1,4 @@
-// secure-gate/src/random/fixed_rng.rs
+// secure-gate/src/random/fixed_random.rs
 use crate::Fixed;
 use rand::rand_core::OsError;
 use rand::rngs::OsRng;
@@ -19,8 +19,8 @@ use rand::TryRngCore;
 /// ```
 /// # #[cfg(feature = "rand")]
 /// # {
-/// use secure_gate::random::FixedRng;
-/// let random: FixedRng<32> = FixedRng::generate();
+/// use secure_gate::random::FixedRandom;
+/// let random: FixedRandom<32> = FixedRandom::generate();
 /// assert_eq!(random.len(), 32);
 /// # }
 /// ```
@@ -29,14 +29,14 @@ use rand::TryRngCore;
 /// ```
 /// # #[cfg(feature = "rand")]
 /// # {
-/// use secure_gate::fixed_alias_rng;
-/// fixed_alias_rng!(Nonce, 24);
+/// use secure_gate::fixed_alias_random;
+/// fixed_alias_random!(Nonce, 24);
 /// let nonce = Nonce::generate();
 /// # }
 /// ```
-pub struct FixedRng<const N: usize>(Fixed<[u8; N]>);
+pub struct FixedRandom<const N: usize>(Fixed<[u8; N]>);
 
-impl<const N: usize> FixedRng<N> {
+impl<const N: usize> FixedRandom<N> {
     /// Generate fresh random bytes using the OS RNG.
     ///
     /// Uses `rand::rngs::OsRng` directly for maximum throughput.
@@ -47,8 +47,8 @@ impl<const N: usize> FixedRng<N> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::random::FixedRng;
-    /// let random = FixedRng::<16>::generate();
+    /// use secure_gate::random::FixedRandom;
+    /// let random = FixedRandom::<16>::generate();
     /// assert!(!random.is_empty());
     /// # }
     /// ```
@@ -69,8 +69,8 @@ impl<const N: usize> FixedRng<N> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::random::FixedRng;
-    /// let random: Result<FixedRng<32>, rand::rand_core::OsError> = FixedRng::try_generate();
+    /// use secure_gate::random::FixedRandom;
+    /// let random: Result<FixedRandom<32>, rand::rand_core::OsError> = FixedRandom::try_generate();
     /// assert!(random.is_ok());
     /// # }
     /// ```
@@ -88,8 +88,8 @@ impl<const N: usize> FixedRng<N> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::random::FixedRng;
-    /// let random = FixedRng::<4>::generate();
+    /// use secure_gate::random::FixedRandom;
+    /// let random = FixedRandom::<4>::generate();
     /// let bytes = random.expose_secret();
     /// # }
     /// ```
@@ -120,8 +120,8 @@ impl<const N: usize> FixedRng<N> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::{Fixed, random::FixedRng};
-    /// let random = FixedRng::<32>::generate();
+    /// use secure_gate::{Fixed, random::FixedRandom};
+    /// let random = FixedRandom::<32>::generate();
     /// let fixed: Fixed<[u8; 32]> = random.into_inner();
     /// // Can now use fixed.expose_secret() as needed
     /// # }
@@ -132,16 +132,16 @@ impl<const N: usize> FixedRng<N> {
     }
 }
 
-impl<const N: usize> core::fmt::Debug for FixedRng<N> {
+impl<const N: usize> core::fmt::Debug for FixedRandom<N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
     }
 }
 
-impl<const N: usize> From<FixedRng<N>> for Fixed<[u8; N]> {
-    /// Convert a `FixedRng` to `Fixed`, transferring ownership.
+impl<const N: usize> From<FixedRandom<N>> for Fixed<[u8; N]> {
+    /// Convert a `FixedRandom` to `Fixed`, transferring ownership.
     ///
-    /// This preserves all security guarantees. The `FixedRng` type
+    /// This preserves all security guarantees. The `FixedRandom` type
     /// ensures the value came from secure RNG, and this conversion
     /// transfers that value to `Fixed` without exposing bytes.
     ///
@@ -150,12 +150,12 @@ impl<const N: usize> From<FixedRng<N>> for Fixed<[u8; N]> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::{Fixed, random::FixedRng};
-    /// let key: Fixed<[u8; 32]> = FixedRng::<32>::generate().into();
+    /// use secure_gate::{Fixed, random::FixedRandom};
+    /// let key: Fixed<[u8; 32]> = FixedRandom::<32>::generate().into();
     /// # }
     /// ```
     #[inline(always)]
-    fn from(rng: FixedRng<N>) -> Self {
+    fn from(rng: FixedRandom<N>) -> Self {
         rng.into_inner()
     }
 }

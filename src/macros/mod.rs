@@ -7,7 +7,7 @@
 //! - `dynamic_generic_alias!`: For generic heap-allocated secrets
 //! - `fixed_alias!`: For fixed-size secrets (`Fixed<[u8; N]>`)
 //! - `fixed_generic_alias!`: For generic fixed-size secrets
-//! - `fixed_alias_rng!`: For random-only fixed-size secrets (`FixedRng<N>`)
+//! - `fixed_alias_random!`: For random-only fixed-size secrets (`FixedRandom<N>`)
 
 pub mod dynamic;
 pub mod fixed;

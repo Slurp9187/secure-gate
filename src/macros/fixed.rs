@@ -78,7 +78,7 @@ macro_rules! fixed_generic_alias {
 
 /// Creates a type alias for a random-only fixed-size secret.
 ///
-/// This macro generates a type alias to `FixedRng<N>`, which can only be
+/// This macro generates a type alias to `FixedRandom<N>`, which can only be
 /// instantiated via `.generate()` (requires the "rand" feature).
 ///
 /// # Examples
@@ -87,8 +87,8 @@ macro_rules! fixed_generic_alias {
 /// ```
 /// #[cfg(feature = "rand")]
 /// {
-/// use secure_gate::fixed_alias_rng;
-/// fixed_alias_rng!(pub MasterKey, 32);
+/// use secure_gate::fixed_alias_random;
+/// fixed_alias_random!(pub MasterKey, 32);
 /// # }
 /// ```
 ///
@@ -96,21 +96,21 @@ macro_rules! fixed_generic_alias {
 /// ```
 /// #[cfg(feature = "rand")]
 /// {
-/// use secure_gate::fixed_alias_rng;
-/// fixed_alias_rng!(PrivateKey, 32); // No visibility modifier = private
+/// use secure_gate::fixed_alias_random;
+/// fixed_alias_random!(PrivateKey, 32); // No visibility modifier = private
 /// # }
 /// ```
 /// Instantiate with Type::generate() (requires 'rand' feature).
 #[macro_export]
-macro_rules! fixed_alias_rng {
+macro_rules! fixed_alias_random {
     ($vis:vis $name:ident, $size:literal) => {
         #[doc = concat!("Random-only fixed-size secret (", stringify!($size), " bytes)")]
         const _: () = { let _ = [(); $size][0]; };
-        $vis type $name = $crate::random::FixedRng<$size>;
+        $vis type $name = $crate::random::FixedRandom<$size>;
     };
     ($name:ident, $size:literal) => {
         #[doc = concat!("Random-only fixed-size secret (", stringify!($size), " bytes)")]
         const _: () = { let _ = [(); $size][0]; };
-        type $name = $crate::random::FixedRng<$size>;
+        type $name = $crate::random::FixedRandom<$size>;
     };
 }
