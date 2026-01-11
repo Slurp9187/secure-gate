@@ -109,7 +109,6 @@ impl<T: crate::CloneSafe> Clone for Dynamic<T> {
 }
 
 /// # Additional conversions
-
 /// Wrap a byte slice into a [`Dynamic`] [`Vec<u8>`].
 impl From<&[u8]> for Dynamic<Vec<u8>> {
     #[inline(always)]
@@ -156,7 +155,6 @@ impl<T> Dynamic<Vec<T>> {
 }
 
 /// # Convenient From impls
-
 /// Wrap a value in a [`Dynamic`] secret by boxing it.
 impl<T> From<T> for Dynamic<T> {
     #[inline(always)]
