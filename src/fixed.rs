@@ -188,13 +188,13 @@ impl<T: Eq> Eq for Fixed<T> {}
 /// Error for slice length mismatches in TryFrom impls.
 #[derive(Debug)]
 pub struct FromSliceError {
-    pub actual_len: usize,
-    pub expected_len: usize,
+    pub(crate) actual_len: usize,
+    pub(crate) expected_len: usize,
 }
 
 impl FromSliceError {
     /// Create a new FromSliceError with the actual and expected lengths.
-    pub fn new(actual_len: usize, expected_len: usize) -> Self {
+    pub(crate) fn new(actual_len: usize, expected_len: usize) -> Self {
         Self {
             actual_len,
             expected_len,

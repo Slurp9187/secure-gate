@@ -133,8 +133,6 @@ fn from_slice_error_on_mismatch() {
     let err_short: Result<Fixed<[u8; 3]>, FromSliceError> = Fixed::try_from(short);
     match err_short {
         Err(e) => {
-            assert_eq!(e.actual_len, 2);
-            assert_eq!(e.expected_len, 3);
             assert_eq!(
                 e.to_string(),
                 "slice length mismatch: expected 3 bytes, got 2 bytes"
@@ -146,8 +144,6 @@ fn from_slice_error_on_mismatch() {
     let err_long: Result<Fixed<[u8; 3]>, FromSliceError> = Fixed::try_from(long);
     match err_long {
         Err(e) => {
-            assert_eq!(e.actual_len, 4);
-            assert_eq!(e.expected_len, 3);
             assert_eq!(
                 e.to_string(),
                 "slice length mismatch: expected 3 bytes, got 4 bytes"
