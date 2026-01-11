@@ -64,7 +64,7 @@ dynamic_alias!(pub Password, String); // Heap string secret
 
 // Create secrets
 let key: Aes256Key = [0u8; 32].into();  // From array/slice
-let mut pw: Password = "hunter2".into();    // From &str/String
+let mut pw: Password = "hunter2".into(); // From &str/String
 
 // Access (zero-cost)
 assert_eq!(pw.expose_secret(), "hunter2");
@@ -231,11 +231,9 @@ Direct generation is also available:
 {
     use secure_gate::encoding::bech32::Bech32String;
 
-    // Bech32 (e.g., Bitcoin segwit)
     let bech32 = Bech32String::new("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4".to_string()).unwrap();
     assert!(bech32.is_bech32());
 
-    // Bech32m (e.g., age keys)
     let bech32m = Bech32String::new("abc14w46h2at4w46h2at4w46h2at4w46h2at958ngu".to_string()).unwrap();
     assert!(bech32m.is_bech32m());
 }
@@ -262,18 +260,47 @@ Available on `Fixed<[u8; N]>` and `Dynamic<T>` where `T: AsRef<[u8]>`.
 
 ## Macros
 
+All macros require explicit visibility (e.g., `pub`, `pub(crate)`, or none for private).
+
+### Basic Aliases
+
 ```rust
 use secure_gate::{fixed_alias, dynamic_alias};
 
-fixed_alias!(pub Aes256Key, 32);
-dynamic_alias!(pub Password, String);
+fixed_alias!(pub Aes256Key, 32);          // Fixed<[u8; 32]>
+dynamic_alias!(pub Password, String);     // Dynamic<String>
+```
 
+### Generic Aliases
+
+For reusable or library-provided secret types:
+
+```rust
+use secure_gate::{fixed_generic_alias, dynamic_generic_alias};
+
+fixed_generic_alias!(pub GenericFixedBuffer<const N: usize>);
+dynamic_generic_alias!(pub GenericHeapSecret<T>);  // T can be any type
+```
+
+Custom doc strings (optional):
+
+```rust
+fixed_generic_alias!(pub SecureBuffer<const N: usize>, "Generic fixed-size secret buffer");
+dynamic_generic_alias!(pub SecureHeap<T>, T, "Generic heap-allocated secret");
+```
+
+### Random-Only Fixed Aliases (`rand` feature)
+
+```rust
 #[cfg(feature = "rand")]
 {
     use secure_gate::fixed_alias_random;
-    fixed_alias_random!(pub MasterKey, 32);
+
+    fixed_alias_random!(pub MasterKey, 32);      // FixedRandom<32>
 }
 ```
+
+These macros create type aliases to `Fixed<[u8; N]>`, `Dynamic<T>`, `FixedRandom<N>`, or their generic counterparts, inheriting all methods and security guarantees.
 
 ## Memory Guarantees (`zeroize` enabled)
 
