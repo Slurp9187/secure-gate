@@ -1,5 +1,3 @@
-// secure-gate/src/macros/dynamic_macros.rs
-
 /// Creates a type alias for a heap-allocated secure secret.
 ///
 /// # Examples

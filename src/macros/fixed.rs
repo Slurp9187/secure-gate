@@ -1,5 +1,3 @@
-// secure-gate/src/macros/fixed_macros.rs
-
 /// Creates a type alias for a fixed-size secure secret.
 ///
 /// This macro generates a type alias to `Fixed<[u8; N]>` with optional visibility.
