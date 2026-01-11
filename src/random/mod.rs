@@ -1,7 +1,7 @@
-// secure-gate/src/random/mod.rs
-//! Cryptographically secure random value generation with encoding conveniences (gated behind “rand” and encoding features).
+//! Cryptographically secure random value generation with encoding conveniences (gated behind `rand` and encoding features).
 //!
-//! Provides `FixedRandom` and `DynamicRandom` types for generating fresh random bytes.
+//!
+//! Provides [`FixedRandom`] and [`DynamicRandom`] types for generating fresh random bytes.
 //! Includes built-in methods for encoding to Hex, Base64, Bech32, and Bech32m strings
 //! without exposing secret bytes.
 //!
@@ -35,9 +35,14 @@
 //! # }
 //! ```
 
+/// Dynamic random bytes generation.
 pub mod dynamic_random;
+
+/// Fixed-size random bytes generation.
 pub mod fixed_random;
 
 // Re-export for API compatibility
+/// Re-export of [`DynamicRandom`].
 pub use dynamic_random::DynamicRandom;
+/// Re-export of [`FixedRandom`].
 pub use fixed_random::FixedRandom;

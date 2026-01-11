@@ -1,4 +1,3 @@
-// secure-gate/src/random/dynamic_random.rs
 use crate::Dynamic;
 use rand::rand_core::OsError;
 use rand::rngs::OsRng;
@@ -9,7 +8,7 @@ use rand::TryRngCore;
 /// This is a newtype over `Dynamic<Vec<u8>>` for semantic clarity.
 /// Like `FixedRandom`, guarantees freshness via RNG construction.
 ///
-/// Requires the "rand" feature.
+/// Requires the `rand` feature.
 ///
 /// Supports direct encoding to Hex, Base64, Bech32, and Bech32m via convenience methods.
 ///
@@ -93,6 +92,7 @@ impl DynamicRandom {
     }
 }
 
+/// Debug implementation (always redacted).
 impl core::fmt::Debug for DynamicRandom {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")

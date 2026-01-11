@@ -1,4 +1,3 @@
-// secure-gate/src/random/fixed_random.rs
 use crate::Fixed;
 use rand::rand_core::OsError;
 use rand::rngs::OsRng;
@@ -9,7 +8,7 @@ use rand::TryRngCore;
 /// This is a newtype over `Fixed<[u8; N]>` that enforces construction only via secure RNG.
 /// Guarantees freshness — cannot be created from arbitrary bytes.
 ///
-/// Requires the "rand" feature.
+/// Requires the `rand` feature.
 ///
 /// Supports direct encoding to Hex, Base64, Bech32, and Bech32m via convenience methods.
 ///
@@ -132,6 +131,7 @@ impl<const N: usize> FixedRandom<N> {
     }
 }
 
+/// Debug implementation (always redacted).
 impl<const N: usize> core::fmt::Debug for FixedRandom<N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")

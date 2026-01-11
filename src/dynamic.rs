@@ -198,8 +198,8 @@ where
     /// # #[cfg(feature = "ct-eq")]
     /// # {
     /// use secure_gate::Dynamic;
-    /// let a = Dynamic::new("secret".to_string());
-    /// let b = Dynamic::new("secret".to_string());
+    /// let a: Dynamic<String> = Dynamic::new("secret".to_string());
+    /// let b: Dynamic<String> = Dynamic::new("secret".to_string());
     /// assert!(a.ct_eq(&b));
     /// # }
     /// ```
