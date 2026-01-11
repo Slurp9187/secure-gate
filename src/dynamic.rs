@@ -1,7 +1,3 @@
-// ==========================================================================
-// src/dynamic.rs
-// ==========================================================================
-
 extern crate alloc;
 
 use alloc::boxed::Box;
@@ -84,13 +80,14 @@ impl<T: ?Sized> Dynamic<T> {
     }
 }
 
+/// Debug implementation (always redacted).
 impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
     }
 }
 
-// Regular equality — fallback when ct-eq feature is disabled
+/// Regular equality — fallback when `ct-eq` feature is disabled.
 #[cfg(not(feature = "ct-eq"))]
 impl<T: ?Sized + PartialEq> PartialEq for Dynamic<T> {
     fn eq(&self, other: &Self) -> bool {
@@ -98,10 +95,11 @@ impl<T: ?Sized + PartialEq> PartialEq for Dynamic<T> {
     }
 }
 
+/// Equality — available when `ct-eq` is not enabled.
 #[cfg(not(feature = "ct-eq"))]
 impl<T: ?Sized + Eq> Eq for Dynamic<T> {}
 
-// Clone impl — opt-in only when T is CloneableSecretMarker
+/// Opt-in Clone — only for types marked `CloneableSecretMarker`.
 #[cfg(feature = "zeroize")]
 impl<T: crate::CloneableSecretMarker> Clone for Dynamic<T> {
     #[inline(always)]
@@ -110,8 +108,9 @@ impl<T: crate::CloneableSecretMarker> Clone for Dynamic<T> {
     }
 }
 
-// === Additional conversions ===
+/// # Additional conversions
 
+/// Wrap a byte slice into a [`Dynamic`] [`Vec<u8>`].
 impl From<&[u8]> for Dynamic<Vec<u8>> {
     #[inline(always)]
     fn from(slice: &[u8]) -> Self {
@@ -119,7 +118,7 @@ impl From<&[u8]> for Dynamic<Vec<u8>> {
     }
 }
 
-// === Ergonomic helpers for common heap types ===
+/// # Ergonomic helpers for common heap types
 impl Dynamic<String> {
     /// Returns the length of the string in bytes.
     ///
@@ -156,7 +155,9 @@ impl<T> Dynamic<Vec<T>> {
     }
 }
 
-// === Convenient From impls ===
+/// # Convenient From impls
+
+/// Wrap a value in a [`Dynamic`] secret by boxing it.
 impl<T> From<T> for Dynamic<T> {
     #[inline(always)]
     fn from(value: T) -> Self {
@@ -164,6 +165,7 @@ impl<T> From<T> for Dynamic<T> {
     }
 }
 
+/// Wrap a boxed value in a [`Dynamic`] secret.
 impl<T: ?Sized> From<Box<T>> for Dynamic<T> {
     #[inline(always)]
     fn from(boxed: Box<T>) -> Self {
@@ -171,6 +173,7 @@ impl<T: ?Sized> From<Box<T>> for Dynamic<T> {
     }
 }
 
+/// Wrap a string slice in a [`Dynamic`] [`String`].
 impl From<&str> for Dynamic<String> {
     #[inline(always)]
     fn from(s: &str) -> Self {
@@ -178,12 +181,28 @@ impl From<&str> for Dynamic<String> {
     }
 }
 
-// Constant-time equality — only available with `ct-eq` feature
+/// Constant-time equality for byte-convertible types — available with `ct-eq` feature.
 #[cfg(feature = "ct-eq")]
 impl<T> Dynamic<T>
 where
     T: ?Sized + AsRef<[u8]>,
 {
+    /// Constant-time equality comparison.
+    ///
+    /// This is the **only safe way** to compare two dynamic secrets.
+    /// Available only when the `ct-eq` feature is enabled.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "ct-eq")]
+    /// # {
+    /// use secure_gate::Dynamic;
+    /// let a = Dynamic::new("secret".to_string());
+    /// let b = Dynamic::new("secret".to_string());
+    /// assert!(a.ct_eq(&b));
+    /// # }
+    /// ```
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
         use crate::ct_eq::ConstantTimeEq;
@@ -193,7 +212,7 @@ where
     }
 }
 
-// Random generation — only available with `rand` feature
+/// Random generation — only available with `rand` feature.
 #[cfg(feature = "rand")]
 impl Dynamic<Vec<u8>> {
     /// Generate fresh random bytes of the specified length using the OS RNG.
@@ -238,7 +257,7 @@ impl Dynamic<Vec<u8>> {
     }
 }
 
-// Zeroize integration
+/// Zeroize integration.
 #[cfg(feature = "zeroize")]
 impl<T: ?Sized + zeroize::Zeroize> zeroize::Zeroize for Dynamic<T> {
     fn zeroize(&mut self) {
@@ -246,5 +265,6 @@ impl<T: ?Sized + zeroize::Zeroize> zeroize::Zeroize for Dynamic<T> {
     }
 }
 
+/// Zeroize on drop integration.
 #[cfg(feature = "zeroize")]
 impl<T: ?Sized + zeroize::Zeroize> zeroize::ZeroizeOnDrop for Dynamic<T> {}
