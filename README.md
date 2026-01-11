@@ -13,7 +13,8 @@
 - `Base64String` — Validated URL-safe base64 string wrapper (no padding)
 - `Bech32String` — Validated Bech32/Bech32m string wrapper
 
-Memory containing secrets is zeroed on drop, including spare capacity where applicable (enabled by default).  
+Memory containing secrets is zeroed on drop, including spare capacity where applicable (enabled by default).
+
 Access requires an explicit `.expose_secret()` (or `.expose_secret_mut()`) call — no `Deref` or implicit paths.
 
 ## Installation
@@ -23,7 +24,7 @@ Access requires an explicit `.expose_secret()` (or `.expose_secret_mut()`) call 
 secure-gate = "0.7.0"
 ```
 
-Basic configuration includes `zeroize` (default) for secure memory handling.  
+Basic configuration includes `zeroize` (default) for secure memory handling.
 Recommended:
 
 ```toml
@@ -47,7 +48,7 @@ secure-gate = { version = "0.7.0", features = ["full"] }
 
 ## Security Model & Design Philosophy
 
-`secure-gate` prioritizes **auditability** and **explicitness** over implicit convenience.  
+`secure-gate` prioritizes **auditability** and **explicitness** over implicit convenience.
 All secret access requires an explicit `.expose_secret()` (or `.expose_secret_mut()`) call — making exposures grep-able and preventing hidden leaks.
 
 These calls are zero-cost `#[inline(always)]` reborrows (fully elided by the optimizer). The explicitness is deliberate "theater" for humans and auditors, with **no runtime overhead**.
@@ -81,10 +82,10 @@ pw.expose_secret_mut().push('!');
 
 ## Opt-In Safe Cloning
 
-Cloning secret data is **opt-in** and **only available** when the `zeroize` feature is enabled.  
+Cloning secret data is **opt-in** and **only available** when the `zeroize` feature is enabled.
 This ensures cloning is deliberate, auditable, and always paired with secure zeroization.
 
-**Key mechanism**: The `CloneSafe` marker trait.  
+**Key mechanism**: The `CloneSafe` marker trait.
 To enable safe cloning:
 1. Implement or derive `Clone`
 2. Implement or derive `Zeroize`
@@ -190,7 +191,7 @@ use secure_gate::CloneSafe;
 }
 ```
 
-`FixedRandom<N>` can only be constructed via cryptographically secure RNG.  
+`FixedRandom<N>` can only be constructed via cryptographically secure RNG.
 Direct generation is also available:
 
 ```rust
