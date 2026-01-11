@@ -4,7 +4,7 @@
 
 - `Fixed<T>` — Stack-allocated wrapper
 - `Dynamic<T>` — Heap-allocated wrapper
-- `FixedRandom<N>` — Cryptographically secure fixed-length random bytes
+- `FixedRandom<N>` — Stack-allocated cryptographically secure random bytes
 - `DynamicRandom` — Heap-allocated cryptographically secure random bytes
 - `CloneableArray<const N: usize>` — Cloneable fixed-size stack secret (`[u8; N]`)
 - `CloneableString` — Cloneable heap-allocated text secret (`String`)
