@@ -1,7 +1,3 @@
-// ==========================================================================
-// src/fixed.rs
-// ==========================================================================
-
 use core::convert::TryFrom;
 use core::fmt;
 
@@ -98,8 +94,7 @@ impl<T> Fixed<T> {
     }
 }
 
-// === Byte-array specific helpers ===
-
+/// # Byte-array specific helpers
 impl<const N: usize> Fixed<[u8; N]> {
     /// Returns the fixed length in bytes.
     ///
@@ -136,6 +131,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     }
 }
 
+/// Implements `TryFrom<&[u8]>` for creating a [`Fixed`] from a byte slice of exact length.
 impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
     type Error = FromSliceError;
 
@@ -167,14 +163,14 @@ impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
     }
 }
 
-// Debug is always redacted
+/// Debug implementation (always redacted).
 impl<T> fmt::Debug for Fixed<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("[REDACTED]")
     }
 }
 
-// Regular equality — fallback when ct-eq feature is disabled
+/// Regular equality — fallback when `ct-eq` feature is disabled.
 #[cfg(not(feature = "ct-eq"))]
 impl<T: PartialEq> PartialEq for Fixed<T> {
     fn eq(&self, other: &Self) -> bool {
@@ -182,6 +178,7 @@ impl<T: PartialEq> PartialEq for Fixed<T> {
     }
 }
 
+/// Equality — available when `ct-eq` is not enabled.
 #[cfg(not(feature = "ct-eq"))]
 impl<T: Eq> Eq for Fixed<T> {}
 
@@ -202,6 +199,7 @@ impl FromSliceError {
     }
 }
 
+/// Displays the error message.
 impl core::fmt::Display for FromSliceError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
@@ -214,7 +212,7 @@ impl core::fmt::Display for FromSliceError {
 
 impl core::error::Error for FromSliceError {}
 
-// Opt-in Clone — only for types marked CloneableSecretMarker (default no-clone)
+/// Opt-in Clone — only for types marked `CloneableSecretMarker` (default no-clone).
 #[cfg(feature = "zeroize")]
 impl<T: crate::CloneableSecretMarker> Clone for Fixed<T> {
     #[inline(always)]
@@ -223,7 +221,7 @@ impl<T: crate::CloneableSecretMarker> Clone for Fixed<T> {
     }
 }
 
-// Constant-time equality — only available with `ct-eq` feature
+/// Constant-time equality — only available with `ct-eq` feature.
 #[cfg(feature = "ct-eq")]
 impl<const N: usize> Fixed<[u8; N]> {
     /// Constant-time equality comparison.
@@ -249,7 +247,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     }
 }
 
-// Random generation — only available with `rand` feature
+/// Random generation — only available with `rand` feature.
 #[cfg(feature = "rand")]
 impl<const N: usize> Fixed<[u8; N]> {
     /// Generate fresh random bytes using the OS RNG.
@@ -293,7 +291,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     }
 }
 
-// Zeroize integration
+/// Zeroize integration.
 #[cfg(feature = "zeroize")]
 impl<T: zeroize::Zeroize> zeroize::Zeroize for Fixed<T> {
     fn zeroize(&mut self) {
@@ -301,5 +299,6 @@ impl<T: zeroize::Zeroize> zeroize::Zeroize for Fixed<T> {
     }
 }
 
+/// Zeroize on drop integration.
 #[cfg(feature = "zeroize")]
 impl<T: zeroize::Zeroize> zeroize::ZeroizeOnDrop for Fixed<T> {}
