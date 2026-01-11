@@ -309,6 +309,7 @@ These macros create type aliases to `Fixed<[u8; N]>`, `Dynamic<T>`, `FixedRandom
 | `Fixed<T>`        | Stack      | Yes       | Yes       | Yes (no heap)    |                           |
 | `Dynamic<T>`      | Heap       | Yes       | Yes       | No (until drop)  | Use `shrink_to_fit()`     |
 | `FixedRandom<N>`  | Stack      | Yes       | Yes       | Yes              |                           |
+| `DynamicRandom`   | Heap       | Yes       | Yes       | No (until drop)  |                           |
 | `HexString`       | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated hex             |
 | `Base64String`    | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated base64          |
 | `Bech32String`    | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated Bech32/Bech32m  |
