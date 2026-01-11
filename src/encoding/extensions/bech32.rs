@@ -1,5 +1,6 @@
 #[cfg(feature = "encoding-bech32")]
-use ::bech32::{self, Bech32, Bech32m, Hrp};
+#[allow(unused_imports)] // Clippy bug: doesn't recognize use in generics
+use ::bech32::{decode, encode, Hrp};
 
 // ========================================
 // Consuming (into_) methods on RNG types
@@ -16,7 +17,7 @@ impl crate::DynamicRandom {
     /// Panics if the HRP is invalid or encoding fails (should never happen for valid random bytes).
     pub fn into_bech32(self, hrp: &str) -> crate::encoding::bech32::Bech32String {
         let hrp = Hrp::parse(hrp).expect("invalid HRP");
-        let encoded = bech32::encode::<Bech32>(hrp, self.expose_secret())
+        let encoded = encode::<::bech32::Bech32>(hrp, self.expose_secret())
             .expect("encoding valid random bytes cannot fail");
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
@@ -33,7 +34,7 @@ impl crate::DynamicRandom {
     /// Panics if the HRP is invalid or encoding fails (should never happen for valid random bytes).
     pub fn into_bech32m(self, hrp: &str) -> crate::encoding::bech32::Bech32String {
         let hrp = Hrp::parse(hrp).expect("invalid HRP");
-        let encoded = bech32::encode::<Bech32m>(hrp, self.expose_secret())
+        let encoded = encode::<::bech32::Bech32m>(hrp, self.expose_secret())
             .expect("encoding valid random bytes cannot fail");
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
@@ -53,7 +54,7 @@ impl<const N: usize> crate::FixedRandom<N> {
     /// Panics if the HRP is invalid or encoding fails (should never happen for valid random bytes).
     pub fn into_bech32(self, hrp: &str) -> crate::encoding::bech32::Bech32String {
         let hrp = Hrp::parse(hrp).expect("invalid HRP");
-        let encoded = bech32::encode::<Bech32>(hrp, self.expose_secret())
+        let encoded = encode::<::bech32::Bech32>(hrp, self.expose_secret())
             .expect("encoding valid random bytes cannot fail");
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
@@ -70,7 +71,7 @@ impl<const N: usize> crate::FixedRandom<N> {
     /// Panics if the HRP is invalid or encoding fails (should never happen for valid random bytes).
     pub fn into_bech32m(self, hrp: &str) -> crate::encoding::bech32::Bech32String {
         let hrp = Hrp::parse(hrp).expect("invalid HRP");
-        let encoded = bech32::encode::<Bech32m>(hrp, self.expose_secret())
+        let encoded = encode::<::bech32::Bech32m>(hrp, self.expose_secret())
             .expect("encoding valid random bytes cannot fail");
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
@@ -94,7 +95,7 @@ impl<const N: usize> crate::FixedRandom<N> {
     /// Panics if the HRP is invalid (should be validated externally if needed).
     pub fn to_bech32(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
         let hrp = Hrp::parse(hrp).expect("invalid HRP");
-        let encoded = bech32::encode::<Bech32>(hrp, self.expose_secret())
+        let encoded = encode::<::bech32::Bech32>(hrp, self.expose_secret())
             .expect("encoding valid bytes cannot fail");
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
@@ -111,7 +112,7 @@ impl<const N: usize> crate::FixedRandom<N> {
     /// Panics if the HRP is invalid (should be validated externally if needed).
     pub fn to_bech32m(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
         let hrp = Hrp::parse(hrp).expect("invalid HRP");
-        let encoded = bech32::encode::<Bech32m>(hrp, self.expose_secret())
+        let encoded = encode::<::bech32::Bech32m>(hrp, self.expose_secret())
             .expect("encoding valid bytes cannot fail");
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
@@ -131,7 +132,7 @@ impl crate::DynamicRandom {
     /// Panics if the HRP is invalid (should be validated externally if needed).
     pub fn to_bech32(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
         let hrp = Hrp::parse(hrp).expect("invalid HRP");
-        let encoded = bech32::encode::<Bech32>(hrp, self.expose_secret())
+        let encoded = encode::<::bech32::Bech32>(hrp, self.expose_secret())
             .expect("encoding valid bytes cannot fail");
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
@@ -148,7 +149,7 @@ impl crate::DynamicRandom {
     /// Panics if the HRP is invalid (should be validated externally if needed).
     pub fn to_bech32m(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
         let hrp = Hrp::parse(hrp).expect("invalid HRP");
-        let encoded = bech32::encode::<Bech32m>(hrp, self.expose_secret())
+        let encoded = encode::<::bech32::Bech32m>(hrp, self.expose_secret())
             .expect("encoding valid bytes cannot fail");
         crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
@@ -169,7 +170,7 @@ pub struct Bech32StringView<'a>(pub(crate) &'a String);
 impl<'a> Bech32StringView<'a> {
     /// Decode the validated Bech32/Bech32m string into raw bytes (allocates).
     pub fn to_bytes(&self) -> Vec<u8> {
-        let (_, data) = bech32::decode(self.0.as_str()).expect("Bech32String is always valid");
+        let (_, data) = decode(self.0.as_str()).expect("Bech32String is always valid");
         data
     }
 }
@@ -223,7 +224,7 @@ impl crate::encoding::bech32::Bech32String {
     /// Decode the validated Bech32/Bech32m string into raw bytes, consuming and zeroizing the wrapper.
     pub fn into_bytes(self) -> Vec<u8> {
         let (_, data) =
-            bech32::decode(self.expose_secret().0.as_str()).expect("Bech32String is always valid");
+            decode(self.expose_secret().0.as_str()).expect("Bech32String is always valid");
         data
     }
 }

@@ -6,7 +6,11 @@
 #![cfg(test)]
 
 use base64::Engine;
-use secure_gate::{fixed_alias_random, Base64String, SecureEncodingExt};
+#[cfg(feature = "rand")]
+use secure_gate::fixed_alias_random;
+use secure_gate::Base64String;
+#[cfg(feature = "rand")]
+use secure_gate::SecureEncodingExt;
 
 #[cfg(feature = "encoding-base64")]
 #[cfg(feature = "rand")]

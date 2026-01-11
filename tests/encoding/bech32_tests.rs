@@ -4,8 +4,8 @@
 
 #![cfg(test)]
 
+#[cfg(feature = "encoding-bech32")]
 use secure_gate::encoding::bech32::Bech32String;
-use secure_gate::SecureEncodingExt;
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
@@ -111,6 +111,7 @@ fn metadata_methods() {
 #[test]
 fn rng_into_bech32_variant_detection_and_round_trip() {
     use secure_gate::random::FixedRandom;
+    use secure_gate::SecureEncodingExt;
 
     let rng = FixedRandom::<16>::generate();
     let raw_bytes = rng.expose_secret().to_vec();

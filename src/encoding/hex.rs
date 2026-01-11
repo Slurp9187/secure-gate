@@ -93,6 +93,7 @@ impl HexString {
         }
     }
 
+    #[cfg(all(feature = "rand", feature = "encoding-hex"))]
     /// Internal constructor for trusted hex strings (e.g., from RNG).
     ///
     /// Skips validation – caller must ensure the string is valid lowercase hex.

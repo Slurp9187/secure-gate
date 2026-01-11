@@ -7,6 +7,7 @@
 use secure_gate::encoding::base64::Base64String;
 #[cfg(feature = "encoding-hex")]
 use secure_gate::encoding::hex::HexString;
+#[allow(unused_imports)]
 use secure_gate::random::DynamicRandom;
 #[cfg(any(
     feature = "encoding-hex",
