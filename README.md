@@ -14,7 +14,7 @@
 - `Bech32String` — Validated Bech32/Bech32m string wrapper
 
 Memory containing secrets is zeroed on drop, including spare capacity where applicable (enabled by default).  
-Access requires an explicit `.expose_secret()` call — no `Deref` or implicit paths.
+Access requires an explicit `.expose_secret()` (or `.expose_secret_mut()`) call — no `Deref` or implicit paths.
 
 ## Installation
 
