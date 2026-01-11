@@ -2,19 +2,19 @@
 
 `no_std`-compatible wrappers for sensitive data with explicit exposure requirements.
 
-- `Fixed<T>` - Stack-allocated wrapper
-- `Dynamic<T>` - Heap-allocated wrapper
-- `FixedRandom<N>` - Cryptographically secure random bytes of fixed length N
-- `DynamicRandom` - Heap-allocated cryptographically secure random bytes
-- `CloneableArray<const N: usize>` - Cloneable fixed-size stack secret (`[u8; N]`)
-- `CloneableString` - Cloneable heap-allocated text secret (`String`)
-- `CloneableVec` - Cloneable heap-allocated binary secret (`Vec<u8>`)
-- `HexString` - Validated lowercase hexadecimal string wrapper
-- `Base64String` - Validated URL-safe base64 string wrapper (no padding)
-- `Bech32String` - Validated Bech32/Bech32m string wrapper
-  Memory containing secrets is zeroed on drop, including spare capacity where applicable. (enabled by default)
-  Access to secret data requires an explicit `.expose_secret()` call. There are no `Deref` implementations or other implicit access paths.
-  Cloning is opt-in (enabled by default).
+- `Fixed<T>` — Stack-allocated wrapper
+- `Dynamic<T>` — Heap-allocated wrapper
+- `FixedRandom<N>` — Cryptographically secure fixed-length random bytes
+- `DynamicRandom` — Heap-allocated cryptographically secure random bytes
+- `CloneableArray<const N: usize>` — Cloneable fixed-size stack secret (`[u8; N]`)
+- `CloneableString` — Cloneable heap-allocated text secret (`String`)
+- `CloneableVec` — Cloneable heap-allocated binary secret (`Vec<u8>`)
+- `HexString` — Validated lowercase hexadecimal string wrapper
+- `Base64String` — Validated URL-safe base64 string wrapper (no padding)
+- `Bech32String` — Validated Bech32/Bech32m string wrapper
+
+Memory containing secrets is zeroed on drop, including spare capacity where applicable (enabled by default).  
+Access requires an explicit `.expose_secret()` call — no `Deref` or implicit paths.
 
 ## Installation
 
@@ -23,9 +23,8 @@
 secure-gate = "0.7.0"
 ```
 
-The basic configuration includes the `zeroize` feature by default for secure memory handling.
-
-Recommended configuration:
+Basic configuration includes `zeroize` (default) for secure memory handling.  
+Recommended:
 
 ```toml
 secure-gate = { version = "0.7.0", features = ["full"] }
@@ -33,162 +32,155 @@ secure-gate = { version = "0.7.0", features = ["full"] }
 
 ## Features
 
-| Feature           | Description                                                                               |
-| ----------------- | ----------------------------------------------------------------------------------------- |
-| `zeroize` (default) | Memory zeroing on drop and opt-in cloning via pre-baked cloneable types                   |
-| `rand`            | Random generation (`FixedRandom<N>::generate()`, `DynamicRandom::generate()`)                   |
-| `ct-eq`           | Constant-time equality comparison                                                         |
-| `encoding`        | All encoding support (`encoding-hex`, `encoding-base64`, `encoding-bech32`)               |
-| `encoding-hex`    | Hex encoding, `HexString`, `FixedRandom` hex methods                                         |
-| `encoding-base64` | `Base64String`                                                                            |
-| `encoding-bech32` | `Bech32String` (Bech32 and Bech32m variants; supports mixed-case input, stores lowercase) |
-| `full`            | All optional features                                                                     |
+| Feature            | Description                                                                 |
+|--------------------|-----------------------------------------------------------------------------|
+| `zeroize` (default)| Memory zeroing on drop + opt-in safe cloning                                |
+| `rand`             | Random generation (`FixedRandom<N>::generate()`, `DynamicRandom::generate()`)|
+| `ct-eq`            | Constant-time equality comparison                                          |
+| `encoding`         | All encoding support (`encoding-hex`, `encoding-base64`, `encoding-bech32`)|
+| `encoding-hex`     | Hex encoding + `HexString` + random hex methods                            |
+| `encoding-base64`  | `Base64String`                                                             |
+| `encoding-bech32`  | `Bech32String` (Bech32/Bech32m, mixed-case input, lowercase storage)       |
+| `full`             | All optional features                                                      |
 
-The crate is `no_std`-compatible with `alloc`. Features are optional and add no overhead when unused.
+`no_std` + `alloc` compatible. Features add no overhead when unused.
 
 ## Security Model & Design Philosophy
 
-`secure-gate` prioritizes **auditability** and explicitness over implicit convenience.
-Every access to secret material - even inside the crate itself - goes through a method named `.expose_secret()` (or `.expose_secret_mut()`). This is deliberate:
+`secure-gate` prioritizes **auditability** and **explicitness** over implicit convenience.  
+All secret access requires an explicit `.expose_secret()` (or `.expose_secret_mut()`) call — making exposures grep-able and preventing hidden leaks.
 
-- Makes every exposure site grep-able and obvious in code reviews
-- Prevents accidental silent leaks or hidden bypasses
-- Ensures consistent reasoning about secret lifetimes and memory handling
-  These calls are `#[inline(always)] const fn` reborrows - the optimizer elides them completely. There is **zero runtime cost**.
-  It's intentional "theatre" for humans and auditors, but free for the machine. Clarity of purpose wins over micro-optimizations.
+These calls are zero-cost `#[inline(always)]` reborrows (fully elided by the optimizer). The explicitness is deliberate "theater" for humans and auditors, with **no runtime overhead**.
 
 ## Quick Start
 
 ```rust
 use secure_gate::{fixed_alias, dynamic_alias};
-fixed_alias!(pub Aes256Key, 32);
-dynamic_alias!(pub Password, String);
-let pw: Password = "hunter2".into();
+
+// Recommended: semantic aliases for clarity
+fixed_alias!(pub Aes256Key, 32);      // Fixed-size byte secret
+dynamic_alias!(pub Password, String); // Heap string secret
+
+// Create secrets
+let key: Aes256Key = [0u8; 32].into();  // From array/slice
+let mut pw: Password = "hunter2".into();    // From &str/String
+
+// Access (zero-cost)
 assert_eq!(pw.expose_secret(), "hunter2");
+let key_bytes = key.expose_secret();    // &[u8; 32]
+
+// Mutable access
+pw.expose_secret_mut().push('!');
+
+// See dedicated sections below for:
+// - Opt-In Safe Cloning (`zeroize` feature)
+// - Random Generation (`rand` feature)
+// - Encoding (`encoding-*` features)
+// - Constant-Time Equality (`ct-eq` feature)
+```
+
+## Opt-In Safe Cloning
+
+Cloning secret data is **opt-in** and **only available** when the `zeroize` feature is enabled.  
+This ensures cloning is deliberate, auditable, and always paired with secure zeroization.
+
+**Key mechanism**: The `CloneSafe` marker trait.  
+To enable safe cloning:
+1. Implement or derive `Clone`
+2. Implement or derive `Zeroize`
+3. Implement `CloneSafe` (blanket implementations exist for primitives and fixed arrays)
+
+This prevents accidental deep copies that could bypass zeroization.
+
+### Pre-Built Cloneable Types
+
+| Type                             | Allocation | Inner Data      | Typical Use Case                     |
+|----------------------------------|------------|-----------------|--------------------------------------|
+| `CloneableArray<const N: usize>` | Stack      | `[u8; N]`       | Fixed-size keys, nonces              |
+| `CloneableString`                | Heap       | `String`        | Passwords, tokens, API keys          |
+| `CloneableVec`                   | Heap       | `Vec<u8>`       | Variable-length binary secrets       |
+
+```rust
+#[cfg(feature = "zeroize")]
+use secure_gate::{CloneableArray, CloneableString, CloneableVec};
+
 #[cfg(feature = "zeroize")]
 {
-    use secure_gate::{CloneableArray, CloneableString, CloneableVec};
     let key: CloneableArray<32> = [0u8; 32].into();
     let pw: CloneableString = "hunter2".into();
     let seed: CloneableVec = vec![0u8; 64].into();
-    let key2 = key.clone();
+
+    let key2 = key.clone();   // Safe deep clone
     let pw2 = pw.clone();
-    let seed2 = seed.clone();
-}
-#[cfg(feature = "rand")]
-{
-    use secure_gate::fixed_alias_random;
-    fixed_alias_random!(pub MasterKey, 32);
-    #[cfg(feature = "encoding-hex")]
-    {
-        let key = MasterKey::generate();
-        let hex = key.into_hex();
-        println!("key hex: {}", hex.expose_secret());
-    }
-    #[cfg(feature = "encoding-base64")]
-    {
-        let key = MasterKey::generate();
-        let base64 = key.into_base64();
-        println!("key base64: {}", base64.expose_secret());
-    }
-    #[cfg(feature = "encoding-bech32")]
-    {
-        let key1 = MasterKey::generate();
-        let bech32 = key1.into_bech32("example");
-        println!("key bech32: {}", bech32.expose_secret());
-        let key2 = MasterKey::generate();
-        let bech32m = key2.into_bech32m("example");
-        println!("key bech32m: {}", bech32m.expose_secret());
-    }
 }
 ```
 
-## Opt-In Cloning
-
-Cloning is available **only** when the `zeroize` feature is enabled.
-The crate provides three ready-to-use cloneable primitives (zero boilerplate):
-| Type | Allocation | Inner Data | Typical Use Case |
-|----------------------------------|------------|------------|-----------------------------------|
-| `CloneableArray<const N: usize>` | Stack | `[u8; N]` | Fixed-size keys/nonces |
-| `CloneableString` | Heap | `String` | Passwords, tokens, API keys |
-| `CloneableVec` | Heap | `Vec<u8>` | Seeds, variable-length binary |
+### Recommended: Semantic Aliases
 
 ```rust
 #[cfg(feature = "zeroize")]
-{
-    use secure_gate::{CloneableArray, CloneableString, CloneableVec};
-    let key: CloneableArray<32> = [0u8; 32].into();
-    let mut pw: CloneableString = "hunter2".into();
-    let seed: CloneableVec = vec![0u8; 64].into();
-    let key2 = key.clone(); // Safe deep clone
-    let pw2 = pw.clone();
-    let seed2 = seed.clone();
-    // Convenience access to inner values
-    pw.expose_inner_mut().push('!');
-    assert_eq!(pw.expose_inner(), "hunter2!");
-}
-```
+use secure_gate::{CloneableArray, CloneableString};
 
-### Semantic Aliases (Recommended)
-
-For better readability, create type aliases:
-
-```rust
 #[cfg(feature = "zeroize")]
 {
-    use secure_gate::{CloneableArray, CloneableString, CloneableVec};
     pub type CloneablePassword = CloneableString;
-    pub type CloneableAes256Key = CloneableArray<32>;
-    pub type CloneableSeed = CloneableVec;
+    pub type CloneableMasterKey = CloneableArray<32>;
 }
 ```
-
-These are zero-cost and make intent crystal clear.
 
 ### Minimizing Stack Exposure
 
-When reading secrets from user input (e.g., passwords), use `init_with`/`try_init_with` to reduce temporary stack exposure:
+Use `init_with` / `try_init_with` when reading from untrusted sources:
 
 ```rust
 #[cfg(feature = "zeroize")]
+use secure_gate::CloneableString;
+
+#[cfg(feature = "zeroize")]
 {
-    use secure_gate::{CloneableString, CloneableVec, CloneableArray};
-    let pw = CloneableString::init_with(|| {
-        // Read from terminal, network, etc.
-        "hunter2".to_string()
-    });
-    let seed = CloneableVec::init_with(|| {
-        // Read binary data...
-        vec![0u8; 64]
-    });
-    let key = CloneableArray::<32>::init_with(|| {
-        // Read fixed-size data...
-        [0u8; 32]
-    });
-    // Or fallible:
-    let pw = CloneableString::try_init_with(|| {
-        Ok::<String, &str>("hunter2".to_string())
-    }).unwrap();
+    let pw = CloneableString::init_with(|| "hunter2".to_string()); // Temporary zeroized immediately
 }
 ```
 
-The temporary is cloned to the heap and zeroized immediately.
+### Custom Cloneable Types
 
-## Randomness
+```rust
+#[cfg(feature = "zeroize")]
+use secure_gate::CloneSafe;
+
+#[cfg(feature = "zeroize")]
+{
+    use zeroize::Zeroize;
+
+    #[derive(Clone, Zeroize)]
+    struct MyKey([u8; 32]);
+
+    impl CloneSafe for MyKey {}  // Enables safe cloning
+
+    let key = MyKey([42u8; 32]);
+    let key_copy = key.clone();
+}
+```
+
+## Random Generation
 
 ```rust
 #[cfg(feature = "rand")]
 {
     use secure_gate::fixed_alias_random;
+
     fixed_alias_random!(pub JwtSigningKey, 32);
     fixed_alias_random!(pub BackupCode, 16);
+
     let key = JwtSigningKey::generate();
+
     #[cfg(feature = "encoding-hex")]
     {
         let code = BackupCode::generate();
         let hex_code = code.into_hex();
         println!("Backup code: {}", hex_code.expose_secret());
     }
+
     #[cfg(feature = "encoding-base64")]
     {
         let code = BackupCode::generate();
@@ -198,13 +190,14 @@ The temporary is cloned to the heap and zeroized immediately.
 }
 ```
 
-`FixedRandom<N>` can only be constructed via cryptographically secure RNG.
+`FixedRandom<N>` can only be constructed via cryptographically secure RNG.  
 Direct generation is also available:
 
 ```rust
 #[cfg(feature = "rand")]
 {
     use secure_gate::{Fixed, Dynamic};
+
     let key: Fixed<[u8; 32]> = Fixed::generate_random();
     let random: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
 }
@@ -216,18 +209,23 @@ Direct generation is also available:
 #[cfg(feature = "encoding-hex")]
 {
     use secure_gate::{encoding::hex::HexString, SecureEncodingExt};
+
     let bytes = [0u8; 16];
     let hex: String = bytes.to_hex();
     let hex_upper: String = bytes.to_hex_upper();
+
     let validated = HexString::new("deadbeef".to_string()).unwrap();
     let decoded = validated.into_bytes();
 }
+
 #[cfg(feature = "encoding-base64")]
 {
     use secure_gate::encoding::base64::Base64String;
+
     let validated = Base64String::new("SGVsbG8".to_string()).unwrap();
     let decoded = validated.into_bytes();
 }
+
 #[cfg(feature = "encoding-bech32")]
 {
     use secure_gate::encoding::bech32::Bech32String;
@@ -242,7 +240,7 @@ Direct generation is also available:
 }
 ```
 
-Encoding functions require explicit `.expose_secret()`. Invalid inputs to the `.new()` constructors are zeroed when the `zeroize` feature is enabled.
+Encoding requires explicit `.expose_secret()`. Invalid inputs to `.new()` are zeroed when `zeroize` is enabled.
 
 ## Constant-Time Equality
 
@@ -250,8 +248,10 @@ Encoding functions require explicit `.expose_secret()`. Invalid inputs to the `.
 #[cfg(feature = "ct-eq")]
 {
     use secure_gate::Fixed;
+
     let a: Fixed<[u8; 32]> = Fixed::from_slice(&[0u8; 32]);
     let b: Fixed<[u8; 32]> = Fixed::from_slice(&[1u8; 32]);
+
     assert!(a.ct_eq(&a));
     assert!(!a.ct_eq(&b));
 }
@@ -263,8 +263,10 @@ Available on `Fixed<[u8; N]>` and `Dynamic<T>` where `T: AsRef<[u8]>`.
 
 ```rust
 use secure_gate::{fixed_alias, dynamic_alias};
+
 fixed_alias!(pub Aes256Key, 32);
 dynamic_alias!(pub Password, String);
+
 #[cfg(feature = "rand")]
 {
     use secure_gate::fixed_alias_random;
@@ -274,18 +276,18 @@ dynamic_alias!(pub Password, String);
 
 ## Memory Guarantees (`zeroize` enabled)
 
-| Type           | Allocation | Auto-zero           | Full wipe | Slack eliminated | Notes                    |
-| -------------- | ---------- | ------------------- | --------- | ---------------- | ------------------------ |
-| `Fixed<T>`     | Stack      | Yes                 | Yes       | Yes (no heap)    |                          |
-| `Dynamic<T>`   | Heap       | Yes                 | Yes       | No (until drop)  | Use `shrink_to_fit()`    |
-| `FixedRandom<N>`  | Stack      | Yes                 | Yes       | Yes              |                          |
-| `HexString`    | Heap       | Yes (invalid input) | Yes       | No (until drop)  | Validated hex            |
-| `Base64String` | Heap       | Yes (invalid input) | Yes       | No (until drop)  | Validated base64         |
-| `Bech32String` | Heap       | Yes (invalid input) | Yes       | No (until drop)  | Validated Bech32/Bech32m |
+| Type              | Allocation | Auto-zero | Full wipe | Slack eliminated | Notes                     |
+|-------------------|------------|-----------|-----------|------------------|---------------------------|
+| `Fixed<T>`        | Stack      | Yes       | Yes       | Yes (no heap)    |                           |
+| `Dynamic<T>`      | Heap       | Yes       | Yes       | No (until drop)  | Use `shrink_to_fit()`     |
+| `FixedRandom<N>`  | Stack      | Yes       | Yes       | Yes              |                           |
+| `HexString`       | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated hex             |
+| `Base64String`    | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated base64          |
+| `Bech32String`    | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated Bech32/Bech32m  |
 
 ## Performance
 
-The wrappers add no runtime overhead compared to raw types in benchmarks.
+Wrappers add no runtime overhead compared to raw types in benchmarks.
 
 ## Changelog
 

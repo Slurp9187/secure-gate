@@ -13,7 +13,7 @@ use zeroize::Zeroize;
 pub struct CloneableStringInner(String);
 
 #[cfg(feature = "zeroize")]
-impl crate::CloneableSecretMarker for CloneableStringInner {}
+impl crate::CloneSafe for CloneableStringInner {}
 
 /// A string wrapped as a cloneable secret.
 ///
@@ -117,6 +117,7 @@ impl CloneableString {
 }
 
 #[cfg(feature = "zeroize")]
+/// Wrap a `String` in a `CloneableString`.
 impl From<String> for CloneableString {
     fn from(value: String) -> Self {
         Dynamic::new(CloneableStringInner(value))
@@ -124,6 +125,7 @@ impl From<String> for CloneableString {
 }
 
 #[cfg(feature = "zeroize")]
+/// Wrap a string slice in a `CloneableString`.
 impl From<&str> for CloneableString {
     fn from(value: &str) -> Self {
         Self::from(value.to_string())

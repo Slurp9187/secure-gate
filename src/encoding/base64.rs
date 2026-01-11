@@ -1,8 +1,4 @@
-// ==========================================================================
-// src/encoding/base64.rs
-// ==========================================================================
-
-// but forbid it otherwise
+// Forbid unsafe_code when the "zeroize" feature is disabled, to ensure secure handling
 #![cfg_attr(not(feature = "zeroize"), forbid(unsafe_code))]
 use alloc::string::String;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -125,6 +121,7 @@ impl PartialEq for Base64String {
 #[cfg(feature = "encoding-base64")]
 impl Eq for Base64String {}
 
+/// Debug implementation (always redacted).
 impl core::fmt::Debug for Base64String {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")

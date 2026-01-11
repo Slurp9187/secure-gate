@@ -1,7 +1,3 @@
-// ==========================================================================
-// src/encoding/hex.rs
-// ==========================================================================
-
 // Allow unsafe_code when zeroize is enabled (needed for hex string validation)
 // but forbid it otherwise
 #![cfg_attr(not(feature = "zeroize"), forbid(unsafe_code))]
@@ -119,7 +115,7 @@ impl HexString {
     }
 }
 
-// Constant-time equality for hex strings – prevents timing attacks when ct-eq enabled
+/// Constant-time equality for hex strings — prevents timing attacks when `ct-eq` feature is enabled.
 #[cfg(all(feature = "encoding-hex", feature = "ct-eq"))]
 impl PartialEq for HexString {
     fn eq(&self, other: &Self) -> bool {
@@ -138,9 +134,11 @@ impl PartialEq for HexString {
     }
 }
 
+/// Equality implementation for hex strings.
 #[cfg(feature = "encoding-hex")]
 impl Eq for HexString {}
 
+/// Debug implementation (always redacted).
 impl core::fmt::Debug for HexString {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")

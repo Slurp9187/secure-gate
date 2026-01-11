@@ -23,9 +23,9 @@ pub use dynamic::Dynamic;
 /// Re-export of the [`Fixed`] type.
 pub use fixed::Fixed;
 
-/// Re-export of the [`CloneableSecretMarker`] trait.
+/// Re-export of the [`CloneSafe`] trait.
 #[cfg(feature = "zeroize")]
-pub use cloneable::CloneableSecretMarker;
+pub use cloneable::CloneSafe;
 
 /// Cloneable secret types (requires the `zeroize` feature).
 /// Provides wrappers that can be safely duplicated while maintaining security guarantees.

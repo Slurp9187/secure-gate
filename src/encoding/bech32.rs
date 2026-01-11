@@ -38,21 +38,7 @@ pub enum EncodingVariant {
     Bech32m,
 }
 
-fn zeroize_input(s: &mut String) {
-    #[cfg(feature = "zeroize")]
-    {
-        zeroize::Zeroize::zeroize(s);
-    }
-    #[cfg(not(feature = "zeroize"))]
-    {
-        let _ = s; // Suppress unused warning
-    }
-}
-
-/// Detect the variant using the crate's built-in checksum validation.
-///
-/// `bech32::decode` accepts both variants but does not expose which succeeded.
-/// We use `UncheckedHrpstring` + `validate_checksum::<Variant>()` to identify it.
+/// Internal function to detect the Bech32 variant.
 fn detect_variant(s: &str) -> EncodingVariant {
     let unchecked = UncheckedHrpstring::new(s)
         .expect("string was already successfully decoded, so unchecked construction must succeed");
@@ -64,6 +50,18 @@ fn detect_variant(s: &str) -> EncodingVariant {
             .validate_checksum::<Bech32m>()
             .expect("string passed decode, so must validate as Bech32m");
         EncodingVariant::Bech32m
+    }
+}
+
+/// Internal function to zeroize invalid input strings.
+fn zeroize_input(s: &mut String) {
+    #[cfg(feature = "zeroize")]
+    {
+        zeroize::Zeroize::zeroize(s);
+    }
+    #[cfg(not(feature = "zeroize"))]
+    {
+        let _ = s; // Suppress unused variable warning when zeroize is disabled
     }
 }
 
@@ -164,7 +162,7 @@ impl Bech32String {
     }
 }
 
-// Constant-time equality (prevents timing attacks when comparing encoded secrets)
+/// Constant-time equality (prevents timing attacks when comparing encoded secrets).
 #[cfg(all(feature = "encoding-bech32", feature = "ct-eq"))]
 impl PartialEq for Bech32String {
     fn eq(&self, other: &Self) -> bool {
@@ -176,6 +174,7 @@ impl PartialEq for Bech32String {
     }
 }
 
+/// Regular equality (fallback when `ct-eq` feature is not enabled).
 #[cfg(all(feature = "encoding-bech32", not(feature = "ct-eq")))]
 impl PartialEq for Bech32String {
     fn eq(&self, other: &Self) -> bool {
@@ -183,9 +182,11 @@ impl PartialEq for Bech32String {
     }
 }
 
+/// Equality implementation.
 #[cfg(feature = "encoding-bech32")]
 impl Eq for Bech32String {}
 
+/// Debug implementation (always redacted).
 impl core::fmt::Debug for Bech32String {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")

@@ -12,7 +12,7 @@ use zeroize::Zeroize;
 pub struct CloneableArrayInner<const N: usize>([u8; N]);
 
 #[cfg(feature = "zeroize")]
-impl<const N: usize> crate::CloneableSecretMarker for CloneableArrayInner<N> {}
+impl<const N: usize> crate::CloneSafe for CloneableArrayInner<N> {}
 
 /// A fixed-size array of bytes wrapped as a cloneable secret.
 ///
@@ -105,6 +105,7 @@ impl<const N: usize> CloneableArray<N> {
 
 #[cfg(feature = "zeroize")]
 impl<const N: usize> From<[u8; N]> for CloneableArray<N> {
+    /// Wrap a `[u8; N]` array in a `CloneableArray`.
     fn from(arr: [u8; N]) -> Self {
         Fixed::new(CloneableArrayInner(arr))
     }

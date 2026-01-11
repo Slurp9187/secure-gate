@@ -13,7 +13,7 @@ use zeroize::Zeroize;
 pub struct CloneableVecInner(Vec<u8>);
 
 #[cfg(feature = "zeroize")]
-impl crate::CloneableSecretMarker for CloneableVecInner {}
+impl crate::CloneSafe for CloneableVecInner {}
 
 /// A dynamically-sized vector of bytes wrapped as a cloneable secret.
 ///
@@ -108,6 +108,7 @@ impl CloneableVec {
 }
 
 #[cfg(feature = "zeroize")]
+/// Wrap a `Vec<u8>` in a `CloneableVec`.
 impl From<Vec<u8>> for CloneableVec {
     fn from(value: Vec<u8>) -> Self {
         Dynamic::new(CloneableVecInner(value))
@@ -115,6 +116,7 @@ impl From<Vec<u8>> for CloneableVec {
 }
 
 #[cfg(feature = "zeroize")]
+/// Wrap a byte slice in a `CloneableVec`.
 impl From<&[u8]> for CloneableVec {
     fn from(value: &[u8]) -> Self {
         Self::from(value.to_vec())

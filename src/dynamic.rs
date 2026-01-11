@@ -99,9 +99,9 @@ impl<T: ?Sized + PartialEq> PartialEq for Dynamic<T> {
 #[cfg(not(feature = "ct-eq"))]
 impl<T: ?Sized + Eq> Eq for Dynamic<T> {}
 
-/// Opt-in Clone — only for types marked `CloneableSecretMarker`.
+/// Opt-in Clone — only for types marked `CloneSafe`.
 #[cfg(feature = "zeroize")]
-impl<T: crate::CloneableSecretMarker> Clone for Dynamic<T> {
+impl<T: crate::CloneSafe> Clone for Dynamic<T> {
     #[inline(always)]
     fn clone(&self) -> Self {
         Dynamic(self.0.clone())

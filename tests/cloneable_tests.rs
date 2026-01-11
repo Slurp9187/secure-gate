@@ -1,12 +1,12 @@
 #![cfg(feature = "zeroize")]
 
-use secure_gate::{CloneableArray, CloneableSecretMarker, CloneableString, CloneableVec, Dynamic, Fixed};
+use secure_gate::{CloneSafe, CloneableArray, CloneableString, CloneableVec, Dynamic, Fixed};
 
 // === Custom Type Cloning ===
 
 #[derive(Clone)]
 struct MyKey([u8; 16]);
-impl CloneableSecretMarker for MyKey {}
+impl CloneSafe for MyKey {}
 impl zeroize::Zeroize for MyKey {
     fn zeroize(&mut self) {
         zeroize::Zeroize::zeroize(&mut self.0);
@@ -154,7 +154,7 @@ fn cloneable_vec_try_init_with() {
     assert!(err.is_err());
 }
 
-// Note: Raw Dynamic<String> cloning is still not allowed (String !impl CloneableSecretMarker),
+// Note: Raw Dynamic<String> cloning is still not allowed (String !impl CloneSafe),
 // but CloneableString provides a safe wrapper for cloning string secrets.
 
 // === No accidental Clone on raw wrappers ===
@@ -162,7 +162,7 @@ fn cloneable_vec_try_init_with() {
 #[allow(unused)]
 fn raw_dynamic_not_cloneable() {
     let s: Dynamic<String> = "secret".into();
-    // let _cloned = s.clone(); // Must not compile — raw Dynamic<T> where T !impl CloneableSecretMarker
+    // let _cloned = s.clone(); // Must not compile — raw Dynamic<T> where T !impl CloneSafe
     // Compile-fail guard: this test ensures no Clone impl leaks
 }
 
@@ -170,13 +170,12 @@ fn raw_dynamic_not_cloneable() {
 #[allow(unused)]
 fn raw_fixed_not_cloneable_by_default() {
     let key: Fixed<[u8; 32]> = Fixed::new([0u8; 32]);
-    // let _cloned = key.clone(); // Must not compile unless inner impls CloneableSecretMarker
+    // let _cloned = key.clone(); // Must not compile unless inner impls CloneSafe
 }
-
-// === Nested CloneableSecretMarker (array of primitives) ===
+// === Nested CloneSafe (array of primitives) ===
 #[test]
 fn nested_cloneable_array() {
-    type NestedKey = [u32; 8]; // u32 impls CloneableSecretMarker, so array does too
+    type NestedKey = [u32; 8]; // u32 impls CloneSafe, so array does too
     let original: Fixed<NestedKey> = Fixed::new([42u32; 8]);
     let cloned = original.clone();
     assert_eq!(original.expose_secret(), cloned.expose_secret());

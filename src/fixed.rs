@@ -212,9 +212,9 @@ impl core::fmt::Display for FromSliceError {
 
 impl core::error::Error for FromSliceError {}
 
-/// Opt-in Clone — only for types marked `CloneableSecretMarker` (default no-clone).
+/// Opt-in Clone — only for types marked `CloneSafe` (default no-clone).
 #[cfg(feature = "zeroize")]
-impl<T: crate::CloneableSecretMarker> Clone for Fixed<T> {
+impl<T: crate::CloneSafe> Clone for Fixed<T> {
     #[inline(always)]
     fn clone(&self) -> Self {
         Self(self.0.clone())

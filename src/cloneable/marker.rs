@@ -1,6 +1,6 @@
 //! Marker trait and implementations for types that can be safely cloned as secrets.
 //!
-//! This module defines the [`CloneableSecretMarker`] trait and provides blanket
+//! This module defines the [`CloneSafe`] trait and provides blanket
 //! implementations for primitive types and fixed-size arrays that are safe to clone
 //! when handling sensitive data. The trait ensures that only types meeting the
 //! security requirements (Clone + Zeroize) can be used in cloneable secret wrappers.
@@ -21,7 +21,7 @@
 ///
 /// This trait is re-exported at the crate root for convenience.
 #[cfg(feature = "zeroize")]
-pub trait CloneableSecretMarker: Clone + zeroize::Zeroize {
+pub trait CloneSafe: Clone + zeroize::Zeroize {
     // Pure marker, no methods
 }
 
@@ -29,38 +29,38 @@ pub trait CloneableSecretMarker: Clone + zeroize::Zeroize {
 // Blanket implementations for primitive types that are safe to clone as secrets.
 // These include integer types commonly used in cryptographic operations like
 // keys, nonces, counters, and other small fixed-size values.
-impl CloneableSecretMarker for i8 {}
+impl CloneSafe for i8 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecretMarker for i16 {}
+impl CloneSafe for i16 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecretMarker for i32 {}
+impl CloneSafe for i32 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecretMarker for i64 {}
+impl CloneSafe for i64 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecretMarker for i128 {}
+impl CloneSafe for i128 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecretMarker for isize {}
+impl CloneSafe for isize {}
 
 #[cfg(feature = "zeroize")]
-impl CloneableSecretMarker for u8 {}
+impl CloneSafe for u8 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecretMarker for u16 {}
+impl CloneSafe for u16 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecretMarker for u32 {}
+impl CloneSafe for u32 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecretMarker for u64 {}
+impl CloneSafe for u64 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecretMarker for u128 {}
+impl CloneSafe for u128 {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecretMarker for usize {}
+impl CloneSafe for usize {}
 
 #[cfg(feature = "zeroize")]
-impl CloneableSecretMarker for bool {}
+impl CloneSafe for bool {}
 #[cfg(feature = "zeroize")]
-impl CloneableSecretMarker for char {}
+impl CloneSafe for char {}
 
 // Blanket implementation for fixed-size arrays of cloneable secret types.
 // This allows arrays like [u8; 32] (AES keys) or [u32; 8] (large integers)
 // to be safely cloned when used as secrets.
 #[cfg(feature = "zeroize")]
-impl<T: CloneableSecretMarker, const N: usize> CloneableSecretMarker for [T; N] {}
+impl<T: CloneSafe, const N: usize> CloneSafe for [T; N] {}
