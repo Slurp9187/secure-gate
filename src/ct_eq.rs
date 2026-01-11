@@ -1,4 +1,4 @@
-//! Constant-time equality comparison for cryptographic secrets (gated behind "ct-eq").
+//! Constant-time equality comparison for cryptographic secrets (gated behind `ct-eq`).
 //!
 //! This module provides the ConstantTimeEq trait, which performs equality
 //! comparisons in constant time to prevent timing attacks. Regular equality
@@ -12,9 +12,6 @@
 //! Always use `ct_eq()` instead of `==` when comparing cryptographic secrets,
 //! authentication tokens, or other sensitive data that should not leak through
 //! timing differences.
-// ==========================================================================
-// src/ct_eq.rs
-// ==========================================================================
 
 #[cfg(feature = "ct-eq")]
 /// Trait for constant-time equality comparison to prevent timing attacks.
@@ -56,6 +53,7 @@ pub trait ConstantTimeEq {
 }
 
 #[cfg(feature = "ct-eq")]
+/// Constant-time equality for byte slices.
 impl ConstantTimeEq for [u8] {
     fn ct_eq(&self, other: &Self) -> bool {
         subtle::ConstantTimeEq::ct_eq(self, other).into()
@@ -63,6 +61,7 @@ impl ConstantTimeEq for [u8] {
 }
 
 #[cfg(feature = "ct-eq")]
+/// Constant-time equality for fixed-size byte arrays.
 impl<const N: usize> ConstantTimeEq for [u8; N] {
     fn ct_eq(&self, other: &Self) -> bool {
         self.as_slice().ct_eq(other.as_slice())
