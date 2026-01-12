@@ -1,19 +1,18 @@
 # secure-gate
-
 `no_std`-compatible wrappers for sensitive data with explicit exposure requirements.
 
-- `Fixed<T>` — Stack-allocated wrapper
-- `Dynamic<T>` — Heap-allocated wrapper
-- `FixedRandom<N>` — Stack-allocated cryptographically secure random bytes
-- `DynamicRandom` — Heap-allocated cryptographically secure random bytes
-- `CloneableArray<const N: usize>` — Cloneable fixed-size stack secret (`[u8; N]`)
-- `CloneableString` — Cloneable heap-allocated text secret (`String`)
-- `CloneableVec` — Cloneable heap-allocated binary secret (`Vec<u8>`)
-- `HexString` — Validated lowercase hexadecimal string wrapper
-- `Base64String` — Validated URL-safe base64 string wrapper (no padding)
-- `Bech32String` — Validated Bech32/Bech32m string wrapper
+- `Fixed<T>` — Stack-allocated wrapper  
+- `Dynamic<T>` — Heap-allocated wrapper  
+- `FixedRandom<N>` — Stack-allocated cryptographically secure random bytes  
+- `DynamicRandom` — Heap-allocated cryptographically secure random bytes  
+- `CloneableArray<const N: usize>` — Cloneable fixed-size stack secret (`[u8; N]`)  
+- `CloneableString` — Cloneable heap-allocated text secret (`String`)  
+- `CloneableVec` — Cloneable heap-allocated binary secret (`Vec<u8>`)  
+- `HexString` — Validated lowercase hexadecimal string wrapper  
+- `Base64String` — Validated URL-safe base64 string wrapper (no padding)  
+- `Bech32String` — Validated Bech32/Bech32m string wrapper  
 
-Memory containing secrets is zeroed on drop, including spare capacity where applicable (enabled by default).
+Memory containing secrets is zeroed on drop, including spare capacity where applicable (when `zeroize` is enabled).
 
 Access requires an explicit `.expose_secret()` (or `.expose_secret_mut()`) call — no `Deref` or implicit paths.
 
@@ -24,32 +23,45 @@ Access requires an explicit `.expose_secret()` (or `.expose_secret_mut()`) call 
 secure-gate = "0.7.0"
 ```
 
-Basic configuration includes `zeroize` (default) for secure memory handling.
-Recommended:
+Basic configuration includes `zeroize` and `ct-eq` (via the `secure` meta-feature) for secure memory handling and constant-time equality.
 
+**Recommended for most users** (secure defaults):
+```toml
+secure-gate = "0.7.0" # default enables "secure"
+```
+
+**Batteries-included** (all optional features):
 ```toml
 secure-gate = { version = "0.7.0", features = ["full"] }
 ```
 
+**Constrained / minimal builds** (no zeroization or ct-eq — **strongly discouraged** for production):
+```toml
+secure-gate = { version = "0.7.0", default-features = false, features = ["insecure"] }
+```
+
 ## Features
 
-| Feature            | Description                                                                 |
-|--------------------|-----------------------------------------------------------------------------|
-| `zeroize` (default)| Memory zeroing on drop + opt-in safe cloning                                |
-| `rand`             | Random generation (`FixedRandom<N>::generate()`, `DynamicRandom::generate()`)|
-| `ct-eq`            | Constant-time equality comparison                                          |
-| `encoding`         | All encoding support (`encoding-hex`, `encoding-base64`, `encoding-bech32`)|
-| `encoding-hex`     | Hex encoding + `HexString` + random hex methods                            |
-| `encoding-base64`  | `Base64String`                                                             |
-| `encoding-bech32`  | `Bech32String` (Bech32/Bech32m, mixed-case input, lowercase storage)       |
-| `full`             | All optional features                                                      |
+| Feature       | Description                                                                                          |
+|---------------|------------------------------------------------------------------------------------------------------|
+| `secure` (default) | Enables `zeroize` + `ct-eq` — secure memory wiping and constant-time equality (recommended)         |
+| `zeroize`     | Memory zeroing on drop + opt-in safe cloning (requires `zeroize` crate)                             |
+| `ct-eq`       | Constant-time equality checks to prevent timing attacks (requires `subtle` crate)                   |
+| `rand`        | Random generation (`FixedRandom<N>::generate()`, `DynamicRandom::generate()`)                       |
+| `encoding`    | All encoding support (`encoding-hex`, `encoding-base64`, `encoding-bech32`)                         |
+| `encoding-hex`| Hex encoding + `HexString` + random hex methods                                                     |
+| `encoding-base64` | `Base64String` (URL-safe, no padding)                                                             |
+| `encoding-bech32` | `Bech32String` (Bech32/Bech32m, mixed-case input, lowercase storage)                             |
+| `full`        | Meta-feature enabling all optional features (includes `secure`)                                    |
+| `insecure`    | Explicit opt-out for no-default-features builds (disables `zeroize` and `ct-eq`) — **not recommended** for production |
 
 `no_std` + `alloc` compatible. Features add no overhead when unused.
 
 ## Security Model & Design Philosophy
 
 `secure-gate` prioritizes **auditability** and **explicitness** over implicit convenience.
-All secret access requires an explicit `.expose_secret()` (or `.expose_secret_mut()`) call — making exposures grep-able and preventing hidden leaks.
+
+All secret access requires an explicit `.expose_secret()` (or `.expose_secret_mut()`) call — making exposures grep-able and preventing hidden leaks.  
 
 These calls are zero-cost `#[inline(always)]` reborrows (fully elided by the optimizer). The explicitness is deliberate "theater" for humans and auditors, with **no runtime overhead**.
 
@@ -59,16 +71,16 @@ These calls are zero-cost `#[inline(always)]` reborrows (fully elided by the opt
 use secure_gate::{fixed_alias, dynamic_alias};
 
 // Recommended: semantic aliases for clarity
-fixed_alias!(pub Aes256Key, 32);      // Fixed-size byte secret
-dynamic_alias!(pub Password, String); // Heap string secret
+fixed_alias!(pub Aes256Key, 32);          // Fixed-size byte secret
+dynamic_alias!(pub Password, String);     // Heap string secret
 
 // Create secrets
-let key: Aes256Key = [0u8; 32].into();  // From array/slice
-let mut pw: Password = "hunter2".into(); // From &str/String
+let key: Aes256Key = [0u8; 32].into();           // From array/slice
+let mut pw: Password = "hunter2".into();         // From &str/String
 
 // Access (zero-cost)
 assert_eq!(pw.expose_secret(), "hunter2");
-let key_bytes = key.expose_secret();    // &[u8; 32]
+let key_bytes = key.expose_secret();             // &[u8; 32]
 
 // Mutable access
 pw.expose_secret_mut().push('!');
@@ -83,9 +95,11 @@ pw.expose_secret_mut().push('!');
 ## Opt-In Safe Cloning
 
 Cloning secret data is **opt-in** and **only available** when the `zeroize` feature is enabled.
+
 This ensures cloning is deliberate, auditable, and always paired with secure zeroization.
 
 **Key mechanism**: The `CloneSafe` marker trait.
+
 To enable safe cloning:
 1. Implement or derive `Clone`
 2. Implement or derive `Zeroize`
@@ -95,11 +109,11 @@ This prevents accidental deep copies that could bypass zeroization.
 
 ### Pre-Built Cloneable Types
 
-| Type                             | Allocation | Inner Data      | Typical Use Case                     |
-|----------------------------------|------------|-----------------|--------------------------------------|
-| `CloneableArray<const N: usize>` | Stack      | `[u8; N]`       | Fixed-size keys, nonces              |
-| `CloneableString`                | Heap       | `String`        | Passwords, tokens, API keys          |
-| `CloneableVec`                   | Heap       | `Vec<u8>`       | Variable-length binary secrets       |
+| Type                            | Allocation | Inner Data      | Typical Use Case                  |
+|---------------------------------|------------|-----------------|-----------------------------------|
+| `CloneableArray<const N: usize>`| Stack      | `[u8; N]`       | Fixed-size keys, nonces           |
+| `CloneableString`               | Heap       | `String`        | Passwords, tokens, API keys       |
+| `CloneableVec`                  | Heap       | `Vec<u8>`       | Variable-length binary secrets    |
 
 ```rust
 #[cfg(feature = "zeroize")]
@@ -111,7 +125,7 @@ use secure_gate::{CloneableArray, CloneableString, CloneableVec};
     let pw: CloneableString = "hunter2".into();
     let seed: CloneableVec = vec![0u8; 64].into();
 
-    let key2 = key.clone();   // Safe deep clone
+    let key2 = key.clone(); // Safe deep clone
     let pw2 = pw.clone();
 }
 ```
@@ -139,7 +153,8 @@ use secure_gate::CloneableString;
 
 #[cfg(feature = "zeroize")]
 {
-    let pw = CloneableString::init_with(|| "hunter2".to_string()); // Temporary zeroized immediately
+    let pw = CloneableString::init_with(|| "hunter2".to_string());
+    // Temporary zeroized immediately
 }
 ```
 
@@ -158,7 +173,7 @@ use secure_gate::CloneSafe;
     #[derive(Clone, Zeroize)]
     struct MyKey([u8; 32]);
 
-    impl CloneSafe for MyKey {}  // Enables safe cloning
+    impl CloneSafe for MyKey {} // Enables safe cloning
 
     let key = MyKey([42u8; 32]);
     let key_copy = key.clone();
@@ -194,6 +209,7 @@ use secure_gate::CloneSafe;
 ```
 
 `FixedRandom<N>` can only be constructed via cryptographically secure RNG.
+
 Direct generation is also available:
 
 ```rust
@@ -263,21 +279,15 @@ Available on `Fixed<[u8; N]>` and `Dynamic<T>` where `T: AsRef<[u8]>`.
 
 ## Security Checklist
 
-To maximize the security of your application when using `secure-gate`, adhere to these guidelines derived from the project's security audit:
+To maximize the security of your application when using `secure-gate`, adhere to these guidelines:
 
-- **Enable Zeroization by Default**: Use the default feature set, which includes `zeroize` for automatic secure wiping of secret memory. Avoid `no-default-features` unless you implement manual zeroization and have strong justification.
-
-- **Pre-validate Encoding Inputs**: For Bech32 and other encodings, validate inputs (e.g., HRPs) upfront. Use `try_*` methods (e.g., `try_to_bech32`) and handle errors to prevent DoS from malformed data.
-
-- **Use Constant-Time Comparisons**: Enable the `ct-eq` feature for all sensitive equality checks to mitigate timing attacks.
-
-- **Minimize Secret Exposures**: Audit your code for `.expose_secret()` calls; keep them minimal, logged, and justified. Avoid unnecessary exposures.
-
-- **Gate Features Conservatively**: Only enable required features (e.g., specific encodings) to limit attack surfaces in production.
-
-- **Safe Cloning**: Restrict cloning to when absolutely needed. Use built-in `CloneSafe` types or implement the trait with care, ensuring `Zeroize` is derived or implemented.
-
-- **Regular Audits**: Periodically review your secret handling logic, especially after dependency updates, to confirm compliance with these practices.
+- **Use secure defaults**: Rely on the default feature set (`secure`) for automatic memory wiping (`zeroize`) and constant-time equality (`ct-eq`). Avoid `--no-default-features` unless you have a strong reason (e.g., constrained embedded environments).
+- **Pre-validate encoding inputs**: For Bech32 and other encodings, validate inputs (e.g., HRPs) upfront. Use `try_*` methods (e.g., `try_to_bech32`) and handle errors properly to avoid issues from malformed data.
+- **Prefer constant-time comparisons**: Use `.ct_eq()` for all sensitive equality checks to prevent timing attacks.
+- **Minimize secret exposures**: Audit your code for `.expose_secret()` calls; keep them minimal, logged, and justified. Avoid unnecessary or prolonged exposures.
+- **Restrict cloning**: Only clone when necessary. Prefer built-in `Cloneable*` types; be cautious with custom `CloneSafe` implementations.
+- **Conservative feature usage**: Enable only the features you need (e.g., specific encodings) to reduce attack surface.
+- **Regular review**: Periodically audit your secret handling logic, especially after dependency updates.
 
 ## Macros
 
@@ -300,14 +310,12 @@ For reusable or library-provided secret types:
 use secure_gate::{fixed_generic_alias, dynamic_generic_alias};
 
 fixed_generic_alias!(pub GenericFixedBuffer);
-dynamic_generic_alias!(pub GenericHeapSecret, Vec<u8>);  // Vec<u8> can be any type
+dynamic_generic_alias!(pub GenericHeapSecret, Vec<u8>); // Vec<u8> can be any type
 ```
 
 Custom doc strings (optional):
 
 ```rust
-use secure_gate::{fixed_generic_alias, dynamic_generic_alias};
-
 fixed_generic_alias!(pub SecureBuffer, "Generic fixed-size secret buffer");
 dynamic_generic_alias!(pub SecureHeap, String, "Generic heap-allocated secret");
 ```
@@ -319,7 +327,7 @@ dynamic_generic_alias!(pub SecureHeap, String, "Generic heap-allocated secret");
 {
     use secure_gate::fixed_alias_random;
 
-    fixed_alias_random!(pub MasterKey, 32);      // FixedRandom<32>
+    fixed_alias_random!(pub MasterKey, 32); // FixedRandom<32>
 }
 ```
 
@@ -327,15 +335,15 @@ These macros create type aliases to `Fixed<[u8; N]>`, `Dynamic<T>`, `FixedRandom
 
 ## Memory Guarantees (`zeroize` enabled)
 
-| Type              | Allocation | Auto-zero | Full wipe | Slack eliminated | Notes                     |
-|-------------------|------------|-----------|-----------|------------------|---------------------------|
-| `Fixed<T>`        | Stack      | Yes       | Yes       | Yes (no heap)    |                           |
-| `Dynamic<T>`      | Heap       | Yes       | Yes       | No (until drop)  | Use `shrink_to_fit()`     |
-| `FixedRandom<N>`  | Stack      | Yes       | Yes       | Yes              |                           |
-| `DynamicRandom`   | Heap       | Yes       | Yes       | No (until drop)  |                           |
-| `HexString`       | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated hex             |
-| `Base64String`    | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated base64          |
-| `Bech32String`    | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated Bech32/Bech32m  |
+| Type                  | Allocation | Auto-zero | Full wipe | Slack eliminated | Notes                                      |
+|-----------------------|------------|-----------|-----------|------------------|--------------------------------------------|
+| `Fixed<T>`            | Stack      | Yes       | Yes       | Yes (no heap)    |                                            |
+| `Dynamic<T>`          | Heap       | Yes       | Yes       | No (until drop)  | Use `shrink_to_fit()`                      |
+| `FixedRandom<N>`      | Stack      | Yes       | Yes       | Yes              |                                            |
+| `DynamicRandom`       | Heap       | Yes       | Yes       | No (until drop)  |                                            |
+| `HexString`           | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated hex                              |
+| `Base64String`        | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated base64                           |
+| `Bech32String`        | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated Bech32/Bech32m                   |
 
 ## Performance
 
@@ -343,7 +351,7 @@ Wrappers add no runtime overhead compared to raw types in benchmarks.
 
 ## Changelog
 
-[[CHANGELOG.md]](https://github.com/Slurp9187/secure-gate/blob/main/CHANGELOG.md)
+[CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/main/CHANGELOG.md)
 
 ## License
 
