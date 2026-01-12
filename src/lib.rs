@@ -45,7 +45,6 @@ mod macros;
 /// - `fixed_alias!`: Create type aliases for fixed-size secrets (`Fixed<[u8; N]>`).
 /// - `fixed_generic_alias!`: Create generic fixed-size secret aliases.
 /// - `fixed_alias_random!`: Create type aliases for random-only fixed-size secrets (`FixedRandom<N>`, requires `rand` feature).
-
 /// Cryptographically secure random generation (requires the `rand` feature).
 /// Provides RNG-backed secret generation with freshness guarantees.
 #[cfg(feature = "rand")]
@@ -76,6 +75,10 @@ pub use encoding::base64::Base64String;
 /// Re-export of [`Bech32String`] for convenience when using bech32 encoding.
 #[cfg(feature = "encoding-bech32")]
 pub use encoding::bech32::Bech32String;
+
+/// Re-export of [`Bech32EncodingError`] for convenience when using bech32 encoding.
+#[cfg(feature = "encoding-bech32")]
+pub use encoding::bech32::Bech32EncodingError;
 
 /// Re-export of [`SecureEncodingExt`] trait for convenient encoding extensions.
 #[cfg(any(

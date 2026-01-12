@@ -11,6 +11,9 @@ use base64_crate::Engine;
 #[cfg(feature = "encoding-bech32")]
 use ::bech32::{self};
 
+#[cfg(feature = "encoding-bech32")]
+use crate::encoding::bech32::Bech32EncodingError;
+
 /// Extension trait for safe, explicit encoding of secret byte data to strings.
 ///
 /// All methods require the caller to first call `.expose_secret()` (or similar).
@@ -52,14 +55,14 @@ pub trait SecureEncodingExt {
     fn try_to_bech32(
         &self,
         hrp: &str,
-    ) -> Result<crate::encoding::bech32::Bech32String, &'static str>;
+    ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError>;
 
     /// Try to encode secret bytes as Bech32m with the specified HRP.
     #[cfg(feature = "encoding-bech32")]
     fn try_to_bech32m(
         &self,
         hrp: &str,
-    ) -> Result<crate::encoding::bech32::Bech32String, &'static str>;
+    ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError>;
 }
 
 #[cfg(any(
@@ -91,9 +94,10 @@ impl SecureEncodingExt for [u8] {
     fn try_to_bech32(
         &self,
         hrp: &str,
-    ) -> Result<crate::encoding::bech32::Bech32String, &'static str> {
-        let hrp = bech32::Hrp::parse(hrp).map_err(|_| "invalid HRP")?;
-        let encoded = bech32::encode::<bech32::Bech32>(hrp, self).map_err(|_| "encoding failed")?;
+    ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
+        let hrp = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        let encoded = bech32::encode::<bech32::Bech32>(hrp, self)
+            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
         Ok(crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32,
@@ -105,10 +109,10 @@ impl SecureEncodingExt for [u8] {
     fn try_to_bech32m(
         &self,
         hrp: &str,
-    ) -> Result<crate::encoding::bech32::Bech32String, &'static str> {
-        let hrp = bech32::Hrp::parse(hrp).map_err(|_| "invalid HRP")?;
-        let encoded =
-            bech32::encode::<bech32::Bech32m>(hrp, self).map_err(|_| "encoding failed")?;
+    ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
+        let hrp = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        let encoded = bech32::encode::<bech32::Bech32m>(hrp, self)
+            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
         Ok(crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32m,
@@ -145,9 +149,10 @@ impl<const N: usize> SecureEncodingExt for [u8; N] {
     fn try_to_bech32(
         &self,
         hrp: &str,
-    ) -> Result<crate::encoding::bech32::Bech32String, &'static str> {
-        let hrp = bech32::Hrp::parse(hrp).map_err(|_| "invalid HRP")?;
-        let encoded = bech32::encode::<bech32::Bech32>(hrp, self).map_err(|_| "encoding failed")?;
+    ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
+        let hrp = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        let encoded = bech32::encode::<bech32::Bech32>(hrp, self)
+            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
         Ok(crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32,
@@ -159,10 +164,10 @@ impl<const N: usize> SecureEncodingExt for [u8; N] {
     fn try_to_bech32m(
         &self,
         hrp: &str,
-    ) -> Result<crate::encoding::bech32::Bech32String, &'static str> {
-        let hrp = bech32::Hrp::parse(hrp).map_err(|_| "invalid HRP")?;
-        let encoded =
-            bech32::encode::<bech32::Bech32m>(hrp, self).map_err(|_| "encoding failed")?;
+    ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
+        let hrp = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        let encoded = bech32::encode::<bech32::Bech32m>(hrp, self)
+            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
         Ok(crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32m,

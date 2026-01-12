@@ -24,7 +24,16 @@
 use alloc::string::String;
 
 use bech32::primitives::decode::UncheckedHrpstring;
-use bech32::{Bech32, Bech32m, Hrp};
+use bech32::{decode, primitives::hrp::Hrp, Bech32, Bech32m};
+
+/// Error type for Bech32 encoding operations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Bech32EncodingError {
+    /// Invalid Human-Readable Part (HRP).
+    InvalidHrp,
+    /// Encoding operation failed.
+    EncodingFailed,
+}
 
 /// The encoding variant used for Bech32 strings.
 ///
@@ -38,42 +47,7 @@ pub enum EncodingVariant {
     Bech32m,
 }
 
-/// Internal function to detect the Bech32 variant.
-fn detect_variant(s: &str) -> EncodingVariant {
-    let unchecked = UncheckedHrpstring::new(s)
-        .expect("string was already successfully decoded, so unchecked construction must succeed");
-
-    if unchecked.validate_checksum::<Bech32>().is_ok() {
-        EncodingVariant::Bech32
-    } else {
-        unchecked
-            .validate_checksum::<Bech32m>()
-            .expect("string passed decode, so must validate as Bech32m");
-        EncodingVariant::Bech32m
-    }
-}
-
-/// Internal function to zeroize invalid input strings.
-fn zeroize_input(s: &mut String) {
-    #[cfg(feature = "zeroize")]
-    {
-        zeroize::Zeroize::zeroize(s);
-    }
-    #[cfg(not(feature = "zeroize"))]
-    {
-        let _ = s; // Suppress unused variable warning when zeroize is disabled
-    }
-}
-
 /// Validated Bech32/Bech32m string wrapper for secret data.
-///
-/// This struct ensures the contained string is a valid Bech32 or Bech32m encoding.
-/// It lowercases the input for canonical storage and tracks which variant was detected.
-///
-/// # Fields
-///
-/// * `inner` - The validated and normalized Bech32/Bech32m string
-/// * `variant` - Whether this uses Bech32 or Bech32m encoding
 pub struct Bech32String {
     pub(crate) inner: crate::Dynamic<String>,
     pub(crate) variant: EncodingVariant,
@@ -90,29 +64,54 @@ impl Bech32String {
     /// Without `zeroize`, rejected bytes may remain in memory until the `String` is dropped
     /// normally. Enable the `zeroize` feature for secure wiping of invalid inputs.
     pub fn new(mut s: String) -> Result<Self, &'static str> {
+        let unchecked = UncheckedHrpstring::new(&s).map_err(|_| "invalid bech32 string")?;
+        let variant = if unchecked.validate_checksum::<Bech32>().is_ok() {
+            EncodingVariant::Bech32
+        } else if unchecked.validate_checksum::<Bech32m>().is_ok() {
+            EncodingVariant::Bech32m
+        } else {
+            return Err("invalid bech32 string");
+        };
+
+        // Normalize to lowercase
         s.make_ascii_lowercase();
 
-        if bech32::decode(&s).is_ok() {
-            let variant = detect_variant(&s);
-            Ok(Self {
-                inner: crate::Dynamic::new(s),
-                variant,
-            })
-        } else {
-            zeroize_input(&mut s);
-            Err("invalid bech32 string")
-        }
+        Ok(Self {
+            inner: crate::Dynamic::new(s),
+            variant,
+        })
     }
 
-    /// Internal constructor for trusted (already-validated and lowercased) strings.
+    /// Create a new `Bech32String` from a validated string, bypassing checks.
     ///
-    /// Used by RNG encoding paths which generate canonical lowercase strings.
-    #[allow(dead_code)]
+    /// # Safety
+    ///
+    /// The input string must be a valid, canonical lowercase Bech32 or Bech32m string.
+    /// Incorrect use can lead to invalid encodings or security issues.
     pub(crate) fn new_unchecked(s: String, variant: EncodingVariant) -> Self {
         Self {
             inner: crate::Dynamic::new(s),
             variant,
         }
+    }
+
+    /// Check if this is a Bech32 encoding.
+    #[inline(always)]
+    pub fn is_bech32(&self) -> bool {
+        self.variant == EncodingVariant::Bech32
+    }
+
+    /// Check if this is a Bech32m encoding.
+    #[inline(always)]
+    pub fn is_bech32m(&self) -> bool {
+        self.variant == EncodingVariant::Bech32m
+    }
+
+    /// Get the Human-Readable Part (HRP) of the string.
+    pub fn hrp(&self) -> Hrp {
+        let (hrp, _) =
+            decode(self.inner.expose_secret().as_str()).expect("Bech32String is always valid");
+        hrp
     }
 
     /// Exact number of bytes the decoded payload represents (allocation-free).
@@ -122,28 +121,6 @@ impl Bech32String {
         let data_part_len = s.len() - sep_pos - 1;
         let data_chars = data_part_len - 6; // subtract checksum
         (data_chars * 5) / 8
-    }
-
-    /// The Human-Readable Part (HRP) of the string.
-    pub fn hrp(&self) -> Hrp {
-        let (hrp, _) = bech32::decode(self.inner.expose_secret().as_str())
-            .expect("Bech32String is always valid");
-        hrp
-    }
-
-    /// Get the detected encoding variant.
-    pub fn variant(&self) -> EncodingVariant {
-        self.variant
-    }
-
-    /// Check if this is Bech32-encoded.
-    pub fn is_bech32(&self) -> bool {
-        self.variant == EncodingVariant::Bech32
-    }
-
-    /// Check if this is Bech32m-encoded.
-    pub fn is_bech32m(&self) -> bool {
-        self.variant == EncodingVariant::Bech32m
     }
 
     /// Length of the encoded string (in characters).
@@ -156,6 +133,18 @@ impl Bech32String {
     #[inline(always)]
     pub const fn is_empty(&self) -> bool {
         self.inner.is_empty()
+    }
+
+    /// Get the detected encoding variant.
+    pub fn variant(&self) -> EncodingVariant {
+        self.variant
+    }
+
+    /// Decode the validated Bech32/Bech32m string into raw bytes, consuming the wrapper.
+    pub fn into_bytes(self) -> Vec<u8> {
+        let (_, data) =
+            decode(self.inner.expose_secret().as_str()).expect("Bech32String is always valid");
+        data
     }
 }
 

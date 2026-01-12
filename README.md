@@ -279,8 +279,6 @@ To maximize the security of your application when using `secure-gate`, adhere to
 
 - **Regular Audits**: Periodically review your secret handling logic, especially after dependency updates, to confirm compliance with these practices.
 
-For full audit details, see [`docs/ai_security_audit_recommendations.md`](docs/ai_security_audit_recommendations.md).
-
 ## Macros
 
 All macros require explicit visibility (e.g., `pub`, `pub(crate)`, or none for private).

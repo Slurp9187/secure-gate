@@ -12,6 +12,7 @@
 /// primitive-like types (e.g., fixed arrays of primitives). Prefer built-in
 /// `CloneableArray`, `CloneableString`, or `CloneableVec` for common cases.
 /// Misuse can bypass the crate's no-accidental-clone guarantees.
+/// Custom implementations are allowed but strongly discouraged — they can prolong secret lifetime.
 ///
 /// Types implementing this trait guarantee that:
 /// - They can be cloned without leaking sensitive information
