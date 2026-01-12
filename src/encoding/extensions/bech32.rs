@@ -233,15 +233,3 @@ impl crate::encoding::bech32::Bech32String {
         Bech32StringView(self.inner.expose_secret())
     }
 }
-
-// ========================================
-// Consuming decode (into_bytes) for secure zeroization
-// ========================================
-
-impl<'a> Bech32StringView<'a> {
-    /// Decode the validated Bech32/Bech32m string into raw bytes, consuming and zeroizing the wrapper.
-    pub fn into_bytes(self) -> Vec<u8> {
-        let (_, data) = decode(self.0.as_str()).expect("Bech32String is always valid");
-        data
-    }
-}
