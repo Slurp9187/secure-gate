@@ -6,7 +6,7 @@ use ::bech32::{decode, encode, Hrp};
 // Consuming (into_) methods on RNG types
 // ========================================
 
-#[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+#[cfg(feature = "rand")]
 impl crate::DynamicRandom {
     /// Consume self and return the random bytes as a validated Bech32 string with the specified HRP.
     ///
@@ -43,7 +43,7 @@ impl crate::DynamicRandom {
     }
 }
 
-#[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+#[cfg(feature = "rand")]
 impl<const N: usize> crate::FixedRandom<N> {
     /// Consume self and return the random bytes as a validated Bech32 string with the specified HRP.
     ///
@@ -84,7 +84,7 @@ impl<const N: usize> crate::FixedRandom<N> {
 // Borrowing (to_) methods on RNG types
 // ========================================
 
-#[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+#[cfg(feature = "rand")]
 impl<const N: usize> crate::FixedRandom<N> {
     /// Borrow and encode the random bytes as a validated Bech32 string with the specified HRP (allocates).
     ///
@@ -121,7 +121,7 @@ impl<const N: usize> crate::FixedRandom<N> {
     }
 }
 
-#[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+#[cfg(feature = "rand")]
 impl crate::DynamicRandom {
     /// Borrow and encode the random bytes as a validated Bech32 string with the specified HRP (allocates).
     ///
@@ -163,10 +163,8 @@ impl crate::DynamicRandom {
 // ========================================
 
 /// View struct for exposed Bech32 strings, allowing decoding without direct access.
-#[cfg(feature = "encoding-bech32")]
 pub struct Bech32StringView<'a>(pub(crate) &'a String);
 
-#[cfg(feature = "encoding-bech32")]
 impl<'a> Bech32StringView<'a> {
     /// Decode the validated Bech32/Bech32m string into raw bytes (allocates).
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -175,7 +173,6 @@ impl<'a> Bech32StringView<'a> {
     }
 }
 
-#[cfg(feature = "encoding-bech32")]
 impl<'a> core::ops::Deref for Bech32StringView<'a> {
     type Target = str;
     fn deref(&self) -> &Self::Target {
@@ -183,21 +180,18 @@ impl<'a> core::ops::Deref for Bech32StringView<'a> {
     }
 }
 
-#[cfg(feature = "encoding-bech32")]
 impl<'a> core::fmt::Debug for Bech32StringView<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
     }
 }
 
-#[cfg(feature = "encoding-bech32")]
 impl<'a> core::fmt::Display for Bech32StringView<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(self.0)
     }
 }
 
-#[cfg(feature = "encoding-bech32")]
 impl<'a> core::cmp::PartialEq<&str> for Bech32StringView<'a> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
@@ -208,7 +202,6 @@ impl<'a> core::cmp::PartialEq<&str> for Bech32StringView<'a> {
 // expose_secret → view implementations
 // ========================================
 
-#[cfg(feature = "encoding-bech32")]
 impl crate::encoding::bech32::Bech32String {
     pub fn expose_secret(&self) -> Bech32StringView<'_> {
         Bech32StringView(self.inner.expose_secret())
@@ -219,7 +212,6 @@ impl crate::encoding::bech32::Bech32String {
 // Consuming decode (into_bytes) for secure zeroization
 // ========================================
 
-#[cfg(feature = "encoding-bech32")]
 impl crate::encoding::bech32::Bech32String {
     /// Decode the validated Bech32/Bech32m string into raw bytes, consuming and zeroizing the wrapper.
     pub fn into_bytes(self) -> Vec<u8> {

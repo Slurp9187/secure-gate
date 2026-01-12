@@ -6,12 +6,10 @@ use zeroize::Zeroize;
 /// This struct wraps a `[u8; N]` array and implements the necessary traits for secure
 /// secret handling: `Clone` for duplication and `Zeroize` for secure memory wiping.
 /// The `zeroize(drop)` attribute ensures the array is zeroized when this struct is dropped.
-#[cfg(feature = "zeroize")]
 #[derive(Clone, PartialEq, Zeroize)]
 #[zeroize(drop)]
 pub struct CloneableArrayInner<const N: usize>([u8; N]);
 
-#[cfg(feature = "zeroize")]
 impl<const N: usize> crate::CloneSafe for CloneableArrayInner<N> {}
 
 /// A fixed-size array of bytes wrapped as a cloneable secret.
@@ -35,10 +33,8 @@ impl<const N: usize> crate::CloneSafe for CloneableArrayInner<N> {}
 /// assert_eq!(inner.len(), 32);
 /// # }
 /// ```
-#[cfg(feature = "zeroize")]
 pub type CloneableArray<const N: usize> = Fixed<CloneableArrayInner<N>>;
 
-#[cfg(feature = "zeroize")]
 impl<const N: usize> CloneableArray<N> {
     /// Returns a reference to the inner array without cloning.
     ///
@@ -103,7 +99,6 @@ impl<const N: usize> CloneableArray<N> {
     }
 }
 
-#[cfg(feature = "zeroize")]
 impl<const N: usize> From<[u8; N]> for CloneableArray<N> {
     /// Wrap a `[u8; N]` array in a `CloneableArray`.
     fn from(arr: [u8; N]) -> Self {
