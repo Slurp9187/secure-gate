@@ -32,8 +32,23 @@ trybuild = "1.0.114"
 # Features
 # ──────────────────────────────────────────────────────────────
 [features]
-# Default feature: Essential for secure secret handling with zeroing (uses 'zeroize' crate)
-default = ["zeroize"]
+# Default feature: Enforces secure handling with zeroization and constant-time operations
+default = ["secure"]
+
+# Secure: Essential for secure secret handling (includes zeroize and ct-eq)
+secure = ["zeroize", "ct-eq"]
+
+# Zeroize: Secure zeroing of secrets on drop or explicit calls (uses 'zeroize' crate with alloc and derives)
+zeroize = ["dep:zeroize"]
+
+# ct-eq: Constant-time equality checks (prevents timing attacks in comparisons; uses 'subtle' crate)
+ct-eq = ["dep:subtle"]
+
+# Full: Meta-feature enabling all optional features for a complete, batteries-included setup
+full = ["secure", "encoding"]
+
+# Insecure: Opt-out feature for no-default-features builds (disables zeroize, ct-eq; use only for testing/low-resource scenarios—strongly discouraged for production)
+insecure = []
 
 # Encoding: Secure conversions (hex/base64) for displaying or serializing secrets without leaks
 encoding = ["encoding-hex", "encoding-base64", "encoding-bech32"]
@@ -44,15 +59,8 @@ encoding-base64 = ["dep:base64"]
 # Bech32 encoding support (uses the 'bech32' crate)
 encoding-bech32 = ["dep:bech32"]
 
-# ct-eq: Constant-time equality checks (prevents timing attacks in comparisons; uses 'subtle' crate)
-ct-eq = ["dep:subtle"]
-# rand: Random number generation for securely creating secrets (uses rand with getrandom for seeding; rand_core is transitive)
+# Rand: Random number generation for securely creating secrets (uses rand with getrandom for seeding; rand_core is transitive)
 rand = ["dep:rand"]
-# zeroize: Secure zeroing of secrets on drop or explicit calls (uses 'zeroize' crate with alloc and derives)
-zeroize = ["dep:zeroize"]
-
-# full: Meta-feature enabling all optional features for a complete, batteries-included setup
-full = ["encoding", "rand", "zeroize", "ct-eq"]
 
 [[bench]]
 name = "fixed_vs_raw"
