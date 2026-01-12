@@ -25,7 +25,8 @@ use ::bech32::{self};
 /// # {
 /// use secure_gate::SecureEncodingExt;
 /// let bytes = [0x42u8; 32];
-/// let hex = bytes.to_hex(); // → "424242..."
+/// let hex_string = bytes.to_hex();
+/// let hex = hex_string.expose_secret(); // → "424242..."
 /// # }
 /// ```
 #[cfg(any(
@@ -36,7 +37,7 @@ use ::bech32::{self};
 pub trait SecureEncodingExt {
     /// Encode secret bytes as lowercase hexadecimal.
     #[cfg(feature = "encoding-hex")]
-    fn to_hex(&self) -> alloc::string::String;
+    fn to_hex(&self) -> crate::encoding::hex::HexString;
 
     /// Encode secret bytes as uppercase hexadecimal.
     #[cfg(feature = "encoding-hex")]
@@ -44,7 +45,7 @@ pub trait SecureEncodingExt {
 
     /// Encode secret bytes as URL-safe base64 (no padding).
     #[cfg(feature = "encoding-base64")]
-    fn to_base64url(&self) -> alloc::string::String;
+    fn to_base64url(&self) -> crate::encoding::base64::Base64String;
 
     /// Encode secret bytes as Bech32 with the specified HRP.
     #[cfg(feature = "encoding-bech32")]
@@ -63,8 +64,8 @@ pub trait SecureEncodingExt {
 impl SecureEncodingExt for [u8] {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
-    fn to_hex(&self) -> alloc::string::String {
-        hex_crate::encode(self)
+    fn to_hex(&self) -> crate::encoding::hex::HexString {
+        crate::encoding::hex::HexString::new_unchecked(hex_crate::encode(self))
     }
 
     #[cfg(feature = "encoding-hex")]
@@ -75,8 +76,8 @@ impl SecureEncodingExt for [u8] {
 
     #[cfg(feature = "encoding-base64")]
     #[inline(always)]
-    fn to_base64url(&self) -> alloc::string::String {
-        URL_SAFE_NO_PAD.encode(self)
+    fn to_base64url(&self) -> crate::encoding::base64::Base64String {
+        crate::encoding::base64::Base64String::new_unchecked(URL_SAFE_NO_PAD.encode(self))
     }
 
     #[cfg(feature = "encoding-bech32")]
@@ -112,8 +113,8 @@ impl SecureEncodingExt for [u8] {
 impl<const N: usize> SecureEncodingExt for [u8; N] {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
-    fn to_hex(&self) -> alloc::string::String {
-        hex_crate::encode(self)
+    fn to_hex(&self) -> crate::encoding::hex::HexString {
+        crate::encoding::hex::HexString::new_unchecked(hex_crate::encode(self))
     }
 
     #[cfg(feature = "encoding-hex")]
@@ -124,8 +125,8 @@ impl<const N: usize> SecureEncodingExt for [u8; N] {
 
     #[cfg(feature = "encoding-base64")]
     #[inline(always)]
-    fn to_base64url(&self) -> alloc::string::String {
-        URL_SAFE_NO_PAD.encode(self)
+    fn to_base64url(&self) -> crate::encoding::base64::Base64String {
+        crate::encoding::base64::Base64String::new_unchecked(URL_SAFE_NO_PAD.encode(self))
     }
 
     #[cfg(feature = "encoding-bech32")]

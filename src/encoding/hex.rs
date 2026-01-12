@@ -89,8 +89,7 @@ impl HexString {
         }
     }
 
-    #[cfg(feature = "rand")]
-    /// Internal constructor for trusted hex strings (e.g., from RNG).
+    /// Internal constructor for trusted hex strings (e.g., from RNG or encoding).
     ///
     /// Skips validation – caller must ensure the string is valid lowercase hex.
     pub(crate) fn new_unchecked(s: String) -> Self {

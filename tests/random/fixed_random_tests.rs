@@ -3,10 +3,6 @@
 
 #![cfg(feature = "rand")]
 
-#[cfg(feature = "encoding-base64")]
-use secure_gate::encoding::base64::Base64String;
-#[cfg(feature = "encoding-hex")]
-use secure_gate::encoding::hex::HexString;
 use secure_gate::random::FixedRandom;
 #[cfg(any(
     feature = "encoding-hex",
@@ -28,7 +24,7 @@ fn raw_fixed_random_works() {
 fn hex_methods_work() {
     // Test to_hex (non-consuming)
     let rng = FixedRandom::<4>::generate();
-    let hex = HexString::new(rng.expose_secret().to_hex()).unwrap();
+    let hex = rng.expose_secret().to_hex();
     assert_eq!(hex.byte_len(), 4);
     assert!(hex
         .expose_secret()
@@ -53,7 +49,7 @@ fn hex_methods_work() {
 #[test]
 fn base64_roundtrip() {
     let rng = FixedRandom::<32>::generate();
-    let encoded = Base64String::new(rng.expose_secret().to_base64url()).unwrap();
+    let encoded = rng.expose_secret().to_base64url();
     assert_eq!(
         encoded.expose_secret().to_bytes(),
         rng.expose_secret().to_vec()
@@ -65,7 +61,7 @@ fn base64_roundtrip() {
 fn base64_methods_work() {
     // Test to_base64 (non-consuming)
     let rng = FixedRandom::<4>::generate();
-    let base64 = Base64String::new(rng.expose_secret().to_base64url()).unwrap();
+    let base64 = rng.expose_secret().to_base64url();
     assert_eq!(base64.byte_len(), 4);
     // Valid URL-safe base64 chars
     assert!(base64

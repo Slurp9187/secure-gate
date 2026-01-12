@@ -20,7 +20,7 @@ fn into_base64_via_alias() {
 
     let key = Base64Key::generate();
     let b64_str = key.expose_secret().to_base64url();
-    let b64 = Base64String::new(b64_str).unwrap();
+    let b64 = b64_str;
 
     // URL-safe base64, no padding
     assert!(b64

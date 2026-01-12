@@ -212,7 +212,8 @@ Direct generation is also available:
     use secure_gate::{encoding::hex::HexString, SecureEncodingExt};
 
     let bytes = [0u8; 16];
-    let hex: String = bytes.to_hex();
+    let hex = bytes.to_hex();
+    let hex_str = hex.expose_secret();
     let hex_upper: String = bytes.to_hex_upper();
 
     let validated = HexString::new("deadbeef".to_string()).unwrap();

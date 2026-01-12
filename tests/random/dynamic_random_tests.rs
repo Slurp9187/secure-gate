@@ -3,10 +3,6 @@
 
 #![cfg(feature = "rand")]
 
-#[cfg(feature = "encoding-base64")]
-use secure_gate::encoding::base64::Base64String;
-#[cfg(feature = "encoding-hex")]
-use secure_gate::encoding::hex::HexString;
 #[allow(unused_imports)]
 use secure_gate::random::DynamicRandom;
 #[cfg(any(
@@ -33,7 +29,7 @@ fn ct_eq_different_lengths() {
 #[test]
 fn dynamic_random_base64() {
     let rng = DynamicRandom::generate(64);
-    let encoded = Base64String::new(rng.expose_secret().to_base64url()).unwrap();
+    let encoded = rng.expose_secret().to_base64url();
     assert_eq!(
         encoded.expose_secret().to_bytes(),
         rng.expose_secret().to_vec()
@@ -71,8 +67,7 @@ fn dynamic_random_bech32() {
 #[test]
 fn dynamic_random_hex() {
     let rng = DynamicRandom::generate(64);
-    let hex_str = rng.expose_secret().to_hex();
-    let hex = HexString::new(hex_str).unwrap();
+    let hex = rng.expose_secret().to_hex();
     assert_eq!(hex.byte_len(), 64);
 
     let rng2 = DynamicRandom::generate(64);
