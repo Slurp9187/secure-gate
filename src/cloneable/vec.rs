@@ -7,12 +7,10 @@ use zeroize::Zeroize;
 /// secret handling: `Clone` for duplication and `Zeroize` for secure memory wiping.
 /// The `zeroize(drop)` attribute ensures the vector contents are zeroized when
 /// this struct is dropped.
-#[cfg(feature = "zeroize")]
 #[derive(Clone, Zeroize)]
 #[zeroize(drop)]
 pub struct CloneableVecInner(Vec<u8>);
 
-#[cfg(feature = "zeroize")]
 impl crate::CloneSafe for CloneableVecInner {}
 
 /// A dynamically-sized vector of bytes wrapped as a cloneable secret.
@@ -39,10 +37,8 @@ impl crate::CloneSafe for CloneableVecInner {}
 /// assert_eq!(inner.len(), 4);
 /// # }
 /// ```
-#[cfg(feature = "zeroize")]
 pub type CloneableVec = Dynamic<CloneableVecInner>;
 
-#[cfg(feature = "zeroize")]
 impl CloneableVec {
     /// Returns a reference to the inner vector without cloning.
     ///
@@ -107,7 +103,6 @@ impl CloneableVec {
     }
 }
 
-#[cfg(feature = "zeroize")]
 /// Wrap a `Vec<u8>` in a `CloneableVec`.
 impl From<Vec<u8>> for CloneableVec {
     fn from(value: Vec<u8>) -> Self {
@@ -115,7 +110,6 @@ impl From<Vec<u8>> for CloneableVec {
     }
 }
 
-#[cfg(feature = "zeroize")]
 /// Wrap a byte slice in a `CloneableVec`.
 impl From<&[u8]> for CloneableVec {
     fn from(value: &[u8]) -> Self {

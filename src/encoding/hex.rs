@@ -89,7 +89,7 @@ impl HexString {
         }
     }
 
-    #[cfg(all(feature = "rand", feature = "encoding-hex"))]
+    #[cfg(feature = "rand")]
     /// Internal constructor for trusted hex strings (e.g., from RNG).
     ///
     /// Skips validation – caller must ensure the string is valid lowercase hex.
@@ -116,7 +116,7 @@ impl HexString {
 }
 
 /// Constant-time equality for hex strings — prevents timing attacks when `ct-eq` feature is enabled.
-#[cfg(all(feature = "encoding-hex", feature = "ct-eq"))]
+#[cfg(feature = "ct-eq")]
 impl PartialEq for HexString {
     fn eq(&self, other: &Self) -> bool {
         use crate::ct_eq::ConstantTimeEq;
@@ -127,7 +127,7 @@ impl PartialEq for HexString {
     }
 }
 
-#[cfg(all(feature = "encoding-hex", not(feature = "ct-eq")))]
+#[cfg(not(feature = "ct-eq"))]
 impl PartialEq for HexString {
     fn eq(&self, other: &Self) -> bool {
         self.0.expose_secret() == other.0.expose_secret()
@@ -135,7 +135,6 @@ impl PartialEq for HexString {
 }
 
 /// Equality implementation for hex strings.
-#[cfg(feature = "encoding-hex")]
 impl Eq for HexString {}
 
 /// Debug implementation (always redacted).

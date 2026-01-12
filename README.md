@@ -278,15 +278,17 @@ For reusable or library-provided secret types:
 ```rust
 use secure_gate::{fixed_generic_alias, dynamic_generic_alias};
 
-fixed_generic_alias!(pub GenericFixedBuffer<const N: usize>);
-dynamic_generic_alias!(pub GenericHeapSecret<T>);  // T can be any type
+fixed_generic_alias!(pub GenericFixedBuffer);
+dynamic_generic_alias!(pub GenericHeapSecret, Vec<u8>);  // Vec<u8> can be any type
 ```
 
 Custom doc strings (optional):
 
 ```rust
-fixed_generic_alias!(pub SecureBuffer<const N: usize>, "Generic fixed-size secret buffer");
-dynamic_generic_alias!(pub SecureHeap<T>, T, "Generic heap-allocated secret");
+use secure_gate::{fixed_generic_alias, dynamic_generic_alias};
+
+fixed_generic_alias!(pub SecureBuffer, "Generic fixed-size secret buffer");
+dynamic_generic_alias!(pub SecureHeap, String, "Generic heap-allocated secret");
 ```
 
 ### Random-Only Fixed Aliases (`rand` feature)

@@ -20,47 +20,31 @@
 /// you're certain cloning won't compromise security.
 ///
 /// This trait is re-exported at the crate root for convenience.
-#[cfg(feature = "zeroize")]
 pub trait CloneSafe: Clone + zeroize::Zeroize {
     // Pure marker, no methods
 }
 
-#[cfg(feature = "zeroize")]
 // Blanket implementations for primitive types that are safe to clone as secrets.
 // These include integer types commonly used in cryptographic operations like
 // keys, nonces, counters, and other small fixed-size values.
 impl CloneSafe for i8 {}
-#[cfg(feature = "zeroize")]
 impl CloneSafe for i16 {}
-#[cfg(feature = "zeroize")]
 impl CloneSafe for i32 {}
-#[cfg(feature = "zeroize")]
 impl CloneSafe for i64 {}
-#[cfg(feature = "zeroize")]
 impl CloneSafe for i128 {}
-#[cfg(feature = "zeroize")]
 impl CloneSafe for isize {}
 
-#[cfg(feature = "zeroize")]
 impl CloneSafe for u8 {}
-#[cfg(feature = "zeroize")]
 impl CloneSafe for u16 {}
-#[cfg(feature = "zeroize")]
 impl CloneSafe for u32 {}
-#[cfg(feature = "zeroize")]
 impl CloneSafe for u64 {}
-#[cfg(feature = "zeroize")]
 impl CloneSafe for u128 {}
-#[cfg(feature = "zeroize")]
 impl CloneSafe for usize {}
 
-#[cfg(feature = "zeroize")]
 impl CloneSafe for bool {}
-#[cfg(feature = "zeroize")]
 impl CloneSafe for char {}
 
 // Blanket implementation for fixed-size arrays of cloneable secret types.
 // This allows arrays like [u8; 32] (AES keys) or [u32; 8] (large integers)
 // to be safely cloned when used as secrets.
-#[cfg(feature = "zeroize")]
 impl<T: CloneSafe, const N: usize> CloneSafe for [T; N] {}

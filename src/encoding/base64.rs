@@ -100,7 +100,6 @@ impl Base64String {
 }
 
 // Constant-time equality for base64 strings – prevents timing attacks when ct-eq enabled
-#[cfg(feature = "encoding-base64")]
 impl PartialEq for Base64String {
     fn eq(&self, other: &Self) -> bool {
         #[cfg(feature = "ct-eq")]
@@ -118,7 +117,6 @@ impl PartialEq for Base64String {
     }
 }
 
-#[cfg(feature = "encoding-base64")]
 impl Eq for Base64String {}
 
 /// Debug implementation (always redacted).

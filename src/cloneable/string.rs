@@ -7,12 +7,10 @@ use zeroize::Zeroize;
 /// secret handling: `Clone` for duplication and `Zeroize` for secure memory wiping.
 /// The `zeroize(drop)` attribute ensures the string contents are zeroized when
 /// this struct is dropped.
-#[cfg(feature = "zeroize")]
 #[derive(Clone, Zeroize)]
 #[zeroize(drop)]
 pub struct CloneableStringInner(String);
 
-#[cfg(feature = "zeroize")]
 impl crate::CloneSafe for CloneableStringInner {}
 
 /// A string wrapped as a cloneable secret.
@@ -39,10 +37,8 @@ impl crate::CloneSafe for CloneableStringInner {}
 /// assert_eq!(inner.as_str(), "secret123");
 /// # }
 /// ```
-#[cfg(feature = "zeroize")]
 pub type CloneableString = Dynamic<CloneableStringInner>;
 
-#[cfg(feature = "zeroize")]
 impl CloneableString {
     /// Returns a reference to the inner string without cloning.
     ///
@@ -116,7 +112,6 @@ impl CloneableString {
     }
 }
 
-#[cfg(feature = "zeroize")]
 /// Wrap a `String` in a `CloneableString`.
 impl From<String> for CloneableString {
     fn from(value: String) -> Self {
@@ -124,7 +119,6 @@ impl From<String> for CloneableString {
     }
 }
 
-#[cfg(feature = "zeroize")]
 /// Wrap a string slice in a `CloneableString`.
 impl From<&str> for CloneableString {
     fn from(value: &str) -> Self {

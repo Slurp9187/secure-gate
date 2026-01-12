@@ -1,11 +1,10 @@
-#[cfg(feature = "encoding-hex")]
 use ::hex as hex_crate;
 
 // ========================================
 // Consuming (into_) methods on RNG types
 // ========================================
 
-#[cfg(all(feature = "rand", feature = "encoding-hex"))]
+#[cfg(feature = "rand")]
 impl crate::DynamicRandom {
     /// Consume self and return the random bytes as a validated hex string.
     ///
@@ -16,7 +15,7 @@ impl crate::DynamicRandom {
     }
 }
 
-#[cfg(all(feature = "rand", feature = "encoding-hex"))]
+#[cfg(feature = "rand")]
 impl<const N: usize> crate::FixedRandom<N> {
     /// Consume self and return the random bytes as a validated hex string.
     ///
@@ -31,7 +30,7 @@ impl<const N: usize> crate::FixedRandom<N> {
 // Borrowing (to_) methods on RNG types
 // ========================================
 
-#[cfg(all(feature = "rand", feature = "encoding-hex"))]
+#[cfg(feature = "rand")]
 impl<const N: usize> crate::FixedRandom<N> {
     /// Borrow and encode the random bytes as a validated lowercase hex string (allocates).
     ///
@@ -42,7 +41,7 @@ impl<const N: usize> crate::FixedRandom<N> {
     }
 }
 
-#[cfg(all(feature = "rand", feature = "encoding-hex"))]
+#[cfg(feature = "rand")]
 impl crate::DynamicRandom {
     /// Borrow and encode the random bytes as a validated lowercase hex string (allocates).
     ///
@@ -58,10 +57,8 @@ impl crate::DynamicRandom {
 // ========================================
 
 /// View struct for exposed hex strings, allowing decoding without direct access.
-#[cfg(feature = "encoding-hex")]
 pub struct HexStringView<'a>(pub(crate) &'a String);
 
-#[cfg(feature = "encoding-hex")]
 impl<'a> HexStringView<'a> {
     /// Decode the validated hex string into raw bytes (allocates).
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -69,7 +66,6 @@ impl<'a> HexStringView<'a> {
     }
 }
 
-#[cfg(feature = "encoding-hex")]
 impl<'a> core::ops::Deref for HexStringView<'a> {
     type Target = str;
     fn deref(&self) -> &Self::Target {
@@ -77,21 +73,18 @@ impl<'a> core::ops::Deref for HexStringView<'a> {
     }
 }
 
-#[cfg(feature = "encoding-hex")]
 impl<'a> core::fmt::Debug for HexStringView<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
     }
 }
 
-#[cfg(feature = "encoding-hex")]
 impl<'a> core::fmt::Display for HexStringView<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(self.0)
     }
 }
 
-#[cfg(feature = "encoding-hex")]
 impl<'a> core::cmp::PartialEq<&str> for HexStringView<'a> {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
@@ -102,7 +95,6 @@ impl<'a> core::cmp::PartialEq<&str> for HexStringView<'a> {
 // expose_secret → view implementations
 // ========================================
 
-#[cfg(feature = "encoding-hex")]
 impl crate::encoding::hex::HexString {
     pub fn expose_secret(&self) -> HexStringView<'_> {
         HexStringView(self.0.expose_secret())
@@ -113,7 +105,6 @@ impl crate::encoding::hex::HexString {
 // Consuming decode (into_bytes) for secure zeroization
 // ========================================
 
-#[cfg(feature = "encoding-hex")]
 impl crate::encoding::hex::HexString {
     /// Decode the validated hex string into raw bytes, consuming and zeroizing the wrapper.
     pub fn into_bytes(self) -> Vec<u8> {

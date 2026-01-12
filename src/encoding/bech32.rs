@@ -115,7 +115,6 @@ impl Bech32String {
         }
     }
 
-    #[cfg(feature = "encoding-bech32")]
     /// Exact number of bytes the decoded payload represents (allocation-free).
     pub fn byte_len(&self) -> usize {
         let s = self.inner.expose_secret().as_str();
@@ -125,7 +124,6 @@ impl Bech32String {
         (data_chars * 5) / 8
     }
 
-    #[cfg(feature = "encoding-bech32")]
     /// The Human-Readable Part (HRP) of the string.
     pub fn hrp(&self) -> Hrp {
         let (hrp, _) = bech32::decode(self.inner.expose_secret().as_str())
@@ -133,7 +131,6 @@ impl Bech32String {
         hrp
     }
 
-    #[cfg(feature = "encoding-bech32")]
     /// Get the detected encoding variant.
     pub fn variant(&self) -> EncodingVariant {
         self.variant
@@ -163,7 +160,7 @@ impl Bech32String {
 }
 
 /// Constant-time equality (prevents timing attacks when comparing encoded secrets).
-#[cfg(all(feature = "encoding-bech32", feature = "ct-eq"))]
+#[cfg(feature = "ct-eq")]
 impl PartialEq for Bech32String {
     fn eq(&self, other: &Self) -> bool {
         use crate::ct_eq::ConstantTimeEq;
@@ -175,7 +172,7 @@ impl PartialEq for Bech32String {
 }
 
 /// Regular equality (fallback when `ct-eq` feature is not enabled).
-#[cfg(all(feature = "encoding-bech32", not(feature = "ct-eq")))]
+#[cfg(not(feature = "ct-eq"))]
 impl PartialEq for Bech32String {
     fn eq(&self, other: &Self) -> bool {
         self.inner.expose_secret() == other.inner.expose_secret()
@@ -183,7 +180,6 @@ impl PartialEq for Bech32String {
 }
 
 /// Equality implementation.
-#[cfg(feature = "encoding-bech32")]
 impl Eq for Bech32String {}
 
 /// Debug implementation (always redacted).
