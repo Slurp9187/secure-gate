@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Accepts mixed-case input (normalized to lowercase for canonical storage).
   - Provides `into_bytes()`, non-allocating `byte_len()`, `hrp()`, constant-time equality, and zeroing of invalid inputs (when `zeroize` enabled).
 - Granular `encoding-bech32` feature and inclusion in meta-feature `encoding`.
+- `Bech32EncodingError` enum for Bech32 encoding operations (`InvalidHrp`, `EncodingFailed`).
+- Fallible Bech32 encoding methods: `try_to_bech32()`, `try_to_bech32m()`, `try_into_bech32()`, `try_into_bech32m()` on `FixedRandom<N>`, `DynamicRandom`, and `SecureEncodingExt`.
+- Security Checklist section in README.md with best practices derived from security audit.
+- Enhanced `CloneSafe` trait documentation with warnings against custom implementations.
 
 ### Changed
 
@@ -64,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added non-allocating `byte_len()` implementations.
   - Refactored encoding traits into `extensions` module with borrowing view types (`HexStringView`, `Base64StringView`, `Bech32StringView`).
 - `Base64String`: simplified validation using single engine-based decode check.
+- Cargo.toml features: `default = ["secure"]` (bundles `zeroize` and `ct-eq`); new `secure` feature; `insecure` for opt-out; updated `full = ["secure", "encoding"]`.
+- `SecureEncodingExt` re-export cfg updated to include `encoding-bech32` feature.
 
 ### Fixed
 
@@ -75,6 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance: Removed unnecessary clone in `CloneableArray` constructor.
 - **FromSliceError enhancement**: Now includes actual vs expected lengths for better developer experience.
 - **Security documentation**: Prominent warnings in encoding modules about zeroize feature requirements for secure wiping of invalid inputs.
+- Removed misplaced `into_bytes` impl on `Bech32StringView` (borrow-only views cannot be consumed).
+- Clippy warnings: removed unused `detect_variant` function and empty line after doc comment.
 
 ### Removed
 
