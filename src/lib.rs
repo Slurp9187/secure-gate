@@ -39,6 +39,13 @@ pub use cloneable::{CloneableArray, CloneableString, CloneableVec};
 /// Convenient macros for creating custom secret wrapper types.
 mod macros;
 
+/// Available macros (exported globally for convenience):
+/// - `dynamic_alias!`: Create type aliases for heap-allocated secrets (`Dynamic<T>`).
+/// - `dynamic_generic_alias!`: Create generic heap-allocated secret aliases.
+/// - `fixed_alias!`: Create type aliases for fixed-size secrets (`Fixed<[u8; N]>`).
+/// - `fixed_generic_alias!`: Create generic fixed-size secret aliases.
+/// - `fixed_alias_random!`: Create type aliases for random-only fixed-size secrets (`FixedRandom<N>`, requires `rand` feature).
+
 /// Cryptographically secure random generation (requires the `rand` feature).
 /// Provides RNG-backed secret generation with freshness guarantees.
 #[cfg(feature = "rand")]
