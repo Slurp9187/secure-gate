@@ -78,7 +78,11 @@ pub use encoding::base64::Base64String;
 pub use encoding::bech32::Bech32String;
 
 /// Re-export of [`SecureEncodingExt`] trait for convenient encoding extensions.
-#[cfg(any(feature = "encoding-hex", feature = "encoding-base64"))]
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
 pub use crate::encoding::extensions::SecureEncodingExt;
 
 /// Re-export of the [`FromSliceError`] type.

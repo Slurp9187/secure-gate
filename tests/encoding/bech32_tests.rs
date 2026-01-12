@@ -116,7 +116,7 @@ fn rng_into_bech32_variant_detection_and_round_trip() {
     let rng = FixedRandom::<16>::generate();
     let raw_bytes = rng.expose_secret().to_vec();
 
-    let b32 = rng.expose_secret().to_bech32("test");
+    let b32 = rng.expose_secret().try_to_bech32("test").unwrap();
     let parsed = Bech32String::new(b32.expose_secret().to_string()).unwrap();
     assert!(parsed.is_bech32());
     assert_eq!(parsed.expose_secret().to_bytes(), raw_bytes);
@@ -124,7 +124,7 @@ fn rng_into_bech32_variant_detection_and_round_trip() {
     let rng_m = FixedRandom::<16>::generate();
     let raw_bytes_m = rng_m.expose_secret().to_vec();
 
-    let b32m = rng_m.expose_secret().to_bech32m("test");
+    let b32m = rng_m.expose_secret().try_to_bech32m("test").unwrap();
     let parsed_m = Bech32String::new(b32m.expose_secret().to_string()).unwrap();
     assert!(parsed_m.is_bech32m());
     assert_eq!(parsed_m.expose_secret().to_bytes(), raw_bytes_m);
@@ -138,7 +138,7 @@ fn rng_into_bech32_consuming_round_trip() {
     let rng = FixedRandom::<32>::generate();
     let raw_bytes = rng.expose_secret().to_vec();
 
-    let b32 = rng.into_bech32("example");
+    let b32 = rng.try_into_bech32("example").unwrap();
     assert!(b32.is_bech32());
     assert_eq!(b32.byte_len(), 32);
     assert_eq!(b32.into_bytes(), raw_bytes);
@@ -146,7 +146,7 @@ fn rng_into_bech32_consuming_round_trip() {
     let rng_m = FixedRandom::<32>::generate();
     let raw_bytes_m = rng_m.expose_secret().to_vec();
 
-    let b32m = rng_m.into_bech32m("example");
+    let b32m = rng_m.try_into_bech32m("example").unwrap();
     assert!(b32m.is_bech32m());
     assert_eq!(b32m.byte_len(), 32);
     assert_eq!(b32m.into_bytes(), raw_bytes_m);

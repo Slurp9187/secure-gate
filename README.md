@@ -145,6 +145,8 @@ use secure_gate::CloneableString;
 
 ### Custom Cloneable Types
 
+**Note**: Custom implementations of `CloneSafe` are possible but discouraged — stick to the pre-baked `CloneableArray`, `CloneableString`, or `CloneableVec` types unless you have a strong justification. Improper impls can undermine the crate's cloning guarantees.
+
 ```rust
 #[cfg(feature = "zeroize")]
 use secure_gate::CloneSafe;
@@ -258,6 +260,26 @@ Encoding requires explicit `.expose_secret()`. Invalid inputs to `.new()` are ze
 ```
 
 Available on `Fixed<[u8; N]>` and `Dynamic<T>` where `T: AsRef<[u8]>`.
+
+## Security Checklist
+
+To maximize the security of your application when using `secure-gate`, adhere to these guidelines derived from the project's security audit:
+
+- **Enable Zeroization by Default**: Use the default feature set, which includes `zeroize` for automatic secure wiping of secret memory. Avoid `no-default-features` unless you implement manual zeroization and have strong justification.
+
+- **Pre-validate Encoding Inputs**: For Bech32 and other encodings, validate inputs (e.g., HRPs) upfront. Use `try_*` methods (e.g., `try_to_bech32`) and handle errors to prevent DoS from malformed data.
+
+- **Use Constant-Time Comparisons**: Enable the `ct-eq` feature for all sensitive equality checks to mitigate timing attacks.
+
+- **Minimize Secret Exposures**: Audit your code for `.expose_secret()` calls; keep them minimal, logged, and justified. Avoid unnecessary exposures.
+
+- **Gate Features Conservatively**: Only enable required features (e.g., specific encodings) to limit attack surfaces in production.
+
+- **Safe Cloning**: Restrict cloning to when absolutely needed. Use built-in `CloneSafe` types or implement the trait with care, ensuring `Zeroize` is derived or implemented.
+
+- **Regular Audits**: Periodically review your secret handling logic, especially after dependency updates, to confirm compliance with these practices.
+
+For full audit details, see [`docs/ai_security_audit_recommendations.md`](docs/ai_security_audit_recommendations.md).
 
 ## Macros
 

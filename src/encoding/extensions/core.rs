@@ -47,13 +47,19 @@ pub trait SecureEncodingExt {
     #[cfg(feature = "encoding-base64")]
     fn to_base64url(&self) -> crate::encoding::base64::Base64String;
 
-    /// Encode secret bytes as Bech32 with the specified HRP.
+    /// Try to encode secret bytes as Bech32 with the specified HRP.
     #[cfg(feature = "encoding-bech32")]
-    fn to_bech32(&self, hrp: &str) -> crate::encoding::bech32::Bech32String;
+    fn try_to_bech32(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::encoding::bech32::Bech32String, &'static str>;
 
-    /// Encode secret bytes as Bech32m with the specified HRP.
+    /// Try to encode secret bytes as Bech32m with the specified HRP.
     #[cfg(feature = "encoding-bech32")]
-    fn to_bech32m(&self, hrp: &str) -> crate::encoding::bech32::Bech32String;
+    fn try_to_bech32m(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::encoding::bech32::Bech32String, &'static str>;
 }
 
 #[cfg(any(
@@ -82,26 +88,31 @@ impl SecureEncodingExt for [u8] {
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn to_bech32(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
-        let hrp = bech32::Hrp::parse(hrp).expect("invalid HRP");
-        let encoded =
-            bech32::encode::<bech32::Bech32>(hrp, self).expect("encoding valid bytes cannot fail");
-        crate::encoding::bech32::Bech32String::new_unchecked(
+    fn try_to_bech32(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::encoding::bech32::Bech32String, &'static str> {
+        let hrp = bech32::Hrp::parse(hrp).map_err(|_| "invalid HRP")?;
+        let encoded = bech32::encode::<bech32::Bech32>(hrp, self).map_err(|_| "encoding failed")?;
+        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32,
-        )
+        ))
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn to_bech32m(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
-        let hrp = bech32::Hrp::parse(hrp).expect("invalid HRP");
+    fn try_to_bech32m(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::encoding::bech32::Bech32String, &'static str> {
+        let hrp = bech32::Hrp::parse(hrp).map_err(|_| "invalid HRP")?;
         let encoded =
-            bech32::encode::<bech32::Bech32m>(hrp, self).expect("encoding valid bytes cannot fail");
-        crate::encoding::bech32::Bech32String::new_unchecked(
+            bech32::encode::<bech32::Bech32m>(hrp, self).map_err(|_| "encoding failed")?;
+        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32m,
-        )
+        ))
     }
 }
 
@@ -131,25 +142,30 @@ impl<const N: usize> SecureEncodingExt for [u8; N] {
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn to_bech32(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
-        let hrp = bech32::Hrp::parse(hrp).expect("invalid HRP");
-        let encoded =
-            bech32::encode::<bech32::Bech32>(hrp, self).expect("encoding valid bytes cannot fail");
-        crate::encoding::bech32::Bech32String::new_unchecked(
+    fn try_to_bech32(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::encoding::bech32::Bech32String, &'static str> {
+        let hrp = bech32::Hrp::parse(hrp).map_err(|_| "invalid HRP")?;
+        let encoded = bech32::encode::<bech32::Bech32>(hrp, self).map_err(|_| "encoding failed")?;
+        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32,
-        )
+        ))
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn to_bech32m(&self, hrp: &str) -> crate::encoding::bech32::Bech32String {
-        let hrp = bech32::Hrp::parse(hrp).expect("invalid HRP");
+    fn try_to_bech32m(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::encoding::bech32::Bech32String, &'static str> {
+        let hrp = bech32::Hrp::parse(hrp).map_err(|_| "invalid HRP")?;
         let encoded =
-            bech32::encode::<bech32::Bech32m>(hrp, self).expect("encoding valid bytes cannot fail");
-        crate::encoding::bech32::Bech32String::new_unchecked(
+            bech32::encode::<bech32::Bech32m>(hrp, self).map_err(|_| "encoding failed")?;
+        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
             encoded,
             crate::encoding::bech32::EncodingVariant::Bech32m,
-        )
+        ))
     }
 }

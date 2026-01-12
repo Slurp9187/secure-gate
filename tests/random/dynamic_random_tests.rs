@@ -44,12 +44,12 @@ fn dynamic_random_base64() {
 #[test]
 fn dynamic_random_bech32() {
     let rng = DynamicRandom::generate(64);
-    let b32 = rng.expose_secret().to_bech32("test");
+    let b32 = rng.expose_secret().try_to_bech32("test").unwrap();
     assert!(b32.is_bech32());
     assert_eq!(b32.expose_secret().to_bytes(), rng.expose_secret().to_vec());
 
     let rng2 = DynamicRandom::generate(64);
-    let b32m = rng2.expose_secret().to_bech32m("test");
+    let b32m = rng2.expose_secret().try_to_bech32m("test").unwrap();
     assert!(b32m.is_bech32m());
     assert_eq!(
         b32m.expose_secret().to_bytes(),
@@ -58,7 +58,7 @@ fn dynamic_random_bech32() {
 
     // into_* consuming
     let rng3 = DynamicRandom::generate(32);
-    let owned_b32 = rng3.into_bech32("hrp");
+    let owned_b32 = rng3.try_into_bech32("hrp").unwrap();
     assert!(owned_b32.is_bech32());
     assert_eq!(owned_b32.into_bytes().len(), 32);
 }

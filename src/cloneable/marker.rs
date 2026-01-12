@@ -5,7 +5,13 @@
 //! when handling sensitive data. The trait ensures that only types meeting the
 //! security requirements (Clone + Zeroize) can be used in cloneable secret wrappers.
 
-/// Marker trait for types that can be safely cloned when used as secrets.
+/// Marker trait enabling safe cloning of secrets.
+///
+/// **WARNING**: Implementing this trait allows deep cloning of secret data, which can
+/// prolong memory lifetime and increase attack surface. Only implement for small,
+/// primitive-like types (e.g., fixed arrays of primitives). Prefer built-in
+/// `CloneableArray`, `CloneableString`, or `CloneableVec` for common cases.
+/// Misuse can bypass the crate's no-accidental-clone guarantees.
 ///
 /// Types implementing this trait guarantee that:
 /// - They can be cloned without leaking sensitive information

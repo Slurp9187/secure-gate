@@ -87,11 +87,11 @@ fn base64_methods_work() {
 #[test]
 fn bech32_variants_roundtrip() {
     let rng = FixedRandom::<32>::generate();
-    let b32 = rng.expose_secret().to_bech32("test");
+    let b32 = rng.expose_secret().try_to_bech32("test").unwrap();
     assert!(b32.is_bech32());
     assert_eq!(b32.expose_secret().to_bytes(), rng.expose_secret().to_vec());
 
-    let b32m = rng.expose_secret().to_bech32m("test");
+    let b32m = rng.expose_secret().try_to_bech32m("test").unwrap();
     assert!(b32m.is_bech32m());
     assert_eq!(
         b32m.expose_secret().to_bytes(),
@@ -104,22 +104,22 @@ fn bech32_variants_roundtrip() {
 fn bech32_methods_work() {
     // Test various sizes
     let rng16 = FixedRandom::<16>::generate();
-    let b32_16 = rng16.expose_secret().to_bech32("example");
+    let b32_16 = rng16.expose_secret().try_to_bech32("example").unwrap();
     assert!(b32_16.is_bech32());
     assert_eq!(b32_16.into_bytes().len(), 16);
 
-    let b32m_16 = rng16.expose_secret().to_bech32m("example");
+    let b32m_16 = rng16.expose_secret().try_to_bech32m("example").unwrap();
     assert!(b32m_16.is_bech32m());
     assert_eq!(b32m_16.into_bytes().len(), 16);
 
     // Test into_* (consuming)
     let rng32 = FixedRandom::<32>::generate();
-    let owned_b32 = rng32.into_bech32("hrp");
+    let owned_b32 = rng32.try_into_bech32("hrp").unwrap();
     assert!(owned_b32.is_bech32());
     assert_eq!(owned_b32.into_bytes().len(), 32);
 
     let rng32m = FixedRandom::<32>::generate();
-    let owned_b32m = rng32m.into_bech32m("hrp");
+    let owned_b32m = rng32m.try_into_bech32m("hrp").unwrap();
     assert!(owned_b32m.is_bech32m());
     assert_eq!(owned_b32m.into_bytes().len(), 32);
 }
