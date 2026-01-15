@@ -20,24 +20,24 @@ Access requires an explicit `.expose_secret()` (or `.expose_secret_mut()`) call 
 
 ```toml
 [dependencies]
-secure-gate = "0.7.0"
+secure-gate = "0.7.0-rc.6"
 ```
 
 Basic configuration includes `zeroize` and `ct-eq` (via the `secure` meta-feature) for secure memory handling and constant-time equality.
 
 **Recommended for most users** (secure defaults):
 ```toml
-secure-gate = "0.7.0" # default enables "secure"
+secure-gate = "0.7.0-rc.6" # default enables "secure"
 ```
 
 **Batteries-included** (all optional features):
 ```toml
-secure-gate = { version = "0.7.0", features = ["full"] }
+secure-gate = { version = "0.7.0-rc.6", features = ["full"] }
 ```
 
 **Constrained / minimal builds** (no zeroization or ct-eq — **strongly discouraged** for production):
 ```toml
-secure-gate = { version = "0.7.0", default-features = false, features = ["insecure"] }
+secure-gate = { version = "0.7.0-rc.6", default-features = false, features = ["insecure"] }
 ```
 
 ## Features
