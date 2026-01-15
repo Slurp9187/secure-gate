@@ -1,6 +1,8 @@
 # secure-gate
 `no_std`-compatible wrappers for sensitive data with explicit exposure requirements.
 
+> **Note**: This crate is in active development and has not undergone independent security audit. Please review it for your use case and handle sensitive data with care.
+
 - `Fixed<T>` — Stack-allocated wrapper  
 - `Dynamic<T>` — Heap-allocated wrapper  
 - `FixedRandom<N>` — Stack-allocated cryptographically secure random bytes  
