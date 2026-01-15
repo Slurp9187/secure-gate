@@ -11,14 +11,18 @@
 //! The extensions are designed to work seamlessly with the main encoding types
 //! while maintaining security guarantees.
 
-pub mod core;
-#[cfg(feature = "encoding-hex")]
-pub mod hex;
 #[cfg(feature = "encoding-base64")]
 pub mod base64;
 #[cfg(feature = "encoding-bech32")]
 pub mod bech32;
+pub mod core;
+#[cfg(feature = "encoding-hex")]
+pub mod hex;
 
+#[cfg(feature = "encoding-base64")]
+pub use base64::Base64StringView;
+#[cfg(feature = "encoding-bech32")]
+pub use bech32::Bech32StringView;
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",
@@ -27,7 +31,3 @@ pub mod bech32;
 pub use core::SecureEncodingExt;
 #[cfg(feature = "encoding-hex")]
 pub use hex::HexStringView;
-#[cfg(feature = "encoding-base64")]
-pub use base64::Base64StringView;
-#[cfg(feature = "encoding-bech32")]
-pub use bech32::Bech32StringView;

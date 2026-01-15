@@ -85,7 +85,7 @@ mod tests {
     #[cfg(not(feature = "ct-eq"))]
     #[test]
     fn partial_eq_fallback() {
-        use secure_gate::{Fixed, Dynamic};
+        use secure_gate::{Dynamic, Fixed};
 
         // Test Fixed<T> equality
         let fixed1 = Fixed::new([1u8, 2, 3]);
