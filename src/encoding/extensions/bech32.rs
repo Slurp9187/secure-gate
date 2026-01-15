@@ -2,6 +2,7 @@
 #[allow(unused_imports)] // Clippy bug: doesn't recognize use in generics
 use ::bech32::{decode, encode, Hrp};
 
+#[cfg(feature = "rand")]
 use crate::Bech32EncodingError;
 
 // ========================================

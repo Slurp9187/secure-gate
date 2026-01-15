@@ -21,6 +21,41 @@ fn from_slice_error_debug() {
     }
 }
 
+/// Test FromSliceError on mismatch
+#[test]
+fn from_slice_error_on_mismatch() {
+    use secure_gate::{Fixed, FromSliceError};
+
+    let short: &[u8] = &[1, 2];
+    let long: &[u8] = &[1, 2, 3, 4];
+
+    let err_short: Result<Fixed<[u8; 3]>, FromSliceError> = Fixed::try_from(short);
+    match err_short {
+        Err(e) => {
+            assert_eq!(
+                e.to_string(),
+                "slice length mismatch: expected 3 bytes, got 2 bytes"
+            );
+        }
+        _ => panic!("Expected error"),
+    }
+
+    let err_long: Result<Fixed<[u8; 3]>, FromSliceError> = Fixed::try_from(long);
+    match err_long {
+        Err(e) => {
+            assert_eq!(
+                e.to_string(),
+                "slice length mismatch: expected 3 bytes, got 4 bytes"
+            );
+        }
+        _ => panic!("Expected error"),
+    }
+
+    // Successful case for comparison
+    let ok: Fixed<[u8; 3]> = Fixed::try_from(&[1, 2, 3][..]).unwrap();
+    assert_eq!(ok.expose_secret(), &[1, 2, 3]);
+}
+
 /// Test Bech32EncodingError variants (requires encoding-bech32 feature)
 #[cfg(feature = "encoding-bech32")]
 #[test]
