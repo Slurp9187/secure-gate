@@ -1,35 +1,36 @@
 # Security Considerations for secure-gate
 
+## TL;DR
+- No independent audit yet—review the code yourself before production use.
+- Defaults are secure (`zeroize` + `ct-eq` enabled).
+- Explicit `.expose_secret()` for auditability; zeroization on drop (with `zeroize`).
+- Use GitHub's Security tab for vulnerability reports (private preferred, public acceptable).
+
 This document outlines key security aspects to consider when using the `secure-gate` crate for handling sensitive data. It is intended for developers evaluating the library for security-critical applications.
 
 ## Audit Status
-
 `secure-gate` has not undergone independent security audit. The crate is in active development and relies on well-established dependencies (e.g., `zeroize`, `subtle`). Review the implementation and test coverage before use in production.
 
 ## Core Security Model
-
 - **Explicit Exposure**: Secret data access requires explicit `.expose_secret()` calls, minimizing accidental leaks. Audit these calls in your code.
 - **Zeroization**: Memory is zeroized on drop when `zeroize` feature is enabled. Without it, data may linger until normal deallocation.
 - **No Implicit Access**: No `Deref` implementations prevent silent borrowing or copying.
 - **Constant-Time Operations**: Timing-safe equality available with `ct-eq` feature; disable only with justification.
 
 ## Feature Implications
-
 - **`zeroize` (Default)**: Enables memory wiping and safe cloning. Recommended for all use cases handling secrets.
 - **`ct-eq` (Default)**: Provides timing-safe comparisons. Avoid `==` for secrets.
 - **`rand`**: Generates cryptographically secure random values. Ensure OS RNG is available and secure.
 - **Encoding Features**: Validate inputs before encoding to prevent malformed outputs or attacks.
 
 ## Potential Concerns
-
-- **Unsafe Code**: Allowed only with required features (e.g., hex validation). Forbidden otherwise.
+- **Unsafe Code**: The crate contains no `unsafe` code. `forbid(unsafe_code)` is applied in minimal configurations as a defensive measure.
 - **Heap Allocation**: `Dynamic<T>` types may leave slack capacity until drop; call `shrink_to_fit()` to mitigate.
 - **Custom Types**: Avoid wrapping sensitive data in non-zeroizeable types; implement `CloneSafe` carefully.
-- **Error Handling**: Errors (e.g., `FromSliceError`) expose metadata only; sensitive data is zeroized on failure.
+- **Error Handling**: Errors like `FromSliceError` expose length metadata only; in encoding failures, invalid inputs are zeroized (with `zeroize` enabled).
 - **Macro Usage**: Macros create type aliases—ensure they match your security needs.
 
 ## Best Practices
-
 - Enable default features (`zeroize` + `ct-eq`) unless constrained environments require otherwise.
 - Audit `.expose_secret()` sites for necessity and duration.
 - Use semantic aliases (e.g., `fixed_alias!`) for clarity.
@@ -44,11 +45,9 @@ This document outlines key security aspects to consider when using the `secure-g
 - Response target: 48 hours.
 
 ## Module-by-Module Security Analysis
-
 This section provides a professional reviewer's perspective on each module's security design, highlighting strengths, potential weaknesses, and review points. It assumes a threat model focused on confidentiality, integrity, and timing attacks in cryptographic contexts.
 
 ### Core Modules (`lib.rs`, `fixed.rs`, `dynamic.rs`)
-
 **Strengths**:
 - Explicit exposure model forces audited access—strong against accidental leaks.
 - Zeroization on drop (with `zeroize`) prevents lingering secrets.
@@ -61,7 +60,7 @@ This section provides a professional reviewer's perspective on each module's sec
 
 **Mitigations**:
 - Regularly call `shrink_to_fit()` on `Dynamic` variants after operations to minimize slack.
-- Use compile-time assertions in macros (e.g., `const _: () = { let _ = [(); $size][0]; };`) to catch invalid sizes early.
+- Use compile-time assertions in macros to catch invalid sizes early.
 - Contextualize error handling to avoid leaking metadata in sensitive contexts.
 
 **Review Points**:
@@ -90,7 +89,6 @@ This section provides a professional reviewer's perspective on each module's sec
 - Verify custom types satisfy `Zeroize` (compiler-enforced).
 
 ### Random Module (`random/`)
-
 **Strengths**:
 - Enforces RNG construction—cannot create from arbitrary bytes.
 - Ties to OS RNG (`OsRng`) for freshness and entropy.
@@ -111,7 +109,6 @@ This section provides a professional reviewer's perspective on each module's sec
 - Review encoding integrations for post-generation leaks.
 
 ### Constant-Time Equality (`ct_eq.rs`)
-
 **Strengths**:
 - Provides `ConstantTimeEq` trait—prevents timing leaks in comparisons.
 - Uses `subtle` crate for vetted impls.
@@ -128,7 +125,6 @@ This section provides a professional reviewer's perspective on each module's sec
 - Test timing differences with tools like cachegrind.
 
 ### Encoding Module (`encoding/`)
-
 **Strengths**:
 - Validates inputs (e.g., hex/base64)—prevents injection or malformed data.
 - Zeroizes invalid inputs with `zeroize`.
@@ -150,10 +146,8 @@ This section provides a professional reviewer's perspective on each module's sec
 - Ensure decoded outputs are handled securely post-validation.
 
 ### Error Handling (`error.rs`)
-
 **Strengths**:
 - Exposes only safe metadata (e.g., lengths); zeroizes secrets on failure.
-- Manual `Error` impl avoids deprecated methods.
 
 **Potential Weaknesses**:
 - Length metadata (e.g., expected vs. actual) may be sensitive in some contexts.
@@ -167,7 +161,6 @@ This section provides a professional reviewer's perspective on each module's sec
 - Ensure error handling doesn't bypass zeroization.
 
 ### Overall Architecture
-
 **Strengths**:
 - Modular, feature-gated design—reduces attack surface when unused.
 - No-unsafe-by-default with selective allowances—code review friendly.
@@ -191,5 +184,4 @@ This section provides a professional reviewer's perspective on each module's sec
 This analysis is not exhaustive—perform your own threat modeling.
 
 ## Disclaimer
-
 This crate is provided under MIT OR Apache-2.0 licenses. It comes with no warranties. Users are responsible for evaluating security for their specific use cases.
