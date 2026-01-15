@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ct_eq` module with `ConstantTimeEq` trait and inherent `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
 - Fallible construction: `impl TryFrom<&[u8]> for Fixed<[u8; N]>` with `FromSliceError`.
   - `from_slice` now delegates to `TryFrom` (panics for compatibility).
+  - Error types centralized in `error.rs` with `thiserror` for improved error handling.
 - Compile-fail testing infrastructure using `trybuild` for security invariant verification.
 - Conversions: `From<&str>` for `Dynamic<String>` and `From<&[u8]>` for `Dynamic<Vec<u8>>`.
 - Explicit methods on `HexString` and `Base64String`: `.expose_secret() -> &String`, `.len()`, `.is_empty()`, `.byte_len()`.
@@ -41,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Accepts mixed-case input (normalized to lowercase for canonical storage).
   - Provides `into_bytes()`, non-allocating `byte_len()`, `hrp()`, constant-time equality, and zeroing of invalid inputs (when `zeroize` enabled).
 - Granular `encoding-bech32` feature and inclusion in meta-feature `encoding`.
+- Centralized error types in new `error.rs` module.
+- Implemented `thiserror` for automatic `Display` and `std::error::Error` trait implementations on error types.
 - `Bech32EncodingError` enum for Bech32 encoding operations (`InvalidHrp`, `EncodingFailed`).
 - Fallible Bech32 encoding methods: `try_to_bech32()`, `try_to_bech32m()`, `try_into_bech32()`, `try_into_bech32m()` on `FixedRandom<N>`, `DynamicRandom`, and `SecureEncodingExt`.
 - Security Checklist section in README.md with best practices derived from security audit.
