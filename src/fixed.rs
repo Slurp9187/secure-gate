@@ -4,6 +4,8 @@ use core::fmt;
 #[cfg(feature = "rand")]
 use rand::rand_core::OsError;
 
+use crate::FromSliceError;
+
 /// Stack-allocated secure secret wrapper.
 ///
 /// This is a zero-cost wrapper for fixed-size secrets like byte arrays or primitives.
@@ -181,36 +183,6 @@ impl<T: PartialEq> PartialEq for Fixed<T> {
 /// Equality — available when `ct-eq` is not enabled.
 #[cfg(not(feature = "ct-eq"))]
 impl<T: Eq> Eq for Fixed<T> {}
-
-/// Error for slice length mismatches in TryFrom impls.
-#[derive(Debug)]
-pub struct FromSliceError {
-    pub(crate) actual_len: usize,
-    pub(crate) expected_len: usize,
-}
-
-impl FromSliceError {
-    /// Create a new FromSliceError with the actual and expected lengths.
-    pub(crate) fn new(actual_len: usize, expected_len: usize) -> Self {
-        Self {
-            actual_len,
-            expected_len,
-        }
-    }
-}
-
-/// Displays the error message.
-impl core::fmt::Display for FromSliceError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(
-            f,
-            "slice length mismatch: expected {} bytes, got {} bytes",
-            self.expected_len, self.actual_len
-        )
-    }
-}
-
-impl core::error::Error for FromSliceError {}
 
 /// Opt-in Clone — only for types marked `CloneSafe` (default no-clone).
 #[cfg(feature = "zeroize")]

@@ -18,6 +18,9 @@ mod dynamic;
 /// These provide fundamental secure storage abstractions for fixed-size data.
 mod fixed;
 
+/// Centralized error types - always available.
+mod error;
+
 /// Re-export of the [`Dynamic`] type.
 pub use dynamic::Dynamic;
 /// Re-export of the [`Fixed`] type.
@@ -78,7 +81,7 @@ pub use encoding::bech32::Bech32String;
 
 /// Re-export of [`Bech32EncodingError`] for convenience when using bech32 encoding.
 #[cfg(feature = "encoding-bech32")]
-pub use encoding::bech32::Bech32EncodingError;
+pub use error::Bech32EncodingError;
 
 /// Re-export of [`SecureEncodingExt`] trait for convenient encoding extensions.
 #[cfg(any(
@@ -89,4 +92,4 @@ pub use encoding::bech32::Bech32EncodingError;
 pub use crate::encoding::extensions::SecureEncodingExt;
 
 /// Re-export of the [`FromSliceError`] type.
-pub use fixed::FromSliceError;
+pub use error::FromSliceError;

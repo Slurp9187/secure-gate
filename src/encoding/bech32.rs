@@ -26,15 +26,6 @@ use alloc::string::String;
 use bech32::primitives::decode::UncheckedHrpstring;
 use bech32::{decode, primitives::hrp::Hrp, Bech32, Bech32m};
 
-/// Error type for Bech32 encoding operations.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Bech32EncodingError {
-    /// Invalid Human-Readable Part (HRP).
-    InvalidHrp,
-    /// Encoding operation failed.
-    EncodingFailed,
-}
-
 /// The encoding variant used for Bech32 strings.
 ///
 /// Bech32 and Bech32m are two similar but incompatible encoding variants.

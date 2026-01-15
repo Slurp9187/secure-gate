@@ -12,7 +12,7 @@ use base64_crate::Engine;
 use ::bech32::{self};
 
 #[cfg(feature = "encoding-bech32")]
-use crate::encoding::bech32::Bech32EncodingError;
+use crate::Bech32EncodingError;
 
 /// Extension trait for safe, explicit encoding of secret byte data to strings.
 ///
