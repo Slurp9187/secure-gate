@@ -49,3 +49,17 @@ fn bech32_encoding_error_traits() {
     assert!(format!("{:?}", error1).contains("InvalidHrp"));
     assert!(format!("{:?}", Bech32EncodingError::EncodingFailed).contains("EncodingFailed"));
 }
+
+/// Test Bech32EncodingError display messages
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bech32_encoding_error_display() {
+    assert_eq!(
+        format!("{}", Bech32EncodingError::InvalidHrp),
+        "invalid Human-Readable Part (HRP)"
+    );
+    assert_eq!(
+        format!("{}", Bech32EncodingError::EncodingFailed),
+        "encoding operation failed"
+    );
+}

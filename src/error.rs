@@ -2,16 +2,17 @@
 
 #[cfg(feature = "encoding-bech32")]
 /// Error type for Bech32 encoding operations.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Bech32EncodingError {
-    /// Invalid Human-Readable Part (HRP).
+    #[error("invalid Human-Readable Part (HRP)")]
     InvalidHrp,
-    /// Encoding operation failed.
+    #[error("encoding operation failed")]
     EncodingFailed,
 }
 
 /// Error for slice length mismatches in TryFrom impls.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
+#[error("slice length mismatch: expected {expected_len} bytes, got {actual_len} bytes")]
 pub struct FromSliceError {
     pub(crate) actual_len: usize,
     pub(crate) expected_len: usize,
@@ -26,15 +27,3 @@ impl FromSliceError {
         }
     }
 }
-
-impl core::fmt::Display for FromSliceError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(
-            f,
-            "slice length mismatch: expected {} bytes, got {} bytes",
-            self.expected_len, self.actual_len
-        )
-    }
-}
-
-impl core::error::Error for FromSliceError {}
