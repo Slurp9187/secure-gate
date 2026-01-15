@@ -1,6 +1,9 @@
 # .github/workflows/fuzz-quick.yml
 name: Fuzz (quick smoke)
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
