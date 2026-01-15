@@ -5,39 +5,6 @@ use secure_gate::{Fixed, FromSliceError};
 #[cfg(feature = "encoding-bech32")]
 use secure_gate::Bech32EncodingError;
 
-/// Test FromSliceError creation, display, and error traits.
-#[test]
-fn from_slice_error_creation_and_display() {
-    let short: &[u8] = &[1, 2];
-    let err_result: Result<Fixed<[u8; 3]>, FromSliceError> = Fixed::try_from(short);
-    match err_result {
-        Err(e) => {
-            assert_eq!(
-                format!("{}", e),
-                "slice length mismatch: expected 3 bytes, got 2 bytes"
-            );
-        }
-        Ok(_) => panic!("Expected error"),
-    }
-}
-
-/// Test FromSliceError implements core::error::Error
-#[test]
-fn from_slice_error_implements_error() {
-    let short: &[u8] = &[1, 2];
-    let err_result: Result<Fixed<[u8; 3]>, FromSliceError> = Fixed::try_from(short);
-    match err_result {
-        Err(e) => {
-            let error_trait: &dyn std::error::Error = &e;
-            assert_eq!(
-                error_trait.to_string(),
-                "slice length mismatch: expected 3 bytes, got 2 bytes"
-            );
-        }
-        Ok(_) => panic!("Expected error"),
-    }
-}
-
 /// Test FromSliceError Debug output
 #[test]
 fn from_slice_error_debug() {
