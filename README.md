@@ -267,8 +267,8 @@ Encoding requires explicit `.expose_secret()`. Invalid inputs to `.new()` are ze
 {
     use secure_gate::Fixed;
 
-    let a: Fixed<[u8; 32]> = Fixed::from_slice(&[0u8; 32]);
-    let b: Fixed<[u8; 32]> = Fixed::from_slice(&[1u8; 32]);
+    let a: Fixed<[u8; 32]> = [0u8; 32].into();
+    let b: Fixed<[u8; 32]> = [1u8; 32].into();
 
     assert!(a.ct_eq(&a));
     assert!(!a.ct_eq(&b));

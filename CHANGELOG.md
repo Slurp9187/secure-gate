@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Borrowing encoding methods (`to_hex()`, `to_hex_upper()`, `to_base64url()`, `to_bech32()`, `to_bech32m()`) available on any `&[u8]` via `SecureEncodingExt`.
 - `ct_eq` module with `ConstantTimeEq` trait and inherent `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
 - Fallible construction: `impl TryFrom<&[u8]> for Fixed<[u8; N]>` with `FromSliceError`.
-  - `from_slice` now delegates to `TryFrom` (panics for compatibility).
+  - Removed `from_slice` method on `Fixed<[u8; N]>`.
   - Error types centralized in `error.rs` with `thiserror` for improved error handling.
 - Compile-fail testing infrastructure using `trybuild` for security invariant verification.
 - Conversions: `From<&str>` for `Dynamic<String>` and `From<&[u8]>` for `Dynamic<Vec<u8>>`.
@@ -61,7 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `Bech32String` now fully generic for Bech32/Bech32m with mixed-case acceptance and canonical lowercase storage.
 - Cloning model: switched to opt-in via `CloneSafe`, centered on pre-baked primitives for maximum ergonomics and safety.
   - All cloneable types are distinctly typed from non-cloneable counterparts — no accidental mixing.
-- `from_slice` on fixed byte arrays now uses fallible `TryFrom` internally.
 - Renamed `rng` module to `random`.
 - Renamed `FixedRng` and `DynamicRng` types to `FixedRandom` and `DynamicRandom`, respectively.
 - Encoding wrappers (`HexString`, `Base64String`, `Bech32String`):
@@ -92,6 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `NoClone` wrapper types and `no_clone()` methods.
 - `RandomHex` type.
 - `Dynamic::new_boxed()` method (redundant with `From<Box<T>>` impl).
+- `from_slice` method on `Fixed<[u8; N]>` (panicking; use `try_from` for fallible construction).
 
 ## [0.6.1] - 2025-12-07
 

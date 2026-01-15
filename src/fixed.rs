@@ -1,4 +1,3 @@
-use core::convert::TryFrom;
 use core::fmt;
 
 #[cfg(feature = "rand")]
@@ -112,24 +111,6 @@ impl<const N: usize> Fixed<[u8; N]> {
     #[inline(always)]
     pub const fn is_empty(&self) -> bool {
         N == 0
-    }
-
-    /// Create from a byte slice of exactly `N` bytes.
-    ///
-    /// Panics if the slice length does not match `N`.
-    /// For fallible construction, use `TryFrom<&[u8]>` instead.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use secure_gate::Fixed;
-    /// let bytes: &[u8] = &[1, 2, 3];
-    /// let secret = Fixed::<[u8; 3]>::from_slice(bytes);
-    /// assert_eq!(secret.expose_secret(), &[1, 2, 3]);
-    /// ```
-    #[inline]
-    pub fn from_slice(bytes: &[u8]) -> Self {
-        Self::try_from(bytes).expect("slice length mismatch")
     }
 }
 

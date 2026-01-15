@@ -122,13 +122,6 @@ fn dynamic_generate_random() {
     assert!(!random.expose_secret().iter().all(|&b| b == 0));
 }
 
-#[test]
-#[should_panic(expected = "slice length mismatch")]
-fn from_slice_panic_on_mismatch() {
-    let bytes: &[u8] = &[1, 2];
-    let _panic = Fixed::<[u8; 3]>::from_slice(bytes);
-}
-
 // === Dynamic<Vec<u8>> from slice ===
 #[test]
 fn dynamic_vec_from_slice() {
