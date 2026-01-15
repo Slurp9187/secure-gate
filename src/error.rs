@@ -11,8 +11,7 @@ pub enum Bech32EncodingError {
 }
 
 /// Error for slice length mismatches in TryFrom impls.
-#[derive(Debug, thiserror::Error)]
-#[error("slice length mismatch: expected {expected_len} bytes, got {actual_len} bytes")]
+#[derive(Debug)]
 pub struct FromSliceError {
     pub(crate) actual_len: usize,
     pub(crate) expected_len: usize,
@@ -27,3 +26,15 @@ impl FromSliceError {
         }
     }
 }
+
+impl core::fmt::Display for FromSliceError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "slice length mismatch: expected {} bytes, got {} bytes",
+            self.expected_len, self.actual_len
+        )
+    }
+}
+
+impl std::error::Error for FromSliceError {}
