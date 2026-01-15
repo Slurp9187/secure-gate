@@ -27,6 +27,31 @@
 /// you're certain cloning won't compromise security.
 ///
 /// This trait is re-exported at the crate root for convenience.
+///
+/// # Examples
+///
+/// Implement for a custom secret type:
+/// ```
+/// # #[cfg(feature = "zeroize")]
+/// # {
+/// use secure_gate::CloneSafe;
+/// use zeroize::Zeroize;
+///
+/// #[derive(Clone)]
+/// struct MySecret([u8; 32]);
+///
+/// impl CloneSafe for MySecret {}
+///
+/// impl Zeroize for MySecret {
+///     fn zeroize(&mut self) {
+///         zeroize::Zeroize::zeroize(&mut self.0);
+///     }
+/// }
+///
+/// let original = MySecret([1u8; 32]);
+/// let copy = original.clone(); // Safe, zeroized on drop
+/// # }
+/// ```
 pub trait CloneSafe: Clone + zeroize::Zeroize {
     // Pure marker, no methods
 }

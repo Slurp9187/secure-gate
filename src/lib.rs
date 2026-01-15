@@ -6,7 +6,10 @@
     )),
     forbid(unsafe_code)
 )]
-// #![doc = include_str!("../README.md")]
+//! Zero-cost secure wrappers for secrets — [`Fixed<T>`] for stack, [`Dynamic<T>`] for heap.
+//!
+//! This crate provides explicit wrappers for sensitive data like [`CloneableArray`], [`CloneableString`], and [`CloneSafe`], ensuring no accidental exposure.
+//! See [README.md](https://github.com/Slurp9187/secure-gate) for usage and examples.
 
 extern crate alloc;
 
