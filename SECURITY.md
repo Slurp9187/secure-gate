@@ -3,7 +3,7 @@
 ## TL;DR
 - No independent audit yet—review the code yourself before production use.
 - Default feature is `secure` (`zeroize` + `ct-eq` enabled).
-- Explicit `.expose_secret()` for auditability; zeroization on drop (with `zeroize`).
+- Explicit `.expose_secret()` and `.expose_secret_mut()` for auditability; zeroization on drop (with `zeroize`).
 - Use GitHub's Security tab for vulnerability reports (private preferred, public acceptable).
 
 This document outlines key security aspects to consider when using the `secure-gate` crate for handling sensitive data. It is intended for developers evaluating the library for security-critical applications.
@@ -12,15 +12,15 @@ This document outlines key security aspects to consider when using the `secure-g
 `secure-gate` has not undergone independent security audit. The crate is in active development and relies on well-established dependencies (e.g., `zeroize`, `subtle`). Review the implementation and test coverage before use in production.
 
 ## Core Security Model
-- **Explicit Exposure**: Secret data access requires explicit `.expose_secret()` calls, minimizing accidental leaks. Audit these calls in your code.
+- **Explicit Exposure**: Secret data access requires explicit `.expose_secret()` and `.expose_secret_mut()` calls, minimizing accidental leaks. Audit all `.expose_secret()` and `.expose_secret_mut()` calls in your code.
 - **Zeroization**: Memory is zeroized on drop when `zeroize` feature is enabled. Without it, data may linger until normal deallocation.
 - **No Implicit Access**: No `Deref` implementations prevent silent borrowing or copying.
 - **Constant-Time Operations**: Timing-safe equality available with `ct-eq` feature; disable only with justification.
 - **No Unsafe Code**: The crate contains no `unsafe` code. `forbid(unsafe_code)` is applied in minimal configurations as a defensive measure.
 
 ## Feature Implications
-- **`zeroize` (Default)**: Enables memory wiping and safe cloning. Recommended for all use cases handling secrets.
-- **`ct-eq` (Default)**: Provides timing-safe comparisons. Avoid `==` for secrets.
+- **`zeroize` (included in default `secure`)**: Enables memory wiping and safe cloning. Recommended for all use cases handling secrets.
+- **`ct-eq` (included in default `secure`)**: Provides timing-safe comparisons. Avoid `==` for secrets.
 - **`rand`**: Generates cryptographically secure random values. Ensure OS RNG is available and secure.
 - **Encoding Features**: Validate inputs before encoding to prevent malformed outputs or attacks.
 
@@ -31,8 +31,8 @@ This document outlines key security aspects to consider when using the `secure-g
 - **Macro Usage**: Macros create type aliases—ensure they match your security needs.
 
 ## Best Practices
-- Enable default features (`zeroize` + `ct-eq`) unless constrained environments require otherwise.
-- Audit `.expose_secret()` sites for necessity and duration.
+- Enable the default `secure` feature (`zeroize` + `ct-eq`) unless constrained environments require otherwise.
+- Audit all `.expose_secret()` and `.expose_secret_mut()` calls for necessity and duration.
 - Use semantic aliases (e.g., `fixed_alias!`) for clarity.
 - Prefer `CloneableArray` etc. over custom `CloneSafe` impls.
 - Validate encoding inputs and handle errors securely.
@@ -64,7 +64,7 @@ This section provides a professional reviewer's perspective on each module's sec
 - Contextualize error handling to avoid leaking metadata in sensitive contexts.
 
 **Review Points**:
-- Verify all `.expose_secret()` calls in application code.
+- Audit all `.expose_secret()` and `.expose_secret_mut()` calls in your code.
 - Check for heap overuse in `Dynamic` variants; monitor for side-channel leaks via allocation patterns.
 - Ensure feature-gated impls (e.g., `Clone`) are not accidentally enabled.
 
