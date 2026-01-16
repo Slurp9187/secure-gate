@@ -66,7 +66,7 @@ mod expose_secret_tests {
     #[test]
     fn test_hex_string_read_only() {
         let secret = HexString::new("deadbeef".to_string()).unwrap();
-        let exposed: &str = &*secret.expose_secret();
+        let exposed: &str = &secret.expose_secret();
         assert_eq!(exposed, "deadbeef");
     }
 
@@ -74,7 +74,7 @@ mod expose_secret_tests {
     #[test]
     fn test_base64_string_read_only() {
         let secret = Base64String::new("ZGVhZGJlZWY".to_string()).unwrap();
-        let exposed: &str = &*secret.expose_secret();
+        let exposed: &str = &secret.expose_secret();
         assert_eq!(exposed, "ZGVhZGJlZWY");
     }
 
@@ -83,12 +83,13 @@ mod expose_secret_tests {
     fn test_bech32_string_read_only() {
         let secret =
             Bech32String::new("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq".to_string()).unwrap();
-        let exposed: &str = &*secret.expose_secret();
+        let exposed: &str = &secret.expose_secret();
         assert!(exposed.contains("bc1q"));
     }
 }
 
 mod secure_metadata_tests {
+    #[allow(unused_imports)]
     use secure_gate::SecureMetadata;
 
     #[cfg(feature = "rand")]

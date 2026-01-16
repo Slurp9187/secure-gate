@@ -20,7 +20,6 @@
 ///
 /// Some traits require optional Cargo features:
 /// - `rand`: Enables [`SecureRandom`] and random wrapper implementations
-
 // Secret Exposure Traits
 /// Module containing secret exposure traits.
 pub mod expose_secret;
