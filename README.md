@@ -337,11 +337,14 @@ These macros create type aliases to `Fixed<[u8; N]>`, `Dynamic<T>`, `FixedRandom
 | `HexString`           | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated hex                              |
 | `Base64String`        | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated base64                           |
 | `Bech32String`        | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated Bech32/Bech32m                   |
-For in-depth security analysis, see [SECURITY.md](SECURITY.md).
 
 ## Performance
 
 The wrappers add no runtime overhead compared to raw types in benchmarks.
+
+## Security
+
+For in-depth security analysis, see [SECURITY.md](SECURITY.md).
 
 ## Security Checklist
 
