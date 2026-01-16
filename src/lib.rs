@@ -25,10 +25,20 @@ mod fixed;
 /// Centralized error types - always available.
 mod error;
 
+/// Core traits for wrapper polymorphism - always available.
+mod traits;
+
 /// Re-export of the [`Dynamic`] type.
 pub use dynamic::Dynamic;
 /// Re-export of the [`Fixed`] type.
 pub use fixed::Fixed;
+
+/// Re-export of the core traits.
+pub use traits::{ExposeSecret, ExposeSecretReadOnly, SecureMetadata};
+
+/// Re-export of SecureRandom (requires `rand` feature).
+#[cfg(feature = "rand")]
+pub use traits::SecureRandom;
 
 /// Re-export of the [`CloneSafe`] trait.
 #[cfg(feature = "zeroize")]
