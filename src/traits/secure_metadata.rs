@@ -95,7 +95,7 @@ pub trait SecureMetadata {
 // Core Wrapper Implementations
 // ============================================================================
 
-/// Implementation for [`Fixed<[u8; N]>`] - constant-time length queries.
+/// Implementation for [`Fixed<[u8; N]>`] - constant-time length and emptiness queries.
 ///
 /// Fixed-size byte arrays have compile-time known lengths, making this
 /// implementation zero-cost and infallible.
@@ -103,6 +103,11 @@ impl<const N: usize> SecureMetadata for Fixed<[u8; N]> {
     #[inline(always)]
     fn len(&self) -> usize {
         N
+    }
+
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        N == 0
     }
 }
 
@@ -115,6 +120,11 @@ impl SecureMetadata for Dynamic<String> {
     fn len(&self) -> usize {
         self.len()
     }
+
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
 }
 
 /// Implementation for [`Dynamic<Vec<T>>`] - element count.
@@ -125,6 +135,11 @@ impl<T> SecureMetadata for Dynamic<Vec<T>> {
     #[inline(always)]
     fn len(&self) -> usize {
         self.len()
+    }
+
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.is_empty()
     }
 }
 
@@ -141,6 +156,11 @@ impl<const N: usize> SecureMetadata for FixedRandom<N> {
     fn len(&self) -> usize {
         self.len()
     }
+
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        N == 0
+    }
 }
 
 /// Implementation for [`DynamicRandom`] - random byte vector length.
@@ -151,6 +171,11 @@ impl SecureMetadata for DynamicRandom {
     #[inline(always)]
     fn len(&self) -> usize {
         self.len()
+    }
+
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.is_empty()
     }
 }
 
@@ -167,6 +192,11 @@ impl SecureMetadata for HexString {
     fn len(&self) -> usize {
         self.len()
     }
+
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
 }
 
 /// Implementation for [`Base64String`] - encoded string length.
@@ -178,6 +208,11 @@ impl SecureMetadata for Base64String {
     fn len(&self) -> usize {
         self.len()
     }
+
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
 }
 
 /// Implementation for [`Bech32String`] - encoded string length.
@@ -188,6 +223,11 @@ impl SecureMetadata for Bech32String {
     #[inline(always)]
     fn len(&self) -> usize {
         self.inner.len()
+    }
+
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
     }
 }
 
@@ -204,6 +244,11 @@ impl<const N: usize> SecureMetadata for CloneableArray<N> {
     fn len(&self) -> usize {
         N
     }
+
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        N == 0
+    }
 }
 
 /// Implementation for [`CloneableString`] - UTF-8 byte length.
@@ -215,6 +260,11 @@ impl SecureMetadata for CloneableString {
     fn len(&self) -> usize {
         self.expose_inner().len()
     }
+
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.expose_inner().is_empty()
+    }
 }
 
 /// Implementation for [`CloneableVec`] - element count.
@@ -225,5 +275,10 @@ impl SecureMetadata for CloneableVec {
     #[inline(always)]
     fn len(&self) -> usize {
         self.expose_inner().len()
+    }
+
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.expose_inner().is_empty()
     }
 }
