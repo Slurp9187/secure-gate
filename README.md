@@ -280,19 +280,6 @@ Encoding requires explicit `.expose_secret()`. Invalid inputs to `.new()` are ze
 
 Available on `Fixed<[u8; N]>` and `Dynamic<T>` where `T: AsRef<[u8]>`.
 
-## Security Checklist
-
-To maximize the security of your application when using `secure-gate`, adhere to these guidelines:
-
-- **Use secure defaults**: Rely on the default feature set (`secure`) for automatic memory wiping (`zeroize`) and constant-time equality (`ct-eq`). Avoid `--no-default-features` unless you have a strong reason (e.g., constrained embedded environments).
-- **Pre-validate encoding inputs**: For Bech32 and other encodings, validate inputs (e.g., HRPs) upfront. Use `try_*` methods (e.g., `try_to_bech32`) and handle errors properly to avoid issues from malformed data.
-- **Prefer constant-time comparisons**: Use `.ct_eq()` for all sensitive equality checks to prevent timing attacks.
-- **Minimize secret exposures**: Audit your code for `.expose_secret()` calls; keep them minimal, logged, and justified. Avoid unnecessary or prolonged exposures.
-- **Restrict cloning**: Only clone when necessary. Prefer built-in `Cloneable*` types; be cautious with custom `CloneSafe` implementations.
-- **Conservative feature usage**: Enable only the features you need (e.g., specific encodings) to reduce attack surface.
-- **Regular review**: Periodically audit your secret handling logic, especially after dependency updates.
-- **Security considerations**: Refer to [SECURITY.md](SECURITY.md) for detailed security considerations.
-
 ## Macros
 
 All macros require explicit visibility (e.g., `pub`, `pub(crate)`, or none for private).
@@ -355,6 +342,19 @@ For in-depth security analysis, see [SECURITY.md](SECURITY.md).
 ## Performance
 
 The wrappers add no runtime overhead compared to raw types in benchmarks.
+
+## Security Checklist
+
+To maximize the security of your application when using `secure-gate`, adhere to these guidelines:
+
+- **Use secure defaults**: Rely on the default feature set (`secure`) for automatic memory wiping (`zeroize`) and constant-time equality (`ct-eq`). Avoid `--no-default-features` unless you have a strong reason (e.g., constrained embedded environments).
+- **Pre-validate encoding inputs**: For Bech32 and other encodings, validate inputs (e.g., HRPs) upfront. Use `try_*` methods (e.g., `try_to_bech32`) and handle errors properly to avoid issues from malformed data.
+- **Prefer constant-time comparisons**: Use `.ct_eq()` for all sensitive equality checks to prevent timing attacks.
+- **Minimize secret exposures**: Audit your code for `.expose_secret()` calls; keep them minimal, logged, and justified. Avoid unnecessary or prolonged exposures.
+- **Restrict cloning**: Only clone when necessary. Prefer built-in `Cloneable*` types; be cautious with custom `CloneSafe` implementations.
+- **Conservative feature usage**: Enable only the features you need (e.g., specific encodings) to reduce attack surface.
+- **Regular review**: Periodically audit your secret handling logic, especially after dependency updates.
+- **Security considerations**: Refer to [SECURITY.md](SECURITY.md) for detailed security considerations.
 
 ## Changelog
 
