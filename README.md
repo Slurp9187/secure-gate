@@ -1,19 +1,19 @@
 # secure-gate
 `no_std`-compatible wrappers for sensitive data with explicit exposure requirements.
 
-> **Note**: This crate is in active development and has not undergone independent security audit. Please review it for your use case and handle sensitive data with care.
+> 🔒 **Note**: This crate is in active development and ***has not undergone independent security audit***. Please review it for your use case and handle sensitive data with care.
 > See [SECURITY.md](SECURITY.md) for detailed security considerations.
 
 - `Fixed<T>` — Stack-allocated wrapper
-- `Dynamic<T>` — Heap-allocated wrapper  
-- `FixedRandom<N>` — Stack-allocated cryptographically secure random bytes  
-- `DynamicRandom` — Heap-allocated cryptographically secure random bytes  
-- `CloneableArray<const N: usize>` — Cloneable fixed-size stack secret (`[u8; N]`)  
-- `CloneableString` — Cloneable heap-allocated text secret (`String`)  
-- `CloneableVec` — Cloneable heap-allocated binary secret (`Vec<u8>`)  
-- `HexString` — Validated lowercase hexadecimal string wrapper  
-- `Base64String` — Validated URL-safe base64 string wrapper (no padding)  
-- `Bech32String` — Validated Bech32/Bech32m string wrapper  
+- `Dynamic<T>` — Heap-allocated wrapper
+- `FixedRandom<N>` — Stack-allocated cryptographically secure random bytes
+- `DynamicRandom` — Heap-allocated cryptographically secure random bytes
+- `CloneableArray<const N: usize>` — Cloneable fixed-size stack secret (`[u8; N]`)
+- `CloneableString` — Cloneable heap-allocated text secret (`String`)
+- `CloneableVec` — Cloneable heap-allocated binary secret (`Vec<u8]`)
+- `HexString` — Validated lowercase hexadecimal string wrapper
+- `Base64String` — Validated URL-safe base64 string wrapper (no padding)
+- `Bech32String` — Validated Bech32/Bech32m string wrapper
 
 Memory containing secrets is zeroed on drop, including spare capacity where applicable (when `zeroize` is enabled).
 
@@ -38,7 +38,7 @@ secure-gate = "0.7.0-rc.7" # default enables "secure"
 secure-gate = { version = "0.7.0-rc.7", features = ["full"] }
 ```
 
-**Constrained / minimal builds** (no zeroization or ct-eq — **strongly discouraged** for production):
+**Constrained/minimal builds** (no zeroization or ct-eq — **strongly discouraged** for production):
 ```toml
 secure-gate = { version = "0.7.0-rc.7", default-features = false, features = ["insecure"] }
 ```
@@ -64,7 +64,7 @@ secure-gate = { version = "0.7.0-rc.7", default-features = false, features = ["i
 
 `secure-gate` prioritizes **auditability** and **explicitness** over implicit convenience.
 
-All secret access requires an explicit `.expose_secret()` (or `.expose_secret_mut()`) call — making exposures grep-able and preventing hidden leaks.  
+All secret access requires an explicit `.expose_secret()` (or `.expose_secret_mut()`) call — making exposures grep-able and preventing hidden leaks.
 
 These calls are zero-cost `#[inline(always)]` reborrows (fully elided by the optimizer). The explicitness is deliberate "theater" for humans and auditors, with **no runtime overhead**.
 
@@ -79,7 +79,7 @@ dynamic_alias!(pub Password, String);     // Heap string secret
 
 // Create secrets
 let key: Aes256Key = [0u8; 32].into();           // From array/slice
-let mut pw: Password = "hunter2".into();         // From &str/String
+let mut pw: Password = "hunter2".into();         // From &str or String
 
 // Access (zero-cost)
 assert_eq!(pw.expose_secret(), "hunter2");
@@ -211,7 +211,7 @@ use secure_gate::CloneSafe;
 }
 ```
 
-`FixedRandom<N>` can only be constructed via cryptographically secure RNG.
+`FixedRandom<N>` can only be constructed via a cryptographically secure RNG.
 
 Direct generation is also available:
 
@@ -291,6 +291,7 @@ To maximize the security of your application when using `secure-gate`, adhere to
 - **Restrict cloning**: Only clone when necessary. Prefer built-in `Cloneable*` types; be cautious with custom `CloneSafe` implementations.
 - **Conservative feature usage**: Enable only the features you need (e.g., specific encodings) to reduce attack surface.
 - **Regular review**: Periodically audit your secret handling logic, especially after dependency updates.
+- **Security considerations**: Refer to [SECURITY.md](SECURITY.md) for detailed security considerations.
 
 ## Macros
 
@@ -349,10 +350,11 @@ These macros create type aliases to `Fixed<[u8; N]>`, `Dynamic<T>`, `FixedRandom
 | `HexString`           | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated hex                              |
 | `Base64String`        | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated base64                           |
 | `Bech32String`        | Heap       | Yes (invalid input) | Yes | No (until drop) | Validated Bech32/Bech32m                   |
+For in-depth security analysis, see [SECURITY.md](SECURITY.md).
 
 ## Performance
 
-Wrappers add no runtime overhead compared to raw types in benchmarks.
+The wrappers add no runtime overhead compared to raw types in benchmarks.
 
 ## Changelog
 
