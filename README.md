@@ -95,6 +95,60 @@ pw.expose_secret_mut().push('!');
 // - Constant-Time Equality (`ct-eq` feature)
 ```
 
+## Polymorphic Traits for Generic Operations
+
+The `secure-gate` crate provides polymorphic traits that enable writing generic code across different secret wrapper types while maintaining security guarantees:
+
+- **`ExposeSecretReadOnly`** & **`ExposeSecret`**: Polymorphic secret access with controlled mutability
+- **`SecureMetadata`**: Safe metadata queries (`len()`, `is_empty()`) without exposing content
+- **`SecureRandom`**: Combined random generation with metadata access (requires `rand` feature)
+
+### Key Security Design
+
+- **Full access**: Core wrappers (`Fixed`, `Dynamic`) implement `ExposeSecret` (read + write)
+- **Read-only**: Random (`FixedRandom`, `DynamicRandom`) and encoding wrappers only implement `ExposeSecretReadOnly` to prevent invalidation of cryptographic properties
+- **Zero-cost**: All traits use `#[inline(always)]` for optimal performance
+- **Type safety**: Polymorphic operations preserve wrapper invariants
+
+### Usage Example
+
+```rust
+use secure_gate::{
+    Fixed, Dynamic,
+    ExposeSecret, SecureMetadata
+};
+
+#[cfg(feature = "rand")]
+use secure_gate::FixedRandom;
+
+// Generic function working with any secret type
+fn check_secret_properties<T: SecureMetadata>(secret: &T) -> (usize, bool) {
+    (secret.len(), secret.is_empty())
+}
+
+// Works with different wrapper types
+let fixed_secret: Fixed<[u8; 32]> = [0u8; 32].into();
+let dynamic_secret: Dynamic<String> = "secret".into();
+
+#[cfg(feature = "rand")]
+{
+    let random_secret = FixedRandom::<16>::generate();
+    // All work polymorphically
+    assert_eq!(check_secret_properties(&fixed_secret), (32, false));
+    assert_eq!(check_secret_properties(&dynamic_secret), (6, false));
+    assert_eq!(check_secret_properties(&random_secret), (16, false));
+}
+```
+
+### Trait Reference
+
+| Trait | Required Features | Access Level | Core Types | Random Types | Encoding Types |
+|-------|-------------------|--------------|------------|--------------|----------------|
+| `ExposeSecretReadOnly` | None | Read-only | ✓ | ✓ | ✓ |
+| `ExposeSecret` | None | Read + Write | ✓ | ❌ | ❌ |
+| `SecureMetadata` | None | Metadata queries | ✓ | ✓ | ✓ |
+| `SecureRandom` | `rand` | Random + metadata | ❌ | ✓ | ❌ |
+
 ## Opt-In Safe Cloning
 
 Cloning secret data is **opt-in** and **only available** when the `zeroize` feature is enabled.
