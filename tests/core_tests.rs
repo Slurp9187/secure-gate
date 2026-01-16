@@ -3,7 +3,7 @@
 // ==========================================================================
 // Core integration tests — pure v0.6.0 API
 
-use secure_gate::{Dynamic, ExposeSecretExt, ExposeSecretMutExt, Fixed, SecureMetadataExt};
+use secure_gate::{Dynamic, ExposeSecret, ExposeSecretMut, Fixed};
 
 // === Basic Functionality ===
 

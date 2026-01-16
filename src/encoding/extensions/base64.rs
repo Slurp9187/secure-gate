@@ -4,7 +4,7 @@ use base64_crate::engine::general_purpose::URL_SAFE_NO_PAD;
 
 use base64_crate::Engine;
 
-use crate::traits::expose_secret_ext::ExposeSecretExt;
+use crate::traits::expose_secret::ExposeSecret;
 
 // ========================================
 // Consuming (into_) methods on RNG types

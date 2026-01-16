@@ -9,10 +9,9 @@ use base64::Engine;
 #[cfg(feature = "rand")]
 use secure_gate::fixed_alias_random;
 use secure_gate::Base64String;
-use secure_gate::ExposeSecretExt;
+use secure_gate::ExposeSecret;
 #[cfg(feature = "rand")]
 use secure_gate::SecureEncodingExt;
-use secure_gate::SecureMetadataExt;
 
 #[cfg(feature = "encoding-base64")]
 #[cfg(feature = "rand")]

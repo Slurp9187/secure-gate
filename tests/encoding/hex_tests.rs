@@ -7,7 +7,7 @@
 
 #[cfg(feature = "encoding-hex")]
 #[allow(unused_imports)] // Clippy may not recognize use in macro
-use secure_gate::{fixed_alias_random, ExposeSecretExt, HexString, SecureMetadataExt};
+use secure_gate::{fixed_alias_random, ExposeSecret, HexString};
 
 use hex;
 

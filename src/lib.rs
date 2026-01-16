@@ -33,15 +33,12 @@ pub use dynamic::Dynamic;
 /// Re-export of the [`Fixed`] type.
 pub use fixed::Fixed;
 
-/// Re-export of the core traits and extension traits.
-pub use traits::{
-    ExposeSecret, ExposeSecretExt, ExposeSecretMut, ExposeSecretMutExt, SecureMetadata,
-    SecureMetadataExt,
-};
+/// Re-export of the traits.
+pub use traits::{ExposeSecret, ExposeSecretMut};
 
-/// Re-export of SecureRandom and extension (requires `rand` feature).
+/// Re-export of SecureRandom (requires `rand` feature).
 #[cfg(feature = "rand")]
-pub use traits::{SecureRandom, SecureRandomExt};
+pub use traits::SecureRandom;
 
 /// Re-export of the [`CloneSafe`] trait.
 #[cfg(feature = "zeroize")]

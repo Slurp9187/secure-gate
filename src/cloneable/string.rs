@@ -24,7 +24,7 @@ impl crate::CloneSafe for CloneableStringInner {}
 /// ```
 /// # #[cfg(feature = "zeroize")]
 /// # {
-/// use secure_gate::{CloneableString, ExposeSecretExt};
+/// use secure_gate::{CloneableString, ExposeSecret};
 ///
 /// // Create from a string
 /// let password: CloneableString = "secret123".to_string().into();

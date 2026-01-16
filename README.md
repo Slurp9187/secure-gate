@@ -71,7 +71,7 @@ These calls are zero-cost `#[inline(always)]` reborrows (fully elided by the opt
 ## Quick Start
 
 ```rust
-use secure_gate::{fixed_alias, dynamic_alias, ExposeSecretExt, ExposeSecretMutExt};
+use secure_gate::{fixed_alias, dynamic_alias, ExposeSecret, ExposeSecretMut, SecureMetadata};
 
 // Recommended: semantic aliases for clarity
 fixed_alias!(pub Aes256Key, 32);          // Fixed-size byte secret
@@ -285,7 +285,7 @@ Direct generation is also available:
 ```rust
 #[cfg(feature = "encoding-hex")]
 {
-    use secure_gate::{encoding::hex::HexString, SecureEncodingExt, ExposeSecretExt};
+    use secure_gate::{encoding::hex::HexString, SecureEncodingExt, ExposeSecret};
 
     let bytes = [0u8; 16];
     let hex = bytes.to_hex();

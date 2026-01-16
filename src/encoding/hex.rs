@@ -4,7 +4,7 @@
 
 use alloc::string::String;
 
-use crate::traits::expose_secret_ext::ExposeSecretExt;
+use crate::traits::expose_secret::ExposeSecret;
 
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]
@@ -27,7 +27,7 @@ fn zeroize_input(s: &mut String) {
 /// # Examples
 ///
 /// ```
-/// # use secure_gate::encoding::hex::HexString;
+/// # use secure_gate::{encoding::hex::HexString, ExposeSecret};
 /// let valid = HexString::new("deadbeef".to_string()).unwrap();
 /// assert_eq!(valid.expose_secret(), "deadbeef");
 /// let bytes = valid.into_bytes(); // Vec<u8> of [0xde, 0xad, 0xbe, 0xef]
@@ -59,7 +59,7 @@ impl HexString {
     /// # Example
     ///
     /// ```
-    /// use secure_gate::encoding::hex::HexString;
+    /// use secure_gate::{encoding::hex::HexString, ExposeSecret};
     /// let valid = HexString::new("deadbeef".to_string()).unwrap();
     /// assert_eq!(valid.expose_secret(), "deadbeef");
     /// ```

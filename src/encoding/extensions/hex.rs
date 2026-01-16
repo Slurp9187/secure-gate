@@ -1,6 +1,6 @@
 use ::hex as hex_crate;
 
-use crate::traits::expose_secret_ext::ExposeSecretExt;
+use crate::traits::expose_secret::ExposeSecret;
 
 // ========================================
 // Consuming (into_) methods on RNG types

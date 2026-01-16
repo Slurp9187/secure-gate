@@ -17,7 +17,7 @@ use rand::TryRngCore;
 /// ```
 /// # #[cfg(feature = "rand")]
 /// # {
-/// use secure_gate::random::DynamicRandom;
+/// use secure_gate::{random::DynamicRandom, ExposeSecret};
 /// let random = DynamicRandom::generate(64);
 /// assert_eq!(random.len(), 64);
 /// # }

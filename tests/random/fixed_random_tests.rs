@@ -4,14 +4,13 @@
 #![cfg(feature = "rand")]
 
 use secure_gate::random::FixedRandom;
-use secure_gate::ExposeSecretExt;
+use secure_gate::ExposeSecret;
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
 use secure_gate::SecureEncodingExt;
-use secure_gate::SecureMetadataExt;
 
 #[test]
 fn raw_fixed_random_works() {

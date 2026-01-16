@@ -5,7 +5,7 @@ use ::bech32::{decode, encode, Hrp};
 #[cfg(feature = "rand")]
 use crate::Bech32EncodingError;
 
-use crate::traits::expose_secret_ext::ExposeSecretExt;
+use crate::traits::expose_secret::ExposeSecret;
 
 // ========================================
 // Consuming (into_) methods on RNG types

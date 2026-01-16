@@ -3,7 +3,7 @@ use core::fmt;
 #[cfg(feature = "rand")]
 use rand::rand_core::OsError;
 
-use crate::ExposeSecretExt;
+use crate::ExposeSecret;
 use crate::FromSliceError;
 
 /// Stack-allocated secure secret wrapper.
@@ -20,14 +20,13 @@ use crate::FromSliceError;
 ///
 /// Basic usage:
 /// ```
-/// use secure_gate::{Fixed, ExposeSecretExt};
+/// use secure_gate::{Fixed, ExposeSecret};
 /// let secret = Fixed::new(42u32);
 /// assert_eq!(*secret.expose_secret(), 42);
 /// ```
 ///
 /// For byte arrays (most common):
 /// ```
-/// use secure_gate::{Fixed, fixed_alias, ExposeSecretExt, SecureMetadataExt};
 /// fixed_alias!(Aes256Key, 32);
 /// let key_bytes = [0x42u8; 32];
 /// let key: Aes256Key = Fixed::from(key_bytes);

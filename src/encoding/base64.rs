@@ -4,8 +4,7 @@ use alloc::string::String;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 
-use crate::traits::expose_secret_ext::ExposeSecretExt;
-use crate::traits::secure_metadata_ext::SecureMetadataExt;
+use crate::traits::expose_secret::ExposeSecret;
 
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]
@@ -26,7 +25,7 @@ fn zeroize_input(s: &mut String) {
 /// # Examples
 ///
 /// ```
-/// # use secure_gate::encoding::base64::Base64String;
+/// # use secure_gate::{encoding::base64::Base64String, ExposeSecret};
 /// let valid = Base64String::new("SGVsbG8".to_string()).unwrap();
 /// assert_eq!(valid.expose_secret(), "SGVsbG8");
 /// let bytes = valid.into_bytes(); // Vec<u8> of "Hello"

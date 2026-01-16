@@ -26,7 +26,7 @@ use alloc::string::String;
 use bech32::primitives::decode::UncheckedHrpstring;
 use bech32::{decode, primitives::hrp::Hrp, Bech32, Bech32m};
 
-use crate::traits::expose_secret_ext::ExposeSecretExt;
+use crate::traits::expose_secret::ExposeSecret;
 
 /// The encoding variant used for Bech32 strings.
 ///

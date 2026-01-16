@@ -3,15 +3,13 @@ use secure_gate::{
     random::{DynamicRandom, FixedRandom},
     SecureRandom,
 };
-#[cfg(feature = "rand")]
-use secure_gate::{ExposeSecretExt, SecureMetadataExt};
 
 #[cfg(feature = "rand")]
 #[test]
 fn test_fixed_random_trait() {
     let secret = FixedRandom::<32>::generate();
 
-    // Test that it implements both traits
+    // Test that it implements the SecureRandom trait
     fn test_random<T: SecureRandom>(_: &T) {}
     test_random(&secret);
 

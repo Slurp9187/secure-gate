@@ -4,7 +4,7 @@
 // → opens beautiful HTML report showing < 0.1 cycle overhead
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use secure_gate::{fixed_alias, ExposeSecretExt, Fixed};
+use secure_gate::{fixed_alias, ExposeSecret, Fixed};
 
 fixed_alias!(RawKey, 32);
 

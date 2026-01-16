@@ -6,7 +6,7 @@
 use secure_gate::{
     fixed_alias_random,
     random::{DynamicRandom, FixedRandom},
-    ExposeSecretExt, SecureMetadataExt,
+    ExposeSecret,
 };
 
 #[cfg(feature = "zeroize")]

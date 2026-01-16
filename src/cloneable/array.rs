@@ -23,7 +23,7 @@ impl<const N: usize> crate::CloneSafe for CloneableArrayInner<N> {}
 /// ```
 /// # #[cfg(feature = "zeroize")]
 /// # {
-/// use secure_gate::{CloneableArray, ExposeSecretExt};
+/// use secure_gate::{CloneableArray, ExposeSecret};
 ///
 /// // Create from an array
 /// let key: CloneableArray<32> = [42u8; 32].into();

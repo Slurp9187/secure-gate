@@ -1,9 +1,9 @@
-use secure_gate::{ExposeSecretExt, ExposeSecretMut, SecureMetadata};
+use secure_gate::{ExposeSecret, ExposeSecretMut};
 
 #[test]
 fn test_metadata_polymorphism() {
     // Can use different types polymorphically for metadata
-    fn check_length<T: SecureMetadata>(item: &T) -> usize {
+    fn check_length<T: ExposeSecret>(item: &T) -> usize {
         item.len()
     }
 
@@ -19,7 +19,7 @@ fn test_metadata_polymorphism() {
 fn test_mutable_polymorphism() {
     // Can use different types polymorphically for mutation
     fn set_first_byte<T: ExposeSecretMut<Inner = [u8; 5]>>(item: &mut T, value: [u8; 5]) {
-        *item.expose_secret_mut() = value;
+        *ExposeSecretMut::expose_secret_mut(item) = value;
     }
 
     let mut fixed: secure_gate::Fixed<[u8; 5]> = secure_gate::Fixed::new([0u8; 5]);

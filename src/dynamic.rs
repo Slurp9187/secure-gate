@@ -2,8 +2,6 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 
-use crate::ExposeSecretExt;
-
 #[cfg(feature = "rand")]
 use rand::rand_core::OsError;
 
@@ -21,14 +19,14 @@ use rand::rand_core::OsError;
 ///
 /// Basic usage:
 /// ```
-/// use secure_gate::{Dynamic, ExposeSecretExt};
+/// use secure_gate::{Dynamic, ExposeSecret};
 /// let secret: Dynamic<String> = "hunter2".into();
 /// assert_eq!(secret.expose_secret(), "hunter2");
 /// ```
 ///
 /// With already-boxed values:
 /// ```
-/// use secure_gate::{Dynamic, ExposeSecretExt};
+/// use secure_gate::{Dynamic, ExposeSecret};
 /// let boxed_secret = Box::new("hunter2".to_string());
 /// let secret: Dynamic<String> = boxed_secret.into(); // or Dynamic::from(boxed_secret)
 /// assert_eq!(secret.expose_secret(), "hunter2");
@@ -36,7 +34,7 @@ use rand::rand_core::OsError;
 ///
 /// Mutable access:
 /// ```
-/// use secure_gate::{Dynamic, ExposeSecretExt, ExposeSecretMutExt};
+/// use secure_gate::{Dynamic, ExposeSecret, ExposeSecretMut};
 /// let mut secret = Dynamic::<String>::new("pass".to_string());
 /// secret.expose_secret_mut().push('!');
 /// assert_eq!(secret.expose_secret(), "pass!");
@@ -133,18 +131,14 @@ impl From<&str> for Dynamic<String> {
     }
 }
 
-/// Constant-time equality for byte-convertible types — available with `ct-eq` feature.
 #[cfg(feature = "ct-eq")]
-impl<T> Dynamic<T>
-where
-    T: ?Sized + AsRef<[u8]>,
-{
+impl Dynamic<String> {
     /// Constant-time equality comparison.
     ///
-    /// This is the **only safe way** to compare two dynamic secrets.
-    /// Available only when the `ct-eq` feature is enabled.
+    /// Compares the byte contents of two `Dynamic<String>` instances in constant time
+    /// to prevent timing attacks. The strings are compared as UTF-8 byte sequences.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// # #[cfg(feature = "ct-eq")]
@@ -158,9 +152,32 @@ where
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
         use crate::ct_eq::ConstantTimeEq;
-        self.expose_secret()
-            .as_ref()
-            .ct_eq(other.expose_secret().as_ref())
+        self.0.as_bytes().ct_eq(other.0.as_bytes())
+    }
+}
+
+#[cfg(feature = "ct-eq")]
+impl Dynamic<Vec<u8>> {
+    /// Constant-time equality comparison.
+    ///
+    /// Compares the byte contents of two `Dynamic<Vec<u8>>` instances in constant time
+    /// to prevent timing attacks. The vectors are compared as byte slices.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(feature = "ct-eq")]
+    /// # {
+    /// use secure_gate::Dynamic;
+    /// let a: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3]);
+    /// let b: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3]);
+    /// assert!(a.ct_eq(&b));
+    /// # }
+    /// ```
+    #[inline]
+    pub fn ct_eq(&self, other: &Self) -> bool {
+        use crate::ct_eq::ConstantTimeEq;
+        self.0.as_slice().ct_eq(other.0.as_slice())
     }
 }
 
@@ -178,7 +195,7 @@ impl Dynamic<Vec<u8>> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::Dynamic;
+    /// use secure_gate::{Dynamic, ExposeSecret};
     /// let random: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
     /// assert_eq!(random.len(), 64);
     /// # }

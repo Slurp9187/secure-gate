@@ -5,7 +5,7 @@
 
 #[allow(unused_imports)]
 use secure_gate::random::DynamicRandom;
-use secure_gate::ExposeSecretExt;
+use secure_gate::ExposeSecret;
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",

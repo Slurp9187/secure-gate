@@ -4,7 +4,7 @@ use secure_gate::random::{DynamicRandom, FixedRandom};
 #[cfg(feature = "encoding-hex")]
 use secure_gate::encoding::hex::HexString;
 
-use secure_gate::{ExposeSecretExt, ExposeSecretMutExt};
+use secure_gate::{ExposeSecret, ExposeSecretMut};
 
 #[cfg(feature = "encoding-base64")]
 use secure_gate::encoding::base64::Base64String;
@@ -22,7 +22,7 @@ fn test_fixed_read_only() {
 #[test]
 fn test_dynamic_read_only() {
     let secret = secure_gate::Dynamic::new(vec![1u8, 2, 3, 4]);
-    let exposed: &[u8] = secret.expose_secret();
+    let exposed = secret.expose_secret().as_slice();
     assert_eq!(exposed, &[1, 2, 3, 4]);
 }
 
@@ -43,7 +43,7 @@ fn test_dynamic_mutable() {
         let exposed: &mut Vec<u8> = secret.expose_secret_mut();
         exposed[0] = 42;
     }
-    assert_eq!(secret.expose_secret(), &[42, 2, 3, 4]);
+    assert_eq!(secret.expose_secret().as_slice(), &[42, 2, 3, 4]);
 }
 
 #[cfg(feature = "rand")]

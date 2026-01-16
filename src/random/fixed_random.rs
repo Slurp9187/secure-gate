@@ -18,7 +18,7 @@ use rand::TryRngCore;
 /// ```
 /// # #[cfg(feature = "rand")]
 /// # {
-/// use secure_gate::random::FixedRandom;
+/// use secure_gate::{random::FixedRandom, ExposeSecret};
 /// let random: FixedRandom<32> = FixedRandom::generate();
 /// assert_eq!(random.len(), 32);
 /// # }
@@ -28,6 +28,7 @@ use rand::TryRngCore;
 /// ```
 /// # #[cfg(feature = "rand")]
 /// # {
+/// use secure_gate::ExposeSecret;
 /// use secure_gate::fixed_alias_random;
 /// fixed_alias_random!(Nonce, 24);
 /// let nonce = Nonce::generate();
@@ -46,7 +47,7 @@ impl<const N: usize> FixedRandom<N> {
     /// ```
     /// # #[cfg(feature = "rand")]
     /// # {
-    /// use secure_gate::random::FixedRandom;
+    /// use secure_gate::{random::FixedRandom, ExposeSecret};
     /// let random = FixedRandom::<16>::generate();
     /// assert!(!random.is_empty());
     /// # }

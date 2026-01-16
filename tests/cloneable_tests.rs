@@ -1,8 +1,8 @@
 #![cfg(feature = "zeroize")]
 
 use secure_gate::{
-    CloneSafe, CloneableArray, CloneableString, CloneableVec, Dynamic, ExposeSecretExt,
-    ExposeSecretMutExt, Fixed,
+    CloneSafe, CloneableArray, CloneableString, CloneableVec, Dynamic, ExposeSecret,
+    ExposeSecretMut, Fixed,
 };
 
 // === Custom Type Cloning ===

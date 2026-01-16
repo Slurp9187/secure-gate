@@ -24,7 +24,7 @@ impl crate::CloneSafe for CloneableVecInner {}
 /// ```
 /// # #[cfg(feature = "zeroize")]
 /// # {
-/// use secure_gate::{CloneableVec, ExposeSecretExt};
+/// use secure_gate::{CloneableVec, ExposeSecret};
 ///
 /// // Create from a vector
 /// let data: CloneableVec = vec![1, 2, 3, 4].into();

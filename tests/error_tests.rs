@@ -1,6 +1,6 @@
 //! Tests for error types defined in the `error.rs` module.
 
-use secure_gate::{ExposeSecretExt, Fixed, FromSliceError};
+use secure_gate::{ExposeSecret, Fixed, FromSliceError};
 
 #[cfg(feature = "encoding-bech32")]
 use secure_gate::Bech32EncodingError;

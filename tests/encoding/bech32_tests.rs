@@ -7,9 +7,7 @@
 #[cfg(feature = "encoding-bech32")]
 use secure_gate::encoding::bech32::Bech32String;
 #[cfg(feature = "encoding-bech32")]
-use secure_gate::ExposeSecretExt;
-#[cfg(feature = "encoding-bech32")]
-use secure_gate::SecureMetadataExt;
+use secure_gate::ExposeSecret;
 
 #[cfg(feature = "encoding-bech32")]
 #[test]

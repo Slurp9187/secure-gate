@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-use secure_gate::SecureMetadata;
+use secure_gate::ExposeSecret;
 
 #[cfg(feature = "rand")]
 use secure_gate::random::{DynamicRandom, FixedRandom};
