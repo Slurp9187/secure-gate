@@ -2,7 +2,7 @@
 
 ## TL;DR
 - No independent audit yet—review the code yourself before production use.
-- Defaults are `secure` (`zeroize` + `ct-eq` enabled).
+- Default is `secure` (`zeroize` + `ct-eq` enabled).
 - Explicit `.expose_secret()` for auditability; zeroization on drop (with `zeroize`).
 - Use GitHub's Security tab for vulnerability reports (private preferred, public acceptable).
 
