@@ -5,7 +5,7 @@ All changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.0] - 2026-01-10
+## [0.7.0] - 2026-01-15
 
 ### Added
 
@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Encouraged pattern: semantic type aliases (e.g., `pub type CloneablePassword = CloneableString;`).
 - `CloneSafe` trait for opt-in cloning of secrets (requires `zeroize` feature).
   - Implemented for primitives (`u8`, `i32`, etc.) and fixed arrays (`[T; N]`).
-  - Custom types can implement the trait.
+  - Custom types can implement the trait for controlled duplication.
 - Fallible RNG methods: `try_generate()` on `FixedRandom<N>` and `DynamicRandom`, returning `Result<Self, rand::Error>`.
   - Corresponding `try_generate_random()` methods on `Fixed` and `Dynamic`.
 - `Base64String` wrapper in `encoding::base64` with validation, `into_bytes()`, and constant-time equality (when `ct-eq` enabled).
@@ -46,12 +46,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implemented `thiserror` for automatic `Display` and `std::error::Error` trait implementations on error types.
 - `Bech32EncodingError` enum for Bech32 encoding operations (`InvalidHrp`, `EncodingFailed`).
 - Fallible Bech32 encoding methods: `try_to_bech32()`, `try_to_bech32m()`, `try_into_bech32()`, `try_into_bech32m()` on `FixedRandom<N>`, `DynamicRandom`, and `SecureEncodingExt`.
-- Security Checklist section in README.md with best practices derived from security audit.
-- Enhanced `CloneSafe` trait documentation with warnings against custom implementations.
+- SECURITY.md document with security considerations, module analysis, and mitigation strategies.
+- ROADMAP.md for future development plans (serde, fuzzing, etc.).
+- Enhanced `CloneSafe` trait documentation with implementation examples and warnings.
+- Security Checklist section in README.md with best practices.
+- Updated README.md with cross-links to SECURITY.md, improved formatting, and security emphasis.
 
 ### Changed
 
-- Default features changed to only `zeroize` to prioritize secure memory handling by default while minimizing dependencies.
+- Default features changed to `secure` (bundling `zeroize` + `ct-eq`) to prioritize secure memory handling by default while minimizing dependencies.
 - Refactored encoding system:
   - Replaced `conversions` module/feature with modular `encoding`.
   - Split into `encoding::hex`, `encoding::base64`, and `encoding::bech32` submodules.
@@ -70,8 +73,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added non-allocating `byte_len()` implementations.
   - Refactored encoding traits into `extensions` module with borrowing view types (`HexStringView`, `Base64StringView`, `Bech32StringView`).
 - `Base64String`: simplified validation using single engine-based decode check.
-- Cargo.toml features: `default = ["secure"]` (bundles `zeroize` and `ct-eq`); new `secure` feature; `insecure` for opt-out; updated `full = ["secure", "encoding"]`.
+- Cargo.toml features: `default = ["secure"]`; new `secure` meta-feature (bundling `zeroize` + `ct-eq`); `insecure` for opt-out; updated `full = ["secure", "encoding"]`.
 - `SecureEncodingExt` re-export cfg updated to include `encoding-bech32` feature.
+- Updated README.md with Unicode symbols for security emphasis and cross-links.
+- Fixed module documentation syntax (e.g., `//!` vs `!`).
 
 ### Fixed
 
@@ -81,10 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Bech32String` `byte_len()` now allocation-free.
 - Bech32/Bech32m variant detection and normalization robustness.
 - Performance: Removed unnecessary clone in `CloneableArray` constructor.
-- **FromSliceError enhancement**: Now includes actual vs expected lengths for better developer experience.
+- **FromSliceError enhancement**: Manual `Display` and `Error` impls to fix deprecated auto-generated methods.
 - **Security documentation**: Prominent warnings in encoding modules about zeroize feature requirements for secure wiping of invalid inputs.
 - Removed misplaced `into_bytes` impl on `Bech32StringView` (borrow-only views cannot be consumed).
-- Clippy warnings: removed unused `detect_variant` function and empty line after doc comment.
+- Clippy warnings: Fixed empty lines after doc comments and other minor issues.
 
 ### Removed
 
