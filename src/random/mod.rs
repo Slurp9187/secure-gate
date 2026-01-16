@@ -35,13 +35,17 @@
 //! ```
 
 /// Dynamic random bytes generation.
+#[cfg(feature = "rand")]
 pub mod dynamic_random;
 
 /// Fixed-size random bytes generation.
+#[cfg(feature = "rand")]
 pub mod fixed_random;
 
 // Re-export for API compatibility
 /// Re-export of [`DynamicRandom`].
+#[cfg(feature = "rand")]
 pub use dynamic_random::DynamicRandom;
 /// Re-export of [`FixedRandom`].
+#[cfg(feature = "rand")]
 pub use fixed_random::FixedRandom;
