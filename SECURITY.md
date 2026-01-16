@@ -27,7 +27,7 @@ This document outlines key security aspects to consider when using the `secure-g
 - **Unsafe Code**: The crate contains no `unsafe` code. `forbid(unsafe_code)` is applied in minimal configurations as a defensive measure.
 - **Heap Allocation**: `Dynamic<T>` types may leave slack capacity until drop; call `shrink_to_fit()` to mitigate.
 - **Custom Types**: Avoid wrapping sensitive data in non-zeroizeable types; implement `CloneSafe` carefully.
-- **Error Handling**: Errors like `FromSliceError` expose length metadata only; in encoding failures, invalid inputs are zeroized (with `zeroize` enabled).
+- **Error Handling**: Errors like `FromSliceError` expose length metadata (e.g., expected vs. actual), which may be sensitive in some contexts; fields are `pub(crate)` to prevent direct external access while allowing internal debugging. Invalid inputs are zeroized in encoding failures (with `zeroize` enabled).
 - **Macro Usage**: Macros create type aliases—ensure they match your security needs.
 
 ## Best Practices
