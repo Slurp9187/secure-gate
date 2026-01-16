@@ -71,18 +71,6 @@ impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
     }
 }
 
-/// Regular equality — fallback when `ct-eq` feature is disabled.
-#[cfg(not(feature = "ct-eq"))]
-impl<T: ?Sized + PartialEq> PartialEq for Dynamic<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.expose_secret() == other.expose_secret()
-    }
-}
-
-/// Equality — available when `ct-eq` is not enabled.
-#[cfg(not(feature = "ct-eq"))]
-impl<T: ?Sized + Eq> Eq for Dynamic<T> {}
-
 /// Opt-in Clone — only for types marked `CloneSafe`.
 #[cfg(feature = "zeroize")]
 impl<T: crate::CloneSafe> Clone for Dynamic<T> {

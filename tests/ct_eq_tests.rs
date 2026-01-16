@@ -8,6 +8,9 @@ mod tests {
     #[cfg(feature = "ct-eq")]
     use secure_gate::{ct_eq::ConstantTimeEq, Dynamic, Fixed};
 
+    #[cfg(not(feature = "ct-eq"))]
+    use secure_gate::ExposeSecret;
+
     #[cfg(feature = "ct-eq")]
     #[test]
     fn slice_ct_eq_basic() {
@@ -82,6 +85,34 @@ mod tests {
         assert!(!a.ct_eq(&c));
     }
 
+    #[cfg(feature = "ct-eq")]
+    #[test]
+    fn test_wrapper_equality_with_ct_eq() {
+        // Test Fixed<T> ct_eq
+        let fixed1 = Fixed::new([1u8, 2, 3]);
+        let fixed2 = Fixed::new([1u8, 2, 3]);
+        let fixed3 = Fixed::new([1u8, 2, 4]);
+
+        assert!(fixed1.ct_eq(&fixed2));
+        assert!(!fixed1.ct_eq(&fixed3));
+
+        // Test Dynamic<T> ct_eq
+        let dyn1: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
+        let dyn2: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
+        let dyn3: Dynamic<Vec<u8>> = vec![1, 2, 4].into();
+
+        assert!(dyn1.ct_eq(&dyn2));
+        assert!(!dyn1.ct_eq(&dyn3));
+
+        // Test with strings
+        let str1: Dynamic<String> = "hello".into();
+        let str2: Dynamic<String> = "hello".into();
+        let str3: Dynamic<String> = "world".into();
+
+        assert!(str1.ct_eq(&str2));
+        assert!(!str1.ct_eq(&str3));
+    }
+
     #[cfg(not(feature = "ct-eq"))]
     #[test]
     fn partial_eq_fallback() {
@@ -92,23 +123,23 @@ mod tests {
         let fixed2 = Fixed::new([1u8, 2, 3]);
         let fixed3 = Fixed::new([1u8, 2, 4]);
 
-        assert_eq!(fixed1, fixed2);
-        assert_ne!(fixed1, fixed3);
+        assert_eq!(fixed1.expose_secret(), fixed2.expose_secret());
+        assert_ne!(fixed1.expose_secret(), fixed3.expose_secret());
 
         // Test Dynamic<T> equality
         let dyn1: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
         let dyn2: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
         let dyn3: Dynamic<Vec<u8>> = vec![1, 2, 4].into();
 
-        assert_eq!(dyn1, dyn2);
-        assert_ne!(dyn1, dyn3);
+        assert_eq!(dyn1.expose_secret(), dyn2.expose_secret());
+        assert_ne!(dyn1.expose_secret(), dyn3.expose_secret());
 
         // Test with strings
         let str1: Dynamic<String> = "hello".into();
         let str2: Dynamic<String> = "hello".into();
         let str3: Dynamic<String> = "world".into();
 
-        assert_eq!(str1, str2);
-        assert_ne!(str1, str3);
+        assert_eq!(str1.expose_secret(), str2.expose_secret());
+        assert_ne!(str1.expose_secret(), str3.expose_secret());
     }
 }

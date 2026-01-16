@@ -55,6 +55,35 @@ impl<T> ExposeSecretMut for Dynamic<Vec<T>> {
     }
 }
 
+/// Implementation for [`Fixed<CloneableArrayInner<N>>`] - provides mutable access.
+#[cfg(feature = "zeroize")]
+impl<const N: usize> ExposeSecretMut
+    for crate::Fixed<crate::cloneable::array::CloneableArrayInner<N>>
+{
+    #[inline(always)]
+    fn expose_secret_mut(&mut self) -> &mut crate::cloneable::array::CloneableArrayInner<N> {
+        &mut self.0
+    }
+}
+
+/// Implementation for [`Dynamic<CloneableStringInner>`] - provides mutable access.
+#[cfg(feature = "zeroize")]
+impl ExposeSecretMut for crate::Dynamic<crate::cloneable::string::CloneableStringInner> {
+    #[inline(always)]
+    fn expose_secret_mut(&mut self) -> &mut crate::cloneable::string::CloneableStringInner {
+        &mut self.0
+    }
+}
+
+/// Implementation for [`Dynamic<CloneableVecInner>`] - provides mutable access.
+#[cfg(feature = "zeroize")]
+impl ExposeSecretMut for crate::Dynamic<crate::cloneable::vec::CloneableVecInner> {
+    #[inline(always)]
+    fn expose_secret_mut(&mut self) -> &mut crate::cloneable::vec::CloneableVecInner {
+        &mut self.0
+    }
+}
+
 // ============================================================================
 // Specific Implementations for Test Types
 // ============================================================================

@@ -1,7 +1,7 @@
 #[cfg(feature = "rand")]
 use secure_gate::{
     random::{DynamicRandom, FixedRandom},
-    SecureRandom,
+    ExposeSecret, SecureRandom,
 };
 
 #[cfg(feature = "rand")]

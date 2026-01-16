@@ -3,7 +3,6 @@ use core::fmt;
 #[cfg(feature = "rand")]
 use rand::rand_core::OsError;
 
-use crate::ExposeSecret;
 use crate::FromSliceError;
 
 /// Stack-allocated secure secret wrapper.
@@ -104,18 +103,6 @@ impl<T> fmt::Debug for Fixed<T> {
     }
 }
 
-/// Regular equality — fallback when `ct-eq` feature is disabled.
-#[cfg(not(feature = "ct-eq"))]
-impl<T: PartialEq> PartialEq for Fixed<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.expose_secret() == other.expose_secret()
-    }
-}
-
-/// Equality — available when `ct-eq` is not enabled.
-#[cfg(not(feature = "ct-eq"))]
-impl<T: Eq> Eq for Fixed<T> {}
-
 /// Opt-in Clone — only for types marked `CloneSafe` (default no-clone).
 #[cfg(feature = "zeroize")]
 impl<T: crate::CloneSafe> Clone for Fixed<T> {
@@ -124,6 +111,9 @@ impl<T: crate::CloneSafe> Clone for Fixed<T> {
         Self(self.0.clone())
     }
 }
+
+#[cfg(feature = "ct-eq")]
+use crate::ExposeSecret;
 
 /// Constant-time equality — only available with `ct-eq` feature.
 #[cfg(feature = "ct-eq")]

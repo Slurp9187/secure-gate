@@ -113,9 +113,59 @@ impl<T> ExposeSecret for Dynamic<Vec<T>> {
     }
 }
 
+/// Implementation for [`Fixed<CloneableArrayInner<N>>`] - exposes the inner wrapper.
+#[cfg(feature = "zeroize")]
+impl<const N: usize> ExposeSecret
+    for crate::Fixed<crate::cloneable::array::CloneableArrayInner<N>>
+{
+    type Inner = crate::cloneable::array::CloneableArrayInner<N>;
+
+    #[inline(always)]
+    fn expose_secret(&self) -> &crate::cloneable::array::CloneableArrayInner<N> {
+        &self.0
+    }
+
+    #[inline(always)]
+    fn len(&self) -> usize {
+        N
+    }
+}
+
 // ============================================================================
 // Random Wrapper Implementations (Read-Only Only)
 // ============================================================================
+
+/// Implementation for [`Dynamic<CloneableStringInner>`] - exposes the inner wrapper.
+#[cfg(feature = "zeroize")]
+impl ExposeSecret for crate::Dynamic<crate::cloneable::string::CloneableStringInner> {
+    type Inner = crate::cloneable::string::CloneableStringInner;
+
+    #[inline(always)]
+    fn expose_secret(&self) -> &crate::cloneable::string::CloneableStringInner {
+        &self.0
+    }
+
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.0 .0.len()
+    }
+}
+
+/// Implementation for [`Dynamic<CloneableVecInner>`] - exposes the inner wrapper.
+#[cfg(feature = "zeroize")]
+impl ExposeSecret for crate::Dynamic<crate::cloneable::vec::CloneableVecInner> {
+    type Inner = crate::cloneable::vec::CloneableVecInner;
+
+    #[inline(always)]
+    fn expose_secret(&self) -> &crate::cloneable::vec::CloneableVecInner {
+        &self.0
+    }
+
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.0 .0.len()
+    }
+}
 
 /// Implementation for [`FixedRandom<N>`] - read-only access.
 ///

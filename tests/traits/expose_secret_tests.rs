@@ -21,7 +21,7 @@ fn test_fixed_read_only() {
 
 #[test]
 fn test_dynamic_read_only() {
-    let secret = secure_gate::Dynamic::new(vec![1u8, 2, 3, 4]);
+    let secret: secure_gate::Dynamic<Vec<u8>> = secure_gate::Dynamic::new(vec![1u8, 2, 3, 4]);
     let exposed = secret.expose_secret().as_slice();
     assert_eq!(exposed, &[1, 2, 3, 4]);
 }
@@ -38,7 +38,7 @@ fn test_fixed_mutable() {
 
 #[test]
 fn test_dynamic_mutable() {
-    let mut secret = secure_gate::Dynamic::new(vec![1u8, 2, 3, 4]);
+    let mut secret: secure_gate::Dynamic<Vec<u8>> = secure_gate::Dynamic::new(vec![1u8, 2, 3, 4]);
     {
         let exposed: &mut Vec<u8> = secret.expose_secret_mut();
         exposed[0] = 42;
@@ -66,7 +66,7 @@ fn test_dynamic_random_read_only() {
 #[test]
 fn test_hex_string_read_only() {
     let secret = HexString::new("deadbeef".to_string()).unwrap();
-    let exposed: &str = &secret.expose_secret();
+    let exposed: &str = secret.expose_secret();
     assert_eq!(exposed, "deadbeef");
 }
 
@@ -74,7 +74,7 @@ fn test_hex_string_read_only() {
 #[test]
 fn test_base64_string_read_only() {
     let secret = Base64String::new("ZGVhZGJlZWY".to_string()).unwrap();
-    let exposed: &str = &secret.expose_secret();
+    let exposed: &str = secret.expose_secret();
     assert_eq!(exposed, "ZGVhZGJlZWY");
 }
 
@@ -83,6 +83,6 @@ fn test_base64_string_read_only() {
 fn test_bech32_string_read_only() {
     let secret =
         Bech32String::new("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq".to_string()).unwrap();
-    let exposed: &str = &secret.expose_secret();
+    let exposed: &str = secret.expose_secret();
     assert!(exposed.contains("bc1q"));
 }
