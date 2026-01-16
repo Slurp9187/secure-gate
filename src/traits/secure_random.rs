@@ -1,4 +1,6 @@
-use super::expose_secret::ExposeSecretReadOnly;
+#[cfg(feature = "rand")]
+use super::expose_secret::ExposeSecret;
+#[cfg(feature = "rand")]
 use super::secure_metadata::SecureMetadata;
 
 /// # Secure Random Traits
@@ -41,7 +43,7 @@ use crate::random::{DynamicRandom, FixedRandom};
 
 /// Random value generation with metadata access.
 ///
-/// This trait combines [`ExposeSecretReadOnly`] and [`SecureMetadata`] to provide
+/// This trait combines [`ExposeSecret`] and [`SecureMetadata`] to provide
 /// a complete interface for working with cryptographically secure random values.
 /// All implementations guarantee that the underlying values were generated from
 /// a secure entropy source and remain immutable after generation.
@@ -49,7 +51,7 @@ use crate::random::{DynamicRandom, FixedRandom};
 /// ## Type Constraints
 ///
 /// - `Inner = [u8]`: Random values are always byte sequences
-/// - Implements `ExposeSecretReadOnly`: Read-only access only (no mutation)
+/// - Implements `ExposeSecret`: Read-only access only (no mutation)
 /// - Implements `SecureMetadata`: Length queries without exposure
 ///
 /// ## Security
@@ -57,16 +59,21 @@ use crate::random::{DynamicRandom, FixedRandom};
 /// - Values cannot be modified after generation
 /// - Fresh entropy from OS RNG or cryptographically secure sources
 /// - Polymorphic operations maintain RNG security properties
-pub trait SecureRandom: ExposeSecretReadOnly<Inner = [u8]> + SecureMetadata {}
+#[cfg(feature = "rand")]
+pub trait SecureRandom: ExposeSecret<Inner = [u8]> + SecureMetadata {}
 
+/// Implementation for [`FixedRandom<N>`] - fixed-size secure random values.
+///
 /// Implementation for [`FixedRandom<N>`] - fixed-size secure random values.
 ///
 /// This implementation provides the complete [`SecureRandom`] interface for
 /// fixed-size random byte arrays generated from cryptographically secure sources.
+#[cfg(feature = "rand")]
 impl<const N: usize> SecureRandom for FixedRandom<N> {}
 
 /// Implementation for [`DynamicRandom`] - dynamic-size secure random values.
 ///
 /// This implementation provides the complete [`SecureRandom`] interface for
 /// dynamically-sized random byte vectors generated from cryptographically secure sources.
+#[cfg(feature = "rand")]
 impl SecureRandom for DynamicRandom {}

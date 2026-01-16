@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Core polymorphism traits** in new `src/traits/` module for generic secret operations:
-  - `ExposeSecretReadOnly` & `ExposeSecret` traits for polymorphic secret access with controlled mutability
+  - `ExposeSecret` & `ExposeSecretMut` traits for polymorphic secret access with controlled mutability
   - `SecureMetadata` trait for safe length/emptiness queries without exposing contents
   - `SecureRandom` trait combining random generation with metadata access (requires `rand` feature)
   - Implemented for all secret wrapper types: `Fixed`, `Dynamic`, `FixedRandom`, `DynamicRandom`, encoding types, and cloneable types

@@ -99,14 +99,14 @@ pw.expose_secret_mut().push('!');
 
 The `secure-gate` crate provides polymorphic traits that enable writing generic code across different secret wrapper types while maintaining security guarantees:
 
-- **`ExposeSecretReadOnly`** & **`ExposeSecret`**: Polymorphic secret access with controlled mutability
+- **`ExposeSecret`** & **`ExposeSecretMut`**: Polymorphic secret access with controlled mutability
 - **`SecureMetadata`**: Safe metadata queries (`len()`, `is_empty()`) without exposing content
 - **`SecureRandom`**: Combined random generation with metadata access (requires `rand` feature)
 
 ### Key Security Design
 
-- **Full access**: Core wrappers (`Fixed`, `Dynamic`) implement `ExposeSecret` (read + write)
-- **Read-only**: Random (`FixedRandom`, `DynamicRandom`) and encoding wrappers only implement `ExposeSecretReadOnly` to prevent invalidation of cryptographic properties
+- **Full access**: Core wrappers (`Fixed`, `Dynamic`) implement `ExposeSecret` and `ExposeSecretMut` (read + write)
+- **Read-only**: Random (`FixedRandom`, `DynamicRandom`) and encoding wrappers only implement `ExposeSecret` to prevent invalidation of cryptographic properties
 - **Zero-cost**: All traits use `#[inline(always)]` for optimal performance
 - **Type safety**: Polymorphic operations preserve wrapper invariants
 
@@ -115,7 +115,7 @@ The `secure-gate` crate provides polymorphic traits that enable writing generic 
 ```rust
 use secure_gate::{
     Fixed, Dynamic,
-    ExposeSecret, SecureMetadata
+    ExposeSecret, ExposeSecretMut, SecureMetadata
 };
 
 #[cfg(feature = "rand")]
@@ -144,8 +144,8 @@ let dynamic_secret: Dynamic<String> = "secret".into();
 
 | Trait | Required Features | Access Level | Core Types | Random Types | Encoding Types |
 |-------|-------------------|--------------|------------|--------------|----------------|
-| `ExposeSecretReadOnly` | None | Read-only | ✓ | ✓ | ✓ |
-| `ExposeSecret` | None | Read + Write | ✓ | ❌ | ❌ |
+| `ExposeSecret` | None | Read-only | ✓ | ✓ | ✓ |
+| `ExposeSecretMut` | None | Read + Write | ✓ | ❌ | ❌ |
 | `SecureMetadata` | None | Metadata queries | ✓ | ✓ | ✓ |
 | `SecureRandom` | `rand` | Random + metadata | ❌ | ✓ | ❌ |
 

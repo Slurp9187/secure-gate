@@ -194,7 +194,7 @@ mod secure_random_tests {
 }
 
 mod polymorphism_tests {
-    use secure_gate::{ExposeSecret, SecureMetadata};
+    use secure_gate::{ExposeSecretMut, SecureMetadata};
 
     #[test]
     fn test_metadata_polymorphism() {
@@ -214,12 +214,12 @@ mod polymorphism_tests {
     #[test]
     fn test_mutable_polymorphism() {
         // Can use different types polymorphically for mutation
-        fn set_value<T: ExposeSecret<Inner = [u8; 5]>>(item: &mut T, value: [u8; 5]) {
+        fn set_first_byte<T: ExposeSecretMut<Inner = [u8; 5]>>(item: &mut T, value: [u8; 5]) {
             *item.expose_secret_mut() = value;
         }
 
         let mut fixed: secure_gate::Fixed<[u8; 5]> = secure_gate::Fixed::new([0u8; 5]);
-        set_value(&mut fixed, [1, 2, 3, 4, 5]);
+        set_first_byte(&mut fixed, [1, 2, 3, 4, 5]);
         assert_eq!(fixed.expose_secret(), &[1, 2, 3, 4, 5]);
     }
 }

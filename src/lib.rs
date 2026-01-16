@@ -34,7 +34,7 @@ pub use dynamic::Dynamic;
 pub use fixed::Fixed;
 
 /// Re-export of the core traits.
-pub use traits::{ExposeSecret, ExposeSecretReadOnly, SecureMetadata};
+pub use traits::{ExposeSecret, ExposeSecretMut, SecureMetadata};
 
 /// Re-export of SecureRandom (requires `rand` feature).
 #[cfg(feature = "rand")]

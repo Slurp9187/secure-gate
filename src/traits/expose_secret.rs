@@ -6,20 +6,20 @@
 //!
 //! ## Key Traits
 //!
-//! - [`ExposeSecretReadOnly`]: Read-only access to secret values
-//! - [`ExposeSecret`]: Mutable access to secret values (full control)
+//! - [`ExposeSecret`]: Read-only access to secret values
+//! - [`ExposeSecretMut`]: Mutable access to secret values (full control)
 //!
 //! ## Security Model
 //!
 //! - **Full access**: Core wrappers ([`Fixed`], [`Dynamic`]) implement both traits
 //! - **Read-only**: Random ([`FixedRandom`], [`DynamicRandom`]) and encoding wrappers
-//!   only implement [`ExposeSecretReadOnly`] to prevent mutation
+//!   only implement [`ExposeSecret`] to prevent mutation
 //! - **Zero-cost**: All implementations use `#[inline(always)]`
 //!
 //! ## Usage
 //!
 //! ```
-//! use secure_gate::{Fixed, Dynamic, ExposeSecret, ExposeSecretReadOnly};
+//! use secure_gate::{Fixed, Dynamic, ExposeSecret, ExposeSecretMut};
 //!
 //! // Full access wrappers
 //! let mut secret = Fixed::new(42);
@@ -60,7 +60,7 @@ use crate::encoding::bech32::Bech32String;
 /// - Does not provide mutation capabilities
 /// - Enables secure polymorphic operations on secrets
 /// - Used by random and encoding wrappers to prevent invalidation
-pub trait ExposeSecretReadOnly {
+pub trait ExposeSecret {
     /// The inner secret type being exposed.
     ///
     /// This can be a sized type (like `[u8; N]`) or unsized (like `str` or `[u8]`).
@@ -80,7 +80,7 @@ pub trait ExposeSecretReadOnly {
 
 /// Mutable access to secret values.
 ///
-/// This trait extends [`ExposeSecretReadOnly`] with mutation capabilities. Only core secret
+/// This trait extends [`ExposeSecret`] with mutation capabilities. Only core secret
 /// wrappers (like [`Fixed`] and [`Dynamic`]) implement this trait, ensuring that mutable
 /// access is explicitly controlled and auditable.
 ///
@@ -89,7 +89,7 @@ pub trait ExposeSecretReadOnly {
 /// - Extends read-only access with mutation
 /// - Only implemented by trusted core wrapper types
 /// - All mutations are explicit and traceable
-pub trait ExposeSecret: ExposeSecretReadOnly {
+pub trait ExposeSecretMut: ExposeSecret {
     /// Expose the secret value for mutable access.
     ///
     /// This method provides controlled mutable access to the inner secret. The returned
@@ -110,7 +110,7 @@ pub trait ExposeSecret: ExposeSecretReadOnly {
 ///
 /// [`Fixed<T>`] is a core wrapper that allows both reading and mutation of secrets.
 /// This implementation delegates to the wrapper's own methods.
-impl<T> ExposeSecretReadOnly for Fixed<T> {
+impl<T> ExposeSecret for Fixed<T> {
     type Inner = T;
 
     #[inline(always)]
@@ -122,7 +122,7 @@ impl<T> ExposeSecretReadOnly for Fixed<T> {
 /// Implementation for [`Fixed<T>`] - provides mutable access.
 ///
 /// Extends the read-only implementation with mutation capabilities.
-impl<T> ExposeSecret for Fixed<T> {
+impl<T> ExposeSecretMut for Fixed<T> {
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut T {
         self.expose_secret_mut()
@@ -133,7 +133,7 @@ impl<T> ExposeSecret for Fixed<T> {
 ///
 /// [`Dynamic<T>`] is a core wrapper that allows both reading and mutation of secrets.
 /// This implementation delegates to the wrapper's own methods.
-impl<T: ?Sized> ExposeSecretReadOnly for Dynamic<T> {
+impl<T: ?Sized> ExposeSecret for Dynamic<T> {
     type Inner = T;
 
     #[inline(always)]
@@ -145,7 +145,7 @@ impl<T: ?Sized> ExposeSecretReadOnly for Dynamic<T> {
 /// Implementation for [`Dynamic<T>`] - provides mutable access.
 ///
 /// Extends the read-only implementation with mutation capabilities.
-impl<T: ?Sized> ExposeSecret for Dynamic<T> {
+impl<T: ?Sized> ExposeSecretMut for Dynamic<T> {
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut T {
         self.expose_secret_mut()
@@ -162,7 +162,7 @@ impl<T: ?Sized> ExposeSecret for Dynamic<T> {
 /// randomly generated secret. The `Inner` type is `[u8]` (slice) for compatibility
 /// with `SecureRandom` trait bounds.
 #[cfg(feature = "rand")]
-impl<const N: usize> ExposeSecretReadOnly for FixedRandom<N> {
+impl<const N: usize> ExposeSecret for FixedRandom<N> {
     type Inner = [u8];
 
     #[inline(always)]
@@ -177,7 +177,7 @@ impl<const N: usize> ExposeSecretReadOnly for FixedRandom<N> {
 /// randomly generated secret. The `Inner` type is `[u8]` (slice) for compatibility
 /// with `SecureRandom` trait bounds.
 #[cfg(feature = "rand")]
-impl ExposeSecretReadOnly for DynamicRandom {
+impl ExposeSecret for DynamicRandom {
     type Inner = [u8];
 
     #[inline(always)]
@@ -196,7 +196,7 @@ impl ExposeSecretReadOnly for DynamicRandom {
 /// validation invariants. The `Inner` type is `str` since encoded strings are
 /// always valid UTF-8.
 #[cfg(feature = "encoding-hex")]
-impl ExposeSecretReadOnly for HexString {
+impl ExposeSecret for HexString {
     type Inner = str;
 
     #[inline(always)]
@@ -211,7 +211,7 @@ impl ExposeSecretReadOnly for HexString {
 /// validation invariants. The `Inner` type is `str` since encoded strings are
 /// always valid UTF-8.
 #[cfg(feature = "encoding-base64")]
-impl ExposeSecretReadOnly for Base64String {
+impl ExposeSecret for Base64String {
     type Inner = str;
 
     #[inline(always)]
@@ -226,7 +226,7 @@ impl ExposeSecretReadOnly for Base64String {
 /// validation invariants. The `Inner` type is `str` since encoded strings are
 /// always valid UTF-8.
 #[cfg(feature = "encoding-bech32")]
-impl ExposeSecretReadOnly for Bech32String {
+impl ExposeSecret for Bech32String {
     type Inner = str;
 
     #[inline(always)]
