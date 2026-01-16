@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Core polymorphism traits** in new `src/traits/` module for generic secret operations:
+  - `ExposeSecretReadOnly` & `ExposeSecret` traits for polymorphic secret access with controlled mutability
+  - `SecureMetadata` trait for safe length/emptiness queries without exposing contents
+  - `SecureRandom` trait combining random generation with metadata access (requires `rand` feature)
+  - Implemented for all secret wrapper types: `Fixed`, `Dynamic`, `FixedRandom`, `DynamicRandom`, encoding types, and cloneable types
+  - Zero-cost abstractions with `#[inline(always)]` for optimal performance
+  - Comprehensive rustdoc with security guarantees and usage examples
 - **Opt-in cloning overhaul** (requires `zeroize` feature):
   - New pre-baked cloneable primitives for zero-boilerplate common cases:
     - `CloneableArray<const N: usize>` — cloneable fixed-size stack secret (`[u8; N]`)
@@ -45,7 +52,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Centralized error types in new `error.rs` module.
 - Implemented `thiserror` for automatic `Display` and `std::error::Error` trait implementations on error types.
 - `Bech32EncodingError` enum for Bech32 encoding operations (`InvalidHrp`, `EncodingFailed`).
+- **New modular encoding system**:
+  - Replaced `conversions` module/feature with modular `encoding`.
+  - Split into `encoding::hex`, `encoding::base64`, and `encoding::bech32` submodules.
+  - Granular features: `encoding` now enables `encoding-hex`, `encoding-base64`, and `encoding-bech32`.
+  - Trait renamed to `SecureEncodingExt`.
+  - Removed `RandomHex` type; replaced with direct methods on `FixedRandom<N>` and `DynamicRandom`.
+  - `Bech32String` now fully generic for Bech32/Bech32m with mixed-case acceptance and canonical lowercase storage.
 - Fallible Bech32 encoding methods: `try_to_bech32()`, `try_to_bech32m()`, `try_into_bech32()`, `try_into_bech32m()` on `FixedRandom<N>`, `DynamicRandom`, and `SecureEncodingExt`.
+
 - SECURITY.md document with security considerations, module analysis, and mitigation strategies.
 - ROADMAP.md for future development plans (serde, fuzzing, etc.).
 - Enhanced `CloneSafe` trait documentation with implementation examples and warnings.
@@ -55,13 +70,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Default features changed to `secure` (bundling `zeroize` + `ct-eq`) to prioritize secure memory handling by default while minimizing dependencies.
-- Refactored encoding system:
-  - Replaced `conversions` module/feature with modular `encoding`.
-  - Split into `encoding::hex`, `encoding::base64`, and `encoding::bech32` submodules.
-  - Granular features: `encoding` now enables `encoding-hex`, `encoding-base64`, and `encoding-bech32`.
-  - Trait renamed to `SecureEncodingExt`.
-  - Removed `RandomHex` type; replaced with direct methods on `FixedRandom<N>` and `DynamicRandom`.
-  - `Bech32String` now fully generic for Bech32/Bech32m with mixed-case acceptance and canonical lowercase storage.
 - Cloning model: switched to opt-in via `CloneSafe`, centered on pre-baked primitives for maximum ergonomics and safety.
   - All cloneable types are distinctly typed from non-cloneable counterparts — no accidental mixing.
 - Renamed `rng` module to `random`.
@@ -76,7 +84,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cargo.toml features: `default = ["secure"]`; new `secure` meta-feature (bundling `zeroize` + `ct-eq`); `insecure` for opt-out; updated `full = ["secure", "encoding"]`.
 - `SecureEncodingExt` re-export cfg updated to include `encoding-bech32` feature.
 - Updated README.md with Unicode symbols for security emphasis and cross-links.
-- Fixed module documentation syntax (e.g., `//!` vs `!`).
 
 ### Fixed
 
