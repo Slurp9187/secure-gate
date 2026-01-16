@@ -4,6 +4,8 @@ use secure_gate::random::{DynamicRandom, FixedRandom};
 #[cfg(feature = "encoding-hex")]
 use secure_gate::encoding::hex::HexString;
 
+use secure_gate::{ExposeSecretExt, ExposeSecretMutExt};
+
 #[cfg(feature = "encoding-base64")]
 use secure_gate::encoding::base64::Base64String;
 

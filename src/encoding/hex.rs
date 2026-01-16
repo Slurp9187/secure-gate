@@ -4,6 +4,8 @@
 
 use alloc::string::String;
 
+use crate::traits::expose_secret_ext::ExposeSecretExt;
+
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]
     {
@@ -99,18 +101,6 @@ impl HexString {
     /// Number of bytes the decoded hex string represents.
     pub fn byte_len(&self) -> usize {
         self.0.expose_secret().len() / 2
-    }
-
-    /// Length of the encoded string (in characters) — delegate directly
-    #[inline(always)]
-    pub const fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Whether the encoded string is empty — delegate directly
-    #[inline(always)]
-    pub const fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 }
 

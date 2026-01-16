@@ -26,6 +26,8 @@ use alloc::string::String;
 use bech32::primitives::decode::UncheckedHrpstring;
 use bech32::{decode, primitives::hrp::Hrp, Bech32, Bech32m};
 
+use crate::traits::expose_secret_ext::ExposeSecretExt;
+
 /// The encoding variant used for Bech32 strings.
 ///
 /// Bech32 and Bech32m are two similar but incompatible encoding variants.
@@ -112,18 +114,6 @@ impl Bech32String {
         let data_part_len = s.len() - sep_pos - 1;
         let data_chars = data_part_len - 6; // subtract checksum
         (data_chars * 5) / 8
-    }
-
-    /// Length of the encoded string (in characters).
-    #[inline(always)]
-    pub const fn len(&self) -> usize {
-        self.inner.len()
-    }
-
-    /// Whether the encoded string is empty.
-    #[inline(always)]
-    pub const fn is_empty(&self) -> bool {
-        self.inner.is_empty()
     }
 
     /// Get the detected encoding variant.

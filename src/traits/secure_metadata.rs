@@ -118,12 +118,12 @@ impl<const N: usize> SecureMetadata for Fixed<[u8; N]> {
 impl SecureMetadata for Dynamic<String> {
     #[inline(always)]
     fn len(&self) -> usize {
-        self.len()
+        self.0.len()
     }
 
     #[inline(always)]
     fn is_empty(&self) -> bool {
-        self.is_empty()
+        self.0.is_empty()
     }
 }
 
@@ -134,12 +134,12 @@ impl SecureMetadata for Dynamic<String> {
 impl<T> SecureMetadata for Dynamic<Vec<T>> {
     #[inline(always)]
     fn len(&self) -> usize {
-        self.len()
+        self.0.len()
     }
 
     #[inline(always)]
     fn is_empty(&self) -> bool {
-        self.is_empty()
+        self.0.is_empty()
     }
 }
 
@@ -154,7 +154,7 @@ impl<T> SecureMetadata for Dynamic<Vec<T>> {
 impl<const N: usize> SecureMetadata for FixedRandom<N> {
     #[inline(always)]
     fn len(&self) -> usize {
-        self.len()
+        N
     }
 
     #[inline(always)]
@@ -170,12 +170,12 @@ impl<const N: usize> SecureMetadata for FixedRandom<N> {
 impl SecureMetadata for DynamicRandom {
     #[inline(always)]
     fn len(&self) -> usize {
-        self.len()
+        self.0 .0.len()
     }
 
     #[inline(always)]
     fn is_empty(&self) -> bool {
-        self.is_empty()
+        self.0 .0.is_empty()
     }
 }
 
@@ -190,12 +190,12 @@ impl SecureMetadata for DynamicRandom {
 impl SecureMetadata for HexString {
     #[inline(always)]
     fn len(&self) -> usize {
-        self.len()
+        self.0.len()
     }
 
     #[inline(always)]
     fn is_empty(&self) -> bool {
-        self.is_empty()
+        self.0.is_empty()
     }
 }
 
@@ -206,12 +206,12 @@ impl SecureMetadata for HexString {
 impl SecureMetadata for Base64String {
     #[inline(always)]
     fn len(&self) -> usize {
-        self.len()
+        self.0.len()
     }
 
     #[inline(always)]
     fn is_empty(&self) -> bool {
-        self.is_empty()
+        self.0.is_empty()
     }
 }
 
@@ -222,12 +222,12 @@ impl SecureMetadata for Base64String {
 impl SecureMetadata for Bech32String {
     #[inline(always)]
     fn len(&self) -> usize {
-        self.inner.len()
+        self.inner.0.len()
     }
 
     #[inline(always)]
     fn is_empty(&self) -> bool {
-        self.inner.is_empty()
+        self.inner.0.is_empty()
     }
 }
 
@@ -258,12 +258,12 @@ impl<const N: usize> SecureMetadata for CloneableArray<N> {
 impl SecureMetadata for CloneableString {
     #[inline(always)]
     fn len(&self) -> usize {
-        self.expose_inner().len()
+        self.0 .0.len()
     }
 
     #[inline(always)]
     fn is_empty(&self) -> bool {
-        self.expose_inner().is_empty()
+        self.0 .0.is_empty()
     }
 }
 
@@ -274,11 +274,11 @@ impl SecureMetadata for CloneableString {
 impl SecureMetadata for CloneableVec {
     #[inline(always)]
     fn len(&self) -> usize {
-        self.expose_inner().len()
+        self.0 .0.len()
     }
 
     #[inline(always)]
     fn is_empty(&self) -> bool {
-        self.expose_inner().is_empty()
+        self.0 .0.is_empty()
     }
 }

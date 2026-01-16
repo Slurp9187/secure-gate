@@ -26,12 +26,20 @@
 pub mod expose_secret;
 /// Re-export exposure traits for convenient access.
 pub use expose_secret::{ExposeSecret, ExposeSecretMut};
+/// Module containing secret exposure extension traits.
+pub mod expose_secret_ext;
+/// Re-export exposure extension traits for convenient access.
+pub use expose_secret_ext::{ExposeSecretExt, ExposeSecretMutExt};
 
 // Metadata Traits
 /// Module containing metadata traits.
 pub mod secure_metadata;
 /// Re-export metadata traits for convenient access.
 pub use secure_metadata::SecureMetadata;
+/// Module containing metadata extension traits.
+pub mod secure_metadata_ext;
+/// Re-export metadata extension traits for convenient access.
+pub use secure_metadata_ext::SecureMetadataExt;
 
 // Random Generation Traits (requires `rand` feature)
 #[cfg(feature = "rand")]
@@ -40,3 +48,9 @@ pub mod secure_random;
 #[cfg(feature = "rand")]
 /// Re-export random traits when the `rand` feature is enabled.
 pub use secure_random::SecureRandom;
+#[cfg(feature = "rand")]
+/// Module containing random generation extension traits.
+pub mod secure_random_ext;
+#[cfg(feature = "rand")]
+/// Re-export random extension traits when the `rand` feature is enabled.
+pub use secure_random_ext::SecureRandomExt;

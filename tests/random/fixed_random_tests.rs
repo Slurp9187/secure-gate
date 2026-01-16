@@ -4,12 +4,14 @@
 #![cfg(feature = "rand")]
 
 use secure_gate::random::FixedRandom;
+use secure_gate::ExposeSecretExt;
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
 use secure_gate::SecureEncodingExt;
+use secure_gate::SecureMetadataExt;
 
 #[test]
 fn raw_fixed_random_works() {
@@ -50,10 +52,7 @@ fn hex_methods_work() {
 fn base64_roundtrip() {
     let rng = FixedRandom::<32>::generate();
     let encoded = rng.expose_secret().to_base64url();
-    assert_eq!(
-        encoded.expose_secret().to_bytes(),
-        rng.expose_secret().to_vec()
-    );
+    assert_eq!(encoded.into_bytes(), rng.expose_secret().to_vec());
 }
 
 #[cfg(all(feature = "rand", feature = "encoding-base64"))]
@@ -89,14 +88,11 @@ fn bech32_variants_roundtrip() {
     let rng = FixedRandom::<32>::generate();
     let b32 = rng.expose_secret().try_to_bech32("test").unwrap();
     assert!(b32.is_bech32());
-    assert_eq!(b32.expose_secret().to_bytes(), rng.expose_secret().to_vec());
+    assert_eq!(b32.into_bytes(), rng.expose_secret().to_vec());
 
     let b32m = rng.expose_secret().try_to_bech32m("test").unwrap();
     assert!(b32m.is_bech32m());
-    assert_eq!(
-        b32m.expose_secret().to_bytes(),
-        rng.expose_secret().to_vec()
-    );
+    assert_eq!(b32m.into_bytes(), rng.expose_secret().to_vec());
 }
 
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]

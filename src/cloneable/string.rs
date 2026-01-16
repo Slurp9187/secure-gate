@@ -9,7 +9,7 @@ use zeroize::Zeroize;
 /// this struct is dropped.
 #[derive(Clone, Zeroize)]
 #[zeroize(drop)]
-pub struct CloneableStringInner(String);
+pub struct CloneableStringInner(pub String);
 
 impl crate::CloneSafe for CloneableStringInner {}
 
@@ -24,7 +24,7 @@ impl crate::CloneSafe for CloneableStringInner {}
 /// ```
 /// # #[cfg(feature = "zeroize")]
 /// # {
-/// use secure_gate::CloneableString;
+/// use secure_gate::{CloneableString, ExposeSecretExt};
 ///
 /// // Create from a string
 /// let password: CloneableString = "secret123".to_string().into();
@@ -33,31 +33,12 @@ impl crate::CloneSafe for CloneableStringInner {}
 /// let token: CloneableString = "token_value".into();
 ///
 /// // Access the inner string
-/// let inner = password.expose_inner();
-/// assert_eq!(inner.as_str(), "secret123");
+/// assert_eq!(password.expose_secret().0.as_str(), "secret123");
 /// # }
 /// ```
 pub type CloneableString = Dynamic<CloneableStringInner>;
 
 impl CloneableString {
-    /// Returns a reference to the inner string without cloning.
-    ///
-    /// This method provides direct access to the wrapped `String`.
-    /// The reference is valid for the lifetime of the `CloneableString`.
-    #[inline(always)]
-    pub const fn expose_inner(&self) -> &String {
-        &self.expose_secret().0
-    }
-
-    /// Returns a mutable reference to the inner string.
-    ///
-    /// This method provides direct mutable access to the wrapped `String`.
-    /// Use this when you need to modify the string contents in-place.
-    #[inline(always)]
-    pub fn expose_inner_mut(&mut self) -> &mut String {
-        &mut self.expose_secret_mut().0
-    }
-
     /// Construct a cloneable string secret by building it in a closure.
     ///
     /// This minimizes the time the secret spends on the stack:

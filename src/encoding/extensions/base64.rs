@@ -4,6 +4,8 @@ use base64_crate::engine::general_purpose::URL_SAFE_NO_PAD;
 
 use base64_crate::Engine;
 
+use crate::traits::expose_secret_ext::ExposeSecretExt;
+
 // ========================================
 // Consuming (into_) methods on RNG types
 // ========================================
@@ -98,14 +100,8 @@ impl<'a> core::cmp::PartialEq<&str> for Base64StringView<'a> {
 }
 
 // ========================================
-// expose_secret → view implementations
+// expose_secret → view implementations (removed)
 // ========================================
-
-impl crate::encoding::base64::Base64String {
-    pub fn expose_secret(&self) -> Base64StringView<'_> {
-        Base64StringView(self.0.expose_secret())
-    }
-}
 
 // ========================================
 // Consuming decode (into_bytes) for secure zeroization
@@ -115,7 +111,7 @@ impl crate::encoding::base64::Base64String {
     /// Decode the validated base64 string into raw bytes, consuming and zeroizing the wrapper.
     pub fn into_bytes(self) -> Vec<u8> {
         URL_SAFE_NO_PAD
-            .decode(self.expose_secret().0.as_str())
+            .decode(self.expose_secret())
             .expect("Base64String is always valid")
     }
 }

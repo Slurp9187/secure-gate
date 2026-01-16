@@ -22,7 +22,7 @@ use rand::TryRngCore;
 /// assert_eq!(random.len(), 64);
 /// # }
 /// ```
-pub struct DynamicRandom(Dynamic<Vec<u8>>);
+pub struct DynamicRandom(pub(crate) Dynamic<Vec<u8>>);
 
 impl DynamicRandom {
     /// Generate fresh random bytes of the specified length.
@@ -65,24 +65,6 @@ impl DynamicRandom {
         OsRng
             .try_fill_bytes(&mut bytes)
             .map(|_| Self(Dynamic::from(bytes)))
-    }
-
-    /// Expose the random bytes for read-only access.
-    #[inline(always)]
-    pub fn expose_secret(&self) -> &[u8] {
-        self.0.expose_secret()
-    }
-
-    /// Returns the length in bytes.
-    #[inline(always)]
-    pub const fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Returns `true` if empty.
-    #[inline(always)]
-    pub const fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 
     /// Consume and return the inner `Dynamic<Vec<u8>>`.

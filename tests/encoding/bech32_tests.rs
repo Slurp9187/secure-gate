@@ -6,6 +6,10 @@
 
 #[cfg(feature = "encoding-bech32")]
 use secure_gate::encoding::bech32::Bech32String;
+#[cfg(feature = "encoding-bech32")]
+use secure_gate::ExposeSecretExt;
+#[cfg(feature = "encoding-bech32")]
+use secure_gate::SecureMetadataExt;
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
@@ -119,7 +123,7 @@ fn rng_into_bech32_variant_detection_and_round_trip() {
     let b32 = rng.expose_secret().try_to_bech32("test").unwrap();
     let parsed = Bech32String::new(b32.expose_secret().to_string()).unwrap();
     assert!(parsed.is_bech32());
-    assert_eq!(parsed.expose_secret().to_bytes(), raw_bytes);
+    assert_eq!(parsed.into_bytes(), raw_bytes);
 
     let rng_m = FixedRandom::<16>::generate();
     let raw_bytes_m = rng_m.expose_secret().to_vec();
@@ -127,7 +131,7 @@ fn rng_into_bech32_variant_detection_and_round_trip() {
     let b32m = rng_m.expose_secret().try_to_bech32m("test").unwrap();
     let parsed_m = Bech32String::new(b32m.expose_secret().to_string()).unwrap();
     assert!(parsed_m.is_bech32m());
-    assert_eq!(parsed_m.expose_secret().to_bytes(), raw_bytes_m);
+    assert_eq!(parsed_m.into_bytes(), raw_bytes_m);
 }
 
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]

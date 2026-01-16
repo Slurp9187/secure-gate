@@ -4,6 +4,9 @@ use alloc::string::String;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 
+use crate::traits::expose_secret_ext::ExposeSecretExt;
+use crate::traits::secure_metadata_ext::SecureMetadataExt;
+
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]
     {
@@ -82,20 +85,8 @@ impl Base64String {
     /// Exact number of bytes the decoded base64 string represents.
     #[inline(always)]
     pub fn byte_len(&self) -> usize {
-        let len = self.len();
+        let len = self.0.len();
         (len / 4) * 3 + (len % 4 == 2) as usize + (len % 4 == 3) as usize * 2
-    }
-
-    /// Length of the encoded string (in characters).
-    #[inline(always)]
-    pub const fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Whether the encoded string is empty.
-    #[inline(always)]
-    pub const fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 }
 

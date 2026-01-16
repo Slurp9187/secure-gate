@@ -8,7 +8,7 @@ use zeroize::Zeroize;
 /// The `zeroize(drop)` attribute ensures the array is zeroized when this struct is dropped.
 #[derive(Clone, PartialEq, Zeroize)]
 #[zeroize(drop)]
-pub struct CloneableArrayInner<const N: usize>([u8; N]);
+pub struct CloneableArrayInner<const N: usize>(pub [u8; N]);
 
 impl<const N: usize> crate::CloneSafe for CloneableArrayInner<N> {}
 
@@ -23,37 +23,19 @@ impl<const N: usize> crate::CloneSafe for CloneableArrayInner<N> {}
 /// ```
 /// # #[cfg(feature = "zeroize")]
 /// # {
-/// use secure_gate::CloneableArray;
+/// use secure_gate::{CloneableArray, ExposeSecretExt};
 ///
 /// // Create from an array
 /// let key: CloneableArray<32> = [42u8; 32].into();
 ///
 /// // Access the inner array
-/// let inner = key.expose_inner();
+/// let inner = &key.expose_secret().0;
 /// assert_eq!(inner.len(), 32);
 /// # }
 /// ```
 pub type CloneableArray<const N: usize> = Fixed<CloneableArrayInner<N>>;
 
 impl<const N: usize> CloneableArray<N> {
-    /// Returns a reference to the inner array without cloning.
-    ///
-    /// This method provides direct access to the wrapped `[u8; N]` array.
-    /// The reference is valid for the lifetime of the `CloneableArray`.
-    #[inline(always)]
-    pub const fn expose_inner(&self) -> &[u8; N] {
-        &self.expose_secret().0
-    }
-
-    /// Returns a mutable reference to the inner array.
-    ///
-    /// This method provides direct mutable access to the wrapped `[u8; N]` array.
-    /// Use this when you need to modify the array contents in-place.
-    #[inline(always)]
-    pub fn expose_inner_mut(&mut self) -> &mut [u8; N] {
-        &mut self.expose_secret_mut().0
-    }
-
     /// Construct a cloneable array secret by building it in a closure.
     ///
     /// Same stack-minimization benefits as `CloneableString::init_with`.

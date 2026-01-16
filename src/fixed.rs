@@ -3,6 +3,7 @@ use core::fmt;
 #[cfg(feature = "rand")]
 use rand::rand_core::OsError;
 
+use crate::ExposeSecretExt;
 use crate::FromSliceError;
 
 /// Stack-allocated secure secret wrapper.
@@ -19,14 +20,14 @@ use crate::FromSliceError;
 ///
 /// Basic usage:
 /// ```
-/// use secure_gate::Fixed;
+/// use secure_gate::{Fixed, ExposeSecretExt};
 /// let secret = Fixed::new(42u32);
 /// assert_eq!(*secret.expose_secret(), 42);
 /// ```
 ///
 /// For byte arrays (most common):
 /// ```
-/// use secure_gate::{Fixed, fixed_alias};
+/// use secure_gate::{Fixed, fixed_alias, ExposeSecretExt, SecureMetadataExt};
 /// fixed_alias!(Aes256Key, 32);
 /// let key_bytes = [0x42u8; 32];
 /// let key: Aes256Key = Fixed::from(key_bytes);
@@ -43,7 +44,7 @@ use crate::FromSliceError;
 /// drop(secret); // memory wiped automatically
 /// # }
 /// ```
-pub struct Fixed<T>(T); // ← field is PRIVATE
+pub struct Fixed<T>(pub(crate) T); // ← field is pub(crate) for trait access
 
 impl<T> Fixed<T> {
     /// Wrap a value in a `Fixed` secret.
@@ -60,59 +61,10 @@ impl<T> Fixed<T> {
     pub const fn new(value: T) -> Self {
         Fixed(value)
     }
-
-    /// Expose the inner value for read-only access.
-    ///
-    /// This is the **only** way to read the secret — loud and auditable.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use secure_gate::Fixed;
-    /// let secret = Fixed::new("hunter2");
-    /// assert_eq!(secret.expose_secret(), &"hunter2");
-    /// ```
-    #[inline(always)]
-    pub const fn expose_secret(&self) -> &T {
-        &self.0
-    }
-
-    /// Expose the inner value for mutable access.
-    ///
-    /// This is the **only** way to mutate the secret — loud and auditable.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use secure_gate::Fixed;
-    /// let mut secret = Fixed::new([1u8, 2, 3]);
-    /// secret.expose_secret_mut()[0] = 42;
-    /// assert_eq!(secret.expose_secret()[0], 42);
-    /// ```
-    #[inline(always)]
-    pub fn expose_secret_mut(&mut self) -> &mut T {
-        &mut self.0
-    }
 }
 
 /// # Byte-array specific helpers
-impl<const N: usize> Fixed<[u8; N]> {
-    /// Returns the fixed length in bytes.
-    ///
-    /// This is safe public metadata — does not expose the secret.
-    #[inline(always)]
-    pub const fn len(&self) -> usize {
-        N
-    }
-
-    /// Returns `true` if the fixed secret is empty (zero-length).
-    ///
-    /// This is safe public metadata — does not expose the secret.
-    #[inline(always)]
-    pub const fn is_empty(&self) -> bool {
-        N == 0
-    }
-}
+impl<const N: usize> Fixed<[u8; N]> {}
 
 /// Implements `TryFrom<&[u8]>` for creating a [`Fixed`] from a byte slice of exact length.
 impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {

@@ -1,5 +1,7 @@
 use ::hex as hex_crate;
 
+use crate::traits::expose_secret_ext::ExposeSecretExt;
+
 // ========================================
 // Consuming (into_) methods on RNG types
 // ========================================
@@ -95,12 +97,6 @@ impl<'a> core::cmp::PartialEq<&str> for HexStringView<'a> {
 // expose_secret → view implementations
 // ========================================
 
-impl crate::encoding::hex::HexString {
-    pub fn expose_secret(&self) -> HexStringView<'_> {
-        HexStringView(self.0.expose_secret())
-    }
-}
-
 // ========================================
 // Consuming decode (into_bytes) for secure zeroization
 // ========================================
@@ -108,6 +104,6 @@ impl crate::encoding::hex::HexString {
 impl crate::encoding::hex::HexString {
     /// Decode the validated hex string into raw bytes, consuming and zeroizing the wrapper.
     pub fn into_bytes(self) -> Vec<u8> {
-        hex_crate::decode(self.expose_secret().0.as_str()).expect("HexString is always valid")
+        hex_crate::decode(self.expose_secret()).expect("HexString is always valid")
     }
 }

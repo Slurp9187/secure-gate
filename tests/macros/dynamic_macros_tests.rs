@@ -4,6 +4,7 @@
 #![cfg(test)]
 
 use secure_gate::dynamic_alias;
+use secure_gate::{ExposeSecretExt, SecureMetadataExt};
 
 // ──────────────────────────────────────────────────────────────
 // Dynamic (heap) alias

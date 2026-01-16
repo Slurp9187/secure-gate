@@ -3,6 +3,8 @@ use secure_gate::{
     random::{DynamicRandom, FixedRandom},
     SecureRandom,
 };
+#[cfg(feature = "rand")]
+use secure_gate::{ExposeSecretExt, SecureMetadataExt};
 
 #[cfg(feature = "rand")]
 #[test]

@@ -2,6 +2,8 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 
+use crate::ExposeSecretExt;
+
 #[cfg(feature = "rand")]
 use rand::rand_core::OsError;
 
@@ -19,14 +21,14 @@ use rand::rand_core::OsError;
 ///
 /// Basic usage:
 /// ```
-/// use secure_gate::Dynamic;
+/// use secure_gate::{Dynamic, ExposeSecretExt};
 /// let secret: Dynamic<String> = "hunter2".into();
 /// assert_eq!(secret.expose_secret(), "hunter2");
 /// ```
 ///
 /// With already-boxed values:
 /// ```
-/// use secure_gate::Dynamic;
+/// use secure_gate::{Dynamic, ExposeSecretExt};
 /// let boxed_secret = Box::new("hunter2".to_string());
 /// let secret: Dynamic<String> = boxed_secret.into(); // or Dynamic::from(boxed_secret)
 /// assert_eq!(secret.expose_secret(), "hunter2");
@@ -34,7 +36,7 @@ use rand::rand_core::OsError;
 ///
 /// Mutable access:
 /// ```
-/// use secure_gate::Dynamic;
+/// use secure_gate::{Dynamic, ExposeSecretExt, ExposeSecretMutExt};
 /// let mut secret = Dynamic::<String>::new("pass".to_string());
 /// secret.expose_secret_mut().push('!');
 /// assert_eq!(secret.expose_secret(), "pass!");
@@ -49,7 +51,7 @@ use rand::rand_core::OsError;
 /// drop(secret); // heap wiped automatically
 /// # }
 /// ```
-pub struct Dynamic<T: ?Sized>(Box<T>);
+pub struct Dynamic<T: ?Sized>(pub(crate) Box<T>);
 
 impl<T: ?Sized> Dynamic<T> {
     /// Wrap a value by boxing it.
@@ -61,22 +63,6 @@ impl<T: ?Sized> Dynamic<T> {
         U: Into<Box<T>>,
     {
         Dynamic(value.into())
-    }
-
-    /// Expose the inner value for read-only access.
-    ///
-    /// This is the **only** way to read the secret — loud and auditable.
-    #[inline(always)]
-    pub const fn expose_secret(&self) -> &T {
-        &self.0
-    }
-
-    /// Expose the inner value for mutable access.
-    ///
-    /// This is the **only** way to mutate the secret — loud and auditable.
-    #[inline(always)]
-    pub fn expose_secret_mut(&mut self) -> &mut T {
-        &mut self.0
     }
 }
 
@@ -118,41 +104,9 @@ impl From<&[u8]> for Dynamic<Vec<u8>> {
 }
 
 /// # Ergonomic helpers for common heap types
-impl Dynamic<String> {
-    /// Returns the length of the string in bytes.
-    ///
-    /// This is safe public metadata — does not expose the secret.
-    #[inline(always)]
-    pub const fn len(&self) -> usize {
-        self.0.len()
-    }
+impl Dynamic<String> {}
 
-    /// Returns `true` if the string is empty (zero bytes).
-    ///
-    /// This is safe public metadata — does not expose the secret.
-    #[inline(always)]
-    pub const fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-}
-
-impl<T> Dynamic<Vec<T>> {
-    /// Returns the number of elements in the vector.
-    ///
-    /// This is safe public metadata — does not expose the secret.
-    #[inline(always)]
-    pub const fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Returns `true` if the vector is empty (zero elements).
-    ///
-    /// This is safe public metadata — does not expose the secret.
-    #[inline(always)]
-    pub const fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-}
+impl<T> Dynamic<Vec<T>> {}
 
 /// # Convenient From impls
 /// Wrap a value in a [`Dynamic`] secret by boxing it.

@@ -9,7 +9,7 @@ use zeroize::Zeroize;
 /// this struct is dropped.
 #[derive(Clone, Zeroize)]
 #[zeroize(drop)]
-pub struct CloneableVecInner(Vec<u8>);
+pub struct CloneableVecInner(pub Vec<u8>);
 
 impl crate::CloneSafe for CloneableVecInner {}
 
@@ -24,7 +24,7 @@ impl crate::CloneSafe for CloneableVecInner {}
 /// ```
 /// # #[cfg(feature = "zeroize")]
 /// # {
-/// use secure_gate::CloneableVec;
+/// use secure_gate::{CloneableVec, ExposeSecretExt};
 ///
 /// // Create from a vector
 /// let data: CloneableVec = vec![1, 2, 3, 4].into();
@@ -33,31 +33,13 @@ impl crate::CloneSafe for CloneableVecInner {}
 /// let data2: CloneableVec = b"hello world".as_slice().into();
 ///
 /// // Access the inner vector
-/// let inner = data.expose_inner();
+/// let inner = &data.expose_secret().0;
 /// assert_eq!(inner.len(), 4);
 /// # }
 /// ```
 pub type CloneableVec = Dynamic<CloneableVecInner>;
 
 impl CloneableVec {
-    /// Returns a reference to the inner vector without cloning.
-    ///
-    /// This method provides direct access to the wrapped `Vec<u8>`.
-    /// The reference is valid for the lifetime of the `CloneableVec`.
-    #[inline(always)]
-    pub const fn expose_inner(&self) -> &Vec<u8> {
-        &self.expose_secret().0
-    }
-
-    /// Returns a mutable reference to the inner vector.
-    ///
-    /// This method provides direct mutable access to the wrapped `Vec<u8>`.
-    /// Use this when you need to modify the vector contents in-place.
-    #[inline(always)]
-    pub fn expose_inner_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.expose_secret_mut().0
-    }
-
     /// Construct a cloneable vec secret by building it in a closure.
     ///
     /// Same stack-minimization benefits as `CloneableString::init_with`.

@@ -1,4 +1,4 @@
-use secure_gate::{ExposeSecretMut, SecureMetadata};
+use secure_gate::{ExposeSecretExt, ExposeSecretMut, SecureMetadata};
 
 #[test]
 fn test_metadata_polymorphism() {

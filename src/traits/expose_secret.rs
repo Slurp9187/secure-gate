@@ -109,13 +109,13 @@ pub trait ExposeSecretMut: ExposeSecret {
 /// Implementation for [`Fixed<T>`] - provides full read/write access.
 ///
 /// [`Fixed<T>`] is a core wrapper that allows both reading and mutation of secrets.
-/// This implementation delegates to the wrapper's own methods.
+/// This implementation directly accesses the inner field.
 impl<T> ExposeSecret for Fixed<T> {
     type Inner = T;
 
     #[inline(always)]
     fn expose_secret(&self) -> &T {
-        self.expose_secret()
+        &self.0
     }
 }
 
@@ -125,20 +125,20 @@ impl<T> ExposeSecret for Fixed<T> {
 impl<T> ExposeSecretMut for Fixed<T> {
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut T {
-        self.expose_secret_mut()
+        &mut self.0
     }
 }
 
 /// Implementation for [`Dynamic<T>`] - provides full read/write access.
 ///
 /// [`Dynamic<T>`] is a core wrapper that allows both reading and mutation of secrets.
-/// This implementation delegates to the wrapper's own methods.
+/// This implementation directly accesses the inner field.
 impl<T: ?Sized> ExposeSecret for Dynamic<T> {
     type Inner = T;
 
     #[inline(always)]
     fn expose_secret(&self) -> &T {
-        self.expose_secret()
+        &self.0
     }
 }
 
@@ -148,7 +148,7 @@ impl<T: ?Sized> ExposeSecret for Dynamic<T> {
 impl<T: ?Sized> ExposeSecretMut for Dynamic<T> {
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut T {
-        self.expose_secret_mut()
+        &mut self.0
     }
 }
 
@@ -167,7 +167,7 @@ impl<const N: usize> ExposeSecret for FixedRandom<N> {
 
     #[inline(always)]
     fn expose_secret(&self) -> &[u8] {
-        self.expose_secret()
+        &self.0 .0
     }
 }
 
@@ -182,7 +182,7 @@ impl ExposeSecret for DynamicRandom {
 
     #[inline(always)]
     fn expose_secret(&self) -> &[u8] {
-        self.expose_secret()
+        &self.0 .0
     }
 }
 
@@ -201,7 +201,7 @@ impl ExposeSecret for HexString {
 
     #[inline(always)]
     fn expose_secret(&self) -> &str {
-        self.expose_secret().0.as_str()
+        self.0.expose_secret().as_str()
     }
 }
 
@@ -216,7 +216,7 @@ impl ExposeSecret for Base64String {
 
     #[inline(always)]
     fn expose_secret(&self) -> &str {
-        self.expose_secret().0.as_str()
+        self.0.expose_secret().as_str()
     }
 }
 
@@ -231,6 +231,6 @@ impl ExposeSecret for Bech32String {
 
     #[inline(always)]
     fn expose_secret(&self) -> &str {
-        self.expose_secret().0.as_str()
+        self.inner.expose_secret().as_str()
     }
 }

@@ -6,6 +6,7 @@
 use secure_gate::fixed_alias;
 #[cfg(feature = "rand")]
 use secure_gate::fixed_alias_random;
+use secure_gate::{ExposeSecretExt, SecureMetadataExt};
 
 // ──────────────────────────────────────────────────────────────
 // Basic fixed-size alias (no rand)

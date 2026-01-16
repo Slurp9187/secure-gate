@@ -5,6 +5,8 @@ use ::bech32::{decode, encode, Hrp};
 #[cfg(feature = "rand")]
 use crate::Bech32EncodingError;
 
+use crate::traits::expose_secret_ext::ExposeSecretExt;
+
 // ========================================
 // Consuming (into_) methods on RNG types
 // ========================================
@@ -226,11 +228,5 @@ impl<'a> core::cmp::PartialEq<&str> for Bech32StringView<'a> {
 }
 
 // ========================================
-// expose_secret → view implementations
+// expose_secret → view implementations (removed)
 // ========================================
-
-impl crate::encoding::bech32::Bech32String {
-    pub fn expose_secret(&self) -> Bech32StringView<'_> {
-        Bech32StringView(self.inner.expose_secret())
-    }
-}

@@ -33,7 +33,7 @@ use rand::TryRngCore;
 /// let nonce = Nonce::generate();
 /// # }
 /// ```
-pub struct FixedRandom<const N: usize>(Fixed<[u8; N]>);
+pub struct FixedRandom<const N: usize>(pub(crate) Fixed<[u8; N]>);
 
 impl<const N: usize> FixedRandom<N> {
     /// Generate fresh random bytes using the OS RNG.
@@ -78,35 +78,6 @@ impl<const N: usize> FixedRandom<N> {
         OsRng
             .try_fill_bytes(&mut bytes)
             .map(|_| Self(Fixed::new(bytes)))
-    }
-
-    /// Expose the random bytes for read-only access.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # #[cfg(feature = "rand")]
-    /// # {
-    /// use secure_gate::random::FixedRandom;
-    /// let random = FixedRandom::<4>::generate();
-    /// let bytes = random.expose_secret();
-    /// # }
-    /// ```
-    #[inline(always)]
-    pub fn expose_secret(&self) -> &[u8; N] {
-        self.0.expose_secret()
-    }
-
-    /// Returns the fixed length in bytes.
-    #[inline(always)]
-    pub const fn len(&self) -> usize {
-        N
-    }
-
-    /// Returns `true` if the length is zero.
-    #[inline(always)]
-    pub const fn is_empty(&self) -> bool {
-        N == 0
     }
 
     /// Consume the wrapper and return the inner `Fixed<[u8; N]>`.
