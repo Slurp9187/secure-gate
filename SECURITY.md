@@ -150,11 +150,11 @@ This section provides a professional reviewer's perspective on each module's sec
 - Exposes only safe metadata (e.g., lengths); zeroizes secrets on failure.
 
 **Potential Weaknesses**:
-- Length metadata (e.g., expected vs. actual) may be sensitive in some contexts.
+- Length metadata (e.g., expected vs. actual) may be sensitive in some contexts. Fields are `pub(crate)` to prevent direct external access while allowing internal debugging.
 
 **Mitigations**:
-- Contextualize errors (e.g., return generic messages in sensitive ops); avoid direct exposure.
-- Wrap error types to add layers of abstraction if metadata is problematic.
+- The `Display` impl provides informative messages without exposing raw fields.
+- In highly sensitive contexts, wrap or genericize errors further.
 
 **Review Points**:
 - Audit error messages for unintended info disclosure.
