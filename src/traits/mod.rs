@@ -29,6 +29,4 @@ pub use expose_secret_mut::ExposeSecretMut;
 
 // Random Generation Traits (requires `rand` feature)
 #[cfg(feature = "rand")]
-pub mod secure_random;
-#[cfg(feature = "rand")]
-pub use secure_random::SecureRandom;
+pub use crate::random::SecureRandom; // ← Cross-module re-export
