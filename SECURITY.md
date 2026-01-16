@@ -16,6 +16,7 @@ This document outlines key security aspects to consider when using the `secure-g
 - **Zeroization**: Memory is zeroized on drop when `zeroize` feature is enabled. Without it, data may linger until normal deallocation.
 - **No Implicit Access**: No `Deref` implementations prevent silent borrowing or copying.
 - **Constant-Time Operations**: Timing-safe equality available with `ct-eq` feature; disable only with justification.
+- **No Unsafe Code**: The crate contains no `unsafe` code. `forbid(unsafe_code)` is applied in minimal configurations as a defensive measure.
 
 ## Feature Implications
 - **`zeroize` (Default)**: Enables memory wiping and safe cloning. Recommended for all use cases handling secrets.
@@ -24,7 +25,6 @@ This document outlines key security aspects to consider when using the `secure-g
 - **Encoding Features**: Validate inputs before encoding to prevent malformed outputs or attacks.
 
 ## Potential Concerns
-- **Unsafe Code**: The crate contains no `unsafe` code. `forbid(unsafe_code)` is applied in minimal configurations as a defensive measure.
 - **Heap Allocation**: `Dynamic<T>` types may leave slack capacity until drop; call `shrink_to_fit()` to mitigate.
 - **Custom Types**: Avoid wrapping sensitive data in non-zeroizeable types; implement `CloneSafe` carefully.
 - **Error Handling**: Errors like `FromSliceError` expose length metadata (e.g., expected vs. actual), which may be sensitive in some contexts; fields are `pub(crate)` to prevent direct external access while allowing internal debugging. Invalid inputs are zeroized in encoding failures (with `zeroize` enabled).
