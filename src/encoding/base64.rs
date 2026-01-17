@@ -57,7 +57,7 @@ impl Base64String {
     /// ```
     /// # #[cfg(feature = "encoding-base64")]
     /// # {
-    /// use secure_gate::encoding::base64::Base64String;
+    /// use secure_gate::{encoding::base64::Base64String, ExposeSecret};
     /// let valid = Base64String::new("SGVsbG8".to_string()).unwrap();
     /// assert_eq!(valid.expose_secret(), "SGVsbG8");
     /// let bytes = valid.into_bytes(); // Vec<u8> of "Hello"

@@ -26,6 +26,7 @@ use crate::FromSliceError;
 ///
 /// For byte arrays (most common):
 /// ```
+/// use secure_gate::{fixed_alias, Fixed, ExposeSecret};
 /// fixed_alias!(Aes256Key, 32);
 /// let key_bytes = [0x42u8; 32];
 /// let key: Aes256Key = Fixed::from(key_bytes);
