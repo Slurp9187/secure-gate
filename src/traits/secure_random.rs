@@ -3,8 +3,6 @@
 //! This trait marks types containing cryptographically fresh random bytes,
 //! ensuring they were generated via secure RNG and provide byte-slice access.
 
-use crate::expose_secret_traits::expose_secret::ExposeSecret;
-
 /// Marker trait for cryptographically secure random values.
 ///
 /// Extends [] with `Inner = [u8]`, guaranteeing fresh random bytes
@@ -15,7 +13,7 @@ use crate::expose_secret_traits::expose_secret::ExposeSecret;
 /// ```
 /// # #[cfg(feature = "rand")]
 /// # {
-/// use secure_gate::random::SecureRandom;
+/// use secure_gate::SecureRandom;
 ///
 /// fn derive_key<R: SecureRandom>(r: &R) {
 ///     let bytes = r.expose_secret();  // Guaranteed fresh &[u8]
@@ -24,10 +22,17 @@ use crate::expose_secret_traits::expose_secret::ExposeSecret;
 /// # }
 /// ```
 #[cfg(feature = "rand")]
-pub trait SecureRandom: ExposeSecret<Inner = [u8]> {}
+mod inner {
+    use super::super::ExposeSecret;
+
+    pub trait SecureRandom: ExposeSecret<Inner = [u8]> {}
+}
 
 #[cfg(feature = "rand")]
-impl<const N: usize> SecureRandom for super::FixedRandom<N> {}
+pub use inner::SecureRandom;
 
 #[cfg(feature = "rand")]
-impl SecureRandom for super::DynamicRandom {}
+impl<const N: usize> SecureRandom for crate::random::FixedRandom<N> {}
+
+#[cfg(feature = "rand")]
+impl SecureRandom for crate::random::DynamicRandom {}

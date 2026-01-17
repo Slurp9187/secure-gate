@@ -1,3 +1,4 @@
+// C:\Users\chadm\Projects\secure-gate\src\random\mod.rs
 //! Cryptographically secure random value generation.
 //!
 //! Provides [`FixedRandom`] and [`DynamicRandom`] for fresh random bytes.
@@ -11,10 +12,6 @@ pub mod dynamic_random;
 #[cfg(feature = "rand")]
 pub mod fixed_random;
 
-/// Secure random marker trait.
-#[cfg(feature = "rand")]
-pub mod secure_random_marker;
-
 // Re-export for API compatibility
 /// Re-export of [`DynamicRandom`].
 #[cfg(feature = "rand")]
@@ -24,4 +21,4 @@ pub use dynamic_random::DynamicRandom;
 pub use fixed_random::FixedRandom;
 /// Re-export of [`SecureRandom`].
 #[cfg(feature = "rand")]
-pub use secure_random_marker::SecureRandom;
+pub use crate::traits::secure_random::SecureRandom;

@@ -1,7 +1,7 @@
 #[cfg(feature = "rand")]
 use super::SecureEncodingExt;
 #[cfg(feature = "rand")]
-use crate::expose_secret_traits::expose_secret::ExposeSecret;
+use crate::traits::expose_secret::ExposeSecret;
 
 #[cfg(feature = "rand")]
 impl crate::DynamicRandom {

@@ -26,7 +26,7 @@ mod fixed;
 mod error;
 
 /// Core traits for wrapper polymorphism - always available.
-mod expose_secret_traits;
+mod traits;
 
 /// Re-export of the [`Dynamic`] type.
 pub use dynamic::Dynamic;
@@ -34,15 +34,19 @@ pub use dynamic::Dynamic;
 pub use fixed::Fixed;
 
 /// Re-export of the traits.
-pub use expose_secret_traits::{ExposeSecret, ExposeSecretMut};
+pub use traits::{ExposeSecret, ExposeSecretMut};
 
 /// Re-export of SecureRandom (requires `rand` feature).
 #[cfg(feature = "rand")]
-pub use expose_secret_traits::SecureRandom;
+pub use traits::SecureRandom;
 
 /// Re-export of the [`CloneSafe`] trait.
 #[cfg(feature = "zeroize")]
-pub use cloneable::CloneSafe;
+pub use traits::CloneSafe;
+
+/// Re-export of the [`ConstantTimeEq`] trait.
+#[cfg(feature = "ct-eq")]
+pub use traits::ConstantTimeEq;
 
 /// Cloneable secret types (requires the `zeroize` feature).
 /// Provides wrappers that can be safely duplicated while maintaining security guarantees.
@@ -66,12 +70,6 @@ mod macros;
 /// Provides RNG-backed secret generation with freshness guarantees.
 #[cfg(feature = "rand")]
 pub mod random;
-
-/// Constant-time equality comparison (requires the `ct-eq` feature).
-/// Prevents timing attacks when comparing sensitive data.
-/// Provides the ConstantTimeEq trait for secure comparisons.
-#[cfg(feature = "ct-eq")]
-pub mod constant_time_eq_trait;
 
 /// Encoding utilities for secrets (various encoding features available).
 /// Secure encoding/decoding with validation and zeroization.

@@ -139,7 +139,7 @@ impl Dynamic<String> {
     /// ```
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
-        use crate::constant_time_eq_trait::ConstantTimeEq;
+        use crate::traits::ConstantTimeEq;
         self.0.as_bytes().ct_eq(other.0.as_bytes())
     }
 }
@@ -164,7 +164,7 @@ impl Dynamic<Vec<u8>> {
     /// ```
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
-        use crate::constant_time_eq_trait::ConstantTimeEq;
+        use crate::traits::ConstantTimeEq;
         self.0.as_slice().ct_eq(other.0.as_slice())
     }
 }

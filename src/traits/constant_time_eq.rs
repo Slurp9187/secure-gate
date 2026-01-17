@@ -13,7 +13,6 @@
 //! authentication tokens, or other sensitive data that should not leak through
 //! timing differences.
 
-#[cfg(feature = "ct-eq")]
 /// Trait for constant-time equality comparison to prevent timing attacks.
 ///
 /// This trait provides equality comparison that takes the same amount of time
@@ -32,16 +31,18 @@
 /// # Examples
 ///
 /// Basic usage:
-/// ```
+/// ```rust
 /// # #[cfg(feature = "ct-eq")]
 /// # {
-/// use secure_gate::constant_time_eq_trait::ConstantTimeEq;
-/// let a = [1u8, 2u8, 3u8];
-/// let b = [1u8, 2u8, 3u8];
-/// let c = [1u8, 5u8, 3u8];
+/// fn main() {
+/// use subtle::ConstantTimeEq;
+/// let a = [1u8, 2u8, 3u8].as_slice();
+/// let b = [1u8, 2u8, 3u8].as_slice();
+/// let c = [1u8, 5u8, 3u8].as_slice();
 ///
-/// assert!(a.ct_eq(&b));  // true
-/// assert!(!a.ct_eq(&c)); // false, but takes same time as true case
+/// assert!(bool::from(a.ct_eq(&b)));  // true
+/// assert!(bool::from(!a.ct_eq(&c))); // false, but takes same time as true case
+/// }
 /// # }
 /// ```
 pub trait ConstantTimeEq {

@@ -21,12 +21,25 @@
 ///
 /// Some traits require optional Cargo features:
 /// - `rand`: Enables [`SecureRandom`] and random wrapper implementations
+/// - `zeroize`: Enables [`CloneSafe`] for safe cloning
 // Secret Exposure Traits
 pub mod expose_secret;
-pub mod expose_secret_mut;
 pub use expose_secret::ExposeSecret;
+
+pub mod expose_secret_mut;
 pub use expose_secret_mut::ExposeSecretMut;
 
-// Random Generation Traits (requires `rand` feature)
+pub mod secure_random;
 #[cfg(feature = "rand")]
-pub use crate::random::SecureRandom; // ← Cross-module re-export
+pub use secure_random::SecureRandom;
+
+#[cfg(feature = "zeroize")]
+pub mod clone_safe;
+#[cfg(feature = "zeroize")]
+pub use clone_safe::CloneSafe;
+
+pub mod constant_time_eq;
+#[cfg(feature = "ct-eq")]
+pub use constant_time_eq::ConstantTimeEq;
+
+// Random Generation Traits (requires `rand` feature)

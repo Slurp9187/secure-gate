@@ -5,7 +5,7 @@
 use alloc::string::String;
 use hex as hex_crate;
 
-use crate::expose_secret_traits::expose_secret::ExposeSecret;
+use crate::traits::expose_secret::ExposeSecret;
 
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]
@@ -112,7 +112,7 @@ impl HexString {
 #[cfg(feature = "ct-eq")]
 impl PartialEq for HexString {
     fn eq(&self, other: &Self) -> bool {
-        use crate::constant_time_eq_trait::ConstantTimeEq;
+        use crate::traits::ConstantTimeEq;
         self.0
             .expose_secret()
             .as_bytes()
