@@ -125,7 +125,7 @@ fn bech32string_decode_borrowing() {
 #[test]
 fn rng_into_bech32_variant_detection_and_round_trip() {
     use secure_gate::random::FixedRandom;
-    use secure_gate::SecureEncodingExt;
+    use secure_gate::SecureEncoding;
 
     let rng = FixedRandom::<16>::generate();
     let raw_bytes = rng.expose_secret().to_vec();

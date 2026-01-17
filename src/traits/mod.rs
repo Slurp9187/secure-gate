@@ -42,4 +42,17 @@ pub mod constant_time_eq;
 #[cfg(feature = "ct-eq")]
 pub use constant_time_eq::ConstantTimeEq;
 
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
+pub mod secure_encoding;
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
+pub use secure_encoding::SecureEncoding;
+
 // Random Generation Traits (requires `rand` feature)

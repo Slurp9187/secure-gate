@@ -10,7 +10,7 @@ use secure_gate::ExposeSecret;
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
-use secure_gate::SecureEncodingExt;
+use secure_gate::SecureEncoding;
 
 #[test]
 fn raw_fixed_random_works() {

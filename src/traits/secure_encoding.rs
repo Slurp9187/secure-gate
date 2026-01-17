@@ -26,7 +26,7 @@ use crate::Bech32EncodingError;
 /// ```
 /// # #[cfg(feature = "encoding-hex")]
 /// # {
-/// use secure_gate::{SecureEncodingExt, ExposeSecret};
+/// use secure_gate::{SecureEncoding, ExposeSecret};
 /// let bytes = [0x42u8; 32];
 /// let hex_string = bytes.to_hex();
 /// let hex = hex_string.expose_secret(); // → "424242..."
@@ -37,7 +37,7 @@ use crate::Bech32EncodingError;
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
-pub trait SecureEncodingExt {
+pub trait SecureEncoding {
     /// Encode secret bytes as lowercase hexadecimal.
     #[cfg(feature = "encoding-hex")]
     fn to_hex(&self) -> crate::encoding::hex::HexString;
@@ -70,7 +70,7 @@ pub trait SecureEncodingExt {
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
-impl SecureEncodingExt for [u8] {
+impl SecureEncoding for [u8] {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
     fn to_hex(&self) -> crate::encoding::hex::HexString {
@@ -123,7 +123,7 @@ impl SecureEncodingExt for [u8] {
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
-impl<const N: usize> SecureEncodingExt for [u8; N] {
+impl<const N: usize> SecureEncoding for [u8; N] {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
     fn to_hex(&self) -> crate::encoding::hex::HexString {

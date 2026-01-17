@@ -48,18 +48,3 @@ pub mod base64_random_ext;
 pub mod bech32;
 #[cfg(feature = "encoding-bech32")]
 pub mod bech32_random_ext;
-
-// Shared extension trait for explicit encoding on exposed bytes
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32"
-))]
-pub mod secure_encoding_ext;
-
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32"
-))]
-pub use secure_encoding_ext::SecureEncodingExt;
