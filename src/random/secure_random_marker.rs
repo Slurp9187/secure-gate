@@ -3,7 +3,7 @@
 //! This trait marks types containing cryptographically fresh random bytes,
 //! ensuring they were generated via secure RNG and provide byte-slice access.
 
-use crate::traits::expose_secret::ExposeSecret;
+use crate::expose_secret_traits::expose_secret::ExposeSecret;
 
 /// Marker trait for cryptographically secure random values.
 ///

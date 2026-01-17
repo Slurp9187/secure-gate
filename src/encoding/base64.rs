@@ -4,7 +4,7 @@ use alloc::string::String;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 
-use crate::traits::expose_secret::ExposeSecret;
+use crate::expose_secret_traits::expose_secret::ExposeSecret;
 
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]
@@ -100,7 +100,7 @@ impl PartialEq for Base64String {
     fn eq(&self, other: &Self) -> bool {
         #[cfg(feature = "ct-eq")]
         {
-            use crate::ct_eq::ConstantTimeEq;
+            use crate::constant_time_eq_trait::ConstantTimeEq;
             self.0
                 .expose_secret()
                 .as_bytes()

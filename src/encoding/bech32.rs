@@ -26,7 +26,7 @@ use alloc::string::String;
 use bech32::primitives::decode::UncheckedHrpstring;
 use bech32::{decode, primitives::hrp::Hrp, Bech32, Bech32m};
 
-use crate::traits::expose_secret::ExposeSecret;
+use crate::expose_secret_traits::expose_secret::ExposeSecret;
 
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]
@@ -139,7 +139,7 @@ impl Bech32String {
 #[cfg(feature = "ct-eq")]
 impl PartialEq for Bech32String {
     fn eq(&self, other: &Self) -> bool {
-        use crate::ct_eq::ConstantTimeEq;
+        use crate::constant_time_eq_trait::ConstantTimeEq;
         self.inner
             .expose_secret()
             .as_bytes()

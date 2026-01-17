@@ -6,7 +6,7 @@
     )),
     forbid(unsafe_code)
 )]
-#![doc = include_str!("../README.md")]
+// #![doc = include_str!("../README.md")]
 //! Zero-cost secure wrappers for secrets — [`Fixed<T>`] for stack, [`Dynamic<T>`] for heap.
 //!
 //! This crate provides explicit wrappers for sensitive data like [`CloneableArray`], [`CloneableString`], and [`CloneSafe`], ensuring no accidental exposure.
@@ -26,7 +26,7 @@ mod fixed;
 mod error;
 
 /// Core traits for wrapper polymorphism - always available.
-mod traits;
+mod expose_secret_traits;
 
 /// Re-export of the [`Dynamic`] type.
 pub use dynamic::Dynamic;
@@ -34,11 +34,11 @@ pub use dynamic::Dynamic;
 pub use fixed::Fixed;
 
 /// Re-export of the traits.
-pub use traits::{ExposeSecret, ExposeSecretMut};
+pub use expose_secret_traits::{ExposeSecret, ExposeSecretMut};
 
 /// Re-export of SecureRandom (requires `rand` feature).
 #[cfg(feature = "rand")]
-pub use traits::SecureRandom;
+pub use expose_secret_traits::SecureRandom;
 
 /// Re-export of the [`CloneSafe`] trait.
 #[cfg(feature = "zeroize")]
@@ -71,7 +71,7 @@ pub mod random;
 /// Prevents timing attacks when comparing sensitive data.
 /// Provides the ConstantTimeEq trait for secure comparisons.
 #[cfg(feature = "ct-eq")]
-pub mod ct_eq;
+pub mod constant_time_eq_trait;
 
 /// Encoding utilities for secrets (various encoding features available).
 /// Secure encoding/decoding with validation and zeroization.

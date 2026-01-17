@@ -136,7 +136,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// ```
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
-        use crate::ct_eq::ConstantTimeEq;
+        use crate::constant_time_eq_trait::ConstantTimeEq;
         self.expose_secret().ct_eq(other.expose_secret())
     }
 }

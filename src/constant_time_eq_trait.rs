@@ -35,7 +35,7 @@
 /// ```
 /// # #[cfg(feature = "ct-eq")]
 /// # {
-/// use secure_gate::ct_eq::ConstantTimeEq;
+/// use secure_gate::ConstantTimeEq;
 /// let a = [1u8, 2u8, 3u8];
 /// let b = [1u8, 2u8, 3u8];
 /// let c = [1u8, 5u8, 3u8];

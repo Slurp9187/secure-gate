@@ -6,7 +6,7 @@
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "ct-eq")]
-    use secure_gate::{ct_eq::ConstantTimeEq, Dynamic, Fixed};
+    use secure_gate::{constant_time_eq_trait::ConstantTimeEq, Dynamic, Fixed};
 
     #[cfg(not(feature = "ct-eq"))]
     use secure_gate::ExposeSecret;

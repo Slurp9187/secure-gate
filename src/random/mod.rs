@@ -13,7 +13,7 @@ pub mod fixed_random;
 
 /// Secure random marker trait.
 #[cfg(feature = "rand")]
-pub mod secure_random;
+pub mod secure_random_marker;
 
 // Re-export for API compatibility
 /// Re-export of [`DynamicRandom`].
@@ -24,4 +24,4 @@ pub use dynamic_random::DynamicRandom;
 pub use fixed_random::FixedRandom;
 /// Re-export of [`SecureRandom`].
 #[cfg(feature = "rand")]
-pub use secure_random::SecureRandom;
+pub use secure_random_marker::SecureRandom;
