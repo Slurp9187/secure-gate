@@ -35,7 +35,7 @@ use crate::encoding::bech32::Bech32String;
 /// Trait for read-only access to secrets, including metadata.
 ///
 /// Import this to enable `.expose_secret()`, `.len()`, and `.is_empty()`.
-/// For mutable access, see [`ExposeSecretMut`].
+/// For mutable access, see [`super::ExposeSecretMut`].
 pub trait ExposeSecret {
     /// The inner secret type being exposed.
     ///

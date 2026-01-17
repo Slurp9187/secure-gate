@@ -97,7 +97,7 @@ impl HexString {
         self.0.expose_secret().len() / 2
     }
 
-    /// decode_to_bytes: borrowing, allocates fresh Vec<u8> from decoded bytes
+    /// decode_to_bytes: borrowing, allocates fresh ` from decoded bytes
     pub fn decode_to_bytes(&self) -> Vec<u8> {
         hex_crate::decode(self.expose_secret()).expect("HexString invariant: always valid")
     }

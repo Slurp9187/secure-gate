@@ -115,7 +115,7 @@ impl Bech32String {
         (data_chars * 5) / 8
     }
 
-    /// decode_to_bytes: borrowing, allocates fresh Vec<u8> from decoded bytes
+    /// decode_to_bytes: borrowing, allocates fresh `Vec<u8>` from decoded bytes
     pub fn decode_to_bytes(&self) -> Vec<u8> {
         let (_, data) = decode(self.inner.expose_secret().as_str())
             .expect("Bech32String invariant: always valid");

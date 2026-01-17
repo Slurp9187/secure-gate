@@ -80,7 +80,7 @@ impl Base64String {
         (len / 4) * 3 + (len % 4 == 2) as usize + (len % 4 == 3) as usize * 2
     }
 
-    /// decode_to_bytes: borrowing, allocates fresh Vec<u8> from decoded bytes
+    /// decode_to_bytes: borrowing, allocates fresh `Vec<u8>` from decoded bytes
     pub fn decode_to_bytes(&self) -> Vec<u8> {
         URL_SAFE_NO_PAD
             .decode(self.expose_secret())
