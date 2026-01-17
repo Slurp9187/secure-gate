@@ -28,6 +28,17 @@ use bech32::{decode, primitives::hrp::Hrp, Bech32, Bech32m};
 
 use crate::traits::expose_secret::ExposeSecret;
 
+fn zeroize_input(s: &mut String) {
+    #[cfg(feature = "zeroize")]
+    {
+        zeroize::Zeroize::zeroize(s);
+    }
+    #[cfg(not(feature = "zeroize"))]
+    {
+        let _ = s; // Suppress unused variable warning when zeroize is disabled
+    }
+}
+
 /// The encoding variant used for Bech32 strings.
 ///
 /// Bech32 and Bech32m are two similar but incompatible encoding variants.
@@ -63,6 +74,7 @@ impl Bech32String {
         } else if unchecked.validate_checksum::<Bech32m>().is_ok() {
             EncodingVariant::Bech32m
         } else {
+            zeroize_input(&mut s);
             return Err("invalid bech32 string");
         };
 
@@ -73,19 +85,6 @@ impl Bech32String {
             inner: crate::Dynamic::new(s),
             variant,
         })
-    }
-
-    /// Create a new `Bech32String` from a validated string, bypassing checks.
-    ///
-    /// # Safety
-    ///
-    /// The input string must be a valid, canonical lowercase Bech32 or Bech32m string.
-    /// Incorrect use can lead to invalid encodings or security issues.
-    pub(crate) fn new_unchecked(s: String, variant: EncodingVariant) -> Self {
-        Self {
-            inner: crate::Dynamic::new(s),
-            variant,
-        }
     }
 
     /// Check if this is a Bech32 encoding.
@@ -114,6 +113,13 @@ impl Bech32String {
         let data_part_len = s.len() - sep_pos - 1;
         let data_chars = data_part_len - 6; // subtract checksum
         (data_chars * 5) / 8
+    }
+
+    /// Borrowing decode: simple allocating default (most common use).
+    pub fn decode(&self) -> Vec<u8> {
+        let (_, data) = decode(self.inner.expose_secret().as_str())
+            .expect("Bech32String invariant: always valid");
+        data
     }
 
     /// Get the detected encoding variant.

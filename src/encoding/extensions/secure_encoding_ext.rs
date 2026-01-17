@@ -97,13 +97,11 @@ impl SecureEncodingExt for [u8] {
         &self,
         hrp: &str,
     ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = bech32::encode::<bech32::Bech32>(hrp, self)
+        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        let encoded = bech32::encode::<bech32::Bech32>(hrp_parsed, self)
             .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32,
-        ))
+        Ok(crate::encoding::bech32::Bech32String::new(encoded)
+            .expect("fresh encode is always valid"))
     }
 
     #[cfg(feature = "encoding-bech32")]
@@ -112,13 +110,11 @@ impl SecureEncodingExt for [u8] {
         &self,
         hrp: &str,
     ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = bech32::encode::<bech32::Bech32m>(hrp, self)
+        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        let encoded = bech32::encode::<bech32::Bech32m>(hrp_parsed, self)
             .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32m,
-        ))
+        Ok(crate::encoding::bech32::Bech32String::new(encoded)
+            .expect("fresh encode is always valid"))
     }
 }
 
@@ -154,13 +150,11 @@ impl<const N: usize> SecureEncodingExt for [u8; N] {
         &self,
         hrp: &str,
     ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = bech32::encode::<bech32::Bech32>(hrp, self)
+        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        let encoded = bech32::encode::<bech32::Bech32>(hrp_parsed, self)
             .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32,
-        ))
+        Ok(crate::encoding::bech32::Bech32String::new(encoded)
+            .expect("fresh encode is always valid"))
     }
 
     #[cfg(feature = "encoding-bech32")]
@@ -169,12 +163,10 @@ impl<const N: usize> SecureEncodingExt for [u8; N] {
         &self,
         hrp: &str,
     ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = bech32::encode::<bech32::Bech32m>(hrp, self)
+        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        let encoded = bech32::encode::<bech32::Bech32m>(hrp_parsed, self)
             .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32m,
-        ))
+        Ok(crate::encoding::bech32::Bech32String::new(encoded)
+            .expect("fresh encode is always valid"))
     }
 }

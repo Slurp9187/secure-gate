@@ -1,10 +1,7 @@
-#[cfg(feature = "encoding-bech32")]
-#[allow(unused_imports)] // Clippy bug: doesn't recognize use in generics
-use ::bech32::{decode, encode, Hrp};
-
 #[cfg(feature = "rand")]
 use crate::Bech32EncodingError;
 
+use crate::encoding::extensions::secure_encoding_ext::SecureEncodingExt;
 use crate::traits::expose_secret::ExposeSecret;
 
 // ========================================
@@ -13,87 +10,36 @@ use crate::traits::expose_secret::ExposeSecret;
 
 #[cfg(feature = "rand")]
 impl crate::DynamicRandom {
-    /// Consume self and return the random bytes as a validated Bech32 string with the specified HRP.
-    ///
-    /// The raw bytes are zeroized immediately after encoding (via drop of `self`).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the HRP is invalid.
     pub fn try_into_bech32(
         self,
         hrp: &str,
     ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp = Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = encode::<::bech32::Bech32>(hrp, self.expose_secret())
-            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32,
-        ))
+        self.expose_secret().try_to_bech32(hrp)
     }
 
-    /// Consume self and return the random bytes as a validated Bech32m string with the specified HRP.
-    ///
-    /// The raw bytes are zeroized immediately after encoding (via drop of `self`).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the HRP is invalid.
     pub fn try_into_bech32m(
         self,
         hrp: &str,
     ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp = Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = encode::<::bech32::Bech32m>(hrp, self.expose_secret())
-            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32m,
-        ))
+        self.expose_secret().try_to_bech32m(hrp)
     }
 }
 
 #[cfg(feature = "rand")]
 impl<const N: usize> crate::FixedRandom<N> {
-    /// Consume self and return the random bytes as a validated Bech32 string with the specified HRP.
-    ///
-    /// The raw bytes are zeroized immediately after encoding (via drop of `self`).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the HRP is invalid.
+    /// Consuming encode (raw random bytes zeroized immediately).
     pub fn try_into_bech32(
         self,
         hrp: &str,
     ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp = Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = encode::<::bech32::Bech32>(hrp, self.expose_secret())
-            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32,
-        ))
+        self.expose_secret().try_to_bech32(hrp)
     }
 
-    /// Consume self and return the random bytes as a validated Bech32m string with the specified HRP.
-    ///
-    /// The raw bytes are zeroized immediately after encoding (via drop of `self`).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the HRP is invalid.
     pub fn try_into_bech32m(
         self,
         hrp: &str,
     ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp = Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = encode::<::bech32::Bech32m>(hrp, self.expose_secret())
-            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32m,
-        ))
+        self.expose_secret().try_to_bech32m(hrp)
     }
 }
 
@@ -103,130 +49,35 @@ impl<const N: usize> crate::FixedRandom<N> {
 
 #[cfg(feature = "rand")]
 impl<const N: usize> crate::FixedRandom<N> {
-    /// Borrow and encode the random bytes as a validated Bech32 string with the specified HRP (allocates).
-    ///
-    /// The original secret remains intact and usable.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the HRP is invalid.
+    /// Borrowing encode (original random remains usable).
     pub fn try_to_bech32(
         &self,
         hrp: &str,
     ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp = Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = encode::<::bech32::Bech32>(hrp, self.expose_secret())
-            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32,
-        ))
+        self.expose_secret().try_to_bech32(hrp)
     }
 
-    /// Borrow and encode the random bytes as a validated Bech32m string with the specified HRP (allocates).
-    ///
-    /// The original secret remains intact and usable.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the HRP is invalid.
     pub fn try_to_bech32m(
         &self,
         hrp: &str,
     ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp = Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = encode::<::bech32::Bech32m>(hrp, self.expose_secret())
-            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32m,
-        ))
+        self.expose_secret().try_to_bech32m(hrp)
     }
 }
 
 #[cfg(feature = "rand")]
 impl crate::DynamicRandom {
-    /// Borrow and encode the random bytes as a validated Bech32 string with the specified HRP (allocates).
-    ///
-    /// The original secret remains intact and usable.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the HRP is invalid.
     pub fn try_to_bech32(
         &self,
         hrp: &str,
     ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp = Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = encode::<::bech32::Bech32>(hrp, self.expose_secret())
-            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32,
-        ))
+        self.expose_secret().try_to_bech32(hrp)
     }
 
-    /// Borrow and encode the random bytes as a validated Bech32m string with the specified HRP (allocates).
-    ///
-    /// The original secret remains intact and usable.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the HRP is invalid.
     pub fn try_to_bech32m(
         &self,
         hrp: &str,
     ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp = Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = encode::<::bech32::Bech32m>(hrp, self.expose_secret())
-            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new_unchecked(
-            encoded,
-            crate::encoding::bech32::EncodingVariant::Bech32m,
-        ))
+        self.expose_secret().try_to_bech32m(hrp)
     }
 }
-
-// ========================================
-// View types and their implementations
-// ========================================
-
-/// View struct for exposed Bech32 strings, allowing decoding without direct access.
-pub struct Bech32StringView<'a>(pub(crate) &'a String);
-
-impl<'a> Bech32StringView<'a> {
-    /// Decode the validated Bech32/Bech32m string into raw bytes (allocates).
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let (_, data) = decode(self.0.as_str()).expect("Bech32String is always valid");
-        data
-    }
-}
-
-impl<'a> core::ops::Deref for Bech32StringView<'a> {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        self.0.as_str()
-    }
-}
-
-impl<'a> core::fmt::Debug for Bech32StringView<'a> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str("[REDACTED]")
-    }
-}
-
-impl<'a> core::fmt::Display for Bech32StringView<'a> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(self.0)
-    }
-}
-
-impl<'a> core::cmp::PartialEq<&str> for Bech32StringView<'a> {
-    fn eq(&self, other: &&str) -> bool {
-        self.0 == *other
-    }
-}
-
-// ========================================
-// expose_secret → view implementations (removed)
-// ========================================

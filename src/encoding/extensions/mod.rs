@@ -19,9 +19,6 @@ pub mod bech32;
 pub mod hex;
 pub mod secure_encoding_ext;
 
-#[cfg(feature = "encoding-bech32")]
-pub use bech32::Bech32StringView;
-
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",

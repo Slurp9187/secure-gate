@@ -109,6 +109,18 @@ fn metadata_methods() {
     assert_eq!(bech32.byte_len(), 20);
 }
 
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bech32string_decode_borrowing() {
+    let bech32 =
+        Bech32String::new("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4".to_string()).unwrap();
+    let bytes = bech32.decode();
+    assert_eq!(bytes.len(), 20);
+    // Verify bech32 is still usable (borrowing)
+    let bytes2 = bech32.decode();
+    assert_eq!(bytes2, bytes);
+}
+
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
 #[test]
 fn rng_into_bech32_variant_detection_and_round_trip() {
