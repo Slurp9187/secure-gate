@@ -19,26 +19,47 @@
 //! # Security Features
 //!
 //! All encoding wrappers implement secure practices:
-//!  - **Security**: Invalid inputs are only zeroized when the `zeroize` feature is enabled.
-//!    Without `zeroize`, rejected secrets may remain in memory until normal drop.
-//!  - Constant-time equality prevents timing attacks (with `ct-eq`)
-//!  - Memory is securely zeroized when wrappers are dropped
-//!  - Debug output shows `[REDACTED]` to prevent accidental exposure
+//! - **Security**: Invalid inputs are only zeroized when the `zeroize` feature is enabled.
+//! Without `zeroize`, rejected secrets may remain in memory until normal drop.
+//! - Constant-time equality prevents timing attacks (with `ct-eq`)
+//! - Memory is securely zeroized when wrappers are dropped
+//! - Debug output shows `[REDACTED]` to prevent accidental exposure
 
-// Allow unsafe_code when zeroize is enabled (not needed here, but consistent)
-// but forbid it when none of the encoding features are enabled
 #![cfg_attr(
-    not(any(feature = "encoding-hex", feature = "encoding-base64")),
+    not(any(
+        feature = "encoding-hex",
+        feature = "encoding-base64",
+        feature = "encoding-bech32"
+    )),
     forbid(unsafe_code)
 )]
 
 #[cfg(feature = "encoding-hex")]
 pub mod hex;
+#[cfg(feature = "encoding-hex")]
+pub mod hex_random_ext;
 
 #[cfg(feature = "encoding-base64")]
 pub mod base64;
+#[cfg(feature = "encoding-base64")]
+pub mod base64_random_ext;
 
 #[cfg(feature = "encoding-bech32")]
 pub mod bech32;
+#[cfg(feature = "encoding-bech32")]
+pub mod bech32_random_ext;
 
-pub mod extensions;
+// Shared extension trait for explicit encoding on exposed bytes
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
+pub mod secure_encoding_ext;
+
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
+pub use secure_encoding_ext::SecureEncodingExt;

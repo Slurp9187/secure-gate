@@ -103,7 +103,7 @@ pub use error::Bech32EncodingError;
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
-pub use crate::encoding::extensions::SecureEncodingExt;
+pub use crate::encoding::SecureEncodingExt;
 
 /// Re-export of the [`FromSliceError`] type.
 pub use error::FromSliceError;
