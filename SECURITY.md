@@ -108,7 +108,7 @@ This section provides a professional reviewer's perspective on each module's sec
 - Verify entropy source in deployment environment.
 - Review encoding integrations for post-generation leaks.
 
-### Constant-Time Equality (`ct_eq.rs`)
+### Constant-Time Equality (`traits/constant_time_eq.rs`)
 **Strengths**:
 - Provides `ConstantTimeEq` trait—prevents timing leaks in comparisons.
 - Uses `subtle` crate for vetted impls.
