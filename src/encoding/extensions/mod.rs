@@ -23,8 +23,7 @@ pub mod secure_encoding_ext;
 pub use base64::Base64StringView;
 #[cfg(feature = "encoding-bech32")]
 pub use bech32::Bech32StringView;
-#[cfg(feature = "encoding-hex")]
-pub use hex::HexStringView;
+
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",

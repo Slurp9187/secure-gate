@@ -143,6 +143,17 @@ fn hexstring_constant_time_eq() {
     assert_ne!(hex1, hex3);
 }
 
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn hexstring_decode_borrowing() {
+    let hex = HexString::new("deadbeef".to_string()).unwrap();
+    let bytes = hex.decode();
+    assert_eq!(bytes, vec![0xde, 0xad, 0xbe, 0xef]);
+    // Verify hex is still usable (borrowing)
+    let bytes2 = hex.decode();
+    assert_eq!(bytes2, bytes);
+}
+
 #[cfg(all(feature = "encoding-hex", feature = "rand"))]
 #[test]
 fn rng_hex_integration() {

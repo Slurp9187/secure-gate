@@ -26,7 +26,7 @@ use crate::Bech32EncodingError;
 /// ```
 /// # #[cfg(feature = "encoding-hex")]
 /// # {
-/// use secure_gate::SecureEncodingExt;
+/// use secure_gate::{SecureEncodingExt, ExposeSecret};
 /// let bytes = [0x42u8; 32];
 /// let hex_string = bytes.to_hex();
 /// let hex = hex_string.expose_secret(); // → "424242..."
@@ -74,7 +74,8 @@ impl SecureEncodingExt for [u8] {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
     fn to_hex(&self) -> crate::encoding::hex::HexString {
-        crate::encoding::hex::HexString::new_unchecked(hex_crate::encode(self))
+        let encoded = hex_crate::encode(self);
+        crate::encoding::hex::HexString::new(encoded).expect("fresh encode is always valid")
     }
 
     #[cfg(feature = "encoding-hex")]
@@ -129,7 +130,8 @@ impl<const N: usize> SecureEncodingExt for [u8; N] {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
     fn to_hex(&self) -> crate::encoding::hex::HexString {
-        crate::encoding::hex::HexString::new_unchecked(hex_crate::encode(self))
+        let encoded = hex_crate::encode(self);
+        crate::encoding::hex::HexString::new(encoded).expect("fresh encode is always valid")
     }
 
     #[cfg(feature = "encoding-hex")]

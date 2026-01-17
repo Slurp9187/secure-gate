@@ -2,6 +2,7 @@
 // but forbid it otherwise
 #![cfg_attr(not(feature = "zeroize"), forbid(unsafe_code))]
 
+use ::hex as hex_crate;
 use alloc::string::String;
 
 use crate::traits::expose_secret::ExposeSecret;
@@ -91,16 +92,19 @@ impl HexString {
         }
     }
 
-    /// Internal constructor for trusted hex strings (e.g., from RNG or encoding).
-    ///
-    /// Skips validation – caller must ensure the string is valid lowercase hex.
-    pub(crate) fn new_unchecked(s: String) -> Self {
-        Self(crate::Dynamic::new(s))
-    }
-
     /// Number of bytes the decoded hex string represents.
     pub fn byte_len(&self) -> usize {
         self.0.expose_secret().len() / 2
+    }
+
+    /// Borrowing decode: simple allocating default (most common use).
+    pub fn decode(&self) -> Vec<u8> {
+        hex_crate::decode(self.expose_secret()).expect("HexString invariant: always valid")
+    }
+
+    /// Consuming decode: zeroizes the HexString immediately.
+    pub fn into_bytes(self) -> Vec<u8> {
+        hex_crate::decode(self.expose_secret()).expect("HexString invariant: always valid")
     }
 }
 
