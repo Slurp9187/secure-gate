@@ -1,6 +1,8 @@
+#[cfg(feature = "rand")]
 use super::SecureEncodingExt;
 #[cfg(feature = "rand")]
 use crate::expose_secret_traits::expose_secret::ExposeSecret;
+#[cfg(feature = "rand")]
 use crate::Bech32EncodingError;
 
 #[cfg(feature = "rand")]

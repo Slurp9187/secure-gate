@@ -115,8 +115,8 @@ impl Bech32String {
         (data_chars * 5) / 8
     }
 
-    /// Borrowing decode: simple allocating default (most common use).
-    pub fn decode(&self) -> Vec<u8> {
+    /// decode_to_bytes: borrowing, allocates fresh Vec<u8> from decoded bytes
+    pub fn decode_to_bytes(&self) -> Vec<u8> {
         let (_, data) = decode(self.inner.expose_secret().as_str())
             .expect("Bech32String invariant: always valid");
         data
@@ -127,8 +127,8 @@ impl Bech32String {
         self.variant
     }
 
-    /// Decode the validated Bech32/Bech32m string into raw bytes, consuming the wrapper.
-    pub fn into_bytes(self) -> Vec<u8> {
+    /// decode_into_bytes: consuming, decodes then zeroizes the wrapper immediately
+    pub fn decode_into_bytes(self) -> Vec<u8> {
         let (_, data) =
             decode(self.inner.expose_secret().as_str()).expect("Bech32String is always valid");
         data

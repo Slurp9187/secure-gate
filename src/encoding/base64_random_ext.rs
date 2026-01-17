@@ -1,3 +1,4 @@
+#[cfg(feature = "rand")]
 use super::SecureEncodingExt;
 #[cfg(feature = "rand")]
 use crate::expose_secret_traits::expose_secret::ExposeSecret;

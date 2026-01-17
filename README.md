@@ -290,7 +290,7 @@ Direct generation is also available:
 
     // Validation of an existing hex string
     let validated = HexString::new("deadbeef".to_string()).expect("valid hex");
-    let decoded = validated.into_bytes();
+    let decoded = validated.decode_into_bytes();
 }
 
 #[cfg(feature = "encoding-base64")]
@@ -300,7 +300,7 @@ Direct generation is also available:
     let bytes = b"Hello".as_slice();
     let base64 = bytes.to_base64url(); // URL-safe, no padding
     let validated = Base64String::new("SGVsbG8".to_string()).expect("valid base64"); // "Hello"
-    let decoded = validated.into_bytes();
+    let decoded = validated.decode_into_bytes();
 }
 
 #[cfg(feature = "encoding-bech32")]
@@ -315,9 +315,11 @@ Direct generation is also available:
     // Validation example
     let bech32_valid = Bech32String::new("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4".to_string()).expect("valid bech32");
     assert!(bech32_valid.is_bech32());
+    let decoded_bech32 = bech32_valid.decode_into_bytes();
     
     let bech32m_valid = Bech32String::new("BC1P0XLXVLHEMJA6C4DQV22UAPCTQUPFHLXM9H8Z3K2E72Q4K9HCZ7VQZK5JJ0".to_string()).expect("valid bech32m");
     assert!(bech32m_valid.is_bech32m());
+    let decoded_bech32m = bech32m_valid.decode_into_bytes();
 }
 ```
 

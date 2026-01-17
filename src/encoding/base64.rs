@@ -28,7 +28,7 @@ fn zeroize_input(s: &mut String) {
 /// # use secure_gate::{encoding::base64::Base64String, ExposeSecret};
 /// let valid = Base64String::new("SGVsbG8".to_string()).unwrap();
 /// assert_eq!(valid.expose_secret(), "SGVsbG8");
-/// let bytes = valid.into_bytes(); // Vec<u8> of "Hello"
+/// let bytes = valid.decode_into_bytes(); // Vec<u8> of "Hello"
 /// ```
 pub struct Base64String(pub(crate) crate::Dynamic<String>);
 
@@ -60,7 +60,7 @@ impl Base64String {
     /// use secure_gate::{encoding::base64::Base64String, ExposeSecret};
     /// let valid = Base64String::new("SGVsbG8".to_string()).unwrap();
     /// assert_eq!(valid.expose_secret(), "SGVsbG8");
-    /// let bytes = valid.into_bytes(); // Vec<u8> of "Hello"
+    /// let bytes = valid.decode_into_bytes(); // Vec<u8> of "Hello"
     /// # }
     /// ```
     pub fn new(s: String) -> Result<Self, &'static str> {
@@ -80,15 +80,15 @@ impl Base64String {
         (len / 4) * 3 + (len % 4 == 2) as usize + (len % 4 == 3) as usize * 2
     }
 
-    /// Borrowing decode: simple allocating default (most common use).
-    pub fn decode(&self) -> Vec<u8> {
+    /// decode_to_bytes: borrowing, allocates fresh Vec<u8> from decoded bytes
+    pub fn decode_to_bytes(&self) -> Vec<u8> {
         URL_SAFE_NO_PAD
             .decode(self.expose_secret())
             .expect("Base64String invariant: always valid")
     }
 
-    /// Consuming decode: zeroizes the Base64String immediately.
-    pub fn into_bytes(self) -> Vec<u8> {
+    /// decode_into_bytes: consuming, decodes then zeroizes the wrapper immediately
+    pub fn decode_into_bytes(self) -> Vec<u8> {
         URL_SAFE_NO_PAD
             .decode(self.expose_secret())
             .expect("Base64String invariant: always valid")

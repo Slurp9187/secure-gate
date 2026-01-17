@@ -2,8 +2,8 @@
 // but forbid it otherwise
 #![cfg_attr(not(feature = "zeroize"), forbid(unsafe_code))]
 
-use ::hex as hex_crate;
 use alloc::string::String;
+use hex as hex_crate;
 
 use crate::expose_secret_traits::expose_secret::ExposeSecret;
 
@@ -31,7 +31,7 @@ fn zeroize_input(s: &mut String) {
 /// # use secure_gate::{encoding::hex::HexString, ExposeSecret};
 /// let valid = HexString::new("deadbeef".to_string()).unwrap();
 /// assert_eq!(valid.expose_secret(), "deadbeef");
-/// let bytes = valid.into_bytes(); // Vec<u8> of [0xde, 0xad, 0xbe, 0xef]
+/// let bytes = valid.decode_into_bytes(); // Vec<u8> of [0xde, 0xad, 0xbe, 0xef]
 /// ```
 pub struct HexString(pub(crate) crate::Dynamic<String>);
 
@@ -97,13 +97,13 @@ impl HexString {
         self.0.expose_secret().len() / 2
     }
 
-    /// Borrowing decode: simple allocating default (most common use).
-    pub fn decode(&self) -> Vec<u8> {
+    /// decode_to_bytes: borrowing, allocates fresh Vec<u8> from decoded bytes
+    pub fn decode_to_bytes(&self) -> Vec<u8> {
         hex_crate::decode(self.expose_secret()).expect("HexString invariant: always valid")
     }
 
-    /// Consuming decode: zeroizes the HexString immediately.
-    pub fn into_bytes(self) -> Vec<u8> {
+    /// decode_into_bytes: consuming, decodes then zeroizes the wrapper immediately
+    pub fn decode_into_bytes(self) -> Vec<u8> {
         hex_crate::decode(self.expose_secret()).expect("HexString invariant: always valid")
     }
 }

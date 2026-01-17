@@ -31,11 +31,11 @@ fn ct_eq_different_lengths() {
 fn dynamic_random_base64() {
     let rng = DynamicRandom::generate(64);
     let encoded = rng.expose_secret().to_base64url();
-    assert_eq!(encoded.into_bytes(), rng.expose_secret().to_vec());
+    assert_eq!(encoded.decode_into_bytes(), rng.expose_secret().to_vec());
 
     let rng2 = DynamicRandom::generate(64);
     let owned = rng2.into_base64url();
-    assert_eq!(owned.into_bytes().len(), 64);
+    assert_eq!(owned.decode_into_bytes().len(), 64);
 }
 
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
@@ -44,17 +44,17 @@ fn dynamic_random_bech32() {
     let rng = DynamicRandom::generate(64);
     let b32 = rng.expose_secret().try_to_bech32("test").unwrap();
     assert!(b32.is_bech32());
-    assert_eq!(b32.into_bytes(), rng.expose_secret().to_vec());
+    assert_eq!(b32.decode_into_bytes(), rng.expose_secret().to_vec());
 
     let rng2 = DynamicRandom::generate(64);
     let b32m = rng2.expose_secret().try_to_bech32m("test").unwrap();
-    assert_eq!(b32m.into_bytes(), rng2.expose_secret().to_vec());
+    assert_eq!(b32m.decode_into_bytes(), rng2.expose_secret().to_vec());
 
     // into_* consuming
     let rng3 = DynamicRandom::generate(32);
     let owned_b32 = rng3.try_into_bech32("hrp").unwrap();
     assert!(owned_b32.is_bech32());
-    assert_eq!(owned_b32.into_bytes().len(), 32);
+    assert_eq!(owned_b32.decode_into_bytes().len(), 32);
 }
 
 #[cfg(feature = "encoding-hex")]
@@ -66,5 +66,5 @@ fn dynamic_random_hex() {
 
     let rng2 = DynamicRandom::generate(64);
     let owned = rng2.into_hex();
-    assert_eq!(owned.into_bytes().len(), 64);
+    assert_eq!(owned.decode_into_bytes().len(), 64);
 }

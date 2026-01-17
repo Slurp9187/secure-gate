@@ -26,7 +26,7 @@ fn into_hex_via_alias() {
         .all(|c: char| c.is_ascii_hexdigit()));
     assert!(hex.expose_secret().chars().all(|c: char| !c.is_uppercase()));
 
-    let bytes = hex.into_bytes();
+    let bytes = hex.decode_into_bytes();
     assert_eq!(bytes.len(), 32);
 }
 
@@ -59,7 +59,7 @@ fn hexstring_valid_parsing() {
     assert_eq!(hex.expose_secret(), "deadbeef");
     assert_eq!(hex.byte_len(), 4);
 
-    let bytes = hex.into_bytes();
+    let bytes = hex.decode_into_bytes();
     assert_eq!(bytes, vec![0xde, 0xad, 0xbe, 0xef]);
 }
 
@@ -69,7 +69,7 @@ fn hexstring_empty() {
     let hex = HexString::new("".to_string()).unwrap();
     assert_eq!(hex.expose_secret(), "");
     assert_eq!(hex.byte_len(), 0);
-    assert_eq!(hex.into_bytes(), Vec::<u8>::new());
+    assert_eq!(hex.decode_into_bytes(), Vec::<u8>::new());
 }
 
 #[cfg(feature = "encoding-hex")]
@@ -114,7 +114,7 @@ fn hexstring_very_long_string() {
     let hex = HexString::new(hex_str).unwrap();
     assert_eq!(hex.byte_len(), 1024);
     assert_eq!(hex.len(), 2048);
-    assert_eq!(hex.into_bytes(), long_bytes);
+    assert_eq!(hex.decode_into_bytes(), long_bytes);
 }
 
 #[cfg(feature = "encoding-hex")]
@@ -124,7 +124,7 @@ fn hexstring_round_trip() {
     let original_bytes = vec![0x12, 0x34, 0x56, 0x78, 0xab, 0xcd, 0xef, 0x00];
     let hex_str = hex::encode(&original_bytes);
     let hex = HexString::new(hex_str).unwrap();
-    let decoded = hex.into_bytes();
+    let decoded = hex.decode_into_bytes();
     assert_eq!(decoded, original_bytes);
 }
 
@@ -147,10 +147,10 @@ fn hexstring_constant_time_eq() {
 #[test]
 fn hexstring_decode_borrowing() {
     let hex = HexString::new("deadbeef".to_string()).unwrap();
-    let bytes = hex.decode();
+    let bytes = hex.decode_to_bytes();
     assert_eq!(bytes, vec![0xde, 0xad, 0xbe, 0xef]);
     // Verify hex is still usable (borrowing)
-    let bytes2 = hex.decode();
+    let bytes2 = hex.decode_to_bytes();
     assert_eq!(bytes2, bytes);
 }
 
@@ -160,5 +160,5 @@ fn rng_hex_integration() {
     use secure_gate::random::FixedRandom;
     let rng = FixedRandom::<32>::generate();
     let hex = rng.into_hex();
-    assert_eq!(hex.into_bytes().len(), 32);
+    assert_eq!(hex.decode_into_bytes().len(), 32);
 }

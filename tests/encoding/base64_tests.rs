@@ -29,7 +29,7 @@ fn into_base64url_via_alias() {
         .chars()
         .all(|c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
 
-    let bytes = b64.into_bytes();
+    let bytes = b64.decode_into_bytes();
     assert_eq!(bytes.len(), 32);
 }
 
@@ -71,7 +71,7 @@ fn base64string_valid_parsing() {
     assert_eq!(b64.len(), 7);
     assert_eq!(b64.byte_len(), 5);
 
-    let bytes = b64.into_bytes();
+    let bytes = b64.decode_into_bytes();
     assert_eq!(bytes, b"Hello");
 }
 
@@ -83,7 +83,7 @@ fn base64string_empty() {
     assert_eq!(b64.len(), 0);
     assert_eq!(b64.byte_len(), 0);
     assert!(b64.is_empty());
-    assert_eq!(b64.into_bytes(), Vec::<u8>::new());
+    assert_eq!(b64.decode_into_bytes(), Vec::<u8>::new());
 }
 
 #[cfg(feature = "encoding-base64")]
@@ -126,10 +126,10 @@ fn base64string_constant_time_eq() {
 #[test]
 fn base64string_decode_borrowing() {
     let b64 = Base64String::new("SGVsbG8".to_string()).unwrap();
-    let bytes = b64.decode();
+    let bytes = b64.decode_to_bytes();
     assert_eq!(bytes, b"Hello");
     // Verify b64 is still usable (borrowing)
-    let bytes2 = b64.decode();
+    let bytes2 = b64.decode_to_bytes();
     assert_eq!(bytes2, bytes);
 }
 
@@ -140,7 +140,7 @@ fn base64string_case_sensitive() {
     let original_bytes = b"Hello";
     let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(original_bytes);
     let b64 = Base64String::new(encoded).unwrap();
-    let decoded = b64.into_bytes();
+    let decoded = b64.decode_into_bytes();
     assert_eq!(decoded, original_bytes);
 }
 
@@ -150,5 +150,5 @@ fn rng_base64url_integration() {
     use secure_gate::random::FixedRandom;
     let rng = FixedRandom::<32>::generate();
     let b64 = rng.into_base64url();
-    assert_eq!(b64.into_bytes().len(), 32);
+    assert_eq!(b64.decode_into_bytes().len(), 32);
 }

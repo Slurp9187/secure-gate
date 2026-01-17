@@ -114,10 +114,10 @@ fn metadata_methods() {
 fn bech32string_decode_borrowing() {
     let bech32 =
         Bech32String::new("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4".to_string()).unwrap();
-    let bytes = bech32.decode();
+    let bytes = bech32.decode_to_bytes();
     assert_eq!(bytes.len(), 20);
     // Verify bech32 is still usable (borrowing)
-    let bytes2 = bech32.decode();
+    let bytes2 = bech32.decode_to_bytes();
     assert_eq!(bytes2, bytes);
 }
 
@@ -133,7 +133,7 @@ fn rng_into_bech32_variant_detection_and_round_trip() {
     let b32 = rng.expose_secret().try_to_bech32("test").unwrap();
     let parsed = Bech32String::new(b32.expose_secret().to_string()).unwrap();
     assert!(parsed.is_bech32());
-    assert_eq!(parsed.into_bytes(), raw_bytes);
+    assert_eq!(parsed.decode_into_bytes(), raw_bytes);
 
     let rng_m = FixedRandom::<16>::generate();
     let raw_bytes_m = rng_m.expose_secret().to_vec();
@@ -141,7 +141,7 @@ fn rng_into_bech32_variant_detection_and_round_trip() {
     let b32m = rng_m.expose_secret().try_to_bech32m("test").unwrap();
     let parsed_m = Bech32String::new(b32m.expose_secret().to_string()).unwrap();
     assert!(parsed_m.is_bech32m());
-    assert_eq!(parsed_m.into_bytes(), raw_bytes_m);
+    assert_eq!(parsed_m.decode_into_bytes(), raw_bytes_m);
 }
 
 #[cfg(all(feature = "rand", feature = "encoding-bech32"))]
@@ -155,7 +155,7 @@ fn rng_into_bech32_consuming_round_trip() {
     let b32 = rng.try_into_bech32("example").unwrap();
     assert!(b32.is_bech32());
     assert_eq!(b32.byte_len(), 32);
-    assert_eq!(b32.into_bytes(), raw_bytes);
+    assert_eq!(b32.decode_into_bytes(), raw_bytes);
 
     let rng_m = FixedRandom::<32>::generate();
     let raw_bytes_m = rng_m.expose_secret().to_vec();
@@ -163,7 +163,7 @@ fn rng_into_bech32_consuming_round_trip() {
     let b32m = rng_m.try_into_bech32m("example").unwrap();
     assert!(b32m.is_bech32m());
     assert_eq!(b32m.byte_len(), 32);
-    assert_eq!(b32m.into_bytes(), raw_bytes_m);
+    assert_eq!(b32m.decode_into_bytes(), raw_bytes_m);
 }
 
 #[cfg(all(feature = "encoding-bech32", feature = "ct-eq"))]
