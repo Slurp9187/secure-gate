@@ -67,6 +67,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Security Checklist section in README.md with best practices.
 - Updated README.md with cross-links to SECURITY.md, improved formatting, and security emphasis.
 
+### Changed (Breaking)
+- **Encoding wrappers method renames** (#52): Renamed decode methods to follow Rust stdlib naming conventions:
+  - `HexString::decode()` → `decode_to_bytes()` (borrowing)
+  - `HexString::into_bytes()` → `decode_into_bytes()` (consuming)
+  - Applied identically to `Base64String` and `Bech32String`.
+- Updated documentation in README.md to remove outdated `shrink_to_fit()` recommendations (#54), reflecting that `zeroize` wipes full buffer capacity including slack. Added references to `zeroize` crate docs for verification.
+
+### Fixed
+- `Bech32String::byte_len()` now uses `rfind('1')` instead of `find('1')` to locate the last separator, aligning with BIP-173/350 spec (#53).
+
 ### Changed
 
 - Default features changed to `secure` (bundling `zeroize` + `ct-eq`) to prioritize secure memory handling by default while minimizing dependencies.
