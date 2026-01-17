@@ -9,6 +9,9 @@
 /// - [`ExposeSecret`] - Read-only secret access with metadata
 /// - [`ExposeSecretMut`] - Mutable secret access
 /// - [`SecureRandom`] - Marker for cryptographically secure random values (requires `rand` feature)
+/// - [`CloneSafe`] - Opt-in safe cloning with zeroization (requires `zeroize` feature)
+/// - [`ConstantTimeEq`] - Constant-time equality to prevent timing attacks (requires `ct-eq` feature)
+/// - [`SecureEncoding`] - Extension trait for secure byte encoding to strings (requires encoding features)
 ///
 /// ## Security Guarantees
 ///
@@ -22,6 +25,8 @@
 /// Some traits require optional Cargo features:
 /// - `rand`: Enables [`SecureRandom`] and random wrapper implementations
 /// - `zeroize`: Enables [`CloneSafe`] for safe cloning
+/// - `ct-eq`: Enables [`ConstantTimeEq`] for constant-time comparisons
+/// - `encoding` (or `encoding-hex`, `encoding-base64`, `encoding-bech32`): Enables [`SecureEncoding`] for byte encoding
 // Secret Exposure Traits
 pub mod expose_secret;
 pub use expose_secret::ExposeSecret;
