@@ -45,6 +45,7 @@
 /// }
 /// # }
 /// ```
+#[cfg(feature = "ct-eq")]
 pub trait ConstantTimeEq {
     /// Compare two values in constant time.
     ///
