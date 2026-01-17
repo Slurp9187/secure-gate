@@ -265,7 +265,7 @@ Direct generation is also available:
 ```rust
 #[cfg(feature = "rand")]
 {
-    use secure_gate::{Fixed, Dynamic, ExposeSecret};
+    use secure_gate::{Fixed, Dynamic};
 
     let key: Fixed<[u8; 32]> = Fixed::generate_random();
     let random: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
@@ -278,7 +278,7 @@ Direct generation is also available:
 #[cfg(feature = "encoding-hex")]
 {
     use secure_gate::{fixed_alias, SecureEncodingExt, ExposeSecret};
-    use secure_gate::encoding::hex::HexString};
+    use secure_gate::encoding::hex::HexString;
     
     fixed_alias!(TestKey, 16);
     let secret: TestKey = [0u8; 16].into();
@@ -305,7 +305,8 @@ Direct generation is also available:
 
 #[cfg(feature = "encoding-bech32")]
 {
-    use secure_gate::{SecureEncodingExt, ExposeSecret, encoding::bech32::Bech32String};
+    use secure_gate::{SecureEncodingExt, ExposeSecret};
+    use secure_gate::encoding::bech32::Bech32String;
     
     let bytes = b"hello".as_slice();
     let bech32 = bytes.try_to_bech32("bc").expect("bech32 encoding failed");
@@ -314,6 +315,9 @@ Direct generation is also available:
     // Validation example
     let bech32_valid = Bech32String::new("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4".to_string()).expect("valid bech32");
     assert!(bech32_valid.is_bech32());
+    
+    let bech32m_valid = Bech32String::new("BC1P0XLXVLHEMJA6C4DQV22UAPCTQUPFHLXM9H8Z3K2E72Q4K9HCZ7VQZK5JJ0".to_string()).expect("valid bech32m");
+    assert!(bech32m_valid.is_bech32m());
 }
 ```
 
