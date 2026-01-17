@@ -6,7 +6,7 @@
 use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
-use secure_gate::Dynamic;
+use secure_gate::{Dynamic, ExposeSecret, ExposeSecretMut};
 use secure_gate_fuzz::arbitrary::{FuzzDynamicString, FuzzDynamicVec};
 
 const MAX_LEN: usize = 1_000_000; // 1MB cap to avoid OOM

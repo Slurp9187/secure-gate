@@ -6,7 +6,7 @@
 use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
-use secure_gate::{Dynamic, Fixed};
+use secure_gate::{Dynamic, Fixed, ExposeSecret, ExposeSecretMut};
 use secure_gate_fuzz::arbitrary::{FuzzDynamicString, FuzzDynamicVec, FuzzFixed32};
 
 #[cfg(feature = "zeroize")]
@@ -108,9 +108,9 @@ fuzz_target!(|data: &[u8]| {
     let nested = Dynamic::<Dynamic<Vec<u8>>>::new(Dynamic::new(data.to_vec()));
     #[cfg(feature = "zeroize")]
     if data[0] % 11 == 0 {
-        let mut inner: Dynamic<Dynamic<Vec<u8>>> =
-            Dynamic::new(Dynamic::new(nested.expose_secret().expose_secret().clone()));
-        inner.zeroize();
+        let inner_vec = data.to_vec();
+        let mut inner_dyn = Dynamic::<Vec<u8>>::new(inner_vec);
+        inner_dyn.zeroize();
     }
     drop(nested);
 
