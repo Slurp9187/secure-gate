@@ -109,7 +109,7 @@ impl Bech32String {
     /// Exact number of bytes the decoded payload represents (allocation-free).
     pub fn byte_len(&self) -> usize {
         let s = self.inner.expose_secret().as_str();
-        let sep_pos = s.find('1').expect("valid bech32 has '1' separator");
+        let sep_pos = s.rfind('1').expect("valid bech32 has '1' separator");
         let data_part_len = s.len() - sep_pos - 1;
         let data_chars = data_part_len - 6; // subtract checksum
         (data_chars * 5) / 8
