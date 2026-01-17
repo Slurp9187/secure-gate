@@ -1,3 +1,6 @@
+use crate::encoding::extensions::secure_encoding_ext::SecureEncodingExt;
+use crate::traits::expose_secret::ExposeSecret;
+
 // ========================================
 // Consuming (into_) methods on RNG types
 // ========================================

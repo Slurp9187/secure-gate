@@ -73,19 +73,25 @@ impl Base64String {
         }
     }
 
-    /// Internal constructor for trusted base64 strings (e.g., from RNG).
-    ///
-    /// Skips validation – caller must ensure the string is valid base64.
-    #[allow(dead_code)]
-    pub(crate) fn new_unchecked(s: String) -> Self {
-        Self(crate::Dynamic::new(s))
-    }
-
     /// Exact number of bytes the decoded base64 string represents.
     #[inline(always)]
     pub fn byte_len(&self) -> usize {
         let len = self.0.len();
         (len / 4) * 3 + (len % 4 == 2) as usize + (len % 4 == 3) as usize * 2
+    }
+
+    /// Borrowing decode: simple allocating default (most common use).
+    pub fn decode(&self) -> Vec<u8> {
+        URL_SAFE_NO_PAD
+            .decode(self.expose_secret())
+            .expect("Base64String invariant: always valid")
+    }
+
+    /// Consuming decode: zeroizes the Base64String immediately.
+    pub fn into_bytes(self) -> Vec<u8> {
+        URL_SAFE_NO_PAD
+            .decode(self.expose_secret())
+            .expect("Base64String invariant: always valid")
     }
 }
 

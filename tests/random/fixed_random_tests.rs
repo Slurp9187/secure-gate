@@ -69,7 +69,7 @@ fn base64_methods_work() {
 
     // Test into_base64 (consuming)
     let rng2 = FixedRandom::<4>::generate();
-    let owned_base64 = rng2.into_base64();
+    let owned_base64 = rng2.into_base64url();
     assert_eq!(owned_base64.byte_len(), 4);
     assert!(owned_base64
         .expose_secret()

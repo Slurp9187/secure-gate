@@ -16,7 +16,7 @@ use secure_gate::SecureEncodingExt;
 #[cfg(feature = "encoding-base64")]
 #[cfg(feature = "rand")]
 #[test]
-fn into_base64_via_alias() {
+fn into_base64url_via_alias() {
     fixed_alias_random!(Base64Key, 32);
 
     let key = Base64Key::generate();
@@ -124,6 +124,17 @@ fn base64string_constant_time_eq() {
 
 #[cfg(feature = "encoding-base64")]
 #[test]
+fn base64string_decode_borrowing() {
+    let b64 = Base64String::new("SGVsbG8".to_string()).unwrap();
+    let bytes = b64.decode();
+    assert_eq!(bytes, b"Hello");
+    // Verify b64 is still usable (borrowing)
+    let bytes2 = b64.decode();
+    assert_eq!(bytes2, bytes);
+}
+
+#[cfg(feature = "encoding-base64")]
+#[test]
 fn base64string_case_sensitive() {
     // Test round-trip consistency for encoding/decoding.
     let original_bytes = b"Hello";
@@ -135,9 +146,9 @@ fn base64string_case_sensitive() {
 
 #[cfg(all(feature = "encoding-base64", feature = "rand"))]
 #[test]
-fn rng_base64_integration() {
+fn rng_base64url_integration() {
     use secure_gate::random::FixedRandom;
     let rng = FixedRandom::<32>::generate();
-    let b64 = rng.into_base64();
+    let b64 = rng.into_base64url();
     assert_eq!(b64.into_bytes().len(), 32);
 }

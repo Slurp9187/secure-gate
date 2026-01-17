@@ -87,7 +87,8 @@ impl SecureEncodingExt for [u8] {
     #[cfg(feature = "encoding-base64")]
     #[inline(always)]
     fn to_base64url(&self) -> crate::encoding::base64::Base64String {
-        crate::encoding::base64::Base64String::new_unchecked(URL_SAFE_NO_PAD.encode(self))
+        let encoded = URL_SAFE_NO_PAD.encode(self);
+        crate::encoding::base64::Base64String::new(encoded).expect("fresh encode is always valid")
     }
 
     #[cfg(feature = "encoding-bech32")]
@@ -143,7 +144,8 @@ impl<const N: usize> SecureEncodingExt for [u8; N] {
     #[cfg(feature = "encoding-base64")]
     #[inline(always)]
     fn to_base64url(&self) -> crate::encoding::base64::Base64String {
-        crate::encoding::base64::Base64String::new_unchecked(URL_SAFE_NO_PAD.encode(self))
+        let encoded = URL_SAFE_NO_PAD.encode(self);
+        crate::encoding::base64::Base64String::new(encoded).expect("fresh encode is always valid")
     }
 
     #[cfg(feature = "encoding-bech32")]

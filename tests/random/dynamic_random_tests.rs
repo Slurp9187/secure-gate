@@ -34,7 +34,7 @@ fn dynamic_random_base64() {
     assert_eq!(encoded.into_bytes(), rng.expose_secret().to_vec());
 
     let rng2 = DynamicRandom::generate(64);
-    let owned = rng2.into_base64();
+    let owned = rng2.into_base64url();
     assert_eq!(owned.into_bytes().len(), 64);
 }
 
