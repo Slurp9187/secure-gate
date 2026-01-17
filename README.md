@@ -277,7 +277,7 @@ Direct generation is also available:
 ```rust
 #[cfg(feature = "encoding-hex")]
 {
-    use secure_gate::{fixed_alias, SecureEncodingExt, ExposeSecret};
+    use secure_gate::{fixed_alias, SecureEncoding, ExposeSecret};
     use secure_gate::encoding::hex::HexString;
     
     fixed_alias!(TestKey, 16);
@@ -295,7 +295,7 @@ Direct generation is also available:
 
 #[cfg(feature = "encoding-base64")]
 {
-    use secure_gate::{SecureEncodingExt, ExposeSecret, encoding::base64::Base64String};
+    use secure_gate::{SecureEncoding, ExposeSecret, encoding::base64::Base64String};
     
     let bytes = b"Hello".as_slice();
     let base64 = bytes.to_base64url(); // URL-safe, no padding
@@ -305,7 +305,7 @@ Direct generation is also available:
 
 #[cfg(feature = "encoding-bech32")]
 {
-    use secure_gate::{SecureEncodingExt, ExposeSecret};
+    use secure_gate::{SecureEncoding, ExposeSecret};
     use secure_gate::encoding::bech32::Bech32String;
     
     let bytes = b"hello".as_slice();
