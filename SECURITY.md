@@ -25,7 +25,9 @@ This document outlines key security aspects to consider when using the `secure-g
 - **Encoding Features**: Validate inputs before encoding to prevent malformed outputs or attacks.
 
 ## Potential Concerns
-- **Heap Allocation**: `Dynamic<T>` types may leave slack capacity until drop; call `shrink_to_fit()` to mitigate.
+- **Heap Allocation**: `Dynamic<T>` types zeroize the full backing buffer capacity (including slack) on drop when the `zeroize` feature is enabled:  
+  - For `Vec<T>`: “Best effort” zeroization for Vec. Ensures the entire capacity of the Vec is zeroed. Cannot ensure that previous reallocations did not leave values on the heap. ([docs](https://docs.rs/zeroize/latest/zeroize/trait.Zeroize.html#impl-Zeroize-for-Vec%3CZ%3E))  
+  - For `String`: “Best effort” zeroization for String. Clears the entire capacity of the String. Cannot ensure that previous reallocations did not leave values on the heap. ([docs](https://docs.rs/zeroize/latest/zeroize/trait.Zeroize.html#impl-Zeroize-for-String))
 - **Custom Types**: Avoid wrapping sensitive data in non-zeroizeable types; implement `CloneSafe` carefully.
 - **Error Handling**: Errors like `FromSliceError` expose length metadata (e.g., expected vs. actual), which may be sensitive in some contexts; fields are `pub(crate)` to prevent direct external access while allowing internal debugging. Invalid inputs are zeroized in encoding failures (with `zeroize` enabled).
 - **Macro Usage**: Macros create type aliases—ensure they match your security needs.
@@ -54,12 +56,10 @@ This section provides a professional reviewer's perspective on each module's sec
 - Type safety prevents Deref/AsRef misuse.
 
 **Potential Weaknesses**:
-- Heap slack in `Dynamic<T>` (e.g., `Vec` capacity) not wiped until drop—call `shrink_to_fit()`; review for temporary allocations.
 - Macro expansions create aliases without runtime checks—audit generated types for unintended usage.
 - Error types (`FromSliceError`) leak length metadata; ensure not sensitive in context.
 
 **Mitigations**:
-- Regularly call `shrink_to_fit()` on `Dynamic` variants after operations to minimize slack.
 - Use compile-time assertions in macros to catch invalid sizes early.
 - Contextualize error handling to avoid leaking metadata in sensitive contexts.
 

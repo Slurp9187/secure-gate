@@ -392,12 +392,16 @@ These macros create type aliases to `Fixed<[u8; N]>`, `Dynamic<T>`, `FixedRandom
 | Type | Allocation | Auto-zero | Full wipe | Slack eliminated | Notes |
 |-----------------------|------------|-----------|-----------|------------------|--------------------------------------------|
 | `Fixed<T>` | Stack | Yes | Yes | Yes (no heap) | - |
-| `Dynamic<T>` | Heap | Yes | Yes | No (until drop) | Use `shrink_to_fit()` |
+| `Dynamic<T>` | Heap | Yes | Yes | Yes | Full capacity wiped on drop |
 | `FixedRandom<N>` | Stack | Yes | Yes | Yes | - |
-| `DynamicRandom` | Heap | Yes | Yes | No (until drop) | - |
-| `HexString` | Heap | Yes (invalid input) | Yes | No (until drop) | Validated hex |
-| `Base64String` | Heap | Yes (invalid input) | Yes | No (until drop) | Validated base64 |
-| `Bech32String` | Heap | Yes (invalid input) | Yes | No (until drop) | Validated Bech32/Bech32m |
+| `DynamicRandom` | Heap | Yes | Yes | Yes | - |
+| `HexString` | Heap | Yes (invalid input) | Yes | Yes | Validated hex |
+| `Base64String` | Heap | Yes (invalid input) | Yes | Yes | Validated base64 |
+| `Bech32String` | Heap | Yes (invalid input) | Yes | Yes | Validated Bech32/Bech32m |
+
+* Full capacity wiping (including slack) is performed by the `zeroize` crate:  
+  - For `Vec<T>`: “Best effort” zeroization for Vec. Ensures the entire capacity of the Vec is zeroed. Cannot ensure that previous reallocations did not leave values on the heap. ([docs](https://docs.rs/zeroize/latest/zeroize/trait.Zeroize.html#impl-Zeroize-for-Vec%3CZ%3E))  
+  - For `String`: “Best effort” zeroization for String. Clears the entire capacity of the String. Cannot ensure that previous reallocations did not leave values on the heap. ([docs](https://docs.rs/zeroize/latest/zeroize/trait.Zeroize.html#impl-Zeroize-for-String))
 
 ## Performance
 
