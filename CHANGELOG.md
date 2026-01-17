@@ -10,9 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Core polymorphism traits** in new `src/traits/` module for generic secret operations:
-  - `ExposeSecret` & `ExposeSecretMut` traits for polymorphic secret access with controlled mutability
-  - `SecureMetadata` trait for safe length/emptiness queries without exposing contents
-  - `SecureRandom` trait combining random generation with metadata access (requires `rand` feature)
+  - `ExposeSecret` & `ExposeSecretMut` traits for polymorphic secret access with controlled mutability and metadata (length/emptiness queries without exposing contents)
+  - `SecureRandom` trait for cryptographically random values with metadata access (requires `rand` feature)
   - Implemented for all secret wrapper types: `Fixed`, `Dynamic`, `FixedRandom`, `DynamicRandom`, encoding types, and cloneable types
   - Zero-cost abstractions with `#[inline(always)]` for optimal performance
   - Comprehensive rustdoc with security guarantees and usage examples
@@ -35,8 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `into_hex()` (consuming) and `to_hex()` (borrowing) methods on `FixedRandom<N>` and `DynamicRandom` (requires `encoding-hex`).
 - `into_base64()` (consuming) and `to_base64url()` (borrowing) methods on `FixedRandom<N>` and `DynamicRandom` (requires `encoding-base64`).
 - `into_bech32(hrp)` / `to_bech32(hrp)` and `into_bech32m(hrp)` / `to_bech32m(hrp)` methods on `FixedRandom<N>` and `DynamicRandom` (requires `encoding-bech32`).
-- Borrowing encoding methods (`to_hex()`, `to_hex_upper()`, `to_base64url()`, `to_bech32()`, `to_bech32m()`) available on any `&[u8]` via `SecureEncodingExt`.
-- `ct_eq` module with `ConstantTimeEq` trait and inherent `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
+- Borrowing encoding methods (`to_hex()`, `to_hex_upper()`, `to_base64url()`, `to_bech32()`, `to_bech32m()`) available on any `&[u8]` via `SecureEncoding` trait.
+- Constant-time equality in `traits/constant_time_eq` module with `ConstantTimeEq` trait and inherent `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
 - Fallible construction: `impl TryFrom<&[u8]> for Fixed<[u8; N]>` with `FromSliceError`.
   - Removed `from_slice` method on `Fixed<[u8; N]>`.
   - Error types centralized in `error.rs` with `thiserror` for improved error handling.
@@ -56,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaced `conversions` module/feature with modular `encoding`.
   - Split into `encoding::hex`, `encoding::base64`, and `encoding::bech32` submodules.
   - Granular features: `encoding` now enables `encoding-hex`, `encoding-base64`, and `encoding-bech32`.
-  - Trait renamed to `SecureEncodingExt`.
+  - `SecureEncoding` trait for byte encoding (renamed from `SecureEncodingExt`).
   - Removed `RandomHex` type; replaced with direct methods on `FixedRandom<N>` and `DynamicRandom`.
   - `Bech32String` now fully generic for Bech32/Bech32m with mixed-case acceptance and canonical lowercase storage.
 - Fallible Bech32 encoding methods: `try_to_bech32()`, `try_to_bech32m()`, `try_into_bech32()`, `try_into_bech32m()` on `FixedRandom<N>`, `DynamicRandom`, and `SecureEncodingExt`.
@@ -80,19 +79,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Default features changed to `secure` (bundling `zeroize` + `ct-eq`) to prioritize secure memory handling by default while minimizing dependencies.
-- Cloning model: switched to opt-in via `CloneSafe`, centered on pre-baked primitives for maximum ergonomics and safety.
+- Cloning model: switched to opt-in via `CloneSafe` (now in `traits/clone_safe`), centered on pre-baked primitives for maximum ergonomics and safety.
   - All cloneable types are distinctly typed from non-cloneable counterparts — no accidental mixing.
 - Renamed `rng` module to `random`.
 - Renamed `FixedRng` and `DynamicRng` types to `FixedRandom` and `DynamicRandom`, respectively.
+- Moved `CloneSafe` to `traits/clone_safe` for trait consolidation.
 - Encoding wrappers (`HexString`, `Base64String`, `Bech32String`):
   - Removed `Deref` implementations for consistent explicit access.
-  - Unified decode method to `into_bytes()` returning raw `Vec<u8>` (renamed from `decode_secret_to_bytes()`).
+  - Unified decode methods renamed to `decode_to_bytes()` (borrowing) and `decode_into_bytes()` (consuming), returning raw `Vec<u8>`.
   - `expose_secret()` now returns `&String` for API consistency.
   - Added non-allocating `byte_len()` implementations.
-  - Refactored encoding traits into `extensions` module with borrowing view types (`HexStringView`, `Base64StringView`, `Bech32StringView`).
 - `Base64String`: simplified validation using single engine-based decode check.
+- Moved `SecureEncoding` trait to `traits/secure_encoding` for trait consolidation.
 - Cargo.toml features: `default = ["secure"]`; new `secure` meta-feature (bundling `zeroize` + `ct-eq`); `insecure` for opt-out; updated `full = ["secure", "encoding"]`.
-- `SecureEncodingExt` re-export cfg updated to include `encoding-bech32` feature.
+- `SecureEncoding` trait re-export cfg updated to include `encoding-bech32` feature.
 - Updated README.md with Unicode symbols for security emphasis and cross-links.
 
 ### Fixed
