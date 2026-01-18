@@ -10,6 +10,7 @@
 // - Prevention of accidental exfiltration
 // - Resource exhaustion resistance
 
+#[cfg(feature = "serde")]
 use secure_gate::ExposeSecret;
 
 #[cfg(all(feature = "serde", feature = "encoding-hex"))]
@@ -99,7 +100,7 @@ fn fixed_random_serialize() {
     let random: FixedRandom<32> = FixedRandom::generate();
     let serialized = serde_json::to_string(&random).unwrap();
     // Deserialize not supported for random types - only test serialization
-    assert!(serialized.len() > 0);
+    assert!(!serialized.is_empty());
     // Ensure serialized contains valid JSON (bytes as array)
     assert!(serialized.starts_with('['));
     assert!(serialized.ends_with(']'));
@@ -111,7 +112,7 @@ fn dynamic_random_serialize() {
     use secure_gate::random::DynamicRandom;
     let random: DynamicRandom = DynamicRandom::generate(64);
     let serialized = serde_json::to_string(&random).unwrap();
-    assert!(serialized.len() > 0);
+    assert!(!serialized.is_empty());
     // Should be byte array
     assert!(serialized.starts_with('['));
     assert!(serialized.ends_with(']'));
@@ -126,7 +127,6 @@ fn no_accidental_serialization_without_marker() {
     use secure_gate::Fixed;
     let _secret = Fixed::new(42u8);
     // serde_json::to_string(&_secret); // This would fail to compile if attempted
-    assert!(true); // Placeholder assertion
 }
 
 #[cfg(feature = "serde")]
