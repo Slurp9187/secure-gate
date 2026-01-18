@@ -23,6 +23,9 @@
 //! fixed-size arrays in trusted environments. Avoid implementing for large or complex
 //! types that could leak sensitive data.
 //!
+//! **Security Note**: Grep for `impl SerializableSecret` during code reviews – each
+//! implementation is a potential exfiltration point.
+//!
 //! This trait is re-exported at the crate root when the `serde` feature is enabled.
 //!
 //! # Examples
