@@ -1,11 +1,10 @@
 # secure-gate Roadmap
 
-## Short-Term (v0.8)
+## Short-Term (v0.7+)
 - Bug fixes from reports.
 - Documentation expansions (examples, troubleshooting).
 - More benchmarks (allocation/timing).
 - Expanded fuzz/property testing.
-- Opt-in Serde support with security guarantees.
 
 ## Medium-Term (v1.0 - Stability Milestone)
 - API polish and semver readiness.
