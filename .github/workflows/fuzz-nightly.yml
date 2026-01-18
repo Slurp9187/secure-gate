@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [expose, mut, parsing]
+        target: [expose, mut, parsing, serde]
         mode: [normal, asan]
 
     env:
@@ -62,14 +62,14 @@ jobs:
       - name: Populate per-target corpus directories
         run: |
           mkdir -p fuzz/corpus
-          for t in expose mut parsing; do
+          for t in expose mut parsing serde; do
             mkdir -p "fuzz/corpus/$t"
             find fuzz/corpus-downloaded -type f -name "*$t*" -exec cp {} "fuzz/corpus/$t/" \; 2>/dev/null || true
           done
 
       - name: Seed minimal corpus (first-run safety net)
         run: |
-          for t in expose mut parsing; do
+          for t in expose mut parsing serde; do
             dir="fuzz/corpus/$t"
             if [ ! -d "$dir" ] || [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
               mkdir -p "$dir"
@@ -79,6 +79,19 @@ jobs:
               head -c 1024 /dev/urandom > "$dir/seed_random"
             fi
           done
+
+          # Add JSON-specific seeds for serde target
+          dir="fuzz/corpus/serde"
+          if [ -d "$dir" ]; then
+            printf '"deadbeef"' > "$dir/seed_json_hex"
+            printf '{}' > "$dir/seed_json_empty_object"
+            printf '[]' > "$dir/seed_json_empty_array"
+            printf '{"key":"value"}' > "$dir/seed_json_simple_object"
+            printf '[1,2,3]' > "$dir/seed_json_array"
+            printf 'null' > "$dir/seed_json_null"
+            printf 'invalid json' > "$dir/seed_json_invalid"
+            printf '{"huge_array":[' > "$dir/seed_json_huge_prefix"
+          fi
 
       - name: Fuzz – ${{ matrix.target }} (${{ matrix.mode }})
         env:
@@ -149,7 +162,7 @@ jobs:
       - name: Reconstruct corpus directories
         run: |
           mkdir -p fuzz/corpus
-          for t in expose mut parsing; do
+          for t in expose mut parsing serde; do
             mkdir -p "fuzz/corpus/$t"
             find fuzz/corpus-downloaded -type f -name "*$t*" -exec cp {} "fuzz/corpus/$t/" \; 2>/dev/null || true
           done
@@ -158,7 +171,7 @@ jobs:
         run: |
           mkdir -p coverage/html coverage/lcov
 
-          for target in expose mut parsing; do
+          for target in expose mut parsing serde; do
             echo "=== Generating coverage for $target ==="
             corpus="fuzz/corpus/$target"
             [ ! -d "$corpus" ] || [ -z "$(ls -A "$corpus")" ] && continue
