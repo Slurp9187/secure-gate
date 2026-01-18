@@ -469,4 +469,4 @@ let key: ExportableApiKey = [0u8; 32].into();
 
 ---
 
-These examples cover maybe 95% of real-world usage.
+These examples possibly cover about 95% of real-world usage.
