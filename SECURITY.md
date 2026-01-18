@@ -25,12 +25,14 @@ This document outlines key security aspects to consider when using the `secure-g
 - **Encoding Features**: Validate inputs before encoding to prevent malformed outputs or attacks.
 
 ## Potential Concerns
+- **Serde Serialization/Deserialization**: With `serde` feature enabled, `Deserialize` allows loading secrets from potentially untrusted sources—validate inputs and trust the source. `Serialize` is opt-in via `SerializableSecret` marker to prevent accidental exfiltration; audit all `impl SerializableSecret` in your codebase.
 - **Heap Allocation**: `Dynamic<T>` types zeroize the full backing buffer capacity (including slack) on drop when the `zeroize` feature is enabled:  
-  - For `Vec<T>`: “Best effort” zeroization for Vec. Ensures the entire capacity of the Vec is zeroed. Cannot ensure that previous reallocations did not leave values on the heap. ([docs](https://docs.rs/zeroize/latest/zeroize/trait.Zeroize.html#impl-Zeroize-for-Vec%3CZ%3E))  
-  - For `String`: “Best effort” zeroization for String. Clears the entire capacity of the String. Cannot ensure that previous reallocations did not leave values on the heap. ([docs](https://docs.rs/zeroize/latest/zeroize/trait.Zeroize.html#impl-Zeroize-for-String))
+  - For `Vec<T>`: "Best effort" zeroization for Vec. Ensures the entire capacity of the Vec is zeroed. Cannot ensure that previous reallocations did not leave values on the heap. ([docs](https://docs.rs/zeroize/latest/zeroize/trait.Zeroize.html#impl-Zeroize-for-Vec%3CZ%3E))  
+  - For `String`: "Best effort" zeroization for String. Clears the entire capacity of the String. Cannot ensure that previous reallocations did not leave values on the heap. ([docs](https://docs.rs/zeroize/latest/zeroize/trait.Zeroize.html#impl-Zeroize-for-String))
 - **Custom Types**: Avoid wrapping sensitive data in non-zeroizeable types; implement `CloneSafe` carefully.
 - **Error Handling**: Errors like `FromSliceError` expose length metadata (e.g., expected vs. actual), which may be sensitive in some contexts; fields are `pub(crate)` to prevent direct external access while allowing internal debugging. Invalid inputs are zeroized in encoding failures (with `zeroize` enabled).
-- **Macro Usage**: Macros create type aliases—ensure they match your security needs.
+- **Macro Usage**: Macros create type aliases without runtime checks—ensure they match your security needs.
+
 
 ## Best Practices
 - Enable the default `secure` feature (`zeroize` + `ct-eq`) unless constrained environments require otherwise.
@@ -82,6 +84,8 @@ This section provides a professional reviewer's perspective on each module's sec
 - Prefer pre-baked types; use custom impls only when necessary.
 - Limit cloning to essential operations; use move semantics where possible.
 - Zeroize cloned copies promptly to minimize exposure window.
+- Validate serde inputs and handle errors securely; only deserialize from trusted sources.
+- Explicitly impl `SerializableSecret` only for types that must be serialized; grep for impls in audits.
 
 **Review Points**:
 - Confirm `zeroize` feature is enabled if cloning is used.
@@ -159,6 +163,30 @@ This section provides a professional reviewer's perspective on each module's sec
 **Review Points**:
 - Audit error messages for unintended info disclosure.
 - Ensure error handling doesn't bypass zeroization.
+
+### Serde Feature (`serde` feature across modules)
+**Strengths**:
+- Pure opt-in `Serialize` via `SerializableSecret` marker with no blanket impls prevents accidental exfiltration—fully grep-able and auditable.
+- `Deserialize` uses secure construction patterns (e.g., `try_init_with` for cloneables) with zeroizing of invalid inputs.
+- Matches `secrecy` crate's approach for high-risk operations like serialization.
+
+**Potential Weaknesses**:
+- `Deserialize` allows loading from potentially untrusted sources—assumes trusted input; no runtime format validation beyond serde.
+- Dependency on `serde` ecosystem increases attack surface; vulnerabilities in serde could affect secret handling.
+- Encoding types serialize as strings, which are plaintext—leakage if not handled carefully post-serialization.
+- Temporary exposure during deserialization before wrapping (mitigated by immediate construction/zeroizing).
+
+**Mitigations**:
+- Only deserialize from verified, trusted sources; validate inputs upstream.
+- Pin `serde` versions and monitor for CVEs; use minimal serde features.
+- Zeroize serialized outputs immediately; avoid network transmission.
+- Test with malicious inputs; ensure invalid data is zeroized (requires `zeroize`).
+
+**Review Points**:
+- Audit all `impl SerializableSecret` for necessity; prefer not to serialize secrets.
+- Confirm `zeroize` is enabled for secure handling of invalid deserialization inputs.
+- Test serde roundtrips with edge cases (malformed JSON, oversized inputs).
+- Verify deserialization sources are trusted; handle errors securely.
 
 ### Overall Architecture
 **Strengths**:

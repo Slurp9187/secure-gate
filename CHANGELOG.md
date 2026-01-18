@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
++ **Optional `serde` feature** for JSON/TOML/YAML serialization support (addresses ROADMAP):
+  - `Deserialize` impls for all secret wrapper types with secure construction and zeroizing of invalid inputs
+  - Opt-in `Serialize` via new `SerializableSecret` marker trait (requires `serde::Serialize`)
+  - Implemented for core types (`Fixed<T>`, `Dynamic<T>`, cloneable types, encoding types, random types)
+  - No blanket implementations; purely user-opt-in serialization to maximize auditability
+  - Comprehensive tests in `tests/serde_tests.rs` covering validation, edge cases, and security
 - **Core polymorphism traits** in new `src/traits/` module for generic secret operations:
   - `ExposeSecret` & `ExposeSecretMut` traits for polymorphic secret access with controlled mutability and metadata (length/emptiness queries without exposing contents)
   - `SecureRandom` trait for cryptographically random values with metadata access (requires `rand` feature)
