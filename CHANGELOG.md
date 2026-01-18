@@ -71,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced `CloneSafe` trait documentation with implementation examples and warnings.
 - Security Checklist section in README.md with best practices.
 - Updated README.md with cross-links to SECURITY.md, improved formatting, and security emphasis.
+- **Dedicated serde fuzz target** (`fuzz_targets/serde.rs`) for secure deserialization testing: covers JSON/TOML/YAML parsing, validation logic, zeroization on invalid inputs, temporary allocation handling, and edge cases to prevent deserialization-based vulnerabilities from untrusted structured data.
 
 ### Changed (Breaking)
 - **Encoding wrappers method renames** (#52): Renamed decode methods to follow Rust stdlib naming conventions:
