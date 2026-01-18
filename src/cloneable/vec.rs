@@ -14,8 +14,7 @@ pub struct CloneableVecInner(pub Vec<u8>);
 
 impl crate::CloneSafe for CloneableVecInner {}
 
-#[cfg(feature = "serde")]
-impl crate::SerializableSecret for CloneableVecInner {}
+
 
 /// A dynamically-sized vector of bytes wrapped as a cloneable secret.
 ///

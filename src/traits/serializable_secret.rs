@@ -44,5 +44,6 @@ pub trait SerializableSecret: serde::Serialize {
     // Pure marker, no methods
 }
 
-// Minimal blanket for u8 (base type for most secrets)
-impl SerializableSecret for u8 {}
+// No blanket implementations - serialization is purely opt-in.
+// Users must explicitly implement SerializableSecret for types they want to serialize.
+// This prevents accidental exfiltration of secrets via serde.
