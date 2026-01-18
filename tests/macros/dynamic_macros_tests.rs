@@ -53,3 +53,11 @@ fn root_visibility_works() {
     let _g: GlobalPass = "global".into();
     let _r: RootPrivateToken = vec![0; 10].into();
 }
+
+#[test]
+fn dynamic_alias_with_custom_doc() {
+    dynamic_alias!(pub DynamicWithDoc, String, "Custom documentation for dynamic secret");
+
+    let d: DynamicWithDoc = "secret".into();
+    assert_eq!(d.expose_secret(), "secret");
+}

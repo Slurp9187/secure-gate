@@ -1,4 +1,9 @@
-/// Creates a type alias for a heap-allocated secure secret.
+/// Creates a type alias for a heap-allocated secure secret with optional custom documentation.
+///
+/// # Syntax
+///
+/// - `dynamic_alias!(vis Name, Type);` — visibility required (e.g., `pub`, `pub(crate)`, or omit for private)
+/// - `dynamic_alias!(vis Name, Type, doc);` — with optional custom doc string
 ///
 /// # Examples
 ///
@@ -16,11 +21,26 @@
 /// dynamic_alias!(SecretString, String); // No visibility modifier = private
 /// let secret = SecretString::new("hidden".to_string());
 /// ```
+///
+/// With custom documentation:
+/// ```
+/// use secure_gate::{dynamic_alias, ExposeSecret};
+/// dynamic_alias!(pub Token, Vec<u8>, "OAuth token for API access");
+/// let token: Token = vec![1, 2, 3].into();
+/// ```
 #[macro_export]
 macro_rules! dynamic_alias {
+    ($vis:vis $name:ident, $inner:ty, $doc:literal) => {
+        #[doc = $doc]
+        $vis type $name = $crate::Dynamic<$inner>;
+    };
     ($vis:vis $name:ident, $inner:ty) => {
         #[doc = concat!("Secure heap-allocated ", stringify!($inner))]
         $vis type $name = $crate::Dynamic<$inner>;
+    };
+    ($name:ident, $inner:ty, $doc:literal) => {
+        #[doc = $doc]
+        type $name = $crate::Dynamic<$inner>;
     };
     ($name:ident, $inner:ty) => {
         #[doc = concat!("Secure heap-allocated ", stringify!($inner))]

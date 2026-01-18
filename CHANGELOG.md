@@ -72,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Security Checklist section in README.md with best practices.
 - Updated README.md with cross-links to SECURITY.md, improved formatting, and security emphasis.
 - **Dedicated serde fuzz target** (`fuzz_targets/serde.rs`) for secure deserialization testing: covers JSON/TOML/YAML parsing, validation logic, zeroization on invalid inputs, temporary allocation handling, and edge cases to prevent deserialization-based vulnerabilities from untrusted structured data.
+- Optional custom rustdoc string support added to all non-generic alias macros (`fixed_alias!`, `dynamic_alias!`, `fixed_alias_random!`) for full consistency with generic variants. Accepts an optional third parameter for custom documentation, falling back to generated docs when omitted. Backward compatible and improves API discoverability.
 
 ### Changed (Breaking)
 - **Encoding wrappers method renames** (#52): Renamed decode methods to follow Rust stdlib naming conventions:
