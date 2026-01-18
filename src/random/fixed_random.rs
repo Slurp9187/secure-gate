@@ -3,6 +3,11 @@ use rand::rand_core::OsError;
 use rand::rngs::OsRng;
 use rand::TryRngCore;
 
+#[cfg(feature = "serde")]
+use serde::Serialize;
+
+use crate::traits::expose_secret::ExposeSecret;
+
 /// Fixed-length cryptographically secure random value with encoding methods.
 ///
 /// This is a newtype over `Fixed<[u8; N]>` that enforces construction only via secure RNG.
@@ -129,5 +134,16 @@ impl<const N: usize> From<FixedRandom<N>> for Fixed<[u8; N]> {
     #[inline(always)]
     fn from(rng: FixedRandom<N>) -> Self {
         rng.into_inner()
+    }
+}
+
+/// Serde serialization support (serializes the random bytes).
+#[cfg(feature = "serde")]
+impl<const N: usize> Serialize for FixedRandom<N> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(self.0.expose_secret())
     }
 }

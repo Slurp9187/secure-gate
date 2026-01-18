@@ -3,6 +3,9 @@ use core::fmt;
 #[cfg(feature = "rand")]
 use rand::rand_core::OsError;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use crate::FromSliceError;
 
 /// Stack-allocated secure secret wrapper.
@@ -197,3 +200,32 @@ impl<T: zeroize::Zeroize> zeroize::Zeroize for Fixed<T> {
 /// Zeroize on drop integration.
 #[cfg(feature = "zeroize")]
 impl<T: zeroize::Zeroize> zeroize::ZeroizeOnDrop for Fixed<T> {}
+
+/// Serde deserialization support (always available with serde feature).
+#[cfg(feature = "serde")]
+impl<'de, T> Deserialize<'de> for Fixed<T>
+where
+    T: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let inner = T::deserialize(deserializer)?;
+        Ok(Fixed::new(inner))
+    }
+}
+
+/// Serde serialization support (opt-in via SerializableSecret marker).
+#[cfg(feature = "serde")]
+impl<T> Serialize for Fixed<T>
+where
+    T: crate::SerializableSecret,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}

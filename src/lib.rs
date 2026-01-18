@@ -44,6 +44,10 @@ pub use traits::SecureRandom;
 #[cfg(feature = "zeroize")]
 pub use traits::CloneSafe;
 
+/// Re-export of the [`SerializableSecret`] trait.
+#[cfg(feature = "serde")]
+pub use traits::SerializableSecret;
+
 /// Re-export of the [`ConstantTimeEq`] trait.
 #[cfg(feature = "ct-eq")]
 pub use traits::ConstantTimeEq;

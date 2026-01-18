@@ -3,6 +3,11 @@ use rand::rand_core::OsError;
 use rand::rngs::OsRng;
 use rand::TryRngCore;
 
+#[cfg(feature = "serde")]
+use serde::Serialize;
+
+use crate::traits::expose_secret::ExposeSecret;
+
 /// Heap-allocated cryptographically secure random bytes with encoding methods.
 ///
 /// This is a newtype over `Dynamic<Vec<u8>>` for semantic clarity.
@@ -100,5 +105,16 @@ impl From<DynamicRandom> for Dynamic<Vec<u8>> {
     #[inline(always)]
     fn from(rng: DynamicRandom) -> Self {
         rng.into_inner()
+    }
+}
+
+/// Serde serialization support (serializes the random bytes).
+#[cfg(feature = "serde")]
+impl Serialize for DynamicRandom {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(self.0.expose_secret())
     }
 }

@@ -2,6 +2,9 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "rand")]
 use rand::rand_core::OsError;
 
@@ -225,3 +228,32 @@ impl<T: ?Sized + zeroize::Zeroize> zeroize::Zeroize for Dynamic<T> {
 /// Zeroize on drop integration.
 #[cfg(feature = "zeroize")]
 impl<T: ?Sized + zeroize::Zeroize> zeroize::ZeroizeOnDrop for Dynamic<T> {}
+
+/// Serde deserialization support (always available with serde feature).
+#[cfg(feature = "serde")]
+impl<'de, T> Deserialize<'de> for Dynamic<T>
+where
+    T: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let inner = T::deserialize(deserializer)?;
+        Ok(Dynamic::new(inner))
+    }
+}
+
+/// Serde serialization support (opt-in via SerializableSecret marker).
+#[cfg(feature = "serde")]
+impl<T> Serialize for Dynamic<T>
+where
+    T: crate::SerializableSecret,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}

@@ -12,6 +12,7 @@
 /// - [`CloneSafe`] - Opt-in safe cloning with zeroization (requires `zeroize` feature)
 /// - [`ConstantTimeEq`] - Constant-time equality to prevent timing attacks (requires `ct-eq` feature)
 /// - [`SecureEncoding`] - Extension trait for secure byte encoding to strings (requires encoding features)
+/// - [`SerializableSecret`] - Marker for types allowing secure serialization (requires `serde` feature)
 ///
 /// ## Security Guarantees
 ///
@@ -27,6 +28,7 @@
 /// - `zeroize`: Enables [`CloneSafe`] for safe cloning
 /// - `ct-eq`: Enables [`ConstantTimeEq`] for constant-time comparisons
 /// - `encoding` (or `encoding-hex`, `encoding-base64`, `encoding-bech32`): Enables [`SecureEncoding`] for byte encoding
+/// - `serde`: Enables [`SerializableSecret`] for opt-in serialization
 // Secret Exposure Traits
 pub mod expose_secret;
 pub use expose_secret::ExposeSecret;
@@ -42,6 +44,11 @@ pub use secure_random::SecureRandom;
 pub mod clone_safe;
 #[cfg(feature = "zeroize")]
 pub use clone_safe::CloneSafe;
+
+#[cfg(feature = "serde")]
+pub mod serializable_secret;
+#[cfg(feature = "serde")]
+pub use serializable_secret::SerializableSecret;
 
 pub mod constant_time_eq;
 #[cfg(feature = "ct-eq")]

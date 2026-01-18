@@ -8,10 +8,14 @@ use zeroize::Zeroize;
 /// The `zeroize(drop)` attribute ensures the string contents are zeroized when
 /// this struct is dropped.
 #[derive(Clone, Zeroize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[zeroize(drop)]
 pub struct CloneableStringInner(pub String);
 
 impl crate::CloneSafe for CloneableStringInner {}
+
+#[cfg(feature = "serde")]
+impl crate::SerializableSecret for CloneableStringInner {}
 
 /// A string wrapped as a cloneable secret.
 ///
@@ -104,5 +108,18 @@ impl From<String> for CloneableString {
 impl From<&str> for CloneableString {
     fn from(value: &str) -> Self {
         Self::from(value.to_string())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for CloneableString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut temp: String = String::deserialize(deserializer)?;
+        let secret = Self::from(temp.clone());
+        temp.zeroize();
+        Ok(secret)
     }
 }

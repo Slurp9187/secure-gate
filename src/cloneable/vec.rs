@@ -8,10 +8,14 @@ use zeroize::Zeroize;
 /// The `zeroize(drop)` attribute ensures the vector contents are zeroized when
 /// this struct is dropped.
 #[derive(Clone, Zeroize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[zeroize(drop)]
 pub struct CloneableVecInner(pub Vec<u8>);
 
 impl crate::CloneSafe for CloneableVecInner {}
+
+#[cfg(feature = "serde")]
+impl crate::SerializableSecret for CloneableVecInner {}
 
 /// A dynamically-sized vector of bytes wrapped as a cloneable secret.
 ///
@@ -96,5 +100,18 @@ impl From<Vec<u8>> for CloneableVec {
 impl From<&[u8]> for CloneableVec {
     fn from(value: &[u8]) -> Self {
         Self::from(value.to_vec())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for CloneableVec {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut temp: Vec<u8> = Vec::deserialize(deserializer)?;
+        let secret = Self::from(temp.clone());
+        temp.zeroize();
+        Ok(secret)
     }
 }

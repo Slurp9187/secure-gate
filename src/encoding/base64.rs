@@ -4,6 +4,9 @@ use alloc::string::String;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use crate::traits::expose_secret::ExposeSecret;
 
 fn zeroize_input(s: &mut String) {
@@ -119,5 +122,28 @@ impl Eq for Base64String {}
 impl core::fmt::Debug for Base64String {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
+    }
+}
+
+/// Serde deserialization support (validates on deserialization).
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Base64String {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s: String = String::deserialize(deserializer)?;
+        Self::new(s).map_err(serde::de::Error::custom)
+    }
+}
+
+/// Serde serialization support (serializes the base64 string).
+#[cfg(feature = "serde")]
+impl Serialize for Base64String {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.expose_secret().serialize(serializer)
     }
 }

@@ -1,6 +1,9 @@
 use crate::Fixed;
 use zeroize::Zeroize;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 /// Inner wrapper for a fixed-size array of bytes that can be safely cloned as a secret.
 ///
 /// This struct wraps a `[u8; N]` array and implements the necessary traits for secure
@@ -11,6 +14,25 @@ use zeroize::Zeroize;
 pub struct CloneableArrayInner<const N: usize>(pub [u8; N]);
 
 impl<const N: usize> crate::CloneSafe for CloneableArrayInner<N> {}
+
+#[cfg(feature = "serde")]
+impl<const N: usize> Serialize for CloneableArrayInner<N>
+where
+    [u8; N]: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<const N: usize> crate::SerializableSecret for CloneableArrayInner<N>
+where
+    [u8; N]: Serialize,
+{}
 
 /// A fixed-size array of bytes wrapped as a cloneable secret.
 ///
@@ -85,5 +107,26 @@ impl<const N: usize> From<[u8; N]> for CloneableArray<N> {
     /// Wrap a `[u8; N]` array in a `CloneableArray`.
     fn from(arr: [u8; N]) -> Self {
         Fixed::new(CloneableArrayInner(arr))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, const N: usize> Deserialize<'de> for CloneableArray<N> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        let mut temp: Vec<u8> = Vec::deserialize(deserializer)?;
+        if temp.len() == N {
+            let mut arr = [0u8; N];
+            arr.copy_from_slice(&temp);
+            let secret = Self::from(arr);
+            temp.zeroize();
+            Ok(secret)
+        } else {
+            temp.zeroize();
+            Err(D::Error::custom("array length mismatch"))
+        }
     }
 }

@@ -26,6 +26,9 @@ use alloc::string::String;
 use bech32::primitives::decode::UncheckedHrpstring;
 use bech32::{decode, primitives::hrp::Hrp, Bech32, Bech32m};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use crate::traits::expose_secret::ExposeSecret;
 
 fn zeroize_input(s: &mut String) {
@@ -162,5 +165,28 @@ impl Eq for Bech32String {}
 impl core::fmt::Debug for Bech32String {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
+    }
+}
+
+/// Serde deserialization support (validates on deserialization).
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Bech32String {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s: String = String::deserialize(deserializer)?;
+        Self::new(s).map_err(serde::de::Error::custom)
+    }
+}
+
+/// Serde serialization support (serializes the bech32 string).
+#[cfg(feature = "serde")]
+impl Serialize for Bech32String {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.inner.expose_secret().serialize(serializer)
     }
 }

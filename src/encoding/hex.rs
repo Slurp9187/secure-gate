@@ -7,6 +7,9 @@ use hex as hex_crate;
 
 use crate::traits::expose_secret::ExposeSecret;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]
     {
@@ -134,5 +137,28 @@ impl Eq for HexString {}
 impl core::fmt::Debug for HexString {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
+    }
+}
+
+/// Serde deserialization support (validates on deserialization).
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for HexString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s: String = String::deserialize(deserializer)?;
+        Self::new(s).map_err(serde::de::Error::custom)
+    }
+}
+
+/// Serde serialization support (serializes the hex string).
+#[cfg(feature = "serde")]
+impl Serialize for HexString {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.expose_secret().serialize(serializer)
     }
 }

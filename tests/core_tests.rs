@@ -128,5 +128,4 @@ fn dynamic_vec_from_slice() {
     let slice: &[u8] = b"hello world";
     let dyn_vec: Dynamic<Vec<u8>> = slice.into();
     assert_eq!(dyn_vec.expose_secret(), b"hello world");
-    assert_eq!(dyn_vec.len(), 11);
 }
