@@ -53,12 +53,12 @@ default = ["secure"]
 secure = ["zeroize", "ct-eq"]
 
 # Zeroize: Secure zeroing of secrets on drop or explicit calls (uses 'zeroize' crate with alloc and derives)
-zeroize = ["dep:zeroize"]
+zeroize = ["dep:zeroize", "blake3/zeroize"]
 
 # ct-eq: Constant-time equality checks (prevents timing attacks in comparisons; uses 'subtle' crate)
 ct-eq = ["dep:subtle"]
 
-hash-eq = ["dep:blake3"]
+hash-eq = ["dep:blake3", "dep:subtle"]
 
 # Full: Meta-feature enabling all optional features for a complete, batteries-included setup
 full = ["secure", "encoding", "hash-eq"]
