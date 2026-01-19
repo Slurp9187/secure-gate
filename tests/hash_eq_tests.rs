@@ -5,7 +5,7 @@
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "zeroize")]
+    #[cfg(all(feature = "hash-eq", feature = "zeroize"))]
     use secure_gate::{CloneableArray, CloneableString, CloneableVec};
     #[cfg(feature = "hash-eq")]
     use secure_gate::{Dynamic, Fixed};
