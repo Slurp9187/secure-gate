@@ -37,6 +37,14 @@ impl<const N: usize> serde::Serialize for ExportableArrayInner<N> {
     }
 }
 
+/// Constant-time equality for raw byte arrays.
+#[cfg(feature = "ct-eq")]
+impl<const N: usize> crate::ConstantTimeEq for ExportableArrayInner<N> {
+    fn ct_eq(&self, other: &Self) -> bool {
+        self.0.ct_eq(&other.0)
+    }
+}
+
 /// Secure encoding support for the inner array bytes.
 #[cfg(any(
     feature = "encoding-hex",

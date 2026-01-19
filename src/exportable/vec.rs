@@ -27,6 +27,14 @@ impl core::fmt::Debug for ExportableVecInner {
 /// Marker impl for serialization of raw byte vectors.
 impl crate::SerializableSecret for ExportableVecInner {}
 
+/// Constant-time equality for raw byte vectors.
+#[cfg(feature = "ct-eq")]
+impl crate::ConstantTimeEq for ExportableVecInner {
+    fn ct_eq(&self, other: &Self) -> bool {
+        self.0.ct_eq(&other.0)
+    }
+}
+
 /// Serde serialization support for raw byte vectors.
 #[cfg(feature = "serde-serialize")]
 impl serde::Serialize for ExportableVecInner {
