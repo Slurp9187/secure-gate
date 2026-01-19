@@ -1,7 +1,5 @@
 use crate::Dynamic;
 use zeroize::Zeroize;
-#[cfg(feature = "serde-serialize")]
-use serde::{ser::Serializer, Serialize};
 
 /// Inner wrapper for a string that can be safely cloned as a secret.
 ///
@@ -17,27 +15,6 @@ impl crate::CloneSafe for CloneableStringInner {}
 
 #[cfg(feature = "serde-serialize")]
 /// Serde serialization support (opt-in via SerializableSecret marker on inner; requires serde-serialize feature).
-impl Serialize for CloneableStringInner
-where
-    String: crate::SerializableSecret,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.0.serialize(serializer)
-    }
-}
-
-
-
-
-
-
-
-
-
-
 
 /// A string wrapped as a cloneable secret.
 ///

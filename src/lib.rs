@@ -60,6 +60,14 @@ pub mod cloneable;
 #[cfg(feature = "zeroize")]
 pub use cloneable::{CloneableArray, CloneableString, CloneableVec};
 
+/// Exportable secret types (requires the `serde-serialize` feature).
+/// Provides wrappers for opt-in serialization of raw secrets.
+#[cfg(feature = "serde-serialize")]
+pub mod exportable;
+/// Re-exports of exportable secret types: [`ExportableArray`], [`ExportableString`], [`ExportableVec`].
+#[cfg(feature = "serde-serialize")]
+pub use exportable::{ExportableArray, ExportableString, ExportableVec};
+
 /// Type alias macros (always available).
 /// Convenient macros for creating custom secret wrapper types.
 mod macros;

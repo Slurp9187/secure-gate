@@ -1,7 +1,5 @@
 use crate::Dynamic;
 use zeroize::Zeroize;
-#[cfg(feature = "serde-serialize")]
-use serde::{ser::Serializer, Serialize};
 
 /// Inner wrapper for a vector of bytes that can be safely cloned as a secret.
 ///
@@ -17,18 +15,6 @@ impl crate::CloneSafe for CloneableVecInner {}
 
 /// Serde serialization support (serializes the vector).
 /// Uniformly gated by SerializableSecret marker on inner type.
-#[cfg(feature = "serde-serialize")]
-impl Serialize for CloneableVecInner
-where
-    Vec<u8>: crate::SerializableSecret,  // Gate on inner
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.0.serialize(serializer)  // Or appropriate forwarding
-    }
-}
 
 /// A dynamically-sized vector of bytes wrapped as a cloneable secret.
 ///

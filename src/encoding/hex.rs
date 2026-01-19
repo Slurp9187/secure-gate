@@ -158,15 +158,19 @@ impl<'de> Deserialize<'de> for HexString {
 /// Serde serialization support (serializes the hex string).
 /// Uniformly gated by SerializableSecret marker.
 /// Users must implement SerializableSecret to enable serialization.
+
 #[cfg(feature = "serde-serialize")]
-impl Serialize for HexString
-where
-    String: crate::SerializableSecret,  // User must impl on String
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.expose_secret().serialize(serializer)  // String output
+impl From<HexString> for crate::ExportableString {
+    fn from(value: HexString) -> Self {
+        let s = value.expose_secret().to_string();
+        Self::from(s)
+    }
+}
+
+#[cfg(feature = "serde-serialize")]
+impl From<HexString> for crate::ExportableVec {
+    fn from(value: HexString) -> Self {
+        let vec = value.decode_into_bytes();
+        Self::from(vec)
     }
 }

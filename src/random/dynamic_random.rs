@@ -107,17 +107,3 @@ impl From<DynamicRandom> for Dynamic<Vec<u8>> {
         rng.into_inner()
     }
 }
-/// Serde serialization support (serializes the random bytes).
-/// Uniformly gated by SerializableSecret marker on inner type.
-#[cfg(feature = "serde-serialize")]
-impl Serialize for DynamicRandom
-where
-    Vec<u8>: crate::SerializableSecret,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.0.serialize(serializer)
-    }
-}
