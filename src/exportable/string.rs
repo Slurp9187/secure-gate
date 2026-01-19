@@ -74,7 +74,6 @@ impl ExportableString {
     /// let secret: ExportableString = ExportableString::from("secret");
     /// # }
     /// ```
-
     /// Build an exportable string secret in a closure.
     ///
     /// This minimizes stack exposure by building the string temporarily.

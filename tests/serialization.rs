@@ -1,12 +1,7 @@
-// ==========================================================================
-// tests/serialization.rs
-// ==========================================================================
-// Unit tests for secure-gate serialization features.
-// Tests roundtrip serialization, conversions, and encoded forwarding via Exportable* types.
-
-use secure_gate::{Dynamic, ExposeSecret, Fixed};
 #[cfg(feature = "serde-serialize")]
 use secure_gate::ExportableArray;
+#[cfg(feature = "serde-serialize")]
+use secure_gate::{Dynamic, ExposeSecret, Fixed};
 
 #[cfg(feature = "serde-serialize")]
 mod exportable_roundtrips {
@@ -157,7 +152,6 @@ mod conversions {
 fn exportable_serialization_requires_feature() {
     // This test is a no-op but documents that Exportable* types require serde-serialize
     // Without the feature, these types don't exist, preventing compilation.
-    assert!(true);
 }
 
 #[cfg(feature = "serde-serialize")]

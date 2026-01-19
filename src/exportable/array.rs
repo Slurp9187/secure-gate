@@ -125,7 +125,6 @@ impl<const N: usize> ExportableArray<N> {
     /// let secret: ExportableArray<4> = ExportableArray::from([1, 2, 3, 4]);
     /// # }
     /// ```
-
     /// Build an exportable array secret in a closure.
     ///
     /// This minimizes stack exposure by building the array temporarily.

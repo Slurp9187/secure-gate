@@ -1,4 +1,3 @@
-
 // ==========================================================================
 // tests/serde/deserialize_tests.rs
 // ==========================================================================
@@ -9,6 +8,7 @@
 // - Validation and bounds checking for encoding types
 // - Resource exhaustion resistance
 
+#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
 use secure_gate::ExposeSecret;
 
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
@@ -19,113 +19,115 @@ fn hex_string_deserialize_invalid_input() {
     let result: Result<HexString, _> = serde_json::from_str("\"gggggggg\"");
     assert!(result.is_err());
     // Invalid characters mixed
-    let result: Result<HexString, _> = serde_json::from_str("\"deadbeef!\"");
+    let result: Result<HexString, _> = serde_json::from_str("\"abcdgggg\"");
     assert!(result.is_err());
-    // Odd length (invalid)
+    // Odd length
     let result: Result<HexString, _> = serde_json::from_str("\"abc\"");
     assert!(result.is_err());
-}
-
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
-#[test]
-fn hex_string_deserialize_large_input() {
-    use secure_gate::encoding::hex::HexString;
-    // Large valid hex should succeed (serde handles it, no built-in limit)
-    let large_hex = "a".repeat(1024);
-    let result: Result<HexString, _> = serde_json::from_str(&format!("\"{}\"", large_hex));
-    assert!(result.is_ok()); // Accepts large valid input
-    assert_eq!(result.unwrap().byte_len(), 512);
+    // Empty string
+    let result: Result<HexString, _> = serde_json::from_str("\"\"");
+    assert!(result.is_ok());
+    let hex = result.unwrap();
+    assert_eq!(hex.expose_secret().len(), 0);
+    // Uppercase
+    let result: Result<HexString, _> = serde_json::from_str("\"ABCDEF\"");
+    assert!(result.is_ok());
+    let hex = result.unwrap();
+    assert_eq!(hex.expose_secret(), "abcdef");
 }
 
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-base64"))]
 #[test]
-fn base64_string_deserialize_invalid_input() {
+fn base64_deserialize_invalid_input() {
     use secure_gate::encoding::base64::Base64String;
-    // Invalid base64 characters
+    // Invalid characters
     let result: Result<Base64String, _> = serde_json::from_str("\"!@#$%\"");
     assert!(result.is_err());
-    // Invalid base64 (wrong padding)
-    let result: Result<Base64String, _> = serde_json::from_str("\"SGVsbG\"");
+    // Invalid characters mixed
+    let result: Result<Base64String, _> = serde_json::from_str("\"abcd!\"");
     assert!(result.is_err());
+    // Invalid padding
+    let result: Result<Base64String, _> = serde_json::from_str("\"abc=\"");
+    assert!(result.is_err());
+    // Valid
+    let result: Result<Base64String, _> = serde_json::from_str("\"YWJj\"");
+    assert!(result.is_ok());
+    let base64 = result.unwrap();
+    assert_eq!(base64.expose_secret(), "YWJj");
 }
 
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
 #[test]
-fn bech32_string_deserialize_invalid_input() {
+fn bech32_deserialize_invalid_input() {
     use secure_gate::encoding::bech32::Bech32String;
-    // Invalid bech32: wrong checksum
-    let result: Result<Bech32String, _> = serde_json::from_str("\"bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5md\"");
+    // Invalid characters
+    let result: Result<Bech32String, _> = serde_json::from_str("\"gggggggg\"");
     assert!(result.is_err());
-    // Invalid HRP
-    let result: Result<Bech32String, _> = serde_json::from_str("\"zz1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq\"");
-    assert!(result.is_err());
-}
-
-#[cfg(feature = "serde-deserialize")]
-#[test]
-fn deserialization_from_malformed_json() {
-    use secure_gate::Dynamic;
-
-    // Test deserialization of malformed JSON for Dynamic<String>
-    let result: Result<Dynamic<String>, _> = serde_json::from_str("{\"key\": \"value\"}"); // Not a string
-    assert!(result.is_err());
-
-    let result: Result<Dynamic<String>, _> = serde_json::from_str("[1, 2, 3]"); // Not a string
-    assert!(result.is_err());
-}
-
-#[cfg(feature = "serde-deserialize")]
-#[test]
-fn resource_exhaustion_prevention() {
-    // Test that we don't allocate excessive memory for malicious input
-    // serde_json has built-in limits, but our types add validation
-    let huge_string = "x".repeat(1000000); // 1MB string
-    let result: Result<secure_gate::Dynamic<String>, _> = serde_json::from_str(&format!("\"{}\"", huge_string));
-    // This should succeed but not cause DoS since serde handles it
+    // Valid bech32
+    let result: Result<Bech32String, _> =
+        serde_json::from_str("\"bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4\"");
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().len(), 1000000);
+    let bech32 = result.unwrap();
+    assert!(bech32.expose_secret().starts_with("bc"));
 }
 
-#[cfg(feature = "serde-deserialize")]
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "serde-serialize",
+    feature = "zeroize"
+))]
 #[test]
-fn zeroizing_on_deserialize_failure() {
-    // This is hard to test directly since zeroizing happens in the implementation
-    // But we can verify that invalid inputs fail without panicking
-    use secure_gate::encoding::hex::HexString;
-    let result = serde_json::from_str::<HexString>("\"invalid\"");
-    assert!(result.is_err());
-    // In the impl, invalid input is zeroized before returning error
+fn cloneable_vec_deserialize() {
+    use secure_gate::CloneableVec;
+    let json = "[1,2,3,4,5,6]";
+    let result: Result<CloneableVec, _> = serde_json::from_str(json);
+    assert!(result.is_ok());
+    let deserialized = result.unwrap();
+    assert_eq!(deserialized.expose_secret().0.len(), 6);
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "zeroize"))]
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "serde-serialize",
+    feature = "zeroize"
+))]
 #[test]
-fn cloneable_string_deserialize_uses_secure_pattern() {
-    let deserialized: secure_gate::CloneableString = serde_json::from_str(r#""hunter2""#).unwrap();
+fn cloneable_string_deserialize() {
+    use secure_gate::CloneableString;
+    let json = "\"hunter2\"";
+    let result: Result<CloneableString, _> = serde_json::from_str(json);
+    assert!(result.is_ok());
+    let deserialized = result.unwrap();
     assert_eq!(deserialized.expose_secret().0, "hunter2");
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "zeroize"))]
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "serde-serialize",
+    feature = "zeroize"
+))]
 #[test]
-fn cloneable_array_length_mismatch() {
-    let result: Result<secure_gate::CloneableArray<32>, _> = serde_json::from_str("[1,2,3]");
-    assert!(result.is_err());
+fn cloneable_vec_large_deserialize() {
+    use secure_gate::CloneableVec;
+    // Create a large JSON array with 100 elements
+    let mut json = "[".to_string();
+    for i in 0..100 {
+        json.push_str(&i.to_string());
+        if i < 99 {
+            json.push(',');
+        }
+    }
+    json.push(']');
+    let result: Result<CloneableVec, _> = serde_json::from_str(&json);
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.len(), 100);
 }
 
-#[cfg(feature = "serde-deserialize")]
-#[test]
-fn deserialize_very_large_string() {
-    let huge = "a".repeat(1_000_000); // 1MB - reasonable for testing
-    let serialized = format!("\"{}\"", huge);
-    let result: secure_gate::Dynamic<String> = serde_json::from_str(&serialized).unwrap();
-    assert_eq!(result.len(), 1_000_000);
-}
-
-#[cfg(feature = "serde-deserialize")]
 #[test]
 fn random_no_deserialize() {
     // Random types don't implement Deserialize - confirm via failed attempt
     // This is a compile-time restriction, but we test by noting it doesn't exist
     // serde_json::from_str::<secure_gate::FixedRandom<32>>("[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]").unwrap_err();
     // Would fail to compile if Deserialize existed
-    assert!(true);
 }

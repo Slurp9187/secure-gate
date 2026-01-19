@@ -16,7 +16,6 @@ impl crate::CloneSafe for CloneableVecInner {}
 
 /// Serde serialization support (serializes the vector).
 /// Uniformly gated by SerializableSecret marker on inner type.
-
 /// A dynamically-sized vector of bytes wrapped as a cloneable secret.
 ///
 /// This type provides a secure wrapper around a `Vec<u8>` that can be safely cloned

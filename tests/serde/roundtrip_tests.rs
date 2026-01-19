@@ -8,9 +8,6 @@
 
 
 #[cfg(feature = "zeroize")]
-use secure_gate::ExposeSecret;
-
-
 #[cfg(feature = "serde-serialize")]
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
 #[test]

@@ -156,7 +156,6 @@ impl<'de> Deserialize<'de> for HexString {
 /// Serde serialization support (serializes the hex string).
 /// Uniformly gated by SerializableSecret marker.
 /// Users must implement SerializableSecret to enable serialization.
-
 #[cfg(feature = "serde-serialize")]
 impl From<HexString> for crate::ExportableString {
     fn from(value: HexString) -> Self {
