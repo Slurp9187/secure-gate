@@ -26,10 +26,6 @@ use alloc::string::String;
 use bech32::primitives::decode::UncheckedHrpstring;
 use bech32::{decode, primitives::hrp::Hrp, Bech32, Bech32m};
 
-#[cfg(feature = "serde-deserialize")]
-use serde::Deserialize;
-
-
 use crate::traits::expose_secret::ExposeSecret;
 
 fn zeroize_input(s: &mut String) {
@@ -169,7 +165,8 @@ impl core::fmt::Debug for Bech32String {
     }
 }
 
-impl<'de> Deserialize<'de> for Bech32String {
+#[cfg(feature = "serde-deserialize")]
+impl<'de> serde::Deserialize<'de> for Bech32String {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,

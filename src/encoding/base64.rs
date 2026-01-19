@@ -7,7 +7,6 @@ use base64::Engine;
 #[cfg(feature = "serde-deserialize")]
 use serde::Deserialize;
 
-
 use crate::traits::expose_secret::ExposeSecret;
 
 fn zeroize_input(s: &mut String) {

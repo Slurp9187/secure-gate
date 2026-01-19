@@ -3,8 +3,6 @@ use rand::rand_core::OsError;
 use rand::rngs::OsRng;
 use rand::TryRngCore;
 
-
-
 /// Heap-allocated cryptographically secure random bytes with encoding methods.
 ///
 /// This is a newtype over `Dynamic<Vec<u8>>` for semantic clarity.

@@ -10,7 +10,6 @@ use crate::traits::expose_secret::ExposeSecret;
 #[cfg(feature = "serde-deserialize")]
 use serde::Deserialize;
 
-
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]
     {
@@ -153,9 +152,6 @@ impl<'de> Deserialize<'de> for HexString {
     }
 }
 
-/// Serde serialization support (serializes the hex string).
-/// Uniformly gated by SerializableSecret marker.
-/// Users must implement SerializableSecret to enable serialization.
 #[cfg(feature = "serde-serialize")]
 impl From<HexString> for crate::ExportableString {
     fn from(value: HexString) -> Self {
