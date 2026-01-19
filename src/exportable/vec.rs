@@ -218,3 +218,19 @@ impl crate::SecureEncoding for ExportableVec {
         self.0.as_ref().try_to_bech32m(hrp)
     }
 }
+
+#[cfg(feature = "serde-serialize")]
+impl From<crate::cloneable::CloneableVec> for ExportableVec {
+    fn from(value: crate::cloneable::CloneableVec) -> Self {
+        let vec = value.expose_secret().0.clone();
+        Self::from(vec)
+    }
+}
+
+#[cfg(all(feature = "serde-serialize", feature = "rand"))]
+impl From<crate::random::DynamicRandom> for ExportableVec {
+    fn from(value: crate::random::DynamicRandom) -> Self {
+        let vec = *value.into_inner();
+        Self::from(vec)
+    }
+}

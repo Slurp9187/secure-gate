@@ -181,17 +181,18 @@ impl<'de> Deserialize<'de> for Bech32String {
     }
 }
 
-/// Serde serialization support (serializes the bech32 string).
-/// Uniformly gated by SerializableSecret marker.
 #[cfg(feature = "serde-serialize")]
-impl Serialize for Bech32String
-where
-    String: crate::SerializableSecret,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.inner.expose_secret().serialize(serializer)
+impl From<Bech32String> for crate::ExportableString {
+    fn from(value: Bech32String) -> Self {
+        let s = value.expose_secret().to_string();
+        Self::from(s)
+    }
+}
+
+#[cfg(feature = "serde-serialize")]
+impl From<Bech32String> for crate::ExportableVec {
+    fn from(value: Bech32String) -> Self {
+        let vec = value.decode_into_bytes();
+        Self::from(vec)
     }
 }

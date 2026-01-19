@@ -220,3 +220,21 @@ impl<const N: usize> crate::SecureEncoding for ExportableArray<N> {
         self.0.try_to_bech32m(hrp)
     }
 }
+
+#[cfg(feature = "serde-serialize")]
+impl<const N: usize> core::convert::From<crate::CloneableArray<N>> for ExportableArray<N> {
+    fn from(value: crate::CloneableArray<N>) -> Self {
+        let inner = value.expose_secret();
+        let array = inner.0;
+        crate::Fixed::new(ExportableArrayInner(array))
+    }
+}
+
+#[cfg(all(feature = "serde-serialize", feature = "rand"))]
+#[cfg(feature = "serde-serialize")]
+impl<const N: usize> core::convert::From<crate::Fixed<[u8; N]>> for ExportableArray<N> {
+    fn from(value: crate::Fixed<[u8; N]>) -> Self {
+        let array = *value.expose_secret();
+        crate::Fixed::new(ExportableArrayInner(array))
+    }
+}

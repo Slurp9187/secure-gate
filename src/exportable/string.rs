@@ -114,6 +114,14 @@ impl core::convert::From<&str> for ExportableString {
 }
 
 #[cfg(feature = "serde-serialize")]
+impl From<crate::cloneable::CloneableString> for ExportableString {
+    fn from(value: crate::cloneable::CloneableString) -> Self {
+        let s = value.expose_secret().0.clone();
+        Self::from(s)
+    }
+}
+
+#[cfg(feature = "serde-serialize")]
 impl From<crate::Dynamic<alloc::string::String>> for ExportableString {
     fn from(value: crate::Dynamic<alloc::string::String>) -> Self {
         let crate::Dynamic(boxed) = value;
