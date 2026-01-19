@@ -23,7 +23,9 @@ base64 = { version = "0.22", optional = true }
 bech32 = { version = "0.11", default-features = false, optional = true, features = ["alloc"] }
 subtle = { version = "2.5", optional = true }
 
-serde = { version = "1", optional = true, default-features = false, features = ["alloc", "derive"] }
+blake3 = { version = "1.8", optional = true, default-features = false }
+
+serde = { version = "1.0", optional = true, default-features = false, features = ["alloc", "derive"] }
 
 thiserror = "2.0"
 
@@ -56,8 +58,10 @@ zeroize = ["dep:zeroize"]
 # ct-eq: Constant-time equality checks (prevents timing attacks in comparisons; uses 'subtle' crate)
 ct-eq = ["dep:subtle"]
 
+hash-eq = ["dep:blake3"]
+
 # Full: Meta-feature enabling all optional features for a complete, batteries-included setup
-full = ["secure", "encoding"]
+full = ["secure", "encoding", "hash-eq"]
 
 # Insecure: Opt-out feature for no-default-features builds (disables zeroize, ct-eq; use only for testing/low-resource scenarios—strongly discouraged for production)
 insecure = []
