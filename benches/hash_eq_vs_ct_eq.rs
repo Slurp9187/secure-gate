@@ -45,21 +45,75 @@ fn bench_large_secret_comparison(c: &mut Criterion) {
     });
 }
 
+// Ultra-large secret: 100KB (massive hash-eq advantage expected)
+#[cfg(all(feature = "hash-eq", feature = "ct-eq"))]
+fn bench_ultra_large_secret_comparison(c: &mut Criterion) {
+    // Mitigate caching: Use fresh allocations with varying data
+    c.bench_function("ultra_large_dynamic_hash_eq", |bencher| {
+        bencher.iter(|| {
+            let a: secure_gate::Dynamic<Vec<u8>> = criterion::black_box(vec![42u8; 100_000]).into();
+            let b: secure_gate::Dynamic<Vec<u8>> = criterion::black_box(vec![42u8; 100_000]).into();
+            criterion::black_box(a == b)
+        });
+    });
+
+    c.bench_function("ultra_large_dynamic_ct_eq", |bencher| {
+        bencher.iter(|| {
+            let a: secure_gate::Dynamic<Vec<u8>> = criterion::black_box(vec![42u8; 100_000]).into();
+            let b: secure_gate::Dynamic<Vec<u8>> = criterion::black_box(vec![42u8; 100_000]).into();
+            criterion::black_box(a.ct_eq(&b))
+        });
+    });
+}
+
+// Massive secret: 1MB (extreme bound for hash-eq fixed overhead)
+#[cfg(all(feature = "hash-eq", feature = "ct-eq"))]
+fn bench_massive_secret_comparison(c: &mut Criterion) {
+    // Mitigate caching: Use fresh allocations with varying data
+    c.bench_function("massive_dynamic_hash_eq", |bencher| {
+        bencher.iter(|| {
+            let a: secure_gate::Dynamic<Vec<u8>> =
+                criterion::black_box(vec![255u8; 1_000_000]).into(); // ~1MB
+            let b: secure_gate::Dynamic<Vec<u8>> =
+                criterion::black_box(vec![255u8; 1_000_000]).into();
+            criterion::black_box(a == b)
+        });
+    });
+
+    c.bench_function("massive_dynamic_ct_eq", |bencher| {
+        bencher.iter(|| {
+            let a: secure_gate::Dynamic<Vec<u8>> =
+                criterion::black_box(vec![255u8; 1_000_000]).into();
+            let b: secure_gate::Dynamic<Vec<u8>> =
+                criterion::black_box(vec![255u8; 1_000_000]).into();
+            criterion::black_box(a.ct_eq(&b))
+        });
+    });
+}
+
 // Hash computation overhead
 #[cfg(feature = "hash-eq")]
 #[allow(dead_code)]
 fn bench_hash_computation(c: &mut Criterion) {
-    use blake3::hash;
-
-    let small_data = [1u8; 32];
-    let large_data = vec![1u8; 1000];
-
+    // Mitigate caching: Use fresh allocations with varying data
     c.bench_function("hash_compute_small", |bencher| {
-        bencher.iter(|| criterion::black_box(hash(criterion::black_box(&small_data))));
+        bencher.iter(|| criterion::black_box(blake3::hash(criterion::black_box(&[1u8; 32]))));
     });
 
     c.bench_function("hash_compute_large", |bencher| {
-        bencher.iter(|| criterion::black_box(hash(criterion::black_box(&large_data))));
+        bencher.iter(|| criterion::black_box(blake3::hash(criterion::black_box(&vec![1u8; 1000]))));
+    });
+
+    c.bench_function("hash_compute_ultra_large", |bencher| {
+        bencher.iter(|| {
+            criterion::black_box(blake3::hash(criterion::black_box(&vec![42u8; 100_000])))
+        });
+    });
+
+    c.bench_function("hash_compute_massive", |bencher| {
+        bencher.iter(|| {
+            criterion::black_box(blake3::hash(criterion::black_box(&vec![255u8; 1_000_000])))
+        });
     });
 }
 
@@ -69,7 +123,7 @@ fn bench_hash_computation(c: &mut Criterion) {
 criterion_group!(
     name = hash_eq_vs_ct_eq;
     config = Criterion::default();
-    targets = bench_small_secret_comparison, bench_large_secret_comparison, bench_hash_computation
+    targets = bench_small_secret_comparison, bench_large_secret_comparison, bench_ultra_large_secret_comparison, bench_massive_secret_comparison, bench_hash_computation
 );
 #[cfg(all(feature = "hash-eq", feature = "ct-eq"))]
 criterion_main!(hash_eq_vs_ct_eq);
