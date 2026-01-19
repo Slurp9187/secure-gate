@@ -196,7 +196,7 @@ impl Dynamic<String> {
     pub fn ct_eq(&self, other: &Self) -> bool {
         use crate::traits::ConstantTimeEq;
         #[cfg(feature = "hash-eq")]
-        return self.eq_hash.ct_eq(&other.eq_hash).into();
+        return self.eq_hash.ct_eq(&other.eq_hash);
         #[cfg(not(feature = "hash-eq"))]
         self.inner.as_bytes().ct_eq(other.inner.as_bytes())
     }
@@ -224,7 +224,7 @@ impl Dynamic<Vec<u8>> {
     pub fn ct_eq(&self, other: &Self) -> bool {
         use crate::traits::ConstantTimeEq;
         #[cfg(feature = "hash-eq")]
-        return self.eq_hash.ct_eq(&other.eq_hash).into();
+        return self.eq_hash.ct_eq(&other.eq_hash);
         #[cfg(not(feature = "hash-eq"))]
         self.inner.as_slice().ct_eq(other.inner.as_slice())
     }

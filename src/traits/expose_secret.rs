@@ -178,7 +178,7 @@ impl<const N: usize> ExposeSecret for FixedRandom<N> {
 
     #[inline(always)]
     fn expose_secret(&self) -> &[u8] {
-        &self.0.inner.as_slice()
+        self.0.inner.as_slice()
     }
 
     #[inline(always)]
@@ -198,7 +198,7 @@ impl ExposeSecret for DynamicRandom {
 
     #[inline(always)]
     fn expose_secret(&self) -> &[u8] {
-        &self.0.inner.as_ref().as_slice()
+        self.0.inner.as_ref().as_slice()
     }
 
     #[inline(always)]
