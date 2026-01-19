@@ -106,5 +106,5 @@ mod test_dynamic_exportable_no_serde {
 
 #[test]
 fn dummy() {
-    assert!(true);
+    // No-op test
 }

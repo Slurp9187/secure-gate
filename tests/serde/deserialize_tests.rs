@@ -8,7 +8,7 @@
 // - Validation and bounds checking for encoding types
 // - Resource exhaustion resistance
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
+#[cfg(feature = "serde-deserialize")]
 use secure_gate::ExposeSecret;
 
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
@@ -122,6 +122,24 @@ fn cloneable_vec_large_deserialize() {
     assert!(result.is_ok());
     let result = result.unwrap();
     assert_eq!(result.len(), 100);
+}
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn fixed_deserialize_wrong_length() {
+    use secure_gate::Fixed;
+    // Wrong length: too short
+    let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str("[1,2,3]");
+    assert!(result.is_err());
+    // Wrong length: too long
+    let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str("[1,2,3,4,5]");
+    assert!(result.is_err());
+    // Wrong type: string
+    let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str("\"not an array\"");
+    assert!(result.is_err());
+    // Wrong type: object
+    let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str("{\"key\": \"value\"}");
+    assert!(result.is_err());
 }
 
 #[test]

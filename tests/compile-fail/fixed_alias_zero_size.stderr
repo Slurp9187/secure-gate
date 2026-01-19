@@ -1,0 +1,7 @@
+error[E0080]: index out of bounds: the length is 0 but the index is 0
+ --> tests/compile-fail/fixed_alias_zero_size.rs:3:1
+  |
+3 | fixed_alias!(ZeroKey, 0);
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed here
+  |
+  = note: this error originates in the macro `fixed_alias` (in Nightly builds, run with -Z macro-backtrace for more info)

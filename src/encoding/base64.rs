@@ -2,6 +2,7 @@
 #![cfg_attr(not(feature = "zeroize"), forbid(unsafe_code))]
 use alloc::string::String;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
 use base64::Engine;
 
 #[cfg(feature = "serde-deserialize")]
@@ -80,7 +81,7 @@ impl Base64String {
     #[inline(always)]
     pub fn byte_len(&self) -> usize {
         let len = self.0.len();
-        (len / 4) * 3 + (len % 4 == 2) as usize + (len % 4 == 3) as usize * 2
+        (len * 3) / 4
     }
 
     /// decode_to_bytes: borrowing, allocates fresh `Vec<u8>` from decoded bytes

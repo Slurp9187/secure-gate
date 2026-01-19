@@ -29,6 +29,7 @@ thiserror = "2.0"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.0"
 serde_json = "1.0"
 trybuild = "1.0.114"
 
