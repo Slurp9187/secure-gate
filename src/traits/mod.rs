@@ -70,4 +70,7 @@ pub use secure_encoding::SecureEncoding;
 #[cfg(feature = "hash-eq")]
 pub mod hash_eq;
 
+#[cfg(feature = "hash-eq")]
+pub mod byteview;
+
 // Random Generation Traits (requires `rand` feature)

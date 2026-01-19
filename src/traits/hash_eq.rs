@@ -13,6 +13,9 @@ use core::hash::Hash;
 use subtle::ConstantTimeEq;
 
 #[cfg(feature = "hash-eq")]
+use crate::traits::byteview::ByteView;
+
+#[cfg(feature = "hash-eq")]
 /// Sealed trait for wrappers that support hash-based equality.
 ///
 /// Provides read access to the fixed-size BLAKE3 digest.
@@ -20,6 +23,16 @@ use subtle::ConstantTimeEq;
 pub trait HashEqSecret: sealed::Sealed {
     /// Borrow the precomputed BLAKE3-256 digest.
     fn eq_hash(&self) -> &[u8; 32];
+
+    /// Recompute the BLAKE3 digest from current bytes.
+    ///
+    /// **Required after any mutation** (e.g., `expose_secret_mut()`).
+    /// Panics if the inner type has no byte view (use only on byte secrets).
+    ///
+    /// # Panics
+    ///
+    /// If the inner secret cannot be viewed as bytes (internal misuse).
+    fn rehash(&mut self);
 }
 
 // Specific implementations for each wrapper type
@@ -45,12 +58,18 @@ impl<T> HashEqSecret for Fixed<T> {
     fn eq_hash(&self) -> &[u8; 32] {
         &self.eq_hash
     }
+
+    fn rehash(&mut self) {
+        // Fixed secrets are immutable — mutation impossible
+        // Panic to catch bugs early
+        panic!("rehash() called on immutable Fixed secret");
+    }
 }
 #[cfg(feature = "hash-eq")]
 impl<T> PartialEq for Fixed<T> {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
-        self.eq_hash().ct_eq(other.eq_hash()).into()
+        self.eq_hash.ct_eq(&other.eq_hash).into()
     }
 }
 #[cfg(feature = "hash-eq")]
@@ -59,7 +78,7 @@ impl<T> Eq for Fixed<T> {}
 impl<T> Hash for Fixed<T> {
     #[inline(always)]
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        state.write(self.eq_hash());
+        state.write(&self.eq_hash);
     }
 }
 
@@ -69,17 +88,22 @@ use crate::Dynamic;
 #[cfg(feature = "hash-eq")]
 impl<T: ?Sized> sealed::Sealed for Dynamic<T> {}
 #[cfg(feature = "hash-eq")]
-impl<T: ?Sized> HashEqSecret for Dynamic<T> {
+impl<T: ?Sized + ByteView> HashEqSecret for Dynamic<T> {
     #[inline(always)]
     fn eq_hash(&self) -> &[u8; 32] {
         &self.eq_hash
+    }
+
+    #[inline(always)]
+    fn rehash(&mut self) {
+        self.eq_hash = *blake3::hash(self.inner.as_bytes()).as_bytes();
     }
 }
 #[cfg(feature = "hash-eq")]
 impl<T: ?Sized> PartialEq for Dynamic<T> {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
-        self.eq_hash().ct_eq(other.eq_hash()).into()
+        self.eq_hash.ct_eq(&other.eq_hash).into()
     }
 }
 #[cfg(feature = "hash-eq")]
@@ -88,7 +112,7 @@ impl<T: ?Sized> Eq for Dynamic<T> {}
 impl<T: ?Sized> Hash for Dynamic<T> {
     #[inline(always)]
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        state.write(self.eq_hash());
+        state.write(&self.eq_hash);
     }
 }
 
@@ -104,6 +128,11 @@ impl HashEqSecret for HexString {
     #[inline(always)]
     fn eq_hash(&self) -> &[u8; 32] {
         &self.0.eq_hash
+    }
+
+    fn rehash(&mut self) {
+        // HexString is typically immutable — panic on misuse
+        panic!("rehash() called on immutable HexString");
     }
 }
 #[cfg(all(feature = "hash-eq", feature = "encoding-hex"))]
@@ -133,6 +162,11 @@ impl HashEqSecret for Base64String {
     fn eq_hash(&self) -> &[u8; 32] {
         &self.0.eq_hash
     }
+
+    fn rehash(&mut self) {
+        // Base64String is typically immutable — panic on misuse
+        panic!("rehash() called on immutable Base64String");
+    }
 }
 #[cfg(all(feature = "hash-eq", feature = "encoding-base64"))]
 impl PartialEq for Base64String {
@@ -160,6 +194,11 @@ impl HashEqSecret for Bech32String {
     #[inline(always)]
     fn eq_hash(&self) -> &[u8; 32] {
         &self.inner.eq_hash
+    }
+
+    fn rehash(&mut self) {
+        // Bech32String is typically immutable — panic on misuse
+        panic!("rehash() called on immutable Bech32String");
     }
 }
 #[cfg(all(feature = "hash-eq", feature = "encoding-bech32"))]
