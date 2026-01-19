@@ -89,65 +89,105 @@ macro_rules! dynamic_generic_alias {
 macro_rules! dynamic_exportable_alias {
     // Raw Vec<u8>
     ($vis:vis $name:ident, Vec<u8>, $doc:literal) => {
-        #[cfg(feature = "serde-serialize")]
-        $vis use serde::Serialize;
+        #[doc = $doc]
+        $vis struct $name {
+            pub inner: Vec<u8>,
+        }
 
         #[cfg(feature = "serde-serialize")]
-        #[derive(Serialize)]
-        #[doc = $doc]
-        $vis struct $name(Vec<u8>);
+        impl serde::Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                self.inner.serialize(serializer)
+            }
+        }
 
         #[cfg(feature = "serde-serialize")]
         impl $crate::SerializableSecret for $name {}
 
-        #[cfg(feature = "serde-serialize")]
-        $vis type $name = $crate::Dynamic<$name>;
+        impl From<Vec<u8>> for $name {
+            fn from(v: Vec<u8>) -> Self {
+                Self { inner: v }
+            }
+        }
     };
     ($vis:vis $name:ident, Vec<u8>) => {
-        #[cfg(feature = "serde-serialize")]
-        $vis use serde::Serialize;
+        #[doc = "Dynamic exportable byte vector"]
+        $vis struct $name {
+            pub inner: Vec<u8>,
+        }
 
         #[cfg(feature = "serde-serialize")]
-        #[derive(Serialize)]
-        #[doc = "Dynamic exportable byte vector"]
-        $vis struct $name(Vec<u8>);
+        impl serde::Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                self.inner.serialize(serializer)
+            }
+        }
 
         #[cfg(feature = "serde-serialize")]
         impl $crate::SerializableSecret for $name {}
 
-        #[cfg(feature = "serde-serialize")]
-        $vis type $name = $crate::Dynamic<$name>;
+        impl From<Vec<u8>> for $name {
+            fn from(v: Vec<u8>) -> Self {
+                Self { inner: v }
+            }
+        }
     };
     // Raw String
     ($vis:vis $name:ident, String, $doc:literal) => {
-        #[cfg(feature = "serde-serialize")]
-        $vis use serde::Serialize;
+        #[doc = $doc]
+        $vis struct $name {
+            pub inner: String,
+        }
 
         #[cfg(feature = "serde-serialize")]
-        #[derive(Serialize)]
-        #[doc = $doc]
-        $vis struct $name(String);
+        impl serde::Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                self.inner.serialize(serializer)
+            }
+        }
 
         #[cfg(feature = "serde-serialize")]
         impl $crate::SerializableSecret for $name {}
 
-        #[cfg(feature = "serde-serialize")]
-        $vis type $name = $crate::Dynamic<$name>;
+        impl From<String> for $name {
+            fn from(s: String) -> Self {
+                Self { inner: s }
+            }
+        }
     };
     ($vis:vis $name:ident, String) => {
-        #[cfg(feature = "serde-serialize")]
-        $vis use serde::Serialize;
+        #[doc = "Dynamic exportable string"]
+        $vis struct $name {
+            pub inner: String,
+        }
 
         #[cfg(feature = "serde-serialize")]
-        #[derive(Serialize)]
-        #[doc = "Dynamic exportable string"]
-        $vis struct $name(String);
+        impl serde::Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                self.inner.serialize(serializer)
+            }
+        }
 
         #[cfg(feature = "serde-serialize")]
         impl $crate::SerializableSecret for $name {}
 
-        #[cfg(feature = "serde-serialize")]
-        $vis type $name = $crate::Dynamic<$name>;
+        impl From<String> for $name {
+            fn from(s: String) -> Self {
+                Self { inner: s }
+            }
+        }
     };
     // Encoded (forward to encoded Serialize)
     ($vis:vis $name:ident, $encoded:ty, $doc:literal) => {

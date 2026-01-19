@@ -204,7 +204,7 @@ assert_eq!(data_clone.expose_secret().0.len(), 129);
 use secure_gate::CloneableString;
 
 #[cfg(feature = "zeroize")]
-let pw = CloneableString::try_init_with(|| Ok("from_input".to_string()));
+let pw: Result<CloneableString, std::convert::Infallible> = CloneableString::try_init_with(|| Ok("from_input".to_string()));
 ```
 
 **Use Case**: Minimal exposure from sources.
@@ -240,20 +240,29 @@ assert_eq!(seed.expose_secret().len(), 64);
 ### Direct Generation on Core Types
 ```rust
 #[cfg(feature = "rand")]
-use secure_gate::Fixed;
-
-#[cfg(feature = "rand")]
-let key: Fixed<[u8; 32]> = Fixed::generate_random();
+{
+    use secure_gate::Fixed;
+    let key: Fixed<[u8; 32]> = Fixed::generate_random();
+}
 ```
 
 **Use Case**: Convenience without separate type.
+
+### Mutable Access
+```rust
+#[cfg(feature = "rand")]
+use secure_gate::Fixed;
+
+#[cfg(feature = "rand")]
+let mut key: Fixed<[u8; 32]> = Fixed::generate_random();
+```
 
 ## 6. Validated Encodings (Hex, Base64, Bech32)
 
 ### Hex Encoding (Immutable)
 ```rust
 #[cfg(feature = "encoding-hex")]
-use secure_gate::{SecureEncoding, ExposeSecret, encoding::hex::HexString};
+use secure_gate::{SecureEncoding, ExposeSecret, encoding::hex::HexString, Fixed};
 
 #[cfg(feature = "encoding-hex")]
 let key: Fixed<[u8; 32]> = Fixed::generate_random();
@@ -264,9 +273,10 @@ assert_eq!(hex.expose_secret().len(), 64);  // "deadbeef..." style
 **Use Case**: Read-only encoded keys.
 
 ### Hex Encoding (Mutable – Rare, but Possible)
+### Mutable Access
 ```rust
 #[cfg(feature = "encoding-hex")]
-use secure_gate::{SecureEncoding, ExposeSecret, ExposeSecretMut, encoding::hex::HexString};
+use secure_gate::{SecureEncoding, ExposeSecret, ExposeSecretMut, encoding::hex::HexString, Fixed};
 
 #[cfg(feature = "encoding-hex")]
 let mut key: Fixed<[u8; 32]> = Fixed::generate_random();
@@ -282,7 +292,7 @@ let hex = key.expose_secret().to_hex();
 use secure_gate::encoding::base64::Base64String;
 
 #[cfg(feature = "encoding-base64")]
-let validated = Base64String::new("SGVsbG8=".to_string()).expect("valid");
+let validated = Base64String::new("YWJj".to_string()).unwrap();
 ```
 
 **Use Case**: Safe input acceptance.
@@ -305,7 +315,7 @@ struct Config {
 
 #[cfg(feature = "serde-deserialize")]
 let config: Config = serde_json::from_str(r#"{
-    "api_key": [1,2,3,...,32],
+    "api_key": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32],
     "password": "secret"
 }"#).unwrap();
 ```
@@ -329,12 +339,27 @@ let hex_key: HexString = serde_json::from_str(r#""deadbeef""#).unwrap();  // Val
 ```rust
 #[cfg(feature = "serde-serialize")]
 use secure_gate::{Fixed, SerializableSecret};
+#[cfg(feature = "serde-serialize")]
+use serde::Serialize;
 
 #[cfg(feature = "serde-serialize")]
-impl SerializableSecret for [u8; 32] {}  // Explicit opt-in
+struct MyKey([u8; 32]);
 
 #[cfg(feature = "serde-serialize")]
-let key: Fixed<[u8; 32]> = Fixed::new([0u8; 32]);
+impl Serialize for MyKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde-serialize")]
+impl SerializableSecret for MyKey {}  // Explicit opt-in
+
+#[cfg(feature = "serde-serialize")]
+let key: Fixed<MyKey> = Fixed::new(MyKey([0u8; 32]));
 let json = serde_json::to_string(&key).unwrap();
 ```
 
@@ -343,14 +368,12 @@ let json = serde_json::to_string(&key).unwrap();
 ### Encoding Export (With Marker)
 ```rust
 #[cfg(all(feature = "serde-serialize", feature = "encoding-hex"))]
-use secure_gate::encoding::hex::HexString;
-
-#[cfg(all(feature = "serde-serialize", feature = "encoding-hex"))]
-impl SerializableSecret for String {}  // Opt-in for strings
+use secure_gate::{encoding::hex::HexString, ExportableString};
 
 #[cfg(all(feature = "serde-serialize", feature = "encoding-hex"))]
 let hex = HexString::new("deadbeef".to_string()).unwrap();
-let json = serde_json::to_string(&hex).unwrap();  // "deadbeef"
+let exportable: ExportableString = hex.into();
+let json = serde_json::to_string(&exportable).unwrap(); // → "\"deadbeef\""
 ```
 
 **Use Case**: Readable export.
@@ -393,7 +416,7 @@ assert_eq!(use_random(&key), 32);
 
 ## 10. All Macros (with Options)
 
-### Fixed (Stack) Aliases
+### fixed_alias! - Fixed (Stack) Aliases
 ```rust
 use secure_gate::fixed_alias;
 
@@ -406,7 +429,7 @@ let key: Aes256Key = [0u8; 32].into();
 let api_key: ApiKey = [0u8; 32].into();
 ```
 
-### Generic Fixed (Stack) Buffers
+### fixed_generic_alias! - Generic Fixed (Stack) Buffers
 ```rust
 use secure_gate::fixed_generic_alias;
 
@@ -416,7 +439,7 @@ fixed_generic_alias!(pub(crate) Buffer);  // Default doc
 let buffer32 = SecureBuffer::<32>::new([0u8; 32]);
 ```
 
-### Dynamic (Heap) Aliases
+### dynamic_alias! - Dynamic (Heap) Aliases
 ```rust
 use secure_gate::dynamic_alias;
 
@@ -429,17 +452,17 @@ let pw: Password = "hunter2".into();
 let token: Token = vec![0u8; 16].into();
 ```
 
-### Generic Dynamic (Heap)
+### dynamic_generic_alias! - Generic Dynamic (Heap)
 ```rust
 use secure_gate::dynamic_generic_alias;
 
 dynamic_generic_alias!(pub SecureVec, Vec<u8>, "Generic heap payload");
-dynamic_generic_alias!(pub(crate) Token);  // Default doc
+dynamic_generic_alias!(pub(crate) Token, Vec<u8>);  // Default doc
 
 let vec: SecureVec = vec![0u8; 128].into();
 ```
 
-### Random-Only Fixed Aliases (Requires `rand`)
+### fixed_alias_random! - Random-Only Fixed Aliases (Requires `rand`)
 ```rust
 #[cfg(feature = "rand")]
 use secure_gate::fixed_alias_random;
@@ -457,23 +480,77 @@ let master = MasterKey::generate();
 let session = SessionKey::generate();
 ```
 
-### Exportable (Serializable) Aliases (Requires `serde-serialize`)
+### fixed_exportable_alias! - Fixed Exportable (Serializable) Aliases (Requires `serde-serialize`)
 ```rust
 #[cfg(feature = "serde-serialize")]
-use secure_gate::exportable_alias;
+use secure_gate::{fixed_exportable_alias, Fixed};
 
 #[cfg(feature = "serde-serialize")]
-exportable_alias!(pub ExportableApiKey, [u8; 32]);
-#[cfg(feature = "serde-serialize")]
-exportable_alias!(pub ExportableHexToken, encoding::hex::HexString, "Exportable hex token");
-#[cfg(feature = "serde-serialize")]
-exportable_alias!(ExportableNonce, FixedRandom<24>);  // Private
+fixed_exportable_alias!(pub ExportableApiKey, 32);
 
-let key: ExportableApiKey = [0u8; 32].into();
+let key: Fixed<ExportableApiKey> = Fixed::new(ExportableApiKey([0u8; 32]));
+// Can be serialized with serde
+```
+
+```rust
+#[cfg(feature = "serde-serialize")]
+use secure_gate::{fixed_exportable_alias, Fixed};
+
+#[cfg(feature = "serde-serialize")]
+fixed_exportable_alias!(pub ExportableKey, 32, "Serializable API key");
+
+let key: Fixed<ExportableKey> = Fixed::new(ExportableKey([0u8; 32]));
+// Can be serialized with serde
+```
+
+### dynamic_exportable_alias! - Dynamic Exportable (Serializable) Aliases (Requires `serde-serialize`)
+```rust
+#[cfg(feature = "serde-serialize")]
+use secure_gate::{dynamic_exportable_alias, Dynamic};
+
+#[cfg(feature = "serde-serialize")]
+dynamic_exportable_alias!(pub ExportablePassword, String);
+
+// Raw types
+let pw: Dynamic<ExportablePassword> = Dynamic::new(ExportablePassword::from("secret".to_string()));
+// Can be serialized with serde
+```
+
+```rust
+#[cfg(feature = "serde-serialize")]
+use secure_gate::{dynamic_exportable_alias, Dynamic};
+
+#[cfg(feature = "serde-serialize")]
+dynamic_exportable_alias!(pub ExportableToken, Vec<u8>, "Serializable token");
+
+let token: Dynamic<ExportableToken> = Dynamic::new(ExportableToken::from(vec![0u8; 16]));
+// Can be serialized with serde
+```
+
+```rust,ignore
+#[cfg(all(feature = "serde-serialize", feature = "encoding-hex"))]
+use secure_gate::{Dynamic, encoding::hex::HexString};
+
+#[cfg(all(feature = "serde-serialize", feature = "encoding-hex"))]
+type ExportableHex = Dynamic<HexString>;
+
+#[cfg(all(feature = "serde-serialize", feature = "encoding-hex"))]
+impl serde::Serialize for ExportableHex {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.expose_secret().expose_secret().serialize(serializer)
+    }
+}
+
+#[cfg(feature = "encoding-hex")]
+let hex: ExportableHex = HexString::new("deadbeef".to_string()).unwrap().into();
+// Serializes as encoded string
 ```
 
 **Use Case**: Semantic + serializable types.
 
 ---
 
-These examples possibly cover about 95% of real-world usage.
+These examples should cover about 90-95% of real-world usage.

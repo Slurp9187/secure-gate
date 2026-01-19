@@ -189,33 +189,52 @@ macro_rules! fixed_alias_random {
 #[macro_export]
 macro_rules! fixed_exportable_alias {
     ($vis:vis $name:ident, $size:literal, $doc:literal) => {
-        #[cfg(feature = "serde-serialize")]
-        $vis use serde::Serialize;
+        #[doc = $doc]
+        $vis struct $name {
+            pub inner: [u8; $size],
+        }
 
         #[cfg(feature = "serde-serialize")]
-        #[derive(Serialize)]
-        #[doc = $doc]
-        $vis struct $name([u8; $size]);
+        impl serde::Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                self.inner.serialize(serializer)
+            }
+        }
 
         #[cfg(feature = "serde-serialize")]
         impl $crate::SerializableSecret for $name {}
 
-        #[cfg(feature = "serde-serialize")]
-        $vis type $name = $crate::Fixed<$name>;
+        impl From<[u8; $size]> for $name {
+            fn from(arr: [u8; $size]) -> Self {
+                Self { inner: arr }
+            }
+        }
     };
     ($vis:vis $name:ident, $size:literal) => {
-        #[cfg(feature = "serde-serialize")]
-        $vis use serde::Serialize;
+        $vis struct $name {
+            pub inner: [u8; $size],
+        }
 
         #[cfg(feature = "serde-serialize")]
-        #[derive(Serialize)]
-        #[doc = concat!("Fixed-size exportable secret (", stringify!($size), " bytes)")]
-        $vis struct $name([u8; $size]);
+        impl serde::Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                self.inner.serialize(serializer)
+            }
+        }
 
         #[cfg(feature = "serde-serialize")]
         impl $crate::SerializableSecret for $name {}
 
-        #[cfg(feature = "serde-serialize")]
-        $vis type $name = $crate::Fixed<$name>;
+        impl From<[u8; $size]> for $name {
+            fn from(arr: [u8; $size]) -> Self {
+                Self { inner: arr }
+            }
+        }
     };
 }

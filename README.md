@@ -377,6 +377,8 @@ Load secrets from JSON/TOML/YAML or serialize raw secrets with explicit opt-in v
     // For encoded strings: Manual forwarding (no automatic Serialize)
     #[cfg(feature = "encoding-hex")]
     {
+        use secure_gate::{HexString, ExportableString};
+        use serde_json;
         let hex = HexString::new("cafebabe".to_string()).unwrap();
         let exportable: ExportableString = hex.into(); // Keeps as encoded string
         let json = serde_json::to_string(&exportable).unwrap(); // → "\"cafebabe\""
@@ -461,8 +463,23 @@ For opt-in serialization of raw secrets (requires deliberate conversion):
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::fixed_exportable_alias;
-    fixed_exportable_alias!(pub SerializableKey, 32); // Generates ExportableArray<32>
+    use secure_gate::SerializableSecret;
+    use serde::Serialize;
+
+    pub struct SerializableKeyInner(pub [u8; 32]);
+
+    impl Serialize for SerializableKeyInner {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.0.serialize(serializer)
+        }
+    }
+
+    impl SerializableSecret for SerializableKeyInner {}
+
+    pub type SerializableKey = secure_gate::Fixed<SerializableKeyInner>;
 }
 ```
 
@@ -471,8 +488,24 @@ With custom documentation:
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::fixed_exportable_alias;
-    fixed_exportable_alias!(pub ExportableToken, 16, "Serializable 16-byte token");
+    use secure_gate::SerializableSecret;
+    use serde::Serialize;
+
+    pub struct ExportableTokenInner(pub [u8; 16]);
+
+    impl Serialize for ExportableTokenInner {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.0.serialize(serializer)
+        }
+    }
+
+    impl SerializableSecret for ExportableTokenInner {}
+
+    #[doc = "Serializable 16-byte token"]
+    pub type ExportableToken = secure_gate::Fixed<ExportableTokenInner>;
 }
 ```
 
@@ -481,10 +514,49 @@ For dynamic types:
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::dynamic_exportable_alias;
-    dynamic_exportable_alias!(pub RawPassword, String); // Generates ExportableString
-    dynamic_exportable_alias!(pub RawData, Vec<u8>); // Generates ExportableVec
-    dynamic_exportable_alias!(pub EncodedKey, secure_gate::HexString); // Forwards encoded string
+    use secure_gate::SerializableSecret;
+    use serde::Serialize;
+
+    pub struct RawPasswordInner(pub String);
+
+    impl Serialize for RawPasswordInner {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.0.serialize(serializer)
+        }
+    }
+
+    impl SerializableSecret for RawPasswordInner {}
+
+    pub type RawPassword = secure_gate::Dynamic<RawPasswordInner>;
+}
+
+#[cfg(feature = "serde-serialize")]
+{
+    use secure_gate::SerializableSecret;
+    use serde::Serialize;
+
+    pub struct RawDataInner(pub Vec<u8>);
+
+    impl Serialize for RawDataInner {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.0.serialize(serializer)
+        }
+    }
+
+    impl SerializableSecret for RawDataInner {}
+
+    pub type RawData = secure_gate::Dynamic<RawDataInner>;
+}
+
+#[cfg(feature = "serde-serialize")]
+{
+    pub type EncodedKey = secure_gate::Dynamic<secure_gate::HexString>;
 }
 ```
 
@@ -493,8 +565,24 @@ With custom documentation:
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::dynamic_exportable_alias;
-    dynamic_exportable_alias!(pub SerializableBlob, Vec<u8>, "Serializable raw byte blob");
+    use secure_gate::SerializableSecret;
+    use serde::Serialize;
+
+    pub struct SerializableBlobInner(pub Vec<u8>);
+
+    impl Serialize for SerializableBlobInner {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.0.serialize(serializer)
+        }
+    }
+
+    impl SerializableSecret for SerializableBlobInner {}
+
+    #[doc = "Serializable raw byte blob"]
+    pub type SerializableBlob = secure_gate::Dynamic<SerializableBlobInner>;
 }
 ```
 
