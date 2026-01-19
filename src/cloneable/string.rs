@@ -14,7 +14,6 @@ pub struct CloneableStringInner(pub String);
 
 impl crate::CloneSafe for CloneableStringInner {}
 
-#[cfg(feature = "serde-serialize")]
 /// A string wrapped as a cloneable secret.
 ///
 /// This type provides a secure wrapper around a `String` that can be safely cloned
