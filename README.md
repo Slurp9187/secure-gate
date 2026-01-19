@@ -348,38 +348,49 @@ Available on `Fixed<[u8; N]>` and `Dynamic<T>` where `T: AsRef<[u8]>`.
 
 ## Serde Support
 
-Load secrets from JSON/TOML/YAML or serialize them with explicit opt-in via split features:
+⚠️ **Security Warning**: Serialization can permanently expose secrets. Only use for secure, trusted contexts (e.g., encrypted config files). Prefer encoded forms. Audit all opt-ins with `grep -r "SerializableSecret\|Exportable"`.
+
+Load secrets from JSON/TOML/YAML or serialize raw secrets with explicit opt-in via `Exportable*` types (requires `"serde-serialize"`):
 
 ```rust
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
 {
-    use secure_gate::{Fixed, SerializableSecret, ExposeSecret};
+    use secure_gate::{Fixed, ExportableArray, ExportableVec, ExportableString, ExposeSecret};
     use serde_json;
 
-    // Deserialize (enabled with serde-deserialize)
-    let secret: Fixed<[u8; 32]> = serde_json::from_str(r#"[1,2,3,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]"#).unwrap();
+    // Deserialize: Load raw secrets into core wrappers (safe, no leaks)
+    let secret: Fixed<[u8; 4]> = serde_json::from_str(r#"[1,2,3,4]"#).unwrap();
 
-    // Serialize (enabled with serde-serialize, gated by SerializableSecret marker - no blanket impls)
-    // Define a newtype to avoid orphan rules in this example
-    #[derive(serde::Deserialize, serde::Serialize)]
-    struct MySecret([u8; 32]);
-    impl SerializableSecret for MySecret {}
+    // Serialize: Convert to Exportable* for raw output, then serialize
+    let exportable: ExportableArray<4> = secret.into(); // Explicit conversion for audit
+    let json = serde_json::to_string(&exportable).unwrap(); // → "[1,2,3,4]"
 
-    let secret: Fixed<MySecret> = Fixed::new(MySecret([1u8; 32]));
-    let json = serde_json::to_string(&secret).unwrap();
+    // For encoded → raw: Decode during conversion
+    #[cfg(feature = "encoding-hex")]
+    {
+        use secure_gate::encoding::hex::HexString;
+        let hex = HexString::new("deadbeef".to_string()).unwrap();
+        let exportable: ExportableVec = hex.into(); // Decodes to raw bytes
+        let json = serde_json::to_string(&exportable).unwrap(); // → "[222,173,190,239]"
+    }
 
-    // Cloneable types can serialize since their inners implement SerializableSecret
-    let string_secret = secure_gate::CloneableString::from("password".to_string());
-    let json_string = serde_json::to_string(&string_secret).unwrap();
+    // For encoded strings: Manual forwarding (no automatic Serialize)
+    #[cfg(feature = "encoding-hex")]
+    {
+        let hex = HexString::new("cafebabe".to_string()).unwrap();
+        let exportable: ExportableString = hex.into(); // Keeps as encoded string
+        let json = serde_json::to_string(&exportable).unwrap(); // → "\"cafebabe\""
+    }
 }
 ```
 
 ### Security Considerations
-- **Deserialize** (`serde-deserialize`): Loads from trusted sources only; invalid inputs are zeroized if `zeroize` enabled
-- **Serialize** (`serde-serialize`): Requires explicit `SerializableSecret` impl for all types - grep for `SerializableSecret` to audit all serialization points; prevents accidental exfiltration
-- **No automatic serialization**: No blanket implementations; even primitive types require explicit marking to prevent accidental leaks
-- **No string/vector leaks**: String/vector secrets don't serialize by default (like `secrecy` crate)
-- **Marker trait**: `SerializableSecret` ensures serialization is intentional and audited
+- **Deserialize** (`serde-deserialize`): Loads from trusted sources; invalid inputs zeroized if `zeroize` enabled
+- **Serialize** (`serde-serialize`): Raw secrets only via `Exportable*` (opt-in). No direct Serialize on encoded/core types to prevent leaks
+- **Exportable* types**: Deliberate conversions for raw output; no encoded auto-leakage
+- **Audit points**: Grep for `Exportable*`, `SerializableSecret`, `fixed_exportable_alias!`, `dynamic_exportable_alias!`
+- **No accidental exfiltration**: Encoded types serialize only encoded strings (manual); raw requires export
+- **Zeroize on errors**: Invalid deserializes are wiped if `zeroize` enabled
 
 ## Macros
 
@@ -443,8 +454,53 @@ With custom documentation:
 }
 ```
 
+### Exportable Aliases (`serde-serialize` feature)
 
-These macros create type aliases to `Fixed<[u8; N]>`, `Dynamic<T>`, `FixedRandom<N>`, or their generic counterparts, inheriting all methods and security guarantees.
+For opt-in serialization of raw secrets (requires deliberate conversion):
+
+```rust
+#[cfg(feature = "serde-serialize")]
+{
+    use secure_gate::fixed_exportable_alias;
+    fixed_exportable_alias!(pub SerializableKey, 32); // Generates ExportableArray<32>
+}
+```
+
+With custom documentation:
+
+```rust
+#[cfg(feature = "serde-serialize")]
+{
+    use secure_gate::fixed_exportable_alias;
+    fixed_exportable_alias!(pub ExportableToken, 16, "Serializable 16-byte token");
+}
+```
+
+For dynamic types:
+
+```rust
+#[cfg(feature = "serde-serialize")]
+{
+    use secure_gate::dynamic_exportable_alias;
+    dynamic_exportable_alias!(pub RawPassword, String); // Generates ExportableString
+    dynamic_exportable_alias!(pub RawData, Vec<u8>); // Generates ExportableVec
+    dynamic_exportable_alias!(pub EncodedKey, secure_gate::HexString); // Forwards encoded string
+}
+```
+
+With custom documentation:
+
+```rust
+#[cfg(feature = "serde-serialize")]
+{
+    use secure_gate::dynamic_exportable_alias;
+    dynamic_exportable_alias!(pub SerializableBlob, Vec<u8>, "Serializable raw byte blob");
+}
+```
+
+⚠️ **Warning**: These macros create types that serialize raw secrets. Only use for deliberate exports in secure contexts. Grep for macro calls during audits.
+
+These macros create type aliases to `Fixed<[u8; N]>`, `Dynamic<T>`, `FixedRandom<N>`, `ExportableArray<N>`, `ExportableVec`, `ExportableString`, or their generated counterparts, inheriting all methods and security guarantees.
 
 ## Memory Guarantees (`zeroize` enabled)
 
@@ -480,7 +536,7 @@ To maximize the security of your application when using `secure-gate`, adhere to
 - **Minimize secret exposures**: Audit your code for `.expose_secret()` calls; keep them minimal, logged, and justified. Avoid unnecessary or prolonged exposures.
 - **Restrict cloning**: Only clone when necessary. Prefer built-in `Cloneable*` types; be cautious with custom `CloneSafe` implementations.
 - **Conservative feature usage**: Enable only the features you need (e.g., specific encodings) to reduce attack surface.
-- **Explicitly mark serializable types**: Only implement `SerializableSecret` for types that must be serialized with `serde-serialize`; audit all impls during code reviews to prevent accidental exfiltration.
+- **Audit serialization opt-ins**: Grep for `SerializableSecret`, `Exportable*`, `fixed_exportable_alias!`, `dynamic_exportable_alias!` to find all serialization points; only use `Exportable*` for deliberate raw secret exports in secure contexts (e.g., encrypted configs).
 - **Regular review**: Periodically audit your secret handling logic, especially after dependency updates.
 - **Security considerations**: Refer to [SECURITY.md](SECURITY.md) for detailed security considerations.
 

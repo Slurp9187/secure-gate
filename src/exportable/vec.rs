@@ -230,7 +230,8 @@ impl From<crate::cloneable::CloneableVec> for ExportableVec {
 #[cfg(all(feature = "serde-serialize", feature = "rand"))]
 impl From<crate::random::DynamicRandom> for ExportableVec {
     fn from(value: crate::random::DynamicRandom) -> Self {
-        let vec = *value.into_inner();
+        let crate::Dynamic(boxed) = value.0;
+        let vec = *boxed;
         Self::from(vec)
     }
 }

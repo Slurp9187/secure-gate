@@ -229,12 +229,3 @@ impl<const N: usize> core::convert::From<crate::CloneableArray<N>> for Exportabl
         crate::Fixed::new(ExportableArrayInner(array))
     }
 }
-
-#[cfg(all(feature = "serde-serialize", feature = "rand"))]
-#[cfg(feature = "serde-serialize")]
-impl<const N: usize> core::convert::From<crate::Fixed<[u8; N]>> for ExportableArray<N> {
-    fn from(value: crate::Fixed<[u8; N]>) -> Self {
-        let array = *value.expose_secret();
-        crate::Fixed::new(ExportableArrayInner(array))
-    }
-}

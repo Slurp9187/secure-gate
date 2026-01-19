@@ -11,34 +11,61 @@ use secure_gate::ExposeSecret;
 use secure_gate::SerializableSecret;
 
 #[cfg(feature = "serde-serialize")]
-impl SerializableSecret for String {}
-
-#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize", feature = "encoding-hex"))]
 #[test]
-fn hex_string_serde_roundtrip() {
-    use secure_gate::encoding::hex::HexString;
-    let original = HexString::new("deadbeef".to_string()).unwrap();
+fn exportable_array_serialize() {
+    use secure_gate::ExportableArray;
+    let original: ExportableArray<4> = [1, 2, 3, 4].into();
     let serialized = serde_json::to_string(&original).unwrap();
-    let deserialized: HexString = serde_json::from_str(&serialized).unwrap();
-    assert_eq!(original.expose_secret(), deserialized.expose_secret());
+    // Should serialize as raw byte array
+    assert_eq!(serialized, "[1,2,3,4]");
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize", feature = "encoding-base64"))]
+#[cfg(feature = "serde-serialize")]
+#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
 #[test]
-fn base64_string_serde_roundtrip() {
-    use secure_gate::encoding::base64::Base64String;
-    let original = Base64String::new("SGVsbG8gV29ybGQ".to_string()).unwrap(); // "Hello World" base64
+fn exportable_array_roundtrip() {
+    use secure_gate::{ExportableArray, ExposeSecret, Fixed};
+    let original: ExportableArray<4> = [1, 2, 3, 4].into();
     let serialized = serde_json::to_string(&original).unwrap();
-    let deserialized: Base64String = serde_json::from_str(&serialized).unwrap();
-    assert_eq!(original.expose_secret(), deserialized.expose_secret());
+    assert_eq!(serialized, "[1,2,3,4]");
+    let deserialized: Fixed<[u8; 4]> = serde_json::from_str(&serialized).unwrap();
+    assert_eq!(deserialized.expose_secret(), &[1, 2, 3, 4]);
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize", feature = "encoding-bech32"))]
+#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
 #[test]
-fn bech32_string_serde_roundtrip() {
-    use secure_gate::encoding::bech32::Bech32String;
-    let original = Bech32String::new("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq".to_string()).unwrap();
+fn exportable_vec_roundtrip() {
+    use secure_gate::{Dynamic, ExportableVec, ExposeSecret};
+    let original: ExportableVec = vec![1, 2, 3].into();
     let serialized = serde_json::to_string(&original).unwrap();
-    let deserialized: Bech32String = serde_json::from_str(&serialized).unwrap();
-    assert_eq!(original.expose_secret(), deserialized.expose_secret());
+    assert_eq!(serialized, "[1,2,3]");
+    let deserialized: Dynamic<Vec<u8>> = serde_json::from_str(&serialized).unwrap();
+    assert_eq!(deserialized.expose_secret(), &[1, 2, 3]);
+}
+
+#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
+#[test]
+fn exportable_string_roundtrip() {
+    use secure_gate::{Dynamic, ExportableString, ExposeSecret};
+    let original: ExportableString = "hello".into();
+    let serialized = serde_json::to_string(&original).unwrap();
+    assert_eq!(serialized, "\"hello\"");
+    let deserialized: Dynamic<String> = serde_json::from_str(&serialized).unwrap();
+    assert_eq!(deserialized.expose_secret(), "hello");
+}
+
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "serde-serialize",
+    feature = "encoding-hex"
+))]
+#[test]
+fn exportable_from_encoded_roundtrip() {
+    use secure_gate::{encoding::hex::HexString, ExportableVec, ExposeSecret};
+    let hex = HexString::new("deadbeef".to_string()).unwrap();
+    let exportable: ExportableVec = hex.into();
+    let serialized = serde_json::to_string(&exportable).unwrap();
+    assert_eq!(serialized, "[222,173,190,239]"); // Raw bytes of "deadbeef"
+    let deserialized: secure_gate::Dynamic<Vec<u8>> = serde_json::from_str(&serialized).unwrap();
+    assert_eq!(deserialized.expose_secret(), &[222, 173, 190, 239]);
 }
