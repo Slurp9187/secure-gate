@@ -108,8 +108,15 @@ impl From<String> for CloneableString {
 }
 
 impl From<&str> for CloneableString {
-    fn from(value: &str) -> Self {
-        Self::from(value.to_string())
+    fn from(s: &str) -> Self {
+        let inner = CloneableStringInner(s.to_string());
+        let mut secret = Dynamic::new(inner);
+        #[cfg(feature = "hash-eq")]
+        {
+            use blake3::hash;
+            secret.eq_hash = *hash(s.as_bytes()).as_bytes();
+        }
+        secret
     }
 }
 

@@ -64,7 +64,7 @@ use subtle::ConstantTimeEq;
 pub struct Dynamic<T: ?Sized> {
     pub(crate) inner: Box<T>,
     #[cfg(feature = "hash-eq")]
-    eq_hash: [u8; 32],
+    pub(crate) eq_hash: [u8; 32],
 }
 
 impl<T: ?Sized> Dynamic<T> {

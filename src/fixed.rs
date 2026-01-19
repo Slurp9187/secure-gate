@@ -58,7 +58,7 @@ use crate::FromSliceError;
 pub struct Fixed<T> {
     pub(crate) inner: T,
     #[cfg(feature = "hash-eq")]
-    eq_hash: [u8; 32],
+    pub(crate) eq_hash: [u8; 32],
 }
 
 impl<T> Fixed<T> {

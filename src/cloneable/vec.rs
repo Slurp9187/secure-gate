@@ -97,14 +97,28 @@ impl CloneableVec {
 /// Wrap a `Vec<u8>` in a `CloneableVec`.
 impl From<Vec<u8>> for CloneableVec {
     fn from(value: Vec<u8>) -> Self {
-        Dynamic::new(CloneableVecInner(value))
+        let inner = CloneableVecInner(value.clone());
+        let mut secret = Dynamic::new(inner);
+        #[cfg(feature = "hash-eq")]
+        {
+            use blake3::hash;
+            secret.eq_hash = *hash(value.as_slice()).as_bytes();
+        }
+        secret
     }
 }
 
 /// Wrap a byte slice in a `CloneableVec`.
 impl From<&[u8]> for CloneableVec {
-    fn from(value: &[u8]) -> Self {
-        Self::from(value.to_vec())
+    fn from(slice: &[u8]) -> Self {
+        let inner = CloneableVecInner(slice.to_vec());
+        let mut secret = Dynamic::new(inner);
+        #[cfg(feature = "hash-eq")]
+        {
+            use blake3::hash;
+            secret.eq_hash = *hash(slice).as_bytes();
+        }
+        secret
     }
 }
 

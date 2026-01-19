@@ -19,7 +19,7 @@ pub struct CloneableArrayInner<const N: usize>(pub [u8; N]);
 
 impl<const N: usize> AsRef<[u8]> for CloneableArrayInner<N> {
     fn as_ref(&self) -> &[u8] {
-        &self.0
+        &self.0[..]
     }
 }
 
@@ -110,7 +110,14 @@ impl<const N: usize> CloneableArray<N> {
 impl<const N: usize> From<[u8; N]> for CloneableArray<N> {
     /// Wrap a `[u8; N]` array in a `CloneableArray`.
     fn from(arr: [u8; N]) -> Self {
-        Fixed::new(CloneableArrayInner(arr))
+        #[cfg(feature = "hash-eq")]
+        use blake3::hash;
+        let mut s = Fixed::new(CloneableArrayInner(arr));
+        #[cfg(feature = "hash-eq")]
+        {
+            s.eq_hash = *hash(arr.as_slice()).as_bytes();
+        }
+        s
     }
 }
 
