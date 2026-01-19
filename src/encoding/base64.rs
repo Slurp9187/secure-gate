@@ -108,34 +108,6 @@ impl Base64String {
     }
 }
 
-// Equality for base64 strings – uses hash-eq when enabled, else ct-eq or string comparison
-impl PartialEq for Base64String {
-    fn eq(&self, other: &Self) -> bool {
-        #[cfg(feature = "hash-eq")]
-        {
-            use crate::ConstantTimeEq;
-            self.0.eq_hash.ct_eq(&other.0.eq_hash).into()
-        }
-        #[cfg(not(feature = "hash-eq"))]
-        {
-            #[cfg(feature = "ct-eq")]
-            {
-                use crate::traits::ConstantTimeEq;
-                self.0
-                    .expose_secret()
-                    .as_bytes()
-                    .ct_eq(other.0.expose_secret().as_bytes())
-            }
-            #[cfg(not(feature = "ct-eq"))]
-            {
-                self.0.expose_secret() == other.0.expose_secret()
-            }
-        }
-    }
-}
-
-impl Eq for Base64String {}
-
 /// Debug implementation (always redacted).
 impl core::fmt::Debug for Base64String {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

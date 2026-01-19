@@ -67,4 +67,7 @@ pub mod secure_encoding;
 ))]
 pub use secure_encoding::SecureEncoding;
 
+#[cfg(feature = "hash-eq")]
+pub mod hash_eq;
+
 // Random Generation Traits (requires `rand` feature)

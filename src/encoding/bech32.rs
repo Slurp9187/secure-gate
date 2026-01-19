@@ -143,38 +143,6 @@ impl Bech32String {
     }
 }
 
-/// Equality for Bech32 strings – uses hash-eq when enabled, else ct-eq or string comparison
-impl PartialEq for Bech32String {
-    fn eq(&self, other: &Self) -> bool {
-        if self.variant != other.variant {
-            return false;
-        }
-        #[cfg(feature = "hash-eq")]
-        {
-            use crate::ConstantTimeEq;
-            self.inner.eq_hash.ct_eq(&other.inner.eq_hash).into()
-        }
-        #[cfg(not(feature = "hash-eq"))]
-        {
-            #[cfg(feature = "ct-eq")]
-            {
-                use crate::traits::ConstantTimeEq;
-                self.inner
-                    .expose_secret()
-                    .as_bytes()
-                    .ct_eq(other.inner.expose_secret().as_bytes())
-            }
-            #[cfg(not(feature = "ct-eq"))]
-            {
-                self.inner.expose_secret() == other.inner.expose_secret()
-            }
-        }
-    }
-}
-
-/// Equality implementation.
-impl Eq for Bech32String {}
-
 /// Debug implementation (always redacted).
 impl core::fmt::Debug for Bech32String {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

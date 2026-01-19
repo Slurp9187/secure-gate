@@ -14,9 +14,6 @@ use serde::ser::Serializer;
 #[cfg(feature = "hash-eq")]
 use blake3::hash;
 
-#[cfg(feature = "hash-eq")]
-use crate::ConstantTimeEq;
-
 /// Heap-allocated secure secret wrapper.
 ///
 /// This is a thin wrapper around `Box<T>` with enforced explicit exposure.
@@ -315,25 +312,5 @@ where
         S: Serializer,
     {
         self.inner.serialize(serializer)
-    }
-}
-
-/// Hash-based equality for byte-based secrets (requires hash-eq feature).
-#[cfg(feature = "hash-eq")]
-impl<T: ?Sized> PartialEq for Dynamic<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.eq_hash.ct_eq(&other.eq_hash).into()
-    }
-}
-
-/// Hash-based equality for byte-based secrets (requires hash-eq feature).
-#[cfg(feature = "hash-eq")]
-impl<T: ?Sized> Eq for Dynamic<T> {}
-
-/// Hash-based hashing for byte-based secrets (requires hash-eq feature).
-#[cfg(feature = "hash-eq")]
-impl<T: ?Sized> core::hash::Hash for Dynamic<T> {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        state.write(&self.eq_hash);
     }
 }

@@ -12,9 +12,6 @@ use serde::ser::Serializer;
 #[cfg(feature = "hash-eq")]
 use blake3::hash;
 
-#[cfg(feature = "hash-eq")]
-use crate::ConstantTimeEq;
-
 use crate::FromSliceError;
 
 /// Stack-allocated secure secret wrapper.
@@ -281,25 +278,5 @@ where
         S: Serializer,
     {
         self.inner.serialize(serializer)
-    }
-}
-
-/// Hash-based equality for byte-based secrets (requires hash-eq feature).
-#[cfg(feature = "hash-eq")]
-impl<T> PartialEq for Fixed<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.eq_hash.ct_eq(&other.eq_hash).into()
-    }
-}
-
-/// Hash-based equality for byte-based secrets (requires hash-eq feature).
-#[cfg(feature = "hash-eq")]
-impl<T> Eq for Fixed<T> {}
-
-/// Hash-based hashing for byte-based secrets (requires hash-eq feature).
-#[cfg(feature = "hash-eq")]
-impl<T> core::hash::Hash for Fixed<T> {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        state.write(&self.eq_hash);
     }
 }
