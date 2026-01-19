@@ -31,7 +31,7 @@ pub trait ExposeSecretMut: ExposeSecret {
 impl<const N: usize, T> ExposeSecretMut for Fixed<[T; N]> {
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut [T; N] {
-        &mut self.0
+        &mut self.inner
     }
 }
 
@@ -41,7 +41,7 @@ impl<const N: usize, T> ExposeSecretMut for Fixed<[T; N]> {
 impl ExposeSecretMut for Dynamic<String> {
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut String {
-        &mut self.0
+        &mut self.inner
     }
 }
 
@@ -51,7 +51,7 @@ impl ExposeSecretMut for Dynamic<String> {
 impl<T> ExposeSecretMut for Dynamic<Vec<T>> {
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut Vec<T> {
-        &mut self.0
+        &mut self.inner
     }
 }
 
@@ -62,16 +62,7 @@ impl<const N: usize> ExposeSecretMut
 {
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut crate::cloneable::array::CloneableArrayInner<N> {
-        &mut self.0
-    }
-}
-
-/// Implementation for [`Dynamic<CloneableStringInner>`] - provides mutable access.
-#[cfg(feature = "zeroize")]
-impl ExposeSecretMut for crate::Dynamic<crate::cloneable::string::CloneableStringInner> {
-    #[inline(always)]
-    fn expose_secret_mut(&mut self) -> &mut crate::cloneable::string::CloneableStringInner {
-        &mut self.0
+        &mut self.inner
     }
 }
 
@@ -80,7 +71,16 @@ impl ExposeSecretMut for crate::Dynamic<crate::cloneable::string::CloneableStrin
 impl ExposeSecretMut for crate::Dynamic<crate::cloneable::vec::CloneableVecInner> {
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut crate::cloneable::vec::CloneableVecInner {
-        &mut self.0
+        &mut self.inner
+    }
+}
+
+/// Implementation for [`Dynamic<CloneableStringInner>`] - provides mutable access.
+#[cfg(feature = "zeroize")]
+impl ExposeSecretMut for crate::Dynamic<crate::cloneable::string::CloneableStringInner> {
+    #[inline(always)]
+    fn expose_secret_mut(&mut self) -> &mut crate::cloneable::string::CloneableStringInner {
+        &mut self.inner
     }
 }
 
@@ -92,6 +92,6 @@ impl ExposeSecretMut for crate::Dynamic<crate::cloneable::vec::CloneableVecInner
 impl ExposeSecretMut for Fixed<u32> {
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut u32 {
-        &mut self.0
+        &mut self.inner
     }
 }

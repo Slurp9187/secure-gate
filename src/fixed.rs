@@ -9,6 +9,12 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "serde-serialize")]
 use serde::ser::Serializer;
 
+#[cfg(feature = "hash-eq")]
+use blake3::hash;
+
+#[cfg(feature = "hash-eq")]
+use subtle::ConstantTimeEq;
+
 use crate::FromSliceError;
 
 /// Stack-allocated secure secret wrapper.
@@ -49,9 +55,22 @@ use crate::FromSliceError;
 /// drop(secret); // memory wiped automatically
 /// # }
 /// ```
-pub struct Fixed<T>(pub(crate) T); // ← field is pub(crate) for trait access
+pub struct Fixed<T> {
+    pub(crate) inner: T,
+    #[cfg(feature = "hash-eq")]
+    eq_hash: [u8; 32],
+}
 
 impl<T> Fixed<T> {
+    /// Wrap a value in a `Fixed` secret.
+    ///
+    /// This is zero-cost and const-friendly.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use secure_gate::Fixed;
+    /// const SECRET: Fixed<u32> = Fixed::new(42);
     /// Wrap a value in a `Fixed` secret.
     ///
     /// This is zero-cost and const-friendly.
@@ -64,13 +83,18 @@ impl<T> Fixed<T> {
     /// ```
     #[inline(always)]
     pub const fn new(value: T) -> Self {
-        Fixed(value)
+        Fixed {
+            inner: value,
+            #[cfg(feature = "hash-eq")]
+            eq_hash: [0u8; 32], // TODO: compute hash if T: AsRef<[u8]>
+        }
     }
 }
 
 /// # Byte-array specific helpers
 impl<const N: usize> Fixed<[u8; N]> {}
 
+/// Implements `TryFrom<&[u8]>` for creating a [`Fixed`] from a byte slice of exact length.
 /// Implements `TryFrom<&[u8]>` for creating a [`Fixed`] from a byte slice of exact length.
 impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
     type Error = FromSliceError;
@@ -81,7 +105,13 @@ impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
         } else {
             let mut arr = [0u8; N];
             arr.copy_from_slice(slice);
-            Ok(Self::new(arr))
+            #[allow(unused_mut)]
+            let mut s = Self::new(arr);
+            #[cfg(feature = "hash-eq")]
+            {
+                s.eq_hash = *hash(slice).as_bytes();
+            }
+            Ok(s)
         }
     }
 }
@@ -96,10 +126,25 @@ impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
     /// ```
     /// use secure_gate::Fixed;
     /// let key: Fixed<[u8; 4]> = [1, 2, 3, 4].into();
+    /// Wrap a raw byte array in a `Fixed` secret.
+    ///
+    /// Zero-cost conversion.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use secure_gate::Fixed;
+    /// let key: Fixed<[u8; 4]> = [1, 2, 3, 4].into();
     /// ```
     #[inline(always)]
     fn from(arr: [u8; N]) -> Self {
-        Self::new(arr)
+        #[allow(unused_mut)]
+        let mut s = Self::new(arr);
+        #[cfg(feature = "hash-eq")]
+        {
+            s.eq_hash = *hash(arr.as_slice()).as_bytes();
+        }
+        s
     }
 }
 
@@ -115,7 +160,11 @@ impl<T> fmt::Debug for Fixed<T> {
 impl<T: crate::CloneSafe> Clone for Fixed<T> {
     #[inline(always)]
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        Fixed {
+            inner: self.inner.clone(),
+            #[cfg(feature = "hash-eq")]
+            eq_hash: self.eq_hash,
+        }
     }
 }
 
@@ -196,7 +245,9 @@ impl<const N: usize> Fixed<[u8; N]> {
 #[cfg(feature = "zeroize")]
 impl<T: zeroize::Zeroize> zeroize::Zeroize for Fixed<T> {
     fn zeroize(&mut self) {
-        self.0.zeroize();
+        self.inner.zeroize();
+        #[cfg(feature = "hash-eq")]
+        self.eq_hash.zeroize();
     }
 }
 
@@ -229,6 +280,26 @@ where
     where
         S: Serializer,
     {
-        self.0.serialize(serializer)
+        self.inner.serialize(serializer)
+    }
+}
+
+/// Hash-based equality for byte-based secrets (requires hash-eq feature).
+#[cfg(feature = "hash-eq")]
+impl<T> PartialEq for Fixed<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.eq_hash.ct_eq(&other.eq_hash).into()
+    }
+}
+
+/// Hash-based equality for byte-based secrets (requires hash-eq feature).
+#[cfg(feature = "hash-eq")]
+impl<T> Eq for Fixed<T> {}
+
+/// Hash-based hashing for byte-based secrets (requires hash-eq feature).
+#[cfg(feature = "hash-eq")]
+impl<T> core::hash::Hash for Fixed<T> {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        state.write(&self.eq_hash);
     }
 }

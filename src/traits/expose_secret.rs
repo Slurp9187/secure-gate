@@ -68,7 +68,7 @@ impl<const N: usize, T> ExposeSecret for Fixed<[T; N]> {
 
     #[inline(always)]
     fn expose_secret(&self) -> &[T; N] {
-        &self.0
+        &self.inner
     }
 
     #[inline(always)]
@@ -86,12 +86,12 @@ impl ExposeSecret for Dynamic<String> {
 
     #[inline(always)]
     fn expose_secret(&self) -> &String {
-        &self.0
+        &self.inner
     }
 
     #[inline(always)]
     fn len(&self) -> usize {
-        self.0.len()
+        self.inner.len()
     }
 }
 
@@ -104,12 +104,12 @@ impl<T> ExposeSecret for Dynamic<Vec<T>> {
 
     #[inline(always)]
     fn expose_secret(&self) -> &Vec<T> {
-        &self.0
+        &self.inner
     }
 
     #[inline(always)]
     fn len(&self) -> usize {
-        self.0.len()
+        self.inner.len()
     }
 }
 
@@ -122,7 +122,7 @@ impl<const N: usize> ExposeSecret
 
     #[inline(always)]
     fn expose_secret(&self) -> &crate::cloneable::array::CloneableArrayInner<N> {
-        &self.0
+        &self.inner
     }
 
     #[inline(always)]
@@ -142,12 +142,12 @@ impl ExposeSecret for crate::Dynamic<crate::cloneable::string::CloneableStringIn
 
     #[inline(always)]
     fn expose_secret(&self) -> &crate::cloneable::string::CloneableStringInner {
-        &self.0
+        &self.inner
     }
 
     #[inline(always)]
     fn len(&self) -> usize {
-        self.0 .0.len()
+        self.inner.0.len()
     }
 }
 
@@ -158,12 +158,12 @@ impl ExposeSecret for crate::Dynamic<crate::cloneable::vec::CloneableVecInner> {
 
     #[inline(always)]
     fn expose_secret(&self) -> &crate::cloneable::vec::CloneableVecInner {
-        &self.0
+        &self.inner
     }
 
     #[inline(always)]
     fn len(&self) -> usize {
-        self.0 .0.len()
+        self.inner.0.len()
     }
 }
 
@@ -178,7 +178,7 @@ impl<const N: usize> ExposeSecret for FixedRandom<N> {
 
     #[inline(always)]
     fn expose_secret(&self) -> &[u8] {
-        &self.0 .0
+        &self.0.inner.as_slice()
     }
 
     #[inline(always)]
@@ -198,12 +198,12 @@ impl ExposeSecret for DynamicRandom {
 
     #[inline(always)]
     fn expose_secret(&self) -> &[u8] {
-        &self.0 .0
+        &self.0.inner.as_ref().as_slice()
     }
 
     #[inline(always)]
     fn len(&self) -> usize {
-        self.0 .0.len()
+        self.0.inner.as_ref().len()
     }
 }
 
@@ -267,7 +267,7 @@ impl ExposeSecret for Bech32String {
 
     #[inline(always)]
     fn len(&self) -> usize {
-        self.inner.0.len()
+        self.inner.len()
     }
 }
 
@@ -281,7 +281,7 @@ impl ExposeSecret for Fixed<u32> {
 
     #[inline(always)]
     fn expose_secret(&self) -> &u32 {
-        &self.0
+        &self.inner
     }
 
     #[inline(always)]

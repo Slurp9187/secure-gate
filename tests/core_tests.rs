@@ -38,7 +38,10 @@ fn expose_secret_provides_access() {
 #[test]
 fn fixed_is_truly_zero_cost() {
     let key = Fixed::new([0u8; 32]);
+    #[cfg(not(feature = "hash-eq"))]
     assert_eq!(core::mem::size_of_val(&key), 32);
+    #[cfg(feature = "hash-eq")]
+    assert_eq!(core::mem::size_of_val(&key), 64);
 }
 
 // === Security Features ===

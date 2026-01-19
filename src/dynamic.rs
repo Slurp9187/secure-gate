@@ -11,6 +11,12 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(feature = "serde-serialize")]
 use serde::ser::Serializer;
 
+#[cfg(feature = "hash-eq")]
+use blake3::hash;
+
+#[cfg(feature = "hash-eq")]
+use subtle::ConstantTimeEq;
+
 /// Heap-allocated secure secret wrapper.
 ///
 /// This is a thin wrapper around `Box<T>` with enforced explicit exposure.
@@ -55,7 +61,11 @@ use serde::ser::Serializer;
 /// drop(secret); // heap wiped automatically
 /// # }
 /// ```
-pub struct Dynamic<T: ?Sized>(pub(crate) Box<T>);
+pub struct Dynamic<T: ?Sized> {
+    pub(crate) inner: Box<T>,
+    #[cfg(feature = "hash-eq")]
+    eq_hash: [u8; 32],
+}
 
 impl<T: ?Sized> Dynamic<T> {
     /// Wrap a value by boxing it.
@@ -66,10 +76,17 @@ impl<T: ?Sized> Dynamic<T> {
     where
         U: Into<Box<T>>,
     {
-        Dynamic(value.into())
+        let inner = value.into();
+        Self {
+            inner,
+            #[cfg(feature = "hash-eq")]
+            eq_hash: [0u8; 32],
+        }
     }
 }
 
+/// # Ergonomic helpers for common heap types
+impl Dynamic<String> {}
 /// Debug implementation (always redacted).
 impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -82,30 +99,51 @@ impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
 impl<T: crate::CloneSafe> Clone for Dynamic<T> {
     #[inline(always)]
     fn clone(&self) -> Self {
-        Dynamic(self.0.clone())
+        Self {
+            inner: self.inner.clone(),
+            #[cfg(feature = "hash-eq")]
+            eq_hash: self.eq_hash,
+        }
     }
 }
 
 /// # Additional conversions
-/// Wrap a byte slice into a [`Dynamic`] [`Vec<u8>`].
+/// Wrap a byte slice in a [`Dynamic`] [`Vec<u8>`].
 impl From<&[u8]> for Dynamic<Vec<u8>> {
     #[inline(always)]
     fn from(slice: &[u8]) -> Self {
-        Self::new(slice.to_vec())
+        #[allow(unused_mut)]
+        let mut secret = Self::new(slice.to_vec());
+        #[cfg(feature = "hash-eq")]
+        {
+            secret.eq_hash = *hash(slice).as_bytes();
+        }
+        secret
     }
 }
-
-/// # Ergonomic helpers for common heap types
-impl Dynamic<String> {}
 
 impl<T> Dynamic<Vec<T>> {}
 
 /// # Convenient From impls
 /// Wrap a value in a [`Dynamic`] secret by boxing it.
-impl<T> From<T> for Dynamic<T> {
+impl<T: 'static> From<T> for Dynamic<T> {
     #[inline(always)]
     fn from(value: T) -> Self {
-        Self(Box::new(value))
+        let mut s = Self {
+            inner: Box::new(value),
+            #[cfg(feature = "hash-eq")]
+            eq_hash: [0u8; 32],
+        };
+        #[cfg(feature = "hash-eq")]
+        {
+            use core::any::Any;
+            if let Some(d) = (&mut s as &mut dyn Any).downcast_mut::<Dynamic<Vec<u8>>>() {
+                d.eq_hash = *hash(d.inner.as_ref().as_ref()).as_bytes();
+            } else if let Some(d) = (&mut s as &mut dyn Any).downcast_mut::<Dynamic<String>>() {
+                d.eq_hash = *hash(d.inner.as_ref().as_bytes()).as_bytes();
+            }
+        }
+        s
     }
 }
 
@@ -113,15 +151,25 @@ impl<T> From<T> for Dynamic<T> {
 impl<T: ?Sized> From<Box<T>> for Dynamic<T> {
     #[inline(always)]
     fn from(boxed: Box<T>) -> Self {
-        Self(boxed)
+        Self {
+            inner: boxed,
+            #[cfg(feature = "hash-eq")]
+            eq_hash: [0u8; 32],
+        }
     }
 }
 
 /// Wrap a string slice in a [`Dynamic`] [`String`].
 impl From<&str> for Dynamic<String> {
     #[inline(always)]
-    fn from(s: &str) -> Self {
-        Self(Box::new(s.to_string()))
+    fn from(input: &str) -> Self {
+        #[allow(unused_mut)]
+        let mut secret = Self::new(input.to_string());
+        #[cfg(feature = "hash-eq")]
+        {
+            secret.eq_hash = *hash(input.as_bytes()).as_bytes();
+        }
+        secret
     }
 }
 
@@ -146,7 +194,10 @@ impl Dynamic<String> {
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
         use crate::traits::ConstantTimeEq;
-        self.0.as_bytes().ct_eq(other.0.as_bytes())
+        #[cfg(feature = "hash-eq")]
+        return self.eq_hash.ct_eq(&other.eq_hash).into();
+        #[cfg(not(feature = "hash-eq"))]
+        self.inner.as_bytes().ct_eq(other.inner.as_bytes())
     }
 }
 
@@ -171,7 +222,10 @@ impl Dynamic<Vec<u8>> {
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
         use crate::traits::ConstantTimeEq;
-        self.0.as_slice().ct_eq(other.0.as_slice())
+        #[cfg(feature = "hash-eq")]
+        return self.eq_hash.ct_eq(&other.eq_hash).into();
+        #[cfg(not(feature = "hash-eq"))]
+        self.inner.as_slice().ct_eq(other.inner.as_slice())
     }
 }
 
@@ -224,7 +278,9 @@ impl Dynamic<Vec<u8>> {
 #[cfg(feature = "zeroize")]
 impl<T: ?Sized + zeroize::Zeroize> zeroize::Zeroize for Dynamic<T> {
     fn zeroize(&mut self) {
-        self.0.zeroize();
+        self.inner.zeroize();
+        #[cfg(feature = "hash-eq")]
+        self.eq_hash.zeroize();
     }
 }
 
@@ -257,6 +313,26 @@ where
     where
         S: Serializer,
     {
-        self.0.serialize(serializer)
+        self.inner.serialize(serializer)
+    }
+}
+
+/// Hash-based equality for byte-based secrets (requires hash-eq feature).
+#[cfg(feature = "hash-eq")]
+impl<T: ?Sized> PartialEq for Dynamic<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.eq_hash.ct_eq(&other.eq_hash).into()
+    }
+}
+
+/// Hash-based equality for byte-based secrets (requires hash-eq feature).
+#[cfg(feature = "hash-eq")]
+impl<T: ?Sized> Eq for Dynamic<T> {}
+
+/// Hash-based hashing for byte-based secrets (requires hash-eq feature).
+#[cfg(feature = "hash-eq")]
+impl<T: ?Sized> core::hash::Hash for Dynamic<T> {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        state.write(&self.eq_hash);
     }
 }

@@ -123,7 +123,7 @@ impl From<crate::cloneable::CloneableString> for ExportableString {
 #[cfg(feature = "serde-serialize")]
 impl From<crate::Dynamic<alloc::string::String>> for ExportableString {
     fn from(value: crate::Dynamic<alloc::string::String>) -> Self {
-        let crate::Dynamic(boxed) = value;
+        let crate::Dynamic { inner: boxed, .. } = value;
         let s = *boxed;
         Self::from(s)
     }

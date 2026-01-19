@@ -12,6 +12,12 @@ use zeroize::Zeroize;
 #[zeroize(drop)]
 pub struct CloneableVecInner(pub Vec<u8>);
 
+impl AsRef<[u8]> for CloneableVecInner {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl crate::CloneSafe for CloneableVecInner {}
 
 /// Serde serialization support (serializes the vector).

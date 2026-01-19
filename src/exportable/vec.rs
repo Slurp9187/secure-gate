@@ -177,7 +177,7 @@ impl core::convert::From<&[u8]> for ExportableVec {
 #[cfg(feature = "serde-serialize")]
 impl From<crate::Dynamic<alloc::vec::Vec<u8>>> for ExportableVec {
     fn from(value: crate::Dynamic<alloc::vec::Vec<u8>>) -> Self {
-        let crate::Dynamic(boxed) = value;
+        let crate::Dynamic { inner: boxed, .. } = value;
         let vec = *boxed;
         Self::from(vec)
     }
@@ -193,19 +193,19 @@ impl crate::SecureEncoding for ExportableVec {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
     fn to_hex(&self) -> crate::HexString {
-        self.0.as_ref().to_hex()
+        self.inner.0.as_slice().to_hex()
     }
 
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
     fn to_hex_upper(&self) -> alloc::string::String {
-        self.0.as_ref().to_hex_upper()
+        self.inner.0.as_slice().to_hex_upper()
     }
 
     #[cfg(feature = "encoding-base64")]
     #[inline(always)]
     fn to_base64url(&self) -> crate::Base64String {
-        self.0.as_ref().to_base64url()
+        self.inner.0.as_slice().to_base64url()
     }
 
     #[cfg(feature = "encoding-bech32")]
@@ -214,7 +214,7 @@ impl crate::SecureEncoding for ExportableVec {
         &self,
         hrp: &str,
     ) -> core::result::Result<crate::Bech32String, crate::Bech32EncodingError> {
-        self.0.as_ref().try_to_bech32(hrp)
+        self.inner.0.as_slice().try_to_bech32(hrp)
     }
 
     #[cfg(feature = "encoding-bech32")]
@@ -223,7 +223,7 @@ impl crate::SecureEncoding for ExportableVec {
         &self,
         hrp: &str,
     ) -> core::result::Result<crate::Bech32String, crate::Bech32EncodingError> {
-        self.0.as_ref().try_to_bech32m(hrp)
+        self.inner.0.as_slice().try_to_bech32m(hrp)
     }
 }
 
@@ -238,7 +238,7 @@ impl From<crate::cloneable::CloneableVec> for ExportableVec {
 #[cfg(all(feature = "serde-serialize", feature = "rand"))]
 impl From<crate::random::DynamicRandom> for ExportableVec {
     fn from(value: crate::random::DynamicRandom) -> Self {
-        let crate::Dynamic(boxed) = value.0;
+        let crate::Dynamic { inner: boxed, .. } = value.0;
         let vec = *boxed;
         Self::from(vec)
     }

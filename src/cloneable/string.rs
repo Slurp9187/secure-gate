@@ -12,6 +12,12 @@ use zeroize::Zeroize;
 #[zeroize(drop)]
 pub struct CloneableStringInner(pub String);
 
+impl AsRef<[u8]> for CloneableStringInner {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
 impl crate::CloneSafe for CloneableStringInner {}
 
 /// A string wrapped as a cloneable secret.

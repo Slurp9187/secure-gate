@@ -17,6 +17,12 @@ use serde::{ser::Serializer, Serialize};
 #[zeroize(drop)]
 pub struct CloneableArrayInner<const N: usize>(pub [u8; N]);
 
+impl<const N: usize> AsRef<[u8]> for CloneableArrayInner<N> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl<const N: usize> crate::CloneSafe for CloneableArrayInner<N> {}
 
 #[cfg(feature = "serde-serialize")]
