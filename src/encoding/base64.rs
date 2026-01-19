@@ -3,6 +3,9 @@
 use alloc::string::String;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
+#[cfg(feature = "hash-eq")]
+use blake3::hash;
+
 use base64::Engine;
 
 #[cfg(feature = "serde-deserialize")]
@@ -69,7 +72,13 @@ impl Base64String {
     /// ```
     pub fn new(s: String) -> Result<Self, &'static str> {
         if URL_SAFE_NO_PAD.decode(&s).is_ok() {
-            Ok(Self(crate::Dynamic::new(s)))
+            #[allow(unused_mut)]
+            let mut result = Self(crate::Dynamic::new(s));
+            #[cfg(feature = "hash-eq")]
+            {
+                result.0.eq_hash = *hash(result.0.expose_secret().as_bytes()).as_bytes();
+            }
+            Ok(result)
         } else {
             let mut s = s;
             zeroize_input(&mut s);
@@ -99,20 +108,28 @@ impl Base64String {
     }
 }
 
-// Constant-time equality for base64 strings – prevents timing attacks when ct-eq enabled
+// Equality for base64 strings – uses hash-eq when enabled, else ct-eq or string comparison
 impl PartialEq for Base64String {
     fn eq(&self, other: &Self) -> bool {
-        #[cfg(feature = "ct-eq")]
+        #[cfg(feature = "hash-eq")]
         {
-            use crate::traits::ConstantTimeEq;
-            self.0
-                .expose_secret()
-                .as_bytes()
-                .ct_eq(other.0.expose_secret().as_bytes())
+            use crate::ConstantTimeEq;
+            self.0.eq_hash.ct_eq(&other.0.eq_hash).into()
         }
-        #[cfg(not(feature = "ct-eq"))]
+        #[cfg(not(feature = "hash-eq"))]
         {
-            self.0.expose_secret() == other.0.expose_secret()
+            #[cfg(feature = "ct-eq")]
+            {
+                use crate::traits::ConstantTimeEq;
+                self.0
+                    .expose_secret()
+                    .as_bytes()
+                    .ct_eq(other.0.expose_secret().as_bytes())
+            }
+            #[cfg(not(feature = "ct-eq"))]
+            {
+                self.0.expose_secret() == other.0.expose_secret()
+            }
         }
     }
 }

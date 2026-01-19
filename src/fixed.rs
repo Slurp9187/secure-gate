@@ -13,7 +13,7 @@ use serde::ser::Serializer;
 use blake3::hash;
 
 #[cfg(feature = "hash-eq")]
-use subtle::ConstantTimeEq;
+use crate::ConstantTimeEq;
 
 use crate::FromSliceError;
 

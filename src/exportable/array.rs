@@ -6,6 +6,9 @@
 #[cfg(feature = "zeroize")]
 use ::zeroize::Zeroize;
 
+#[cfg(feature = "hash-eq")]
+use blake3::hash;
+
 use crate::ExposeSecret;
 
 #[cfg(feature = "zeroize")]
@@ -144,7 +147,12 @@ impl<const N: usize> ExportableArray<N> {
         F: FnOnce() -> [u8; N],
     {
         let mut tmp = constructor();
-        let result = crate::Fixed::new(ExportableArrayInner(tmp));
+        #[allow(unused_mut)]
+        let mut result = crate::Fixed::new(ExportableArrayInner(tmp));
+        #[cfg(feature = "hash-eq")]
+        {
+            result.eq_hash = *hash(tmp.as_slice()).as_bytes();
+        }
         #[cfg(feature = "zeroize")]
         ::zeroize::Zeroize::zeroize(&mut tmp);
         result
@@ -155,13 +163,25 @@ impl<const N: usize> ExportableArray<N> {
 impl<const N: usize> core::convert::From<crate::Fixed<[u8; N]>> for ExportableArray<N> {
     fn from(value: crate::Fixed<[u8; N]>) -> Self {
         let array = *value.expose_secret();
-        crate::Fixed::new(ExportableArrayInner(array))
+        #[allow(unused_mut)]
+        let mut s = crate::Fixed::new(ExportableArrayInner(array));
+        #[cfg(feature = "hash-eq")]
+        {
+            s.eq_hash = *hash(array.as_slice()).as_bytes();
+        }
+        s
     }
 }
 
 impl<const N: usize> core::convert::From<[u8; N]> for ExportableArray<N> {
     fn from(value: [u8; N]) -> Self {
-        crate::Fixed::new(ExportableArrayInner(value))
+        #[allow(unused_mut)]
+        let mut s = crate::Fixed::new(ExportableArrayInner(value));
+        #[cfg(feature = "hash-eq")]
+        {
+            s.eq_hash = *hash(value.as_slice()).as_bytes();
+        }
+        s
     }
 }
 
@@ -172,7 +192,13 @@ impl<const N: usize> core::convert::TryFrom<&[u8]> for ExportableArray<N> {
         if value.len() == N {
             let mut array = [0u8; N];
             array.copy_from_slice(value);
-            Ok(crate::Fixed::new(ExportableArrayInner(array)))
+            #[allow(unused_mut)]
+            let mut s = crate::Fixed::new(ExportableArrayInner(array));
+            #[cfg(feature = "hash-eq")]
+            {
+                s.eq_hash = *hash(value).as_bytes();
+            }
+            Ok(s)
         } else {
             Err(crate::FromSliceError {
                 actual_len: value.len(),
@@ -231,6 +257,12 @@ impl<const N: usize> core::convert::From<crate::CloneableArray<N>> for Exportabl
     fn from(value: crate::CloneableArray<N>) -> Self {
         let inner = value.expose_secret();
         let array = inner.0;
-        crate::Fixed::new(ExportableArrayInner(array))
+        #[allow(unused_mut)]
+        let mut s = crate::Fixed::new(ExportableArrayInner(array));
+        #[cfg(feature = "hash-eq")]
+        {
+            s.eq_hash = *hash(array.as_slice()).as_bytes();
+        }
+        s
     }
 }

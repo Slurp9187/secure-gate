@@ -1,5 +1,8 @@
 extern crate alloc;
 
+#[cfg(feature = "hash-eq")]
+use blake3::hash;
+
 use crate::ExposeSecret;
 
 /// Inner wrapper for a string that enables opt-in serialization.
@@ -93,7 +96,12 @@ impl ExportableString {
         F: FnOnce() -> alloc::string::String,
     {
         let mut tmp = constructor();
-        let result = crate::Dynamic::new(ExportableStringInner(tmp.clone()));
+        #[allow(unused_mut)]
+        let mut result = crate::Dynamic::new(ExportableStringInner(tmp.clone()));
+        #[cfg(feature = "hash-eq")]
+        {
+            result.eq_hash = *hash(tmp.as_bytes()).as_bytes();
+        }
         #[cfg(feature = "zeroize")]
         ::zeroize::Zeroize::zeroize(&mut tmp);
         result
@@ -102,13 +110,25 @@ impl ExportableString {
 
 impl core::convert::From<alloc::string::String> for ExportableString {
     fn from(value: alloc::string::String) -> Self {
-        crate::Dynamic::new(ExportableStringInner(value))
+        #[allow(unused_mut)]
+        let mut s = crate::Dynamic::new(ExportableStringInner(value.clone()));
+        #[cfg(feature = "hash-eq")]
+        {
+            s.eq_hash = *hash(value.as_bytes()).as_bytes();
+        }
+        s
     }
 }
 
 impl core::convert::From<&str> for ExportableString {
     fn from(value: &str) -> Self {
-        crate::Dynamic::new(ExportableStringInner(value.to_string()))
+        #[allow(unused_mut)]
+        let mut s = crate::Dynamic::new(ExportableStringInner(value.to_string()));
+        #[cfg(feature = "hash-eq")]
+        {
+            s.eq_hash = *hash(value.as_bytes()).as_bytes();
+        }
+        s
     }
 }
 
@@ -116,15 +136,30 @@ impl core::convert::From<&str> for ExportableString {
 impl From<crate::cloneable::CloneableString> for ExportableString {
     fn from(value: crate::cloneable::CloneableString) -> Self {
         let s = value.expose_secret().0.clone();
-        Self::from(s)
+        #[allow(unused_mut)]
+        let mut result = Self::from(s);
+        #[cfg(feature = "hash-eq")]
+        {
+            result.eq_hash = value.eq_hash;
+        }
+        result
     }
 }
 
 #[cfg(feature = "serde-serialize")]
 impl From<crate::Dynamic<alloc::string::String>> for ExportableString {
     fn from(value: crate::Dynamic<alloc::string::String>) -> Self {
-        let crate::Dynamic { inner: boxed, .. } = value;
+        let crate::Dynamic {
+            inner: boxed,
+            eq_hash,
+        } = value;
         let s = *boxed;
-        Self::from(s)
+        #[allow(unused_mut)]
+        let mut result = Self::from(s);
+        #[cfg(feature = "hash-eq")]
+        {
+            result.eq_hash = eq_hash;
+        }
+        result
     }
 }

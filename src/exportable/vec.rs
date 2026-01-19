@@ -1,5 +1,8 @@
 extern crate alloc;
 
+#[cfg(feature = "hash-eq")]
+use blake3::hash;
+
 use crate::ExposeSecret;
 
 /// Inner wrapper for a dynamic byte vector that enables opt-in serialization.
@@ -132,7 +135,12 @@ impl ExportableVec {
         F: FnOnce() -> alloc::vec::Vec<u8>,
     {
         let mut tmp = constructor();
-        let result = crate::Dynamic::new(ExportableVecInner(tmp.clone()));
+        #[allow(unused_mut)]
+        let mut result = crate::Dynamic::new(ExportableVecInner(tmp.clone()));
+        #[cfg(feature = "hash-eq")]
+        {
+            result.eq_hash = *hash(tmp.as_slice()).as_bytes();
+        }
         #[cfg(feature = "zeroize")]
         ::zeroize::Zeroize::zeroize(&mut tmp);
         result
@@ -157,29 +165,56 @@ impl ExportableVec {
     ) -> core::result::Result<Self, alloc::collections::TryReserveError> {
         let mut vec = alloc::vec::Vec::with_capacity(value.len());
         vec.extend_from_slice(value);
-        Ok(crate::Dynamic::new(ExportableVecInner(vec)))
+        #[allow(unused_mut)]
+        let mut s = crate::Dynamic::new(ExportableVecInner(vec));
+        #[cfg(feature = "hash-eq")]
+        {
+            s.eq_hash = *hash(value).as_bytes();
+        }
+        Ok(s)
     }
 }
 
 impl core::convert::From<alloc::vec::Vec<u8>> for ExportableVec {
     fn from(value: alloc::vec::Vec<u8>) -> Self {
-        crate::Dynamic::new(ExportableVecInner(value))
+        #[allow(unused_mut)]
+        let mut s = crate::Dynamic::new(ExportableVecInner(value.clone()));
+        #[cfg(feature = "hash-eq")]
+        {
+            s.eq_hash = *hash(value.as_slice()).as_bytes();
+        }
+        s
     }
 }
 
 impl core::convert::From<&[u8]> for ExportableVec {
     fn from(value: &[u8]) -> Self {
         let vec = alloc::vec::Vec::from(value);
-        crate::Dynamic::new(ExportableVecInner(vec))
+        #[allow(unused_mut)]
+        let mut s = crate::Dynamic::new(ExportableVecInner(vec));
+        #[cfg(feature = "hash-eq")]
+        {
+            s.eq_hash = *hash(value).as_bytes();
+        }
+        s
     }
 }
 
 #[cfg(feature = "serde-serialize")]
 impl From<crate::Dynamic<alloc::vec::Vec<u8>>> for ExportableVec {
     fn from(value: crate::Dynamic<alloc::vec::Vec<u8>>) -> Self {
-        let crate::Dynamic { inner: boxed, .. } = value;
+        let crate::Dynamic {
+            inner: boxed,
+            eq_hash,
+        } = value;
         let vec = *boxed;
-        Self::from(vec)
+        #[allow(unused_mut)]
+        let mut result = Self::from(vec);
+        #[cfg(feature = "hash-eq")]
+        {
+            result.eq_hash = eq_hash;
+        }
+        result
     }
 }
 
@@ -231,15 +266,30 @@ impl crate::SecureEncoding for ExportableVec {
 impl From<crate::cloneable::CloneableVec> for ExportableVec {
     fn from(value: crate::cloneable::CloneableVec) -> Self {
         let vec = value.expose_secret().0.clone();
-        Self::from(vec)
+        #[allow(unused_mut)]
+        let mut result = Self::from(vec);
+        #[cfg(feature = "hash-eq")]
+        {
+            result.eq_hash = value.eq_hash;
+        }
+        result
     }
 }
 
 #[cfg(all(feature = "serde-serialize", feature = "rand"))]
 impl From<crate::random::DynamicRandom> for ExportableVec {
     fn from(value: crate::random::DynamicRandom) -> Self {
-        let crate::Dynamic { inner: boxed, .. } = value.0;
+        let crate::Dynamic {
+            inner: boxed,
+            eq_hash,
+        } = value.0;
         let vec = *boxed;
-        Self::from(vec)
+        #[allow(unused_mut)]
+        let mut result = Self::from(vec);
+        #[cfg(feature = "hash-eq")]
+        {
+            result.eq_hash = eq_hash;
+        }
+        result
     }
 }

@@ -45,7 +45,7 @@ pub mod clone_safe;
 #[cfg(feature = "zeroize")]
 pub use clone_safe::CloneSafe;
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "serde-serialize")]
 pub mod serializable_secret;
 #[cfg(feature = "serde-serialize")]
 pub use serializable_secret::SerializableSecret;

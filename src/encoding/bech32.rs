@@ -23,6 +23,9 @@
 
 use alloc::string::String;
 
+#[cfg(feature = "hash-eq")]
+use blake3::hash;
+
 use bech32::primitives::decode::UncheckedHrpstring;
 use bech32::{decode, primitives::hrp::Hrp, Bech32, Bech32m};
 
@@ -81,10 +84,15 @@ impl Bech32String {
         // Normalize to lowercase
         s.make_ascii_lowercase();
 
-        Ok(Self {
+        let mut result = Self {
             inner: crate::Dynamic::new(s),
             variant,
-        })
+        };
+        #[cfg(feature = "hash-eq")]
+        {
+            result.inner.eq_hash = *hash(result.inner.expose_secret().as_bytes()).as_bytes();
+        }
+        Ok(result)
     }
 
     /// Check if this is a Bech32 encoding.
@@ -135,23 +143,32 @@ impl Bech32String {
     }
 }
 
-/// Constant-time equality (prevents timing attacks when comparing encoded secrets).
-#[cfg(feature = "ct-eq")]
+/// Equality for Bech32 strings – uses hash-eq when enabled, else ct-eq or string comparison
 impl PartialEq for Bech32String {
     fn eq(&self, other: &Self) -> bool {
-        use crate::traits::ConstantTimeEq;
-        self.inner
-            .expose_secret()
-            .as_bytes()
-            .ct_eq(other.inner.expose_secret().as_bytes())
-    }
-}
-
-/// Regular equality (fallback when `ct-eq` feature is not enabled).
-#[cfg(not(feature = "ct-eq"))]
-impl PartialEq for Bech32String {
-    fn eq(&self, other: &Self) -> bool {
-        self.inner.expose_secret() == other.inner.expose_secret()
+        if self.variant != other.variant {
+            return false;
+        }
+        #[cfg(feature = "hash-eq")]
+        {
+            use crate::ConstantTimeEq;
+            self.inner.eq_hash.ct_eq(&other.inner.eq_hash).into()
+        }
+        #[cfg(not(feature = "hash-eq"))]
+        {
+            #[cfg(feature = "ct-eq")]
+            {
+                use crate::traits::ConstantTimeEq;
+                self.inner
+                    .expose_secret()
+                    .as_bytes()
+                    .ct_eq(other.inner.expose_secret().as_bytes())
+            }
+            #[cfg(not(feature = "ct-eq"))]
+            {
+                self.inner.expose_secret() == other.inner.expose_secret()
+            }
+        }
     }
 }
 

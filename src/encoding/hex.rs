@@ -87,7 +87,14 @@ impl HexString {
 
         if valid {
             s = String::from_utf8(bytes).expect("valid UTF-8 after hex normalization");
-            Ok(Self(crate::Dynamic::new(s)))
+            #[allow(unused_mut)]
+            let mut result = Self(crate::Dynamic::new(s));
+            #[cfg(feature = "hash-eq")]
+            {
+                use blake3::hash;
+                result.0.eq_hash = *hash(result.0.expose_secret().as_bytes()).as_bytes();
+            }
+            Ok(result)
         } else {
             s = String::from_utf8(bytes).unwrap_or_default();
             zeroize_input(&mut s);
@@ -111,22 +118,28 @@ impl HexString {
     }
 }
 
-/// Constant-time equality for hex strings — prevents timing attacks when `ct-eq` feature is enabled.
-#[cfg(feature = "ct-eq")]
 impl PartialEq for HexString {
     fn eq(&self, other: &Self) -> bool {
-        use crate::traits::ConstantTimeEq;
-        self.0
-            .expose_secret()
-            .as_bytes()
-            .ct_eq(other.0.expose_secret().as_bytes())
-    }
-}
-
-#[cfg(not(feature = "ct-eq"))]
-impl PartialEq for HexString {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.expose_secret() == other.0.expose_secret()
+        #[cfg(feature = "hash-eq")]
+        {
+            use crate::ConstantTimeEq;
+            self.0.eq_hash.ct_eq(&other.0.eq_hash).into()
+        }
+        #[cfg(not(feature = "hash-eq"))]
+        {
+            #[cfg(feature = "ct-eq")]
+            {
+                use crate::traits::ConstantTimeEq;
+                self.0
+                    .expose_secret()
+                    .as_bytes()
+                    .ct_eq(other.0.expose_secret().as_bytes())
+            }
+            #[cfg(not(feature = "ct-eq"))]
+            {
+                self.0.expose_secret() == other.0.expose_secret()
+            }
+        }
     }
 }
 
