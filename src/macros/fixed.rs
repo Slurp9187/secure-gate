@@ -69,14 +69,14 @@ macro_rules! fixed_alias {
 ///
 /// With custom doc:
 /// ```
-/// use secure_gate::fixed_generic_alias;
-/// fixed_generic_alias!(pub GenericBuffer, "Generic secure byte buffer");
+//// use secure_gate::fixed_generic_alias;
+//// fixed_generic_alias!(pub GenericBuffer, "Generic secure byte buffer");
 /// ```
 ///
 /// With default doc:
 /// ```
-/// use secure_gate::fixed_generic_alias;
-/// fixed_generic_alias!(pub(crate) Buffer);
+//// use secure_gate::fixed_generic_alias;
+//// fixed_generic_alias!(pub(crate) Buffer);
 /// ```
 /// For random initialization, use `Type::<N>::generate()` (requires 'rand' feature).
 #[macro_export]
@@ -102,8 +102,8 @@ macro_rules! fixed_generic_alias {
 /// ```
 /// #[cfg(feature = "rand")]
 /// {
-/// use secure_gate::fixed_alias_random;
-/// fixed_alias_random!(pub MasterKey, 32);
+//// use secure_gate::fixed_alias_random;
+//// fixed_alias_random!(pub MasterKey, 32);
 /// # }
 /// ```
 ///
@@ -111,8 +111,8 @@ macro_rules! fixed_generic_alias {
 /// ```
 /// #[cfg(feature = "rand")]
 /// {
-/// use secure_gate::fixed_alias_random;
-/// fixed_alias_random!(PrivateKey, 32); // No visibility modifier = private
+//// use secure_gate::fixed_alias_random;
+//// fixed_alias_random!(PrivateKey, 32); // No visibility modifier = private
 /// # }
 /// ```
 ///
@@ -120,8 +120,8 @@ macro_rules! fixed_generic_alias {
 /// ```
 /// #[cfg(feature = "rand")]
 /// {
-/// use secure_gate::fixed_alias_random;
-/// fixed_alias_random!(pub SessionKey, 32, "Random session key for authentication");
+//// use secure_gate::fixed_alias_random;
+//// fixed_alias_random!(pub SessionKey, 32, "Random session key for authentication");
 /// # }
 /// ```
 /// Instantiate with Type::generate() (requires 'rand' feature).
@@ -146,5 +146,76 @@ macro_rules! fixed_alias_random {
         #[doc = concat!("Random-only fixed-size secret (", stringify!($size), " bytes)")]
         const _: () = { let _ = [(); $size][0]; };
         type $name = $crate::random::FixedRandom<$size>;
+    };
+}
+
+// Creates a type alias for a fixed-size exportable secret (opt-in serialization).
+//
+// This macro generates an inner newtype for raw byte arrays, implements SerializableSecret for opt-in serialization,
+// and creates a type alias to `Fixed<Inner>`. Requires the "serde-serialize" feature to compile.
+//
+// The generated type allows deliberate serialization of raw secrets while maintaining security.
+//
+// # Syntax
+//
+// - `fixed_exportable_alias!(vis Name, size);` — visibility required
+// - `fixed_exportable_alias!(vis Name, size, doc);` — with optional custom doc string
+//
+// # Examples
+//
+// Public alias:
+// ```
+// #[cfg(feature = "serde-serialize")]
+// {
+// use secure_gate::fixed_exportable_alias;
+// fixed_exportable_alias!(pub Aes256Key, 32);
+// let key: Aes256Key = [42u8; 32].into();
+// // key can now be serialized
+// # }
+// ```
+//
+// With custom documentation:
+// ```
+// #[cfg(feature = "serde-serialize")]
+// {
+// use secure_gate::fixed_exportable_alias;
+// fixed_exportable_alias!(pub ApiKey, 32, "Serializable API key");
+// # }
+// ```
+//
+// # Security Warning
+//
+// Only use for types where raw serialization is necessary and secure.
+#[macro_export]
+macro_rules! fixed_exportable_alias {
+    ($vis:vis $name:ident, $size:literal, $doc:literal) => {
+        #[cfg(feature = "serde-serialize")]
+        $vis use serde::Serialize;
+
+        #[cfg(feature = "serde-serialize")]
+        #[derive(Serialize)]
+        #[doc = $doc]
+        $vis struct $name([u8; $size]);
+
+        #[cfg(feature = "serde-serialize")]
+        impl $crate::SerializableSecret for $name {}
+
+        #[cfg(feature = "serde-serialize")]
+        $vis type $name = $crate::Fixed<$name>;
+    };
+    ($vis:vis $name:ident, $size:literal) => {
+        #[cfg(feature = "serde-serialize")]
+        $vis use serde::Serialize;
+
+        #[cfg(feature = "serde-serialize")]
+        #[derive(Serialize)]
+        #[doc = concat!("Fixed-size exportable secret (", stringify!($size), " bytes)")]
+        $vis struct $name([u8; $size]);
+
+        #[cfg(feature = "serde-serialize")]
+        impl $crate::SerializableSecret for $name {}
+
+        #[cfg(feature = "serde-serialize")]
+        $vis type $name = $crate::Fixed<$name>;
     };
 }
