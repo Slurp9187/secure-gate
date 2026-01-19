@@ -12,7 +12,7 @@
 /// - [`CloneSafe`] - Opt-in safe cloning with zeroization (requires `zeroize` feature)
 /// - [`ConstantTimeEq`] - Constant-time equality to prevent timing attacks (requires `ct-eq` feature)
 /// - [`SecureEncoding`] - Extension trait for secure byte encoding to strings (requires encoding features)
-/// - [`SerializableSecret`] - Marker for types allowing secure serialization (requires `serde` feature)
+/// - [`SerializableSecret`] - Marker for types allowing secure serialization (requires `serde-serialize` feature)
 ///
 /// ## Security Guarantees
 ///
@@ -47,7 +47,7 @@ pub use clone_safe::CloneSafe;
 
 #[cfg(feature = "serde")]
 pub mod serializable_secret;
-#[cfg(feature = "serde")]
+#[cfg(feature = "serde-serialize")]
 pub use serializable_secret::SerializableSecret;
 
 pub mod constant_time_eq;

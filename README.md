@@ -56,7 +56,9 @@ secure-gate = { version = "0.7.0-rc.9", default-features = false, features = ["i
 | `encoding-hex`| Hex encoding + `HexString` + random hex methods |
 | `encoding-base64` | `Base64String` (URL-safe, no padding) |
 | `encoding-bech32` | `Bech32String` (Bech32/Bech32m, mixed-case input, lowercase storage) |
-| `serde` | Serde support: `Deserialize` for loading secrets, opt-in `Serialize` via `SerializableSecret` marker |
+| `serde-deserialize` | Serde `Deserialize` support for loading secrets |
+| `serde-serialize` | Serde `Serialize` support (gated by `SerializableSecret` marker) |
+| `serde` | Meta-feature enabling both `serde-deserialize` and `serde-serialize` |
 | `full` | Meta-feature enabling all optional features (includes `secure`) |
 | `insecure` | Explicit opt-out for no-default-features builds (disables `zeroize` and `ct-eq`) — **not recommended** for production |
 
@@ -346,18 +348,18 @@ Available on `Fixed<[u8; N]>` and `Dynamic<T>` where `T: AsRef<[u8]>`.
 
 ## Serde Support
 
-Load secrets from JSON/TOML/YAML or serialize them with explicit opt-in:
+Load secrets from JSON/TOML/YAML or serialize them with explicit opt-in via split features:
 
 ```rust
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
 {
     use secure_gate::{Fixed, SerializableSecret, ExposeSecret};
     use serde_json;
 
-    // Deserialize (always available)
+    // Deserialize (enabled with serde-deserialize)
     let secret: Fixed<[u8; 32]> = serde_json::from_str(r#"[1,2,3,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]"#).unwrap();
 
-    // Serialize (opt-in via SerializableSecret marker - no blanket impls)
+    // Serialize (enabled with serde-serialize, gated by SerializableSecret marker - no blanket impls)
     // Define a newtype to avoid orphan rules in this example
     #[derive(serde::Deserialize, serde::Serialize)]
     struct MySecret([u8; 32]);
@@ -366,16 +368,15 @@ Load secrets from JSON/TOML/YAML or serialize them with explicit opt-in:
     let secret: Fixed<MySecret> = Fixed::new(MySecret([1u8; 32]));
     let json = serde_json::to_string(&secret).unwrap();
 
-    // Other types
+    // Cloneable types can serialize since their inners implement SerializableSecret
     let string_secret = secure_gate::CloneableString::from("password".to_string());
-    // Serialize: not allowed by default - protects against accidental leaks
-    // impl SerializableSecret for secure_gate::CloneableStringInner {}  // Uncomment to allow
+    let json_string = serde_json::to_string(&string_secret).unwrap();
 }
 ```
 
 ### Security Considerations
-- **Deserialize**: Loads from trusted sources only; invalid inputs are zeroized if `zeroize` enabled
-- **Serialize**: Requires explicit `SerializableSecret` impl - grep for `SerializableSecret` to audit all serialization points
+- **Deserialize** (`serde-deserialize`): Loads from trusted sources only; invalid inputs are zeroized if `zeroize` enabled
+- **Serialize** (`serde-serialize`): Requires explicit `SerializableSecret` impl for all types - grep for `SerializableSecret` to audit all serialization points; prevents accidental exfiltration
 - **No automatic serialization**: No blanket implementations; even primitive types require explicit marking to prevent accidental leaks
 - **No string/vector leaks**: String/vector secrets don't serialize by default (like `secrecy` crate)
 - **Marker trait**: `SerializableSecret` ensures serialization is intentional and audited
@@ -479,7 +480,7 @@ To maximize the security of your application when using `secure-gate`, adhere to
 - **Minimize secret exposures**: Audit your code for `.expose_secret()` calls; keep them minimal, logged, and justified. Avoid unnecessary or prolonged exposures.
 - **Restrict cloning**: Only clone when necessary. Prefer built-in `Cloneable*` types; be cautious with custom `CloneSafe` implementations.
 - **Conservative feature usage**: Enable only the features you need (e.g., specific encodings) to reduce attack surface.
-- **Explicitly mark serializable types**: Only implement `SerializableSecret` for types that must be serialized with `serde`; audit all impls during code reviews to prevent accidental exfiltration.
+- **Explicitly mark serializable types**: Only implement `SerializableSecret` for types that must be serialized with `serde-serialize`; audit all impls during code reviews to prevent accidental exfiltration.
 - **Regular review**: Periodically audit your secret handling logic, especially after dependency updates.
 - **Security considerations**: Refer to [SECURITY.md](SECURITY.md) for detailed security considerations.
 

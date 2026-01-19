@@ -3,8 +3,11 @@ use core::fmt;
 #[cfg(feature = "rand")]
 use rand::rand_core::OsError;
 
-#[cfg(feature = "serde")]
+#[cfg(any(feature = "serde-deserialize", feature = "serde-serialize"))]
 use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "serde-serialize")]
+use serde::ser::Serializer;
 
 use crate::FromSliceError;
 
@@ -201,8 +204,8 @@ impl<T: zeroize::Zeroize> zeroize::Zeroize for Fixed<T> {
 #[cfg(feature = "zeroize")]
 impl<T: zeroize::Zeroize> zeroize::ZeroizeOnDrop for Fixed<T> {}
 
-/// Serde deserialization support (always available with serde feature).
-#[cfg(feature = "serde")]
+/// Serde deserialization support (unconditional; requires serde-deserialize feature).
+#[cfg(feature = "serde-deserialize")]
 impl<'de, T> Deserialize<'de> for Fixed<T>
 where
     T: Deserialize<'de>,
@@ -216,15 +219,15 @@ where
     }
 }
 
-/// Serde serialization support (opt-in via SerializableSecret marker).
-#[cfg(feature = "serde")]
+#[cfg(feature = "serde-serialize")]
+/// Serde serialization support (opt-in via SerializableSecret marker; requires serde-serialize feature).
 impl<T> Serialize for Fixed<T>
 where
     T: crate::SerializableSecret,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer,
+        S: Serializer,
     {
         self.0.serialize(serializer)
     }

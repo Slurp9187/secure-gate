@@ -7,8 +7,11 @@ use hex as hex_crate;
 
 use crate::traits::expose_secret::ExposeSecret;
 
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde-deserialize")]
+use serde::Deserialize;
+
+#[cfg(feature = "serde-serialize")]
+use serde::{ser::Serializer, Serialize};
 
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]
@@ -141,7 +144,7 @@ impl core::fmt::Debug for HexString {
 }
 
 /// Serde deserialization support (validates on deserialization).
-#[cfg(feature = "serde")]
+#[cfg(feature = "serde-deserialize")]
 impl<'de> Deserialize<'de> for HexString {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -153,12 +156,17 @@ impl<'de> Deserialize<'de> for HexString {
 }
 
 /// Serde serialization support (serializes the hex string).
-#[cfg(feature = "serde")]
-impl Serialize for HexString {
+/// Uniformly gated by SerializableSecret marker.
+/// Users must implement SerializableSecret to enable serialization.
+#[cfg(feature = "serde-serialize")]
+impl Serialize for HexString
+where
+    String: crate::SerializableSecret,  // User must impl on String
+{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer,
+        S: Serializer,
     {
-        self.expose_secret().serialize(serializer)
+        self.expose_secret().serialize(serializer)  // String output
     }
 }

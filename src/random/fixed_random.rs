@@ -3,8 +3,8 @@ use rand::rand_core::OsError;
 use rand::rngs::OsRng;
 use rand::TryRngCore;
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+#[cfg(feature = "serde-serialize")]
+use serde::{ser::Serializer, Serialize};
 
 use crate::traits::expose_secret::ExposeSecret;
 
@@ -108,6 +108,8 @@ impl<const N: usize> FixedRandom<N> {
     }
 }
 
+
+
 /// Debug implementation (always redacted).
 impl<const N: usize> core::fmt::Debug for FixedRandom<N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -138,11 +140,15 @@ impl<const N: usize> From<FixedRandom<N>> for Fixed<[u8; N]> {
 }
 
 /// Serde serialization support (serializes the random bytes).
-#[cfg(feature = "serde")]
-impl<const N: usize> Serialize for FixedRandom<N> {
+/// Uniformly gated by SerializableSecret marker on inner type.
+#[cfg(feature = "serde-serialize")]
+impl<const N: usize> Serialize for FixedRandom<N>
+where
+    [u8; N]: crate::SerializableSecret,
+{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer,
+        S: Serializer,
     {
         serializer.serialize_bytes(self.0.expose_secret())
     }

@@ -26,8 +26,11 @@ use alloc::string::String;
 use bech32::primitives::decode::UncheckedHrpstring;
 use bech32::{decode, primitives::hrp::Hrp, Bech32, Bech32m};
 
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde-deserialize")]
+use serde::Deserialize;
+
+#[cfg(feature = "serde-serialize")]
+use serde::{ser::Serializer, Serialize};
 
 use crate::traits::expose_secret::ExposeSecret;
 
@@ -168,8 +171,6 @@ impl core::fmt::Debug for Bech32String {
     }
 }
 
-/// Serde deserialization support (validates on deserialization).
-#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Bech32String {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -181,11 +182,15 @@ impl<'de> Deserialize<'de> for Bech32String {
 }
 
 /// Serde serialization support (serializes the bech32 string).
-#[cfg(feature = "serde")]
-impl Serialize for Bech32String {
+/// Uniformly gated by SerializableSecret marker.
+#[cfg(feature = "serde-serialize")]
+impl Serialize for Bech32String
+where
+    String: crate::SerializableSecret,
+{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer,
+        S: Serializer,
     {
         self.inner.expose_secret().serialize(serializer)
     }

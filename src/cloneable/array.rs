@@ -1,8 +1,11 @@
 use crate::Fixed;
 use zeroize::Zeroize;
 
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde-deserialize")]
+use serde::Deserialize;
+
+#[cfg(feature = "serde-serialize")]
+use serde::{ser::Serializer, Serialize};
 
 /// Inner wrapper for a fixed-size array of bytes that can be safely cloned as a secret.
 ///
@@ -15,24 +18,19 @@ pub struct CloneableArrayInner<const N: usize>(pub [u8; N]);
 
 impl<const N: usize> crate::CloneSafe for CloneableArrayInner<N> {}
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "serde-serialize")]
 impl<const N: usize> Serialize for CloneableArrayInner<N>
 where
-    [u8; N]: Serialize,
+    [u8; N]: crate::SerializableSecret,  // Gate on inner array
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer,
+        S: Serializer,
     {
-        self.0.serialize(serializer)
+        self.0.serialize(serializer)  // Or appropriate forwarding
     }
 }
 
-#[cfg(feature = "serde")]
-impl<const N: usize> crate::SerializableSecret for CloneableArrayInner<N>
-where
-    [u8; N]: Serialize,
-{}
 
 /// A fixed-size array of bytes wrapped as a cloneable secret.
 ///
@@ -110,7 +108,7 @@ impl<const N: usize> From<[u8; N]> for CloneableArray<N> {
     }
 }
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "serde-deserialize")]
 impl<'de, const N: usize> Deserialize<'de> for CloneableArray<N> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

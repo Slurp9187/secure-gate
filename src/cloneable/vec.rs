@@ -1,5 +1,7 @@
 use crate::Dynamic;
 use zeroize::Zeroize;
+#[cfg(feature = "serde-serialize")]
+use serde::{ser::Serializer, Serialize};
 
 /// Inner wrapper for a vector of bytes that can be safely cloned as a secret.
 ///
@@ -8,13 +10,25 @@ use zeroize::Zeroize;
 /// The `zeroize(drop)` attribute ensures the vector contents are zeroized when
 /// this struct is dropped.
 #[derive(Clone, Zeroize)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[zeroize(drop)]
 pub struct CloneableVecInner(pub Vec<u8>);
 
 impl crate::CloneSafe for CloneableVecInner {}
 
-
+/// Serde serialization support (serializes the vector).
+/// Uniformly gated by SerializableSecret marker on inner type.
+#[cfg(feature = "serde-serialize")]
+impl Serialize for CloneableVecInner
+where
+    Vec<u8>: crate::SerializableSecret,  // Gate on inner
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.0.serialize(serializer)  // Or appropriate forwarding
+    }
+}
 
 /// A dynamically-sized vector of bytes wrapped as a cloneable secret.
 ///
@@ -102,7 +116,7 @@ impl From<&[u8]> for CloneableVec {
     }
 }
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "serde-deserialize")]
 impl<'de> serde::Deserialize<'de> for CloneableVec {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

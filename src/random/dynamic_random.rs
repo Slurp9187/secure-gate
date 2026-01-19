@@ -3,8 +3,8 @@ use rand::rand_core::OsError;
 use rand::rngs::OsRng;
 use rand::TryRngCore;
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+#[cfg(feature = "serde-serialize")]
+use serde::{ser::Serializer, Serialize};
 
 use crate::traits::expose_secret::ExposeSecret;
 
@@ -107,14 +107,17 @@ impl From<DynamicRandom> for Dynamic<Vec<u8>> {
         rng.into_inner()
     }
 }
-
 /// Serde serialization support (serializes the random bytes).
-#[cfg(feature = "serde")]
-impl Serialize for DynamicRandom {
+/// Uniformly gated by SerializableSecret marker on inner type.
+#[cfg(feature = "serde-serialize")]
+impl Serialize for DynamicRandom
+where
+    Vec<u8>: crate::SerializableSecret,
+{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer,
+        S: Serializer,
     {
-        serializer.serialize_bytes(self.0.expose_secret())
+        self.0.serialize(serializer)
     }
 }

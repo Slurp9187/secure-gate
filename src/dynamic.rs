@@ -2,11 +2,14 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
 #[cfg(feature = "rand")]
 use rand::rand_core::OsError;
+
+#[cfg(any(feature = "serde-deserialize", feature = "serde-serialize"))]
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+#[cfg(feature = "serde-serialize")]
+use serde::ser::Serializer;
 
 /// Heap-allocated secure secret wrapper.
 ///
@@ -229,11 +232,11 @@ impl<T: ?Sized + zeroize::Zeroize> zeroize::Zeroize for Dynamic<T> {
 #[cfg(feature = "zeroize")]
 impl<T: ?Sized + zeroize::Zeroize> zeroize::ZeroizeOnDrop for Dynamic<T> {}
 
-/// Serde deserialization support (always available with serde feature).
-#[cfg(feature = "serde")]
+/// Serde deserialization support (always available with serde-deserialize feature).
+#[cfg(feature = "serde-deserialize")]
 impl<'de, T> Deserialize<'de> for Dynamic<T>
 where
-    T: Deserialize<'de>,
+    T: DeserializeOwned,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -244,15 +247,15 @@ where
     }
 }
 
-/// Serde serialization support (opt-in via SerializableSecret marker).
-#[cfg(feature = "serde")]
+/// Serde serialization support (opt-in via SerializableSecret marker; requires serde-serialize feature).
+#[cfg(feature = "serde-serialize")]
 impl<T> Serialize for Dynamic<T>
 where
     T: crate::SerializableSecret,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer,
+        S: Serializer,
     {
         self.0.serialize(serializer)
     }

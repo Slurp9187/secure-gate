@@ -73,8 +73,12 @@ encoding-bech32 = ["dep:bech32"]
 # Rand: Random number generation for securely creating secrets (uses rand with getrandom for seeding; rand_core is transitive)
 rand = ["dep:rand"]
 
-# Serde feature: Enables serde Deserialize (always) and opt-in Serialize
-serde = ["dep:serde"]
+# Serde deserialize: Enables serde Deserialize only (safe loading)
+serde-deserialize = ["dep:serde"]
+# Serde serialize: Enables serde Serialize only (requires SerializableSecret marker)
+serde-serialize = ["dep:serde"]
+# Serde: Meta-feature enabling both deserialize and serialize
+serde = ["serde-deserialize", "serde-serialize"]
 
 [[bench]]
 name = "fixed_vs_raw"

@@ -4,8 +4,11 @@ use alloc::string::String;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde-deserialize")]
+use serde::Deserialize;
+
+#[cfg(feature = "serde-serialize")]
+use serde::{ser::Serializer, Serialize};
 
 use crate::traits::expose_secret::ExposeSecret;
 
@@ -126,7 +129,7 @@ impl core::fmt::Debug for Base64String {
 }
 
 /// Serde deserialization support (validates on deserialization).
-#[cfg(feature = "serde")]
+#[cfg(feature = "serde-deserialize")]
 impl<'de> Deserialize<'de> for Base64String {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -138,11 +141,15 @@ impl<'de> Deserialize<'de> for Base64String {
 }
 
 /// Serde serialization support (serializes the base64 string).
-#[cfg(feature = "serde")]
-impl Serialize for Base64String {
+/// Uniformly gated by SerializableSecret marker.
+#[cfg(feature = "serde-serialize")]
+impl Serialize for Base64String
+where
+    String: crate::SerializableSecret,
+{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer,
+        S: Serializer,
     {
         self.expose_secret().serialize(serializer)
     }
