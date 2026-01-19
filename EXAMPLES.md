@@ -398,10 +398,12 @@ assert_eq!(use_random(&key), 32);
 use secure_gate::fixed_alias;
 
 fixed_alias!(pub Aes256Key, 32);
+fixed_alias!(pub ApiKey, 32, "API key for external service");  // Custom doc
 fixed_alias!(pub(crate) InternalKey, 64);
 fixed_alias!(InternalNonce, 24);  // Private
 
 let key: Aes256Key = [0u8; 32].into();
+let api_key: ApiKey = [0u8; 32].into();
 ```
 
 ### Generic Fixed (Stack) Buffers
@@ -419,10 +421,12 @@ let buffer32 = SecureBuffer::<32>::new([0u8; 32]);
 use secure_gate::dynamic_alias;
 
 dynamic_alias!(pub Password, String);
+dynamic_alias!(pub Token, Vec<u8>, "OAuth access token");  // Custom doc
 dynamic_alias!(pub(crate) Payload, Vec<u8>);
 dynamic_alias!(InternalToken, String);  // Private
 
 let pw: Password = "hunter2".into();
+let token: Token = vec![0u8; 16].into();
 ```
 
 ### Generic Dynamic (Heap)
@@ -443,11 +447,14 @@ use secure_gate::fixed_alias_random;
 #[cfg(feature = "rand")]
 fixed_alias_random!(pub MasterKey, 32);
 #[cfg(feature = "rand")]
+fixed_alias_random!(pub SessionKey, 32, "Random session key for auth");  // Custom doc
+#[cfg(feature = "rand")]
 fixed_alias_random!(pub(crate) SessionNonce, 24);
 #[cfg(feature = "rand")]
 fixed_alias_random!(InternalNonce, 24);  // Private
 
 let master = MasterKey::generate();
+let session = SessionKey::generate();
 ```
 
 ### Exportable (Serializable) Aliases (Requires `serde-serialize`)

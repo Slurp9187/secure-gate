@@ -392,6 +392,14 @@ fixed_alias!(pub Aes256Key, 32); // Fixed<[u8; 32]>
 dynamic_alias!(pub Password, String); // Dynamic<String>
 ```
 
+With custom documentation:
+
+```rust
+use secure_gate::{fixed_alias, dynamic_alias};
+fixed_alias!(pub ApiKey, 32, "API key for service authentication");
+dynamic_alias!(pub Token, Vec<u8>, "OAuth access token");
+```
+
 ### Generic Aliases
 
 For reusable or library-provided secret types:
@@ -422,6 +430,18 @@ dynamic_generic_alias!(pub SecureHeap, String, "Generic heap-allocated secret");
     fixed_alias_random!(pub MasterKey, 32); // FixedRandom<32>
 }
 ```
+
+With custom documentation:
+
+```rust
+#[cfg(feature = "rand")]
+{
+    use secure_gate::fixed_alias_random;
+
+    fixed_alias_random!(pub SessionKey, 32, "Random session key for authentication");
+}
+```
+
 
 These macros create type aliases to `Fixed<[u8; N]>`, `Dynamic<T>`, `FixedRandom<N>`, or their generic counterparts, inheriting all methods and security guarantees.
 

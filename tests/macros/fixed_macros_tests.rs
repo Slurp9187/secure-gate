@@ -115,6 +115,23 @@ fn fixed_aliases_distinct_types() {
     // Compile-fail guard: ensures semantic types don't coerce
 }
 
+#[test]
+fn fixed_alias_with_custom_doc() {
+    fixed_alias!(pub KeyWithDoc, 32, "Custom documentation for key");
+
+    let k: KeyWithDoc = [0u8; 32].into();
+    assert_eq!(k.len(), 32);
+}
+
+#[cfg(feature = "rand")]
+#[test]
+fn fixed_alias_random_with_custom_doc() {
+    fixed_alias_random!(pub RngKeyWithDoc, 32, "Custom documentation for random key");
+
+    let k = RngKeyWithDoc::generate();
+    assert_eq!(k.len(), 32);
+}
+
 #[cfg(feature = "rand")]
 #[test]
 fn rng_aliases_distinct_types() {
