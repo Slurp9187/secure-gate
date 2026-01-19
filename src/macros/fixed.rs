@@ -69,14 +69,14 @@ macro_rules! fixed_alias {
 ///
 /// With custom doc:
 /// ```
-//// use secure_gate::fixed_generic_alias;
-//// fixed_generic_alias!(pub GenericBuffer, "Generic secure byte buffer");
+/// use secure_gate::fixed_generic_alias;
+/// fixed_generic_alias!(pub GenericBuffer, "Generic secure byte buffer");
 /// ```
 ///
 /// With default doc:
 /// ```
-//// use secure_gate::fixed_generic_alias;
-//// fixed_generic_alias!(pub(crate) Buffer);
+/// use secure_gate::fixed_generic_alias;
+/// fixed_generic_alias!(pub(crate) Buffer);
 /// ```
 /// For random initialization, use `Type::<N>::generate()` (requires 'rand' feature).
 #[macro_export]
@@ -102,8 +102,8 @@ macro_rules! fixed_generic_alias {
 /// ```
 /// #[cfg(feature = "rand")]
 /// {
-//// use secure_gate::fixed_alias_random;
-//// fixed_alias_random!(pub MasterKey, 32);
+/// use secure_gate::fixed_alias_random;
+/// fixed_alias_random!(pub MasterKey, 32);
 /// # }
 /// ```
 ///
@@ -111,8 +111,8 @@ macro_rules! fixed_generic_alias {
 /// ```
 /// #[cfg(feature = "rand")]
 /// {
-//// use secure_gate::fixed_alias_random;
-//// fixed_alias_random!(PrivateKey, 32); // No visibility modifier = private
+/// use secure_gate::fixed_alias_random;
+/// fixed_alias_random!(PrivateKey, 32); // No visibility modifier = private
 /// # }
 /// ```
 ///
@@ -120,8 +120,8 @@ macro_rules! fixed_generic_alias {
 /// ```
 /// #[cfg(feature = "rand")]
 /// {
-//// use secure_gate::fixed_alias_random;
-//// fixed_alias_random!(pub SessionKey, 32, "Random session key for authentication");
+/// use secure_gate::fixed_alias_random;
+/// fixed_alias_random!(pub SessionKey, 32, "Random session key for authentication");
 /// # }
 /// ```
 /// Instantiate with Type::generate() (requires 'rand' feature).

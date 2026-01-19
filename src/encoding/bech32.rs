@@ -29,8 +29,6 @@ use bech32::{decode, primitives::hrp::Hrp, Bech32, Bech32m};
 #[cfg(feature = "serde-deserialize")]
 use serde::Deserialize;
 
-#[cfg(feature = "serde-serialize")]
-use serde::{ser::Serializer, Serialize};
 
 use crate::traits::expose_secret::ExposeSecret;
 

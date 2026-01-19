@@ -71,7 +71,7 @@ impl ExportableString {
     /// # #[cfg(feature = "serde-serialize")]
     /// # {
     /// use secure_gate::ExportableString;
-    /// let secret: ExportableString = ExportableString::new("secret".to_string());
+    /// let secret: ExportableString = ExportableString::from("secret");
     /// # }
     /// ```
 

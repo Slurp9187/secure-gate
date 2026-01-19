@@ -1,3 +1,4 @@
+#[cfg(feature = "zeroize")]
 use crate::Fixed;
 use zeroize::Zeroize;
 
@@ -21,16 +22,15 @@ impl<const N: usize> crate::CloneSafe for CloneableArrayInner<N> {}
 #[cfg(feature = "serde-serialize")]
 impl<const N: usize> Serialize for CloneableArrayInner<N>
 where
-    [u8; N]: crate::SerializableSecret,  // Gate on inner array
+    [u8; N]: crate::SerializableSecret, // Gate on inner array
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        self.0.serialize(serializer)  // Or appropriate forwarding
+        self.0.serialize(serializer) // Or appropriate forwarding
     }
 }
-
 
 /// A fixed-size array of bytes wrapped as a cloneable secret.
 ///

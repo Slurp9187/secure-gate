@@ -3,10 +3,7 @@ use rand::rand_core::OsError;
 use rand::rngs::OsRng;
 use rand::TryRngCore;
 
-#[cfg(feature = "serde-serialize")]
-use serde::{ser::Serializer, Serialize};
 
-use crate::traits::expose_secret::ExposeSecret;
 
 /// Heap-allocated cryptographically secure random bytes with encoding methods.
 ///

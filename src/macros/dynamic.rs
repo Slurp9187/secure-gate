@@ -75,60 +75,16 @@ macro_rules! dynamic_generic_alias {
 /// This macro generates an inner newtype for raw dynamic data (Vec<u8> or String), implements SerializableSecret for opt-in serialization,
 /// and creates a type alias to `Dynamic<Inner>`. For encoded types (e.g., HexString), it creates an alias with Serialize forwarding to the encoded string.
 ///
-/// Requires the "serde-serialize" feature to compile for raw types.
+/// Requires the "serde-serialize" feature to compile.
 ///
 /// # Syntax
 ///
-/// - `dynamic_exportable_alias!(vis Name, inner_ty);` — for raw (Vec<u8>/String) or encoded types
+/// - `dynamic_exportable_alias!(vis Name, inner_ty);` — for raw (`Vec<u8>`/String) or encoded types
 /// - `dynamic_exportable_alias!(vis Name, inner_ty, doc);` — with optional custom doc string
-///
-/// # Examples
-///
-/// Raw Vec<u8> alias:
-/// ```
-/// #[cfg(feature = "serde-serialize")]
-/// {
-/// use secure_gate::dynamic_exportable_alias;
-/// dynamic_exportable_alias!(pub SecureData, Vec<u8>);
-/// let data: SecureData = vec![1, 2, 3].into();
-/// // data can now be serialized as raw bytes
-/// # }
-/// ```
-///
-/// Raw String alias:
-/// ```
-/// #[cfg(feature = "serde-serialize")]
-/// {
-/// use secure_gate::dynamic_exportable_alias;
-/// dynamic_exportable_alias!(pub SecretText, String);
-/// let text: SecretText = "secret".to_string().into();
-/// // text can now be serialized as raw string
-/// # }
-/// ```
-///
-/// Encoded alias (manual Serialize forwarding):
-/// ```
-/// #[cfg(all(feature = "serde-serialize", feature = "encoding-hex"))]
-/// {
-/// use secure_gate::dynamic_exportable_alias;
-/// dynamic_exportable_alias!(pub EncodedKey, secure_gate::HexString);
-/// let key: EncodedKey = secure_gate::HexString::new("deadbeef").unwrap().into();
-/// // key serializes as the hex string, not raw bytes
-/// # }
-/// ```
-///
-/// With custom documentation:
-/// ```
-/// #[cfg(feature = "serde-serialize")]
-/// {
-/// use secure_gate::dynamic_exportable_alias;
-/// dynamic_exportable_alias!(pub ApiToken, String, "Serializable API token");
-/// # }
-/// ```
 ///
 /// # Security Warning
 ///
-/// For raw types, only use where raw serialization is secure. For encoded, prefer for non-sensitive encoded forms.
+/// For raw types, only use where raw serialization is necessary and secure. For encoded, prefer for non-sensitive encoded forms.
 #[macro_export]
 macro_rules! dynamic_exportable_alias {
     // Raw Vec<u8>

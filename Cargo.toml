@@ -83,3 +83,7 @@ serde = ["serde-deserialize", "serde-serialize"]
 [[bench]]
 name = "fixed_vs_raw"
 harness = false
+
+[[bench]]
+name = "serde"
+harness = false

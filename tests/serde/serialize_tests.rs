@@ -8,7 +8,6 @@
 // - Validation and roundtrips for encoding types
 // - Prevention of accidental exfiltration
 
-use secure_gate::SerializableSecret;
 
 #[cfg(feature = "serde-serialize")]
 #[test]

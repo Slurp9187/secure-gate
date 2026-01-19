@@ -7,8 +7,6 @@ use base64::Engine;
 #[cfg(feature = "serde-deserialize")]
 use serde::Deserialize;
 
-#[cfg(feature = "serde-serialize")]
-use serde::{ser::Serializer, Serialize};
 
 use crate::traits::expose_secret::ExposeSecret;
 

@@ -1,3 +1,4 @@
+#[cfg(feature = "zeroize")]
 use crate::Dynamic;
 use zeroize::Zeroize;
 

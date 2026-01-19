@@ -6,9 +6,10 @@
 // This file tests full serialize/deserialize roundtrips with focus on
 // end-to-end functionality requiring both serde-deserialize and serde-serialize
 
-use secure_gate::{ConstantTimeEq, ExposeSecret};
 
-use secure_gate::SerializableSecret;
+#[cfg(feature = "zeroize")]
+use secure_gate::ExposeSecret;
+
 
 #[cfg(feature = "serde-serialize")]
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
@@ -60,16 +61,11 @@ fn exportable_from_encoded_roundtrip() {
     assert_eq!(deserialized.expose_secret(), &[222, 173, 190, 239]);
 }
 
-#[cfg(all(
-    feature = "serde-serialize",
-    feature = "zeroize",
-    feature = "rand",
-    feature = "ct-eq"
-))]
+#[cfg(all(feature = "serde-serialize", feature = "zeroize", feature = "rand"))]
 #[test]
 fn full_feature_integration() {
-    // Test all features work together: rand generation, zeroize on drop, ct_eq, serialization
-    use secure_gate::{ExportableArray, ExposeSecret, FixedRandom};
+    // Test all features work together: rand generation, zeroize on drop, serialization
+    use secure_gate::{ExportableArray, FixedRandom};
 
     let random: FixedRandom<8> = FixedRandom::generate();
     let fixed: secure_gate::Fixed<[u8; 8]> = random.into();
@@ -80,7 +76,4 @@ fn full_feature_integration() {
     assert!(json.starts_with('[') && json.ends_with(']'));
 
     // Features verified by successful compilation and execution
-    assert!(true);
-
-    // Zeroize happens on drop, can't test directly but no panics
 }

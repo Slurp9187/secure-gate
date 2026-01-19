@@ -75,8 +75,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated README.md with cross-links to SECURITY.md, improved formatting, and security emphasis.
 - **Dedicated serde fuzz target** (`fuzz_targets/serde.rs`) for secure deserialization testing: covers JSON/TOML/YAML parsing, validation logic, zeroization on invalid inputs, temporary allocation handling, and edge cases to prevent deserialization-based vulnerabilities from untrusted structured data.
 - Optional custom rustdoc string support added to all non-generic alias macros (`fixed_alias!`, `dynamic_alias!`, `fixed_alias_random!`) for full consistency with generic variants. Accepts an optional third parameter for custom documentation, falling back to generated docs when omitted. Backward compatible and improves API discoverability.
+- **Opt-in raw serialization system** (`"serde-serialize"` feature) for deliberate secret export:
+  - New `Exportable*` types (`ExportableArray<N>`, `ExportableString`, `ExportableVec`) in `src/exportable/` for serializing raw secrets (bytes/text) with automatic `SerializableSecret` impls and zeroize on drop.
+  - Macros `fixed_exportable_alias!` and `dynamic_exportable_alias!` for creating custom serializable secret types.
+  - Conversions from core/cloneable/random types to `Exportable*` for secure transitions.
+  - Benchmarks (`benches/serde.rs`) measuring minimal overhead vs. raw types.
+  - Unit tests, integration tests, compile-fail tests, and security tests ensuring no leaks.
+- **Removed direct `Serialize` impls** from encoded types (`HexString`, `Base64String`, `Bech32String`) and random/cloneable types—now require manual `Exportable*` conversion for raw output, enforcing auditability.
 
 ### Changed (Breaking)
+- **Serialization model**: Core/cloneable/random/encoded types no longer directly serialize raw secrets—use new `Exportable*` types for deliberate raw output to prevent accidental exfiltration.
+- **Encoded types**: Removed `Serialize` impls; now provide `From<Encoded>` to `ExportableString` (encoded str) or `ExportableVec` (decoded raw) for controlled access.
 - **Encoding wrappers method renames** (#52): Renamed decode methods to follow Rust stdlib naming conventions:
   - `HexString::decode()` → `decode_to_bytes()` (borrowing)
   - `HexString::into_bytes()` → `decode_into_bytes()` (consuming)

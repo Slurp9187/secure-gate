@@ -121,9 +121,8 @@ impl<const N: usize> ExportableArray<N> {
     /// ```
     /// # #[cfg(feature = "serde-serialize")]
     /// # {
-    /// use secure_gate::Fixed;
-    /// use secure_gate::exportable::ExportableArrayInner;
-    /// let secret: secure_gate::ExportableArray<4> = Fixed::new(ExportableArrayInner([1, 2, 3, 4]));
+    /// use secure_gate::ExportableArray;
+    /// let secret: ExportableArray<4> = ExportableArray::from([1, 2, 3, 4]);
     /// # }
     /// ```
 
@@ -136,9 +135,8 @@ impl<const N: usize> ExportableArray<N> {
     /// ```
     /// # #[cfg(feature = "serde-serialize")]
     /// # {
-    /// use secure_gate::Fixed;
-    /// use secure_gate::exportable::ExportableArrayInner;
-    /// let secret = Fixed::new(ExportableArrayInner([1, 2, 3, 4])); // from init_with equiv
+    /// use secure_gate::ExportableArray;
+    /// let secret: ExportableArray<4> = ExportableArray::init_with(|| [1, 2, 3, 4]);
     /// # }
     /// ```
     #[inline(always)]

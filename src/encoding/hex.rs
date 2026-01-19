@@ -10,8 +10,6 @@ use crate::traits::expose_secret::ExposeSecret;
 #[cfg(feature = "serde-deserialize")]
 use serde::Deserialize;
 
-#[cfg(feature = "serde-serialize")]
-use serde::{ser::Serializer, Serialize};
 
 fn zeroize_input(s: &mut String) {
     #[cfg(feature = "zeroize")]

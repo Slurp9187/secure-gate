@@ -6,7 +6,7 @@
 
 use secure_gate::{Dynamic, ExposeSecret, Fixed};
 #[cfg(feature = "serde-serialize")]
-use secure_gate::{ExportableArray, ExportableString, ExportableVec};
+use secure_gate::ExportableArray;
 
 #[cfg(feature = "serde-serialize")]
 mod exportable_roundtrips {

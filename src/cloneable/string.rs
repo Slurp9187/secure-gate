@@ -1,3 +1,4 @@
+#[cfg(feature = "zeroize")]
 use crate::Dynamic;
 use zeroize::Zeroize;
 
@@ -14,8 +15,6 @@ pub struct CloneableStringInner(pub String);
 impl crate::CloneSafe for CloneableStringInner {}
 
 #[cfg(feature = "serde-serialize")]
-/// Serde serialization support (opt-in via SerializableSecret marker on inner; requires serde-serialize feature).
-
 /// A string wrapped as a cloneable secret.
 ///
 /// This type provides a secure wrapper around a `String` that can be safely cloned
@@ -103,7 +102,6 @@ impl From<String> for CloneableString {
     }
 }
 
-/// Wrap a string slice in a `CloneableString`.
 impl From<&str> for CloneableString {
     fn from(value: &str) -> Self {
         Self::from(value.to_string())
