@@ -98,6 +98,7 @@ impl CloneableVec {
 impl From<Vec<u8>> for CloneableVec {
     fn from(value: Vec<u8>) -> Self {
         let inner = CloneableVecInner(value.clone());
+        #[allow(unused_mut)]
         let mut secret = Dynamic::new(inner);
         #[cfg(feature = "hash-eq")]
         {
@@ -112,6 +113,7 @@ impl From<Vec<u8>> for CloneableVec {
 impl From<&[u8]> for CloneableVec {
     fn from(slice: &[u8]) -> Self {
         let inner = CloneableVecInner(slice.to_vec());
+        #[allow(unused_mut)]
         let mut secret = Dynamic::new(inner);
         #[cfg(feature = "hash-eq")]
         {

@@ -110,6 +110,7 @@ impl From<String> for CloneableString {
 impl From<&str> for CloneableString {
     fn from(s: &str) -> Self {
         let inner = CloneableStringInner(s.to_string());
+        #[allow(unused_mut)]
         let mut secret = Dynamic::new(inner);
         #[cfg(feature = "hash-eq")]
         {

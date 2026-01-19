@@ -110,11 +110,11 @@ impl<const N: usize> CloneableArray<N> {
 impl<const N: usize> From<[u8; N]> for CloneableArray<N> {
     /// Wrap a `[u8; N]` array in a `CloneableArray`.
     fn from(arr: [u8; N]) -> Self {
-        #[cfg(feature = "hash-eq")]
-        use blake3::hash;
+        #[allow(unused_mut)]
         let mut s = Fixed::new(CloneableArrayInner(arr));
         #[cfg(feature = "hash-eq")]
         {
+            use blake3::hash;
             s.eq_hash = *hash(arr.as_slice()).as_bytes();
         }
         s
