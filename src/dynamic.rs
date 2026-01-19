@@ -129,6 +129,7 @@ impl<T> Dynamic<Vec<T>> {}
 impl<T: 'static> From<T> for Dynamic<T> {
     #[inline(always)]
     fn from(value: T) -> Self {
+        #[allow(unused_mut)]
         let mut s = Self {
             inner: Box::new(value),
             #[cfg(feature = "hash-eq")]
