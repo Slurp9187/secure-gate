@@ -10,6 +10,7 @@
 #[macro_export(local_inner_macros)] // Optional: allows inner macros if recursive
 macro_rules! impl_redacted_debug {
     ($type:ty) => {
+        /// Debug implementation (always redacted).
         impl<T> core::fmt::Debug for $type {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 f.write_str("[REDACTED]")
@@ -17,6 +18,7 @@ macro_rules! impl_redacted_debug {
         }
     };
     ($type:ty, ?Sized) => {
+        /// Debug implementation (always redacted).
         impl<T: ?Sized> core::fmt::Debug for $type {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 f.write_str("[REDACTED]")

@@ -6,9 +6,6 @@ use crate::traits::HashEqSecret;
 
 use crate::traits::secure_construction::Sealed as SecureSealed;
 
-#[cfg(any(feature = "serde-deserialize", feature = "serde-serialize"))]
-use serde::Deserialize;
-
 /// Stack-allocated secure secret wrapper.
 ///
 /// This is a zero-cost wrapper for fixed-size secrets like byte arrays or primitives.
@@ -119,8 +116,6 @@ impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
     }
 }
 
-crate::impl_redacted_debug!(Fixed<T>);
-
 /// On-demand hash equality.
 #[cfg(feature = "hash-eq")]
 impl<T> crate::traits::hash_eq::Sealed for Fixed<T> {}
@@ -148,35 +143,6 @@ impl<T: AsRef<[u8]>> Eq for Fixed<T> {}
 impl<T: AsRef<[u8]>> core::hash::Hash for Fixed<T> {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.hash_digest().hash(state);
-    }
-}
-
-#[cfg(feature = "ct-eq")]
-use crate::ExposeSecret;
-
-/// Constant-time equality — only available with `ct-eq` feature.
-#[cfg(feature = "ct-eq")]
-impl<const N: usize> Fixed<[u8; N]> {
-    /// Constant-time equality comparison.
-    ///
-    /// This is the **only safe way** to compare two fixed-size secrets.
-    /// Available only when the `ct-eq` feature is enabled.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # #[cfg(feature = "ct-eq")]
-    /// # {
-    /// use secure_gate::Fixed;
-    /// let a = Fixed::new([1u8; 32]);
-    /// let b = Fixed::new([1u8; 32]);
-    /// assert!(a.ct_eq(&b));
-    /// # }
-    /// ```
-    #[inline]
-    pub fn ct_eq(&self, other: &Self) -> bool {
-        use crate::traits::ConstantTimeEq;
-        self.expose_secret().ct_eq(other.expose_secret())
     }
 }
 
@@ -256,29 +222,8 @@ impl<const N: usize> crate::SecureConstruction for Fixed<[u8; N]> {
     }
 }
 
-/// Zeroize integration.
-#[cfg(feature = "zeroize")]
-impl<T: zeroize::Zeroize> zeroize::Zeroize for Fixed<T> {
-    fn zeroize(&mut self) {
-        self.inner.zeroize();
-    }
-}
-
-/// Zeroize on drop integration.
-#[cfg(feature = "zeroize")]
-impl<T: zeroize::Zeroize> zeroize::ZeroizeOnDrop for Fixed<T> {}
-
-/// Serde deserialization support (unconditional; requires serde-deserialize feature).
-#[cfg(feature = "serde-deserialize")]
-impl<'de, T> Deserialize<'de> for Fixed<T>
-where
-    T: Deserialize<'de>,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let inner = T::deserialize(deserializer)?;
-        Ok(Fixed::new(inner))
-    }
-}
+// Macro-generated implementations
+crate::impl_ct_eq_fixed!();
+crate::impl_redacted_debug!(Fixed<T>);
+crate::impl_serde_deserialize_fixed!(Fixed<T>);
+crate::impl_zeroize_integration_fixed!(Fixed<T>);

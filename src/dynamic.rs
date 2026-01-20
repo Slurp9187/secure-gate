@@ -8,9 +8,6 @@ use rand::TryRngCore;
 #[cfg(feature = "hash-eq")]
 use crate::traits::HashEqSecret;
 
-#[cfg(any(feature = "serde-deserialize", feature = "serde-serialize"))]
-use serde::{de::DeserializeOwned, Deserialize};
-
 /// Heap-allocated secure secret wrapper.
 ///
 /// This is a thin wrapper around `Box<T>` with enforced explicit exposure.
@@ -75,8 +72,6 @@ impl<T: ?Sized> Dynamic<T> {
 
 /// # Ergonomic helpers for common heap types
 impl Dynamic<String> {}
-
-crate::impl_redacted_debug!(Dynamic<T>, ?Sized);
 
 /// On-demand hash equality.
 #[cfg(feature = "hash-eq")]
@@ -172,56 +167,6 @@ impl From<&str> for Dynamic<String> {
     }
 }
 
-#[cfg(feature = "ct-eq")]
-impl Dynamic<String> {
-    /// Constant-time equality comparison.
-    ///
-    /// Compares the byte contents of two `Dynamic<String>` instances in constant time
-    /// to prevent timing attacks. The strings are compared as UTF-8 byte sequences.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # #[cfg(feature = "ct-eq")]
-    /// # {
-    /// use secure_gate::Dynamic;
-    /// let a: Dynamic<String> = Dynamic::new("secret".to_string());
-    /// let b: Dynamic<String> = Dynamic::new("secret".to_string());
-    /// assert!(a.ct_eq(&b));
-    /// # }
-    /// ```
-    #[inline]
-    pub fn ct_eq(&self, other: &Self) -> bool {
-        use crate::traits::ConstantTimeEq;
-        self.inner.as_bytes().ct_eq(other.inner.as_bytes())
-    }
-}
-
-#[cfg(feature = "ct-eq")]
-impl Dynamic<Vec<u8>> {
-    /// Constant-time equality comparison.
-    ///
-    /// Compares the byte contents of two `Dynamic<Vec<u8>>` instances in constant time
-    /// to prevent timing attacks. The vectors are compared as byte slices.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # #[cfg(feature = "ct-eq")]
-    /// # {
-    /// use secure_gate::Dynamic;
-    /// let a: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8; 32]);
-    /// let b: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8; 32]);
-    /// assert!(a.ct_eq(&b));
-    /// # }
-    /// ```
-    #[inline]
-    pub fn ct_eq(&self, other: &Self) -> bool {
-        use crate::traits::ConstantTimeEq;
-        self.inner.as_slice().ct_eq(other.inner.as_slice())
-    }
-}
-
 /// Random generation — only available with `rand` feature.
 #[cfg(feature = "rand")]
 impl Dynamic<Vec<u8>> {
@@ -282,29 +227,9 @@ impl Dynamic<Vec<u8>> {
     }
 }
 
-/// Zeroize integration.
-#[cfg(feature = "zeroize")]
-impl<T: ?Sized + zeroize::Zeroize> zeroize::Zeroize for Dynamic<T> {
-    fn zeroize(&mut self) {
-        self.inner.zeroize();
-    }
-}
-
-/// Zeroize on drop integration.
-#[cfg(feature = "zeroize")]
-impl<T: ?Sized + zeroize::Zeroize> zeroize::ZeroizeOnDrop for Dynamic<T> {}
-
-/// Serde deserialization support (always available with serde-deserialize feature).
-#[cfg(feature = "serde-deserialize")]
-impl<'de, T> Deserialize<'de> for Dynamic<T>
-where
-    T: DeserializeOwned,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let inner = T::deserialize(deserializer)?;
-        Ok(Dynamic::new(inner))
-    }
-}
+// Macro-generated implementations
+crate::impl_ct_eq_dynamic!(Dynamic<String>, as_bytes);
+crate::impl_ct_eq_dynamic!(Dynamic<Vec<u8>>, as_slice);
+crate::impl_redacted_debug!(Dynamic<T>, ?Sized);
+crate::impl_serde_deserialize_dynamic!(Dynamic<T>);
+crate::impl_zeroize_integration_dynamic!(Dynamic<T>);
