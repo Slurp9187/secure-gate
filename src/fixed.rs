@@ -4,11 +4,11 @@ use rand::TryRngCore;
 #[cfg(feature = "hash-eq")]
 use crate::traits::HashEqSecret;
 
-#[cfg(any(feature = "serde-deserialize", feature = "serde-serialize"))]
-use serde::{Deserialize, Serialize};
+use crate::traits::redacted_debug::Sealed as RedactedSealed;
+use crate::traits::secure_construction::Sealed as SecureSealed;
 
-#[cfg(feature = "serde-serialize")]
-use serde::ser::Serializer;
+#[cfg(any(feature = "serde-deserialize", feature = "serde-serialize"))]
+use serde::Deserialize;
 
 use core::fmt;
 
@@ -119,7 +119,7 @@ impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
 }
 
 /// Redacted Debug marker.
-impl<T> crate::traits::redacted_debug::Sealed for Fixed<T> {}
+impl<T> RedactedSealed for Fixed<T> {}
 
 impl<T> crate::RedactedDebug for Fixed<T> {}
 
@@ -160,17 +160,6 @@ impl<T: AsRef<[u8]>> core::hash::Hash for Fixed<T> {
     }
 }
 
-/// Opt-in Clone — only for types marked `CloneableType` (default no-clone).
-#[cfg(feature = "zeroize")]
-impl<T: crate::CloneableType> Clone for Fixed<T> {
-    #[inline(always)]
-    fn clone(&self) -> Self {
-        Fixed {
-            inner: self.inner.clone(),
-        }
-    }
-}
-
 #[cfg(feature = "ct-eq")]
 use crate::ExposeSecret;
 
@@ -201,7 +190,7 @@ impl<const N: usize> Fixed<[u8; N]> {
 }
 
 /// Secure construction — only available with relevant features.
-impl<const N: usize> crate::traits::secure_construction::Sealed for Fixed<[u8; N]> {}
+impl<const N: usize> SecureSealed for Fixed<[u8; N]> {}
 
 #[cfg(any(
     feature = "rand",
@@ -300,19 +289,5 @@ where
     {
         let inner = T::deserialize(deserializer)?;
         Ok(Fixed::new(inner))
-    }
-}
-
-#[cfg(feature = "serde-serialize")]
-/// Serde serialization support (opt-in via ExportableType marker; requires serde-serialize feature).
-impl<T> Serialize for Fixed<T>
-where
-    T: crate::ExportableType,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.inner.serialize(serializer)
     }
 }

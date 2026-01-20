@@ -4,8 +4,7 @@
 #![cfg(test)]
 
 use secure_gate::fixed_alias;
-#[cfg(feature = "rand")]
-use secure_gate::fixed_alias_random;
+
 use secure_gate::ExposeSecret;
 
 // ──────────────────────────────────────────────────────────────
@@ -78,31 +77,6 @@ fn root_visibility_works() {
 }
 
 // ──────────────────────────────────────────────────────────────
-// RNG visibility tests for fixed aliases
-// ──────────────────────────────────────────────────────────────
-#[cfg(feature = "rand")]
-mod rng_vis {
-    use super::*;
-
-    fixed_alias_random!(pub(crate) CrateRngKey, 32);
-    fixed_alias_random!(pub(in super) ParentRngKey, 24);
-
-    #[test]
-    fn rng_visibility_works() {
-        let _k = CrateRngKey::generate();
-        let _n = ParentRngKey::generate();
-        assert_eq!(_k.len(), 32);
-        assert_eq!(_n.len(), 24);
-    }
-}
-
-#[cfg(feature = "rand")]
-#[test]
-fn parent_can_access_rng_pub_in_super() {
-    let _n = rng_vis::ParentRngKey::generate();
-    let _k = rng_vis::CrateRngKey::generate();
-    assert_eq!(_n.len(), 24);
-}
 
 // === Alias type distinction ===
 #[test]
@@ -121,23 +95,4 @@ fn fixed_alias_with_custom_doc() {
 
     let k: KeyWithDoc = [0u8; 32].into();
     assert_eq!(k.len(), 32);
-}
-
-#[cfg(feature = "rand")]
-#[test]
-fn fixed_alias_random_with_custom_doc() {
-    fixed_alias_random!(pub RngKeyWithDoc, 32, "Custom documentation for random key");
-
-    let k = RngKeyWithDoc::generate();
-    assert_eq!(k.len(), 32);
-}
-
-#[cfg(feature = "rand")]
-#[test]
-fn rng_aliases_distinct_types() {
-    fixed_alias_random!(RngTypeA, 32);
-    fixed_alias_random!(RngTypeB, 32);
-
-    let _a = RngTypeA::generate();
-    // let _wrong: RngTypeB = a; // Must not compile
 }

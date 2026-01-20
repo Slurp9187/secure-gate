@@ -9,11 +9,10 @@ use rand::TryRngCore;
 #[cfg(feature = "hash-eq")]
 use crate::traits::HashEqSecret;
 
-#[cfg(any(feature = "serde-deserialize", feature = "serde-serialize"))]
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use crate::traits::redacted_debug::Sealed as RedactedSealed;
 
-#[cfg(feature = "serde-serialize")]
-use serde::ser::Serializer;
+#[cfg(any(feature = "serde-deserialize", feature = "serde-serialize"))]
+use serde::{de::DeserializeOwned, Deserialize};
 
 /// Heap-allocated secure secret wrapper.
 ///
@@ -80,7 +79,7 @@ impl<T: ?Sized> Dynamic<T> {
 /// # Ergonomic helpers for common heap types
 impl Dynamic<String> {}
 /// Redacted Debug marker.
-impl<T: ?Sized> crate::traits::redacted_debug::Sealed for Dynamic<T> {}
+impl<T: ?Sized> RedactedSealed for Dynamic<T> {}
 
 impl<T: ?Sized> crate::RedactedDebug for Dynamic<T> {}
 
@@ -144,17 +143,6 @@ impl Eq for Dynamic<String> {}
 impl core::hash::Hash for Dynamic<String> {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.hash_digest().hash(state);
-    }
-}
-
-/// Opt-in Clone — only for types marked `CloneableType`.
-#[cfg(feature = "zeroize")]
-impl<T: crate::CloneableType> Clone for Dynamic<T> {
-    #[inline(always)]
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
     }
 }
 
@@ -330,19 +318,5 @@ where
     {
         let inner = T::deserialize(deserializer)?;
         Ok(Dynamic::new(inner))
-    }
-}
-
-/// Serde serialization support (opt-in via ExportableType marker; requires serde-serialize feature).
-#[cfg(feature = "serde-serialize")]
-impl<T> Serialize for Dynamic<T>
-where
-    T: crate::ExportableType,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.inner.serialize(serializer)
     }
 }

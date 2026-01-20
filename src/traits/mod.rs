@@ -35,16 +35,6 @@ pub use expose_secret::ExposeSecret;
 pub mod expose_secret_mut;
 pub use expose_secret_mut::ExposeSecretMut;
 
-#[cfg(feature = "zeroize")]
-pub mod cloneable_type;
-#[cfg(feature = "zeroize")]
-pub use cloneable_type::CloneableType;
-
-#[cfg(feature = "serde-serialize")]
-pub mod exportable_type;
-#[cfg(feature = "serde-serialize")]
-pub use exportable_type::ExportableType;
-
 pub mod constant_time_eq;
 #[cfg(feature = "ct-eq")]
 pub use constant_time_eq::ConstantTimeEq;
@@ -67,43 +57,32 @@ pub mod secure_encoding;
 ))]
 pub use secure_encoding::SecureEncoding;
 
-/// Sealed marker trait for redacted Debug output.
-pub trait RedactedDebug: redacted_debug::Sealed {}
+pub use redacted_debug::RedactedDebug;
 
-pub mod redacted_debug {
-    pub trait Sealed {}
-}
-
-/// Sealed marker trait for secure construction (random/decoding).
-pub trait SecureConstruction: secure_construction::Sealed {
-    /// Generate a secure random instance (panics on failure).
-    #[cfg(feature = "rand")]
-    fn from_random() -> Self;
-
-    /// Decode from hex string (panics on invalid/length mismatch).
-    #[cfg(feature = "encoding-hex")]
-    fn from_hex(s: &str) -> Self;
-
-    /// Decode from base64 string (panics on invalid/length mismatch).
-    #[cfg(feature = "encoding-base64")]
-    fn from_base64(s: &str) -> Self;
-
-    /// Decode from bech32 string with HRP (panics on invalid).
-    #[cfg(feature = "encoding-bech32")]
-    fn from_bech32(s: &str, hrp: &str) -> Self;
-}
-
-pub mod secure_construction {
-    pub trait Sealed {}
-}
-
-/// Sealed marker trait for on-demand hash-based equality.
-#[cfg(feature = "hash-eq")]
-pub trait HashEqSecret: hash_eq_secret::Sealed {
-    fn hash_digest(&self) -> [u8; 32];
-}
+#[cfg(any(
+    feature = "rand",
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
+pub use secure_construction::SecureConstruction;
 
 #[cfg(feature = "hash-eq")]
-pub mod hash_eq_secret {
-    pub trait Sealed {}
-}
+pub use hash_eq_secret::HashEqSecret;
+
+#[allow(unused_imports)]
+pub use cloneable_type::CloneableType;
+
+#[allow(unused_imports)]
+pub use exportable_type::ExportableType;
+
+pub mod redacted_debug;
+
+pub mod secure_construction;
+
+#[cfg(feature = "hash-eq")]
+pub mod hash_eq_secret;
+
+pub mod cloneable_type;
+
+pub mod exportable_type;

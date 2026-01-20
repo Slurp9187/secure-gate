@@ -50,33 +50,9 @@ pub use traits::SecureConstruction;
 #[cfg(feature = "hash-eq")]
 pub use traits::HashEqSecret;
 
-/// Re-export of the [`CloneableType`] trait.
-#[cfg(feature = "zeroize")]
-pub use traits::CloneableType;
-
-/// Re-export of the [`ExportableType`] trait.
-#[cfg(feature = "serde-serialize")]
-pub use traits::ExportableType;
-
 /// Re-export of the [`ConstantTimeEq`] trait.
 #[cfg(feature = "ct-eq")]
 pub use traits::ConstantTimeEq;
-
-// /// Cloneable secret types (requires the `zeroize` feature).
-// /// Provides wrappers that can be safely duplicated while maintaining security guarantees.
-// #[cfg(feature = "zeroize")]
-// pub mod cloneable;
-// /// Re-exports of cloneable secret types: [`CloneableArray`], [`CloneableString`], [`CloneableVec`].
-// #[cfg(feature = "zeroize")]
-// pub use cloneable::{CloneableArray, CloneableString, CloneableVec};
-
-// /// Exportable secret types (requires the `serde-serialize` feature).
-// /// Provides wrappers for opt-in serialization of raw secrets.
-// #[cfg(feature = "serde-serialize")]
-// pub mod exportable;
-// /// Re-exports of exportable secret types: [`ExportableArray`], [`ExportableString`], [`ExportableVec`].
-// #[cfg(feature = "serde-serialize")]
-// pub use exportable::{ExportableArray, ExportableString, ExportableVec};
 
 /// Type alias macros (always available).
 /// Convenient macros for creating custom secret wrapper types.

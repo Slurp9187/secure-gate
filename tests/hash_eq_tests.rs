@@ -5,8 +5,7 @@
 
 #[cfg(test)]
 mod tests {
-    #[cfg(all(feature = "hash-eq", feature = "zeroize"))]
-    use secure_gate::{CloneableArray, CloneableString, CloneableVec};
+
     #[cfg(feature = "hash-eq")]
     use secure_gate::{Dynamic, Fixed};
 
@@ -55,49 +54,6 @@ mod tests {
         // Different lengths
         let str4: Dynamic<String> = "hi".into();
         assert_ne!(str1, str4);
-    }
-
-    #[cfg(all(feature = "hash-eq", feature = "zeroize"))]
-    #[test]
-    fn cloneable_vec_partial_eq_basic() {
-        // Equal vectors
-        let cv1: CloneableVec = vec![1u8, 2, 3, 4].into();
-        let cv2: CloneableVec = vec![1u8, 2, 3, 4].into();
-        assert_eq!(cv1, cv2);
-
-        // Unequal vectors
-        let cv3: CloneableVec = vec![1u8, 2, 3, 5].into();
-        assert_ne!(cv1, cv3);
-
-        // Different lengths
-        let cv4: CloneableVec = vec![1u8, 2, 3].into();
-        assert_ne!(cv1, cv4);
-    }
-
-    #[cfg(all(feature = "hash-eq", feature = "zeroize"))]
-    #[test]
-    fn cloneable_string_partial_eq_basic() {
-        // Equal strings
-        let cs1: CloneableString = "hello".into();
-        let cs2: CloneableString = "hello".into();
-        assert_eq!(cs1, cs2);
-
-        // Unequal strings
-        let cs3: CloneableString = "world".into();
-        assert_ne!(cs1, cs3);
-    }
-
-    #[cfg(all(feature = "hash-eq", feature = "zeroize"))]
-    #[test]
-    fn cloneable_array_partial_eq_basic() {
-        // Equal arrays
-        let ca1: CloneableArray<4> = CloneableArray::from([1u8, 2, 3, 4]);
-        let ca2: CloneableArray<4> = CloneableArray::from([1u8, 2, 3, 4]);
-        assert_eq!(ca1, ca2);
-
-        // Unequal arrays
-        let ca3: CloneableArray<4> = CloneableArray::from([1u8, 2, 3, 5]);
-        assert_ne!(ca1, ca3);
     }
 
     #[cfg(feature = "hash-eq")]
