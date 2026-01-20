@@ -1,7 +1,9 @@
 // Tests for exportable types: opt-in serialization without accidental exposure
 // Uses ExportableType marker for secure exporting
 
-#![cfg(all(feature = "zeroize", feature = "serde"))]
+extern crate alloc;
+
+// Cfgs added to individual tests
 
 use secure_gate::{
     exportable_dynamic_alias, exportable_fixed_alias, Dynamic, ExportableType, ExposeSecret,
@@ -25,6 +27,7 @@ impl zeroize::Zeroize for MyKey {
     }
 }
 
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 #[test]
 fn custom_type_exportable_secret_enables_serialization() {
     // For custom types, you could define an exportable alias if needed
@@ -34,7 +37,7 @@ fn custom_type_exportable_secret_enables_serialization() {
 
 // === Basic Fixed Exporting ===
 
-#[test]
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 #[test]
 fn fixed_arrays_can_be_serialized() {
     let key: ExportableArray32 = [0x42u8; 32].into();
@@ -42,6 +45,7 @@ fn fixed_arrays_can_be_serialized() {
     assert!(serialized.contains("66")); // 0x42 is 66 in decimal for JSON array
 }
 
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 #[test]
 fn primitives_via_dynamic_exportable() {
     let data: ExportableVec = vec![123, 45].into();
@@ -50,6 +54,7 @@ fn primitives_via_dynamic_exportable() {
     assert_eq!(deserialized, vec![123, 45]);
 }
 
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 #[test]
 fn serialized_fixed_are_consistent() {
     let original: ExportableArray4 = [0u8; 4].into();
@@ -60,6 +65,7 @@ fn serialized_fixed_are_consistent() {
 
 // === ExportableArray Tests ===
 
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 #[test]
 fn exportable_array_serialization() {
     let arr: ExportableArray32 = [0x42u8; 32].into();
@@ -68,6 +74,7 @@ fn exportable_array_serialization() {
     assert_eq!(deserialized, [0x42u8; 32]);
 }
 
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 #[test]
 fn exportable_array_mutation_before_serialization() {
     let mut arr: ExportableArray4 = [0u8; 4].into();
@@ -79,6 +86,7 @@ fn exportable_array_mutation_before_serialization() {
 
 // === ExportableString Tests ===
 
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 #[test]
 fn exportable_string_serialization() {
     let s: ExportableString = "secret".to_string().into();
@@ -87,6 +95,7 @@ fn exportable_string_serialization() {
     assert_eq!(deserialized, "secret");
 }
 
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 #[test]
 fn exportable_string_mutability_before_serialization() {
     let mut s: ExportableString = "base".to_string().into();
@@ -98,6 +107,7 @@ fn exportable_string_mutability_before_serialization() {
 
 // === ExportableVec Tests ===
 
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 #[test]
 fn exportable_vec_serialization() {
     let v: ExportableVec = vec![1u8, 2, 3].into();
@@ -106,6 +116,7 @@ fn exportable_vec_serialization() {
     assert_eq!(deserialized, vec![1, 2, 3]);
 }
 
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 #[test]
 fn exportable_vec_mutability_before_serialization() {
     let mut v: ExportableVec = vec![1u8, 2, 3].into();
@@ -116,16 +127,16 @@ fn exportable_vec_mutability_before_serialization() {
 }
 
 // === No accidental Serialize on raw wrappers ===
+#[cfg(all(feature = "zeroize", feature = "serde", not(feature = "serde")))]
 #[test]
-#[cfg(not(feature = "serde"))] // Only test if serde not enabled
 #[allow(unused)]
 fn raw_dynamic_not_exportable() {
     let s: Dynamic<String> = "secret".into();
     // No Serialize impl on raw Dynamic
 }
 
+#[cfg(all(feature = "zeroize", feature = "serde", not(feature = "serde")))]
 #[test]
-#[cfg(not(feature = "serde"))] // Only test if serde not enabled
 #[allow(unused)]
 fn raw_fixed_not_exportable_by_default() {
     let key: Fixed<[u8; 32]> = Fixed::new([0u8; 32]);
@@ -133,6 +144,7 @@ fn raw_fixed_not_exportable_by_default() {
 }
 
 // === Nested ExportableType ===
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 #[test]
 fn nested_exportable_array() {
     // For testing, use available size
