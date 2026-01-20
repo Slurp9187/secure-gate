@@ -92,7 +92,7 @@ impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
 
 /// On-demand hash equality.
 #[cfg(feature = "hash-eq")]
-impl<T: ?Sized> crate::traits::hash_eq_secret::Sealed for Dynamic<T> {}
+impl<T: ?Sized> crate::traits::hash_eq::Sealed for Dynamic<T> {}
 
 #[cfg(feature = "hash-eq")]
 impl crate::HashEqSecret for Dynamic<Vec<u8>> {

@@ -79,6 +79,3 @@ pub use traits::SecureEncoding;
 /// Re-export of [`Bech32EncodingError`] for convenience when using bech32 encoding.
 #[cfg(feature = "encoding-bech32")]
 pub use error::Bech32EncodingError;
-
-/// Re-export of the [`FromSliceError`] type.
-pub use error::FromSliceError;

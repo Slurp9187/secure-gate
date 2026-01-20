@@ -68,7 +68,7 @@ pub use redacted_debug::RedactedDebug;
 pub use secure_construction::SecureConstruction;
 
 #[cfg(feature = "hash-eq")]
-pub use hash_eq_secret::HashEqSecret;
+pub use hash_eq::HashEqSecret;
 
 #[allow(unused_imports)]
 pub use cloneable_type::CloneableType;
@@ -81,7 +81,7 @@ pub mod redacted_debug;
 pub mod secure_construction;
 
 #[cfg(feature = "hash-eq")]
-pub mod hash_eq_secret;
+pub mod hash_eq;
 
 pub mod cloneable_type;
 

@@ -12,8 +12,6 @@ use serde::Deserialize;
 
 use core::fmt;
 
-use crate::FromSliceError;
-
 /// Stack-allocated secure secret wrapper.
 ///
 /// This is a zero-cost wrapper for fixed-size secrets like byte arrays or primitives.
@@ -80,20 +78,26 @@ impl<T> Fixed<T> {
 /// # Byte-array specific helpers
 impl<const N: usize> Fixed<[u8; N]> {}
 
-/// Implements `TryFrom<&[u8]>` for creating a [`Fixed`] from a byte slice of exact length.
-/// Implements `TryFrom<&[u8]>` for creating a [`Fixed`] from a byte slice of exact length.
-impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
-    type Error = FromSliceError;
-
-    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
-        if slice.len() != N {
-            Err(FromSliceError::new(slice.len(), N))
-        } else {
-            let mut arr = [0u8; N];
-            arr.copy_from_slice(slice);
-            let s = Self::new(arr);
-            Ok(s)
-        }
+impl<const N: usize> From<&[u8]> for Fixed<[u8; N]> {
+    /// Create a `Fixed` from a byte slice, panicking on length mismatch.
+    ///
+    /// This is a fail-fast conversion for crypto contexts where exact length is expected.
+    /// Panics if the slice length does not match the array size `N`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `slice.len() != N`.
+    fn from(slice: &[u8]) -> Self {
+        assert_eq!(
+            slice.len(),
+            N,
+            "slice length mismatch: expected {}, got {}",
+            N,
+            slice.len()
+        );
+        let mut arr = [0u8; N];
+        arr.copy_from_slice(slice);
+        Self::new(arr)
     }
 }
 
@@ -132,7 +136,7 @@ impl<T> fmt::Debug for Fixed<T> {
 
 /// On-demand hash equality.
 #[cfg(feature = "hash-eq")]
-impl<T> crate::traits::hash_eq_secret::Sealed for Fixed<T> {}
+impl<T> crate::traits::hash_eq::Sealed for Fixed<T> {}
 
 #[cfg(feature = "hash-eq")]
 impl<T: AsRef<[u8]>> crate::HashEqSecret for Fixed<T> {
