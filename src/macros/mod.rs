@@ -9,9 +9,8 @@
 //! - `fixed_generic_alias!`: For generic fixed-size secrets
 //! - `fixed_alias_random!`: For random-only fixed-size secrets (`FixedRandom<N>`)
 
-/// Dynamic alias macros.
-mod dynamic;
-/// Fixed alias macros.
-mod fixed;
+/// Internal implementation macros.
+mod internal_impl_macros;
 
-mod implementations;
+/// Public type-alias macros.
+mod public_type_alias_macros;

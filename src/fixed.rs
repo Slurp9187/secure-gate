@@ -91,35 +91,19 @@ impl<const N: usize> From<&[u8]> for Fixed<[u8; N]> {
     }
 }
 
-#[cfg(feature = "hash-eq")]
-impl<T: AsRef<[u8]>> PartialEq for Fixed<T> {
-    fn eq(&self, other: &Self) -> bool {
-        use crate::traits::ConstantTimeEq;
-        use blake3::hash;
-        let self_hash = *hash(self.inner.as_ref()).as_bytes();
-        let other_hash = *hash(other.inner.as_ref()).as_bytes();
-        self_hash.ct_eq(&other_hash)
-    }
-}
-
-#[cfg(feature = "hash-eq")]
-impl<T: AsRef<[u8]>> Eq for Fixed<T> {}
-
-#[cfg(feature = "hash-eq")]
-impl<T: AsRef<[u8]>> core::hash::Hash for Fixed<T> {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        use blake3::hash;
-        let hash_bytes = *hash(self.inner.as_ref()).as_bytes();
-        hash_bytes.hash(state);
-    }
-}
-
 // Macro-generated From constructor implementations
 crate::impl_from_fixed!(array);
 crate::impl_from_random_fixed!();
 
-// Macro-generated implementations
+// Macro-generated equality implementations
 crate::impl_ct_eq_fixed!();
+crate::impl_hash_eq_fixed!();
+
+// Macro-generated redacted debug implementations
 crate::impl_redacted_debug!(Fixed<T>);
+
+// Macro-generated serde implementations
 crate::impl_serde_deserialize_fixed!(Fixed<T>);
+
+// Macro-generated zeroize implementations
 crate::impl_zeroize_integration_fixed!(Fixed<T>);
