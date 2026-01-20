@@ -35,7 +35,7 @@ pub use dynamic::Dynamic;
 pub use fixed::Fixed;
 
 /// Re-export of the traits.
-pub use traits::{ExposeSecret, ExposeSecretMut, RedactedDebug};
+pub use traits::{ExposeSecret, ExposeSecretMut};
 
 /// Re-export of the [`SecureConstruction`] trait.
 #[cfg(any(

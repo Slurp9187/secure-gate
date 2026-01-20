@@ -57,8 +57,6 @@ pub mod secure_encoding;
 ))]
 pub use secure_encoding::SecureEncoding;
 
-pub use redacted_debug::RedactedDebug;
-
 #[cfg(any(
     feature = "rand",
     feature = "encoding-hex",
@@ -75,8 +73,6 @@ pub use cloneable_type::CloneableType;
 
 #[allow(unused_imports)]
 pub use exportable_type::ExportableType;
-
-pub mod redacted_debug;
 
 pub mod secure_construction;
 

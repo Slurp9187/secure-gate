@@ -1,15 +1,12 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use core::fmt;
 
 #[cfg(feature = "rand")]
 use rand::TryRngCore;
 
 #[cfg(feature = "hash-eq")]
 use crate::traits::HashEqSecret;
-
-use crate::traits::redacted_debug::Sealed as RedactedSealed;
 
 #[cfg(any(feature = "serde-deserialize", feature = "serde-serialize"))]
 use serde::{de::DeserializeOwned, Deserialize};
@@ -78,17 +75,8 @@ impl<T: ?Sized> Dynamic<T> {
 
 /// # Ergonomic helpers for common heap types
 impl Dynamic<String> {}
-/// Redacted Debug marker.
-impl<T: ?Sized> RedactedSealed for Dynamic<T> {}
 
-impl<T: ?Sized> crate::RedactedDebug for Dynamic<T> {}
-
-/// Debug implementation (always redacted).
-impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("[REDACTED]")
-    }
-}
+crate::impl_redacted_debug!(Dynamic<T>, ?Sized);
 
 /// On-demand hash equality.
 #[cfg(feature = "hash-eq")]

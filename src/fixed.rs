@@ -4,13 +4,10 @@ use rand::TryRngCore;
 #[cfg(feature = "hash-eq")]
 use crate::traits::HashEqSecret;
 
-use crate::traits::redacted_debug::Sealed as RedactedSealed;
 use crate::traits::secure_construction::Sealed as SecureSealed;
 
 #[cfg(any(feature = "serde-deserialize", feature = "serde-serialize"))]
 use serde::Deserialize;
-
-use core::fmt;
 
 /// Stack-allocated secure secret wrapper.
 ///
@@ -122,17 +119,7 @@ impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
     }
 }
 
-/// Redacted Debug marker.
-impl<T> RedactedSealed for Fixed<T> {}
-
-impl<T> crate::RedactedDebug for Fixed<T> {}
-
-/// Debug implementation (always redacted).
-impl<T> fmt::Debug for Fixed<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("[REDACTED]")
-    }
-}
+crate::impl_redacted_debug!(Fixed<T>);
 
 /// On-demand hash equality.
 #[cfg(feature = "hash-eq")]

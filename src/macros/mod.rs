@@ -13,3 +13,5 @@
 mod dynamic;
 /// Fixed alias macros.
 mod fixed;
+/// Internal macros for secure-gate types.
+mod impl_redacted_debug;
