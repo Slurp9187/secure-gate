@@ -13,8 +13,8 @@ macro_rules! impl_hash_eq_dynamic {
         #[cfg(feature = "hash-eq")]
         impl PartialEq for Dynamic<$inner> {
             fn eq(&self, other: &Self) -> bool {
-                use crate::traits::ConstantTimeEq;
                 use blake3::hash;
+                use $crate::traits::ConstantTimeEq;
                 let self_hash = *hash(self.inner.$method()).as_bytes();
                 let other_hash = *hash(other.inner.$method()).as_bytes();
                 self_hash.ct_eq(&other_hash)

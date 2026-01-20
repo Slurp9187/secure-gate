@@ -1,6 +1,3 @@
-#[cfg(feature = "rand")]
-use rand::TryRngCore;
-
 /// Stack-allocated secure secret wrapper.
 ///
 /// This is a zero-cost wrapper for fixed-size secrets like byte arrays or primitives.

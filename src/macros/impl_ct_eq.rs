@@ -30,7 +30,7 @@ macro_rules! impl_ct_eq_dynamic {
             /// ```
             #[inline]
             pub fn ct_eq(&self, other: &Self) -> bool {
-                use crate::traits::ConstantTimeEq;
+                use $crate::traits::ConstantTimeEq;
                 self.inner.$method().ct_eq(other.inner.$method())
             }
         }
@@ -64,7 +64,7 @@ macro_rules! impl_ct_eq_fixed {
             /// ```
             #[inline]
             pub fn ct_eq(&self, other: &Self) -> bool {
-                use crate::traits::ConstantTimeEq;
+                use $crate::traits::ConstantTimeEq;
                 self.inner.ct_eq(&other.inner)
             }
         }
