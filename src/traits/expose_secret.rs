@@ -100,26 +100,3 @@ impl<T> ExposeSecret for Dynamic<Vec<T>> {
         self.inner.len()
     }
 }
-
-// ============================================================================
-// Random Wrapper Implementations (Read-Only Only)
-// ============================================================================
-
-// ============================================================================
-// Specific Implementations for Test Types
-// ============================================================================
-
-/// Implementation for [`Fixed<u32>`] - provides access for test compatibility.
-impl ExposeSecret for Fixed<u32> {
-    type Inner = u32;
-
-    #[inline(always)]
-    fn expose_secret(&self) -> &u32 {
-        &self.inner
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        1
-    }
-}

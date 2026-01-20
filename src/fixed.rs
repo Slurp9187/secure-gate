@@ -13,8 +13,8 @@
 /// Basic usage:
 /// ```
 /// use secure_gate::{Fixed, ExposeSecret};
-/// let secret = Fixed::new(42u32);
-/// assert_eq!(*secret.expose_secret(), 42);
+/// let secret = Fixed::new([42u8; 1]);
+/// assert_eq!(secret.expose_secret()[0], 42);
 /// ```
 ///
 /// For byte arrays (most common):
