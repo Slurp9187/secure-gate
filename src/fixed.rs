@@ -67,31 +67,8 @@ impl<T> Fixed<T> {
 /// # Byte-array specific helpers
 impl<const N: usize> Fixed<[u8; N]> {}
 
-// From implementations for byte arrays
-impl<const N: usize> From<&[u8]> for Fixed<[u8; N]> {
-    /// Create a `Fixed` from a byte slice, panicking on length mismatch.
-    ///
-    /// This is a fail-fast conversion for crypto contexts where exact length is expected.
-    /// Panics if the slice length does not match the array size `N`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `slice.len() != N`.
-    fn from(slice: &[u8]) -> Self {
-        assert_eq!(
-            slice.len(),
-            N,
-            "slice length mismatch: expected {}, got {}",
-            N,
-            slice.len()
-        );
-        let mut arr = [0u8; N];
-        arr.copy_from_slice(slice);
-        Self::new(arr)
-    }
-}
-
 // Macro-generated From constructor implementations
+crate::impl_from_fixed!(slice);
 crate::impl_from_fixed!(array);
 crate::impl_from_random_fixed!();
 
