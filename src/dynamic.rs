@@ -5,6 +5,11 @@ use alloc::boxed::Box;
 #[cfg(feature = "rand")]
 use rand::TryRngCore;
 
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
 use crate::traits::expose_secret::ExposeSecret;
 
 /// Heap-allocated secure secret wrapper.

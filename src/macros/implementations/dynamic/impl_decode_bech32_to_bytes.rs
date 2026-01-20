@@ -11,7 +11,7 @@
 macro_rules! impl_decode_bech32_to_bytes {
     () => {
         #[cfg(feature = "encoding-bech32")]
-        impl crate::Dynamic<String> {
+        impl $crate::Dynamic<String> {
             /// Decode the string as bech32 to bytes, ignoring HRP (assumes validated bech32 string).
             pub fn decode_bech32_to_bytes(&self) -> Vec<u8> {
                 use bech32::decode;

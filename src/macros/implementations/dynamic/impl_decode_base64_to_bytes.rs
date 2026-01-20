@@ -11,7 +11,7 @@
 macro_rules! impl_decode_base64_to_bytes {
     () => {
         #[cfg(feature = "encoding-base64")]
-        impl crate::Dynamic<String> {
+        impl $crate::Dynamic<String> {
             /// Decode the string as base64 to bytes (assumes validated base64 string).
             pub fn decode_base64_to_bytes(&self) -> Vec<u8> {
                 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
