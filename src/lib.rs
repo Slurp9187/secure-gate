@@ -37,19 +37,6 @@ pub use fixed::Fixed;
 /// Re-export of the traits.
 pub use traits::{ExposeSecret, ExposeSecretMut};
 
-/// Re-export of the [`SecureConstruction`] trait.
-#[cfg(any(
-    feature = "rand",
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32"
-))]
-pub use traits::SecureConstruction;
-
-/// Re-export of the [`HashEqSecret`] trait.
-#[cfg(feature = "hash-eq")]
-pub use traits::HashEqSecret;
-
 /// Re-export of the [`ConstantTimeEq`] trait.
 #[cfg(feature = "ct-eq")]
 pub use traits::ConstantTimeEq;

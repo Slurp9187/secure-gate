@@ -83,17 +83,6 @@ fn dynamic_len_is_empty() {
 }
 
 #[cfg(feature = "rand")]
-// === Random Generation ===
-#[test]
-fn fixed_generate_random() {
-    use secure_gate::{Fixed, SecureConstruction};
-    let key: Fixed<[u8; 32]> = Fixed::from_random();
-    assert_eq!(key.len(), 32);
-    // Verify it's actually random (not all zeros)
-    assert!(!key.expose_secret().iter().all(|&b| b == 0));
-}
-
-#[cfg(feature = "rand")]
 #[test]
 fn dynamic_generate_random() {
     use secure_gate::Dynamic;

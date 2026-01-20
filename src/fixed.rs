@@ -1,11 +1,6 @@
 #[cfg(feature = "rand")]
 use rand::TryRngCore;
 
-#[cfg(feature = "hash-eq")]
-use crate::traits::HashEqSecret;
-
-use crate::traits::secure_construction::Sealed as SecureSealed;
-
 /// Stack-allocated secure secret wrapper.
 ///
 /// This is a zero-cost wrapper for fixed-size secrets like byte arrays or primitives.
@@ -115,24 +110,14 @@ impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
         Self::new(arr)
     }
 }
-
-/// On-demand hash equality.
-#[cfg(feature = "hash-eq")]
-impl<T> crate::traits::hash_eq::Sealed for Fixed<T> {}
-
-#[cfg(feature = "hash-eq")]
-impl<T: AsRef<[u8]>> crate::HashEqSecret for Fixed<T> {
-    fn hash_digest(&self) -> [u8; 32] {
-        use blake3::hash;
-        *hash(self.inner.as_ref()).as_bytes()
-    }
-}
-
 #[cfg(feature = "hash-eq")]
 impl<T: AsRef<[u8]>> PartialEq for Fixed<T> {
     fn eq(&self, other: &Self) -> bool {
         use crate::traits::ConstantTimeEq;
-        self.hash_digest().ct_eq(&other.hash_digest())
+        use blake3::hash;
+        let self_hash = *hash(self.inner.as_ref()).as_bytes();
+        let other_hash = *hash(other.inner.as_ref()).as_bytes();
+        self_hash.ct_eq(&other_hash)
     }
 }
 
@@ -142,83 +127,9 @@ impl<T: AsRef<[u8]>> Eq for Fixed<T> {}
 #[cfg(feature = "hash-eq")]
 impl<T: AsRef<[u8]>> core::hash::Hash for Fixed<T> {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.hash_digest().hash(state);
-    }
-}
-
-/// Secure construction — only available with relevant features.
-impl<const N: usize> SecureSealed for Fixed<[u8; N]> {}
-
-#[cfg(any(
-    feature = "rand",
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32"
-))]
-impl<const N: usize> crate::SecureConstruction for Fixed<[u8; N]> {
-    #[cfg(feature = "rand")]
-    fn from_random() -> Self {
-        let mut bytes = [0u8; N];
-        rand::rngs::OsRng
-            .try_fill_bytes(&mut bytes)
-            .expect("OsRng failure is a program error");
-        Self::from(bytes)
-    }
-
-    #[cfg(feature = "encoding-hex")]
-    fn from_hex(s: &str) -> Self {
-        use hex as hex_crate;
-        let decoded = hex_crate::decode(s).expect("invalid hex string");
-        if decoded.len() != N {
-            panic!(
-                "hex decode length mismatch: expected {}, got {}",
-                N,
-                decoded.len()
-            );
-        }
-        let mut arr = [0u8; N];
-        arr.copy_from_slice(&decoded);
-        Self::from(arr)
-    }
-
-    #[cfg(feature = "encoding-base64")]
-    fn from_base64(s: &str) -> Self {
-        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-        use base64::Engine;
-        let decoded = URL_SAFE_NO_PAD.decode(s).expect("invalid base64 string");
-        if decoded.len() != N {
-            panic!(
-                "base64 decode length mismatch: expected {}, got {}",
-                N,
-                decoded.len()
-            );
-        }
-        let mut arr = [0u8; N];
-        arr.copy_from_slice(&decoded);
-        Self::from(arr)
-    }
-
-    #[cfg(feature = "encoding-bech32")]
-    fn from_bech32(s: &str, hrp: &str) -> Self {
-        use bech32::decode;
-        let (decoded_hrp, decoded_data) = decode(s).expect("invalid bech32 string");
-        if decoded_hrp.as_str() != hrp {
-            panic!(
-                "bech32 HRP mismatch: expected {}, got {}",
-                hrp,
-                decoded_hrp.as_str()
-            );
-        }
-        if decoded_data.len() != N {
-            panic!(
-                "bech32 decode length mismatch: expected {}, got {}",
-                N,
-                decoded_data.len()
-            );
-        }
-        let mut arr = [0u8; N];
-        arr.copy_from_slice(&decoded_data);
-        Self::from(arr)
+        use blake3::hash;
+        let hash_bytes = *hash(self.inner.as_ref()).as_bytes();
+        hash_bytes.hash(state);
     }
 }
 

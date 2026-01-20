@@ -57,27 +57,11 @@ pub mod secure_encoding;
 ))]
 pub use secure_encoding::SecureEncoding;
 
-#[cfg(any(
-    feature = "rand",
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32"
-))]
-pub use secure_construction::SecureConstruction;
-
-#[cfg(feature = "hash-eq")]
-pub use hash_eq::HashEqSecret;
-
 #[allow(unused_imports)]
 pub use cloneable_type::CloneableType;
 
 #[allow(unused_imports)]
 pub use exportable_type::ExportableType;
-
-pub mod secure_construction;
-
-#[cfg(feature = "hash-eq")]
-pub mod hash_eq;
 
 pub mod cloneable_type;
 
