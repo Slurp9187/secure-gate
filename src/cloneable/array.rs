@@ -23,12 +23,12 @@ impl<const N: usize> AsRef<[u8]> for CloneableArrayInner<N> {
     }
 }
 
-impl<const N: usize> crate::CloneSafe for CloneableArrayInner<N> {}
+impl<const N: usize> crate::CloneableType for CloneableArrayInner<N> {}
 
 #[cfg(feature = "serde-serialize")]
 impl<const N: usize> Serialize for CloneableArrayInner<N>
 where
-    [u8; N]: crate::SerializableSecret, // Gate on inner array
+    [u8; N]: crate::ExportableType, // Gate on inner array
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -110,13 +110,7 @@ impl<const N: usize> CloneableArray<N> {
 impl<const N: usize> From<[u8; N]> for CloneableArray<N> {
     /// Wrap a `[u8; N]` array in a `CloneableArray`.
     fn from(arr: [u8; N]) -> Self {
-        #[allow(unused_mut)]
-        let mut s = Fixed::new(CloneableArrayInner(arr));
-        #[cfg(feature = "hash-eq")]
-        {
-            use blake3::hash;
-            s.eq_hash = *hash(arr.as_slice()).as_bytes();
-        }
+        let s = Fixed::new(CloneableArrayInner(arr));
         s
     }
 }

@@ -72,7 +72,7 @@ macro_rules! dynamic_generic_alias {
 
 /// Creates a type alias for a heap-allocated exportable secret (opt-in serialization).
 ///
-/// This macro generates an inner newtype for raw dynamic data (Vec<u8> or String), implements SerializableSecret for opt-in serialization,
+/// This macro generates an inner newtype for raw dynamic data (Vec<u8> or String), implements ExportableType for opt-in serialization,
 /// and creates a type alias to `Dynamic<Inner>`. For encoded types (e.g., HexString), it creates an alias with Serialize forwarding to the encoded string.
 ///
 /// Requires the "serde-serialize" feature to compile.
@@ -105,7 +105,7 @@ macro_rules! dynamic_exportable_alias {
         }
 
         #[cfg(feature = "serde-serialize")]
-        impl $crate::SerializableSecret for $name {}
+        impl $crate::ExportableType for $name {}
 
         impl From<Vec<u8>> for $name {
             fn from(v: Vec<u8>) -> Self {
@@ -130,7 +130,7 @@ macro_rules! dynamic_exportable_alias {
         }
 
         #[cfg(feature = "serde-serialize")]
-        impl $crate::SerializableSecret for $name {}
+        impl $crate::ExportableType for $name {}
 
         impl From<Vec<u8>> for $name {
             fn from(v: Vec<u8>) -> Self {
@@ -156,7 +156,7 @@ macro_rules! dynamic_exportable_alias {
         }
 
         #[cfg(feature = "serde-serialize")]
-        impl $crate::SerializableSecret for $name {}
+        impl $crate::ExportableType for $name {}
 
         impl From<String> for $name {
             fn from(s: String) -> Self {
@@ -181,7 +181,7 @@ macro_rules! dynamic_exportable_alias {
         }
 
         #[cfg(feature = "serde-serialize")]
-        impl $crate::SerializableSecret for $name {}
+        impl $crate::ExportableType for $name {}
 
         impl From<String> for $name {
             fn from(s: String) -> Self {

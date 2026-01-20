@@ -1,18 +1,19 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
+use core::fmt;
 
 #[cfg(feature = "rand")]
-use rand::rand_core::OsError;
+use rand::TryRngCore;
+
+#[cfg(feature = "hash-eq")]
+use crate::traits::HashEqSecret;
 
 #[cfg(any(feature = "serde-deserialize", feature = "serde-serialize"))]
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(feature = "serde-serialize")]
 use serde::ser::Serializer;
-
-#[cfg(feature = "hash-eq")]
-use blake3::hash;
 
 /// Heap-allocated secure secret wrapper.
 ///
@@ -60,8 +61,6 @@ use blake3::hash;
 /// ```
 pub struct Dynamic<T: ?Sized> {
     pub(crate) inner: Box<T>,
-    #[cfg(feature = "hash-eq")]
-    pub(crate) eq_hash: [u8; 32],
 }
 
 impl<T: ?Sized> Dynamic<T> {
@@ -74,32 +73,87 @@ impl<T: ?Sized> Dynamic<T> {
         U: Into<Box<T>>,
     {
         let inner = value.into();
-        Self {
-            inner,
-            #[cfg(feature = "hash-eq")]
-            eq_hash: [0u8; 32],
-        }
+        Self { inner }
     }
 }
 
 /// # Ergonomic helpers for common heap types
 impl Dynamic<String> {}
+/// Redacted Debug marker.
+impl<T: ?Sized> crate::traits::redacted_debug::Sealed for Dynamic<T> {}
+
+impl<T: ?Sized> crate::RedactedDebug for Dynamic<T> {}
+
 /// Debug implementation (always redacted).
 impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("[REDACTED]")
     }
 }
 
-/// Opt-in Clone — only for types marked `CloneSafe`.
+/// On-demand hash equality.
+#[cfg(feature = "hash-eq")]
+impl<T: ?Sized> crate::traits::hash_eq_secret::Sealed for Dynamic<T> {}
+
+#[cfg(feature = "hash-eq")]
+impl crate::HashEqSecret for Dynamic<Vec<u8>> {
+    fn hash_digest(&self) -> [u8; 32] {
+        use blake3::hash;
+        *hash(self.inner.as_slice()).as_bytes()
+    }
+}
+
+#[cfg(feature = "hash-eq")]
+impl crate::HashEqSecret for Dynamic<String> {
+    fn hash_digest(&self) -> [u8; 32] {
+        use blake3::hash;
+        *hash(self.inner.as_bytes()).as_bytes()
+    }
+}
+
+#[cfg(feature = "hash-eq")]
+impl PartialEq for Dynamic<Vec<u8>> {
+    fn eq(&self, other: &Self) -> bool {
+        use crate::traits::ConstantTimeEq;
+        self.hash_digest().ct_eq(&other.hash_digest())
+    }
+}
+
+#[cfg(feature = "hash-eq")]
+impl Eq for Dynamic<Vec<u8>> {}
+
+#[cfg(feature = "hash-eq")]
+impl core::hash::Hash for Dynamic<Vec<u8>> {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.hash_digest().hash(state);
+    }
+}
+
+#[cfg(feature = "hash-eq")]
+impl PartialEq for Dynamic<String> {
+    fn eq(&self, other: &Self) -> bool {
+        use crate::traits::ConstantTimeEq;
+        self.hash_digest().ct_eq(&other.hash_digest())
+    }
+}
+
+#[cfg(feature = "hash-eq")]
+impl Eq for Dynamic<String> {}
+
+#[cfg(feature = "hash-eq")]
+impl core::hash::Hash for Dynamic<String> {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.hash_digest().hash(state);
+    }
+}
+
+/// Opt-in Clone — only for types marked `CloneableType`.
 #[cfg(feature = "zeroize")]
-impl<T: crate::CloneSafe> Clone for Dynamic<T> {
+impl<T: crate::CloneableType> Clone for Dynamic<T> {
     #[inline(always)]
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            #[cfg(feature = "hash-eq")]
-            eq_hash: self.eq_hash,
         }
     }
 }
@@ -109,13 +163,7 @@ impl<T: crate::CloneSafe> Clone for Dynamic<T> {
 impl From<&[u8]> for Dynamic<Vec<u8>> {
     #[inline(always)]
     fn from(slice: &[u8]) -> Self {
-        #[allow(unused_mut)]
-        let mut secret = Self::new(slice.to_vec());
-        #[cfg(feature = "hash-eq")]
-        {
-            secret.eq_hash = *hash(slice).as_bytes();
-        }
-        secret
+        Self::new(slice.to_vec())
     }
 }
 
@@ -126,22 +174,9 @@ impl<T> Dynamic<Vec<T>> {}
 impl<T: 'static> From<T> for Dynamic<T> {
     #[inline(always)]
     fn from(value: T) -> Self {
-        #[allow(unused_mut)]
-        let mut s = Self {
+        Self {
             inner: Box::new(value),
-            #[cfg(feature = "hash-eq")]
-            eq_hash: [0u8; 32],
-        };
-        #[cfg(feature = "hash-eq")]
-        {
-            use core::any::Any;
-            if let Some(d) = (&mut s as &mut dyn Any).downcast_mut::<Dynamic<Vec<u8>>>() {
-                d.eq_hash = *hash(d.inner.as_ref().as_ref()).as_bytes();
-            } else if let Some(d) = (&mut s as &mut dyn Any).downcast_mut::<Dynamic<String>>() {
-                d.eq_hash = *hash(d.inner.as_ref().as_bytes()).as_bytes();
-            }
         }
-        s
     }
 }
 
@@ -149,11 +184,7 @@ impl<T: 'static> From<T> for Dynamic<T> {
 impl<T: ?Sized> From<Box<T>> for Dynamic<T> {
     #[inline(always)]
     fn from(boxed: Box<T>) -> Self {
-        Self {
-            inner: boxed,
-            #[cfg(feature = "hash-eq")]
-            eq_hash: [0u8; 32],
-        }
+        Self { inner: boxed }
     }
 }
 
@@ -161,13 +192,7 @@ impl<T: ?Sized> From<Box<T>> for Dynamic<T> {
 impl From<&str> for Dynamic<String> {
     #[inline(always)]
     fn from(input: &str) -> Self {
-        #[allow(unused_mut)]
-        let mut secret = Self::new(input.to_string());
-        #[cfg(feature = "hash-eq")]
-        {
-            secret.eq_hash = *hash(input.as_bytes()).as_bytes();
-        }
-        secret
+        Self::new(input.to_string())
     }
 }
 
@@ -192,9 +217,6 @@ impl Dynamic<String> {
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
         use crate::traits::ConstantTimeEq;
-        #[cfg(feature = "hash-eq")]
-        return self.eq_hash.ct_eq(&other.eq_hash);
-        #[cfg(not(feature = "hash-eq"))]
         self.inner.as_bytes().ct_eq(other.inner.as_bytes())
     }
 }
@@ -212,17 +234,14 @@ impl Dynamic<Vec<u8>> {
     /// # #[cfg(feature = "ct-eq")]
     /// # {
     /// use secure_gate::Dynamic;
-    /// let a: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3]);
-    /// let b: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3]);
+    /// let a: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8; 32]);
+    /// let b: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8; 32]);
     /// assert!(a.ct_eq(&b));
     /// # }
     /// ```
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
         use crate::traits::ConstantTimeEq;
-        #[cfg(feature = "hash-eq")]
-        return self.eq_hash.ct_eq(&other.eq_hash);
-        #[cfg(not(feature = "hash-eq"))]
         self.inner.as_slice().ct_eq(other.inner.as_slice())
     }
 }
@@ -230,11 +249,10 @@ impl Dynamic<Vec<u8>> {
 /// Random generation — only available with `rand` feature.
 #[cfg(feature = "rand")]
 impl Dynamic<Vec<u8>> {
-    /// Generate fresh random bytes of the specified length using the OS RNG.
+    /// Fill with fresh random bytes of the specified length using the OS RNG.
     ///
-    /// This is a convenience method that generates random bytes directly
-    /// without going through `DynamicRandom`. Equivalent to:
-    /// `DynamicRandom::generate(len).into_inner()`
+    /// Panics on RNG failure for fail-fast crypto code. Guarantees secure entropy
+    /// from system sources.
     ///
     /// # Example
     ///
@@ -242,33 +260,49 @@ impl Dynamic<Vec<u8>> {
     /// # #[cfg(feature = "rand")]
     /// # {
     /// use secure_gate::{Dynamic, ExposeSecret};
-    /// let random: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
+    /// let random: Dynamic<Vec<u8>> = Dynamic::from_random(64);
     /// assert_eq!(random.len(), 64);
     /// # }
     /// ```
     #[inline]
-    pub fn generate_random(len: usize) -> Self {
-        crate::random::DynamicRandom::generate(len).into_inner()
+    pub fn from_random(len: usize) -> Self {
+        let mut bytes = vec![0u8; len];
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut bytes)
+            .expect("OsRng failure is a program error");
+        Self::from(bytes)
     }
 
-    /// Try to generate random bytes for Dynamic.
-    ///
-    /// Returns an error if the RNG fails.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # #[cfg(feature = "rand")]
-    /// # {
-    /// use secure_gate::Dynamic;
-    /// let random: Result<Dynamic<Vec<u8>>, rand::rand_core::OsError> = Dynamic::try_generate_random(64);
-    /// assert!(random.is_ok());
-    /// # }
-    /// ```
-    #[inline]
-    pub fn try_generate_random(len: usize) -> Result<Self, OsError> {
-        crate::random::DynamicRandom::try_generate(len)
-            .map(|rng: crate::random::DynamicRandom| rng.into_inner())
+    /// Decode from hex string to Vec<u8> (panics on invalid).
+    #[cfg(feature = "encoding-hex")]
+    pub fn from_hex(s: &str) -> Self {
+        use hex as hex_crate;
+        let decoded = hex_crate::decode(s).expect("invalid hex string");
+        Self::from(decoded)
+    }
+
+    /// Decode from base64 string to Vec<u8> (panics on invalid).
+    #[cfg(feature = "encoding-base64")]
+    pub fn from_base64(s: &str) -> Self {
+        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        use base64::Engine;
+        let decoded = URL_SAFE_NO_PAD.decode(s).expect("invalid base64 string");
+        Self::from(decoded)
+    }
+
+    /// Decode from bech32 string with HRP to Vec<u8> (panics on invalid/HRP mismatch).
+    #[cfg(feature = "encoding-bech32")]
+    pub fn from_bech32(s: &str, hrp: &str) -> Self {
+        use bech32::decode;
+        let (decoded_hrp, decoded_data) = decode(s).expect("invalid bech32 string");
+        if decoded_hrp.as_str() != hrp {
+            panic!(
+                "bech32 HRP mismatch: expected {}, got {}",
+                hrp,
+                decoded_hrp.as_str()
+            );
+        }
+        Self::from(decoded_data)
     }
 }
 
@@ -277,8 +311,6 @@ impl Dynamic<Vec<u8>> {
 impl<T: ?Sized + zeroize::Zeroize> zeroize::Zeroize for Dynamic<T> {
     fn zeroize(&mut self) {
         self.inner.zeroize();
-        #[cfg(feature = "hash-eq")]
-        self.eq_hash.zeroize();
     }
 }
 
@@ -301,11 +333,11 @@ where
     }
 }
 
-/// Serde serialization support (opt-in via SerializableSecret marker; requires serde-serialize feature).
+/// Serde serialization support (opt-in via ExportableType marker; requires serde-serialize feature).
 #[cfg(feature = "serde-serialize")]
 impl<T> Serialize for Dynamic<T>
 where
-    T: crate::SerializableSecret,
+    T: crate::ExportableType,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

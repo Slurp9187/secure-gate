@@ -5,7 +5,7 @@
 //! properly zeroized when dropped. These types are only available when the
 //! "serde-serialize" feature is enabled.
 //!
-//! The types in this module implement the [`SerializableSecret`] trait, enabling
+//! The types in this module implement the [`ExportableType`] trait, enabling
 //! serialization of raw bytes or text without automatic leakage. This is designed
 //! for deliberate export in secure contexts (e.g., config files), not for encoding
 //! or random generation—use conversions or macros for those.

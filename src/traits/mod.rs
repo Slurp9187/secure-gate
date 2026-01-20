@@ -8,11 +8,10 @@
 ///
 /// - [`ExposeSecret`] - Read-only secret access with metadata
 /// - [`ExposeSecretMut`] - Mutable secret access
-/// - [`SecureRandom`] - Marker for cryptographically secure random values (requires `rand` feature)
-/// - [`CloneSafe`] - Opt-in safe cloning with zeroization (requires `zeroize` feature)
-/// - [`ConstantTimeEq`] - Constant-time equality to prevent timing attacks (requires `ct-eq` feature)
+/// - [`CloneableType`] - Opt-in safe cloning with zeroization (requires zeroize feature)
+/// - [`ConstantTimeEq`] - Constant-time equality to prevent timing attacks (requires ct-eq feature)
 /// - [`SecureEncoding`] - Extension trait for secure byte encoding to strings (requires encoding features)
-/// - [`SerializableSecret`] - Marker for types allowing secure serialization (requires `serde-serialize` feature)
+/// - [`ExportableType`] - Marker for types allowing secure serialization (requires serde-serialize feature)
 ///
 /// ## Security Guarantees
 ///
@@ -24,11 +23,11 @@
 /// ## Feature Gates
 ///
 /// Some traits require optional Cargo features:
-/// - `rand`: Enables [`SecureRandom`] and random wrapper implementations
-/// - `zeroize`: Enables [`CloneSafe`] for safe cloning
-/// - `ct-eq`: Enables [`ConstantTimeEq`] for constant-time comparisons
-/// - `encoding` (or `encoding-hex`, `encoding-base64`, `encoding-bech32`): Enables [`SecureEncoding`] for byte encoding
-/// - `serde`: Enables [`SerializableSecret`] for opt-in serialization
+/// - rand: Enables random wrapper implementations
+/// - zeroize: Enables [`CloneableType`] for safe cloning
+/// - ct-eq: Enables [`ConstantTimeEq`] for constant-time comparisons
+/// - encoding (or encoding-hex, encoding-base64, encoding-bech32): Enables [`SecureEncoding`] for byte encoding
+/// - serde: Enables [`ExportableType`] for opt-in serialization
 // Secret Exposure Traits
 pub mod expose_secret;
 pub use expose_secret::ExposeSecret;
@@ -36,19 +35,15 @@ pub use expose_secret::ExposeSecret;
 pub mod expose_secret_mut;
 pub use expose_secret_mut::ExposeSecretMut;
 
-pub mod secure_random;
-#[cfg(feature = "rand")]
-pub use secure_random::SecureRandom;
-
 #[cfg(feature = "zeroize")]
-pub mod clone_safe;
+pub mod cloneable_type;
 #[cfg(feature = "zeroize")]
-pub use clone_safe::CloneSafe;
+pub use cloneable_type::CloneableType;
 
 #[cfg(feature = "serde-serialize")]
-pub mod serializable_secret;
+pub mod exportable_type;
 #[cfg(feature = "serde-serialize")]
-pub use serializable_secret::SerializableSecret;
+pub use exportable_type::ExportableType;
 
 pub mod constant_time_eq;
 #[cfg(feature = "ct-eq")]
@@ -65,12 +60,50 @@ pub mod secure_encoding;
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
 pub use secure_encoding::SecureEncoding;
 
+/// Sealed marker trait for redacted Debug output.
+pub trait RedactedDebug: redacted_debug::Sealed {}
+
+pub mod redacted_debug {
+    pub trait Sealed {}
+}
+
+/// Sealed marker trait for secure construction (random/decoding).
+pub trait SecureConstruction: secure_construction::Sealed {
+    /// Generate a secure random instance (panics on failure).
+    #[cfg(feature = "rand")]
+    fn from_random() -> Self;
+
+    /// Decode from hex string (panics on invalid/length mismatch).
+    #[cfg(feature = "encoding-hex")]
+    fn from_hex(s: &str) -> Self;
+
+    /// Decode from base64 string (panics on invalid/length mismatch).
+    #[cfg(feature = "encoding-base64")]
+    fn from_base64(s: &str) -> Self;
+
+    /// Decode from bech32 string with HRP (panics on invalid).
+    #[cfg(feature = "encoding-bech32")]
+    fn from_bech32(s: &str, hrp: &str) -> Self;
+}
+
+pub mod secure_construction {
+    pub trait Sealed {}
+}
+
+/// Sealed marker trait for on-demand hash-based equality.
 #[cfg(feature = "hash-eq")]
-pub mod hash_eq;
+pub trait HashEqSecret: hash_eq_secret::Sealed {
+    fn hash_digest(&self) -> [u8; 32];
+}
 
 #[cfg(feature = "hash-eq")]
-pub mod byteview;
-
-// Random Generation Traits (requires `rand` feature)
+pub mod hash_eq_secret {
+    pub trait Sealed {}
+}

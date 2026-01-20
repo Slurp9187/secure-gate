@@ -10,7 +10,7 @@
 // #![doc = include_str!("../EXAMPLES.md")] // uncomment for doctest runs
 //! Zero-cost secure wrappers for secrets — [`Fixed<T>`] for stack, [`Dynamic<T>`] for heap.
 //!
-//! This crate provides explicit wrappers for sensitive data like [`CloneableArray`], [`CloneableString`], and [`CloneSafe`], ensuring no accidental exposure.
+//! This crate provides explicit wrappers for sensitive data like [`CloneableArray`], [`CloneableString`], and [`CloneableType`], ensuring no accidental exposure.
 //! See [README.md](https://github.com/Slurp9187/secure-gate) for usage and examples.
 
 extern crate alloc;
@@ -35,39 +35,48 @@ pub use dynamic::Dynamic;
 pub use fixed::Fixed;
 
 /// Re-export of the traits.
-pub use traits::{ExposeSecret, ExposeSecretMut};
+pub use traits::{ExposeSecret, ExposeSecretMut, RedactedDebug};
 
-/// Re-export of SecureRandom (requires `rand` feature).
-#[cfg(feature = "rand")]
-pub use traits::SecureRandom;
+/// Re-export of the [`SecureConstruction`] trait.
+#[cfg(any(
+    feature = "rand",
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
+pub use traits::SecureConstruction;
 
-/// Re-export of the [`CloneSafe`] trait.
+/// Re-export of the [`HashEqSecret`] trait.
+#[cfg(feature = "hash-eq")]
+pub use traits::HashEqSecret;
+
+/// Re-export of the [`CloneableType`] trait.
 #[cfg(feature = "zeroize")]
-pub use traits::CloneSafe;
+pub use traits::CloneableType;
 
-/// Re-export of the [`SerializableSecret`] trait.
+/// Re-export of the [`ExportableType`] trait.
 #[cfg(feature = "serde-serialize")]
-pub use traits::SerializableSecret;
+pub use traits::ExportableType;
 
 /// Re-export of the [`ConstantTimeEq`] trait.
 #[cfg(feature = "ct-eq")]
 pub use traits::ConstantTimeEq;
 
-/// Cloneable secret types (requires the `zeroize` feature).
-/// Provides wrappers that can be safely duplicated while maintaining security guarantees.
-#[cfg(feature = "zeroize")]
-pub mod cloneable;
-/// Re-exports of cloneable secret types: [`CloneableArray`], [`CloneableString`], [`CloneableVec`].
-#[cfg(feature = "zeroize")]
-pub use cloneable::{CloneableArray, CloneableString, CloneableVec};
+// /// Cloneable secret types (requires the `zeroize` feature).
+// /// Provides wrappers that can be safely duplicated while maintaining security guarantees.
+// #[cfg(feature = "zeroize")]
+// pub mod cloneable;
+// /// Re-exports of cloneable secret types: [`CloneableArray`], [`CloneableString`], [`CloneableVec`].
+// #[cfg(feature = "zeroize")]
+// pub use cloneable::{CloneableArray, CloneableString, CloneableVec};
 
-/// Exportable secret types (requires the `serde-serialize` feature).
-/// Provides wrappers for opt-in serialization of raw secrets.
-#[cfg(feature = "serde-serialize")]
-pub mod exportable;
-/// Re-exports of exportable secret types: [`ExportableArray`], [`ExportableString`], [`ExportableVec`].
-#[cfg(feature = "serde-serialize")]
-pub use exportable::{ExportableArray, ExportableString, ExportableVec};
+// /// Exportable secret types (requires the `serde-serialize` feature).
+// /// Provides wrappers for opt-in serialization of raw secrets.
+// #[cfg(feature = "serde-serialize")]
+// pub mod exportable;
+// /// Re-exports of exportable secret types: [`ExportableArray`], [`ExportableString`], [`ExportableVec`].
+// #[cfg(feature = "serde-serialize")]
+// pub use exportable::{ExportableArray, ExportableString, ExportableVec};
 
 /// Type alias macros (always available).
 /// Convenient macros for creating custom secret wrapper types.
@@ -78,35 +87,9 @@ mod macros;
 /// - `dynamic_generic_alias!`: Create generic heap-allocated secret aliases.
 /// - `fixed_alias!`: Create type aliases for fixed-size secrets (`Fixed<[u8; N]>`).
 /// - `fixed_generic_alias!`: Create generic fixed-size secret aliases.
-/// - `fixed_alias_random!`: Create type aliases for random-only fixed-size secrets (`FixedRandom<N>`, requires `rand` feature).
-/// Cryptographically secure random generation (requires the `rand` feature).
-/// Provides RNG-backed secret generation with freshness guarantees.
-#[cfg(feature = "rand")]
-pub mod random;
-
 /// Encoding utilities for secrets (various encoding features available).
 /// Secure encoding/decoding with validation and zeroization.
 pub mod encoding;
-
-/// Re-exports for convenient access to feature-gated types.
-#[cfg(feature = "rand")]
-pub use random::{DynamicRandom, FixedRandom};
-
-/// Re-export of [`HexString`] for convenience when using hex encoding.
-#[cfg(feature = "encoding-hex")]
-pub use encoding::hex::HexString;
-
-/// Re-export of [`Base64String`] for convenience when using base64 encoding.
-#[cfg(feature = "encoding-base64")]
-pub use encoding::base64::Base64String;
-
-/// Re-export of [`Bech32String`] for convenience when using bech32 encoding.
-#[cfg(feature = "encoding-bech32")]
-pub use encoding::bech32::Bech32String;
-
-/// Re-export of [`Bech32EncodingError`] for convenience when using bech32 encoding.
-#[cfg(feature = "encoding-bech32")]
-pub use error::Bech32EncodingError;
 
 /// Re-export of [`SecureEncoding`] trait for convenient encoding extensions.
 /// Re-export of the [`SecureEncoding`] trait.
@@ -116,6 +99,10 @@ pub use error::Bech32EncodingError;
     feature = "encoding-bech32"
 ))]
 pub use traits::SecureEncoding;
+
+/// Re-export of [`Bech32EncodingError`] for convenience when using bech32 encoding.
+#[cfg(feature = "encoding-bech32")]
+pub use error::Bech32EncodingError;
 
 /// Re-export of the [`FromSliceError`] type.
 pub use error::FromSliceError;

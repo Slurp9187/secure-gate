@@ -9,10 +9,7 @@ use base64_crate::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64_crate::Engine;
 
 #[cfg(feature = "encoding-bech32")]
-use ::bech32::{self};
-
-#[cfg(feature = "encoding-bech32")]
-use crate::Bech32EncodingError;
+use bech32::{self};
 
 /// Extension trait for safe, explicit encoding of secret byte data to strings.
 ///
@@ -26,10 +23,10 @@ use crate::Bech32EncodingError;
 /// ```
 /// # #[cfg(feature = "encoding-hex")]
 /// # {
-/// use secure_gate::{SecureEncoding, ExposeSecret};
+/// use secure_gate::SecureEncoding;
 /// let bytes = [0x42u8; 32];
 /// let hex_string = bytes.to_hex();
-/// let hex = hex_string.expose_secret(); // → "424242..."
+/// // hex_string is now String: "424242..."
 /// # }
 /// ```
 #[cfg(any(
@@ -40,7 +37,7 @@ use crate::Bech32EncodingError;
 pub trait SecureEncoding {
     /// Encode secret bytes as lowercase hexadecimal.
     #[cfg(feature = "encoding-hex")]
-    fn to_hex(&self) -> crate::encoding::hex::HexString;
+    fn to_hex(&self) -> alloc::string::String;
 
     /// Encode secret bytes as uppercase hexadecimal.
     #[cfg(feature = "encoding-hex")]
@@ -48,21 +45,15 @@ pub trait SecureEncoding {
 
     /// Encode secret bytes as URL-safe base64 (no padding).
     #[cfg(feature = "encoding-base64")]
-    fn to_base64url(&self) -> crate::encoding::base64::Base64String;
+    fn to_base64url(&self) -> alloc::string::String;
 
-    /// Try to encode secret bytes as Bech32 with the specified HRP.
+    /// Encode secret bytes as Bech32 with the specified HRP.
     #[cfg(feature = "encoding-bech32")]
-    fn try_to_bech32(
-        &self,
-        hrp: &str,
-    ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError>;
+    fn to_bech32(&self, hrp: &str) -> alloc::string::String;
 
-    /// Try to encode secret bytes as Bech32m with the specified HRP.
+    /// Encode secret bytes as Bech32m with the specified HRP.
     #[cfg(feature = "encoding-bech32")]
-    fn try_to_bech32m(
-        &self,
-        hrp: &str,
-    ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError>;
+    fn to_bech32m(&self, hrp: &str) -> alloc::string::String;
 }
 
 #[cfg(any(
@@ -73,9 +64,8 @@ pub trait SecureEncoding {
 impl SecureEncoding for [u8] {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
-    fn to_hex(&self) -> crate::encoding::hex::HexString {
-        let encoded = hex_crate::encode(self);
-        crate::encoding::hex::HexString::new(encoded).expect("fresh encode is always valid")
+    fn to_hex(&self) -> alloc::string::String {
+        hex_crate::encode(self)
     }
 
     #[cfg(feature = "encoding-hex")]
@@ -86,35 +76,22 @@ impl SecureEncoding for [u8] {
 
     #[cfg(feature = "encoding-base64")]
     #[inline(always)]
-    fn to_base64url(&self) -> crate::encoding::base64::Base64String {
-        let encoded = URL_SAFE_NO_PAD.encode(self);
-        crate::encoding::base64::Base64String::new(encoded).expect("fresh encode is always valid")
+    fn to_base64url(&self) -> alloc::string::String {
+        URL_SAFE_NO_PAD.encode(self)
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32(
-        &self,
-        hrp: &str,
-    ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = bech32::encode::<bech32::Bech32>(hrp_parsed, self)
-            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new(encoded)
-            .expect("fresh encode is always valid"))
+    fn to_bech32(&self, hrp: &str) -> alloc::string::String {
+        let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
+        bech32::encode::<bech32::Bech32>(hrp_parsed, self).expect("bech32 encoding failed")
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32m(
-        &self,
-        hrp: &str,
-    ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = bech32::encode::<bech32::Bech32m>(hrp_parsed, self)
-            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new(encoded)
-            .expect("fresh encode is always valid"))
+    fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
+        let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
+        bech32::encode::<bech32::Bech32m>(hrp_parsed, self).expect("bech32m encoding failed")
     }
 }
 
@@ -126,9 +103,8 @@ impl SecureEncoding for [u8] {
 impl<const N: usize> SecureEncoding for [u8; N] {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
-    fn to_hex(&self) -> crate::encoding::hex::HexString {
-        let encoded = hex_crate::encode(self);
-        crate::encoding::hex::HexString::new(encoded).expect("fresh encode is always valid")
+    fn to_hex(&self) -> alloc::string::String {
+        hex_crate::encode(self)
     }
 
     #[cfg(feature = "encoding-hex")]
@@ -139,34 +115,21 @@ impl<const N: usize> SecureEncoding for [u8; N] {
 
     #[cfg(feature = "encoding-base64")]
     #[inline(always)]
-    fn to_base64url(&self) -> crate::encoding::base64::Base64String {
-        let encoded = URL_SAFE_NO_PAD.encode(self);
-        crate::encoding::base64::Base64String::new(encoded).expect("fresh encode is always valid")
+    fn to_base64url(&self) -> alloc::string::String {
+        URL_SAFE_NO_PAD.encode(self)
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32(
-        &self,
-        hrp: &str,
-    ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = bech32::encode::<bech32::Bech32>(hrp_parsed, self)
-            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new(encoded)
-            .expect("fresh encode is always valid"))
+    fn to_bech32(&self, hrp: &str) -> alloc::string::String {
+        let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
+        bech32::encode::<bech32::Bech32>(hrp_parsed, self).expect("bech32 encoding failed")
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32m(
-        &self,
-        hrp: &str,
-    ) -> Result<crate::encoding::bech32::Bech32String, Bech32EncodingError> {
-        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
-        let encoded = bech32::encode::<bech32::Bech32m>(hrp_parsed, self)
-            .map_err(|_| Bech32EncodingError::EncodingFailed)?;
-        Ok(crate::encoding::bech32::Bech32String::new(encoded)
-            .expect("fresh encode is always valid"))
+    fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
+        let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
+        bech32::encode::<bech32::Bech32m>(hrp_parsed, self).expect("bech32m encoding failed")
     }
 }

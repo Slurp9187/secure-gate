@@ -157,7 +157,7 @@ fn exportable_serialization_requires_feature() {
 #[cfg(feature = "serde-serialize")]
 #[test]
 fn no_direct_core_serialization_without_marker() {
-    // Core Fixed<T> doesn't serialize unless T: SerializableSecret
+    // Core Fixed<T> doesn't serialize unless T: ExportableType
     let fixed: Fixed<[u8; 2]> = Fixed::new([1, 2]);
     // This would fail to compile if attempted: serde_json::to_string(&fixed);
     // Instead, convert to Exportable*

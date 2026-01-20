@@ -1,7 +1,7 @@
 /// Inner wrapper for a fixed-size byte array that enables opt-in serialization.
 ///
 /// This struct wraps a byte array and provides secure serialization when the
-/// `SerializableSecret` marker is implemented. It ensures zeroization on drop
+/// `ExportableType` marker is implemented. It ensures zeroization on drop
 /// to prevent memory leaks.
 #[cfg(feature = "zeroize")]
 use ::zeroize::Zeroize;
@@ -27,7 +27,7 @@ impl<const N: usize> core::fmt::Debug for ExportableArrayInner<N> {
 }
 
 /// Marker impl for serialization of raw byte arrays.
-impl<const N: usize> crate::SerializableSecret for ExportableArrayInner<N> {}
+impl<const N: usize> crate::ExportableType for ExportableArrayInner<N> {}
 
 /// Serde serialization support for raw byte arrays.
 #[cfg(feature = "serde-serialize")]
@@ -57,7 +57,7 @@ impl<const N: usize> crate::ConstantTimeEq for ExportableArrayInner<N> {
 impl<const N: usize> crate::SecureEncoding for ExportableArrayInner<N> {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
-    fn to_hex(&self) -> crate::HexString {
+    fn to_hex(&self) -> alloc::string::String {
         self.0.to_hex()
     }
 
@@ -69,26 +69,20 @@ impl<const N: usize> crate::SecureEncoding for ExportableArrayInner<N> {
 
     #[cfg(feature = "encoding-base64")]
     #[inline(always)]
-    fn to_base64url(&self) -> crate::Base64String {
+    fn to_base64url(&self) -> alloc::string::String {
         self.0.to_base64url()
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32(
-        &self,
-        hrp: &str,
-    ) -> core::result::Result<crate::Bech32String, crate::Bech32EncodingError> {
-        self.0.try_to_bech32(hrp)
+    fn to_bech32(&self, hrp: &str) -> alloc::string::String {
+        self.0.to_bech32(hrp)
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32m(
-        &self,
-        hrp: &str,
-    ) -> core::result::Result<crate::Bech32String, crate::Bech32EncodingError> {
-        self.0.try_to_bech32m(hrp)
+    fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
+        self.0.to_bech32m(hrp)
     }
 }
 
@@ -147,12 +141,7 @@ impl<const N: usize> ExportableArray<N> {
         F: FnOnce() -> [u8; N],
     {
         let mut tmp = constructor();
-        #[allow(unused_mut)]
-        let mut result = crate::Fixed::new(ExportableArrayInner(tmp));
-        #[cfg(feature = "hash-eq")]
-        {
-            result.eq_hash = *hash(tmp.as_slice()).as_bytes();
-        }
+        let result = crate::Fixed::new(ExportableArrayInner(tmp));
         #[cfg(feature = "zeroize")]
         ::zeroize::Zeroize::zeroize(&mut tmp);
         result
@@ -165,10 +154,6 @@ impl<const N: usize> core::convert::From<crate::Fixed<[u8; N]>> for ExportableAr
         let array = *value.expose_secret();
         #[allow(unused_mut)]
         let mut s = crate::Fixed::new(ExportableArrayInner(array));
-        #[cfg(feature = "hash-eq")]
-        {
-            s.eq_hash = *hash(array.as_slice()).as_bytes();
-        }
         s
     }
 }
@@ -177,10 +162,6 @@ impl<const N: usize> core::convert::From<[u8; N]> for ExportableArray<N> {
     fn from(value: [u8; N]) -> Self {
         #[allow(unused_mut)]
         let mut s = crate::Fixed::new(ExportableArrayInner(value));
-        #[cfg(feature = "hash-eq")]
-        {
-            s.eq_hash = *hash(value.as_slice()).as_bytes();
-        }
         s
     }
 }
@@ -192,12 +173,7 @@ impl<const N: usize> core::convert::TryFrom<&[u8]> for ExportableArray<N> {
         if value.len() == N {
             let mut array = [0u8; N];
             array.copy_from_slice(value);
-            #[allow(unused_mut)]
-            let mut s = crate::Fixed::new(ExportableArrayInner(array));
-            #[cfg(feature = "hash-eq")]
-            {
-                s.eq_hash = *hash(value).as_bytes();
-            }
+            let s = crate::Fixed::new(ExportableArrayInner(array));
             Ok(s)
         } else {
             Err(crate::FromSliceError {
@@ -217,7 +193,7 @@ impl<const N: usize> core::convert::TryFrom<&[u8]> for ExportableArray<N> {
 impl<const N: usize> crate::SecureEncoding for ExportableArray<N> {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
-    fn to_hex(&self) -> crate::HexString {
+    fn to_hex(&self) -> alloc::string::String {
         self.inner.0.as_slice().to_hex()
     }
 
@@ -229,26 +205,20 @@ impl<const N: usize> crate::SecureEncoding for ExportableArray<N> {
 
     #[cfg(feature = "encoding-base64")]
     #[inline(always)]
-    fn to_base64url(&self) -> crate::Base64String {
+    fn to_base64url(&self) -> alloc::string::String {
         self.inner.0.as_slice().to_base64url()
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32(
-        &self,
-        hrp: &str,
-    ) -> core::result::Result<crate::Bech32String, crate::Bech32EncodingError> {
-        self.inner.0.as_slice().try_to_bech32(hrp)
+    fn to_bech32(&self, hrp: &str) -> alloc::string::String {
+        self.inner.0.as_slice().to_bech32(hrp)
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32m(
-        &self,
-        hrp: &str,
-    ) -> core::result::Result<crate::Bech32String, crate::Bech32EncodingError> {
-        self.inner.0.as_slice().try_to_bech32m(hrp)
+    fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
+        self.inner.0.as_slice().to_bech32m(hrp)
     }
 }
 
@@ -259,10 +229,6 @@ impl<const N: usize> core::convert::From<crate::CloneableArray<N>> for Exportabl
         let array = inner.0;
         #[allow(unused_mut)]
         let mut s = crate::Fixed::new(ExportableArrayInner(array));
-        #[cfg(feature = "hash-eq")]
-        {
-            s.eq_hash = *hash(array.as_slice()).as_bytes();
-        }
         s
     }
 }

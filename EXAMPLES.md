@@ -255,7 +255,7 @@ assert_eq!(payload.expose_secret()[64], 0xFF);
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::{Fixed, SerializableSecret};
+    use secure_gate::{Fixed, ExportableType};
     use serde::Serialize;
     struct MyKey([u8; 32]);
     impl Serialize for MyKey {
@@ -266,7 +266,7 @@ assert_eq!(payload.expose_secret()[64], 0xFF);
             self.0.serialize(serializer)
         }
     }
-    impl SerializableSecret for MyKey {} // Explicit opt-in
+    impl ExportableType for MyKey {} // Explicit opt-in
     let key: Fixed<MyKey> = Fixed::new(MyKey([0u8; 32]));
     let json = serde_json::to_string(&key).unwrap();
 }

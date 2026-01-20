@@ -1,6 +1,6 @@
 // This file should NOT compile when "serde-serialize" and "zeroize" are enabled.
 // It verifies that cloneable wrappers cannot be serialized without an explicit
-// user-provided impl SerializableSecret for the inner type.
+// user-provided impl ExportableType for the inner type.
 //
 // Expected failures:
 // - No Serialize for CloneableString (missing marker on String)
@@ -15,7 +15,7 @@ fn main() {
     let data: CloneableVec = vec![0u8; 128].into();
     let key: CloneableArray<32> = [0u8; 32].into();
 
-    // These lines must cause compile errors due to missing SerializableSecret
+    // These lines must cause compile errors due to missing ExportableType
     let _ = serde_json::to_string(&pw);
     let _ = serde_json::to_string(&data);
     let _ = serde_json::to_string(&key);

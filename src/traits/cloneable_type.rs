@@ -1,6 +1,6 @@
 //! Marker trait and implementations for types that can be safely cloned as secrets.
 //!
-//! This module defines the [`CloneSafe`] trait and provides blanket
+//! This module defines the [`CloneableType`] trait and provides blanket
 //! implementations for primitive types and fixed-size arrays that are safe to clone
 //! when handling sensitive data. The trait ensures that only types meeting the
 //! security requirements (Clone + Zeroize) can be used in cloneable secret wrappers.
@@ -34,13 +34,13 @@
 /// ```
 /// # #[cfg(feature = "zeroize")]
 /// # {
-/// use secure_gate::CloneSafe;
+/// use secure_gate::CloneableType;
 /// use zeroize::Zeroize;
 ///
 /// #[derive(Clone)]
 /// struct MySecret([u8; 32]);
 ///
-/// impl CloneSafe for MySecret {}
+/// impl CloneableType for MySecret {}
 ///
 /// impl Zeroize for MySecret {
 ///     fn zeroize(&mut self) {
@@ -52,31 +52,31 @@
 /// let copy = original.clone(); // Safe, zeroized on drop
 /// # }
 /// ```
-pub trait CloneSafe: Clone + zeroize::Zeroize {
+pub trait CloneableType: Clone + zeroize::Zeroize {
     // Pure marker, no methods
 }
 
 // Blanket implementations for primitive types that are safe to clone as secrets.
 // These include integer types commonly used in cryptographic operations like
 // keys, nonces, counters, and other small fixed-size values.
-impl CloneSafe for i8 {}
-impl CloneSafe for i16 {}
-impl CloneSafe for i32 {}
-impl CloneSafe for i64 {}
-impl CloneSafe for i128 {}
-impl CloneSafe for isize {}
+impl CloneableType for i8 {}
+impl CloneableType for i16 {}
+impl CloneableType for i32 {}
+impl CloneableType for i64 {}
+impl CloneableType for i128 {}
+impl CloneableType for isize {}
 
-impl CloneSafe for u8 {}
-impl CloneSafe for u16 {}
-impl CloneSafe for u32 {}
-impl CloneSafe for u64 {}
-impl CloneSafe for u128 {}
-impl CloneSafe for usize {}
+impl CloneableType for u8 {}
+impl CloneableType for u16 {}
+impl CloneableType for u32 {}
+impl CloneableType for u64 {}
+impl CloneableType for u128 {}
+impl CloneableType for usize {}
 
-impl CloneSafe for bool {}
-impl CloneSafe for char {}
+impl CloneableType for bool {}
+impl CloneableType for char {}
 
 // Blanket implementation for fixed-size arrays of cloneable secret types.
 // This allows arrays like [u8; 32] (AES keys) or [u32; 8] (large integers)
 // to be safely cloned when used as secrets.
-impl<T: CloneSafe, const N: usize> CloneSafe for [T; N] {}
+impl<T: CloneableType, const N: usize> CloneableType for [T; N] {}

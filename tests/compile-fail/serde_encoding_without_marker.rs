@@ -2,11 +2,11 @@
 // This file should NOT compile when "serde-serialize" and the respective encoding
 // feature is enabled.
 // It verifies that encoding wrappers (HexString, Base64String, Bech32String)
-// cannot be serialized without an explicit user-provided impl SerializableSecret
+// cannot be serialized without an explicit user-provided impl ExportableType
 // for the inner type (String).
 //
 // Expected failure (for each enabled encoding):
-// - No Serialize due to missing SerializableSecret on String
+// - No Serialize due to missing ExportableType on String
 
 #[cfg(all(feature = "serde-serialize", feature = "encoding-hex"))]
 fn hex_test() {
@@ -14,7 +14,7 @@ fn hex_test() {
 
     let hex = HexString::new("deadbeef".to_string()).unwrap();
 
-    // This line must cause compile error: no SerializableSecret on String
+    // This line must cause compile error: no ExportableType on String
     let _ = serde_json::to_string(&hex);
 }
 
@@ -24,7 +24,7 @@ fn base64_test() {
 
     let b64 = Base64String::new("SGVsbG8gV29ybGQ".to_string()).unwrap();
 
-    // This line must cause compile error: no SerializableSecret on String
+    // This line must cause compile error: no ExportableType on String
     let _ = serde_json::to_string(&b64);
 }
 
@@ -34,7 +34,7 @@ fn bech32_test() {
 
     let bech32 = Bech32String::new("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq".to_string()).unwrap();
 
-    // This line must cause compile error: no SerializableSecret on String
+    // This line must cause compile error: no ExportableType on String
     let _ = serde_json::to_string(&bech32);
 }
 

@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 + **Refined `serde` feature** for JSON/TOML/YAML serialization support (addresses ROADMAP):
   - Split into separate `serde-deserialize` and `serde-serialize` features for granular control
   - `serde-deserialize`: Enables `Deserialize` impls for all secret wrapper types with secure construction and zeroizing of invalid inputs
-  - `serde-serialize`: Enables opt-in `Serialize` via new `SerializableSecret` marker trait (requires `serde::Serialize`), uniformly gated for all types
+  - `serde-serialize`: Enables opt-in `Serialize` via new `ExportableType` marker trait (requires `serde::Serialize`), uniformly gated for all types
   - `serde`: Meta-feature enabling both `serde-deserialize` and `serde-serialize`
   - Implemented for core types (`Fixed<T>`, `Dynamic<T>`, cloneable types, encoding types, random types)
   - No blanket implementations; purely user-opt-in serialization to maximize auditability
@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Convenience methods: `.expose_inner()` / `.expose_inner_mut()` on `CloneableString` and `CloneableVec`.
   - `init_with` and `try_init_with` constructors on all cloneable types (`CloneableArray`, `CloneableString`, `CloneableVec`) to minimize temporary stack exposure when reading secrets from user input.
   - Encouraged pattern: semantic type aliases (e.g., `pub type CloneablePassword = CloneableString;`).
-- `CloneSafe` trait for opt-in cloning of secrets (requires `zeroize` feature).
+- `CloneableType` trait for opt-in cloning of secrets (requires `zeroize` feature).
   - Implemented for primitives (`u8`, `i32`, etc.) and fixed arrays (`[T; N]`).
   - Custom types can implement the trait for controlled duplication.
 - Fallible RNG methods: `try_generate()` on `FixedRandom<N>` and `DynamicRandom`, returning `Result<Self, rand::Error>`.
@@ -70,13 +70,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - SECURITY.md document with security considerations, module analysis, and mitigation strategies.
 - ROADMAP.md for future development plans (serde, fuzzing, etc.).
-- Enhanced `CloneSafe` trait documentation with implementation examples and warnings.
+- Enhanced `CloneableType` trait documentation with implementation examples and warnings.
 - Security Checklist section in README.md with best practices.
 - Updated README.md with cross-links to SECURITY.md, improved formatting, and security emphasis.
 - **Dedicated serde fuzz target** (`fuzz_targets/serde.rs`) for secure deserialization testing: covers JSON/TOML/YAML parsing, validation logic, zeroization on invalid inputs, temporary allocation handling, and edge cases to prevent deserialization-based vulnerabilities from untrusted structured data.
 - Optional custom rustdoc string support added to all non-generic alias macros (`fixed_alias!`, `dynamic_alias!`, `fixed_alias_random!`) for full consistency with generic variants. Accepts an optional third parameter for custom documentation, falling back to generated docs when omitted. Backward compatible and improves API discoverability.
 - **Opt-in raw serialization system** (`"serde-serialize"` feature) for deliberate secret export:
-  - New `Exportable*` types (`ExportableArray<N>`, `ExportableString`, `ExportableVec`) in `src/exportable/` for serializing raw secrets (bytes/text) with automatic `SerializableSecret` impls and zeroize on drop.
+  - New `Exportable*` types (`ExportableArray<N>`, `ExportableString`, `ExportableVec`) in `src/exportable/` for serializing raw secrets (bytes/text) with automatic `ExportableType` impls and zeroize on drop.
   - Macros `fixed_exportable_alias!` and `dynamic_exportable_alias!` for creating custom serializable secret types.
   - Conversions from core/cloneable/random types to `Exportable*` for secure transitions.
   - Benchmarks (`benches/serde.rs`) measuring minimal overhead vs. raw types.
@@ -98,11 +98,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Default features changed to `secure` (bundling `zeroize` + `ct-eq`) to prioritize secure memory handling by default while minimizing dependencies.
-- Cloning model: switched to opt-in via `CloneSafe` (now in `traits/clone_safe`), centered on pre-baked primitives for maximum ergonomics and safety.
+- Cloning model: switched to opt-in via `CloneableType` (now in `traits/clone_safe`), centered on pre-baked primitives for maximum ergonomics and safety.
   - All cloneable types are distinctly typed from non-cloneable counterparts — no accidental mixing.
 - Renamed `rng` module to `random`.
 - Renamed `FixedRng` and `DynamicRng` types to `FixedRandom` and `DynamicRandom`, respectively.
-- Moved `CloneSafe` to `traits/clone_safe` for trait consolidation.
+- Moved `CloneableType` to `traits/clone_safe` for trait consolidation.
 - Encoding wrappers (`HexString`, `Base64String`, `Bech32String`):
   - Removed `Deref` implementations for consistent explicit access.
   - Unified decode methods renamed to `decode_to_bytes()` (borrowing) and `decode_into_bytes()` (consuming), returning raw `Vec<u8>`.
@@ -116,7 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Feature gating for `CloneSafe` and related impls (requires `zeroize`).
+- Feature gating for `CloneableType` and related impls (requires `zeroize`).
 - Doc-test compatibility across all feature configurations.
 - Resolved compilation conflicts in error types and trait bounds.
 - `Bech32String` `byte_len()` now allocation-free.

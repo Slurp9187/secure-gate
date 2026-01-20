@@ -57,7 +57,7 @@ secure-gate = { version = "0.7.0-rc.10", default-features = false, features = ["
 | `encoding-base64` | `Base64String` (URL-safe, no padding) |
 | `encoding-bech32` | `Bech32String` (Bech32/Bech32m, mixed-case input, lowercase storage) |
 | `serde-deserialize` | Serde `Deserialize` support for loading secrets |
-| `serde-serialize` | Serde `Serialize` support (gated by `SerializableSecret` marker) |
+| `serde-serialize` | Serde `Serialize` support (gated by `ExportableType` marker) |
 | `serde` | Meta-feature enabling both `serde-deserialize` and `serde-serialize` |
 | `full` | Meta-feature enabling all optional features (includes `secure`) |
 | `insecure` | Explicit opt-out for no-default-features builds (disables `zeroize` and `ct-eq`) — **not recommended** for production |
@@ -152,12 +152,12 @@ Cloning secret data is **opt-in** and **only available** when the `zeroize` feat
 
 This ensures cloning is deliberate, auditable, and always paired with secure zeroization.
 
-**Key mechanism**: The `CloneSafe` marker trait.
+**Key mechanism**: The `CloneableType` marker trait.
 
 To enable safe cloning:
 1. Implement or derive `Clone`
 2. Implement or derive `Zeroize`
-3. Implement `CloneSafe` (blanket implementations exist for primitives and fixed arrays)
+3. Implement `CloneableType` (blanket implementations exist for primitives and fixed arrays)
 
 This prevents accidental deep copies that could bypass zeroization.
 
@@ -214,11 +214,11 @@ use secure_gate::CloneableString;
 
 ### Custom Cloneable Types
 
-**Note**: Custom implementations of `CloneSafe` are possible but discouraged — stick to the pre-baked `CloneableArray`, `CloneableString`, or `CloneableVec` types unless you have a strong justification. Improper impls can undermine the crate's cloning guarantees.
+**Note**: Custom implementations of `CloneableType` are possible but discouraged — stick to the pre-baked `CloneableArray`, `CloneableString`, or `CloneableVec` types unless you have a strong justification. Improper impls can undermine the crate's cloning guarantees.
 
 ```rust
 #[cfg(feature = "zeroize")]
-use secure_gate::CloneSafe;
+use secure_gate::CloneableType;
 
 #[cfg(feature = "zeroize")]
 {
@@ -227,7 +227,7 @@ use secure_gate::CloneSafe;
     #[derive(Clone, Zeroize)]
     struct MyKey([u8; 32]);
 
-    impl CloneSafe for MyKey {} // Enables safe cloning
+    impl CloneableType for MyKey {} // Enables safe cloning
 
     let key = MyKey([42u8; 32]);
     let key_copy = key.clone();
@@ -348,7 +348,7 @@ Available on `Fixed<[u8; N]>` and `Dynamic<T>` where `T: AsRef<[u8]>`.
 
 ## Serde Support
 
-⚠️ **Security Warning**: Serialization can permanently expose secrets. Only use for secure, trusted contexts (e.g., encrypted config files). Prefer encoded forms. Audit all opt-ins with `grep -r "SerializableSecret\|Exportable"`.
+⚠️ **Security Warning**: Serialization can permanently expose secrets. Only use for secure, trusted contexts (e.g., encrypted config files). Prefer encoded forms. Audit all opt-ins with `grep -r "ExportableType\|Exportable"`.
 
 Load secrets from JSON/TOML/YAML or serialize raw secrets with explicit opt-in via `Exportable*` types (requires `"serde-serialize"`):
 
@@ -390,7 +390,7 @@ Load secrets from JSON/TOML/YAML or serialize raw secrets with explicit opt-in v
 - **Deserialize** (`serde-deserialize`): Loads from trusted sources; invalid inputs zeroized if `zeroize` enabled
 - **Serialize** (`serde-serialize`): Raw secrets only via `Exportable*` (opt-in). No direct Serialize on encoded/core types to prevent leaks
 - **Exportable* types**: Deliberate conversions for raw output; no encoded auto-leakage
-- **Audit points**: Grep for `Exportable*`, `SerializableSecret`, `fixed_exportable_alias!`, `dynamic_exportable_alias!`
+- **Audit points**: Grep for `Exportable*`, `ExportableType`, `fixed_exportable_alias!`, `dynamic_exportable_alias!`
 - **No accidental exfiltration**: Encoded types serialize only encoded strings (manual); raw requires export
 - **Zeroize on errors**: Invalid deserializes are wiped if `zeroize` enabled
 
@@ -463,7 +463,7 @@ For opt-in serialization of raw secrets (requires deliberate conversion):
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::SerializableSecret;
+    use secure_gate::ExportableType;
     use serde::Serialize;
 
     pub struct SerializableKeyInner(pub [u8; 32]);
@@ -477,7 +477,7 @@ For opt-in serialization of raw secrets (requires deliberate conversion):
         }
     }
 
-    impl SerializableSecret for SerializableKeyInner {}
+    impl ExportableType for SerializableKeyInner {}
 
     pub type SerializableKey = secure_gate::Fixed<SerializableKeyInner>;
 }
@@ -488,7 +488,7 @@ With custom documentation:
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::SerializableSecret;
+    use secure_gate::ExportableType;
     use serde::Serialize;
 
     pub struct ExportableTokenInner(pub [u8; 16]);
@@ -502,7 +502,7 @@ With custom documentation:
         }
     }
 
-    impl SerializableSecret for ExportableTokenInner {}
+    impl ExportableType for ExportableTokenInner {}
 
     #[doc = "Serializable 16-byte token"]
     pub type ExportableToken = secure_gate::Fixed<ExportableTokenInner>;
@@ -514,7 +514,7 @@ For dynamic types:
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::SerializableSecret;
+    use secure_gate::ExportableType;
     use serde::Serialize;
 
     pub struct RawPasswordInner(pub String);
@@ -528,14 +528,14 @@ For dynamic types:
         }
     }
 
-    impl SerializableSecret for RawPasswordInner {}
+    impl ExportableType for RawPasswordInner {}
 
     pub type RawPassword = secure_gate::Dynamic<RawPasswordInner>;
 }
 
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::SerializableSecret;
+    use secure_gate::ExportableType;
     use serde::Serialize;
 
     pub struct RawDataInner(pub Vec<u8>);
@@ -549,7 +549,7 @@ For dynamic types:
         }
     }
 
-    impl SerializableSecret for RawDataInner {}
+    impl ExportableType for RawDataInner {}
 
     pub type RawData = secure_gate::Dynamic<RawDataInner>;
 }
@@ -565,7 +565,7 @@ With custom documentation:
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::SerializableSecret;
+    use secure_gate::ExportableType;
     use serde::Serialize;
 
     pub struct SerializableBlobInner(pub Vec<u8>);
@@ -579,7 +579,7 @@ With custom documentation:
         }
     }
 
-    impl SerializableSecret for SerializableBlobInner {}
+    impl ExportableType for SerializableBlobInner {}
 
     #[doc = "Serializable raw byte blob"]
     pub type SerializableBlob = secure_gate::Dynamic<SerializableBlobInner>;
@@ -622,9 +622,9 @@ To maximize the security of your application when using `secure-gate`, adhere to
 - **Pre-validate encoding inputs**: For Bech32 and other encodings, validate inputs (e.g., HRPs) upfront. Use `try_*` methods (e.g., `try_to_bech32`) and handle errors properly to avoid issues from malformed data.
 - **Prefer constant-time comparisons**: Use `.ct_eq()` for all sensitive equality checks to prevent timing attacks.
 - **Minimize secret exposures**: Audit your code for `.expose_secret()` calls; keep them minimal, logged, and justified. Avoid unnecessary or prolonged exposures.
-- **Restrict cloning**: Only clone when necessary. Prefer built-in `Cloneable*` types; be cautious with custom `CloneSafe` implementations.
+- **Restrict cloning**: Only clone when necessary. Prefer built-in `Cloneable*` types; be cautious with custom `CloneableType` implementations.
 - **Conservative feature usage**: Enable only the features you need (e.g., specific encodings) to reduce attack surface.
-- **Audit serialization opt-ins**: Grep for `SerializableSecret`, `Exportable*`, `fixed_exportable_alias!`, `dynamic_exportable_alias!` to find all serialization points; only use `Exportable*` for deliberate raw secret exports in secure contexts (e.g., encrypted configs).
+- **Audit serialization opt-ins**: Grep for `ExportableType`, `Exportable*`, `fixed_exportable_alias!`, `dynamic_exportable_alias!` to find all serialization points; only use `Exportable*` for deliberate raw secret exports in secure contexts (e.g., encrypted configs).
 - **Regular review**: Periodically audit your secret handling logic, especially after dependency updates.
 - **Security considerations**: Refer to [SECURITY.md](SECURITY.md) for detailed security considerations.
 

@@ -151,7 +151,7 @@ macro_rules! fixed_alias_random {
 
 // Creates a type alias for a fixed-size exportable secret (opt-in serialization).
 //
-// This macro generates an inner newtype for raw byte arrays, implements SerializableSecret for opt-in serialization,
+// This macro generates an inner newtype for raw byte arrays, implements ExportableType for opt-in serialization,
 // and creates a type alias to `Fixed<Inner>`. Requires the "serde-serialize" feature to compile.
 //
 // The generated type allows deliberate serialization of raw secrets while maintaining security.
@@ -205,7 +205,7 @@ macro_rules! fixed_exportable_alias {
         }
 
         #[cfg(feature = "serde-serialize")]
-        impl $crate::SerializableSecret for $name {}
+        impl $crate::ExportableType for $name {}
 
         impl From<[u8; $size]> for $name {
             fn from(arr: [u8; $size]) -> Self {
@@ -229,7 +229,7 @@ macro_rules! fixed_exportable_alias {
         }
 
         #[cfg(feature = "serde-serialize")]
-        impl $crate::SerializableSecret for $name {}
+        impl $crate::ExportableType for $name {}
 
         impl From<[u8; $size]> for $name {
             fn from(arr: [u8; $size]) -> Self {

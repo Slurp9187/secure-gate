@@ -7,7 +7,7 @@ use crate::ExposeSecret;
 
 /// Inner wrapper for a dynamic byte vector that enables opt-in serialization.
 /// This struct wraps a `Vec<u8>` and provides secure serialization when the
-/// `SerializableSecret` marker is implemented. It ensures zeroization on drop
+/// `ExportableType` marker is implemented. It ensures zeroization on drop
 /// to prevent memory leaks.
 #[cfg(feature = "zeroize")]
 use ::zeroize::Zeroize;
@@ -28,7 +28,7 @@ impl core::fmt::Debug for ExportableVecInner {
 }
 
 /// Marker impl for serialization of raw byte vectors.
-impl crate::SerializableSecret for ExportableVecInner {}
+impl crate::ExportableType for ExportableVecInner {}
 
 /// Constant-time equality for raw byte vectors.
 #[cfg(feature = "ct-eq")]
@@ -58,7 +58,7 @@ impl serde::Serialize for ExportableVecInner {
 impl crate::SecureEncoding for ExportableVecInner {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
-    fn to_hex(&self) -> crate::HexString {
+    fn to_hex(&self) -> alloc::string::String {
         self.0.to_hex()
     }
 
@@ -70,26 +70,20 @@ impl crate::SecureEncoding for ExportableVecInner {
 
     #[cfg(feature = "encoding-base64")]
     #[inline(always)]
-    fn to_base64url(&self) -> crate::Base64String {
+    fn to_base64url(&self) -> alloc::string::String {
         self.0.to_base64url()
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32(
-        &self,
-        hrp: &str,
-    ) -> core::result::Result<crate::Bech32String, crate::Bech32EncodingError> {
-        self.0.try_to_bech32(hrp)
+    fn to_bech32(&self, hrp: &str) -> alloc::string::String {
+        self.0.to_bech32(hrp)
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32m(
-        &self,
-        hrp: &str,
-    ) -> core::result::Result<crate::Bech32String, crate::Bech32EncodingError> {
-        self.0.try_to_bech32m(hrp)
+    fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
+        self.0.to_bech32m(hrp)
     }
 }
 
@@ -135,12 +129,7 @@ impl ExportableVec {
         F: FnOnce() -> alloc::vec::Vec<u8>,
     {
         let mut tmp = constructor();
-        #[allow(unused_mut)]
-        let mut result = crate::Dynamic::new(ExportableVecInner(tmp.clone()));
-        #[cfg(feature = "hash-eq")]
-        {
-            result.eq_hash = *hash(tmp.as_slice()).as_bytes();
-        }
+        let result = crate::Dynamic::new(ExportableVecInner(tmp.clone()));
         #[cfg(feature = "zeroize")]
         ::zeroize::Zeroize::zeroize(&mut tmp);
         result
@@ -165,56 +154,29 @@ impl ExportableVec {
     ) -> core::result::Result<Self, alloc::collections::TryReserveError> {
         let mut vec = alloc::vec::Vec::with_capacity(value.len());
         vec.extend_from_slice(value);
-        #[allow(unused_mut)]
-        let mut s = crate::Dynamic::new(ExportableVecInner(vec));
-        #[cfg(feature = "hash-eq")]
-        {
-            s.eq_hash = *hash(value).as_bytes();
-        }
+        let s = crate::Dynamic::new(ExportableVecInner(vec));
         Ok(s)
     }
 }
 
 impl core::convert::From<alloc::vec::Vec<u8>> for ExportableVec {
     fn from(value: alloc::vec::Vec<u8>) -> Self {
-        #[allow(unused_mut)]
-        let mut s = crate::Dynamic::new(ExportableVecInner(value.clone()));
-        #[cfg(feature = "hash-eq")]
-        {
-            s.eq_hash = *hash(value.as_slice()).as_bytes();
-        }
-        s
+        crate::Dynamic::new(ExportableVecInner(value.clone()))
     }
 }
 
 impl core::convert::From<&[u8]> for ExportableVec {
     fn from(value: &[u8]) -> Self {
-        let vec = alloc::vec::Vec::from(value);
-        #[allow(unused_mut)]
-        let mut s = crate::Dynamic::new(ExportableVecInner(vec));
-        #[cfg(feature = "hash-eq")]
-        {
-            s.eq_hash = *hash(value).as_bytes();
-        }
-        s
+        let inner = ExportableVecInner(value.to_vec());
+        crate::Dynamic::new(inner)
     }
 }
 
 #[cfg(feature = "serde-serialize")]
 impl From<crate::Dynamic<alloc::vec::Vec<u8>>> for ExportableVec {
     fn from(value: crate::Dynamic<alloc::vec::Vec<u8>>) -> Self {
-        let crate::Dynamic {
-            inner: boxed,
-            eq_hash,
-        } = value;
-        let vec = *boxed;
-        #[allow(unused_mut)]
-        let mut result = Self::from(vec);
-        #[cfg(feature = "hash-eq")]
-        {
-            result.eq_hash = eq_hash;
-        }
-        result
+        let vec = *value.inner;
+        crate::Dynamic::new(ExportableVecInner(vec.clone()))
     }
 }
 
@@ -227,7 +189,7 @@ impl From<crate::Dynamic<alloc::vec::Vec<u8>>> for ExportableVec {
 impl crate::SecureEncoding for ExportableVec {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
-    fn to_hex(&self) -> crate::HexString {
+    fn to_hex(&self) -> alloc::string::String {
         self.inner.0.as_slice().to_hex()
     }
 
@@ -239,26 +201,20 @@ impl crate::SecureEncoding for ExportableVec {
 
     #[cfg(feature = "encoding-base64")]
     #[inline(always)]
-    fn to_base64url(&self) -> crate::Base64String {
+    fn to_base64url(&self) -> alloc::string::String {
         self.inner.0.as_slice().to_base64url()
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32(
-        &self,
-        hrp: &str,
-    ) -> core::result::Result<crate::Bech32String, crate::Bech32EncodingError> {
-        self.inner.0.as_slice().try_to_bech32(hrp)
+    fn to_bech32(&self, hrp: &str) -> alloc::string::String {
+        self.inner.0.as_slice().to_bech32(hrp)
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32m(
-        &self,
-        hrp: &str,
-    ) -> core::result::Result<crate::Bech32String, crate::Bech32EncodingError> {
-        self.inner.0.as_slice().try_to_bech32m(hrp)
+    fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
+        self.inner.0.as_slice().to_bech32m(hrp)
     }
 }
 
@@ -266,30 +222,6 @@ impl crate::SecureEncoding for ExportableVec {
 impl From<crate::cloneable::CloneableVec> for ExportableVec {
     fn from(value: crate::cloneable::CloneableVec) -> Self {
         let vec = value.expose_secret().0.clone();
-        #[allow(unused_mut)]
-        let mut result = Self::from(vec);
-        #[cfg(feature = "hash-eq")]
-        {
-            result.eq_hash = value.eq_hash;
-        }
-        result
-    }
-}
-
-#[cfg(all(feature = "serde-serialize", feature = "rand"))]
-impl From<crate::random::DynamicRandom> for ExportableVec {
-    fn from(value: crate::random::DynamicRandom) -> Self {
-        let crate::Dynamic {
-            inner: boxed,
-            eq_hash,
-        } = value.0;
-        let vec = *boxed;
-        #[allow(unused_mut)]
-        let mut result = Self::from(vec);
-        #[cfg(feature = "hash-eq")]
-        {
-            result.eq_hash = eq_hash;
-        }
-        result
+        crate::Dynamic::new(ExportableVecInner(vec))
     }
 }

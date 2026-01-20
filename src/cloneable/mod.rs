@@ -4,7 +4,7 @@
 //! in a way that allows controlled cloning while ensuring the data is properly zeroized
 //! when dropped. These types are only available when the "zeroize" feature is enabled.
 //!
-//! The types in this module implement the [`CloneSafe`] trait (from the `traits` module), which ensures
+//! The types in this module implement the [`CloneableType`] trait (from the `traits` module), which ensures
 //! that only types safe for secret duplication are used. This prevents accidental leaks
 //! of sensitive data through unsafe cloning operations.
 #[cfg(feature = "zeroize")]

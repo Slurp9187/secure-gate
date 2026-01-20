@@ -1,6 +1,6 @@
 // This file should NOT compile when "serde-serialize" and "rand" are enabled.
 // It verifies that random wrappers cannot be serialized without an explicit
-// user-provided impl SerializableSecret for the inner type.
+// user-provided impl ExportableType for the inner type.
 //
 // Expected failures:
 // - No Serialize for FixedRandom<32> (missing marker on [u8; 32])
@@ -13,7 +13,7 @@ fn main() {
     let fixed: FixedRandom<32> = FixedRandom::generate();
     let dyn_rand: DynamicRandom = DynamicRandom::generate(64);
 
-    // These lines must cause compile errors due to missing SerializableSecret
+    // These lines must cause compile errors due to missing ExportableType
     let _ = serde_json::to_string(&fixed);
     let _ = serde_json::to_string(&dyn_rand);
 }

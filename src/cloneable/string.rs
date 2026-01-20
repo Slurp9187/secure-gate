@@ -18,7 +18,7 @@ impl AsRef<[u8]> for CloneableStringInner {
     }
 }
 
-impl crate::CloneSafe for CloneableStringInner {}
+impl crate::CloneableType for CloneableStringInner {}
 
 /// A string wrapped as a cloneable secret.
 ///
@@ -110,13 +110,7 @@ impl From<String> for CloneableString {
 impl From<&str> for CloneableString {
     fn from(s: &str) -> Self {
         let inner = CloneableStringInner(s.to_string());
-        #[allow(unused_mut)]
-        let mut secret = Dynamic::new(inner);
-        #[cfg(feature = "hash-eq")]
-        {
-            use blake3::hash;
-            secret.eq_hash = *hash(s.as_bytes()).as_bytes();
-        }
+        let secret = Dynamic::new(inner);
         secret
     }
 }

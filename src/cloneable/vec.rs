@@ -18,10 +18,10 @@ impl AsRef<[u8]> for CloneableVecInner {
     }
 }
 
-impl crate::CloneSafe for CloneableVecInner {}
+impl crate::CloneableType for CloneableVecInner {}
 
 /// Serde serialization support (serializes the vector).
-/// Uniformly gated by SerializableSecret marker on inner type.
+/// Uniformly gated by ExportableType marker on inner type.
 /// A dynamically-sized vector of bytes wrapped as a cloneable secret.
 ///
 /// This type provides a secure wrapper around a `Vec<u8>` that can be safely cloned
@@ -96,30 +96,20 @@ impl CloneableVec {
 
 /// Wrap a `Vec<u8>` in a `CloneableVec`.
 impl From<Vec<u8>> for CloneableVec {
+    /// Wrap a `Vec<u8>` in a `CloneableVec`.
     fn from(value: Vec<u8>) -> Self {
-        let inner = CloneableVecInner(value.clone());
-        #[allow(unused_mut)]
-        let mut secret = Dynamic::new(inner);
-        #[cfg(feature = "hash-eq")]
-        {
-            use blake3::hash;
-            secret.eq_hash = *hash(value.as_slice()).as_bytes();
-        }
+        let inner = CloneableVecInner(value);
+        let secret = Dynamic::new(inner);
         secret
     }
 }
 
 /// Wrap a byte slice in a `CloneableVec`.
 impl From<&[u8]> for CloneableVec {
+    /// Wrap a `&[u8]` slice in a `CloneableVec`.
     fn from(slice: &[u8]) -> Self {
         let inner = CloneableVecInner(slice.to_vec());
-        #[allow(unused_mut)]
-        let mut secret = Dynamic::new(inner);
-        #[cfg(feature = "hash-eq")]
-        {
-            use blake3::hash;
-            secret.eq_hash = *hash(slice).as_bytes();
-        }
+        let secret = Dynamic::new(inner);
         secret
     }
 }

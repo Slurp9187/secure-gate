@@ -58,10 +58,17 @@ zeroize = ["dep:zeroize", "blake3/zeroize"]
 # ct-eq: Constant-time equality checks (prevents timing attacks in comparisons; uses 'subtle' crate)
 ct-eq = ["dep:subtle"]
 
+# Hash-based equality (uses blake3 for fast, secure hashing without caching overhead)
 hash-eq = ["dep:blake3", "dep:subtle"]
 
+# Cloneable: Opt-in safe cloning for secrets (requires zeroize)
+cloneable = ["dep:zeroize"]
+
+# Exportable: Opt-in serialization for secrets (requires serde)
+exportable = ["dep:serde"]
+
 # Full: Meta-feature enabling all optional features for a complete, batteries-included setup
-full = ["secure", "encoding", "hash-eq"]
+full = ["secure", "encoding", "hash-eq", "cloneable", "exportable"]
 
 # Insecure: Opt-out feature for no-default-features builds (disables zeroize, ct-eq; use only for testing/low-resource scenarios—strongly discouraged for production)
 insecure = []

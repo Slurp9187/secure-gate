@@ -20,18 +20,6 @@
 /// Import these traits to access secret values and their metadata ergonomically.
 use crate::{Dynamic, Fixed};
 
-#[cfg(feature = "rand")]
-use crate::random::{DynamicRandom, FixedRandom};
-
-#[cfg(feature = "encoding-hex")]
-use crate::encoding::hex::HexString;
-
-#[cfg(feature = "encoding-base64")]
-use crate::encoding::base64::Base64String;
-
-#[cfg(feature = "encoding-bech32")]
-use crate::encoding::bech32::Bech32String;
-
 /// Trait for read-only access to secrets, including metadata.
 ///
 /// Import this to enable `.expose_secret()`, `.len()`, and `.is_empty()`.
@@ -114,162 +102,66 @@ impl<T> ExposeSecret for Dynamic<Vec<T>> {
 }
 
 /// Implementation for [`Fixed<CloneableArrayInner<N>>`] - exposes the inner wrapper.
-#[cfg(feature = "zeroize")]
-impl<const N: usize> ExposeSecret
-    for crate::Fixed<crate::cloneable::array::CloneableArrayInner<N>>
-{
-    type Inner = crate::cloneable::array::CloneableArrayInner<N>;
+// #[cfg(feature = "zeroize")]
+// impl<const N: usize> ExposeSecret
+//     for crate::Fixed<crate::cloneable::array::CloneableArrayInner<N>>
+// {
+//     type Inner = crate::cloneable::array::CloneableArrayInner<N>;
 
-    #[inline(always)]
-    fn expose_secret(&self) -> &crate::cloneable::array::CloneableArrayInner<N> {
-        &self.inner
-    }
+//     #[inline(always)]
+//     fn expose_secret(&self) -> &crate::cloneable::array::CloneableArrayInner<N> {
+//         &self.inner
+//     }
 
-    #[inline(always)]
-    fn len(&self) -> usize {
-        N
-    }
-}
+//     #[inline(always)]
+//     fn len(&self) -> usize {
+//         N
+//     }
+// }
 
 // ============================================================================
 // Random Wrapper Implementations (Read-Only Only)
 // ============================================================================
 
 /// Implementation for [`Dynamic<CloneableStringInner>`] - exposes the inner wrapper.
-#[cfg(feature = "zeroize")]
-impl ExposeSecret for crate::Dynamic<crate::cloneable::string::CloneableStringInner> {
-    type Inner = crate::cloneable::string::CloneableStringInner;
+// #[cfg(feature = "zeroize")]
+// #[cfg(feature = "zeroize")]
+// impl ExposeSecret for crate::Dynamic<crate::cloneable::string::CloneableStringInner> {
+//     type Inner = crate::cloneable::string::CloneableStringInner;
 
-    #[inline(always)]
-    fn expose_secret(&self) -> &crate::cloneable::string::CloneableStringInner {
-        &self.inner
-    }
+//     #[inline(always)]
+//     fn expose_secret(&self) -> &crate::cloneable::string::CloneableStringInner {
+//         &self.inner
+//     }
 
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.inner.0.len()
-    }
-}
+//     #[inline(always)]
+//     fn len(&self) -> usize {
+//         self.inner.0.len()
+//     }
+// }
 
 /// Implementation for [`Dynamic<CloneableVecInner>`] - exposes the inner wrapper.
-#[cfg(feature = "zeroize")]
-impl ExposeSecret for crate::Dynamic<crate::cloneable::vec::CloneableVecInner> {
-    type Inner = crate::cloneable::vec::CloneableVecInner;
+// #[cfg(feature = "zeroize")]
+// #[cfg(feature = "zeroize")]
+// impl ExposeSecret for crate::Dynamic<crate::cloneable::vec::CloneableVecInner> {
+//     type Inner = crate::cloneable::vec::CloneableVecInner;
 
-    #[inline(always)]
-    fn expose_secret(&self) -> &crate::cloneable::vec::CloneableVecInner {
-        &self.inner
-    }
+//     #[inline(always)]
+//     fn expose_secret(&self) -> &crate::cloneable::vec::CloneableVecInner {
+//         &self.inner
+//     }
 
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.inner.0.len()
-    }
-}
+//     #[inline(always)]
+//     fn len(&self) -> usize {
+//         self.inner.0.len()
+//     }
+// }
 
 /// Implementation for [`FixedRandom<N>`] - read-only access.
 ///
-/// Random wrappers only provide read-only access to prevent invalidation of the
-/// randomly generated secret. The `Inner` type is `[u8]` (slice) for compatibility
-/// with `SecureRandom` trait bounds.
-#[cfg(feature = "rand")]
-impl<const N: usize> ExposeSecret for FixedRandom<N> {
-    type Inner = [u8];
+// Random wrappers purged in issue 68.
 
-    #[inline(always)]
-    fn expose_secret(&self) -> &[u8] {
-        self.0.inner.as_slice()
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        N
-    }
-}
-
-/// Implementation for [`DynamicRandom`] - read-only access.
-///
-/// Random wrappers only provide read-only access to prevent invalidation of the
-/// randomly generated secret. The `Inner` type is `[u8]` (slice) for compatibility
-/// with `SecureRandom` trait bounds.
-#[cfg(feature = "rand")]
-impl ExposeSecret for DynamicRandom {
-    type Inner = [u8];
-
-    #[inline(always)]
-    fn expose_secret(&self) -> &[u8] {
-        self.0.inner.as_ref().as_slice()
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.0.inner.as_ref().len()
-    }
-}
-
-// ============================================================================
-// Encoding Wrapper Implementations (Read-Only Only)
-// ============================================================================
-
-/// Implementation for [`HexString`] - read-only access.
-///
-/// Encoding wrappers only provide read-only access to prevent invalidation of
-/// validation invariants. The `Inner` type is `str` since encoded strings are
-/// always valid UTF-8.
-#[cfg(feature = "encoding-hex")]
-impl ExposeSecret for HexString {
-    type Inner = str;
-
-    #[inline(always)]
-    fn expose_secret(&self) -> &str {
-        self.0.expose_secret().as_str()
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-}
-
-/// Implementation for [`Base64String`] - read-only access.
-///
-/// Encoding wrappers only provide read-only access to prevent invalidation of
-/// validation invariants. The `Inner` type is `str` since encoded strings are
-/// always valid UTF-8.
-#[cfg(feature = "encoding-base64")]
-impl ExposeSecret for Base64String {
-    type Inner = str;
-
-    #[inline(always)]
-    fn expose_secret(&self) -> &str {
-        self.0.expose_secret().as_str()
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-}
-
-/// Implementation for [`Bech32String`] - read-only access.
-///
-/// Encoding wrappers only provide read-only access to prevent invalidation of
-/// validation invariants. The `Inner` type is `str` since encoded strings are
-/// always valid UTF-8.
-#[cfg(feature = "encoding-bech32")]
-impl ExposeSecret for Bech32String {
-    type Inner = str;
-
-    #[inline(always)]
-    fn expose_secret(&self) -> &str {
-        self.inner.expose_secret().as_str()
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-}
+// Encoding wrappers purged in issue 65.
 
 // ============================================================================
 // Specific Implementations for Test Types
