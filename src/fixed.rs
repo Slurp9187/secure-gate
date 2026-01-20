@@ -36,6 +36,9 @@
 /// drop(secret); // memory wiped automatically
 /// # }
 /// ```
+#[cfg(feature = "rand")]
+use rand::TryRngCore;
+
 pub struct Fixed<T> {
     pub(crate) inner: T,
 }
@@ -64,6 +67,7 @@ impl<T> Fixed<T> {
 /// # Byte-array specific helpers
 impl<const N: usize> Fixed<[u8; N]> {}
 
+// From implementations for byte arrays
 impl<const N: usize> From<&[u8]> for Fixed<[u8; N]> {
     /// Create a `Fixed` from a byte slice, panicking on length mismatch.
     ///
@@ -87,26 +91,6 @@ impl<const N: usize> From<&[u8]> for Fixed<[u8; N]> {
     }
 }
 
-impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
-    /// Wrap a raw byte array in a `Fixed` secret.
-    ///
-    /// Zero-cost conversion.
-    ///
-    /// Wrap a raw byte array in a Fixed secret.
-    ///
-    /// Zero-cost conversion.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use secure_gate::Fixed;
-    /// let key: Fixed<[u8; 4]> = [1, 2, 3, 4].into();
-    /// ```
-    #[inline(always)]
-    fn from(arr: [u8; N]) -> Self {
-        Self::new(arr)
-    }
-}
 #[cfg(feature = "hash-eq")]
 impl<T: AsRef<[u8]>> PartialEq for Fixed<T> {
     fn eq(&self, other: &Self) -> bool {
@@ -129,6 +113,10 @@ impl<T: AsRef<[u8]>> core::hash::Hash for Fixed<T> {
         hash_bytes.hash(state);
     }
 }
+
+// Macro-generated From implementations
+crate::impl_from_fixed!(array);
+crate::impl_from_random_fixed!();
 
 // Macro-generated implementations
 crate::impl_ct_eq_fixed!();

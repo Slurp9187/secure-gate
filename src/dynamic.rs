@@ -82,7 +82,7 @@ crate::impl_hash_eq_dynamic!(Vec<u8>, as_slice);
 crate::impl_hash_eq_dynamic!(String, as_bytes);
 
 // Macro-generated constructor implementations
-crate::impl_from_random!(Dynamic<Vec<u8>>);
+crate::impl_from_random_dynamic!(Dynamic<Vec<u8>>);
 crate::impl_from_hex!(Dynamic<Vec<u8>>);
 crate::impl_from_base64!(Dynamic<Vec<u8>>);
 crate::impl_from_bech32!(Dynamic<Vec<u8>>);

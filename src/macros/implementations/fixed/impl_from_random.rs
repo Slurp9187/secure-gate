@@ -1,20 +1,21 @@
 //! Internal macros for random generation in secure-gate types.
 //!
 //! This module contains macros used to implement from_random methods
-//! for Dynamic types without code duplication.
+//! for Fixed types without code duplication.
 
-/// Macro to implement from_random for Dynamic byte vectors.
+/// Macro to implement from_random for Fixed byte arrays.
 ///
-/// This generates a from_random method that fills a Vec<u8> with random bytes.
+/// This generates a from_random method that creates a random [u8; N] filled with random bytes.
 /// Requires the "rand" feature.
 #[macro_export(local_inner_macros)]
-macro_rules! impl_from_random {
-    ($type:ty) => {
+macro_rules! impl_from_random_fixed {
+    () => {
         /// Random generation — only available with `rand` feature.
         #[cfg(feature = "rand")]
-        impl $type {
-            /// Fill with fresh random bytes of the specified length using the OS RNG.
+        impl<const N: usize> Fixed<[u8; N]> {
+            /// Generate a secure random instance (panics on failure).
             ///
+            /// Fill with fresh random bytes using the OS RNG.
             /// Panics on RNG failure for fail-fast crypto code. Guarantees secure entropy
             /// from system sources.
             ///
@@ -23,15 +24,14 @@ macro_rules! impl_from_random {
             /// ```
             /// # #[cfg(feature = "rand")]
             /// # {
-            /// use secure_gate::{Dynamic, ExposeSecret};
-            /// let random: Dynamic<Vec<u8>> = Dynamic::from_random(64);
-            /// assert_eq!(random.len(), 64);
+            /// use secure_gate::{Fixed, ExposeSecret};
+            /// let random: Fixed<[u8; 32]> = Fixed::from_random();
+            /// assert_eq!(random.len(), 32);
             /// # }
             /// ```
             #[inline]
-            pub fn from_random(len: usize) -> Self {
-                let mut bytes = Vec::with_capacity(len);
-                bytes.resize(len, 0u8);
+            pub fn from_random() -> Self {
+                let mut bytes = [0u8; N];
                 rand::rngs::OsRng
                     .try_fill_bytes(&mut bytes)
                     .expect("OsRng failure is a program error");
