@@ -35,7 +35,7 @@ pub use dynamic::Dynamic;
 pub use fixed::Fixed;
 
 /// Re-export of the traits.
-pub use traits::{ExposeSecret, ExposeSecretMut};
+pub use traits::{CloneableType, ExportableType, ExposeSecret, ExposeSecretMut};
 
 /// Re-export of the [`ConstantTimeEq`] trait.
 #[cfg(feature = "ct-eq")]
@@ -48,6 +48,8 @@ mod macros;
 /// Available macros (exported globally for convenience):
 /// - `cloneable_fixed_alias!`: Create cloneable type aliases for fixed-size secrets.
 /// - `cloneable_dynamic_alias!`: Create cloneable type aliases for dynamic secrets.
+/// - `exportable_fixed_alias!`: Create exportable type aliases for fixed-size secrets.
+/// - `exportable_dynamic_alias!`: Create exportable type aliases for dynamic secrets.
 /// - `dynamic_alias!`: Create type aliases for heap-allocated secrets (`Dynamic<T>`).
 /// - `dynamic_generic_alias!`: Create generic heap-allocated secret aliases.
 /// - `fixed_alias!`: Create type aliases for fixed-size secrets (`Fixed<[u8; N]>`).

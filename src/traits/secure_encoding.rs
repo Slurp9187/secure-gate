@@ -133,3 +133,83 @@ impl<const N: usize> SecureEncoding for [u8; N] {
         bech32::encode::<bech32::Bech32m>(hrp_parsed, self).expect("bech32m encoding failed")
     }
 }
+
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
+impl SecureEncoding for alloc::vec::Vec<u8> {
+    #[cfg(feature = "encoding-hex")]
+    #[inline(always)]
+    fn to_hex(&self) -> alloc::string::String {
+        hex_crate::encode(self)
+    }
+
+    #[cfg(feature = "encoding-hex")]
+    #[inline(always)]
+    fn to_hex_upper(&self) -> alloc::string::String {
+        hex_crate::encode_upper(self)
+    }
+
+    #[cfg(feature = "encoding-base64")]
+    #[inline(always)]
+    fn to_base64url(&self) -> alloc::string::String {
+        URL_SAFE_NO_PAD.encode(self)
+    }
+
+    #[cfg(feature = "encoding-bech32")]
+    #[inline(always)]
+    fn to_bech32(&self, hrp: &str) -> alloc::string::String {
+        let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
+        bech32::encode::<bech32::Bech32>(hrp_parsed, self).expect("bech32 encoding failed")
+    }
+
+    #[cfg(feature = "encoding-bech32")]
+    #[inline(always)]
+    fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
+        let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
+        bech32::encode::<bech32::Bech32m>(hrp_parsed, self).expect("bech32m encoding failed")
+    }
+}
+
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
+impl SecureEncoding for alloc::string::String {
+    #[cfg(feature = "encoding-hex")]
+    #[inline(always)]
+    fn to_hex(&self) -> alloc::string::String {
+        hex_crate::encode(self.as_bytes())
+    }
+
+    #[cfg(feature = "encoding-hex")]
+    #[inline(always)]
+    fn to_hex_upper(&self) -> alloc::string::String {
+        hex_crate::encode_upper(self.as_bytes())
+    }
+
+    #[cfg(feature = "encoding-base64")]
+    #[inline(always)]
+    fn to_base64url(&self) -> alloc::string::String {
+        URL_SAFE_NO_PAD.encode(self.as_bytes())
+    }
+
+    #[cfg(feature = "encoding-bech32")]
+    #[inline(always)]
+    fn to_bech32(&self, hrp: &str) -> alloc::string::String {
+        let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
+        bech32::encode::<bech32::Bech32>(hrp_parsed, self.as_bytes())
+            .expect("bech32 encoding failed")
+    }
+
+    #[cfg(feature = "encoding-bech32")]
+    #[inline(always)]
+    fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
+        let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
+        bech32::encode::<bech32::Bech32m>(hrp_parsed, self.as_bytes())
+            .expect("bech32m encoding failed")
+    }
+}

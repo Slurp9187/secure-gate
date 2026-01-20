@@ -1,24 +1,18 @@
-// Creates a cloneable type alias for a dynamic heap-allocated secure secret.
-///
-/// This macro generates a newtype around `Dynamic<T>` with implementations for `Clone` and `CloneableType`.
-/// It inherits the security properties of `Dynamic` but allows explicit duplication via `Clone`.
-///
-/// # Syntax
-///
-/// `cloneable_dynamic_alias!(vis Name, Type);` — visibility required (e.g., `pub`), Type is the inner type like `String` or `Vec<u8>`
+// Creates an exportable type alias for a dynamic heap-allocated secure secret.
+//
+// This macro generates a newtype around `Dynamic<T>` with implementations for `Serialize` and `ExportableType`.
+// It inherits the security properties of `Dynamic` but allows deliberate serialization via `Serialize`.
+//
+// # Syntax
+//
+// `exportable_dynamic_alias!(vis Name, Type);` — visibility required (e.g., `pub`), Type is the inner type like `String` or `Vec<u8>`
 #[macro_export]
-macro_rules! cloneable_dynamic_alias {
+macro_rules! exportable_dynamic_alias {
     ($vis:vis $name:ident, $type:ty) => {
-        #[doc = concat!("Cloneable dynamic secure secret (", stringify!($type), ")")]
+        #[doc = concat!("Exportable dynamic secure secret (", stringify!($type), ")")]
         $vis struct $name($crate::Dynamic<$type>);
 
-        impl Clone for $name {
-            fn clone(&self) -> Self {
-                Self($crate::Dynamic::new(self.0.expose_secret().clone()))
-            }
-        }
-
-        impl $crate::CloneableType for $name {}
+        impl $crate::ExportableType for $name {}
 
         impl $crate::ExposeSecret for $name {
             type Inner = $type;
@@ -37,13 +31,6 @@ macro_rules! cloneable_dynamic_alias {
         impl $crate::ExposeSecretMut for $name {
             fn expose_secret_mut(&mut self) -> &mut Self::Inner {
                 self.0.expose_secret_mut()
-            }
-        }
-
-        #[cfg(feature = "ct-eq")]
-        impl $crate::ConstantTimeEq for $name {
-            fn ct_eq(&self, other: &Self) -> bool {
-                self.expose_secret().ct_eq(other.expose_secret())
             }
         }
 
@@ -79,11 +66,10 @@ macro_rules! cloneable_dynamic_alias {
             }
         }
 
-        impl std::ops::Deref for $name {
-            type Target = $crate::Dynamic<$type>;
-
-            fn deref(&self) -> &Self::Target {
-                &self.0
+        #[cfg(feature = "ct-eq")]
+        impl $crate::ConstantTimeEq for $name {
+            fn ct_eq(&self, other: &Self) -> bool {
+                self.expose_secret().ct_eq(other.expose_secret())
             }
         }
 
@@ -93,21 +79,19 @@ macro_rules! cloneable_dynamic_alias {
             }
         }
 
-        impl $name {
-            /// Initialize with a closure that returns the secret data.
-            pub fn init_with<F>(f: F) -> Self
-            where
-                F: FnOnce() -> $type,
-            {
-                Self($crate::Dynamic::new(f()))
-            }
+        impl std::ops::Deref for $name {
+            type Target = $crate::Dynamic<$type>;
 
-            /// Try to initialize with a closure that may fail.
-            pub fn try_init_with<F, E>(f: F) -> Result<Self, E>
-            where
-                F: FnOnce() -> Result<$type, E>,
-            {
-                f().map(|value| Self($crate::Dynamic::new(value)))
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
+        // Assuming serde feature is enabled
+        #[cfg(feature = "serde")]
+        impl serde::Serialize for $name {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                self.0.expose_secret().serialize(serializer)
             }
         }
     };

@@ -1,24 +1,18 @@
-// Creates a cloneable type alias for a fixed-size secure secret.
-///
-/// This macro generates a newtype around `Fixed<[u8; N]>` with implementations for `Clone` and `CloneableType`.
-/// It inherits the security properties of `Fixed` but allows explicit duplication via `Clone`.
-///
-/// # Syntax
-///
-/// `cloneable_fixed_alias!(vis Name, size);` — visibility required (e.g., `pub`)
+// Creates an exportable type alias for a fixed-size secure secret.
+//
+// This macro generates a newtype around `Fixed<[u8; N]>` with implementations for `Serialize` and `ExportableType`.
+// It inherits the security properties of `Fixed` but allows deliberate serialization via `Serialize`.
+//
+// # Syntax
+//
+// `exportable_fixed_alias!(vis Name, size);` — visibility required (e.g., `pub`)
 #[macro_export]
-macro_rules! cloneable_fixed_alias {
+macro_rules! exportable_fixed_alias {
     ($vis:vis $name:ident, $size:literal) => {
-        #[doc = concat!("Cloneable fixed-size secure secret (", stringify!($size), " bytes)")]
+        #[doc = concat!("Exportable fixed-size secure secret (", stringify!($size), " bytes)")]
         $vis struct $name($crate::Fixed<[u8; $size]>);
 
-        impl Clone for $name {
-            fn clone(&self) -> Self {
-                Self($crate::Fixed::new(self.0.expose_secret().clone()))
-            }
-        }
-
-        impl $crate::CloneableType for $name {}
+        impl $crate::ExportableType for $name {}
 
         impl $crate::ExposeSecret for $name {
             type Inner = [u8; $size];
@@ -34,28 +28,9 @@ macro_rules! cloneable_fixed_alias {
             }
         }
 
-        impl From<[u8; $size]> for $name {
-            fn from(arr: [u8; $size]) -> Self {
-                Self($crate::Fixed::new(arr))
-            }
-        }
-
-        impl From<&[u8]> for $name {
-            fn from(slice: &[u8]) -> Self {
-                Self($crate::Fixed::from(slice))
-            }
-        }
-
         impl $crate::ExposeSecretMut for $name {
             fn expose_secret_mut(&mut self) -> &mut Self::Inner {
                 self.0.expose_secret_mut()
-            }
-        }
-
-        #[cfg(feature = "ct-eq")]
-        impl $crate::ConstantTimeEq for $name {
-            fn ct_eq(&self, other: &Self) -> bool {
-                self.expose_secret().ct_eq(other.expose_secret())
             }
         }
 
@@ -91,6 +66,25 @@ macro_rules! cloneable_fixed_alias {
             }
         }
 
+        #[cfg(feature = "ct-eq")]
+        impl $crate::ConstantTimeEq for $name {
+            fn ct_eq(&self, other: &Self) -> bool {
+                self.expose_secret().ct_eq(other.expose_secret())
+            }
+        }
+
+        impl From<[u8; $size]> for $name {
+            fn from(arr: [u8; $size]) -> Self {
+                Self($crate::Fixed::new(arr))
+            }
+        }
+
+        impl From<&[u8]> for $name {
+            fn from(slice: &[u8]) -> Self {
+                Self($crate::Fixed::from(slice))
+            }
+        }
+
         impl std::ops::Deref for $name {
             type Target = $crate::Fixed<[u8; $size]>;
 
@@ -99,21 +93,11 @@ macro_rules! cloneable_fixed_alias {
             }
         }
 
-        impl $name {
-            /// Initialize with a closure that returns the secret data.
-            pub fn init_with<F>(f: F) -> Self
-            where
-                F: FnOnce() -> [u8; $size],
-            {
-                Self($crate::Fixed::new(f()))
-            }
-
-            /// Try to initialize with a closure that may fail.
-            pub fn try_init_with<F, E>(f: F) -> Result<Self, E>
-            where
-                F: FnOnce() -> Result<[u8; $size], E>,
-            {
-                f().map(|arr| Self($crate::Fixed::new(arr)))
+        // Assuming serde feature is enabled
+        #[cfg(feature = "serde")]
+        impl serde::Serialize for $name {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                self.0.expose_secret().serialize(serializer)
             }
         }
     };

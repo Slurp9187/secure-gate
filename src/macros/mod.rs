@@ -17,3 +17,6 @@ mod public_type_alias_macros;
 
 /// Cloneable type macros.
 mod clonable_types;
+
+/// Exportable type macros.
+mod exportable_types;

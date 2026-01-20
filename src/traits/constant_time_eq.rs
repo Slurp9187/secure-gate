@@ -63,9 +63,22 @@ impl ConstantTimeEq for [u8] {
 }
 
 #[cfg(feature = "ct-eq")]
-/// Constant-time equality for fixed-size byte arrays.
 impl<const N: usize> ConstantTimeEq for [u8; N] {
     fn ct_eq(&self, other: &Self) -> bool {
         self.as_slice().ct_eq(other.as_slice())
+    }
+}
+
+#[cfg(feature = "ct-eq")]
+impl ConstantTimeEq for alloc::vec::Vec<u8> {
+    fn ct_eq(&self, other: &Self) -> bool {
+        self.as_slice().ct_eq(other.as_slice())
+    }
+}
+
+#[cfg(feature = "ct-eq")]
+impl ConstantTimeEq for alloc::string::String {
+    fn ct_eq(&self, other: &Self) -> bool {
+        self.as_bytes().ct_eq(other.as_bytes())
     }
 }
