@@ -46,6 +46,8 @@ pub use traits::ConstantTimeEq;
 mod macros;
 
 /// Available macros (exported globally for convenience):
+/// - `cloneable_fixed_alias!`: Create cloneable type aliases for fixed-size secrets.
+/// - `cloneable_dynamic_alias!`: Create cloneable type aliases for dynamic secrets.
 /// - `dynamic_alias!`: Create type aliases for heap-allocated secrets (`Dynamic<T>`).
 /// - `dynamic_generic_alias!`: Create generic heap-allocated secret aliases.
 /// - `fixed_alias!`: Create type aliases for fixed-size secrets (`Fixed<[u8; N]>`).
@@ -66,11 +68,3 @@ pub use traits::SecureEncoding;
 /// Re-export of [`Bech32EncodingError`] for convenience when using bech32 encoding.
 #[cfg(feature = "encoding-bech32")]
 pub use error::Bech32EncodingError;
-
-/// Exportable types for opt-in raw secret serialization.
-#[cfg(feature = "exportable")]
-pub mod exportable;
-
-/// Re-export of exportable types for opt-in serialization.
-#[cfg(feature = "exportable")]
-pub use exportable::{ExportableArray, ExportableString, ExportableVec};

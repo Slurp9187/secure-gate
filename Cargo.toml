@@ -64,11 +64,10 @@ hash-eq = ["dep:blake3", "dep:subtle"]
 # Cloneable: Opt-in safe cloning for secrets (requires zeroize)
 cloneable = ["dep:zeroize"]
 
-# Exportable: Opt-in serialization for secrets (requires serde)
-exportable = ["dep:serde"]
+
 
 # Full: Meta-feature enabling all optional features for a complete, batteries-included setup
-full = ["secure", "encoding", "hash-eq", "cloneable", "exportable"]
+full = ["secure", "encoding", "hash-eq", "cloneable"]
 
 # Insecure: Opt-out feature for no-default-features builds (disables zeroize, ct-eq; use only for testing/low-resource scenarios—strongly discouraged for production)
 insecure = []
@@ -98,8 +97,4 @@ harness = false
 
 [[bench]]
 name = "hash_eq_vs_ct_eq"
-harness = false
-
-[[bench]]
-name = "serde"
 harness = false
