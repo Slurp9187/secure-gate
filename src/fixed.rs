@@ -114,7 +114,7 @@ impl<T: AsRef<[u8]>> core::hash::Hash for Fixed<T> {
     }
 }
 
-// Macro-generated From implementations
+// Macro-generated From constructor implementations
 crate::impl_from_fixed!(array);
 crate::impl_from_random_fixed!();
 

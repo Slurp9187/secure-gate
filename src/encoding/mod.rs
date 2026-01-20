@@ -22,4 +22,3 @@
 //! (Empty module for future extensions if needed.)
 
 // The `SecureEncoding` trait is defined in `src/traits/secure_encoding.rs`.
-// No sub-modules remain after purging wrappers and extensions.

@@ -5,6 +5,8 @@ use alloc::boxed::Box;
 #[cfg(feature = "rand")]
 use rand::TryRngCore;
 
+use crate::traits::expose_secret::ExposeSecret;
+
 /// Heap-allocated secure secret wrapper.
 ///
 /// This is a thin wrapper around `Box<T>` with enforced explicit exposure.
@@ -80,6 +82,11 @@ crate::impl_from_dynamic!(value);
 // Macro-generated hash equality implementations
 crate::impl_hash_eq_dynamic!(Vec<u8>, as_slice);
 crate::impl_hash_eq_dynamic!(String, as_bytes);
+
+// Macro-generated decoding methods for validated Dynamic<String>
+crate::impl_decode_hex_to_bytes!();
+crate::impl_decode_base64_to_bytes!();
+crate::impl_decode_bech32_to_bytes!();
 
 // Macro-generated constructor implementations
 crate::impl_from_random_dynamic!(Dynamic<Vec<u8>>);
