@@ -10,7 +10,7 @@
 //! - `fixed_alias_random!`: For random-only fixed-size secrets (`FixedRandom<N>`)
 
 /// Internal implementation macros.
-mod internal_impl_macros;
+mod local_inner_impl_macros;
 
 /// Public type-alias macros.
 mod public_type_alias_macros;
