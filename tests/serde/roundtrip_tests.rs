@@ -18,27 +18,6 @@ serializable_dynamic_alias!(pub TestSerializableVec, Vec<u8>);
 
 // Add Deserialize for roundtrips
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
-impl<'de> serde::Deserialize<'de> for TestSerializableArray {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let inner = <[u8; 4]>::deserialize(deserializer)?;
-        Ok(Self::from(inner))
-    }
-}
-
-#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
-impl<'de> serde::Deserialize<'de> for TestSerializableVec {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let inner = Vec::<u8>::deserialize(deserializer)?;
-        Ok(Self::from(inner))
-    }
-}
-
 #[cfg(all(feature = "serde-serialize", feature = "serde-deserialize"))]
 #[test]
 fn fixed_roundtrip() {

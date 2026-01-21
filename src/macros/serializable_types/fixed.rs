@@ -43,34 +43,34 @@ macro_rules! serializable_fixed_alias {
         impl $crate::SecureEncoding for $name {
             #[cfg(feature = "encoding-hex")]
             fn to_hex(&self) -> alloc::string::String {
-                self.expose_secret().to_hex()
+                <$name as $crate::ExposeSecret>::expose_secret(self).to_hex()
             }
 
             #[cfg(feature = "encoding-hex")]
             fn to_hex_upper(&self) -> alloc::string::String {
-                self.expose_secret().to_hex_upper()
+                <$name as $crate::ExposeSecret>::expose_secret(self).to_hex_upper()
             }
 
             #[cfg(feature = "encoding-base64")]
             fn to_base64url(&self) -> alloc::string::String {
-                self.expose_secret().to_base64url()
+                <$name as $crate::ExposeSecret>::expose_secret(self).to_base64url()
             }
 
             #[cfg(feature = "encoding-bech32")]
             fn to_bech32(&self, hrp: &str) -> alloc::string::String {
-                self.expose_secret().to_bech32(hrp)
+                <$name as $crate::ExposeSecret>::expose_secret(self).to_bech32(hrp)
             }
 
             #[cfg(feature = "encoding-bech32")]
             fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
-                self.expose_secret().to_bech32m(hrp)
+                <$name as $crate::ExposeSecret>::expose_secret(self).to_bech32m(hrp)
             }
         }
 
         #[cfg(feature = "ct-eq")]
         impl $crate::ConstantTimeEq for $name {
             fn ct_eq(&self, other: &Self) -> bool {
-                self.expose_secret().ct_eq(other.expose_secret())
+                <$name as $crate::ExposeSecret>::expose_secret(self).ct_eq(<$name as $crate::ExposeSecret>::expose_secret(other))
             }
         }
 
@@ -98,7 +98,18 @@ macro_rules! serializable_fixed_alias {
         #[cfg(feature = "serde")]
         impl serde::Serialize for $name {
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-                self.0.expose_secret().serialize(serializer)
+                <$crate::Fixed<[u8; $size]> as $crate::ExposeSecret>::expose_secret(&self.0).serialize(serializer)
+            }
+        }
+
+        #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
+        impl<'de> serde::Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let inner = <[u8; $size]>::deserialize(deserializer)?;
+                Ok(Self::from(inner))
             }
         }
     };

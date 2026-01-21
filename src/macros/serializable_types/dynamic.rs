@@ -43,34 +43,34 @@ macro_rules! serializable_dynamic_alias {
         impl $crate::SecureEncoding for $name {
             #[cfg(feature = "encoding-hex")]
             fn to_hex(&self) -> alloc::string::String {
-                self.expose_secret().to_hex()
+                $crate::ExposeSecret::expose_secret(self).to_hex()
             }
 
             #[cfg(feature = "encoding-hex")]
             fn to_hex_upper(&self) -> alloc::string::String {
-                self.expose_secret().to_hex_upper()
+                $crate::ExposeSecret::expose_secret(self).to_hex_upper()
             }
 
             #[cfg(feature = "encoding-base64")]
             fn to_base64url(&self) -> alloc::string::String {
-                self.expose_secret().to_base64url()
+                $crate::ExposeSecret::expose_secret(self).to_base64url()
             }
 
             #[cfg(feature = "encoding-bech32")]
             fn to_bech32(&self, hrp: &str) -> alloc::string::String {
-                self.expose_secret().to_bech32(hrp)
+                $crate::ExposeSecret::expose_secret(self).to_bech32(hrp)
             }
 
             #[cfg(feature = "encoding-bech32")]
             fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
-                self.expose_secret().to_bech32m(hrp)
+                $crate::ExposeSecret::expose_secret(self).to_bech32m(hrp)
             }
         }
 
         #[cfg(feature = "ct-eq")]
         impl $crate::ConstantTimeEq for $name {
             fn ct_eq(&self, other: &Self) -> bool {
-                self.expose_secret().ct_eq(other.expose_secret())
+                $crate::ExposeSecret::expose_secret(self).ct_eq($crate::ExposeSecret::expose_secret(other))
             }
         }
 
@@ -93,6 +93,17 @@ macro_rules! serializable_dynamic_alias {
         impl serde::Serialize for $name {
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
                 self.0.expose_secret().serialize(serializer)
+            }
+        }
+
+        #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
+        impl<'de> serde::Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let inner = <$type>::deserialize(deserializer)?;
+                Ok(Self::from(inner))
             }
         }
     };

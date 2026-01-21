@@ -6,6 +6,9 @@
 
 #![cfg(test)]
 
+#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
+use secure_gate::ExposeSecret;
+
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",
@@ -40,32 +43,10 @@ mod ct_eq_proptests {
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
 mod serde_proptests {
     use super::*;
-    use secure_gate::{serializable_dynamic_alias, serializable_fixed_alias, ExposeSecret};
+    use secure_gate::{serializable_dynamic_alias, serializable_fixed_alias};
 
     serializable_fixed_alias!(pub TestSerializableArray, 4);
     serializable_dynamic_alias!(pub TestSerializableVec, Vec<u8>);
-
-    #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
-    impl<'de> serde::Deserialize<'de> for TestSerializableArray {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            let inner = <[u8; 4]>::deserialize(deserializer)?;
-            Ok(Self::from(inner))
-        }
-    }
-
-    #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
-    impl<'de> serde::Deserialize<'de> for TestSerializableVec {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            let inner = Vec::<u8>::deserialize(deserializer)?;
-            Ok(Self::from(inner))
-        }
-    }
 
     proptest! {
         #![proptest_config(proptest::prelude::ProptestConfig::with_cases(10))]
