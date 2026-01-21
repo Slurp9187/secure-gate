@@ -14,13 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `serde-deserialize`: Enables `Deserialize` impls for all secret wrapper types with secure construction and zeroizing of invalid inputs
   - `serde-serialize`: Enables opt-in `Serialize` via new `SerializableType` marker trait (requires `serde::Serialize`), uniformly gated for all types
   - `serde`: Meta-feature enabling both `serde-deserialize` and `serde-serialize`
-  - Implemented for core types (`Fixed<T>`, `Dynamic<T>`, cloneable types, encoding types, random types)
+  - Implemented for core types (`Fixed<T>`, `Dynamic<T>`, cloneable types, random types)
   - No blanket implementations; purely user-opt-in serialization to maximize auditability
   - Comprehensive tests in `tests/serde_tests.rs` covering validation, edge cases, and security
 - **Core polymorphism traits** in new `src/traits/` module for generic secret operations:
   - `ExposeSecret` & `ExposeSecretMut` traits for polymorphic secret access with controlled mutability and metadata (length/emptiness queries without exposing contents)
   - `SecureRandom` trait for cryptographically random values with metadata access (requires `rand` feature)
-  - Implemented for all secret wrapper types: `Fixed`, `Dynamic`, `FixedRandom`, `DynamicRandom`, encoding types, and cloneable types
+  - Implemented for all secret wrapper types: `Fixed`, `Dynamic`, `FixedRandom`, `DynamicRandom`, and cloneable types
   - Zero-cost abstractions with `#[inline(always)]` for optimal performance
   - Comprehensive rustdoc with security guarantees and usage examples
 
@@ -30,8 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Macros for creating custom cloneable type aliases (`cloneable_fixed_alias!`, `cloneable_dynamic_alias!`).
 - Fallible RNG methods: `try_generate()` on `FixedRandom<N>` and `DynamicRandom`, returning `Result<Self, rand::Error>`.
   - Corresponding `try_generate_random()` methods on `Fixed` and `Dynamic`.
-- `Base64String` wrapper in `encoding::base64` with validation, `into_bytes()`, and constant-time equality (when `ct-eq` enabled).
-  - Validates URL-safe no-pad base64; invalid inputs are zeroed when `zeroize` enabled.
+
 - `into_hex()` (consuming) and `to_hex()` (borrowing) methods on `FixedRandom<N>` and `DynamicRandom` (requires `encoding-hex`).
 - `into_base64()` (consuming) and `to_base64url()` (borrowing) methods on `FixedRandom<N>` and `DynamicRandom` (requires `encoding-base64`).
 - `into_bech32(hrp)` / `to_bech32(hrp)` and `into_bech32m(hrp)` / `to_bech32m(hrp)` methods on `FixedRandom<N>` and `DynamicRandom` (requires `encoding-bech32`).
@@ -42,24 +41,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Error types centralized in `error.rs` with `thiserror` for improved error handling.
 - Compile-fail testing infrastructure using `trybuild` for security invariant verification.
 - Conversions: `From<&str>` for `Dynamic<String>` and `From<&[u8]>` for `Dynamic<Vec<u8>>`.
-- Explicit methods on `HexString` and `Base64String`: `.expose_secret() -> &String`, `.len()`, `.is_empty()`, `.byte_len()`.
-- `Bech32String` wrapper in `encoding::bech32`.
-  - Generic support for both Bech32 and Bech32m variants (no protocol-specific HRP restrictions).
-  - Variant detection with `variant()`, `is_bech32()`, `is_bech32m()` methods.
-  - Accepts mixed-case input (normalized to lowercase for canonical storage).
-  - Provides `into_bytes()`, non-allocating `byte_len()`, `hrp()`, constant-time equality, and zeroing of invalid inputs (when `zeroize` enabled).
 - Granular `encoding-bech32` feature and inclusion in meta-feature `encoding`.
+
 - Centralized error types in new `error.rs` module.
 - Implemented `thiserror` for automatic `Display` and `std::error::Error` trait implementations on error types.
 - `Bech32EncodingError` enum for Bech32 encoding operations (`InvalidHrp`, `EncodingFailed`).
+
 - **New modular encoding system**:
   - Replaced `conversions` module/feature with modular `encoding`.
   - Split into `encoding::hex`, `encoding::base64`, and `encoding::bech32` submodules.
   - Granular features: `encoding` now enables `encoding-hex`, `encoding-base64`, and `encoding-bech32`.
   - `SecureEncoding` trait for byte encoding (renamed from `SecureEncodingExt`).
   - Removed `RandomHex` type; replaced with direct methods on `FixedRandom<N>` and `DynamicRandom`.
-  - `Bech32String` now fully generic for Bech32/Bech32m with mixed-case acceptance and canonical lowercase storage.
-- Fallible Bech32 encoding methods: `try_to_bech32()`, `try_to_bech32m()`, `try_into_bech32()`, `try_into_bech32m()` on `FixedRandom<N>`, `DynamicRandom`, and `SecureEncodingExt`.
+- Fallible Bech32 encoding methods: `try_to_bech32()`, `try_to_bech32m()`, `try_into_bech32()`, `try_into_bech32m()` on `FixedRandom<N>`, `DynamicRandom`, and `SecureEncoding`.
 
 - SECURITY.md document with security considerations, module analysis, and mitigation strategies.
 - ROADMAP.md for future development plans (serde, fuzzing, etc.).
@@ -75,19 +69,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Conversions from core/cloneable/random types to `Serializable*` for secure transitions.
   - Benchmarks (`benches/serde.rs`) measuring minimal overhead vs. raw types.
   - Unit tests, integration tests, compile-fail tests, and security tests ensuring no leaks.
-- **Removed direct `Serialize` impls** from encoded types (`HexString`, `Base64String`, `Bech32String`) and random/cloneable types—now require manual `Serializable*` conversion for raw output, enforcing auditability.
+
 
 ### Changed (Breaking)
 - **Serialization model**: Core/cloneable/random/encoded types no longer directly serialize raw secrets—use new `Serializable*` types for deliberate raw output to prevent accidental exfiltration.
-- **Encoded types**: Removed `Serialize` impls; now provide `From<Encoded>` to `SerializableString` (encoded str) or `SerializableVec` (decoded raw) for controlled access.
-- **Encoding wrappers method renames** (#52): Renamed decode methods to follow Rust stdlib naming conventions:
-  - `HexString::decode()` → `decode_to_bytes()` (borrowing)
-  - `HexString::into_bytes()` → `decode_into_bytes()` (consuming)
-  - Applied identically to `Base64String` and `Bech32String`.
+
+
 - Updated documentation in README.md to remove outdated `shrink_to_fit()` recommendations (#54), reflecting that `zeroize` wipes full buffer capacity including slack. Added references to `zeroize` crate docs for verification.
 
 ### Fixed
-- `Bech32String::byte_len()` now uses `rfind('1')` instead of `find('1')` to locate the last separator, aligning with BIP-173/350 spec (#53).
 
 ### Changed
 
@@ -97,12 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed `rng` module to `random`.
 - Renamed `FixedRng` and `DynamicRng` types to `FixedRandom` and `DynamicRandom`, respectively.
 - Moved `CloneableType` to `traits/clone_safe` for trait consolidation.
-- Encoding wrappers (`HexString`, `Base64String`, `Bech32String`):
-  - Removed `Deref` implementations for consistent explicit access.
-  - Unified decode methods renamed to `decode_to_bytes()` (borrowing) and `decode_into_bytes()` (consuming), returning raw `Vec<u8>`.
-  - `expose_secret()` now returns `&String` for API consistency.
-  - Added non-allocating `byte_len()` implementations.
-- `Base64String`: simplified validation using single engine-based decode check.
+
 - Moved `SecureEncoding` trait to `traits/secure_encoding` for trait consolidation.
 - Cargo.toml features: `default = ["secure"]`; new `secure` meta-feature (bundling `zeroize` + `ct-eq`); `insecure` for opt-out; updated `full = ["secure", "encoding"]`.
 - `SecureEncoding` trait re-export cfg updated to include `encoding-bech32` feature.
@@ -113,18 +98,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Feature gating for `CloneableType` and related impls (requires `zeroize`).
 - Doc-test compatibility across all feature configurations.
 - Resolved compilation conflicts in error types and trait bounds.
-- `Bech32String` `byte_len()` now allocation-free.
+
 - Bech32/Bech32m variant detection and normalization robustness.
 - Performance: Removed unnecessary clone in `CloneableArray` constructor.
 - **FromSliceError enhancement**: Manual `Display` and `Error` impls to fix deprecated auto-generated methods.
-- **Security documentation**: Prominent warnings in encoding modules about zeroize feature requirements for secure wiping of invalid inputs.
-- Removed misplaced `into_bytes` impl on `Bech32StringView` (borrow-only views cannot be consumed).
+
+
 - Clippy warnings: Fixed empty lines after doc comments and other minor issues.
 
 ### Removed
 
 - `NoClone` wrapper types and `no_clone()` methods.
-- `RandomHex` type.
+
 - `Dynamic::new_boxed()` method (redundant with `From<Box<T>>` impl).
 - `from_slice` method on `Fixed<[u8; N]>` (panicking; use `try_from` for fallible construction).
 - Certain macros from `public_type_alias_macros` module were removed for consistency.
@@ -206,7 +191,7 @@ fixed_alias!(pub(crate) Internal, 64); // Crate-visible type
 ### Added
 
 - `len()` and `is_empty()` on `Fixed<[u8; N]>`.
-- `HexString::new` with zero extra allocations: in-place lowercasing, validation, and zeroization of rejected inputs under `zeroize`.
+
 - Compile-time negative impl guard for `SecureConversionsExt` on wrapper types.
 - `rand_core = { version = "0.9", optional = true }` dependency for `rand` feature.
 - Direct `OsRng` calls in `FixedRng<N>::generate()` and `DynamicRng::generate()`.
