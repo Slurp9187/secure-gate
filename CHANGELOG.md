@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 + **Refined `serde` feature** for JSON/TOML/YAML serialization support (addresses ROADMAP):
   - Split into separate `serde-deserialize` and `serde-serialize` features for granular control
   - `serde-deserialize`: Enables `Deserialize` impls for all secret wrapper types with secure construction and zeroizing of invalid inputs
-  - `serde-serialize`: Enables opt-in `Serialize` via new `ExportableType` marker trait (requires `serde::Serialize`), uniformly gated for all types
+  - `serde-serialize`: Enables opt-in `Serialize` via new `SerializableType` marker trait (requires `serde::Serialize`), uniformly gated for all types
   - `serde`: Meta-feature enabling both `serde-deserialize` and `serde-serialize`
   - Implemented for core types (`Fixed<T>`, `Dynamic<T>`, cloneable types, encoding types, random types)
   - No blanket implementations; purely user-opt-in serialization to maximize auditability
@@ -23,18 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented for all secret wrapper types: `Fixed`, `Dynamic`, `FixedRandom`, `DynamicRandom`, encoding types, and cloneable types
   - Zero-cost abstractions with `#[inline(always)]` for optimal performance
   - Comprehensive rustdoc with security guarantees and usage examples
-- **Opt-in cloning overhaul** (requires `zeroize` feature):
-  - New pre-baked cloneable primitives for zero-boilerplate common cases:
-    - `CloneableArray<const N: usize>` — cloneable fixed-size stack secret (`[u8; N]`)
-    - `CloneableString` — cloneable heap-allocated text secret (`String`)
-    - `CloneableVec` — cloneable heap-allocated binary secret (`Vec<u8>`)
-  - Organized in `src/cloneable/` module with submodules `array`, `string`, and `vec`.
-  - Convenience methods: `.expose_inner()` / `.expose_inner_mut()` on `CloneableString` and `CloneableVec`.
-  - `init_with` and `try_init_with` constructors on all cloneable types (`CloneableArray`, `CloneableString`, `CloneableVec`) to minimize temporary stack exposure when reading secrets from user input.
-  - Encouraged pattern: semantic type aliases (e.g., `pub type CloneablePassword = CloneableString;`).
+
 - `CloneableType` trait for opt-in cloning of secrets (requires `zeroize` feature).
   - Implemented for primitives (`u8`, `i32`, etc.) and fixed arrays (`[T; N]`).
   - Custom types can implement the trait for controlled duplication.
+- Macros for creating custom cloneable type aliases (`cloneable_fixed_alias!`, `cloneable_dynamic_alias!`).
 - Fallible RNG methods: `try_generate()` on `FixedRandom<N>` and `DynamicRandom`, returning `Result<Self, rand::Error>`.
   - Corresponding `try_generate_random()` methods on `Fixed` and `Dynamic`.
 - `Base64String` wrapper in `encoding::base64` with validation, `into_bytes()`, and constant-time equality (when `ct-eq` enabled).
@@ -75,17 +68,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated README.md with cross-links to SECURITY.md, improved formatting, and security emphasis.
 - **Dedicated serde fuzz target** (`fuzz_targets/serde.rs`) for secure deserialization testing: covers JSON/TOML/YAML parsing, validation logic, zeroization on invalid inputs, temporary allocation handling, and edge cases to prevent deserialization-based vulnerabilities from untrusted structured data.
 - Optional custom rustdoc string support added to all non-generic alias macros (`fixed_alias!`, `dynamic_alias!`, `fixed_alias_random!`) for full consistency with generic variants. Accepts an optional third parameter for custom documentation, falling back to generated docs when omitted. Backward compatible and improves API discoverability.
+- Extensive macro-ization of internal implementations for `Fixed` and `Dynamic` types, reducing boilerplate and ensuring consistency across trait impls (e.g., for `serde`, `Clone`, `Zeroize`, etc.).
 - **Opt-in raw serialization system** (`"serde-serialize"` feature) for deliberate secret export:
-  - New `Exportable*` types (`ExportableArray<N>`, `ExportableString`, `ExportableVec`) in `src/exportable/` for serializing raw secrets (bytes/text) with automatic `ExportableType` impls and zeroize on drop.
-  - Macros `fixed_exportable_alias!` and `dynamic_exportable_alias!` for creating custom serializable secret types.
-  - Conversions from core/cloneable/random types to `Exportable*` for secure transitions.
+  - New `Serializable*` types (`SerializableArray<N>`, `SerializableString`, `SerializableVec`) in `src/serializable/` for serializing raw secrets (bytes/text) with automatic `SerializableType` impls and zeroize on drop.
+  - Macros `serializable_fixed_alias!` and `serializable_dynamic_alias!` for creating custom serializable secret types.
+  - Conversions from core/cloneable/random types to `Serializable*` for secure transitions.
   - Benchmarks (`benches/serde.rs`) measuring minimal overhead vs. raw types.
   - Unit tests, integration tests, compile-fail tests, and security tests ensuring no leaks.
-- **Removed direct `Serialize` impls** from encoded types (`HexString`, `Base64String`, `Bech32String`) and random/cloneable types—now require manual `Exportable*` conversion for raw output, enforcing auditability.
+- **Removed direct `Serialize` impls** from encoded types (`HexString`, `Base64String`, `Bech32String`) and random/cloneable types—now require manual `Serializable*` conversion for raw output, enforcing auditability.
 
 ### Changed (Breaking)
-- **Serialization model**: Core/cloneable/random/encoded types no longer directly serialize raw secrets—use new `Exportable*` types for deliberate raw output to prevent accidental exfiltration.
-- **Encoded types**: Removed `Serialize` impls; now provide `From<Encoded>` to `ExportableString` (encoded str) or `ExportableVec` (decoded raw) for controlled access.
+- **Serialization model**: Core/cloneable/random/encoded types no longer directly serialize raw secrets—use new `Serializable*` types for deliberate raw output to prevent accidental exfiltration.
+- **Encoded types**: Removed `Serialize` impls; now provide `From<Encoded>` to `SerializableString` (encoded str) or `SerializableVec` (decoded raw) for controlled access.
 - **Encoding wrappers method renames** (#52): Renamed decode methods to follow Rust stdlib naming conventions:
   - `HexString::decode()` → `decode_to_bytes()` (borrowing)
   - `HexString::into_bytes()` → `decode_into_bytes()` (consuming)
@@ -133,6 +127,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RandomHex` type.
 - `Dynamic::new_boxed()` method (redundant with `From<Box<T>>` impl).
 - `from_slice` method on `Fixed<[u8; N]>` (panicking; use `try_from` for fallible construction).
+- Certain macros from `public_type_alias_macros` module were removed for consistency.
 
 ## [0.6.1] - 2025-12-07
 

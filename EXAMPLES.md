@@ -203,12 +203,12 @@ assert_eq!(payload.expose_secret()[64], 0xFF);
 ```rust
 #[cfg(all(feature = "serde-serialize", feature = "encoding-hex", feature = "rand"))]
 {
-    use secure_gate::{SecureEncoding, ExposeSecret, ExposeSecretMut, encoding::hex::HexString, Fixed, ExportableString};
+    use secure_gate::{SecureEncoding, ExposeSecret, ExposeSecretMut, encoding::hex::HexString, Fixed, SerializableString};
     use serde_json;
     let mut key: Fixed<[u8; 32]> = Fixed::generate_random();
     key.expose_secret_mut()[0] = 0xFF;
     let hex = key.expose_secret().to_hex();
-    let exportable: ExportableString = hex.into();
+    let exportable: SerializableString = hex.into();
     let json = serde_json::to_string(&exportable).unwrap(); // "\"modified_hex_string\""
 }
 ```
@@ -255,7 +255,7 @@ assert_eq!(payload.expose_secret()[64], 0xFF);
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::{Fixed, ExportableType};
+    use secure_gate::{Fixed, SerializableType};
     use serde::Serialize;
     struct MyKey([u8; 32]);
     impl Serialize for MyKey {
@@ -266,7 +266,7 @@ assert_eq!(payload.expose_secret()[64], 0xFF);
             self.0.serialize(serializer)
         }
     }
-    impl ExportableType for MyKey {} // Explicit opt-in
+    impl SerializableType for MyKey {} // Explicit opt-in
     let key: Fixed<MyKey> = Fixed::new(MyKey([0u8; 32]));
     let json = serde_json::to_string(&key).unwrap();
 }
@@ -276,9 +276,9 @@ assert_eq!(payload.expose_secret()[64], 0xFF);
 ```rust
 #[cfg(all(feature = "serde-serialize", feature = "encoding-hex"))]
 {
-    use secure_gate::{encoding::hex::HexString, ExportableString};
+    use secure_gate::{encoding::hex::HexString, SerializableString};
     let hex = HexString::new("deadbeef".to_string()).unwrap();
-    let exportable: ExportableString = hex.into();
+    let exportable: SerializableString = hex.into();
     let json = serde_json::to_string(&exportable).unwrap(); // → "\"deadbeef\""
 }
 ```
@@ -357,42 +357,42 @@ let vec: SecureVec = vec![0u8; 128].into();
     let session = SessionKey::generate();
 }
 ```
-### fixed_exportable_alias! - Fixed Exportable (Serializable) Aliases (Requires `serde-serialize`)
+### serializable_fixed_alias! - Fixed Serializable Aliases (Requires `serde-serialize`)
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::{fixed_exportable_alias, Fixed};
-    fixed_exportable_alias!(pub ExportableApiKey, 32);
-    let key: Fixed<ExportableApiKey> = Fixed::new(ExportableApiKey { inner: [0u8; 32] });
+    use secure_gate::{serializable_fixed_alias, Fixed};
+    serializable_fixed_alias!(pub SerializableApiKey, 32);
+    let key: Fixed<SerializableApiKey> = Fixed::new(SerializableApiKey([0u8; 32]));
     // Can be serialized with serde
 }
 ```
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::{fixed_exportable_alias, Fixed};
-    fixed_exportable_alias!(pub ExportableKey, 32, "Serializable API key");
-    let key: Fixed<ExportableKey> = Fixed::new(ExportableKey { inner: [0u8; 32] });
+    use secure_gate::{serializable_fixed_alias, Fixed};
+    serializable_fixed_alias!(pub SerializableKey, 32, "Serializable API key");
+    let key: Fixed<SerializableKey> = Fixed::new(SerializableKey([0u8; 32]));
     // Can be serialized with serde
 }
 ```
-### dynamic_exportable_alias! - Dynamic Exportable (Serializable) Aliases (Requires `serde-serialize`)
+### serializable_dynamic_alias! - Dynamic Serializable Aliases (Requires `serde-serialize`)
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::{dynamic_exportable_alias, Dynamic};
-    dynamic_exportable_alias!(pub ExportablePassword, String);
+    use secure_gate::{serializable_dynamic_alias, Dynamic};
+    serializable_dynamic_alias!(pub SerializablePassword, String);
     // Raw types
-    let pw: Dynamic<ExportablePassword> = Dynamic::new(ExportablePassword::from("secret".to_string()));
+    let pw: Dynamic<SerializablePassword> = Dynamic::new(SerializablePassword("secret".to_string()));
     // Can be serialized with serde
 }
 ```
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::{dynamic_exportable_alias, Dynamic};
-    dynamic_exportable_alias!(pub ExportableToken, Vec<u8>, "Serializable token");
-    let token: Dynamic<ExportableToken> = Dynamic::new(ExportableToken::from(vec![0u8; 16]));
+    use secure_gate::{serializable_dynamic_alias, Dynamic};
+    serializable_dynamic_alias!(pub SerializableToken, Vec<u8>, "Serializable token");
+    let token: Dynamic<SerializableToken> = Dynamic::new(SerializableToken(vec![0u8; 16]));
     // Can be serialized with serde
 }
 ```
