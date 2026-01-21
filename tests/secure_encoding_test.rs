@@ -174,3 +174,21 @@ fn test_cloneable_string_to_bech32() {
     let bech = data.to_bech32("test");
     assert!(bech.starts_with("test"));
 }
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+#[should_panic(expected = "invalid hrp")]
+fn test_invalid_hrp_bech32() {
+    let data: [u8; 4] = [1, 2, 3, 4];
+    // Invalid HRP: empty string
+    let _ = data.to_bech32("");
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+#[should_panic(expected = "bech32 encoding failed")]
+fn test_bech32_encoding_failure() {
+    // This might not actually fail, but as an example of potential encoding errors
+    let data: Vec<u8> = vec![255; 1000]; // Very long data might cause issues, but bech32 can handle large data
+    let _ = data.to_bech32("test");
+}

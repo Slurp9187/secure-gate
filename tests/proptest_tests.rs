@@ -15,6 +15,8 @@
 ))]
 use proptest::prelude::*;
 
+extern crate alloc;
+
 #[cfg(feature = "ct-eq")]
 mod ct_eq_proptests {
     use super::*;
@@ -31,6 +33,57 @@ mod ct_eq_proptests {
         #[test]
         fn constant_time_eq_symmetric(a in prop::collection::vec(any::<u8>(), 0..256), b in prop::collection::vec(any::<u8>(), 0..256)) {
             prop_assert_eq!(bool::from(::subtle::ConstantTimeEq::ct_eq(a.as_slice(), b.as_slice())), bool::from(::subtle::ConstantTimeEq::ct_eq(b.as_slice(), a.as_slice())));
+        }
+    }
+}
+
+#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
+mod serde_proptests {
+    use super::*;
+    use secure_gate::{serializable_dynamic_alias, serializable_fixed_alias, ExposeSecret};
+
+    serializable_fixed_alias!(pub TestSerializableArray, 4);
+    serializable_dynamic_alias!(pub TestSerializableVec, Vec<u8>);
+
+    #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
+    impl<'de> serde::Deserialize<'de> for TestSerializableArray {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let inner = <[u8; 4]>::deserialize(deserializer)?;
+            Ok(Self::from(inner))
+        }
+    }
+
+    #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
+    impl<'de> serde::Deserialize<'de> for TestSerializableVec {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let inner = Vec::<u8>::deserialize(deserializer)?;
+            Ok(Self::from(inner))
+        }
+    }
+
+    proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig::with_cases(10))]
+
+        #[test]
+        fn dynamic_serde_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
+            let original: TestSerializableVec = data.clone().into();
+            let serialized = serde_json::to_string(&original).unwrap();
+            let deserialized: TestSerializableVec = serde_json::from_str(&serialized).unwrap();
+            prop_assert_eq!(original.expose_secret().clone(), deserialized.expose_secret().clone());
+        }
+
+        #[test]
+        fn fixed_serde_roundtrip(data in prop::array::uniform4(any::<u8>())) {
+            let original: TestSerializableArray = data.into();
+            let serialized = serde_json::to_string(&original).unwrap();
+            let deserialized: TestSerializableArray = serde_json::from_str(&serialized).unwrap();
+            prop_assert_eq!(original.expose_secret(), deserialized.expose_secret());
         }
     }
 }
