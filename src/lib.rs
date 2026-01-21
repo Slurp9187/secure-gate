@@ -54,8 +54,8 @@ mod macros;
 /// - `dynamic_generic_alias!`: Create generic heap-allocated secret aliases.
 /// - `fixed_alias!`: Create type aliases for fixed-size secrets (`Fixed<[u8; N]>`).
 /// - `fixed_generic_alias!`: Create generic fixed-size secret aliases.
-/// Re-export of [`SecureEncoding`] trait for convenient encoding extensions.
-/// Re-export of the [`SecureEncoding`] trait.
+///   Re-export of [`SecureEncoding`] trait for convenient encoding extensions.
+///   Re-export of the [`SecureEncoding`] trait.
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",

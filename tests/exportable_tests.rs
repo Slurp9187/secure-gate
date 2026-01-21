@@ -1,10 +1,10 @@
+#![cfg(all(feature = "zeroize", feature = "serde"))]
+
 // Tests for exportable types: opt-in serialization without accidental exposure
 // Uses ExportableType marker for secure exporting
-
 extern crate alloc;
 
 // Cfgs added to individual tests
-
 use secure_gate::{
     exportable_dynamic_alias, exportable_fixed_alias, Dynamic, ExportableType, ExposeSecret,
     ExposeSecretMut, Fixed,
@@ -17,10 +17,14 @@ exportable_dynamic_alias!(pub ExportableString, String);
 exportable_dynamic_alias!(pub ExportableVec, Vec<u8>);
 
 // === Custom Type Exporting ===
-
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct MyKey([u8; 16]);
+
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 impl ExportableType for MyKey {}
+
+#[cfg(all(feature = "zeroize", feature = "serde"))]
 impl zeroize::Zeroize for MyKey {
     fn zeroize(&mut self) {
         zeroize::Zeroize::zeroize(&mut self.0);

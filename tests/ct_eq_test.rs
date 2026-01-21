@@ -1,6 +1,6 @@
-extern crate alloc;
+#![cfg(feature = "ct-eq")]
 
-// Global cfg removed, added to individual tests
+extern crate alloc;
 
 use secure_gate::{
     cloneable_dynamic_alias, cloneable_fixed_alias, exportable_dynamic_alias,
@@ -15,7 +15,6 @@ exportable_fixed_alias!(pub TestExportableArray, 4);
 exportable_dynamic_alias!(pub TestExportableString, String);
 exportable_dynamic_alias!(pub TestExportableVec, Vec<u8>);
 
-#[cfg(feature = "ct-eq")]
 #[test]
 fn test_slice_ct_eq() {
     let a = [1u8, 2, 3].as_slice();
@@ -26,7 +25,6 @@ fn test_slice_ct_eq() {
     assert!(!a.ct_eq(c));
 }
 
-#[cfg(feature = "ct-eq")]
 #[test]
 fn test_array_ct_eq() {
     let a: [u8; 4] = [1, 2, 3, 4];
@@ -37,7 +35,6 @@ fn test_array_ct_eq() {
     assert!(!a.ct_eq(&c));
 }
 
-#[cfg(feature = "ct-eq")]
 #[test]
 fn test_vec_ct_eq() {
     let a: Vec<u8> = vec![1, 2, 3];
@@ -48,7 +45,6 @@ fn test_vec_ct_eq() {
     assert!(!a.ct_eq(&c));
 }
 
-#[cfg(feature = "ct-eq")]
 #[test]
 fn test_string_ct_eq() {
     let a: String = "hello".to_string();
@@ -59,7 +55,6 @@ fn test_string_ct_eq() {
     assert!(!a.ct_eq(&c));
 }
 
-#[cfg(feature = "ct-eq")]
 #[test]
 fn test_cloneable_array_ct_eq() {
     let a: TestCloneableArray = [1u8, 2, 3, 4].into();
@@ -70,7 +65,6 @@ fn test_cloneable_array_ct_eq() {
     assert!(!a.ct_eq(&c));
 }
 
-#[cfg(feature = "ct-eq")]
 #[test]
 fn test_cloneable_string_ct_eq() {
     let a: TestCloneableString = "test".to_string().into();
@@ -81,7 +75,6 @@ fn test_cloneable_string_ct_eq() {
     assert!(!a.ct_eq(&c));
 }
 
-#[cfg(feature = "ct-eq")]
 #[test]
 fn test_cloneable_vec_ct_eq() {
     let a: TestCloneableVec = vec![1, 2, 3].into();
@@ -92,7 +85,6 @@ fn test_cloneable_vec_ct_eq() {
     assert!(!a.ct_eq(&c));
 }
 
-#[cfg(feature = "ct-eq")]
 #[test]
 fn test_exportable_array_ct_eq() {
     let a: TestExportableArray = [1u8, 2, 3, 4].into();
@@ -103,7 +95,6 @@ fn test_exportable_array_ct_eq() {
     assert!(!a.ct_eq(&c));
 }
 
-#[cfg(feature = "ct-eq")]
 #[test]
 fn test_exportable_string_ct_eq() {
     let a: TestExportableString = "test".to_string().into();
@@ -114,7 +105,6 @@ fn test_exportable_string_ct_eq() {
     assert!(!a.ct_eq(&c));
 }
 
-#[cfg(feature = "ct-eq")]
 #[test]
 fn test_exportable_vec_ct_eq() {
     let a: TestExportableVec = vec![1, 2, 3].into();
