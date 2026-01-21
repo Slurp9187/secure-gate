@@ -14,11 +14,11 @@ All examples are designed to compile with the latest version and demonstrate rea
 1. [Basic Secrets: Fixed (Stack) & Dynamic (Heap)](#basic-secrets-fixed-stack--dynamic-heap)
 2. [Fixed (Stack) Byte Arrays (Keys, Nonces)](#fixed-stack-byte-arrays)
 3. [Dynamic (Heap) Strings & Vectors](#dynamic-heap-strings--vectors)
-4. [Opt-In Safe Cloning (`cloneable` feature)](#opt-in-safe-cloning)
-5. [Cryptographic Randomness (`rand` feature)](#cryptographic-randomness)
-6. [Encoding (`encoding-*` features)](#encoding)
-7. [Serde: Loading Secrets (`serde-deserialize`)](#serde-loading-secrets)
-8. [Serde: Exporting Secrets (`serde-serialize` with marker)](#serde-exporting-secrets)
+4. [Cryptographic Randomness (`rand` feature)](#cryptographic-randomness)
+5. [Encoding (`encoding-*` features)](#encoding)
+6. [Opt-In Safe Cloning (`cloneable` feature)](#opt-in-safe-cloning)
+7. [Opt-In Serialization (`serde-serialize` feature)](#opt-in-serialization)
+8. [Serde: Loading Secrets (`serde-deserialize`)](#serde-loading-secrets)
 9. [Polymorphic Traits (ExposeSecret, ConstantTimeEq)](#polymorphic-traits)
 10. [All Macros (with Options)](#all-macros-with-options)
 
@@ -174,11 +174,28 @@ use secure_gate::{cloneable_fixed_alias, ExposeSecret};
 #[cfg(feature = "cloneable")]
 {
     extern crate alloc;
+    
     cloneable_fixed_alias!(pub CloneableKey, 32);
 
     let key: CloneableKey = [0u8; 32].into();
 
     let key2 = key.clone(); // Safe deep clone
+}
+```
+
+### Cloneable Dynamic String
+```rust
+#[cfg(feature = "cloneable")]
+use secure_gate::{cloneable_dynamic_alias, ExposeSecret};
+
+#[cfg(feature = "cloneable")]
+{
+    extern crate alloc;
+    cloneable_dynamic_alias!(pub CloneablePassword, String);
+
+    let pw: CloneablePassword = "hunter2".to_string().into();
+
+    let pw2 = pw.clone(); // Safe deep clone
 }
 ```
 
@@ -276,19 +293,18 @@ Inbound decoding via direct constructors (panic on invalid).
 }
 
 #[cfg(feature = "encoding-base64")]
-extern crate alloc;
-
-#[cfg(feature = "encoding-base64")]
 {
+    extern crate alloc;
+
     use secure_gate::Dynamic;
 
     let data = Dynamic::<alloc::vec::Vec<u8>>::from_base64("SGVsbG8");
 }
 
 #[cfg(feature = "encoding-bech32")]
-
-#[cfg(feature = "encoding-bech32")]
 {
+    extern crate alloc;
+
     use secure_gate::Dynamic;
 
     let data = Dynamic::<alloc::vec::Vec<u8>>::from_bech32("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "bc");
@@ -330,6 +346,20 @@ use secure_gate::serializable_fixed_alias;
     serializable_fixed_alias!(pub ExportableKey, 32);
 
     let key: ExportableKey = [0u8; 32].into();
+}
+```
+
+### Dynamic Exportable
+```rust
+#[cfg(feature = "serde-serialize")]
+use secure_gate::{serializable_dynamic_alias, ExposeSecret};
+
+#[cfg(feature = "serde-serialize")]
+{
+    extern crate alloc;
+    serializable_dynamic_alias!(pub ExportablePassword, String);
+
+    let pw: ExportablePassword = "hunter2".to_string().into();
 }
 ```
 
