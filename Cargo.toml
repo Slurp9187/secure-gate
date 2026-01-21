@@ -59,7 +59,7 @@ zeroize = ["dep:zeroize", "blake3/zeroize"]
 ct-eq = ["dep:subtle"]
 
 # Hash-based equality (uses blake3 for fast, secure hashing without caching overhead)
-hash-eq = ["dep:blake3", "dep:subtle"]
+hash-eq = ["ct-eq", "dep:blake3"]
 
 # Cloneable: Opt-in safe cloning for secrets (requires zeroize)
 cloneable = ["dep:zeroize"]

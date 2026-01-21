@@ -4,11 +4,11 @@
 // Benchmarks comparing hash-eq (Blake3-based) vs ct-eq (subtle-based) performance.
 // Expect hash-eq to outperform ct-eq for secrets >128 bytes due to fixed 32B comparison.
 
-#[cfg(all(feature = "hash-eq", feature = "ct-eq"))]
+#[cfg(feature = "hash-eq")]
 use criterion::{criterion_group, criterion_main, Criterion};
 
 // Small secret: 32 bytes (expect ct-eq to be faster)
-#[cfg(all(feature = "hash-eq", feature = "ct-eq"))]
+#[cfg(feature = "hash-eq")]
 fn bench_small_secret_comparison(c: &mut Criterion) {
     use secure_gate::Fixed;
 
@@ -27,7 +27,7 @@ fn bench_small_secret_comparison(c: &mut Criterion) {
 }
 
 // Large secret: 1000 bytes (expect hash-eq to be faster)
-#[cfg(all(feature = "hash-eq", feature = "ct-eq"))]
+#[cfg(feature = "hash-eq")]
 fn bench_large_secret_comparison(c: &mut Criterion) {
     use secure_gate::Dynamic;
 
@@ -46,7 +46,7 @@ fn bench_large_secret_comparison(c: &mut Criterion) {
 }
 
 // Ultra-large secret: 100KB (massive hash-eq advantage expected)
-#[cfg(all(feature = "hash-eq", feature = "ct-eq"))]
+#[cfg(feature = "hash-eq")]
 fn bench_ultra_large_secret_comparison(c: &mut Criterion) {
     // Mitigate caching: Use fresh allocations with varying data
     c.bench_function("ultra_large_dynamic_hash_eq", |bencher| {
@@ -67,7 +67,7 @@ fn bench_ultra_large_secret_comparison(c: &mut Criterion) {
 }
 
 // Massive secret: 1MB (extreme bound for hash-eq fixed overhead)
-#[cfg(all(feature = "hash-eq", feature = "ct-eq"))]
+#[cfg(feature = "hash-eq")]
 fn bench_massive_secret_comparison(c: &mut Criterion) {
     // Mitigate caching: Use fresh allocations with varying data
     c.bench_function("massive_dynamic_hash_eq", |bencher| {
@@ -119,17 +119,17 @@ fn bench_hash_computation(c: &mut Criterion) {
 
 // Storage impact note: +32 bytes per instance (negligible for most cases)
 
-#[cfg(all(feature = "hash-eq", feature = "ct-eq"))]
+#[cfg(feature = "hash-eq")]
 criterion_group!(
     name = hash_eq_vs_ct_eq;
     config = Criterion::default();
     targets = bench_small_secret_comparison, bench_large_secret_comparison, bench_ultra_large_secret_comparison, bench_massive_secret_comparison, bench_hash_computation
 );
-#[cfg(all(feature = "hash-eq", feature = "ct-eq"))]
+#[cfg(feature = "hash-eq")]
 criterion_main!(hash_eq_vs_ct_eq);
 
 // No benches when required features are not enabled
-#[cfg(not(all(feature = "hash-eq", feature = "ct-eq")))]
+#[cfg(not(feature = "hash-eq"))]
 fn main() {
-    println!("Benchmarks require both 'hash-eq' and 'ct-eq' features to be enabled.");
+    println!("Benchmarks require the 'hash-eq' feature to be enabled.");
 }

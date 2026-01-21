@@ -16,18 +16,6 @@ macro_rules! impl_ct_eq_dynamic {
             ///
             /// Compares the byte contents of two instances in constant time
             /// to prevent timing attacks.
-            ///
-            /// # Examples
-            ///
-            /// ```
-            /// # #[cfg(feature = "ct-eq")]
-            /// # {
-            /// use secure_gate::Dynamic;
-            /// let a = Dynamic::new(/* ... */);
-            /// let b = Dynamic::new(/* ... */);
-            /// assert!(a.ct_eq(&b));
-            /// # }
-            /// ```
             #[inline]
             pub fn ct_eq(&self, other: &Self) -> bool {
                 use $crate::traits::ConstantTimeEq;
