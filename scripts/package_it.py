@@ -50,6 +50,18 @@ PROJECT_ROOT = find_project_root()
 # =================================================================
 PACKAGES = [
     {
+        "suffix": "docs",
+        "root_files": [
+            "CHANGELOG.md",
+            "README.md",
+            "ROADMAP.md",
+            "SECURITY.md",
+        ],
+        "include_dirs": [],
+        "file_pattern": "*.md",
+        "description": "Full documentation source",
+    },
+    {
         "suffix": "src",
         "root_files": [
             "Cargo.toml",
@@ -87,6 +99,13 @@ PACKAGES = [
     #     "file_pattern": "mod.rs",
     #     "description": "Only mod.rs files from src/ and tests/ (module structure overview)",
     # },
+    {
+        "suffix": "benches",
+        "root_files": [],
+        "include_dirs": ["benches"],
+        "file_pattern": "*.rs",
+        "description": "benches (benchmarking)",
+    },
 ]
 
 # =================================================================
