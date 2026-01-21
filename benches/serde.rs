@@ -73,7 +73,7 @@ fn bench_dynamic_serialize(c: &mut Criterion) {
     let exportable_vec: SerializableVec = data_vec.clone().into();
     let exportable_str: SerializableString = data_str.clone().into();
 
-    let mut group = c.benchmark_group("dynamic (1KB)");
+    let mut group = c.benchmark_group("dynamic (1 KiB)");
 
     group.bench_function("SerializableVec serialize", |b| {
         b.iter(|| {
@@ -106,6 +106,94 @@ fn bench_dynamic_serialize(c: &mut Criterion) {
     group.finish();
 }
 
+#[cfg(feature = "serde-serialize")]
+fn bench_large_dynamic_serialize(c: &mut Criterion) {
+    let mut group = c.benchmark_group("large_dynamic (1 MiB)");
+
+    group.bench_function("SerializableVec serialize", |b| {
+        b.iter(|| {
+            let exportable_vec: SerializableVec =
+                criterion::black_box(vec![42u8; 1_048_576]).into();
+            let json = to_string(black_box(&exportable_vec)).unwrap();
+            black_box(json)
+        })
+    });
+
+    group.bench_function("SerializableString serialize", |b| {
+        b.iter(|| {
+            let exportable_str: SerializableString =
+                criterion::black_box("A".repeat(1_048_576)).into();
+            let json = to_string(black_box(&exportable_str)).unwrap();
+            black_box(json)
+        })
+    });
+
+    group.bench_function("raw Vec<u8> serialize", |b| {
+        b.iter(|| {
+            let data_vec = criterion::black_box(vec![42u8; 1_048_576]);
+            let json = to_string(black_box(&data_vec)).unwrap();
+            black_box(json)
+        })
+    });
+
+    group.bench_function("raw String serialize", |b| {
+        b.iter(|| {
+            let data_str = criterion::black_box("A".repeat(1_048_576));
+            let json = to_string(black_box(&data_str)).unwrap();
+            black_box(json)
+        })
+    });
+
+    group.finish();
+}
+
+#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
+fn bench_large_dynamic_roundtrip(c: &mut Criterion) {
+    use secure_gate::Dynamic;
+
+    let mut group = c.benchmark_group("large dynamic roundtrip (1 MiB)");
+
+    group.bench_function("SerializableVec → Dynamic<Vec<u8>>", |b| {
+        b.iter(|| {
+            let exportable_vec: SerializableVec =
+                criterion::black_box(vec![42u8; 1_048_576]).into();
+            let json = to_string(black_box(&exportable_vec)).unwrap();
+            let deserialized: Dynamic<Vec<u8>> = from_str(&json).unwrap();
+            black_box(deserialized)
+        })
+    });
+
+    group.bench_function("SerializableString → Dynamic<String>", |b| {
+        b.iter(|| {
+            let exportable_str: SerializableString =
+                criterion::black_box("A".repeat(1_048_576)).into();
+            let json = to_string(black_box(&exportable_str)).unwrap();
+            let deserialized: Dynamic<String> = from_str(&json).unwrap();
+            black_box(deserialized)
+        })
+    });
+
+    group.bench_function("raw Vec<u8> → Dynamic<Vec<u8>> roundtrip", |b| {
+        b.iter(|| {
+            let data_vec = criterion::black_box(vec![42u8; 1_048_576]);
+            let json = to_string(black_box(&data_vec)).unwrap();
+            let deserialized: Dynamic<Vec<u8>> = from_str(&json).unwrap();
+            black_box(deserialized)
+        })
+    });
+
+    group.bench_function("raw String → Dynamic<String> roundtrip", |b| {
+        b.iter(|| {
+            let data_str = criterion::black_box("A".repeat(1_048_576));
+            let json = to_string(black_box(&data_str)).unwrap();
+            let deserialized: Dynamic<String> = from_str(&json).unwrap();
+            black_box(deserialized)
+        })
+    });
+
+    group.finish();
+}
+
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
 fn bench_dynamic_roundtrip(c: &mut Criterion) {
     use secure_gate::Dynamic;
@@ -116,7 +204,7 @@ fn bench_dynamic_roundtrip(c: &mut Criterion) {
     let exportable_vec: SerializableVec = data_vec.clone().into();
     let exportable_str: SerializableString = data_str.clone().into();
 
-    let mut group = c.benchmark_group("dynamic roundtrip (1KB)");
+    let mut group = c.benchmark_group("dynamic roundtrip (1 KiB)");
 
     group.bench_function("SerializableVec → Dynamic<Vec<u8>>", |b| {
         b.iter(|| {
@@ -162,6 +250,10 @@ fn serde_benchmarks(c: &mut Criterion) {
     bench_dynamic_serialize(c);
     #[cfg(feature = "serde-deserialize")]
     bench_dynamic_roundtrip(c);
+
+    bench_large_dynamic_serialize(c);
+    #[cfg(feature = "serde-deserialize")]
+    bench_large_dynamic_roundtrip(c);
 }
 
 #[cfg(feature = "serde-serialize")]
