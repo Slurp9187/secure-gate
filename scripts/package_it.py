@@ -81,17 +81,18 @@ PACKAGES = [
         "file_pattern": "*.rs",
         "description": "All integration tests",
     },
-    # {
-    #     "suffix": "fuzz",
-    #     "root_files": [
-    #         "fuzz/Cargo.toml",
-    #         ".github/workflows/fuzz-nightly.yml",
-    #         ".github/workflows/fuzz-quick.yml",
-    #     ],
-    #     "include_dirs": ["fuzz/fuzz_targets"],
-    #     "file_pattern": "*.rs",
-    #     "description": "Fuzzing targets",
-    # },
+    {
+        "suffix": "fuzz",
+        "root_files": [
+            "fuzz/Cargo.toml",
+            ".github/workflows/fuzz-miri.yml",
+            ".github/workflows/fuzz-nightly.yml",
+            ".github/workflows/fuzz-quick.yml",
+        ],
+        "include_dirs": ["fuzz/fuzz_targets"],
+        "file_pattern": "*.rs",
+        "description": "Fuzzing targets",
+    },
     # {
     #     "suffix": "mod",
     #     "root_files": [],
