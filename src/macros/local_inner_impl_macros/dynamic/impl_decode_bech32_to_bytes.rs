@@ -27,6 +27,34 @@ macro_rules! impl_decode_bech32_to_bytes {
                     .expect("validated bech32 string should decode");
                 data
             }
+
+            /// Decode the string as bech32 to bytes, checking that the HRP matches the expected one.
+            pub fn decode_bech32_to_bytes_with_hrp(
+                &self,
+                expected_hrp: &str,
+            ) -> Result<Vec<u8>, $crate::error::Bech32EncodingError> {
+                use bech32::decode;
+                let (decoded_hrp, data) = decode(self.expose_secret().as_str())
+                    .map_err(|_| $crate::error::Bech32EncodingError::EncodingFailed)?;
+                if decoded_hrp.as_str() != expected_hrp {
+                    return Err($crate::error::Bech32EncodingError::InvalidHrp);
+                }
+                Ok(data)
+            }
+
+            /// Consuming version: decode as bech32 with HRP check and immediately drop the wrapper.
+            pub fn decode_bech32_into_bytes_with_hrp(
+                self,
+                expected_hrp: &str,
+            ) -> Result<Vec<u8>, $crate::error::Bech32EncodingError> {
+                use bech32::decode;
+                let (decoded_hrp, data) = decode(self.expose_secret().as_str())
+                    .map_err(|_| $crate::error::Bech32EncodingError::EncodingFailed)?;
+                if decoded_hrp.as_str() != expected_hrp {
+                    return Err($crate::error::Bech32EncodingError::InvalidHrp);
+                }
+                Ok(data)
+            }
         }
     };
 }
