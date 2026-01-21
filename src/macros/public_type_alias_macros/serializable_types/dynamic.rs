@@ -65,6 +65,16 @@ macro_rules! serializable_dynamic_alias {
             fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
                 $crate::ExposeSecret::expose_secret(self).to_bech32m(hrp)
             }
+
+            #[cfg(feature = "encoding-bech32")]
+            fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, $crate::Bech32EncodingError> {
+                $crate::ExposeSecret::expose_secret(self).try_to_bech32(hrp)
+            }
+
+            #[cfg(feature = "encoding-bech32")]
+            fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, $crate::Bech32EncodingError> {
+                $crate::ExposeSecret::expose_secret(self).try_to_bech32m(hrp)
+            }
         }
 
         #[cfg(feature = "ct-eq")]

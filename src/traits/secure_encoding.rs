@@ -9,6 +9,8 @@ use base64_crate::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64_crate::Engine;
 
 #[cfg(feature = "encoding-bech32")]
+use crate::error::Bech32EncodingError;
+#[cfg(feature = "encoding-bech32")]
 use bech32::{self};
 
 /// Extension trait for safe, explicit encoding of secret byte data to strings.
@@ -54,6 +56,14 @@ pub trait SecureEncoding {
     /// Encode secret bytes as Bech32m with the specified HRP.
     #[cfg(feature = "encoding-bech32")]
     fn to_bech32m(&self, hrp: &str) -> alloc::string::String;
+
+    /// Fallibly encode secret bytes as Bech32 with the specified HRP.
+    #[cfg(feature = "encoding-bech32")]
+    fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, Bech32EncodingError>;
+
+    /// Fallibly encode secret bytes as Bech32m with the specified HRP.
+    #[cfg(feature = "encoding-bech32")]
+    fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, Bech32EncodingError>;
 }
 
 #[cfg(any(
@@ -92,6 +102,22 @@ impl SecureEncoding for [u8] {
     fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
         let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
         bech32::encode::<bech32::Bech32m>(hrp_parsed, self).expect("bech32m encoding failed")
+    }
+
+    #[cfg(feature = "encoding-bech32")]
+    #[inline(always)]
+    fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, Bech32EncodingError> {
+        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        bech32::encode::<bech32::Bech32>(hrp_parsed, self)
+            .map_err(|_| Bech32EncodingError::EncodingFailed)
+    }
+
+    #[cfg(feature = "encoding-bech32")]
+    #[inline(always)]
+    fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, Bech32EncodingError> {
+        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        bech32::encode::<bech32::Bech32m>(hrp_parsed, self)
+            .map_err(|_| Bech32EncodingError::EncodingFailed)
     }
 }
 
@@ -132,6 +158,22 @@ impl<const N: usize> SecureEncoding for [u8; N] {
         let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
         bech32::encode::<bech32::Bech32m>(hrp_parsed, self).expect("bech32m encoding failed")
     }
+
+    #[cfg(feature = "encoding-bech32")]
+    #[inline(always)]
+    fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, Bech32EncodingError> {
+        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        bech32::encode::<bech32::Bech32>(hrp_parsed, self)
+            .map_err(|_| Bech32EncodingError::EncodingFailed)
+    }
+
+    #[cfg(feature = "encoding-bech32")]
+    #[inline(always)]
+    fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, Bech32EncodingError> {
+        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        bech32::encode::<bech32::Bech32m>(hrp_parsed, self)
+            .map_err(|_| Bech32EncodingError::EncodingFailed)
+    }
 }
 
 #[cfg(any(
@@ -170,6 +212,22 @@ impl SecureEncoding for alloc::vec::Vec<u8> {
     fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
         let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
         bech32::encode::<bech32::Bech32m>(hrp_parsed, self).expect("bech32m encoding failed")
+    }
+
+    #[cfg(feature = "encoding-bech32")]
+    #[inline(always)]
+    fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, Bech32EncodingError> {
+        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        bech32::encode::<bech32::Bech32>(hrp_parsed, self)
+            .map_err(|_| Bech32EncodingError::EncodingFailed)
+    }
+
+    #[cfg(feature = "encoding-bech32")]
+    #[inline(always)]
+    fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, Bech32EncodingError> {
+        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        bech32::encode::<bech32::Bech32m>(hrp_parsed, self)
+            .map_err(|_| Bech32EncodingError::EncodingFailed)
     }
 }
 
@@ -211,5 +269,21 @@ impl SecureEncoding for alloc::string::String {
         let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
         bech32::encode::<bech32::Bech32m>(hrp_parsed, self.as_bytes())
             .expect("bech32m encoding failed")
+    }
+
+    #[cfg(feature = "encoding-bech32")]
+    #[inline(always)]
+    fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, Bech32EncodingError> {
+        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        bech32::encode::<bech32::Bech32>(hrp_parsed, self.as_bytes())
+            .map_err(|_| Bech32EncodingError::EncodingFailed)
+    }
+
+    #[cfg(feature = "encoding-bech32")]
+    #[inline(always)]
+    fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, Bech32EncodingError> {
+        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32EncodingError::InvalidHrp)?;
+        bech32::encode::<bech32::Bech32m>(hrp_parsed, self.as_bytes())
+            .map_err(|_| Bech32EncodingError::EncodingFailed)
     }
 }

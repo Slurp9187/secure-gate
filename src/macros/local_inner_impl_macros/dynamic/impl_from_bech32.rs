@@ -25,6 +25,19 @@ macro_rules! impl_from_bech32 {
                 }
                 Self::from(decoded_data)
             }
+
+            pub fn try_from_bech32(
+                s: &str,
+                hrp: &str,
+            ) -> Result<Self, $crate::error::Bech32EncodingError> {
+                use bech32::decode;
+                let (decoded_hrp, decoded_data) =
+                    decode(s).map_err(|_| $crate::error::Bech32EncodingError::EncodingFailed)?;
+                if decoded_hrp.as_str() != hrp {
+                    return Err($crate::error::Bech32EncodingError::InvalidHrp);
+                }
+                Ok(Self::from(decoded_data))
+            }
         }
     };
 }
