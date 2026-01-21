@@ -41,17 +41,17 @@ secure-gate = { version = "0.7.0-rc.10", default-features = false }
 | `secure` (default) | Enables `zeroize` + `ct-eq` — secure memory wiping and constant-time equality (recommended) |
 | `zeroize` | Memory zeroing on drop + opt-in safe cloning (requires `zeroize` crate) |
 | `ct-eq` | Constant-time equality checks to prevent timing attacks (requires `subtle` crate) |
-| `hash-eq` | Fast hash-based equality (on-demand BLAKE3, requires `blake3` and `subtle`) |
+| `hash-eq` | Fast hash-based equality (BLAKE3 hashing with constant-time hash comparison, requires `blake3` and `ct-eq`) |
 | `cloneable` | Opt-in safe cloning wrappers and `CloneableType` marker (requires `zeroize`) |
-| `encoding` | All encoding support (`encoding-hex`, `encoding-base64`, `encoding-bech32`) |
-| `encoding-hex` | Hex encoding/decoding + constructors (requires `hex` crate) |
+| `encoding` | All encoding support (`encoding-base64`, `encoding-bech32`, `encoding-hex`) |
 | `encoding-base64` | Base64 encoding/decoding + constructors (requires `base64` crate) |
 | `encoding-bech32` | Bech32 encoding/decoding + constructors (requires `bech32` crate) |
+| `encoding-hex` | Hex encoding/decoding + constructors (requires `hex` crate) |
 | `rand` | Secure random generation (`from_random()`) (requires `rand` crate) |
+| `serde` | Meta-feature enabling both `serde-deserialize` and `serde-serialize` |
 | `serde-deserialize` | Serde `Deserialize` support for loading secrets (requires `serde` crate) |
 | `serde-serialize` | Serde `Serialize` support (gated by `SerializableType` marker) (requires `serde` crate) |
-| `serde` | Meta-feature enabling both `serde-deserialize` and `serde-serialize` |
-| `full` | Meta-feature enabling all optional features (includes `secure`) |
+| `full` | Meta-feature enabling `secure`, `encoding`, `hash-eq`, and `cloneable` features |
 
 `no_std` + `alloc` compatible. Features add no overhead when unused.
 
@@ -184,6 +184,20 @@ Inbound decoding via direct constructors (panic on invalid):
 }
 ```
 
+## Hash-Based Equality (`hash-eq` feature)
+```rust
+#[cfg(feature = "hash-eq")]
+{
+    use secure_gate::Fixed;
+
+    let a: Fixed<[u8; 32]> = [0u8; 32].into();
+    let b: Fixed<[u8; 32]> = [1u8; 32].into();
+
+    assert!(a == a);
+    assert!(a != b);
+}
+```
+
 ## Opt-In Safe Cloning (`cloneable` feature)
 Cloning is opt-in via `CloneableType` marker and convenience macros.
 
@@ -239,6 +253,10 @@ use secure_gate::serializable_fixed_alias;
     serializable_fixed_alias!(pub ExportableKey, 32);
 
     let key: ExportableKey = [0u8; 32].into();
+
+    // Serialize to JSON
+    let serialized = serde_json::to_string(&key).unwrap();
+    println!("{}", serialized);
 }
 ```
 
@@ -257,6 +275,10 @@ use secure_gate::SerializableType;
     impl SerializableType for RawKey {}
 
     let key = RawKey([42u8; 32]);
+
+    // Serialize to JSON (or other formats as needed)
+    let serialized = serde_json::to_string(&key).unwrap();
+    println!("{}", serialized);  // e.g., outputs the byte array as JSON
 }
 ```
 
