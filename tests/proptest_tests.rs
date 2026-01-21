@@ -82,3 +82,120 @@ fn proptest_modules_present() {
     // It verifies that the proptest modules are compiled in.
     assert_eq!(2 + 2, 4);
 }
+
+#[cfg(feature = "ct-eq")]
+mod ct_eq_wrapper_proptests {
+    use super::*;
+    use secure_gate::{dynamic_alias, fixed_alias};
+
+    fixed_alias!(TestFixed32, 32);
+    dynamic_alias!(TestDynamic, Vec<u8>);
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]  // More cases for thoroughness
+
+        #[test]
+        fn fixed_ct_eq_symmetric(a in prop::array::uniform32(any::<u8>()), b in prop::array::uniform32(any::<u8>())) {
+            let fa: TestFixed32 = a.into();
+            let fb: TestFixed32 = b.into();
+            prop_assert_eq!(fa.ct_eq(&fb), fb.ct_eq(&fa));  // Symmetry
+        }
+
+        #[test]
+        fn fixed_ct_eq_reflexive(a in prop::array::uniform32(any::<u8>())) {
+            let fa: TestFixed32 = a.into();
+            prop_assert!(fa.ct_eq(&fa));  // Reflexive
+        }
+
+        #[test]
+        fn dynamic_ct_eq_symmetric(a in prop::collection::vec(any::<u8>(), 0..256), b in prop::collection::vec(any::<u8>(), 0..256)) {
+            let da: TestDynamic = a.clone().into();
+            let db: TestDynamic = b.clone().into();
+            prop_assert_eq!(da.ct_eq(&db), db.ct_eq(&da));  // Symmetry
+        }
+    }
+}
+
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
+mod encoding_roundtrip_proptests {
+    use super::*;
+    use secure_gate::{dynamic_alias, ExposeSecret, SecureEncoding};
+
+    dynamic_alias!(TestDynamicVec, Vec<u8>);
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(50))]
+
+        #[cfg(feature = "encoding-hex")]
+        #[test]
+        fn hex_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
+            let secret: TestDynamicVec = data.clone().into();
+            let hex = secret.expose_secret().to_hex();
+            let decoded: TestDynamicVec = TestDynamicVec::from_hex(hex.as_str());
+            prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
+        }
+
+        #[cfg(feature = "encoding-base64")]
+        #[test]
+        fn base64_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
+            let secret: TestDynamicVec = data.clone().into();
+            let b64 = secret.expose_secret().to_base64url();
+            let decoded: TestDynamicVec = TestDynamicVec::from_base64(b64.as_str());
+            prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
+        }
+
+        #[cfg(feature = "encoding-bech32")]
+        #[test]
+        fn bech32_roundtrip(data in prop::collection::vec(any::<u8>(), 0..32)) {
+            let secret: TestDynamicVec = data.clone().into();
+            let bech32 = secret.expose_secret().to_bech32("test");
+            let decoded: TestDynamicVec = TestDynamicVec::from_bech32(bech32.as_str(), "test");
+            prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
+        }
+    }
+}
+
+#[cfg(feature = "hash-eq")]
+mod hash_eq_proptests {
+    use super::*;
+    use secure_gate::{dynamic_alias, fixed_alias};
+
+    fixed_alias!(TestFixed32, 32);
+    dynamic_alias!(TestDynamic, Vec<u8>);
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        #[test]
+        fn fixed_hash_eq_symmetric(a in prop::array::uniform32(any::<u8>()), b in prop::array::uniform32(any::<u8>())) {
+            let fa: TestFixed32 = a.into();
+            let fb: TestFixed32 = b.into();
+            prop_assert_eq!(fa == fb, fb == fa);  // Symmetry
+        }
+
+        #[test]
+        fn fixed_hash_eq_reflexive(a in prop::array::uniform32(any::<u8>())) {
+            let fa: TestFixed32 = a.into();
+            prop_assert!(fa == fa);  // Reflexive
+        }
+
+        #[test]
+        fn dynamic_hash_eq_symmetric(a in prop::collection::vec(any::<u8>(), 0..256), b in prop::collection::vec(any::<u8>(), 0..256)) {
+            let da: TestDynamic = a.clone().into();
+            let db: TestDynamic = b.clone().into();
+            prop_assert_eq!(da == db, db == da);  // Symmetry
+        }
+
+        #[test]
+        fn hash_eq_consistency_with_ct_eq(a in prop::collection::vec(any::<u8>(), 0..256), b in prop::collection::vec(any::<u8>(), 0..256)) {
+            // Ensure hash_eq agrees with ct_eq (they should be logically equivalent, just different perf)
+            let da: TestDynamic = a.clone().into();
+            let db: TestDynamic = b.clone().into();
+            prop_assert_eq!(da == db, da.ct_eq(&db));
+        }
+    }
+}
