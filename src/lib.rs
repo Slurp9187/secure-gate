@@ -6,14 +6,12 @@
     )),
     forbid(unsafe_code)
 )]
-#![doc = include_str!("../README.md")]
-// uncomment for doctest runs
-// #![doc = include_str!("../EXAMPLES.md")] // uncomment for doctest runs
+// #![doc = include_str!("../README.md")] // uncomment for doctest runs
+#![doc = include_str!("../EXAMPLES.md")] // uncomment for doctest runs
 //! Zero-cost secure wrappers for secrets — [`Fixed<T>`] for stack, [`Dynamic<T>`] for heap.
 //!
 //! This crate provides explicit wrappers for sensitive data like [`CloneableArray`], [`CloneableString`], and [`CloneableType`], ensuring no accidental exposure.
-//! See [README.md](https://github.com/Slurp9187/secure-gate) for usage and examples.
-
+//! See README.md for usage and examples.
 extern crate alloc;
 
 /// Dynamic secret wrapper types - always available with zero dependencies.
