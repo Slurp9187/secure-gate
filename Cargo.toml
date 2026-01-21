@@ -64,8 +64,6 @@ hash-eq = ["dep:blake3", "dep:subtle"]
 # Cloneable: Opt-in safe cloning for secrets (requires zeroize)
 cloneable = ["dep:zeroize"]
 
-
-
 # Full: Meta-feature enabling all optional features for a complete, batteries-included setup
 full = ["secure", "encoding", "hash-eq", "cloneable"]
 
