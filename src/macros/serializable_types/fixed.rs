@@ -12,6 +12,7 @@ macro_rules! serializable_fixed_alias {
         #[doc = concat!("Serializable fixed-size secure secret (", stringify!($size), " bytes)")]
         $vis struct $name($crate::Fixed<[u8; $size]>);
 
+        #[cfg(feature = "serde")]
         impl $crate::SerializableType for $name {}
 
         impl $crate::ExposeSecret for $name {

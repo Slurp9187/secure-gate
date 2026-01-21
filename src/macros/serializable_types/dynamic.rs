@@ -12,6 +12,7 @@ macro_rules! serializable_dynamic_alias {
         #[doc = concat!("Serializable dynamic secure secret (", stringify!($type), ")")]
         $vis struct $name($crate::Dynamic<$type>);
 
+        #[cfg(feature = "serde")]
         impl $crate::SerializableType for $name {}
 
         impl $crate::ExposeSecret for $name {
