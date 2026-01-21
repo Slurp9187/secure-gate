@@ -7,10 +7,11 @@
 ///
 /// This generates a from_bech32 method that decodes a bech32 string with HRP to Vec<u8>.
 /// Requires the "encoding-bech32" feature.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_from_bech32 {
     ($type:ty) => {
-        /// Decode from bech32 string with HRP to Vec<u8> (panics on invalid/HRP mismatch).
+        /// Decode from bech32 string with HRP to `Vec<u8>` (panics on invalid/HRP mismatch).
         #[cfg(feature = "encoding-bech32")]
         impl $type {
             pub fn from_bech32(s: &str, hrp: &str) -> Self {

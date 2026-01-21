@@ -7,13 +7,14 @@
 ///
 /// This generates a from_random method that fills a Vec<u8> with random bytes.
 /// Requires the "rand" feature.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_from_random_dynamic {
     ($type:ty) => {
         /// Random generation — only available with `rand` feature.
         #[cfg(feature = "rand")]
         impl $type {
-            /// Fill with fresh random bytes of the specified length using the OS RNG.
+            /// Fill with fresh random bytes of the specified length using the System RNG.
             ///
             /// Panics on RNG failure for fail-fast crypto code. Guarantees secure entropy
             /// from system sources.

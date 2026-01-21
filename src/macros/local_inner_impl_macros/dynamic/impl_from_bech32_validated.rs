@@ -1,13 +1,14 @@
 //! Internal macros for validated bech32 string wrapping in secure-gate types.
 //!
 //! This module contains macros used to implement validated from_bech32 methods
-//! for Dynamic<String> types without code duplication.
+//! for `Dynamic<String>` types without code duplication.
 
 /// Macro to implement validated from_bech32 for Dynamic string wrappers.
 ///
 /// This generates a from_bech32 method that validates a bech32 string and wraps it as Dynamic<String>.
 /// Performs the same checks as Bech32String::new but returns Dynamic<String> instead of Bech32String.
 /// Requires the "encoding-bech32" feature.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_from_bech32_validated {
     ($type:ty) => {

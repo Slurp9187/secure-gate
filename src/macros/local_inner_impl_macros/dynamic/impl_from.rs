@@ -6,6 +6,7 @@
 /// Macro to implement From traits for Dynamic types.
 ///
 /// This generates various From impls for Dynamic, such as from slices, values, boxes, and strings.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_from_dynamic {
     (slice) => {

@@ -11,7 +11,6 @@
 ///
 /// These aliases maintain all security properties of the underlying types while providing
 /// better ergonomics and type safety in application code.
-
 /// Macros for creating Dynamic type aliases (heap-allocated secrets).
 mod dynamic;
 

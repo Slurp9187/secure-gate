@@ -21,7 +21,7 @@ This document outlines key security aspects to consider when using the `secure-g
 ## Feature Implications
 - **`zeroize` (included in default `secure`)**: Enables memory wiping and safe cloning. Recommended for all use cases handling secrets.
 - **`ct-eq` (included in default `secure`)**: Provides timing-safe comparisons. Avoid `==` for secrets.
-- **`rand`**: Generates cryptographically secure random values. Ensure OS RNG is available and secure.
+- **`rand`**: Generates cryptographically secure random values. Ensure System RNG is available and secure.
 - **Encoding Features**: Validate inputs before encoding to prevent malformed outputs or attacks.
 
 ## Potential Concerns
@@ -95,11 +95,11 @@ This section provides a professional reviewer's perspective on each module's sec
 ### Random Module (`random/`)
 **Strengths**:
 - Enforces RNG construction—cannot create from arbitrary bytes.
-- Ties to OS RNG (`OsRng`) for freshness and entropy.
+- Ties to System RNG (`OsRng`) for freshness and entropy.
 
 **Potential Weaknesses**:
 - Falls back to panics on RNG failure—may deny service; handle `try_generate()` errors.
-- Depends on OS RNG security—attackable via OS compromise.
+- Depends on System RNG security—attackable via OS compromise.
 - Allocation size leakage via `Vec<u8>` resizing.
 
 **Mitigations**:

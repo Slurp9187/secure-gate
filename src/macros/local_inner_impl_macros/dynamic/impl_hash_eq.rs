@@ -7,6 +7,7 @@
 ///
 /// This generates PartialEq, Eq, and Hash impls with inlined hash computation for specific Dynamic types.
 /// Requires the "hash-eq" feature.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_hash_eq_dynamic {
     ($inner:ty, $method:ident) => {

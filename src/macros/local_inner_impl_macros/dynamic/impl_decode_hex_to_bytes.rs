@@ -1,3 +1,4 @@
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_decode_hex_to_bytes {
     () => {

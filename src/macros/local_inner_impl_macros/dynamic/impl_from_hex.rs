@@ -7,10 +7,11 @@
 ///
 /// This generates a from_hex method that decodes a hex string to Vec<u8>.
 /// Requires the "encoding-hex" feature.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_from_hex {
     ($type:ty) => {
-        /// Decode from hex string to Vec<u8> (panics on invalid).
+        /// Decode from hex string to `Vec<u8>` (panics on invalid).
         #[cfg(feature = "encoding-hex")]
         impl $type {
             pub fn from_hex(s: &str) -> Self {

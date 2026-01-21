@@ -7,6 +7,7 @@
 ///
 /// This generates a ct_eq method that compares byte contents in constant time.
 /// Requires the "ct-eq" feature.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_ct_eq_dynamic {
     ($type:ty, $method:ident) => {

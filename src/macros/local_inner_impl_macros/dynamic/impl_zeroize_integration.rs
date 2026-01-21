@@ -2,6 +2,7 @@
 ///
 /// This ensures that Dynamic types can be securely zeroed when the inner type supports Zeroize.
 /// Requires the "zeroize" feature.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_zeroize_integration_dynamic {
     ($type:ty) => {

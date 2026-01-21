@@ -7,6 +7,7 @@
 ///
 /// This ensures that all secret types display as "[REDACTED]" in debug output,
 /// preventing accidental logging of sensitive data.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)] // Optional: allows inner macros if recursive
 macro_rules! impl_redacted_debug {
     ($type:ty) => {

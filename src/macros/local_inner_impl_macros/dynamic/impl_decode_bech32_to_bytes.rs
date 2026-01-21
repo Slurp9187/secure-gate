@@ -1,12 +1,13 @@
 //! Internal macros for bech32 decoding in secure-gate types.
 //!
 //! This module contains macros used to implement decode_bech32_to_bytes methods
-//! for Dynamic<String> types without code duplication.
+//! for `Dynamic<String>` types without code duplication.
 
 /// Macro to implement bech32 decoding methods for Dynamic string wrappers.
 ///
 /// This generates decode_bech32_to_bytes and decode_bech32_into_bytes methods.
 /// Requires the "encoding-bech32" feature.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_decode_bech32_to_bytes {
     () => {

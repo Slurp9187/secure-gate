@@ -7,6 +7,19 @@
 ///
 /// This generates PartialEq, Eq, and Hash impls with inlined hash computation for Fixed types.
 /// Requires the "hash-eq" feature.
+///
+/// # Implementation Details
+///
+/// Equality is determined by comparing BLAKE3 hashes of the underlying data using constant-time
+/// equality (`ConstantTimeEq::ct_eq`) to prevent timing attacks. Hashing uses the `blake3::hash`
+/// function for fast, secure computation.
+///
+/// # Security Notes
+///
+/// - Hashing provides deterministic, fast equality checks without caching.
+/// - Constant-time comparison ensures resistance to timing-based side-channel attacks.
+/// - This trades off some performance for strong security guarantees compared to direct comparison.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_hash_eq_fixed {
     () => {

@@ -1,13 +1,14 @@
 //! Internal macros for validated base64 string wrapping in secure-gate types.
 //!
 //! This module contains macros used to implement validated from_base64 methods
-//! for Dynamic<String> types without code duplication.
+//! for `Dynamic<String>` types without code duplication.
 
 /// Macro to implement validated from_base64 for Dynamic string wrappers.
 ///
 /// This generates a from_base64 method that validates a base64 string and wraps it as Dynamic<String>.
 /// Performs the same checks as Base64String::new but returns Dynamic<String> instead of Base64String.
 /// Requires the "encoding-base64" feature.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_from_base64_validated {
     ($type:ty) => {

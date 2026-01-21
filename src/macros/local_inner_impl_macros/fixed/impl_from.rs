@@ -6,6 +6,7 @@
 /// Macro to implement From traits for Fixed types.
 ///
 /// This generates various From impls for Fixed, such as from arrays and slices.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_from_fixed {
     (array) => {

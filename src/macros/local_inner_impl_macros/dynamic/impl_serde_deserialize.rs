@@ -2,6 +2,7 @@
 ///
 /// This provides safe deserialization for Dynamic types by delegating to the inner type's Deserialize.
 /// Requires the "serde-deserialize" feature.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_serde_deserialize_dynamic {
     ($type:ty) => {

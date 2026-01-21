@@ -7,6 +7,7 @@
 ///
 /// This generates a from_random method that creates a random [u8; N] filled with random bytes.
 /// Requires the "rand" feature.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_from_random_fixed {
     () => {
@@ -15,7 +16,7 @@ macro_rules! impl_from_random_fixed {
         impl<const N: usize> Fixed<[u8; N]> {
             /// Generate a secure random instance (panics on failure).
             ///
-            /// Fill with fresh random bytes using the OS RNG.
+            /// Fill with fresh random bytes using the System RNG.
             /// Panics on RNG failure for fail-fast crypto code. Guarantees secure entropy
             /// from system sources.
             ///

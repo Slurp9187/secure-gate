@@ -7,10 +7,11 @@
 ///
 /// This generates a from_base64 method that decodes a base64 string to Vec<u8>.
 /// Requires the "encoding-base64" feature.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_from_base64 {
     ($type:ty) => {
-        /// Decode from base64 string to Vec<u8> (panics on invalid).
+        /// Decode from base64 string to `Vec<u8>` (panics on invalid).
         #[cfg(feature = "encoding-base64")]
         impl $type {
             pub fn from_base64(s: &str) -> Self {

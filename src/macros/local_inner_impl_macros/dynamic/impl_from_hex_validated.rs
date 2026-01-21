@@ -1,13 +1,14 @@
 //! Internal macros for validated hex string wrapping in secure-gate types.
 //!
 //! This module contains macros used to implement validated from_hex methods
-//! for Dynamic<String> types without code duplication.
+//! for `Dynamic<String>` types without code duplication.
 
 /// Macro to implement validated from_hex for Dynamic string wrappers.
 ///
 /// This generates a from_hex method that validates a hex string and wraps it as Dynamic<String>.
 /// Performs the same checks as HexString::new but returns Dynamic<String> instead of HexString.
 /// Requires the "encoding-hex" feature.
+#[doc(hidden)]
 #[macro_export(local_inner_macros)]
 macro_rules! impl_from_hex_validated {
     ($type:ty) => {
