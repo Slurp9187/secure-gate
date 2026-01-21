@@ -3,17 +3,17 @@
 extern crate alloc;
 
 use secure_gate::{
-    cloneable_dynamic_alias, cloneable_fixed_alias, exportable_dynamic_alias,
-    exportable_fixed_alias, ConstantTimeEq, ExposeSecret,
+    cloneable_dynamic_alias, cloneable_fixed_alias, serializable_dynamic_alias,
+    serializable_fixed_alias, ConstantTimeEq, ExposeSecret,
 };
 
 // Define test types using macros
 cloneable_fixed_alias!(pub TestCloneableArray, 4);
 cloneable_dynamic_alias!(pub TestCloneableString, String);
 cloneable_dynamic_alias!(pub TestCloneableVec, Vec<u8>);
-exportable_fixed_alias!(pub TestExportableArray, 4);
-exportable_dynamic_alias!(pub TestExportableString, String);
-exportable_dynamic_alias!(pub TestExportableVec, Vec<u8>);
+serializable_fixed_alias!(pub TestSerializableArray, 4);
+serializable_dynamic_alias!(pub TestSerializableString, String);
+serializable_dynamic_alias!(pub TestSerializableVec, Vec<u8>);
 
 #[test]
 fn test_slice_ct_eq() {
@@ -87,9 +87,10 @@ fn test_cloneable_vec_ct_eq() {
 
 #[test]
 fn test_exportable_array_ct_eq() {
-    let a: TestExportableArray = [1u8, 2, 3, 4].into();
-    let b: TestExportableArray = [1u8, 2, 3, 4].into();
-    let c: TestExportableArray = [1u8, 2, 3, 5].into();
+    // Cloneable tests for serializable types
+    let a: TestSerializableArray = [1u8, 2, 3, 4].into();
+    let b: TestSerializableArray = [1u8, 2, 3, 4].into();
+    let c: TestSerializableArray = [1u8, 2, 3, 5].into();
 
     assert!(a.ct_eq(&b));
     assert!(!a.ct_eq(&c));
@@ -97,9 +98,10 @@ fn test_exportable_array_ct_eq() {
 
 #[test]
 fn test_exportable_string_ct_eq() {
-    let a: TestExportableString = "test".to_string().into();
-    let b: TestExportableString = "test".to_string().into();
-    let c: TestExportableString = "fail".to_string().into();
+    // Dynamic String
+    let a: TestSerializableString = "test".to_string().into();
+    let b: TestSerializableString = "test".to_string().into();
+    let c: TestSerializableString = "fail".to_string().into();
 
     assert!(a.ct_eq(&b));
     assert!(!a.ct_eq(&c));
@@ -107,9 +109,10 @@ fn test_exportable_string_ct_eq() {
 
 #[test]
 fn test_exportable_vec_ct_eq() {
-    let a: TestExportableVec = vec![1, 2, 3].into();
-    let b: TestExportableVec = vec![1, 2, 3].into();
-    let c: TestExportableVec = vec![1, 2, 4].into();
+    // Dynamic Vec
+    let a: TestSerializableVec = vec![1, 2, 3].into();
+    let b: TestSerializableVec = vec![1, 2, 3].into();
+    let c: TestSerializableVec = vec![1, 2, 4].into();
 
     assert!(a.ct_eq(&b));
     assert!(!a.ct_eq(&c));

@@ -4,10 +4,9 @@
 // Serde serialization integration tests for secure-gate
 //
 // This file tests serialization functionality with focus on edge cases and security:
-// - Opt-in serialization via ExportableType
+// - Opt-in serialization via SerializableType marker
 // - Validation and roundtrips for encoding types
 // - Prevention of accidental exfiltration
-
 
 #[cfg(feature = "serde-serialize")]
 #[test]

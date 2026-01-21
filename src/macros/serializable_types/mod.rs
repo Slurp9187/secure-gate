@@ -1,6 +1,6 @@
-// secure-gate\src\macros\exportable_types\mod.rs
+// secure-gate\src\macros\serializable_types\mod.rs
 
-//! Exportable type macros for secure secret serialization.
+//! Serializable type macros for secure secret serialization.
 //!
 //! This module provides macros for creating type aliases that allow opt-in serialization
 //! of secrets while maintaining security properties.

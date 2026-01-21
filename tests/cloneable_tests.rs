@@ -1,7 +1,6 @@
-extern crate alloc;
+#![cfg(feature = "zeroize")]
 
-// Temporarily remove cfg to run tests without feature
-// #![cfg(feature = "zeroize")]
+extern crate alloc;
 
 // Define cloneable types using the new macros
 use secure_gate::{

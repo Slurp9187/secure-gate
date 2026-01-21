@@ -7,17 +7,17 @@
 extern crate alloc;
 
 use secure_gate::{
-    cloneable_dynamic_alias, cloneable_fixed_alias, exportable_dynamic_alias,
-    exportable_fixed_alias, ExposeSecret, SecureEncoding,
+    cloneable_dynamic_alias, cloneable_fixed_alias, serializable_dynamic_alias,
+    serializable_fixed_alias, ExposeSecret, SecureEncoding,
 };
 
 // Define test types using macros
 cloneable_fixed_alias!(pub TestCloneableArray, 4);
 cloneable_dynamic_alias!(pub TestCloneableString, String);
 cloneable_dynamic_alias!(pub TestCloneableVec, Vec<u8>);
-exportable_fixed_alias!(pub TestExportableArray, 4);
-exportable_dynamic_alias!(pub TestExportableString, String);
-exportable_dynamic_alias!(pub TestExportableVec, Vec<u8>);
+serializable_fixed_alias!(pub TestSerializableArray, 4);
+serializable_dynamic_alias!(pub TestSerializableString, String);
+serializable_dynamic_alias!(pub TestSerializableVec, Vec<u8>);
 
 #[test]
 fn test_slice_to_hex() {
@@ -135,21 +135,21 @@ fn test_cloneable_vec_to_bech32() {
 
 #[test]
 fn test_exportable_string_to_hex() {
-    let data: TestExportableString = "abc".to_string().into();
+    let data: TestSerializableString = "abc".to_string().into();
     let hex = data.to_hex();
     assert_eq!(hex, "616263");
 }
 
 #[test]
 fn test_exportable_vec_to_base64url() {
-    let data: TestExportableVec = vec![1, 2, 3].into();
+    let data: TestSerializableVec = vec![1, 2, 3].into();
     let b64 = data.to_base64url();
     assert_eq!(b64, "AQID");
 }
 
 #[test]
 fn test_exportable_array_to_bech32() {
-    let data: TestExportableArray = [1u8, 2, 3, 4].into();
+    let data: TestSerializableArray = [1u8, 2, 3, 4].into();
     let bech = data.to_bech32("test");
     assert!(bech.starts_with("test"));
 }
@@ -163,7 +163,7 @@ fn test_cloneable_string_to_hex() {
 
 #[test]
 fn test_exportable_string_to_base64url() {
-    let data: TestExportableString = "hello".to_string().into();
+    let data: TestSerializableString = "hello".to_string().into();
     let b64 = data.to_base64url();
     assert_eq!(b64, "aGVsbG8");
 }

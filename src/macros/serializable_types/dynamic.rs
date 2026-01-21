@@ -1,18 +1,18 @@
-// Creates an exportable type alias for a dynamic heap-allocated secure secret.
+// Creates a serializable type alias for a dynamic heap-allocated secure secret.
 //
-// This macro generates a newtype around `Dynamic<T>` with implementations for `Serialize` and `ExportableType`.
+// This macro generates a newtype around `Dynamic<T>` with implementations for `Serialize` and `SerializableType`.
 // It inherits the security properties of `Dynamic` but allows deliberate serialization via `Serialize`.
 //
 // # Syntax
 //
-// `exportable_dynamic_alias!(vis Name, Type);` — visibility required (e.g., `pub`), Type is the inner type like `String` or `Vec<u8>`
+// `serializable_dynamic_alias!(vis Name, Type);` — visibility required (e.g., `pub`), Type is the inner type like `String` or `Vec<u8>`
 #[macro_export]
-macro_rules! exportable_dynamic_alias {
+macro_rules! serializable_dynamic_alias {
     ($vis:vis $name:ident, $type:ty) => {
-        #[doc = concat!("Exportable dynamic secure secret (", stringify!($type), ")")]
+        #[doc = concat!("Serializable dynamic secure secret (", stringify!($type), ")")]
         $vis struct $name($crate::Dynamic<$type>);
 
-        impl $crate::ExportableType for $name {}
+        impl $crate::SerializableType for $name {}
 
         impl $crate::ExposeSecret for $name {
             type Inner = $type;

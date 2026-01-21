@@ -34,8 +34,12 @@ pub use dynamic::Dynamic;
 /// Re-export of the [`Fixed`] type.
 pub use fixed::Fixed;
 
+#[cfg(feature = "zeroize")]
+pub use traits::CloneableType;
+#[cfg(feature = "serde")]
+pub use traits::SerializableType;
 /// Re-export of the traits.
-pub use traits::{CloneableType, ExportableType, ExposeSecret, ExposeSecretMut};
+pub use traits::{ExposeSecret, ExposeSecretMut};
 
 /// Re-export of the [`ConstantTimeEq`] trait.
 #[cfg(feature = "ct-eq")]

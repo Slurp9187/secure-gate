@@ -11,7 +11,7 @@
 /// - [`CloneableType`] - Opt-in safe cloning with zeroization (requires zeroize feature)
 /// - [`ConstantTimeEq`] - Constant-time equality to prevent timing attacks (requires ct-eq feature)
 /// - [`SecureEncoding`] - Extension trait for secure byte encoding to strings (requires encoding features)
-/// - [`ExportableType`] - Marker for types allowing secure serialization (requires serde-serialize feature)
+/// - [`SerializableType`] - Marker for types allowing secure serialization (requires serde-serialize feature)
 ///
 /// ## Security Guarantees
 ///
@@ -27,7 +27,7 @@
 /// - zeroize: Enables [`CloneableType`] for safe cloning
 /// - ct-eq: Enables [`ConstantTimeEq`] for constant-time comparisons
 /// - encoding (or encoding-hex, encoding-base64, encoding-bech32): Enables [`SecureEncoding`] for byte encoding
-/// - serde: Enables [`ExportableType`] for opt-in serialization
+/// - serde: Enables [`SerializableType`] for opt-in serialization
 // Secret Exposure Traits
 pub mod expose_secret;
 pub use expose_secret::ExposeSecret;
@@ -35,6 +35,7 @@ pub use expose_secret::ExposeSecret;
 pub mod expose_secret_mut;
 pub use expose_secret_mut::ExposeSecretMut;
 
+#[cfg(feature = "ct-eq")]
 pub mod constant_time_eq;
 #[cfg(feature = "ct-eq")]
 pub use constant_time_eq::ConstantTimeEq;
@@ -50,19 +51,14 @@ pub mod secure_encoding;
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32"
-))]
 pub use secure_encoding::SecureEncoding;
 
-#[allow(unused_imports)]
+#[cfg(feature = "zeroize")]
+pub mod cloneable_type;
+#[cfg(feature = "zeroize")]
 pub use cloneable_type::CloneableType;
 
-#[allow(unused_imports)]
-pub use exportable_type::ExportableType;
-
-pub mod cloneable_type;
-
-pub mod exportable_type;
+#[cfg(feature = "serde")]
+pub mod serializable_type;
+#[cfg(feature = "serde")]
+pub use serializable_type::SerializableType;

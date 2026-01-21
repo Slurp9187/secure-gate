@@ -7,4 +7,4 @@
 //! ensure that serialization does not leak secrets unintentionally.
 
 #[allow(dead_code)]
-pub trait ExportableType {}
+pub trait SerializableType {}

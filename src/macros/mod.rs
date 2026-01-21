@@ -19,4 +19,4 @@ mod public_type_alias_macros;
 mod clonable_types;
 
 /// Exportable type macros.
-mod exportable_types;
+mod serializable_types;
