@@ -19,6 +19,15 @@ macro_rules! impl_from_base64 {
                 let decoded = URL_SAFE_NO_PAD.decode(s).expect("invalid base64 string");
                 Self::from(decoded)
             }
+
+            pub fn try_from_base64(s: &str) -> Result<Self, $crate::Base64Error> {
+                use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+                use base64::Engine;
+                let decoded = URL_SAFE_NO_PAD
+                    .decode(s)
+                    .map_err(|_| $crate::Base64Error::InvalidBase64)?;
+                Ok(Self::from(decoded))
+            }
         }
     };
 }

@@ -139,12 +139,30 @@ mod encoding_roundtrip_proptests {
             prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
         }
 
+        #[cfg(feature = "encoding-hex")]
+        #[test]
+        fn hex_try_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
+            let secret: TestDynamicVec = data.clone().into();
+            let hex = secret.expose_secret().to_hex();
+            let decoded: TestDynamicVec = TestDynamicVec::try_from_hex(hex.as_str()).unwrap();
+            prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
+        }
+
         #[cfg(feature = "encoding-base64")]
         #[test]
         fn base64_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
             let secret: TestDynamicVec = data.clone().into();
             let b64 = secret.expose_secret().to_base64url();
             let decoded: TestDynamicVec = TestDynamicVec::from_base64(b64.as_str());
+            prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
+        }
+
+        #[cfg(feature = "encoding-base64")]
+        #[test]
+        fn base64_try_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
+            let secret: TestDynamicVec = data.clone().into();
+            let b64 = secret.expose_secret().to_base64url();
+            let decoded: TestDynamicVec = TestDynamicVec::try_from_base64(b64.as_str()).unwrap();
             prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
         }
 

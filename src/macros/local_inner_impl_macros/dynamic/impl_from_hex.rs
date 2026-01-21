@@ -18,6 +18,12 @@ macro_rules! impl_from_hex {
                 let decoded = hex_crate::decode(s).expect("invalid hex string");
                 Self::from(decoded)
             }
+
+            pub fn try_from_hex(s: &str) -> Result<Self, $crate::HexError> {
+                use hex as hex_crate;
+                let decoded = hex_crate::decode(s).map_err(|_| $crate::HexError::InvalidHex)?;
+                Ok(Self::from(decoded))
+            }
         }
     };
 }

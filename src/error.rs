@@ -9,3 +9,19 @@ pub enum Bech32EncodingError {
     #[error("encoding operation failed")]
     EncodingFailed,
 }
+
+#[cfg(feature = "encoding-base64")]
+/// Error type for Base64 decoding operations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum Base64Error {
+    #[error("invalid base64 string")]
+    InvalidBase64,
+}
+
+#[cfg(feature = "encoding-hex")]
+/// Error type for Hex decoding operations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum HexError {
+    #[error("invalid hex string")]
+    InvalidHex,
+}

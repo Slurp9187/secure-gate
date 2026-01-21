@@ -37,6 +37,30 @@ macro_rules! impl_from_hex_validated {
                     String::from_utf8(bytes).expect("valid UTF-8 after hex normalization");
                 Self::from(validated_string)
             }
+
+            pub fn try_from_hex(s: &str) -> Result<Self, $crate::HexError> {
+                // Validate upfront (like HexString::new)
+                if s.len() % 2 != 0 {
+                    return Err($crate::HexError::InvalidHex);
+                }
+                let mut bytes = s.as_bytes().to_vec();
+                for b in &mut bytes {
+                    match *b {
+                        b'A'..=b'F' => *b += 32, // 'A' → 'a' (lowercase)
+                        b'a'..=b'f' | b'0'..=b'9' => {}
+                        _ => {
+                            // Zeroize invalid input if zeroize feature enabled
+                            #[cfg(feature = "zeroize")]
+                            zeroize::Zeroize::zeroize(&mut bytes);
+                            return Err($crate::HexError::InvalidHex);
+                        }
+                    }
+                }
+                // Convert back to string after validation/normalization
+                let validated_string =
+                    String::from_utf8(bytes).expect("valid UTF-8 after hex normalization");
+                Ok(Self::from(validated_string))
+            }
         }
     };
 }

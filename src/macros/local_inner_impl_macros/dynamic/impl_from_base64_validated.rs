@@ -24,6 +24,16 @@ macro_rules! impl_from_base64_validated {
                     panic!("invalid base64 string");
                 }
             }
+
+            pub fn try_from_base64(s: &str) -> Result<Self, $crate::Base64Error> {
+                use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+                use base64::Engine;
+                if URL_SAFE_NO_PAD.decode(s).is_ok() {
+                    Ok(Self::from(s.to_string()))
+                } else {
+                    Err($crate::Base64Error::InvalidBase64)
+                }
+            }
         }
     };
 }
