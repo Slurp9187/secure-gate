@@ -6,8 +6,7 @@ extern crate alloc;
 
 // Cfgs added to individual tests
 use secure_gate::{
-    exportable_dynamic_alias, exportable_fixed_alias, Dynamic, ExportableType, ExposeSecret,
-    ExposeSecretMut, Fixed,
+    exportable_dynamic_alias, exportable_fixed_alias, ExportableType, ExposeSecret, ExposeSecretMut,
 };
 
 // Define exportable types using the new macros (specific sizes since macros don't support generics)
@@ -19,6 +18,7 @@ exportable_dynamic_alias!(pub ExportableVec, Vec<u8>);
 // === Custom Type Exporting ===
 #[cfg(all(feature = "zeroize", feature = "serde"))]
 #[derive(serde::Serialize, serde::Deserialize)]
+#[allow(dead_code)]
 struct MyKey([u8; 16]);
 
 #[cfg(all(feature = "zeroize", feature = "serde"))]
