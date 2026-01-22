@@ -61,6 +61,13 @@ macro_rules! cloneable_fixed_alias {
             }
         }
 
+        #[cfg(feature = "hash-eq")]
+        impl $crate::HashEq for $name {
+            fn hash_eq(&self, other: &Self) -> bool {
+                self.0.hash_eq(&other.0)
+            }
+        }
+
         #[cfg(any(
             feature = "encoding-hex",
             feature = "encoding-base64",

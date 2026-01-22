@@ -96,6 +96,13 @@ macro_rules! serializable_dynamic_alias {
             }
         }
 
+        #[cfg(feature = "hash-eq")]
+        impl $crate::HashEq for $name {
+            fn hash_eq(&self, other: &Self) -> bool {
+                self.0.hash_eq(&other.0)
+            }
+        }
+
         impl From<$type> for $name {
             fn from(value: $type) -> Self {
                 Self($crate::Dynamic::new(value))

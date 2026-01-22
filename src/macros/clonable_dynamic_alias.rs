@@ -91,6 +91,13 @@ macro_rules! cloneable_dynamic_alias {
             }
         }
 
+        #[cfg(feature = "hash-eq")]
+        impl $crate::HashEq for $name {
+            fn hash_eq(&self, other: &Self) -> bool {
+                self.0.hash_eq(&other.0)
+            }
+        }
+
         impl std::ops::Deref for $name {
             type Target = $crate::Dynamic<$type>;
 

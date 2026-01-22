@@ -96,6 +96,13 @@ macro_rules! serializable_fixed_alias {
             }
         }
 
+        #[cfg(feature = "hash-eq")]
+        impl $crate::HashEq for $name {
+            fn hash_eq(&self, other: &Self) -> bool {
+                self.0.hash_eq(&other.0)
+            }
+        }
+
         impl From<[u8; $size]> for $name {
             fn from(arr: [u8; $size]) -> Self {
                 Self($crate::Fixed::new(arr))
