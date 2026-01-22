@@ -1,5 +1,7 @@
 #![cfg(feature = "insecure")]
 
+extern crate alloc;
+
 // Tests for insecure mode: wrappers as conduits without zeroize/ct-eq dependencies.
 // Ensures stripped functionality works for embedded/lightweight use cases.
 
