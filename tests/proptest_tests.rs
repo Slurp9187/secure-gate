@@ -135,7 +135,8 @@ mod encoding_roundtrip_proptests {
         fn hex_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
             let secret: TestDynamicVec = data.clone().into();
             let hex = secret.expose_secret().to_hex();
-            let decoded: TestDynamicVec = TestDynamicVec::from_hex(hex.as_str());
+            let json = format!("\"{}\"", hex);
+            let decoded: TestDynamicVec = serde_json::from_str(&json).unwrap();
             prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
         }
 
@@ -144,7 +145,9 @@ mod encoding_roundtrip_proptests {
         fn hex_try_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
             let secret: TestDynamicVec = data.clone().into();
             let hex = secret.expose_secret().to_hex();
-            let decoded: TestDynamicVec = TestDynamicVec::try_from_hex(hex.as_str()).unwrap();
+            let json = format!("\"{}\"", hex);
+            let decoded: Result<TestDynamicVec, _> = serde_json::from_str(&json);
+            let decoded = decoded.unwrap();
             prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
         }
 
@@ -153,7 +156,8 @@ mod encoding_roundtrip_proptests {
         fn base64_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
             let secret: TestDynamicVec = data.clone().into();
             let b64 = secret.expose_secret().to_base64url();
-            let decoded: TestDynamicVec = TestDynamicVec::from_base64(b64.as_str());
+            let json = format!("\"{}\"", b64);
+            let decoded: TestDynamicVec = serde_json::from_str(&json).unwrap();
             prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
         }
 
@@ -162,7 +166,9 @@ mod encoding_roundtrip_proptests {
         fn base64_try_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
             let secret: TestDynamicVec = data.clone().into();
             let b64 = secret.expose_secret().to_base64url();
-            let decoded: TestDynamicVec = TestDynamicVec::try_from_base64(b64.as_str()).unwrap();
+            let json = format!("\"{}\"", b64);
+            let decoded: Result<TestDynamicVec, _> = serde_json::from_str(&json);
+            let decoded = decoded.unwrap();
             prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
         }
 
@@ -171,7 +177,8 @@ mod encoding_roundtrip_proptests {
         fn bech32_roundtrip(data in prop::collection::vec(any::<u8>(), 0..32)) {
             let secret: TestDynamicVec = data.clone().into();
             let bech32 = secret.expose_secret().to_bech32("test");
-            let decoded: TestDynamicVec = TestDynamicVec::from_bech32(bech32.as_str(), "test");
+            let json = format!("\"{}\"", bech32);
+            let decoded: TestDynamicVec = serde_json::from_str(&json).unwrap();
             prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
         }
     }
