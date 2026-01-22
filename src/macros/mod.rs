@@ -10,4 +10,12 @@
 //! - `fixed_alias_random!`: For random-only fixed-size secrets (`FixedRandom<N>`)
 
 /// Public type-alias macros.
-mod public_type_alias_macros;
+/// Cloneable type aliases.
+mod clonable_dynamic_alias;
+mod clonable_fixed_alias;
+/// Dynamic and fixed aliases.
+mod dynamic_alias;
+mod fixed_alias;
+/// Serializable type aliases.
+mod serializable_dynamic_alias;
+mod serializable_fixed_alias;
