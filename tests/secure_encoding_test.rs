@@ -51,6 +51,14 @@ fn test_string_to_hex() {
     assert_eq!(hex, "616263");
 }
 
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn test_hex_prefix() {
+    let data: [u8; 4] = [1, 2, 3, 4];
+    assert_eq!(data.to_hex_prefix(2), "0102…");
+    assert_eq!(data.to_hex_prefix(4), "01020304");
+}
+
 #[cfg(feature = "encoding-base64")]
 #[test]
 fn test_slice_to_base64url() {
