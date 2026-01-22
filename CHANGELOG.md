@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Zero-cost abstractions with `#[inline(always)]` for optimal performance
   - Comprehensive rustdoc with security guarantees and usage examples
 
-- `CloneableType` trait for opt-in cloning of secrets (requires `zeroize` feature).
+- `CloneableType` trait for opt-in cloning of secrets.
   - Implemented for primitives (`u8`, `i32`, etc.) and fixed arrays (`[T; N]`).
   - Custom types can implement the trait for controlled duplication.
 - Macros for creating custom cloneable type aliases (`cloneable_fixed_alias!`, `cloneable_dynamic_alias!`).
@@ -70,8 +70,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Benchmarks (`benches/serde.rs`) measuring minimal overhead vs. raw types.
   - Unit tests, integration tests, compile-fail tests, and security tests ensuring no leaks.
 
+  - CI matrix in `.github/workflows/ci.yml` for comprehensive testing across 8 key feature combinations (default, full, insecure variants, no features).
+  - `insecure_tests.rs` for validating stripped mode functionality and cloneable independence in low-resource environments.
 
-### Changed (Breaking)
+
+  ### Changed (Breaking)
 - **Serialization model**: Core/cloneable/random/encoded types no longer directly serialize raw secrets—use new `Serializable*` types for deliberate raw output to prevent accidental exfiltration.
 
 
@@ -82,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Default features changed to `secure` (bundling `zeroize` + `ct-eq`) to prioritize secure memory handling by default while minimizing dependencies.
+- Cloneable feature made independent of `zeroize` for embedded/stripped mode compatibility, allowing insecure cloning via raw types without zeroization (secure cloning still recommended).
 - Cloning model: switched to opt-in via `CloneableType` (now in `traits/clone_safe`), centered on pre-baked primitives for maximum ergonomics and safety.
   - All cloneable types are distinctly typed from non-cloneable counterparts — no accidental mixing.
 - Renamed `rng` module to `random`.
@@ -95,7 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Feature gating for `CloneableType` and related impls (requires `zeroize`).
+- Feature gating for `CloneableType` and related impls (now independent of `zeroize` for embedded compatibility).
 - Doc-test compatibility across all feature configurations.
 - Resolved compilation conflicts in error types and trait bounds.
 
