@@ -1,11 +1,25 @@
-// Creates a serializable type alias for a dynamic heap-allocated secure secret.
-//
-// This macro generates a newtype around `Dynamic<T>` with implementations for `Serialize` and `SerializableType`.
-// It inherits the security properties of `Dynamic` but allows deliberate serialization via `Serialize`.
-//
-// # Syntax
-//
-// `serializable_dynamic_alias!(vis Name, Type);` — visibility required (e.g., `pub`), Type is the inner type like `String` or `Vec<u8>`
+
+/// Creates a serializable type alias for a dynamic heap-allocated secure secret.
+///
+/// This macro generates a newtype around `Dynamic<T>` with implementations for `Serialize` and `SerializableType`.
+/// It inherits the security properties of `Dynamic` but allows deliberate serialization via `Serialize`.
+///
+/// # Syntax
+///
+/// `serializable_dynamic_alias!(vis Name, Type);` — visibility required (e.g., `pub`), Type is the inner type like `String` or `Vec<u8>`
+///
+/// **Security Warning**
+/// This macro creates a deliberately serializable type.
+/// Serialization can lead to accidental secret leakage via:
+/// - debug printing / logging
+/// - insecure configuration files
+/// - network payloads without encryption
+/// - debug endpoints or introspection tools
+///
+/// Only use this macro when serialization is explicitly required (e.g., persisting to trusted encrypted storage, sending over authenticated secure channels).
+///
+/// **Prefer non-serializable `Fixed<T>` / `Dynamic<T>` whenever possible** to eliminate the risk of exfiltration entirely.
+
 #[macro_export]
 macro_rules! serializable_dynamic_alias {
     ($vis:vis $name:ident, $type:ty) => {
@@ -107,7 +121,10 @@ macro_rules! serializable_dynamic_alias {
         }
 
         #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
-        impl<'de> serde::Deserialize<'de> for $name {
+        impl<'de> serde::Deserialize<'de> for $name
+        where
+            $type: serde::de::DeserializeOwned,
+        {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where
                 D: serde::Deserializer<'de>,
