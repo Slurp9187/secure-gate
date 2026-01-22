@@ -2,10 +2,25 @@
 #![forbid(unsafe_code)]
 // #![doc = include_str!("../README.md")] // uncomment for doctest runs
 // #![doc = include_str!("../EXAMPLES.md")] // uncomment for doctest runs
-//! Zero-cost secure wrappers for secrets — [`Fixed<T>`] for stack, [`Dynamic<T>`] for heap.
+//! Zero-cost secure wrappers for secrets — [`Fixed<T>`] for stack-allocated fixed-size data,
+//! [`Dynamic<T>`] for heap-allocated variable-length data.
 //!
-//! This crate provides explicit wrappers for sensitive data like \[`CloneableArray`\], \[`CloneableString`\], and \[`CloneableType`\], ensuring no accidental exposure.
-//! See README.md for usage and examples.
+//! This crate provides explicit, guarded wrappers for sensitive values (e.g. keys, tokens, ciphertexts)
+//! with controlled exposure via `.expose_secret()` / `.expose_secret_mut()`. No accidental leaks via
+//! `Deref`, `AsRef`, or implicit conversions.
+//!
+//! See [README.md](../README.md) for usage examples, feature overview, and macros for custom aliases.
+//!
+//! ## Equality Options
+//!
+//! - [`ConstantTimeEq`] (via `ct-eq` feature): Direct byte-by-byte constant-time comparison using `subtle`.
+//!   Best for small/fixed-size secrets (< ~256–512 bytes) where speed matters most.
+//! - [`HashEq`] (via `hash-eq` feature): BLAKE3 hash → constant-time compare on fixed 32-byte digest.
+//!   Faster for large/variable secrets (e.g. ML-KEM ciphertexts ~1–1.5 KiB, ML-DSA signatures ~2–4 KiB),
+//!   with length hiding and optional keyed mode (`rand` for per-process random key).
+//!
+//! See the [`HashEq`] trait documentation for performance numbers, security properties (probabilistic,
+//! timing-safe), and guidance on when to choose each (or hybrid).
 extern crate alloc;
 
 /// Dynamic secret wrapper types - always available with zero dependencies.

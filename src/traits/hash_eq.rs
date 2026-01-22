@@ -1,32 +1,41 @@
-//! Probabilistic constant-time equality for secret types.
-//!
-//! This module provides the [`HashEq`] trait, which enables fast, constant-time equality
-//! checks using BLAKE3 hashing. This is ideal for large or variable-length secrets where
-//! direct comparison would be inefficient.
-//!
-//! ## Key Features
-//!
-//! - **Constant-time**: Uses [`subtle::ct_eq`] for hash comparison.
-//! - **Keyed hashing** (optional): With `rand` enabled, uses a per-process random key to
-//!   mitigate offline precomputation attacks.
-//! - **Performance**: Flat ~120–130ns variance, superior to ct_eq for large secrets.
-//!
-//! ## Security Considerations
-//!
-//! - **Probabilistic**: Extremely low collision risk, but not zero. Use [`ConstantTimeEq`]
-//!   for strict equality.
-//! - **DoS potential**: Hashing large inputs can be costly; rate-limit untrusted comparisons.
-//! - **Keyed mode**: Enabled with `rand` for stronger security in adversarial scenarios.
-//! - **Prefer ct_eq for small secrets**: Hashing has overhead; direct comparison is faster for <32 bytes.
-//!
-//! ## Usage
-//!
-//! ```rust,ignore
-//! use secure_gate::{Fixed, HashEq};
-//! let secret1: Fixed<[u8; 64]> = Fixed::new([42u8; 64]);
-//! let secret2: Fixed<[u8; 64]> = Fixed::new([42u8; 64]);
-//! assert!(secret1.hash_eq(&secret2)); // Fast, constant-time check
-//! ```
+/// Probabilistic constant-time equality via BLAKE3 hashing.
+///
+/// Provides fast equality checks for secrets by hashing inputs (BLAKE3) then
+/// comparing the fixed 32-byte digests in constant time (via `ct_eq`/`subtle`).
+///
+/// Ideal for **large or variable-length secrets** (e.g. ML-KEM ciphertexts ~1–1.5 KiB,
+/// ML-DSA signatures ~2–4 KiB) where direct byte-by-byte `ct_eq` becomes slow or
+/// increases side-channel surface.
+///
+/// ## Security Properties
+/// - **Timing-safe**: BLAKE3 is data-independent; final 32-byte compare is constant-time.
+/// - **Length hiding**: Original length not observable via timing/cache.
+/// - **Keyed mode** (with `"rand"` feature): Per-process random key resists precomputation /
+///   multi-target attacks across comparisons.
+/// - **Probabilistic**: Collision probability ~2⁻¹²⁸ — negligible for equality checks,
+///   but use [`ConstantTimeEq`] for strict deterministic equality.
+///
+/// ## Performance
+/// - Fixed overhead (~120–150 ns on small inputs) + very low per-byte cost.
+/// - Beats full `ct_eq` for > ~300–500 bytes (2× at 1 KiB, 5–8× at 100 KiB+).
+/// - Prefer [`ConstantTimeEq`] for tiny fixed-size tags (< 128–256 bytes).
+///
+/// ## Warnings
+/// - **DoS risk**: Hashing very large untrusted inputs is costly — rate-limit or bound sizes.
+/// - **Not zero-collision**: Extremely unlikely false positives; don't rely on it for uniqueness.
+///
+/// ## Example
+/// ```
+/// # #[cfg(feature = "hash-eq")]
+/// # {
+/// use secure_gate::{Dynamic, HashEq};
+/// let a: Dynamic<Vec<u8>> = vec![42u8; 2048].into();  // e.g. ML-DSA signature
+/// let b: Dynamic<Vec<u8>> = vec![42u8; 2048].into();  // matching value
+/// if a.hash_eq(&b) {
+///     // constant-time, fast for large blobs
+/// }
+/// # }
+/// ```
 
 #[cfg(feature = "hash-eq")]
 use crate::traits::constant_time_eq::ConstantTimeEq;

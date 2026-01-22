@@ -191,6 +191,8 @@ Inbound decoding via Serde deserialization (auto-detects encoding from strings):
 
 ## Constant-Time Equality (`ct-eq` feature)
 
+`ct-eq` feature: Uses `subtle` for direct constant-time byte comparison.
+
 ```rust
 #[cfg(feature = "ct-eq")]
 {
@@ -205,6 +207,11 @@ Inbound decoding via Serde deserialization (auto-detects encoding from strings):
 ```
 
 ## Hash-Based Equality (`hash-eq` feature)
+
+`hash-eq` feature: BLAKE3 hash + constant-time digest compare.
+  - Stronger for large secrets (performance + length hiding).
+  - Keyed mode (`rand`) adds multi-target resistance.
+  - Probabilistic (collision risk ~2⁻¹²⁸); prefer `ct-eq` for small/high-assurance needs.
 
 ```rust
 #[cfg(feature = "hash-eq")]
