@@ -16,6 +16,7 @@ fn try_decode(s: &str) -> Result<alloc::vec::Vec<u8>, &'static str> {
     if let Ok(data) = hex::decode(s) {
         return Ok(data);
     }
+
     #[cfg(feature = "encoding-base64")]
     if let Ok(data) = base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, s) {
         return Ok(data);

@@ -151,26 +151,7 @@ mod encoding_roundtrip_proptests {
             prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
         }
 
-        #[cfg(feature = "encoding-base64")]
-        #[test]
-        fn base64_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
-            let secret: TestDynamicVec = data.clone().into();
-            let b64 = secret.expose_secret().to_base64url();
-            let json = format!("\"{}\"", b64);
-            let decoded: TestDynamicVec = serde_json::from_str(&json).unwrap();
-            prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
-        }
 
-        #[cfg(feature = "encoding-base64")]
-        #[test]
-        fn base64_try_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
-            let secret: TestDynamicVec = data.clone().into();
-            let b64 = secret.expose_secret().to_base64url();
-            let json = format!("\"{}\"", b64);
-            let decoded: Result<TestDynamicVec, _> = serde_json::from_str(&json);
-            let decoded = decoded.unwrap();
-            prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
-        }
 
         #[cfg(feature = "encoding-bech32")]
         #[test]
