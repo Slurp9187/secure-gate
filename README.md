@@ -333,7 +333,7 @@ dynamic_alias!(pub Token, Vec<u8>, "OAuth access token");
 use secure_gate::{fixed_generic_alias, dynamic_generic_alias};
 
 fixed_generic_alias!(pub GenericFixedBuffer);
-dynamic_generic_alias!(pub GenericHeapSecret, Vec<u8>);
+dynamic_generic_alias!(pub GenericHeapSecret);
 ```
 
 ## Memory Guarantees (`zeroize` enabled)
