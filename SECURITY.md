@@ -1,23 +1,28 @@
 # Security Considerations for secure-gate
 
 ## TL;DR
-- No independent audit yet—review the code yourself before production use.
-- Default feature is `secure` (`zeroize` + `ct-eq` enabled).
-- Explicit `.expose_secret()` and `.expose_secret_mut()` for auditability; zeroization on drop (with `zeroize`).
-- Use GitHub's Security tab for vulnerability reports (private preferred, public acceptable).
+- No independent security audit has been performed — review the code yourself before production use.
+- Default feature set is `secure` (`zeroize` + `ct-eq` enabled).
+- Explicit `.expose_secret()` / `.expose_secret_mut()` calls required for all access — zero-cost reborrows, fully elided by optimizer.
+- Memory zeroed on drop (including spare capacity in `Vec`/`String`) when `zeroize` feature is enabled.
+- Use GitHub Security tab for vulnerability reports (private reporting preferred, public acceptable).
 
-This document outlines key security aspects to consider when using the `secure-gate` crate for handling sensitive data. It is intended for developers evaluating the library for security-critical applications.
+This document summarizes security-relevant design choices, strengths, potential weaknesses, and review points for the `secure-gate` crate. It is intended for developers performing threat modeling or security reviews.
 
 ## Audit Status
-`secure-gate` has not undergone independent security audit. The crate is in active development and relies on well-established dependencies (e.g., `zeroize`, `subtle`). Review the implementation and test coverage before use in production.
+`secure-gate` has **not** undergone independent security audit.  
+The implementation relies on established dependencies (`zeroize`, `subtle`, `blake3`, `rand`, encoding crates).  
+Users should review source code and test coverage before using in security-critical applications.
 
 ## Core Security Model
-- **Explicit Exposure**: Secret data access requires explicit `.expose_secret()` and `.expose_secret_mut()` calls, minimizing accidental leaks. Audit all `.expose_secret()` and `.expose_secret_mut()` calls in your code.
-- **Zeroization**: Memory is zeroized on drop when `zeroize` feature is enabled. Without it, data may linger until normal deallocation.
-- **No Implicit Access**: No `Deref` implementations prevent silent borrowing or copying.
-- **Constant-Time Operations**: Timing-safe equality available with `ct-eq` feature; disable only with justification.
-- **No Unsafe Code**: The crate contains no `unsafe` code. `forbid(unsafe_code)` is applied in minimal configurations as a defensive measure.
+- **Explicit exposure only** — `.expose_secret()` / `.expose_secret_mut()` required; no `Deref`, `AsRef`, or implicit paths.
+- **Zeroization on drop** — enabled via `zeroize` feature; full backing buffer (including slack capacity) is zeroized.
+- **No unsafe code in crate itself** — `#![forbid(unsafe_code)]` enforced in minimal configurations.
+- **Redacted Debug** — prevents accidental secret logging via `{:?}`.
+- **Constant-time equality** — available via `ct-eq` feature; `==` discouraged.
+- **No automatic Clone / Serialize** — requires explicit opt-in via macros + marker traits (`CloneableType`, `SerializableType`).
 
+<<<<<<< Updated upstream
 ## Feature Implications
 - **`zeroize` (included in default `secure`)**: Enables memory wiping and safe cloning. Recommended for all use cases handling secrets.
 - **`ct-eq` (included in default `secure`)**: Provides timing-safe comparisons. Avoid `==` for secrets.
@@ -32,9 +37,98 @@ This document outlines key security aspects to consider when using the `secure-g
 - **Custom Types**: Avoid wrapping sensitive data in non-zeroizeable types; implement `CloneableType` carefully.
 - **Error Handling**: Errors like `FromSliceError` expose length metadata (e.g., expected vs. actual), which may be sensitive in some contexts; fields are `pub(crate)` to prevent direct external access while allowing internal debugging. Invalid inputs are zeroized in encoding failures (with `zeroize` enabled).
 - **Macro Usage**: Macros create type aliases without runtime checks—ensure they match your security needs.
+=======
+## Feature Security Implications
 
+| Feature                  | Security Impact                                                                 | Recommendation                                      |
+|--------------------------|---------------------------------------------------------------------------------|-----------------------------------------------------|
+| `secure` (default)       | Enables `zeroize` + `ct-eq` — recommended baseline                              | Always enable unless extreme constraints            |
+| `zeroize`                | Zeroes memory on drop; required for safe cloning                                | Strongly recommended                                |
+| `ct-eq`                  | Timing-safe comparisons via `subtle` crate                                      | Strongly recommended; avoid `==`                    |
+| `hash-eq`                | Fast equality via BLAKE3 + ct-eq on digest; probabilistic constant-time         | Use only when performance matters; prefer `ct-eq` for small secrets |
+| `cloneable`              | Opt-in cloning via macros + `CloneableType` marker; increases copies in memory  | Use only when multiple owners required              |
+| `serde-serialize`        | Opt-in serialization via `SerializableType` marker; risk of exfiltration        | Enable only when needed; audit all impls            |
+| `serde-deserialize`      | Allows loading secrets; temporary copies during parsing                         | Enable only for trusted sources                     |
+| `encoding-*`             | Explicit encoding; zeroizes invalid inputs when `zeroize` enabled               | Validate inputs upstream                            |
+| `rand`                   | Uses `OsRng` for cryptographically secure randomness; panics on failure        | Ensure OS entropy source is secure                  |
+>>>>>>> Stashed changes
+
+## Module-by-Module Security Notes
+
+### Core (`lib.rs`, `fixed.rs`, `dynamic.rs`)
+- Strengths
+  - Explicit exposure model forces audited access
+  - No `Deref` / `AsRef` prevents silent leaks
+  - Zeroization covers full capacity (including slack) when enabled
+- Weaknesses
+  - Macro expansions create aliases without runtime checks — audit generated types
+  - Error types may leak length metadata (fields `pub(crate)` to limit exposure)
+- Mitigations
+  - Use compile-time size assertions in macros
+  - Contextualize error handling to avoid metadata leaks
+
+### Cloneable Module
+- Strengths
+  - Opt-in via macro + `CloneableType` marker
+  - Gated behind `zeroize` — cloning unavailable without zeroization
+- Weaknesses
+  - Cloning multiplies exposure surface
+- Mitigations
+  - Prefer move semantics; limit cloning
+  - Zeroize clones promptly
+  - Audit custom `CloneableType` impls
+
+### Serializable Module
+- Strengths
+  - Opt-in via macro + `SerializableType` marker
+  - Serialize gated separately from deserialize
+- Weaknesses
+  - Serialization risk of leakage (logs, insecure storage)
+  - Deserialize from untrusted sources creates temporary copies
+- Mitigations
+  - Enable `serde-serialize` only when required
+  - Audit all `impl SerializableType`
+  - Deserialize only from trusted sources
+  - Zeroize invalid deserialization inputs
+
+### Random Module
+- Strengths
+  - Uses `OsRng` for system CSPRNG
+- Weaknesses
+  - Panics on RNG failure (DoS vector)
+  - Allocation size may leak via side-channels
+- Mitigations
+  - Use `try_from_random` variant when available
+  - Deploy in trusted OS environments
+
+### Constant-Time Equality
+- Strengths
+  - Delegates to `subtle` crate (vetted implementation)
+- Weaknesses
+  - Disabled without `ct-eq` feature → timing vulnerable
+- Mitigations
+  - Always enable `ct-eq` for sensitive comparisons
+
+### Encoding Module
+- Strengths
+  - Explicit encoding; zeroizes invalid inputs
+- Weaknesses
+  - Decoding allocates temporary buffers
+  - Bech32 HRP validation relies on upstream crate
+- Mitigations
+  - Validate inputs upstream
+  - Fuzz test parsers
+
+### Error Handling
+- Strengths
+  - Minimal metadata exposure
+- Weaknesses
+  - Length info in errors may be sensitive
+- Mitigations
+  - Wrap errors in high-sensitivity contexts
 
 ## Best Practices
+<<<<<<< Updated upstream
 - Enable the default `secure` feature (`zeroize` + `ct-eq`) unless constrained environments require otherwise.
 - Audit all `.expose_secret()` and `.expose_secret_mut()` calls for necessity and duration.
 - Use semantic aliases (e.g., `fixed_alias!`) for clarity.
@@ -210,6 +304,21 @@ This section provides a professional reviewer's perspective on each module's sec
 - For production, isolate sensitive operations and consider HSMs or enclaves.
 
 This analysis is not exhaustive—perform your own threat modeling.
+=======
+- Enable default `secure` feature unless extreme constraints.
+- Audit all `.expose_secret()` / `.expose_secret_mut()` calls.
+- Use semantic aliases via macros.
+- Prefer non-cloneable / non-serializable types when possible.
+- Validate encoding/decoding inputs.
+- Monitor dependencies for updates and CVEs.
+
+## Vulnerability Reporting
+- Preferred: GitHub private vulnerability reporting (Security tab → Report a vulnerability)
+- Alternative: Draft / public issue
+- Response target: 48 hours
+- Public disclosure welcome after coordinated fix
+>>>>>>> Stashed changes
 
 ## Disclaimer
-This crate is provided under MIT OR Apache-2.0 licenses. It comes with no warranties. Users are responsible for evaluating security for their specific use cases.
+This document reflects design intent and observed properties as of January 2026.  
+No warranties are provided. Users are responsible for their own security evaluation.
