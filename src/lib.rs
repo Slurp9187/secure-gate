@@ -64,9 +64,9 @@ mod macros;
 ))]
 pub use traits::SecureEncoding;
 
-/// Re-export of [`Bech32EncodingError`] for convenience when using bech32 encoding.
+/// Re-export of [`Bech32Error`] for convenience when using bech32 encoding/decoding.
 #[cfg(feature = "encoding-bech32")]
-pub use error::Bech32EncodingError;
+pub use error::Bech32Error;
 
 /// Re-export of [`Base64Error`] for convenience when using base64 decoding.
 #[cfg(feature = "encoding-base64")]
@@ -75,3 +75,6 @@ pub use error::Base64Error;
 /// Re-export of [`HexError`] for convenience when using hex decoding.
 #[cfg(feature = "encoding-hex")]
 pub use error::HexError;
+
+/// Re-export of [`DecodingError`] for convenience in decoding operations.
+pub use error::DecodingError;

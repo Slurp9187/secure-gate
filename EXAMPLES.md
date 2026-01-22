@@ -186,6 +186,30 @@ let text  = Secure::<String>::new("secret".to_string());
 }
 ```
 
+### Bech32 Encoding (Fallible)
+```rust
+#[cfg(feature = "encoding-bech32")]
+{
+    use secure_gate::*;
+    extern crate alloc;
+
+    let bytes = b"Hello world".as_slice();
+
+    // Infallible (panics on error)
+    let bech32 = bytes.to_bech32("test"); // "test1w0psnj"
+
+    // Fallible (returns Result)
+    let result = bytes.try_to_bech32("test");
+    assert!(result.is_ok());
+    let bech32_str = result.unwrap();
+
+    // Error handling for invalid HRP
+    let invalid_hrp = bytes.try_to_bech32("Invalid_HRP");
+    assert!(invalid_hrp.is_err());
+    // invalid_hrp.err() => Some(Bech32Error::InvalidHrp)
+}
+```
+
 ### Inbound Decoding (via Serde – auto-detects encoding from strings)
 ```rust
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]

@@ -79,12 +79,12 @@ macro_rules! serializable_fixed_alias {
             }
 
             #[cfg(feature = "encoding-bech32")]
-            fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, $crate::Bech32EncodingError> {
+            fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, $crate::Bech32Error> {
                 <$name as $crate::ExposeSecret>::expose_secret(self).try_to_bech32(hrp)
             }
 
             #[cfg(feature = "encoding-bech32")]
-            fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, $crate::Bech32EncodingError> {
+            fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, $crate::Bech32Error> {
                 <$name as $crate::ExposeSecret>::expose_secret(self).try_to_bech32m(hrp)
             }
         }

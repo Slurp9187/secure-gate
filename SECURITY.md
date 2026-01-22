@@ -104,11 +104,12 @@ Users should review source code and test coverage before using in security-criti
 
 ### Error Handling
 - Strengths
-  - Minimal metadata exposure
+  - Minimal metadata exposure; type-safe error enums (e.g., `DecodingError` for decoding failures, `Bech32Error` for encoding) prevent generic strings and improve debugging
+  - Explicit fallible methods (e.g., `try_to_bech32`) alongside infallible ones for better error control
 - Weaknesses
-  - Length info in errors may be sensitive
+  - Length info in errors may be sensitive (e.g., buffer sizes in `DecodingError`)
 - Mitigations
-  - Wrap errors in high-sensitivity contexts
+  - Wrap errors in high-sensitivity contexts; audit error handling for metadata leaks
 
 ## Best Practices
 - Enable default `secure` feature unless extreme constraints.

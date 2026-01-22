@@ -69,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cloning model: switched to opt-in via `CloneableType`, centered on macro-generated cloneable types via `cloneable_fixed_alias!` and `cloneable_dynamic_alias!` for maximum ergonomics and safety.
   - All cloneable types are distinctly typed from non-cloneable counterparts — no accidental mixing.
 - `SecureEncoding` trait re-export cfg updated to include `encoding-bech32` feature.
+- Error handling overhaul: Renamed `Bech32EncodingError` to `Bech32Error` for broader use (encoding/decoding), added `DecodingError` enum for unified decoding failures (hex/base64/bech32), and updated `SecureEncoding` to use `Bech32Error`; internal decoding now returns proper error types instead of static strings.
 
 ### Fixed
 
