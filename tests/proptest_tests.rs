@@ -123,14 +123,16 @@ mod ct_eq_wrapper_proptests {
 ))]
 mod encoding_roundtrip_proptests {
     use super::*;
-    use secure_gate::{dynamic_alias, ExposeSecret, SecureEncoding};
+    use secure_gate::dynamic_alias;
+    #[cfg(feature = "serde-deserialize")]
+    use secure_gate::{ExposeSecret, SecureEncoding};
 
     dynamic_alias!(TestDynamicVec, Vec<u8>);
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(50))]
 
-        #[cfg(feature = "encoding-hex")]
+        #[cfg(all(feature = "encoding-hex", feature = "serde-deserialize"))]
         #[test]
         fn hex_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
             let secret: TestDynamicVec = data.clone().into();
@@ -140,7 +142,7 @@ mod encoding_roundtrip_proptests {
             prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
         }
 
-        #[cfg(feature = "encoding-hex")]
+        #[cfg(all(feature = "encoding-hex", feature = "serde-deserialize"))]
         #[test]
         fn hex_try_roundtrip(data in prop::collection::vec(any::<u8>(), 0..100)) {
             let secret: TestDynamicVec = data.clone().into();
@@ -153,7 +155,7 @@ mod encoding_roundtrip_proptests {
 
 
 
-        #[cfg(feature = "encoding-bech32")]
+        #[cfg(all(feature = "encoding-bech32", feature = "serde-deserialize"))]
         #[test]
         fn bech32_roundtrip(data in prop::collection::vec(any::<u8>(), 0..32)) {
             let secret: TestDynamicVec = data.clone().into();
