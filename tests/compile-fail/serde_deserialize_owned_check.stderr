@@ -1,0 +1,12 @@
+error[E0106]: missing lifetime specifier
+ --> tests/compile-fail/serde_deserialize_owned_check.rs:5:45
+  |
+5 | serializable_dynamic_alias!(pub TestSecret, &str);
+  |                                             ^ expected named lifetime parameter
+  |
+
+error: in the trait associated type is declared without lifetime parameters, so using a borrowed type for them requires that lifetime to come from the implemented type
+ --> tests/compile-fail/serde_deserialize_owned_check.rs:5:45
+  |
+5 | serializable_dynamic_alias!(pub TestSecret, &str);
+  |                                             ^ this lifetime must come from the implemented type
