@@ -33,7 +33,7 @@ pub use dynamic::Dynamic;
 /// Re-export of the [`Fixed`] type.
 pub use fixed::Fixed;
 
-#[cfg(feature = "zeroize")]
+#[cfg(feature = "cloneable")]
 pub use traits::CloneableType;
 #[cfg(feature = "serde")]
 pub use traits::SerializableType;

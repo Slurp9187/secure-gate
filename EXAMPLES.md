@@ -250,7 +250,7 @@ let text  = Secure::<String>::new("secret".to_string());
 
 ### Cloneable Fixed Key
 ```rust
-#[cfg(feature = "zeroize")]
+#[cfg(feature = "cloneable")]
 {
     use secure_gate::*;
     extern crate alloc;
@@ -264,7 +264,7 @@ let text  = Secure::<String>::new("secret".to_string());
 
 ### Cloneable Dynamic Password
 ```rust
-#[cfg(feature = "zeroize")]
+#[cfg(feature = "cloneable")]
 {
     use secure_gate::*;
     extern crate alloc;

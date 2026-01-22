@@ -62,8 +62,8 @@ ct-eq = ["dep:subtle"]
 # Hash-based equality (uses blake3 for fast, secure hashing without caching overhead)
 hash-eq = ["ct-eq", "dep:blake3", "dep:once_cell"]
 
-# Cloneable: Opt-in safe cloning for secrets (requires zeroize)
-cloneable = ["dep:zeroize"]
+# Cloneable: Opt-in safe cloning for secrets
+cloneable = []
 
 # Full: Meta-feature enabling all optional features for a complete, batteries-included setup
 full = ["secure", "encoding", "hash-eq", "cloneable"]

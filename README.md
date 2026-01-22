@@ -45,7 +45,7 @@ secure-gate = { version = "0.7.0-rc.10", default-features = false }
 | `zeroize`            | Memory zeroing on drop + opt-in safe cloning (requires `zeroize` crate)                              |
 | `ct-eq`              | Constant-time equality checks to prevent timing attacks (requires `subtle` crate)                   |
 | `hash-eq`            | Fast hash-based equality (BLAKE3 hashing with constant-time hash comparison, requires `blake3` and `ct-eq`) |
-| `cloneable`          | Opt-in safe cloning wrappers and `CloneableType` marker (requires `zeroize`)                         |
+| `cloneable`          | Opt-in safe cloning wrappers and `CloneableType` marker                         |
 | `encoding`           | All encoding support (`encoding-base64`, `encoding-bech32`, `encoding-hex`)                          |
 | `encoding-base64`    | Base64 encoding/decoding + constructors (requires `base64` crate)                                    |
 | `encoding-bech32`    | Bech32 encoding/decoding + constructors (requires `bech32` crate)                                    |

@@ -1,4 +1,4 @@
-#![cfg(feature = "zeroize")]
+#![cfg(feature = "cloneable")]
 
 extern crate alloc;
 

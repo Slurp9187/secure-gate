@@ -8,7 +8,7 @@
 ///
 /// - [`ExposeSecret`] - Read-only secret access with metadata
 /// - [`ExposeSecretMut`] - Mutable secret access
-/// - [`CloneableType`] - Opt-in safe cloning with zeroization (requires zeroize feature)
+/// - [`CloneableType`] - Opt-in safe cloning with zeroization (requires cloneable feature)
 /// - [`ConstantTimeEq`] - Constant-time equality to prevent timing attacks (requires ct-eq feature)
 /// - [`SecureEncoding`] - Extension trait for secure byte encoding to strings (requires encoding features)
 /// - [`SerializableType`] - Marker for types allowing secure serialization (requires serde-serialize feature)
@@ -24,7 +24,7 @@
 ///
 /// Some traits require optional Cargo features:
 /// - rand: Enables random wrapper implementations
-/// - zeroize: Enables [`CloneableType`] for safe cloning
+/// - cloneable: Enables [`CloneableType`] for safe cloning
 /// - ct-eq: Enables [`ConstantTimeEq`] for constant-time comparisons
 /// - encoding (or encoding-hex, encoding-base64, encoding-bech32): Enables [`SecureEncoding`] for byte encoding
 /// - serde: Enables [`SerializableType`] for opt-in serialization
@@ -58,9 +58,9 @@ pub mod secure_encoding;
 ))]
 pub use secure_encoding::SecureEncoding;
 
-#[cfg(feature = "zeroize")]
+#[cfg(feature = "cloneable")]
 pub mod cloneable_type;
-#[cfg(feature = "zeroize")]
+#[cfg(feature = "cloneable")]
 pub use cloneable_type::CloneableType;
 
 #[cfg(feature = "serde")]

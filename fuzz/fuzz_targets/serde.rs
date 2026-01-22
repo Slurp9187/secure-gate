@@ -68,7 +68,7 @@ fuzz_target!(|data: &[u8]| {
     try_deser!(Dynamic<Vec<u8>>, data);
 
     // 2. Cloneable (temp clone + zeroize paths)
-    #[cfg(feature = "zeroize")]
+    #[cfg(all(feature = "cloneable", feature = "zeroize"))]
     {
         try_deser!(CloneableString, data);
         try_deser!(CloneableVec, data);
