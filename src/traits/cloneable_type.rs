@@ -19,4 +19,4 @@
 /// // Now MySecret can be safely cloned as it's marked with CloneableType
 /// ```
 #[allow(dead_code)]
-pub trait CloneableType {}
+pub trait CloneableType: Clone {}

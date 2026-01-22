@@ -27,7 +27,7 @@
 /// - cloneable: Enables [`CloneableType`] for safe cloning
 /// - ct-eq: Enables [`ConstantTimeEq`] for constant-time comparisons
 /// - encoding (or encoding-hex, encoding-base64, encoding-bech32): Enables [`SecureEncoding`] for byte encoding
-/// - serde: Enables [`SerializableType`] for opt-in serialization
+/// - serde-serialize: Enables [`SerializableType`] for opt-in serialization
 // Secret Exposure Traits
 pub mod expose_secret;
 pub use expose_secret::ExposeSecret;
@@ -63,7 +63,7 @@ pub mod cloneable_type;
 #[cfg(feature = "cloneable")]
 pub use cloneable_type::CloneableType;
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "serde-serialize")]
 pub mod serializable_type;
-#[cfg(feature = "serde")]
+#[cfg(feature = "serde-serialize")]
 pub use serializable_type::SerializableType;

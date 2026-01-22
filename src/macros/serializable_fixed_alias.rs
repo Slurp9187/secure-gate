@@ -24,7 +24,7 @@ macro_rules! serializable_fixed_alias {
         #[doc = concat!("Serializable fixed-size secure secret (", stringify!($size), " bytes)")]
         $vis struct $name($crate::Fixed<[u8; $size]>);
 
-        #[cfg(feature = "serde")]
+        #[cfg(feature = "serde-serialize")]
         impl $crate::SerializableType for $name {}
 
         impl $crate::ExposeSecret for $name {
@@ -116,8 +116,8 @@ macro_rules! serializable_fixed_alias {
             }
         }
 
-        // Assuming serde feature is enabled
-        #[cfg(feature = "serde")]
+        // Assuming serde-serialize feature is enabled
+        #[cfg(feature = "serde-serialize")]
         impl serde::Serialize for $name {
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
                 <$crate::Fixed<[u8; $size]> as $crate::ExposeSecret>::expose_secret(&self.0).serialize(serializer)

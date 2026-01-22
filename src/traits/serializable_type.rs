@@ -1,7 +1,7 @@
 //! Marker trait for opt-in serialization of raw secrets.
-//
+//!
 //! Marker trait for types allowing secure serialization.
-//
+//!
 //! Implement this on types that can be deliberately serialized while maintaining security.
 //! The trait itself is a marker and does not provide methods, but implementations must
 //! ensure that serialization does not leak secrets unintentionally.
@@ -29,5 +29,10 @@
 ///
 /// // Now MySecret can be serialized securely, as it's marked with SerializableType
 /// ```
+#[cfg(feature = "serde-serialize")]
+#[allow(dead_code)]
+pub trait SerializableType: serde::Serialize {}
+
+#[cfg(not(feature = "serde-serialize"))]
 #[allow(dead_code)]
 pub trait SerializableType {}

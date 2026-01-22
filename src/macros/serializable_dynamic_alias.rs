@@ -24,7 +24,7 @@ macro_rules! serializable_dynamic_alias {
         #[doc = concat!("Serializable dynamic secure secret (", stringify!($type), ")")]
         $vis struct $name($crate::Dynamic<$type>);
 
-        #[cfg(feature = "serde")]
+        #[cfg(feature = "serde-serialize")]
         impl $crate::SerializableType for $name {}
 
         impl $crate::ExposeSecret for $name {
@@ -111,7 +111,7 @@ macro_rules! serializable_dynamic_alias {
         }
 
         // Assuming serde feature is enabled
-        #[cfg(feature = "serde")]
+        #[cfg(feature = "serde-serialize")]
         impl serde::Serialize for $name {
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
                 self.0.expose_secret().serialize(serializer)
