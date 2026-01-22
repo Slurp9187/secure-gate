@@ -1,4 +1,3 @@
-
 /// Creates a serializable type alias for a dynamic heap-allocated secure secret.
 ///
 /// This macro generates a newtype around `Dynamic<T>` with implementations for `Serialize` and `SerializableType`.
@@ -19,7 +18,6 @@
 /// Only use this macro when serialization is explicitly required (e.g., persisting to trusted encrypted storage, sending over authenticated secure channels).
 ///
 /// **Prefer non-serializable `Fixed<T>` / `Dynamic<T>` whenever possible** to eliminate the risk of exfiltration entirely.
-
 #[macro_export]
 macro_rules! serializable_dynamic_alias {
     ($vis:vis $name:ident, $type:ty) => {

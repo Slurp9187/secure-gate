@@ -7,53 +7,53 @@
 mod tests {
 
     #[cfg(feature = "hash-eq")]
-    use secure_gate::{Dynamic, Fixed};
+    use secure_gate::{Dynamic, Fixed, HashEq};
 
     #[cfg(feature = "hash-eq")]
     #[test]
-    fn fixed_partial_eq_basic() {
+    fn fixed_hash_eq_basic() {
         // Equal arrays
         let fixed1: Fixed<[u8; 4]> = Fixed::from([1u8, 2, 3, 4]);
         let fixed2: Fixed<[u8; 4]> = Fixed::from([1u8, 2, 3, 4]);
-        assert_eq!(fixed1, fixed2);
+        assert!(fixed1.hash_eq(&fixed2));
 
         // Unequal arrays
         let fixed3: Fixed<[u8; 4]> = Fixed::from([1u8, 2, 3, 5]);
-        assert_ne!(fixed1, fixed3);
+        assert!(!fixed1.hash_eq(&fixed3));
     }
 
     #[cfg(feature = "hash-eq")]
     #[test]
-    fn dynamic_vec_partial_eq_basic() {
+    fn dynamic_vec_hash_eq_basic() {
         // Equal vectors
         let dyn1: Dynamic<Vec<u8>> = vec![1u8, 2, 3, 4].into();
         let dyn2: Dynamic<Vec<u8>> = vec![1u8, 2, 3, 4].into();
-        assert_eq!(dyn1, dyn2);
+        assert!(dyn1.hash_eq(&dyn2));
 
         // Unequal vectors (same length)
         let dyn3: Dynamic<Vec<u8>> = vec![1u8, 2, 3, 5].into();
-        assert_ne!(dyn1, dyn3);
+        assert!(!dyn1.hash_eq(&dyn3));
 
         // Unequal vectors (different length)
         let dyn4: Dynamic<Vec<u8>> = vec![1u8, 2, 3].into();
-        assert_ne!(dyn1, dyn4);
+        assert!(!dyn1.hash_eq(&dyn4));
     }
 
     #[cfg(feature = "hash-eq")]
     #[test]
-    fn dynamic_string_partial_eq_basic() {
+    fn dynamic_string_hash_eq_basic() {
         // Equal strings
         let str1: Dynamic<String> = "hello".into();
         let str2: Dynamic<String> = "hello".into();
-        assert_eq!(str1, str2);
+        assert!(str1.hash_eq(&str2));
 
         // Unequal strings
         let str3: Dynamic<String> = "world".into();
-        assert_ne!(str1, str3);
+        assert!(!str1.hash_eq(&str3));
 
         // Different lengths
         let str4: Dynamic<String> = "hi".into();
-        assert_ne!(str1, str4);
+        assert!(!str1.hash_eq(&str4));
     }
 
     #[cfg(feature = "hash-eq")]
@@ -68,8 +68,8 @@ mod tests {
         let dyn2: Dynamic<Vec<u8>> = data2.into();
         let dyn3: Dynamic<Vec<u8>> = data3.into();
 
-        assert_eq!(dyn1, dyn2);
-        assert_ne!(dyn1, dyn3);
+        assert!(dyn1.hash_eq(&dyn2));
+        assert!(!dyn1.hash_eq(&dyn3));
     }
 
     #[cfg(feature = "hash-eq")]
@@ -85,8 +85,8 @@ mod tests {
         let dyn2: Dynamic<Vec<u8>> = data2.to_vec().into();
         let dyn3: Dynamic<Vec<u8>> = data3.to_vec().into();
 
-        assert_eq!(dyn1, dyn3);
-        assert_ne!(dyn1, dyn2);
+        assert!(dyn1.hash_eq(&dyn3));
+        assert!(!dyn1.hash_eq(&dyn2));
     }
 
     #[cfg(feature = "hash-eq")]
@@ -108,13 +108,13 @@ mod tests {
 
         let start_equal = Instant::now();
         for _ in 0..iterations {
-            let _ = dyn1 == dyn2;
+            let _ = dyn1.hash_eq(&dyn2);
         }
         let time_equal = start_equal.elapsed();
 
         let start_unequal = Instant::now();
         for _ in 0..iterations {
-            let _ = dyn1 == dyn3;
+            let _ = dyn1.hash_eq(&dyn3);
         }
         let time_unequal = start_unequal.elapsed();
 

@@ -138,6 +138,8 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
         }
     }
 }
+/// # Byte-array specific helpers
+impl<const N: usize> Fixed<[u8; N]> {}
 
 // Macro-generated From constructor implementations
 crate::impl_from_fixed!(slice);
@@ -146,7 +148,19 @@ crate::impl_from_random_fixed!();
 
 // Macro-generated equality implementations
 crate::impl_ct_eq_fixed!();
-crate::impl_hash_eq_fixed!();
+
+// Optional Hash impl for collections (use HashEq for explicit equality checks)
+#[cfg(feature = "hash-eq")]
+impl<T: AsRef<[u8]>> core::hash::Hash for Fixed<T> {
+    /// WARNING: Using Fixed in HashMap/HashSet enables implicit equality via hash collisions.
+    /// This is probabilistic and NOT cryptographically secure. Prefer HashEq::hash_eq() for secrets.
+    /// Rate-limit or avoid in untrusted contexts due to DoS potential.
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        use blake3::hash;
+        let hash_bytes = *hash(self.inner.as_ref()).as_bytes();
+        hash_bytes.hash(state);
+    }
+}
 
 // Macro-generated redacted debug implementations
 crate::impl_redacted_debug!(Fixed<T>);

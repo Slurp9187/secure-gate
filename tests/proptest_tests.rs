@@ -187,7 +187,7 @@ mod encoding_roundtrip_proptests {
 #[cfg(feature = "hash-eq")]
 mod hash_eq_proptests {
     use super::*;
-    use secure_gate::{dynamic_alias, fixed_alias};
+    use secure_gate::{dynamic_alias, fixed_alias, HashEq};
 
     fixed_alias!(TestFixed32, 32);
     dynamic_alias!(TestDynamic, Vec<u8>);
@@ -195,32 +195,36 @@ mod hash_eq_proptests {
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(100))]
 
+        #[cfg(feature = "hash-eq")]
         #[test]
         fn fixed_hash_eq_symmetric(a in prop::array::uniform32(any::<u8>()), b in prop::array::uniform32(any::<u8>())) {
             let fa: TestFixed32 = a.into();
             let fb: TestFixed32 = b.into();
-            prop_assert_eq!(fa == fb, fb == fa);  // Symmetry
+            prop_assert_eq!(fa.hash_eq(&fb), fb.hash_eq(&fa));  // Symmetry
         }
 
+        #[cfg(feature = "hash-eq")]
         #[test]
         fn fixed_hash_eq_reflexive(a in prop::array::uniform32(any::<u8>())) {
             let fa: TestFixed32 = a.into();
-            prop_assert!(fa == fa);  // Reflexive
+            prop_assert!(fa.hash_eq(&fa));  // Reflexive
         }
 
+        #[cfg(feature = "hash-eq")]
         #[test]
         fn dynamic_hash_eq_symmetric(a in prop::collection::vec(any::<u8>(), 0..256), b in prop::collection::vec(any::<u8>(), 0..256)) {
             let da: TestDynamic = a.clone().into();
             let db: TestDynamic = b.clone().into();
-            prop_assert_eq!(da == db, db == da);  // Symmetry
+            prop_assert_eq!(da.hash_eq(&db), db.hash_eq(&da));  // Symmetry
         }
 
+        #[cfg(feature = "hash-eq")]
         #[test]
         fn hash_eq_consistency_with_ct_eq(a in prop::collection::vec(any::<u8>(), 0..256), b in prop::collection::vec(any::<u8>(), 0..256)) {
             // Ensure hash_eq agrees with ct_eq (they should be logically equivalent, just different perf)
             let da: TestDynamic = a.clone().into();
             let db: TestDynamic = b.clone().into();
-            prop_assert_eq!(da == db, da.ct_eq(&db));
+            prop_assert_eq!(da.hash_eq(&db), da.ct_eq(&db));
         }
     }
 }

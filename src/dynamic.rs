@@ -10,7 +10,6 @@ use rand::TryRngCore;
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
-
 /// Helper function to try decoding a string as bech32, hex, or base64 in priority order.
 #[cfg(feature = "serde-deserialize")]
 fn try_decode(s: &str) -> Result<alloc::vec::Vec<u8>, &'static str> {
@@ -101,9 +100,30 @@ crate::impl_from_dynamic!(slice);
 crate::impl_from_dynamic!(str);
 crate::impl_from_dynamic!(value);
 
-// Macro-generated hash equality implementations
-crate::impl_hash_eq_dynamic!(Vec<u8>, as_slice);
-crate::impl_hash_eq_dynamic!(String, as_bytes);
+// Optional Hash impls for collections (use HashEq for explicit equality checks)
+#[cfg(feature = "hash-eq")]
+impl core::hash::Hash for Dynamic<alloc::vec::Vec<u8>> {
+    /// WARNING: Using Dynamic in HashMap/HashSet enables implicit equality via hash collisions.
+    /// This is probabilistic and NOT cryptographically secure. Prefer HashEq::hash_eq() for secrets.
+    /// Rate-limit or avoid in untrusted contexts due to DoS potential.
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        use blake3::hash;
+        let hash_bytes = *hash(self.inner.as_slice()).as_bytes();
+        hash_bytes.hash(state);
+    }
+}
+
+#[cfg(feature = "hash-eq")]
+impl core::hash::Hash for Dynamic<alloc::string::String> {
+    /// WARNING: Using Dynamic in HashMap/HashSet enables implicit equality via hash collisions.
+    /// This is probabilistic and NOT cryptographically secure. Prefer HashEq::hash_eq() for secrets.
+    /// Rate-limit or avoid in untrusted contexts due to DoS potential.
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        use blake3::hash;
+        let hash_bytes = *hash(self.inner.as_bytes()).as_bytes();
+        hash_bytes.hash(state);
+    }
+}
 
 // Macro-generated implementations
 crate::impl_ct_eq_dynamic!(Dynamic<String>, as_bytes);

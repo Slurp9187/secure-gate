@@ -40,6 +40,11 @@ pub mod constant_time_eq;
 #[cfg(feature = "ct-eq")]
 pub use constant_time_eq::ConstantTimeEq;
 
+#[cfg(feature = "hash-eq")]
+pub mod hash_eq;
+#[cfg(feature = "hash-eq")]
+pub use hash_eq::HashEq;
+
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",

@@ -44,6 +44,10 @@ pub use traits::{ExposeSecret, ExposeSecretMut};
 #[cfg(feature = "ct-eq")]
 pub use traits::ConstantTimeEq;
 
+/// Re-export of the [`HashEq`] trait.
+#[cfg(feature = "hash-eq")]
+pub use traits::HashEq;
+
 /// Type alias macros (always available).
 /// Convenient macros for creating custom secret wrapper types.
 mod macros;
