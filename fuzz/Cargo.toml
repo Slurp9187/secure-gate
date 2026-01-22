@@ -8,7 +8,7 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-secure-gate = { path = "../", features = ["zeroize", "rand", "encoding", "serde"] }
+secure-gate = { path = "../", features = ["zeroize", "rand", "encoding", "serde", "cloneable"] }
 arbitrary = { version = "1.3", features = ["derive"] }
 libfuzzer-sys = "0.4"
 
@@ -19,7 +19,7 @@ serde_json = "1.0"
 serde = "1.0"
 
 [features]
-default = ["zeroize", "rand", "encoding"]
+default = ["zeroize", "rand", "encoding", "cloneable"]
 
 zeroize = ["secure-gate/zeroize"]
 rand = ["secure-gate/rand"]
@@ -28,6 +28,7 @@ encoding = ["secure-gate/encoding"]
 encoding-hex = ["secure-gate/encoding-hex"]
 encoding-base64 = ["secure-gate/encoding-base64"]
 encoding-bech32 = ["secure-gate/encoding-bech32"]
+cloneable = ["secure-gate/cloneable"]
 
 [[bin]]
 name = "expose"
