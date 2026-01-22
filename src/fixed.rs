@@ -167,5 +167,14 @@ crate::impl_redacted_debug!(Fixed<T>);
 
 // Serde deserialization for generic Fixed<T> (simple delegation)
 
-// Macro-generated zeroize implementations
-crate::impl_zeroize_integration_fixed!(Fixed<T>);
+// Zeroize integration
+#[cfg(feature = "zeroize")]
+impl<T: zeroize::Zeroize> zeroize::Zeroize for Fixed<T> {
+    fn zeroize(&mut self) {
+        self.inner.zeroize();
+    }
+}
+
+/// Zeroize on drop integration
+#[cfg(feature = "zeroize")]
+impl<T: zeroize::Zeroize> zeroize::ZeroizeOnDrop for Fixed<T> {}

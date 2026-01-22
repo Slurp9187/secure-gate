@@ -167,4 +167,14 @@ impl<'de> serde::Deserialize<'de> for Dynamic<alloc::vec::Vec<u8>> {
     }
 }
 
-crate::impl_zeroize_integration_dynamic!(Dynamic<T>);
+// Zeroize integration
+#[cfg(feature = "zeroize")]
+impl<T: ?Sized + zeroize::Zeroize> zeroize::Zeroize for Dynamic<T> {
+    fn zeroize(&mut self) {
+        self.inner.zeroize();
+    }
+}
+
+/// Zeroize on drop integration
+#[cfg(feature = "zeroize")]
+impl<T: ?Sized + zeroize::Zeroize> zeroize::ZeroizeOnDrop for Dynamic<T> {}
