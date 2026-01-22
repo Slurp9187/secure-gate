@@ -450,11 +450,11 @@ dynamic_alias!(SecretString, String);
 dynamic_generic_alias!(Secure);
 
 // Cloneable fixed
-#[cfg(feature = "zeroize")]
+#[cfg(feature = "cloneable")]
 cloneable_fixed_alias!(CloneKey, 32);
 
 // Cloneable dynamic
-#[cfg(feature = "zeroize")]
+#[cfg(feature = "cloneable")]
 cloneable_dynamic_alias!(ClonePw, String);
 
 // Serializable fixed
