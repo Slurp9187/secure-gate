@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented for core types (`Fixed<T>`, `Dynamic<T>`)
   - No blanket implementations; purely user-opt-in serialization to maximize auditability
   - Comprehensive tests in `tests/serde_tests.rs` covering validation, edge cases, and security
+
 - **Core polymorphism traits** in new `src/traits/` module for generic secret operations:
   - `ExposeSecret` & `ExposeSecretMut` traits for polymorphic secret access with controlled mutability and metadata (length/emptiness queries without exposing contents)
   - Implemented for all secret wrapper types: `Fixed`, `Dynamic`, and cloneable types
@@ -51,8 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SECURITY.md document with security considerations, module analysis, and mitigation strategies.
 - Enhanced `CloneableType` trait documentation with implementation examples and warnings.
 - Security Checklist section in README.md with best practices.
+
 - **Dedicated serde fuzz target** (`fuzz_targets/serde.rs`) for secure deserialization testing: covers JSON/TOML/YAML parsing, validation logic, zeroization on invalid inputs, temporary allocation handling, and edge cases to prevent deserialization-based vulnerabilities from untrusted structured data.
 - Optional custom rustdoc string support added to all non-generic alias macros (`fixed_alias!`, `dynamic_alias!`, `fixed_alias_random!`) for full consistency with generic variants. Accepts an optional third parameter for custom documentation, falling back to generated docs when omitted. Backward compatible and improves API discoverability.
+
 - **Opt-in raw serialization system** (`"serde-serialize"` feature) for deliberate secret export:
   - Macros `serializable_fixed_alias!` and `serializable_dynamic_alias!` for creating custom serializable secret types.
   - Benchmarks (`benches/serde.rs`) measuring minimal overhead vs. raw types.
@@ -61,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `insecure_tests.rs` for validating stripped mode functionality and cloneable independence in low-resource environments.
   - Unconditional `#![forbid(unsafe_code)]` — paradigm shift from conditional forbid (only in minimal builds) to forbidding unsafe code everywhere, strengthening memory safety guarantees.
 
-  ### Changed (Breaking)
+### Changed (Breaking)
 - Default features changed to `secure` (new meta-feature bundling `zeroize` + `ct-eq`) to prioritize secure memory handling by default while minimizing dependencies; `insecure` for opt-out; updated `full = ["secure", "encoding"]`.
 - Cloning model: switched to opt-in via `CloneableType`, centered on macro-generated cloneable types via `cloneable_fixed_alias!` and `cloneable_dynamic_alias!` for maximum ergonomics and safety.
   - All cloneable types are distinctly typed from non-cloneable counterparts — no accidental mixing.
@@ -76,7 +79,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - `NoClone` wrapper types and `no_clone()` methods.
-
 - `Dynamic::new_boxed()` method (redundant with `From<Box<T>>` impl).
 - `from_slice` method on `Fixed<[u8; N]>` (panicking; use `try_from` for fallible construction).
 
