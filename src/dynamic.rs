@@ -90,11 +90,40 @@ impl<T: ?Sized> Dynamic<T> {
 impl Dynamic<String> {}
 impl<T> Dynamic<Vec<T>> {}
 
-// Macro-generated constructor implementations
-crate::impl_from_dynamic!(box);
-crate::impl_from_dynamic!(slice);
-crate::impl_from_dynamic!(str);
-crate::impl_from_dynamic!(value);
+// From impls for Dynamic types
+impl<T: ?Sized> From<Box<T>> for Dynamic<T> {
+    /// Wrap a boxed value in a [`Dynamic`] secret.
+    #[inline(always)]
+    fn from(boxed: Box<T>) -> Self {
+        Self { inner: boxed }
+    }
+}
+
+impl From<&[u8]> for Dynamic<Vec<u8>> {
+    /// Wrap a byte slice in a [`Dynamic`] [`Vec<u8>`].
+    #[inline(always)]
+    fn from(slice: &[u8]) -> Self {
+        Self::new(slice.to_vec())
+    }
+}
+
+impl From<&str> for Dynamic<String> {
+    /// Wrap a string slice in a [`Dynamic`] [`String`].
+    #[inline(always)]
+    fn from(input: &str) -> Self {
+        Self::new(input.to_string())
+    }
+}
+
+impl<T: 'static> From<T> for Dynamic<T> {
+    /// Wrap a value in a [`Dynamic`] secret by boxing it.
+    #[inline(always)]
+    fn from(value: T) -> Self {
+        Self {
+            inner: Box::new(value),
+        }
+    }
+}
 
 // Optional Hash impls for collections (use HashEq for explicit equality checks)
 #[cfg(feature = "hash-eq")]
@@ -122,13 +151,69 @@ impl core::hash::Hash for Dynamic<alloc::string::String> {
 }
 
 // Macro-generated implementations
-crate::impl_ct_eq_dynamic!(Dynamic<String>, as_bytes);
-crate::impl_ct_eq_dynamic!(Dynamic<Vec<u8>>, as_slice);
+// Constant-time equality for Dynamic types
+#[cfg(feature = "ct-eq")]
+impl Dynamic<String> {
+    /// Constant-time equality comparison.
+    ///
+    /// Compares the byte contents of two instances in constant time
+    /// to prevent timing attacks.
+    #[inline]
+    pub fn ct_eq(&self, other: &Self) -> bool {
+        use crate::traits::ConstantTimeEq;
+        self.inner.as_bytes().ct_eq(other.inner.as_bytes())
+    }
+}
 
-crate::impl_redacted_debug!(Dynamic<T>, ?Sized);
+#[cfg(feature = "ct-eq")]
+impl Dynamic<Vec<u8>> {
+    /// Constant-time equality comparison.
+    ///
+    /// Compares the byte contents of two instances in constant time
+    /// to prevent timing attacks.
+    #[inline]
+    pub fn ct_eq(&self, other: &Self) -> bool {
+        use crate::traits::ConstantTimeEq;
+        self.inner.as_slice().ct_eq(other.inner.as_slice())
+    }
+}
+
+// Redacted Debug implementation
+impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("[REDACTED]")
+    }
+}
 
 // Macro-generated constructor implementations
-crate::impl_from_random_dynamic!(Dynamic<Vec<u8>>);
+// Random generation — only available with `rand` feature.
+#[cfg(feature = "rand")]
+impl Dynamic<alloc::vec::Vec<u8>> {
+    /// Fill with fresh random bytes of the specified length using the System RNG.
+    ///
+    /// Panics on RNG failure for fail-fast crypto code. Guarantees secure entropy
+    /// from system sources.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use secure_gate::{Dynamic, ExposeSecret};
+    /// let random: Dynamic<Vec<u8>> = Dynamic::from_random(64);
+    /// assert_eq!(random.len(), 64);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn from_random(len: usize) -> Self {
+        let mut bytes = alloc::vec::Vec::with_capacity(len);
+        bytes.resize(len, 0u8);
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut bytes)
+            .expect("OsRng failure is a program error");
+        Self::from(bytes)
+    }
+}
 
 // Serde deserialization for Dynamic<Vec<u8>> with auto-decoding, and simple delegation for others
 #[cfg(feature = "serde-deserialize")]

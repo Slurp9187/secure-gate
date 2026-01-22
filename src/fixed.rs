@@ -141,13 +141,104 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
 /// # Byte-array specific helpers
 impl<const N: usize> Fixed<[u8; N]> {}
 
-// Macro-generated From constructor implementations
-crate::impl_from_fixed!(slice);
-crate::impl_from_fixed!(array);
-crate::impl_from_random_fixed!();
+// From impls for byte arrays and slices
+impl<const N: usize> From<&[u8]> for Fixed<[u8; N]> {
+    /// Create a `Fixed` from a byte slice, panicking on length mismatch.
+    ///
+    /// This is a fail-fast conversion for crypto contexts where exact length is expected.
+    /// Panics if the slice length does not match the array size `N`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `slice.len() != N`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use secure_gate::Fixed;
+    /// let key: Fixed<[u8; 4]> = (&[1, 2, 3, 4][..]).into();
+    /// ```
+    fn from(slice: &[u8]) -> Self {
+        if slice.len() != N {
+            core::panic!("slice length mismatch: expected {}, got {}", N, slice.len());
+        }
+        let mut arr = [0u8; N];
+        arr.copy_from_slice(slice);
+        Self::new(arr)
+    }
+}
 
-// Macro-generated equality implementations
-crate::impl_ct_eq_fixed!();
+impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
+    /// Wrap a raw byte array in a `Fixed` secret.
+    ///
+    /// Zero-cost conversion.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use secure_gate::Fixed;
+    /// let key: Fixed<[u8; 4]> = [1, 2, 3, 4].into();
+    /// ```
+    #[inline(always)]
+    fn from(arr: [u8; N]) -> Self {
+        Self::new(arr)
+    }
+}
+
+// Random generation — only available with `rand` feature.
+#[cfg(feature = "rand")]
+impl<const N: usize> Fixed<[u8; N]> {
+    /// Generate a secure random instance (panics on failure).
+    ///
+    /// Fill with fresh random bytes using the System RNG.
+    /// Panics on RNG failure for fail-fast crypto code. Guarantees secure entropy
+    /// from system sources.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use secure_gate::{Fixed, ExposeSecret};
+    /// let random: Fixed<[u8; 32]> = Fixed::from_random();
+    /// assert_eq!(random.len(), 32);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn from_random() -> Self {
+        let mut bytes = [0u8; N];
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut bytes)
+            .expect("OsRng failure is a program error");
+        Self::from(bytes)
+    }
+}
+
+// Constant-time equality
+#[cfg(feature = "ct-eq")]
+impl<const N: usize> Fixed<[u8; N]> {
+    /// Constant-time equality comparison.
+    ///
+    /// This is the **only safe way** to compare two fixed-size secrets.
+    /// Available only when the `ct-eq` feature is enabled.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "ct-eq")]
+    /// # {
+    /// use secure_gate::Fixed;
+    /// let a = Fixed::new([1u8; 32]);
+    /// let b = Fixed::new([1u8; 32]);
+    /// assert!(a.ct_eq(&b));
+    /// # }
+    /// ```
+    #[inline]
+    pub fn ct_eq(&self, other: &Self) -> bool {
+        use crate::traits::ConstantTimeEq;
+        self.inner.ct_eq(&other.inner)
+    }
+}
 
 // Optional Hash impl for collections (use HashEq for explicit equality checks)
 #[cfg(feature = "hash-eq")]
@@ -162,8 +253,12 @@ impl<T: AsRef<[u8]>> core::hash::Hash for Fixed<T> {
     }
 }
 
-// Macro-generated redacted debug implementations
-crate::impl_redacted_debug!(Fixed<T>);
+// Redacted Debug implementation
+impl<T> core::fmt::Debug for Fixed<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("[REDACTED]")
+    }
+}
 
 // Serde deserialization for generic Fixed<T> (simple delegation)
 
