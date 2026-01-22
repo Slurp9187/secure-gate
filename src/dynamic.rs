@@ -5,11 +5,6 @@ use alloc::boxed::Box;
 #[cfg(feature = "rand")]
 use rand::TryRngCore;
 
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32"
-))]
 /// Helper function to try decoding a string as bech32, hex, or base64 in priority order.
 #[cfg(feature = "serde-deserialize")]
 fn try_decode(s: &str) -> Result<alloc::vec::Vec<u8>, &'static str> {

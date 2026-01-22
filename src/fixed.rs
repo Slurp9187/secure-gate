@@ -41,7 +41,7 @@ use rand::TryRngCore;
 
 /// Helper function to try decoding a string as bech32, hex, or base64 in priority order.
 #[cfg(feature = "serde-deserialize")]
-fn try_decode(s: &str) -> Result<Vec<u8>, &'static str> {
+fn try_decode(s: &str) -> Result<alloc::vec::Vec<u8>, &'static str> {
     #[cfg(feature = "encoding-bech32")]
     if let Ok((_, data)) = bech32::decode(s) {
         return Ok(data);
