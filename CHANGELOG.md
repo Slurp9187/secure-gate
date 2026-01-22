@@ -59,9 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Unit tests, integration tests, compile-fail tests, and security tests ensuring no leaks.
   - CI matrix in `.github/workflows/ci.yml` for comprehensive testing across 8 key feature combinations (default, full, insecure variants, no features).
   - `insecure_tests.rs` for validating stripped mode functionality and cloneable independence in low-resource environments.
+  - Unconditional `#![forbid(unsafe_code)]` — paradigm shift from conditional forbid (only in minimal builds) to forbidding unsafe code everywhere, strengthening memory safety guarantees.
 
-### Changed
-
+  ### Changed (Breaking)
 - Default features changed to `secure` (new meta-feature bundling `zeroize` + `ct-eq`) to prioritize secure memory handling by default while minimizing dependencies; `insecure` for opt-out; updated `full = ["secure", "encoding"]`.
 - Cloning model: switched to opt-in via `CloneableType`, centered on macro-generated cloneable types via `cloneable_fixed_alias!` and `cloneable_dynamic_alias!` for maximum ergonomics and safety.
   - All cloneable types are distinctly typed from non-cloneable counterparts — no accidental mixing.

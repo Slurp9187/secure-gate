@@ -17,7 +17,7 @@ Users should review source code and test coverage before using in security-criti
 ## Core Security Model
 - **Explicit exposure only** — `.expose_secret()` / `.expose_secret_mut()` required; no `Deref`, `AsRef`, or implicit paths.
 - **Zeroization on drop** — enabled via `zeroize` feature; full backing buffer (including slack capacity) is zeroized.
-- **No unsafe code in crate itself** — `#![forbid(unsafe_code)]` enforced in minimal configurations.
+- **No unsafe code in crate itself** — `#![forbid(unsafe_code)]` enforced unconditionally.
 - **Redacted Debug** — prevents accidental secret logging via `{:?}`.
 - **Constant-time equality** — available via `ct-eq` feature; `==` discouraged.
 - **No automatic Clone / Serialize** — requires explicit opt-in via macros + marker traits (`CloneableType`, `SerializableType`).

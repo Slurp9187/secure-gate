@@ -2,7 +2,8 @@
 `no_std`-compatible wrappers for sensitive data with explicit exposure requirements.
 
 > 🔒 **Note**: This crate is in active development and ***has not undergone independent security audit***.  
-> Please review it for your use case and handle sensitive data with care.
+> Please review it for your use case and handle sensitive data with care.  
+> **Memory safety**: Enforces `#![forbid(unsafe_code)]` unconditionally — no unsafe code anywhere in the crate.
 
 > See [SECURITY.md](SECURITY.md) for detailed security considerations.
 
@@ -65,6 +66,8 @@ secure-gate = { version = "0.7.0-rc.10", default-features = false }
 All secret access requires an explicit `.expose_secret()` (or `.expose_secret_mut()`) call — making exposures grep-able and preventing hidden leaks.
 
 These calls are zero-cost `#[inline(always)]` reborrows (fully elided by the optimizer). The explicitness is deliberate for humans and auditors, with **no runtime overhead**.
+
+**No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally in the entire crate, strengthening memory safety guarantees.
 
 ## Quick Start
 
