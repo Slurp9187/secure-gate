@@ -1,11 +1,25 @@
-// Creates a serializable type alias for a fixed-size secure secret.
-//
-// This macro generates a newtype around `Fixed<[u8; N]>` with implementations for `Serialize` and `SerializableType`.
-// It inherits the security properties of `Fixed` but allows deliberate serialization via `Serialize`.
-//
-// # Syntax
-//
-// `serializable_fixed_alias!(vis Name, size);` — visibility required (e.g., `pub`)
+
+/// Creates a serializable type alias for a fixed-size secure secret.
+///
+/// This macro generates a newtype around `Fixed<[u8; N]>` with implementations for `Serialize` and `SerializableType`.
+/// It inherits the security properties of `Fixed` but allows deliberate serialization via `Serialize`.
+///
+/// # Syntax
+///
+/// `serializable_fixed_alias!(vis Name, size);` — visibility required (e.g., `pub`)
+///
+/// **Security Warning**
+/// This macro creates a deliberately serializable type.
+/// Serialization can lead to accidental secret leakage via:
+/// - debug printing / logging
+/// - insecure configuration files
+/// - network payloads without encryption
+/// - debug endpoints or introspection tools
+///
+/// Only use this macro when serialization is explicitly required (e.g., persisting to trusted encrypted storage, sending over authenticated secure channels).
+///
+/// **Prefer non-serializable `Fixed<T>` / `Dynamic<T>` whenever possible** to eliminate the risk of exfiltration entirely.
+
 #[macro_export]
 macro_rules! serializable_fixed_alias {
     ($vis:vis $name:ident, $size:literal) => {
