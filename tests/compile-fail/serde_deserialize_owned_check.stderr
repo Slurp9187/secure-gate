@@ -11,20 +11,9 @@ error: in the trait associated type is declared without lifetime parameters, so 
 5 | serializable_dynamic_alias!(pub TestSecret, &str);
   |                                             ^ this lifetime must come from the implemented type
 
-you could add a lifetime on the impl block, if the trait or the self type could have one
-  |
-
-note: in the trait the associated type is declared without lifetime parameters, so using a borrowed type for them requires that lifetime to come from the implemented type
- --> $RUST/core/src/ops/deref.rs
-  |
-  | pub const trait Deref: PointeeSized {
-  | -----------------------------------
-...
-  |     type Target: ?Sized;
-  |     ^^^^^^^^^^^^^^^^^^^
-
 error[E0637]: `&` without an explicit lifetime name cannot be used here
  --> tests/compile-fail/serde_deserialize_owned_check.rs:5:45
   |
 5 | serializable_dynamic_alias!(pub TestSecret, &str);
   |                                             ^ explicit lifetime name needed here
+  |
