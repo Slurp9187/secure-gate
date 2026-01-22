@@ -30,9 +30,4 @@
 /// // Now MySecret can be serialized securely, as it's marked with SerializableType
 /// ```
 #[cfg(feature = "serde-serialize")]
-#[allow(dead_code)]
 pub trait SerializableType: serde::Serialize {}
-
-#[cfg(not(feature = "serde-serialize"))]
-#[allow(dead_code)]
-pub trait SerializableType {}
