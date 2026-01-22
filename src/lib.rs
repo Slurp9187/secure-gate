@@ -1,11 +1,5 @@
-// Allow unsafe_code when encoding or zeroize is enabled (encoding needs it for hex validation)
-#![cfg_attr(
-    not(any(
-        feature = "zeroize",
-        any(feature = "encoding-hex", feature = "encoding-base64")
-    )),
-    forbid(unsafe_code)
-)]
+// Forbid unsafe code unconditionally
+#![forbid(unsafe_code)]
 // #![doc = include_str!("../README.md")] // uncomment for doctest runs
 // #![doc = include_str!("../EXAMPLES.md")] // uncomment for doctest runs
 //! Zero-cost secure wrappers for secrets — [`Fixed<T>`] for stack, [`Dynamic<T>`] for heap.
