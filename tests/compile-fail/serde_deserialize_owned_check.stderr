@@ -10,10 +10,3 @@ error: in the trait associated type is declared without lifetime parameters, so 
   |
 5 | serializable_dynamic_alias!(pub TestSecret, &str);
   |                                             ^ this lifetime must come from the implemented type
-
-error[E0637]: `&` without an explicit lifetime name cannot be used here
- --> tests/compile-fail/serde_deserialize_owned_check.rs:5:45
-  |
-5 | serializable_dynamic_alias!(pub TestSecret, &str);
-  |                                             ^ explicit lifetime name needed here
-  |
