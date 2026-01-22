@@ -206,8 +206,7 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// ```
     #[inline]
     pub fn from_random(len: usize) -> Self {
-        let mut bytes = alloc::vec::Vec::with_capacity(len);
-        bytes.resize(len, 0u8);
+        let mut bytes = vec![0u8; len];
         rand::rngs::OsRng
             .try_fill_bytes(&mut bytes)
             .expect("OsRng failure is a program error");
