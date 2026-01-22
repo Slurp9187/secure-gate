@@ -82,3 +82,23 @@ impl ConstantTimeEq for alloc::string::String {
         self.as_bytes().ct_eq(other.as_bytes())
     }
 }
+
+#[cfg(feature = "ct-eq")]
+impl<T> ConstantTimeEq for crate::Dynamic<T>
+where
+    T: ConstantTimeEq,
+{
+    fn ct_eq(&self, other: &Self) -> bool {
+        (*self.inner).ct_eq(&*other.inner)
+    }
+}
+
+#[cfg(feature = "ct-eq")]
+impl<T> ConstantTimeEq for crate::Fixed<T>
+where
+    T: ConstantTimeEq,
+{
+    fn ct_eq(&self, other: &Self) -> bool {
+        self.inner.ct_eq(&other.inner)
+    }
+}

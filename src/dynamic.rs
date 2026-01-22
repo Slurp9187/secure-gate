@@ -252,6 +252,18 @@ impl<'de> serde::Deserialize<'de> for Dynamic<alloc::vec::Vec<u8>> {
     }
 }
 
+// Serde deserialization for Dynamic<String>
+#[cfg(feature = "serde-deserialize")]
+impl<'de> serde::Deserialize<'de> for Dynamic<String> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s: String = serde::Deserialize::deserialize(deserializer)?;
+        Ok(Dynamic::new(s))
+    }
+}
+
 // Zeroize integration
 #[cfg(feature = "zeroize")]
 impl<T: ?Sized + zeroize::Zeroize> zeroize::Zeroize for Dynamic<T> {

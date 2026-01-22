@@ -120,22 +120,28 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
                 arr.copy_from_slice(&bytes);
                 Ok(Fixed::new(arr))
             }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut vec = alloc::vec::Vec::with_capacity(M);
+                while let Some(value) = seq.next_element()? {
+                    vec.push(value);
+                }
+                if vec.len() != M {
+                    return Err(serde::de::Error::invalid_length(
+                        vec.len(),
+                        &M.to_string().as_str(),
+                    ));
+                }
+                let mut arr = [0u8; M];
+                arr.copy_from_slice(&vec);
+                Ok(Fixed::new(arr))
+            }
         }
 
-        if deserializer.is_human_readable() {
-            deserializer.deserialize_str(FixedVisitor::<N>)
-        } else {
-            let vec: Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
-            if vec.len() != N {
-                return Err(serde::de::Error::invalid_length(
-                    vec.len(),
-                    &N.to_string().as_str(),
-                ));
-            }
-            let mut arr = [0u8; N];
-            arr.copy_from_slice(&vec);
-            Ok(Fixed::new(arr))
-        }
+        deserializer.deserialize_any(FixedVisitor::<N>)
     }
 }
 /// # Byte-array specific helpers
