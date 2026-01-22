@@ -240,7 +240,7 @@ let text  = Secure::<String>::new("secret".to_string());
     let result: Result<Dynamic<Vec<u8>>, _> = serde_json::from_str(valid_hex);
     assert!(result.is_ok());
 
-    let invalid = r#""gggg""#; // Invalid hex
+    let invalid = r#""!!!!""#; // Invalid encoding
     let result: Result<Dynamic<Vec<u8>>, _> = serde_json::from_str(invalid);
     assert!(result.is_err());
 }
@@ -250,7 +250,7 @@ let text  = Secure::<String>::new("secret".to_string());
 
 ### Cloneable Fixed Key
 ```rust
-#[cfg(feature = "cloneable")]
+#[cfg(feature = "zeroize")]
 {
     use secure_gate::*;
     extern crate alloc;
@@ -264,7 +264,7 @@ let text  = Secure::<String>::new("secret".to_string());
 
 ### Cloneable Dynamic Password
 ```rust
-#[cfg(feature = "cloneable")]
+#[cfg(feature = "zeroize")]
 {
     use secure_gate::*;
     extern crate alloc;
@@ -442,6 +442,7 @@ fixed_alias!(Key32, 32);
 // Generic fixed
 fixed_generic_alias!(Buffer);
 
+```
 // Basic dynamic
 dynamic_alias!(SecretString, String);
 
@@ -449,16 +450,21 @@ dynamic_alias!(SecretString, String);
 dynamic_generic_alias!(Secure);
 
 // Cloneable fixed
+#[cfg(feature = "zeroize")]
 cloneable_fixed_alias!(CloneKey, 32);
 
 // Cloneable dynamic
+#[cfg(feature = "zeroize")]
 cloneable_dynamic_alias!(ClonePw, String);
 
 // Serializable fixed
+#[cfg(feature = "serde-serialize")]
 serializable_fixed_alias!(ExportKey, 32);
 
 // Serializable dynamic
+#[cfg(feature = "serde-serialize")]
 serializable_dynamic_alias!(ExportToken, Vec<u8>);
+```
 ```
 
 All examples compile with `"full"` features. Adjust feature set as needed.

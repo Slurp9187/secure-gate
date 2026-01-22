@@ -12,12 +12,14 @@ macro_rules! cloneable_fixed_alias {
         #[doc = concat!("Cloneable fixed-size secure secret (", stringify!($size), " bytes)")]
         $vis struct $name($crate::Fixed<[u8; $size]>);
 
+        #[cfg(feature = "zeroize")]
         impl Clone for $name {
             fn clone(&self) -> Self {
                 Self($crate::Fixed::new(self.0.expose_secret().clone()))
             }
         }
 
+        #[cfg(feature = "zeroize")]
         impl $crate::CloneableType for $name {}
 
         impl $crate::ExposeSecret for $name {

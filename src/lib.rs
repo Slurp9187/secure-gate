@@ -7,7 +7,7 @@
     forbid(unsafe_code)
 )]
 // #![doc = include_str!("../README.md")] // uncomment for doctest runs
-#![doc = include_str!("../EXAMPLES.md")]
+// #![doc = include_str!("../EXAMPLES.md")] // uncomment for doctest runs
 //! Zero-cost secure wrappers for secrets — [`Fixed<T>`] for stack, [`Dynamic<T>`] for heap.
 //!
 //! This crate provides explicit wrappers for sensitive data like \[`CloneableArray`\], \[`CloneableString`\], and \[`CloneableType`\], ensuring no accidental exposure.

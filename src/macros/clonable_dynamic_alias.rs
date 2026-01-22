@@ -12,12 +12,14 @@ macro_rules! cloneable_dynamic_alias {
         #[doc = concat!("Cloneable dynamic secure secret (", stringify!($type), ")")]
         $vis struct $name($crate::Dynamic<$type>);
 
+        #[cfg(feature = "zeroize")]
         impl Clone for $name {
             fn clone(&self) -> Self {
                 Self($crate::Dynamic::new(self.0.expose_secret().clone()))
             }
         }
 
+        #[cfg(feature = "zeroize")]
         impl $crate::CloneableType for $name {}
 
         impl $crate::ExposeSecret for $name {
