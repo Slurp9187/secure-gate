@@ -91,3 +91,7 @@ harness = false
 [[bench]]
 name = "hash_eq_vs_ct_eq"
 harness = false
+
+[[bench]]
+name = "serde"
+harness = false

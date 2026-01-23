@@ -43,22 +43,23 @@ use base64::{engine::general_purpose, Engine};
 
 /// Helper function to try decoding a string as bech32, hex, or base64 in priority order.
 #[cfg(feature = "serde-deserialize")]
-fn try_decode(s: &str) -> Result<alloc::vec::Vec<u8>, crate::DecodingError> {
+fn try_decode(_s: &str) -> Result<alloc::vec::Vec<u8>, crate::DecodingError> {
     #[cfg(feature = "encoding-bech32")]
-    if let Ok((_, data)) = ::bech32::decode(s) {
+    if let Ok((_, data)) = ::bech32::decode(_s) {
         let (converted, _) =
             convert_bits(5, 8, false, &data).map_err(|_| crate::DecodingError::InvalidBech32)?;
         return Ok(converted);
     }
     #[cfg(feature = "encoding-hex")]
-    if let Ok(data) = ::hex::decode(s) {
+    if let Ok(data) = ::hex::decode(_s) {
         return Ok(data);
     }
 
     #[cfg(feature = "encoding-base64")]
-    if let Ok(data) = Engine::decode(&general_purpose::URL_SAFE_NO_PAD, s) {
+    if let Ok(data) = Engine::decode(&general_purpose::URL_SAFE_NO_PAD, _s) {
         return Ok(data);
     }
+
     Err(crate::DecodingError::InvalidEncoding)
 }
 

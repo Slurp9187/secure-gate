@@ -67,7 +67,11 @@ mod macros;
 /// - `fixed_generic_alias!`: Create generic fixed-size secret aliases.
 ///   Re-export of [`SecureEncoding`] trait for convenient encoding extensions.
 ///   Re-export of the [`SecureEncoding`] trait.
-#[cfg(feature = "encoding")]
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
 pub use traits::SecureEncoding;
 
 /// Re-export of [`Bech32Error`] for convenience when using bech32 encoding/decoding.

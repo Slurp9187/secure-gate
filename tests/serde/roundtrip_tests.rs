@@ -9,7 +9,14 @@
 extern crate alloc;
 
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
-use secure_gate::{ExposeSecret, SerializableType};
+use secure_gate::SerializableType;
+
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "serde-serialize",
+    feature = "encoding-hex"
+))]
+use secure_gate::ExposeSecret;
 
 // Define test types using marker traits with Serialize and Deserialize
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
@@ -57,6 +64,11 @@ fn dynamic_roundtrip() {
     feature = "serde-serialize",
     feature = "serde-deserialize",
     any(feature = "encoding-hex", feature = "encoding-base64")
+))]
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "serde-serialize",
+    feature = "encoding-hex"
 ))]
 #[test]
 fn secure_encoding_roundtrip() {

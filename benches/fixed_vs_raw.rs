@@ -12,7 +12,7 @@ fixed_alias!(pub RawKey, 32); // Alias for semantic testing
 fn bench_raw_array(c: &mut Criterion) {
     let key = [42u8; 32];
 
-    let mut group = c.benchmark_group("raw 32 B");
+    let mut group = c.benchmark_group("raw_32b");
 
     group.bench_function("single index access", |b| {
         b.iter(|| {
@@ -39,7 +39,7 @@ fn bench_fixed_explicit(c: &mut Criterion) {
     let key = Fixed::new([42u8; 32]);
     let mut mut_key = Fixed::new([42u8; 32]);
 
-    let mut group = c.benchmark_group("Fixed 32 B explicit");
+    let mut group = c.benchmark_group("fixed_explicit_32b");
 
     group.bench_function("single index access", |b| {
         b.iter(|| {
@@ -76,7 +76,7 @@ fn bench_fixed_alias_explicit(c: &mut Criterion) {
     let key = RawKey::new([42u8; 32]);
     let mut mut_key = RawKey::new([42u8; 32]);
 
-    let mut group = c.benchmark_group("fixed_alias! (RawKey 32 B)");
+    let mut group = c.benchmark_group("fixed_alias_rawkey_32b");
 
     group.bench_function("single index access", |b| {
         b.iter(|| {

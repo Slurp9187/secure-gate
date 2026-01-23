@@ -89,7 +89,7 @@ fn bench_dynamic_serialize(c: &mut Criterion) {
     let exportable_vec = SerializableVec(data_vec.clone());
     let exportable_str = SerializableString(data_str.clone());
 
-    let mut group = c.benchmark_group("dynamic (1 KiB)");
+    let mut group = c.benchmark_group("dynamic_1kb");
 
     group.bench_function("SerializableVec serialize", |b| {
         b.iter(|| {
@@ -124,7 +124,7 @@ fn bench_dynamic_serialize(c: &mut Criterion) {
 
 #[cfg(feature = "serde-serialize")]
 fn bench_large_dynamic_serialize(c: &mut Criterion) {
-    let mut group = c.benchmark_group("large_dynamic (1 MiB)");
+    let mut group = c.benchmark_group("dynamic_1mb");
 
     group.bench_function("SerializableVec serialize", |b| {
         b.iter(|| {
@@ -165,7 +165,7 @@ fn bench_large_dynamic_serialize(c: &mut Criterion) {
 fn bench_large_dynamic_roundtrip(c: &mut Criterion) {
     use secure_gate::Dynamic;
 
-    let mut group = c.benchmark_group("large dynamic roundtrip (1 MiB)");
+    let mut group = c.benchmark_group("dynamic_roundtrip_1mb");
 
     group.bench_function("SerializableVec → Dynamic<Vec<u8>>", |b| {
         b.iter(|| {
@@ -216,7 +216,7 @@ fn bench_dynamic_roundtrip(c: &mut Criterion) {
     let exportable_vec = SerializableVec(data_vec.clone());
     let exportable_str = SerializableString(data_str.clone());
 
-    let mut group = c.benchmark_group("dynamic roundtrip (1 KiB)");
+    let mut group = c.benchmark_group("dynamic_roundtrip_1kb");
 
     group.bench_function("SerializableVec → Dynamic<Vec<u8>>", |b| {
         b.iter(|| {
@@ -260,8 +260,6 @@ fn serde_benchmarks(c: &mut Criterion) {
     bench_fixed_roundtrip(c);
 
     bench_dynamic_serialize(c);
-    #[cfg(feature = "serde-deserialize")]
-    bench_dynamic_roundtrip(c);
 
     bench_large_dynamic_serialize(c);
     #[cfg(feature = "serde-deserialize")]
