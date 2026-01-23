@@ -67,12 +67,13 @@ See [SECURITY.md](SECURITY.md) for details.
 
 ```rust
 use secure_gate::{fixed_alias, dynamic_alias, ExposeSecret, ExposeSecretMut};
+extern crate alloc;
 
-fixed_alias!(pub Aes256Key, 32);       // Fixed<[u8; 32]>
 dynamic_alias!(pub Password, String);   // Dynamic<String>
+fixed_alias!(pub Aes256Key, 32);       // Fixed<[u8; 32]>
 
-let key: Aes256Key = [42u8; 32].into();
 let mut pw: Password = "secret".into();
+let key: Aes256Key = [42u8; 32].into();
 
 // Scoped access (preferred, prevents leaks)
 let len = pw.with_secret(|s| s.len());
@@ -96,19 +97,22 @@ Generic code across wrappers:
 - **`SecureEncoding`**: String encoding/decoding.
 
 ```rust
-use secure_gate::{Fixed, Dynamic, ExposeSecret, ConstantTimeEq};
+use secure_gate::{Fixed, Dynamic, ExposeSecret};
+extern crate alloc;
 
 fn check_len<T: ExposeSecret>(secret: &T) -> usize {
-    secret.with_secret(|inner| inner.len())  // Generic over Fixed/Dynamic
+    secret.len()  // Generic over Fixed/Dynamic
 }
+```
 
+```rust
 #[cfg(feature = "ct-eq")]
-fn secrets_equal<L, R>(left: &L, right: &R) -> bool
-where
-    L: ConstantTimeEq,
-    R: ConstantTimeEq,
 {
-    left.ct_eq(right)  // Safe, constant-time
+    use secure_gate::{Fixed, ConstantTimeEq};
+
+    let a: Fixed<[u8; 32]> = [0; 32].into();
+    let b: Fixed<[u8; 32]> = [1; 32].into();
+    assert!(!a.ct_eq(&b));  // Timing-safe
 }
 ```
 
@@ -120,6 +124,7 @@ Secure random bytes via system entropy.
 #[cfg(feature = "rand")]
 {
     use secure_gate::{Fixed, Dynamic};
+    extern crate alloc;
 
     let key: Fixed<[u8; 32]> = Fixed::from_random();
     let data: Dynamic<Vec<u8>> = Dynamic::from_random(64);
@@ -136,16 +141,19 @@ Explicit string conversions via `SecureEncoding` trait.
 ```rust
 #[cfg(feature = "encoding-hex")]
 {
+    use secure_gate::SecureEncoding;
     let hex = [0u8; 16].to_hex();  // "0000000000000000"
 }
 
 #[cfg(feature = "encoding-base64")]
 {
+    use secure_gate::SecureEncoding;
     let b64 = b"hello".to_base64url();  // "aGVsbG8"
 }
 
 #[cfg(feature = "encoding-bech32")]
 {
+    use secure_gate::SecureEncoding;
     let bech32 = b"test".to_bech32("bc");  // "bc1qtest..."
 }
 ```
@@ -154,12 +162,16 @@ Explicit string conversions via `SecureEncoding` trait.
 ```rust
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
 {
+    use secure_gate::Dynamic;
+    extern crate alloc;
+
     let key: Dynamic<Vec<u8>> = serde_json::from_str(r#""deadbeef""#).unwrap();
 }
 
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
 {
-    let data: Dynamic<Vec<u8>> = serde_json::from_str(r#""bc1qw508d..."#).unwrap();
+    use secure_gate::Dynamic;
+    let result: Result<Dynamic<Vec<u8>>, _> = serde_json::from_str(r#""bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4""#);
 }
 ```
 
@@ -171,6 +183,7 @@ Bech32 includes fallible `try_to_bech32()` for error handling.
 ```rust
 #[cfg(feature = "ct-eq")]
 {
+    use secure_gate::Fixed;
     let a: Fixed<[u8; 32]> = [0; 32].into();
     let b: Fixed<[u8; 32]> = [1; 32].into();
     assert!(!a.ct_eq(&b));  // Timing-safe
@@ -181,8 +194,12 @@ Bech32 includes fallible `try_to_bech32()` for error handling.
 ```rust
 #[cfg(feature = "hash-eq")]
 {
-    use secure_gate::HashEq;
-    assert!(a.hash_eq(&a));  // Probabilistic safety
+    use secure_gate::{Fixed, HashEq};
+    let a: Fixed<[u8; 32]> = [1; 32].into();
+    let b: Fixed<[u8; 32]> = [1; 32].into();
+    let c: Fixed<[u8; 32]> = [2; 32].into();
+    assert!(a.hash_eq(&b));
+    assert!(!a.hash_eq(&c));
 }
 ```
 
@@ -212,16 +229,18 @@ Mark types for serde export with `SerializableType`.
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::SerializableType;
+    use secure_gate::{Dynamic, SerializableType};
     use serde::Serialize;
+    extern crate alloc;
 
     #[derive(Serialize)]
     struct RawKey(Vec<u8>);
 
-    impl SerializableType for RawKey {}  // Opt-in
+    impl SerializableType for RawKey {}
 
     let key = RawKey(vec![1, 2, 3]);
-    let json = serde_json::to_string(&key).unwrap();  // Allowed
+    let wrapped: Dynamic<RawKey> = key.into();
+    let json = serde_json::to_string(&wrapped).unwrap();  // Allowed
 }
 ```
 
@@ -229,12 +248,17 @@ Mark types for serde export with `SerializableType`.
 
 **Fixed** (exact sizes):
 ```rust
+use secure_gate::Fixed;
+
 let fixed: Fixed<[u8; 4]> = [1, 2, 3, 4].into();  // Infallible
 let tried: Result<Fixed<[u8; 4]>, _> = [1, 2, 3, 4].try_into();  // Fallible alternative
 ```
 
 **Dynamic** (flexible):
 ```rust
+use secure_gate::Dynamic;
+extern crate alloc;
+
 let dyn_vec: Dynamic<Vec<u8>> = [1, 2, 3].as_slice().into();  // Infallible copy
 let dyn_str: Dynamic<String> = "hello".into();  // Infallible
 ```
@@ -245,20 +269,37 @@ Require explicit visibility (`pub`, `pub(crate)`, etc.).
 
 ### Basic Aliases
 ```rust
+use secure_gate::{fixed_alias, dynamic_alias};
+
 fixed_alias!(pub AesKey, 32);
 dynamic_alias!(pub Password, String);
 ```
 
 ### With Custom Docs
 ```rust
-fixed_alias!(pub ApiKey, 32, "Service API key");
+use secure_gate::{fixed_alias, dynamic_alias};
+
 dynamic_alias!(pub Token, Vec<u8>, "OAuth token");
+fixed_alias!(pub ApiKey, 32, "Service API key");
 ```
 
 ### Generic Aliases
+
 ```rust
-fixed_generic_alias!(pub Buffer);
-dynamic_generic_alias!(pub Secret);
+use secure_gate::{dynamic_generic_alias, fixed_generic_alias};
+extern crate alloc;
+
+dynamic_generic_alias!(Secret);
+fixed_generic_alias!(Buffer);
+```
+
+### With Custom Docs (Generic)
+
+```rust
+use secure_gate::{dynamic_generic_alias, fixed_generic_alias};
+
+dynamic_generic_alias!(pub Token, "OAuth token");
+fixed_generic_alias!(pub ApiKey, "Service API key");
 ```
 
 ## Memory & Performance

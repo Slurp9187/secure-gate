@@ -12,4 +12,6 @@
 /// Public type-alias macros.
 /// Dynamic and fixed aliases.
 mod dynamic_alias;
+mod dynamic_generic_alias;
 mod fixed_alias;
+mod fixed_generic_alias;
