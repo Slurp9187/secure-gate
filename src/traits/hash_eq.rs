@@ -13,12 +13,12 @@
 /// - **Keyed mode** (with `"rand"` feature): Per-process random key resists precomputation /
 ///   multi-target attacks across comparisons.
 /// - **Probabilistic**: Collision probability ~2⁻¹²⁸ — negligible for equality checks,
-///   but use [`ConstantTimeEq`] for strict deterministic equality.
+///   but use [`crate::ConstantTimeEq`] for strict deterministic equality.
 ///
 /// ## Performance
 /// - Fixed overhead (~120–150 ns on small inputs) + very low per-byte cost.
 /// - Beats full `ct_eq` for > ~300–500 bytes (2× at 1 KiB, 5–8× at 100 KiB+).
-/// - Prefer [`ConstantTimeEq`] for tiny fixed-size tags (< 128–256 bytes).
+/// - Prefer [`crate::ConstantTimeEq`] for tiny fixed-size tags (< 128–256 bytes).
 ///
 /// ## Warnings
 /// - **DoS risk**: Hashing very large untrusted inputs is costly — rate-limit or bound sizes.
@@ -48,11 +48,11 @@ pub trait HashEq {
     ///
     /// - **Probabilistic nature**: Hash collisions are extremely unlikely but not impossible.
     /// - **Probabilistic nature**: Hash collisions are extremely unlikely but not impossible.
-    ///   Use [`ConstantTimeEq`] for strict cryptographic equality.
+    ///   Use [`crate::ConstantTimeEq`] for strict cryptographic equality.
     /// - **DoS amplification**: Hashing can be slower for large inputs; rate-limit in untrusted contexts.
     /// - **Deterministic vs keyed**: Plain hashing is deterministic (useful for tests); keyed mode
     ///   with `rand` enabled mitigates precomputation attacks.
-    /// - **Not suitable for small/fixed secrets**: Prefer [`ConstantTimeEq`] for <32 bytes.
+    /// - **Not suitable for small/fixed secrets**: Prefer [`crate::ConstantTimeEq`] for <32 bytes.
     ///
     /// # Performance
     ///

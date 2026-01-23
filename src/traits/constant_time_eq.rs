@@ -35,7 +35,7 @@
 /// # #[cfg(feature = "ct-eq")]
 /// # {
 /// fn main() {
-/// use subtle::ConstantTimeEq;
+/// use secure_gate::ConstantTimeEq;
 /// let a = [1u8, 2u8, 3u8].as_slice();
 /// let b = [1u8, 2u8, 3u8].as_slice();
 /// let c = [1u8, 5u8, 3u8].as_slice();

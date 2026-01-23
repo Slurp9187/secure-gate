@@ -1,3 +1,30 @@
+//! # Secure Encoding Trait
+//!
+//! Extension trait for safe, explicit encoding of secret byte data to strings.
+//!
+//! All methods require the caller to first call `.expose_secret()` (or similar).
+//! This makes every secret access loud, grep-able, and auditable.
+//!
+//! For Bech32 encoding, use the trait methods with an HRP.
+//!
+//! ## Security Warning
+//!
+//! These methods produce human-readable strings containing the full secret.
+//! Use only when intentionally exposing the secret (e.g., QR codes, user export, audited logging).
+//! For debugging/logging, prefer redacted helpers like `to_hex_prefix`.
+//! All calls require explicit `.expose_secret()` first — no implicit paths exist.
+//!
+//! ## Example
+//!
+//! ```
+//! # #[cfg(feature = "encoding-hex")]
+//! # {
+//! use secure_gate::SecureEncoding;
+//! let bytes = [0x42u8; 32];
+//! let hex_string = bytes.to_hex();
+//! // hex_string is now String: "424242..."
+//! # }
+//! ```
 #[cfg(feature = "encoding-hex")]
 use ::hex as hex_crate;
 

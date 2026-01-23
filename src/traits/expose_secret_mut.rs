@@ -6,11 +6,16 @@
 //!
 //! - [`ExposeSecretMut`]: Mutable access to secret values
 //!
-/// ## Usage
-///
-/// Import this trait to enable `.expose_secret_mut()` on mutable secret wrappers.
+//! ## Security Model
+//!
+//! - **Mutable access**: Only core wrappers ([`crate::Fixed`], [`crate::Dynamic`]) implement [`ExposeSecretMut`]
+//! - **Zero-cost**: All implementations use `#[inline(always)]`
 use super::ExposeSecret;
 
+/// ## Usage
+///
+/// Import this trait to enable `.with_secret_mut()` and `.expose_secret_mut()`.
+/// Extends [`ExposeSecret`], so read access and metadata are also available.
 /// Trait for mutable access to secrets.
 ///
 /// Extends [`ExposeSecret`], so metadata and read access are included.
