@@ -12,18 +12,32 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use serde_json::{from_str, to_string};
 
 #[cfg(feature = "serde-serialize")]
-use secure_gate::{serializable_dynamic_alias, serializable_fixed_alias, ExposeSecret};
+use secure_gate::{ExposeSecret, SerializableType};
 
 #[cfg(feature = "serde-serialize")]
-serializable_fixed_alias!(SerializableArray32, 32);
+#[derive(serde::Serialize)]
+struct SerializableArray32([u8; 32]);
+
 #[cfg(feature = "serde-serialize")]
-serializable_dynamic_alias!(SerializableString, String);
+impl SerializableType for SerializableArray32 {}
+
 #[cfg(feature = "serde-serialize")]
-serializable_dynamic_alias!(SerializableVec, Vec<u8>);
+#[derive(serde::Serialize)]
+struct SerializableVec(Vec<u8>);
+
+#[cfg(feature = "serde-serialize")]
+impl SerializableType for SerializableVec {}
+
+#[cfg(feature = "serde-serialize")]
+#[derive(serde::Serialize)]
+struct SerializableString(String);
+
+#[cfg(feature = "serde-serialize")]
+impl SerializableType for SerializableString {}
 
 #[cfg(feature = "serde-serialize")]
 fn bench_fixed_serialize(c: &mut Criterion) {
-    let exportable: SerializableArray32 = [42u8; 32].into();
+    let exportable = SerializableArray32([42u8; 32]);
     let raw = [42u8; 32];
 
     c.bench_function("SerializableArray32 serialize", |b| {
@@ -45,7 +59,7 @@ fn bench_fixed_serialize(c: &mut Criterion) {
 fn bench_fixed_roundtrip(c: &mut Criterion) {
     use secure_gate::Fixed;
 
-    let exportable: SerializableArray32 = [42u8; 32].into();
+    let exportable = SerializableArray32([42u8; 32]);
     let raw = [42u8; 32];
 
     c.bench_function("SerializableArray32 → Fixed<[u8; 32]> roundtrip", |b| {
@@ -70,8 +84,8 @@ fn bench_dynamic_serialize(c: &mut Criterion) {
     let data_vec = vec![42u8; 1024];
     let data_str = "A".repeat(1024);
 
-    let exportable_vec: SerializableVec = data_vec.clone().into();
-    let exportable_str: SerializableString = data_str.clone().into();
+    let exportable_vec = SerializableVec(data_vec.clone());
+    let exportable_str = SerializableString(data_str.clone());
 
     let mut group = c.benchmark_group("dynamic (1 KiB)");
 
@@ -112,8 +126,7 @@ fn bench_large_dynamic_serialize(c: &mut Criterion) {
 
     group.bench_function("SerializableVec serialize", |b| {
         b.iter(|| {
-            let exportable_vec: SerializableVec =
-                criterion::black_box(vec![42u8; 1_048_576]).into();
+            let exportable_vec = SerializableVec(criterion::black_box(vec![42u8; 1_048_576]));
             let json = to_string(black_box(&exportable_vec)).unwrap();
             black_box(json)
         })
@@ -121,8 +134,7 @@ fn bench_large_dynamic_serialize(c: &mut Criterion) {
 
     group.bench_function("SerializableString serialize", |b| {
         b.iter(|| {
-            let exportable_str: SerializableString =
-                criterion::black_box("A".repeat(1_048_576)).into();
+            let exportable_str = SerializableString(criterion::black_box("A".repeat(1_048_576)));
             let json = to_string(black_box(&exportable_str)).unwrap();
             black_box(json)
         })
@@ -155,8 +167,7 @@ fn bench_large_dynamic_roundtrip(c: &mut Criterion) {
 
     group.bench_function("SerializableVec → Dynamic<Vec<u8>>", |b| {
         b.iter(|| {
-            let exportable_vec: SerializableVec =
-                criterion::black_box(vec![42u8; 1_048_576]).into();
+            let exportable_vec = SerializableVec(criterion::black_box(vec![42u8; 1_048_576]));
             let json = to_string(black_box(&exportable_vec)).unwrap();
             let deserialized: Dynamic<Vec<u8>> = from_str(&json).unwrap();
             black_box(deserialized)
@@ -165,8 +176,7 @@ fn bench_large_dynamic_roundtrip(c: &mut Criterion) {
 
     group.bench_function("SerializableString → Dynamic<String>", |b| {
         b.iter(|| {
-            let exportable_str: SerializableString =
-                criterion::black_box("A".repeat(1_048_576)).into();
+            let exportable_str = SerializableString(criterion::black_box("A".repeat(1_048_576)));
             let json = to_string(black_box(&exportable_str)).unwrap();
             let deserialized: Dynamic<String> = from_str(&json).unwrap();
             black_box(deserialized)
@@ -201,8 +211,8 @@ fn bench_dynamic_roundtrip(c: &mut Criterion) {
     let data_vec = vec![42u8; 1024];
     let data_str = "A".repeat(1024);
 
-    let exportable_vec: SerializableVec = data_vec.clone().into();
-    let exportable_str: SerializableString = data_str.clone().into();
+    let exportable_vec = SerializableVec(data_vec.clone());
+    let exportable_str = SerializableString(data_str.clone());
 
     let mut group = c.benchmark_group("dynamic roundtrip (1 KiB)");
 
