@@ -10,7 +10,7 @@
 //!
 //! - **Mutable access**: Only core wrappers ([`crate::Fixed`], [`crate::Dynamic`]) implement [`ExposeSecretMut`]
 //! - **Zero-cost**: All implementations use `#[inline(always)]`
-use super::ExposeSecret;
+use crate::ExposeSecret;
 
 /// ## Usage
 ///

@@ -10,9 +10,8 @@
 //!
 //! ## Security Model
 //!
-//! - **Full access**: Core wrappers ([`Fixed`], [`Dynamic`]) implement [`ExposeSecret`], with mutable variants implementing [`ExposeSecretMut`]
-//! - **Read-only**: Random ([`FixedRandom`], [`DynamicRandom`]) and encoding wrappers
-//!   only implement [`ExposeSecret`] to prevent mutation
+//! - **Full access**: Core wrappers ([`crate::Fixed`], [`crate::Dynamic`]) implement [`ExposeSecret`], with mutable variants implementing [`ExposeSecretMut`]
+//! - **Read-only**: Encoding wrappers only implement [`ExposeSecret`] to prevent mutation
 //! - **Zero-cost**: All implementations use `#[inline(always)]`
 //!
 /// Trait for read-only access to secrets, including metadata.
@@ -22,7 +21,7 @@
 /// Import these traits to access secret values and their metadata ergonomically.
 ///
 /// Import this to enable `.with_secret()`, `.expose_secret()`, `.len()`, and `.is_empty()`.
-/// For mutable access, see [`super::ExposeSecretMut`].
+/// For mutable access, see [`crate::ExposeSecretMut`].
 ///
 /// ## Security Note
 ///

@@ -27,14 +27,6 @@ fn fixed_deserialize_wrong_length() {
     assert!(result.is_err());
 }
 
-#[test]
-fn random_no_deserialize() {
-    // Random types don't implement Deserialize - confirm via failed attempt
-    // This is a compile-time restriction, but we test by noting it doesn't exist
-    // serde_json::from_str::<secure_gate::FixedRandom<32>>("[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]").unwrap_err();
-    // Would fail to compile if Deserialize existed
-}
-
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
 #[test]
 fn fixed_deserialize_hex_string() {
