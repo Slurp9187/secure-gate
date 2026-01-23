@@ -187,7 +187,7 @@ impl<T> crate::ExposeSecret for Dynamic<Vec<T>> {
 
     #[inline(always)]
     fn len(&self) -> usize {
-        self.inner.len()
+        self.inner.len() * core::mem::size_of::<T>()
     }
 }
 

@@ -160,7 +160,7 @@ impl<const N: usize, T> crate::ExposeSecret for Fixed<[T; N]> {
 
     #[inline(always)]
     fn len(&self) -> usize {
-        N
+        N * core::mem::size_of::<T>()
     }
 }
 
