@@ -225,30 +225,36 @@ where
 /// # Byte-array specific helpers
 impl<const N: usize> Fixed<[u8; N]> {}
 
-// From impls for byte arrays and slices
-impl<const N: usize> From<&[u8]> for Fixed<[u8; N]> {
-    /// Create a `Fixed` from a byte slice, panicking on length mismatch.
+// Fallible conversion from byte slice.
+impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
+    type Error = crate::error::FromSliceError;
+
+    /// Attempt to create a `Fixed` from a byte slice, returning an error on length mismatch.
     ///
-    /// This is a fail-fast conversion for crypto contexts where exact length is expected.
-    /// Panics if the slice length does not match the array size `N`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `slice.len() != N`.
+    /// This is the safe alternative to panicking conversions.
     ///
     /// # Example
     ///
     /// ```
     /// use secure_gate::Fixed;
-    /// let key: Fixed<[u8; 4]> = (&[1, 2, 3, 4][..]).into();
+    /// let slice: &[u8] = &[1u8, 2, 3, 4];
+    /// let key: Result<Fixed<[u8; 4]>, _> = slice.try_into();
+    /// assert!(key.is_ok());
+    ///
+    /// let short_slice: &[u8] = &[1u8, 2];
+    /// let fail: Result<Fixed<[u8; 4]>, _> = short_slice.try_into();
+    /// assert!(fail.is_err());
     /// ```
-    fn from(slice: &[u8]) -> Self {
+    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
         if slice.len() != N {
-            core::panic!("slice length mismatch: expected {}, got {}", N, slice.len());
+            return Err(crate::error::FromSliceError::LengthMismatch {
+                expected: N,
+                got: slice.len(),
+            });
         }
         let mut arr = [0u8; N];
         arr.copy_from_slice(slice);
-        Self::new(arr)
+        Ok(Self::new(arr))
     }
 }
 
@@ -268,6 +274,8 @@ impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
         Self::new(arr)
     }
 }
+
+// Fallible conversion from byte slice.
 
 /// Custom serde deserialization for byte arrays with auto-detection of hex/base64/bech32 strings.
 #[cfg(feature = "serde-deserialize")]

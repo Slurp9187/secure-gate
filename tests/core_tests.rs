@@ -99,3 +99,17 @@ fn dynamic_vec_from_slice() {
     let dyn_vec: Dynamic<Vec<u8>> = slice.into();
     assert_eq!(dyn_vec.expose_secret(), b"hello world");
 }
+
+// === TryFrom for Fixed ===
+#[test]
+fn fixed_try_from_slice() {
+    let slice: &[u8] = &[1u8, 2, 3, 4];
+    let result: Result<Fixed<[u8; 4]>, _> = slice.try_into();
+    assert!(result.is_ok());
+    let fixed = result.unwrap();
+    assert_eq!(fixed.expose_secret(), &[1, 2, 3, 4]);
+
+    let short_slice: &[u8] = &[1u8, 2];
+    let fail: Result<Fixed<[u8; 4]>, _> = short_slice.try_into();
+    assert!(fail.is_err());
+}

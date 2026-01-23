@@ -2,6 +2,13 @@
 
 //! Centralized error types for the secure-gate crate.
 
+/// Error type for slice conversion operations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum FromSliceError {
+    #[error("slice length mismatch: expected {expected}, got {got}")]
+    LengthMismatch { expected: usize, got: usize },
+}
+
 #[cfg(feature = "encoding-bech32")]
 /// Error type for Bech32 operations (encoding and decoding).
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
