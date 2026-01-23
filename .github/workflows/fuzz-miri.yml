@@ -47,7 +47,7 @@ jobs:
             -Zmiri-disable-isolation
             -Zmiri-strict-provenance
         run: |
-          cargo miri test --workspace --all-features -- --include-ignored --skip compile_fail_tests
+          cargo miri test --workspace --all-features -- --include-ignored --skip fixed_alias_zero_size_compile_fail --skip serde_core_without_marker_compile_fail
 
       - name: Light corpus scan with Miri (weekly or manual)
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
