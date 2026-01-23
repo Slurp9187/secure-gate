@@ -9,39 +9,48 @@
 extern crate alloc;
 
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
-use secure_gate::ExposeSecret;
-use secure_gate::{serializable_dynamic_alias, serializable_fixed_alias};
+use secure_gate::{ExposeSecret, SerializableType};
 
-// Define test types using macros
-serializable_fixed_alias!(pub TestSerializableArray, 4);
-serializable_dynamic_alias!(pub TestSerializableVec, Vec<u8>);
+// Define test types using marker traits with Serialize and Deserialize
+#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct TestSerializableArray([u8; 4]);
+
+#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
+impl SerializableType for TestSerializableArray {}
+
+#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct TestSerializableVec(Vec<u8>);
+
+#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
+impl SerializableType for TestSerializableVec {}
 
 // Add Deserialize for roundtrips
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
-#[cfg(all(feature = "serde-serialize", feature = "serde-deserialize"))]
 #[test]
 fn fixed_roundtrip() {
     use serde_json;
 
-    let original: TestSerializableArray = [1u8, 2, 3, 4].into();
+    let original = TestSerializableArray([1u8, 2, 3, 4]);
     let serialized = serde_json::to_string(&original).expect("Serialization failed");
     let deserialized: TestSerializableArray =
         serde_json::from_str(&serialized).expect("Deserialization failed");
 
-    assert_eq!(original.expose_secret(), deserialized.expose_secret());
+    assert_eq!(original.0, deserialized.0);
 }
 
-#[cfg(all(feature = "serde-serialize", feature = "serde-deserialize"))]
+#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
 #[test]
 fn dynamic_roundtrip() {
     use serde_json;
 
-    let original: TestSerializableVec = vec![1u8, 2, 3, 4].into();
+    let original = TestSerializableVec(vec![1u8, 2, 3, 4]);
     let serialized = serde_json::to_string(&original).expect("Serialization failed");
     let deserialized: TestSerializableVec =
         serde_json::from_str(&serialized).expect("Deserialization failed");
 
-    assert_eq!(original.expose_secret(), deserialized.expose_secret());
+    assert_eq!(original.0, deserialized.0);
 }
 
 #[cfg(all(
