@@ -4,9 +4,15 @@
 // Compile-fail tests using trybuild - verifies that certain code patterns
 // are properly rejected at compile time for security reasons.
 
-#[cfg(feature = "rand")]
 #[test]
-fn compile_fail_tests() {
+fn fixed_alias_zero_size_compile_fail() {
     let t = trybuild::TestCases::new();
-    t.compile_fail("tests/compile-fail/*.rs");
+    t.compile_fail("tests/compile-fail/fixed_alias_zero_size.rs");
+}
+
+#[cfg(feature = "serde-serialize")]
+#[test]
+fn serde_core_without_marker_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/serde_core_without_marker.rs");
 }
