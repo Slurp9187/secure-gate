@@ -62,21 +62,13 @@ pub use traits::HashEq;
 mod macros;
 
 /// Available macros (exported globally for convenience):
-/// - `cloneable_fixed_alias!`: Create cloneable type aliases for fixed-size secrets.
-/// - `cloneable_dynamic_alias!`: Create cloneable type aliases for dynamic secrets.
-/// - `exportable_fixed_alias!`: Create exportable type aliases for fixed-size secrets.
-/// - `exportable_dynamic_alias!`: Create exportable type aliases for dynamic secrets.
 /// - `dynamic_alias!`: Create type aliases for heap-allocated secrets (`Dynamic<T>`).
 /// - `dynamic_generic_alias!`: Create generic heap-allocated secret aliases.
 /// - `fixed_alias!`: Create type aliases for fixed-size secrets (`Fixed<[u8; N]>`).
 /// - `fixed_generic_alias!`: Create generic fixed-size secret aliases.
 ///   Re-export of [`SecureEncoding`] trait for convenient encoding extensions.
 ///   Re-export of the [`SecureEncoding`] trait.
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32"
-))]
+#[cfg(feature = "encoding")]
 pub use traits::SecureEncoding;
 
 /// Re-export of [`Bech32Error`] for convenience when using bech32 encoding/decoding.

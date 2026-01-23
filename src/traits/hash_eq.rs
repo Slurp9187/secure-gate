@@ -36,7 +36,6 @@
 /// }
 /// # }
 /// ```
-
 #[cfg(feature = "hash-eq")]
 use crate::traits::constant_time_eq::ConstantTimeEq;
 #[cfg(feature = "hash-eq")]

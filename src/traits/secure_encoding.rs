@@ -10,8 +10,43 @@ use base64_crate::Engine;
 
 #[cfg(feature = "encoding-bech32")]
 use crate::error::Bech32Error;
+
+/// Local implementation of bit conversion for Bech32, since bech32 crate doesn't expose it in v0.11.
 #[cfg(feature = "encoding-bech32")]
-use bech32::{self};
+fn convert_bits(
+    from: u8,
+    to: u8,
+    pad: bool,
+    data: &[u8],
+) -> Result<(alloc::vec::Vec<u8>, usize), ()> {
+    if !(1..=8).contains(&from) || !(1..=8).contains(&to) {
+        return Err(());
+    }
+    let mut acc = 0u64;
+    let mut bits = 0u8;
+    let mut ret = alloc::vec::Vec::new();
+    let maxv = (1u64 << to) - 1;
+    let _max_acc = (1u64 << (from + to - 1)) - 1;
+    for &v in data {
+        if ((v as u32) >> from) != 0 {
+            return Err(());
+        }
+        acc = (acc << from) | (v as u64);
+        bits += from;
+        while bits >= to {
+            bits -= to;
+            ret.push(((acc >> bits) & maxv) as u8);
+        }
+    }
+    if pad {
+        if bits > 0 {
+            ret.push(((acc << (to - bits)) & maxv) as u8);
+        }
+    } else if bits >= from || ((acc << (to - bits)) & maxv) != 0 {
+        return Err(());
+    }
+    Ok((ret, bits as usize))
+}
 
 /// Extension trait for safe, explicit encoding of secret byte data to strings.
 ///
@@ -38,11 +73,6 @@ use bech32::{self};
 /// // hex_string is now String: "424242..."
 /// # }
 /// ```
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32"
-))]
 pub trait SecureEncoding {
     /// Encode secret bytes as lowercase hexadecimal.
     #[cfg(feature = "encoding-hex")]
@@ -76,21 +106,24 @@ pub trait SecureEncoding {
     #[cfg(feature = "encoding-bech32")]
     fn to_bech32m(&self, hrp: &str) -> alloc::string::String;
 
-    /// Fallibly encode secret bytes as Bech32 with the specified HRP.
+    /// Fallibly encode secret bytes as Bech32 with the specified HRP and optional expected HRP validation.
     #[cfg(feature = "encoding-bech32")]
-    fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error>;
+    fn try_to_bech32(
+        &self,
+        hrp: &str,
+        expected_hrp: Option<&str>,
+    ) -> Result<alloc::string::String, Bech32Error>;
 
-    /// Fallibly encode secret bytes as Bech32m with the specified HRP.
+    /// Fallibly encode secret bytes as Bech32m with the specified HRP and optional expected HRP validation.
     #[cfg(feature = "encoding-bech32")]
-    fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error>;
+    fn try_to_bech32m(
+        &self,
+        hrp: &str,
+        expected_hrp: Option<&str>,
+    ) -> Result<alloc::string::String, Bech32Error>;
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32"
-))]
 impl<T: AsRef<[u8]> + ?Sized> SecureEncoding for T {
     #[cfg(feature = "encoding-hex")]
     #[inline(always)]
@@ -123,31 +156,62 @@ impl<T: AsRef<[u8]> + ?Sized> SecureEncoding for T {
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
     fn to_bech32(&self, hrp: &str) -> alloc::string::String {
+        let (converted, _) =
+            convert_bits(8, 5, true, self.as_ref()).expect("bech32 bit conversion failed");
         let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
-        bech32::encode::<bech32::Bech32>(hrp_parsed, self.as_ref()).expect("bech32 encoding failed")
+        bech32::encode::<bech32::Bech32>(hrp_parsed, &converted).expect("bech32 encoding failed")
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
     fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
+        let (converted, _) =
+            convert_bits(8, 5, true, self.as_ref()).expect("bech32 bit conversion failed");
         let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
-        bech32::encode::<bech32::Bech32m>(hrp_parsed, self.as_ref())
-            .expect("bech32m encoding failed")
+        bech32::encode::<bech32::Bech32m>(hrp_parsed, &converted).expect("bech32m encoding failed")
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error> {
+    fn try_to_bech32(
+        &self,
+        hrp: &str,
+        expected_hrp: Option<&str>,
+    ) -> Result<alloc::string::String, Bech32Error> {
+        let (converted, _) =
+            convert_bits(8, 5, true, self.as_ref()).map_err(|_| Bech32Error::ConversionFailed)?;
         let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
-        bech32::encode::<bech32::Bech32>(hrp_parsed, self.as_ref())
+        if let Some(exp) = expected_hrp {
+            if hrp != exp {
+                return Err(Bech32Error::UnexpectedHrp {
+                    expected: exp.to_string(),
+                    got: hrp.to_string(),
+                });
+            }
+        }
+        bech32::encode::<bech32::Bech32>(hrp_parsed, &converted)
             .map_err(|_| Bech32Error::OperationFailed)
     }
 
     #[cfg(feature = "encoding-bech32")]
     #[inline(always)]
-    fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error> {
+    fn try_to_bech32m(
+        &self,
+        hrp: &str,
+        expected_hrp: Option<&str>,
+    ) -> Result<alloc::string::String, Bech32Error> {
+        let (converted, _) =
+            convert_bits(8, 5, true, self.as_ref()).map_err(|_| Bech32Error::ConversionFailed)?;
         let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
-        bech32::encode::<bech32::Bech32m>(hrp_parsed, self.as_ref())
+        if let Some(exp) = expected_hrp {
+            if hrp != exp {
+                return Err(Bech32Error::UnexpectedHrp {
+                    expected: exp.to_string(),
+                    got: hrp.to_string(),
+                });
+            }
+        }
+        bech32::encode::<bech32::Bech32m>(hrp_parsed, &converted)
             .map_err(|_| Bech32Error::OperationFailed)
     }
 }

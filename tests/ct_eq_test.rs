@@ -2,18 +2,7 @@
 
 extern crate alloc;
 
-use secure_gate::{
-    cloneable_dynamic_alias, cloneable_fixed_alias, serializable_dynamic_alias,
-    serializable_fixed_alias, ConstantTimeEq, ExposeSecret,
-};
-
-// Define test types using macros
-cloneable_fixed_alias!(pub TestCloneableArray, 4);
-cloneable_dynamic_alias!(pub TestCloneableString, String);
-cloneable_dynamic_alias!(pub TestCloneableVec, Vec<u8>);
-serializable_fixed_alias!(pub TestSerializableArray, 4);
-serializable_dynamic_alias!(pub TestSerializableString, String);
-serializable_dynamic_alias!(pub TestSerializableVec, Vec<u8>);
+use secure_gate::ConstantTimeEq;
 
 #[test]
 fn test_slice_ct_eq() {
@@ -50,69 +39,6 @@ fn test_string_ct_eq() {
     let a: String = "hello".to_string();
     let b: String = "hello".to_string();
     let c: String = "world".to_string();
-
-    assert!(a.ct_eq(&b));
-    assert!(!a.ct_eq(&c));
-}
-
-#[test]
-fn test_cloneable_array_ct_eq() {
-    let a: TestCloneableArray = [1u8, 2, 3, 4].into();
-    let b: TestCloneableArray = [1u8, 2, 3, 4].into();
-    let c: TestCloneableArray = [1u8, 2, 3, 5].into();
-
-    assert!(a.ct_eq(&b));
-    assert!(!a.ct_eq(&c));
-}
-
-#[test]
-fn test_cloneable_string_ct_eq() {
-    let a: TestCloneableString = "test".to_string().into();
-    let b: TestCloneableString = "test".to_string().into();
-    let c: TestCloneableString = "fail".to_string().into();
-
-    assert!(a.ct_eq(&b));
-    assert!(!a.ct_eq(&c));
-}
-
-#[test]
-fn test_cloneable_vec_ct_eq() {
-    let a: TestCloneableVec = vec![1, 2, 3].into();
-    let b: TestCloneableVec = vec![1, 2, 3].into();
-    let c: TestCloneableVec = vec![1, 2, 4].into();
-
-    assert!(a.ct_eq(&b));
-    assert!(!a.ct_eq(&c));
-}
-
-#[test]
-fn test_exportable_array_ct_eq() {
-    // Cloneable tests for serializable types
-    let a: TestSerializableArray = [1u8, 2, 3, 4].into();
-    let b: TestSerializableArray = [1u8, 2, 3, 4].into();
-    let c: TestSerializableArray = [1u8, 2, 3, 5].into();
-
-    assert!(a.ct_eq(&b));
-    assert!(!a.ct_eq(&c));
-}
-
-#[test]
-fn test_exportable_string_ct_eq() {
-    // Dynamic String
-    let a: TestSerializableString = "test".to_string().into();
-    let b: TestSerializableString = "test".to_string().into();
-    let c: TestSerializableString = "fail".to_string().into();
-
-    assert!(a.ct_eq(&b));
-    assert!(!a.ct_eq(&c));
-}
-
-#[test]
-fn test_exportable_vec_ct_eq() {
-    // Dynamic Vec
-    let a: TestSerializableVec = vec![1, 2, 3].into();
-    let b: TestSerializableVec = vec![1, 2, 3].into();
-    let c: TestSerializableVec = vec![1, 2, 4].into();
 
     assert!(a.ct_eq(&b));
     assert!(!a.ct_eq(&c));

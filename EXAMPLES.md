@@ -272,64 +272,45 @@ let text  = Secure::<String>::new("secret".to_string());
 
 ## 6. Opt-In Safe Cloning (`cloneable` feature)
 
-### Cloneable Fixed Key
+### Custom Cloneable Type
+
+To create a cloneable secret type, implement `CloneableType` on your type:
+
 ```rust
 #[cfg(feature = "cloneable")]
 {
-    use secure_gate::*;
-    extern crate alloc;
+    use secure_gate::CloneableType;
+    use zeroize::Zeroize;
 
-    cloneable_fixed_alias!(CloneableKey, 32);
+    #[derive(Clone, Zeroize)]
+    struct MyKey([u8; 32]);
 
-    let key1 = CloneableKey::from([42u8; 32]);
-    let key2 = key1.clone(); // safe deep clone
-}
-```
+    impl CloneableType for MyKey {}
 
-### Cloneable Dynamic Password
-```rust
-#[cfg(feature = "cloneable")]
-{
-    use secure_gate::*;
-    extern crate alloc;
-
-    cloneable_dynamic_alias!(CloneablePassword, String);
-
-    let pw1 = CloneablePassword::from("hunter2".to_string());
-    let pw2 = pw1.clone(); // safe deep clone
+    let key1 = MyKey([42u8; 32]);
+    let key2 = key1.clone(); // Safe deep clone
 }
 ```
 
 ## 7. Opt-In Serialization (`serde-serialize` feature)
 
-### Serializable Fixed Key
+### Custom Serializable Type
+
+To create a serializable secret type, implement `SerializableType` on your type:
+
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::*;
-    use serde_json;
-    extern crate alloc;
+    use secure_gate::SerializableType;
+    use serde::Serialize;
 
+    #[derive(Serialize)]
+    struct MyKey([u8; 32]);
 
-    serializable_fixed_alias!(ExportableKey, 32);
+    impl SerializableType for MyKey {}
 
-    let key = ExportableKey::from([0u8; 32]);
+    let key = MyKey([42u8; 32]);
     let json = serde_json::to_string(&key).unwrap();
-}
-```
-
-### Serializable Dynamic Token
-```rust
-#[cfg(feature = "serde-serialize")]
-{
-    use secure_gate::*;
-    use serde_json;
-    extern crate alloc;
-
-    serializable_dynamic_alias!(ExportableToken, Vec<u8>);
-
-    let token = ExportableToken::from(vec![1,2,3]);
-    let json = serde_json::to_string(&token).unwrap();
 }
 ```
 
@@ -473,21 +454,7 @@ dynamic_alias!(SecretString, String);
 // Generic dynamic
 dynamic_generic_alias!(Secure);
 
-// Cloneable fixed
-#[cfg(feature = "cloneable")]
-cloneable_fixed_alias!(CloneKey, 32);
 
-// Cloneable dynamic
-#[cfg(feature = "cloneable")]
-cloneable_dynamic_alias!(ClonePw, String);
-
-// Serializable fixed
-#[cfg(feature = "serde-serialize")]
-serializable_fixed_alias!(ExportKey, 32);
-
-// Serializable dynamic
-#[cfg(feature = "serde-serialize")]
-serializable_dynamic_alias!(ExportToken, Vec<u8>);
 ```
 ```
 

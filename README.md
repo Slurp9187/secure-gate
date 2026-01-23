@@ -228,26 +228,7 @@ Inbound decoding via Serde deserialization (auto-detects encoding from strings):
 
 ## Opt-In Safe Cloning (`cloneable` feature)
 
-Cloning is opt-in via `CloneableType` marker and convenience macros.
-
-```rust
-#[cfg(feature = "cloneable")]
-use secure_gate::{cloneable_fixed_alias, cloneable_dynamic_alias, ExposeSecret};
-
-#[cfg(feature = "cloneable")]
-{
-    extern crate alloc;
-
-    cloneable_fixed_alias!(pub CloneableKey, 32);
-    cloneable_dynamic_alias!(pub CloneablePassword, String);
-
-    let key: CloneableKey = [0u8; 32].into();
-    let pw: CloneablePassword = "hunter2".to_string().into();
-
-    let key2 = key.clone();   // Safe deep clone
-    let pw2 = pw.clone();
-}
-```
+Cloning is opt-in via `CloneableType` marker.
 
 Custom:
 ```rust
@@ -270,25 +251,7 @@ use secure_gate::CloneableType;
 
 ## Opt-In Serialization (`serde-serialize` feature)
 
-Raw serialization is opt-in via `SerializableType` marker and convenience macros (risky — audit carefully).
-
-```rust
-#[cfg(feature = "serde-serialize")]
-use secure_gate::serializable_fixed_alias;
-
-#[cfg(feature = "serde-serialize")]
-{
-    extern crate alloc;
-
-    serializable_fixed_alias!(pub ExportableKey, 32);
-
-    let key: ExportableKey = [0u8; 32].into();
-
-    // Serialize to JSON
-    let serialized = serde_json::to_string(&key).unwrap();
-    println!("{}", serialized);
-}
-```
+Raw serialization is opt-in via `SerializableType` marker.
 
 Custom:
 ```rust

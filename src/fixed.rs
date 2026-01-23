@@ -39,12 +39,51 @@
 #[cfg(feature = "rand")]
 use rand::TryRngCore;
 
+/// Local implementation of bit conversion for Bech32, since bech32 crate doesn't expose it in v0.11.
+#[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
+fn convert_bits(
+    from: u8,
+    to: u8,
+    pad: bool,
+    data: &[u8],
+) -> Result<(alloc::vec::Vec<u8>, usize), ()> {
+    if !(1..=8).contains(&from) || !(1..=8).contains(&to) {
+        return Err(());
+    }
+    let mut acc = 0u64;
+    let mut bits = 0u8;
+    let mut ret = alloc::vec::Vec::new();
+    let maxv = (1u64 << to) - 1;
+    let _max_acc = (1u64 << (from + to - 1)) - 1;
+    for &v in data {
+        if ((v as u32) >> from) != 0 {
+            return Err(());
+        }
+        acc = (acc << from) | (v as u64);
+        bits += from;
+        while bits >= to {
+            bits -= to;
+            ret.push(((acc >> bits) & maxv) as u8);
+        }
+    }
+    if pad {
+        if bits > 0 {
+            ret.push(((acc << (to - bits)) & maxv) as u8);
+        }
+    } else if bits >= from || ((acc << (to - bits)) & maxv) != 0 {
+        return Err(());
+    }
+    Ok((ret, bits as usize))
+}
+
 /// Helper function to try decoding a string as bech32, hex, or base64 in priority order.
 #[cfg(feature = "serde-deserialize")]
 fn try_decode(s: &str) -> Result<alloc::vec::Vec<u8>, crate::DecodingError> {
     #[cfg(feature = "encoding-bech32")]
     if let Ok((_, data)) = bech32::decode(s) {
-        return Ok(data);
+        let (converted, _) =
+            convert_bits(5, 8, false, &data).map_err(|_| crate::DecodingError::InvalidBech32)?;
+        return Ok(converted);
     }
     #[cfg(feature = "encoding-hex")]
     if let Ok(data) = hex::decode(s) {

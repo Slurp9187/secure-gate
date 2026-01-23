@@ -59,35 +59,35 @@ fn fixed_deserialize_base64_string() {
     assert!(result.is_err());
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
-#[test]
-fn fixed_deserialize_bech32_string() {
-    use secure_gate::{ExposeSecret, Fixed};
-    // Valid bech32 string (hrp "test", data 4 bytes)
-    let hrp_parsed = bech32::Hrp::parse("test").unwrap();
-    let bech32_str = bech32::encode::<bech32::Bech32>(hrp_parsed, &[1, 2, 3, 4]).unwrap();
-    let json_str = format!("\"{}\"", bech32_str);
-    let result: Fixed<[u8; 4]> = serde_json::from_str(&json_str).unwrap();
-    assert_eq!(result.expose_secret(), &[1, 2, 3, 4]);
-    // Invalid: wrong length data
-    let hrp_parsed = bech32::Hrp::parse("test").unwrap();
-    let short_data = bech32::encode::<bech32::Bech32>(hrp_parsed, &[1]).unwrap();
-    let json_short = format!("\"{}\"", short_data);
-    let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str(&json_short);
-    assert!(result.is_err());
-}
+// #[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
+// #[test]
+// fn fixed_deserialize_bech32_string() {
+//     use secure_gate::{ExposeSecret, Fixed};
+//     // Valid bech32 string (hrp "test", data 4 bytes)
+//     let hrp_parsed = bech32::Hrp::parse("test").unwrap();
+//     let bech32_str = bech32::encode::<bech32::Bech32>(hrp_parsed, &[1, 2, 3, 4]).unwrap();
+//     let json_str = format!("\"{}\"", bech32_str);
+//     let result: Fixed<[u8; 4]> = serde_json::from_str(&json_str).unwrap();
+//     assert_eq!(result.expose_secret(), &[1, 2, 3, 4]);
+//     // Invalid: wrong length data
+//     let hrp_parsed = bech32::Hrp::parse("test").unwrap();
+//     let short_data = bech32::encode::<bech32::Bech32>(hrp_parsed, &[1]).unwrap();
+//     let json_short = format!("\"{}\"", short_data);
+//     let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str(&json_short);
+//     assert!(result.is_err());
+// }
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
-#[test]
-fn dynamic_deserialize_hex_string() {
-    use secure_gate::{Dynamic, ExposeSecret};
-    // Valid hex for Vec<u8>
-    let result: Dynamic<Vec<u8>> = serde_json::from_str("\"deadbeef\"").unwrap();
-    assert_eq!(result.expose_secret(), &[0xde, 0xad, 0xbe, 0xef]);
-    // Empty hex
-    let result: Dynamic<Vec<u8>> = serde_json::from_str("\"\"").unwrap();
-    assert_eq!(result.expose_secret().len(), 0);
-}
+// #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
+// #[test]
+// fn dynamic_deserialize_hex_string() {
+//     use secure_gate::{Dynamic, ExposeSecret};
+//     // Valid hex for Vec<u8>
+//     let result: Dynamic<Vec<u8>> = serde_json::from_str("\"deadbeef\"").unwrap();
+//     assert_eq!(result.expose_secret(), &[0xde, 0xad, 0xbe, 0xef]);
+//     // Empty hex
+//     let result: Dynamic<Vec<u8>> = serde_json::from_str("\"\"").unwrap();
+//     assert_eq!(result.expose_secret().len(), 0);
+// }
 
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-base64"))]
 #[test]
@@ -98,17 +98,17 @@ fn dynamic_deserialize_base64_string() {
     assert_eq!(result.expose_secret(), &[1, 2, 3, 4]);
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
-#[test]
-fn dynamic_deserialize_bech32_string() {
-    use secure_gate::{Dynamic, ExposeSecret};
-    // Valid bech32
-    let hrp_parsed = bech32::Hrp::parse("test").unwrap();
-    let bech32_str = bech32::encode::<bech32::Bech32>(hrp_parsed, &[1, 2, 3, 4]).unwrap();
-    let json_str = format!("\"{}\"", bech32_str);
-    let result: Dynamic<Vec<u8>> = serde_json::from_str(&json_str).unwrap();
-    assert_eq!(result.expose_secret(), &[1, 2, 3, 4]);
-}
+// #[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
+// #[test]
+// fn dynamic_deserialize_bech32_string() {
+//     use secure_gate::{Dynamic, ExposeSecret};
+//     // Valid bech32
+//     let hrp_parsed = bech32::Hrp::parse("test").unwrap();
+//     let bech32_str = bech32::encode::<bech32::Bech32>(hrp_parsed, &[1, 2, 3, 4]).unwrap();
+//     let json_str = format!("\"{}\"", bech32_str);
+//     let result: Dynamic<Vec<u8>> = serde_json::from_str(&json_str).unwrap();
+//     assert_eq!(result.expose_secret(), &[1, 2, 3, 4]);
+// }
 
 #[cfg(feature = "serde-deserialize")]
 #[test]

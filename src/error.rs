@@ -4,12 +4,16 @@
 
 #[cfg(feature = "encoding-bech32")]
 /// Error type for Bech32 operations (encoding and decoding).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Bech32Error {
     #[error("invalid Human-Readable Part (HRP)")]
     InvalidHrp,
+    #[error("bit conversion failed")]
+    ConversionFailed,
     #[error("bech32 operation failed")]
     OperationFailed,
+    #[error("unexpected HRP: expected {expected}, got {got}")]
+    UnexpectedHrp { expected: String, got: String },
 }
 
 #[cfg(feature = "encoding-base64")]

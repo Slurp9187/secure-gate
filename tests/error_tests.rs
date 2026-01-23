@@ -29,8 +29,8 @@ fn bech32_error_variants() {
 #[test]
 fn bech32_error_traits() {
     let error1 = Bech32Error::InvalidHrp;
-    let error2 = error1; // Copy
-    let error3 = error1; // Copy
+    let error2 = error1.clone(); // Clone
+    let error3 = error1.clone(); // Clone
 
     assert_eq!(error1, error2);
     assert_eq!(error1, error3);

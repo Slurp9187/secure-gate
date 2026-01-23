@@ -37,51 +37,6 @@ fn insecure_fixed_mutability() {
 
 // === Cloning in Insecure + Cloneable Mode ===
 
-#[cfg(feature = "cloneable")]
-mod insecure_cloneable {
-    use super::*;
-
-    cloneable_dynamic_alias!(InsecureString, String);
-    cloneable_fixed_alias!(InsecureKey, 4);
-    cloneable_dynamic_alias!(InsecureVec, Vec<u8>);
-
-    #[test]
-    fn insecure_cloneable_dynamic() {
-        let original: InsecureString = "clone_me".to_string().into();
-        let cloned = original.clone();
-        assert_eq!(
-            original.expose_secret().as_str(),
-            cloned.expose_secret().as_str()
-        );
-    }
-
-    #[test]
-    fn insecure_cloneable_fixed() {
-        let original: InsecureKey = [1, 2, 3, 4].into();
-        let cloned = original.clone();
-        assert_eq!(original.expose_secret(), cloned.expose_secret());
-    }
-
-    #[test]
-    fn insecure_cloneable_vec() {
-        let original: InsecureVec = vec![5, 6, 7].into();
-        let cloned = original.clone();
-        assert_eq!(
-            original.expose_secret().as_slice(),
-            cloned.expose_secret().as_slice()
-        );
-    }
-
-    #[test]
-    fn insecure_cloneable_independence() {
-        let mut original: InsecureVec = vec![1].into();
-        let cloned = original.clone();
-        original.expose_secret_mut().push(2);
-        assert_eq!(original.expose_secret().as_slice(), &[1, 2]);
-        assert_eq!(cloned.expose_secret().as_slice(), &[1]); // independent
-    }
-}
-
 // === No Security Features (ct-eq unavailable) ===
 
 // Note: In insecure mode, ct_eq is not available, so we can't test it.

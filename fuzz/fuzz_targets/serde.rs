@@ -7,47 +7,11 @@ use libfuzzer_sys::fuzz_target;
 // #[cfg(feature = "encoding-hex")]
 // use secure_gate::encoding::hex::HexString;
 
-// Define cloneable types using macros
-secure_gate::cloneable_dynamic_alias!(CloneableString, String);
-secure_gate::cloneable_dynamic_alias!(CloneableVec, Vec<u8>);
-secure_gate::cloneable_fixed_alias!(CloneableArray, 32);
-
 use secure_gate::{Dynamic, ExposeSecret, ExposeSecretMut, Fixed};
 use serde::Deserialize;
 use serde_json;
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
-
-// Implement Deserialize for cloneable types as newtypes
-impl<'de> Deserialize<'de> for CloneableString {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let inner = Dynamic::<String>::deserialize(deserializer)?;
-        Ok(CloneableString(inner))
-    }
-}
-
-impl<'de> Deserialize<'de> for CloneableVec {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let inner = Dynamic::<Vec<u8>>::deserialize(deserializer)?;
-        Ok(CloneableVec(inner))
-    }
-}
-
-impl<'de> Deserialize<'de> for CloneableArray {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let inner = Fixed::<[u8; 32]>::deserialize(deserializer)?;
-        Ok(CloneableArray(inner))
-    }
-}
 
 fuzz_target!(|data: &[u8]| {
     // Cap to avoid instant OOM – serde can allocate aggressively
@@ -66,14 +30,6 @@ fuzz_target!(|data: &[u8]| {
     try_deser!(Fixed<[u8; 32]>, data);
     try_deser!(Dynamic<String>, data);
     try_deser!(Dynamic<Vec<u8>>, data);
-
-    // 2. Cloneable (temp clone + zeroize paths)
-    #[cfg(all(feature = "cloneable", feature = "zeroize"))]
-    {
-        try_deser!(CloneableString, data);
-        try_deser!(CloneableVec, data);
-        try_deser!(CloneableArray, data);
-    }
 
     // 3. Encoding wrappers (validation + zeroize on invalid) - commented out as encoding types not implemented
     // #[cfg(feature = "encoding-hex")]
