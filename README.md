@@ -4,8 +4,8 @@
 
 > 🔒 **Security Notice**: This crate ***has not undergone independent audit***. Review the code and [SECURITY.md](SECURITY.md) before production use. Memory safety is guaranteed—no unsafe code (`#![forbid(unsafe_code)]`).
 
-- `Fixed<T>` – Stack-allocated fixed-size secrets (e.g., keys, hashes).
 - `Dynamic<T>` – Heap-allocated variable-size secrets (e.g., passwords, tokens).
+- `Fixed<T>` – Stack-allocated fixed-size secrets (e.g., keys, hashes).
 
 Zeroizes memory on drop (when `zeroize` enabled). All access requires explicit `.expose_secret()` or scoped `.with_secret()` – no implicit leaks.
 
@@ -97,11 +97,11 @@ Generic code across wrappers:
 - **`SecureEncoding`**: String encoding/decoding.
 
 ```rust
-use secure_gate::{Fixed, Dynamic, ExposeSecret};
+use secure_gate::{Dynamic, Fixed, ExposeSecret};
 extern crate alloc;
 
 fn check_len<T: ExposeSecret>(secret: &T) -> usize {
-    secret.len()  // Generic over Fixed/Dynamic
+    secret.len()  // Generic over Dynamic/Fixed
 }
 ```
 
@@ -126,10 +126,10 @@ Secure random bytes via system entropy.
     use secure_gate::{Fixed, Dynamic};
     extern crate alloc;
 
-    let key: Fixed<[u8; 32]> = Fixed::from_random();
     let data: Dynamic<Vec<u8>> = Dynamic::from_random(64);
+    let key: Fixed<[u8; 32]> = Fixed::from_random();
 
-    // Panics on RNG failure (fail-fast)
+    // Panics on RNG failure
 }
 ```
 
@@ -246,14 +246,6 @@ Mark types for serde export with `SerializableType`.
 
 ## Construction
 
-**Fixed** (exact sizes):
-```rust
-use secure_gate::Fixed;
-
-let fixed: Fixed<[u8; 4]> = [1, 2, 3, 4].into();  // Infallible
-let tried: Result<Fixed<[u8; 4]>, _> = [1, 2, 3, 4].try_into();  // Fallible alternative
-```
-
 **Dynamic** (flexible):
 ```rust
 use secure_gate::Dynamic;
@@ -261,6 +253,14 @@ extern crate alloc;
 
 let dyn_vec: Dynamic<Vec<u8>> = [1, 2, 3].as_slice().into();  // Infallible copy
 let dyn_str: Dynamic<String> = "hello".into();  // Infallible
+```
+
+**Fixed** (exact sizes):
+```rust
+use secure_gate::Fixed;
+
+let fixed: Fixed<[u8; 4]> = [1, 2, 3, 4].into();  // Infallible
+let tried: Result<Fixed<[u8; 4]>, _> = [1, 2, 3, 4].try_into();  // Fallible alternative
 ```
 
 ## Macros
@@ -305,8 +305,8 @@ fixed_generic_alias!(pub ApiKey, "Service API key");
 ## Memory & Performance
 
 **Zeroization** (`zeroize`):
-- Stack: `Fixed<T>` wipes on drop.
 - Heap: `Dynamic<T>` wipes full allocation, including slack (best-effort, not guaranteed in all environments).
+- Stack: `Fixed<T>` wipes on drop.
 
 **Performance**: Zero overhead—wrappers inline to raw types. Explicit exposure elided by optimizer.
 

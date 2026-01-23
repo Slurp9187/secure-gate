@@ -15,8 +15,8 @@ Adjust features for minimal builds (e.g., `default-features = false`).
 
 ## Table of Contents
 1. [Basic Construction & Access](#1-basic-construction--access)
-2. [Fixed-Size Secrets (Stack)](#2-fixed-size-secrets-stack)
-3. [Dynamic Secrets (Heap)](#3-dynamic-secrets-heap)
+2. [Dynamic Secrets (Heap)](#2-dynamic-secrets-heap)
+3. [Fixed-Size Secrets (Stack)](#3-fixed-size-secrets-stack)
 4. [Cryptographic Randomness (`rand`)](#4-cryptographic-randomness-rand)
 5. [Encoding & Decoding (`encoding-*`)](#5-encoding--decoding-encoding-)
 6. [Opt-In Cloning (`cloneable`)](#6-opt-in-cloning-cloneable)
@@ -28,6 +28,8 @@ Adjust features for minimal builds (e.g., `default-features = false`).
 12. [Macros Overview](#12-macros-overview)
 
 ## 1. Basic Construction & Access
+
+
 
 ### Fixed (Stack) – Immutable
 ```rust
@@ -62,33 +64,7 @@ assert_eq!(nonce.expose_secret()[0], 0xFF);
 assert_eq!(nonce.expose_secret()[1], 0xAA);
 ```
 
-### Dynamic (Heap) – Immutable
-```rust
-use secure_gate::*;
-extern crate alloc;
-
-let password: Dynamic<String> = "hunter2".into();
-
-let len = password.with_secret(|s| s.len());
-assert_eq!(len, 7);
-
-assert_eq!(password.expose_secret(), "hunter2");
-```
-
-### Dynamic (Heap) – Mutable
-```rust
-use secure_gate::*;
-extern crate alloc;
-
-let mut token: Dynamic<String> = "api_token".into();
-
-token.with_secret_mut(|s| s.push_str("_v2"));
-token.expose_secret_mut().push('!');
-
-assert_eq!(token.expose_secret(), "api_token_v2!");
-```
-
-## 2. Fixed-Size Secrets (Stack)
+## 2. Dynamic Secrets (Heap)
 
 ### From Array/Slice (Infallible)
 ```rust
@@ -135,7 +111,7 @@ fixed_generic_alias!(SecureBuffer);
 let buffer: SecureBuffer<64> = [0u8; 64].into();
 ```
 
-## 3. Dynamic Secrets (Heap)
+## 3. Fixed-Size Secrets (Stack)
 
 ### From Owned Values
 ```rust
@@ -366,11 +342,11 @@ fn get_len<S: ExposeSecret>(secret: &S) -> usize {
     secret.len()
 }
 
-let fixed: Fixed<[u8; 16]> = [0; 16].into();
 let dynamic: Dynamic<Vec<u8>> = vec![1; 8].into();
+let fixed: Fixed<[u8; 16]> = [0; 16].into();
 
-assert_eq!(get_len(&fixed), 16);
 assert_eq!(get_len(&dynamic), 8);
+assert_eq!(get_len(&fixed), 16);
 ```
 
 ### Constant-Time Equality
@@ -384,8 +360,8 @@ assert_eq!(get_len(&dynamic), 8);
         a.ct_eq(b)
     }
 
-    let a: Fixed<[u8; 4]> = [1; 4].into();
-    let b: Fixed<[u8; 4]> = [1; 4].into();
+    let a: Dynamic<Vec<u8>> = vec![1; 4].into();
+    let b: Dynamic<Vec<u8>> = vec![1; 4].into();
     assert!(safe_eq(&a, &b));
 }
 ```

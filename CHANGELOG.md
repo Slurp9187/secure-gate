@@ -8,10 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.7.0] - 2026-01-22
 
 ### Added
-- **Security Hardening for Secret Wrappers**: Complete overhaul of `Fixed<T>` and `Dynamic<T>` with explicit exposure model. Added private `inner` fields, requiring all access through controlled methods. Introduced dual exposure API: scoped `with_secret` (recommended for safety) and direct `expose_secret` (auditable escape hatch). Prevents accidental leaks via long-lived borrows.
+- **Security Hardening for Secret Wrappers**: Complete overhaul of `Dynamic<T>` and `Fixed<T>` with explicit exposure model. Added private `inner` fields, requiring all access through controlled methods. Introduced dual exposure API: scoped `with_secret` (recommended for safety) and direct `expose_secret` (auditable escape hatch). Prevents accidental leaks via long-lived borrows.
 - **Opt-In Cloning**: New `CloneableType` marker trait for deliberate secret duplication. Independent of `zeroize` for embedded compatibility. Replaced implicit cloning with explicit marker implementation on inner types.
 - **Opt-In Serialization**: Split `serde` into `serde-deserialize` and `serde-serialize` features. `Deserialize` for all wrappers with secure construction; `Serialize` gated behind `SerializableType` marker trait for user-opt-in export.
-- **Polymorphic Traits**: Added `ExposeSecret` and `ExposeSecretMut` traits in `src/traits/` for generic secret access with metadata (length, emptiness) without exposing contents. Implemented for `Fixed<T>` and `Dynamic<T>` with zero-cost abstractions.
+- **Polymorphic Traits**: Added `ExposeSecret` and `ExposeSecretMut` traits in `src/traits/` for generic secret access with metadata (length, emptiness) without exposing contents. Implemented for `Dynamic<T>` and `Fixed<T>` with zero-cost abstractions.
 - **Enhanced Encoding System**: Replaced old conversions with `SecureEncoding` trait. Added `to_hex`, `to_hex_upper`, `to_base64url`, `to_bech32`, `to_bech32m` methods on any `AsRef<[u8]>` (including consuming `into_*` variants). Granular features: `encoding-hex`, `encoding-base64`, `encoding-bech32`, meta `encoding`.
 - **Constant-Time Equality**: `ConstantTimeEq` trait in `src/traits/constant_time_eq` with `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>` for timing-attack resistance.
 - **Random Generation**: `from_random()` on `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` for cryptographically secure initialization (panics on RNG failure, requires `rand`).

@@ -4,8 +4,8 @@
 
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
-//! Zero-cost secure wrappers for secrets — [`Fixed<T>`] for stack-allocated fixed-size data,
-//! [`Dynamic<T>`] for heap-allocated variable-length data.
+//! Zero-cost secure wrappers for secrets — [`Dynamic<T>`] for heap-allocated variable-length data,
+//! [`Fixed<T>`] for stack-allocated fixed-size data.
 //!
 //! This crate provides explicit, guarded wrappers for sensitive values (e.g. keys, tokens, ciphertexts)
 //! with controlled exposure via `.expose_secret()` / `.expose_secret_mut()`. No accidental leaks via

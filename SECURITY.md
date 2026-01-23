@@ -48,7 +48,7 @@ The implementation relies on vetted dependencies (`zeroize`, `subtle`, `blake3`,
 
 ## Module-by-Module Security Notes
 
-### Core Wrappers (`fixed.rs`, `dynamic.rs`)
+### Core Wrappers (`dynamic.rs`, `fixed.rs`)
 - **Strengths**
   - Private `inner` fields prevent direct access; all exposure via audited methods.
   - Dual exposure: Scoped `with_secret()` closures limit borrow lifetimes; direct `expose_secret()` is grep-able.
@@ -93,7 +93,7 @@ The implementation relies on vetted dependencies (`zeroize`, `subtle`, `blake3`,
 ## Best Practices
 - **Enable defaults**: Use `secure` meta-feature unless constraints prohibit it.
 - **Audit exposure**: Grep all `with_secret()`, `expose_secret()`, `expose_secret_mut()` calls—prefer scoped access.
-- **Use aliases**: Leverage `fixed_alias!`, `dynamic_alias!` for semantic types.
+- **Use aliases**: Leverage `dynamic_alias!`, `fixed_alias!` for semantic types.
 - **Limit risky ops**: Avoid cloning/serialization unless necessary; audit all marker impls.
 - **Input validation**: Check upstream before encoding/decoding; trust no inputs.
 - **Monitor deps**: Keep dependencies updated; review CVE reports.
