@@ -1,7 +1,9 @@
+// uncomment for doctest runs
+// #![doc = include_str!("../EXAMPLES.md")]
+// #![doc = include_str!("../README.md")]
+
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
-// #![doc = include_str!("../README.md")] // uncomment for doctest runs
-// #![doc = include_str!("../EXAMPLES.md")] // uncomment for doctest runs
 //! Zero-cost secure wrappers for secrets — [`Fixed<T>`] for stack-allocated fixed-size data,
 //! [`Dynamic<T>`] for heap-allocated variable-length data.
 //!

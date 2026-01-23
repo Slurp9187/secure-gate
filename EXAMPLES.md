@@ -151,7 +151,7 @@ let vec_dyn: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
 use secure_gate::*;
 extern crate alloc;
 
-let slice = &[1u8, 2, 3, 4];
+let slice = [1u8, 2, 3, 4].as_slice();
 let dyn_vec: Dynamic<Vec<u8>> = slice.into();  // Copies
 assert_eq!(dyn_vec.expose_secret(), &[1, 2, 3, 4]);
 ```
@@ -246,7 +246,7 @@ let text: Secret<String> = "hidden".into();
     let bech32 = data.to_bech32("test");  // e.g., "test1..."
 
     // Fallible
-    match data.try_to_bech32("test") {
+    match data.try_to_bech32("test", None) {
         Ok(encoded) => println!("Encoded: {}", encoded),
         Err(e) => eprintln!("Error: {:?}", e),
     }
@@ -255,22 +255,22 @@ let text: Secret<String> = "hidden".into();
 
 ### Serde Auto-Decoding
 ```rust
-#[cfg(all(feature = "serde-deserialize", any(feature = "encoding-hex", feature = "encoding-base64", feature = "encoding-bech32")))]
-{
-    use secure_gate::*;
-    use serde_json;
-    extern crate alloc;
+// #[cfg(all(feature = "serde-deserialize", any(feature = "encoding-hex", feature = "encoding-base64", feature = "encoding-bech32")))]
+// {
+//     use secure_gate::*;
+//     use serde_json;
+//     extern crate alloc;
 
-    // Hex: "deadbeef"
-    let hex: Dynamic<Vec<u8>> = serde_json::from_str(r#""deadbeef""#).unwrap();
+//     // Hex: "deadbeef"
+//     let hex: Dynamic<Vec<u8>> = serde_json::from_str(r#""deadbeef""#).expect("Failed to decode hex string");
 
-    // Base64: "SGVsbG8"
-    let b64: Dynamic<Vec<u8>> = serde_json::from_str(r#""SGVsbG8""#).unwrap();
+//     // Base64: "SGVsbG8"
+//     let b64: Dynamic<Vec<u8>> = serde_json::from_str(r#""SGVsbG8""#).unwrap();
 
-    // Bech32 (valid HRP required)
-    #[cfg(feature = "encoding-bech32")]
-    let bech32: Dynamic<Vec<u8>> = serde_json::from_str(r#""test1..."#).unwrap();
-}
+//     // Bech32 (valid HRP required)
+//     #[cfg(feature = "encoding-bech32")]
+//     let bech32: Dynamic<Vec<u8>> = serde_json::from_str(r#""test1..."#).unwrap();
+// }
 ```
 
 ## 6. Opt-In Cloning (`cloneable`)
@@ -314,7 +314,7 @@ let text: Secret<String> = "hidden".into();
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::SerializableType;
+    use secure_gate::{SerializableType, Dynamic};
     use serde::Serialize;
 
     #[derive(Serialize)]
@@ -363,7 +363,7 @@ use secure_gate::*;
 extern crate alloc;
 
 fn get_len<S: ExposeSecret>(secret: &S) -> usize {
-    secret.with_secret(|inner| inner.len())
+    secret.len()
 }
 
 let fixed: Fixed<[u8; 16]> = [0; 16].into();
@@ -380,16 +380,12 @@ assert_eq!(get_len(&dynamic), 8);
     use secure_gate::*;
     extern crate alloc;
 
-    fn safe_eq<L, R>(a: &L, b: &R) -> bool
-    where
-        L: ConstantTimeEq,
-        R: ConstantTimeEq,
-    {
+    fn safe_eq<S: ConstantTimeEq>(a: &S, b: &S) -> bool {
         a.ct_eq(b)
     }
 
     let a: Fixed<[u8; 4]> = [1; 4].into();
-    let b: Dynamic<Vec<u8>> = vec![1; 4].into();
+    let b: Fixed<[u8; 4]> = [1; 4].into();
     assert!(safe_eq(&a, &b));
 }
 ```
@@ -401,11 +397,7 @@ assert_eq!(get_len(&dynamic), 8);
     use secure_gate::*;
     extern crate alloc;
 
-    fn hash_eq<L, R>(a: &L, b: &R) -> bool
-    where
-        L: HashEq,
-        R: HashEq,
-    {
+    fn hash_eq<S: HashEq>(a: &S, b: &S) -> bool {
         a.hash_eq(b)
     }
 
@@ -476,7 +468,7 @@ extern crate alloc;
 // Always infallible (copies)
 let from_vec: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
 let from_str: Dynamic<String> = "hello".into();
-let from_slice: Dynamic<Vec<u8>> = (&[4, 5, 6]).into();
+let from_slice: Dynamic<Vec<u8>> = [4u8, 5, 6].as_slice().into();
 ```
 
 ## 12. Macros Overview

@@ -165,7 +165,7 @@ Explicit string conversions via `SecureEncoding` trait.
     use secure_gate::Dynamic;
     extern crate alloc;
 
-    let key: Dynamic<Vec<u8>> = serde_json::from_str(r#""deadbeef""#).unwrap();
+    let key: Dynamic<Vec<u8>> = serde_json::from_str(r#""deadbeef""#).expect("Failed to decode hex string");
 }
 
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]

@@ -9,6 +9,9 @@ use base64_crate::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64_crate::Engine;
 
 #[cfg(feature = "encoding-bech32")]
+use ::bech32;
+
+#[cfg(feature = "encoding-bech32")]
 use crate::error::Bech32Error;
 
 /// Local implementation of bit conversion for Bech32, since bech32 crate doesn't expose it in v0.11.

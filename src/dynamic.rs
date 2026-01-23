@@ -48,13 +48,13 @@ fn convert_bits(
 #[cfg(feature = "serde-deserialize")]
 fn try_decode(s: &str) -> Result<alloc::vec::Vec<u8>, crate::DecodingError> {
     #[cfg(feature = "encoding-bech32")]
-    if let Ok((_, data)) = bech32::decode(s) {
+    if let Ok((_, data)) = ::bech32::decode(s) {
         let (converted, _) =
             convert_bits(5, 8, false, &data).map_err(|_| crate::DecodingError::InvalidBech32)?;
         return Ok(converted);
     }
     #[cfg(feature = "encoding-hex")]
-    if let Ok(data) = general_purpose::URL_SAFE_NO_PAD.decode(s) {
+    if let Ok(data) = ::hex::decode(s) {
         return Ok(data);
     }
 
