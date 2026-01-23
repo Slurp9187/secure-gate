@@ -50,10 +50,3 @@ path = "fuzz_targets/parsing.rs"
 test = false
 bench = false
 doc = false
-
-[[bin]]
-name = "serde"
-path = "fuzz_targets/serde.rs"
-test = false
-bench = false
-doc = false
