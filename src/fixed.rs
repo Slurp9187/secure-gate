@@ -1,41 +1,3 @@
-/// Stack-allocated secure secret wrapper.
-///
-/// This is a zero-cost wrapper for fixed-size secrets like byte arrays or primitives.
-/// The inner field is private, forcing all access through explicit methods.
-///
-/// Security invariants:
-/// - No `Deref` or `AsRef` — prevents silent access or borrowing.
-/// - No implicit `Copy` — even for `[u8; N]`, duplication must be explicit via `.clone()`.
-/// - `Debug` is always redacted.
-///
-/// # Examples
-///
-/// Basic usage:
-/// ```
-/// use secure_gate::{Fixed, ExposeSecret};
-/// let secret = Fixed::new([42u8; 1]);
-/// assert_eq!(secret.expose_secret()[0], 42);
-/// ```
-///
-/// For byte arrays (most common):
-/// ```
-/// use secure_gate::{fixed_alias, Fixed, ExposeSecret};
-/// fixed_alias!(Aes256Key, 32);
-/// let key_bytes = [0x42u8; 32];
-/// let key: Aes256Key = Fixed::from(key_bytes);
-/// assert_eq!(key.len(), 32);
-/// assert_eq!(key.expose_secret()[0], 0x42);
-/// ```
-///
-/// With `zeroize` feature (automatic wipe on drop):
-/// ```
-/// # #[cfg(feature = "zeroize")]
-/// # {
-/// use secure_gate::Fixed;
-/// let mut secret = Fixed::new([1u8, 2, 3]);
-/// drop(secret); // memory wiped automatically
-/// # }
-/// ```
 #[cfg(feature = "rand")]
 use rand::TryRngCore;
 
@@ -100,6 +62,44 @@ fn try_decode(s: &str) -> Result<alloc::vec::Vec<u8>, crate::DecodingError> {
     Err(crate::DecodingError::InvalidEncoding)
 }
 
+/// Fixed-size stack-allocated secure secret wrapper.
+///
+/// This is a zero-cost wrapper for fixed-size secrets like byte arrays or primitives.
+/// The inner field is private, forcing all access through explicit methods.
+///
+/// Security invariants:
+/// - No `Deref` or `AsRef` — prevents silent access or borrowing.
+/// - No implicit `Copy` — even for `[u8; N]`, duplication must be explicit via `.clone()`.
+/// - `Debug` is always redacted.
+///
+/// # Examples
+///
+/// Basic usage:
+/// ```
+/// use secure_gate::{Fixed, ExposeSecret};
+/// let secret = Fixed::new([42u8; 1]);
+/// assert_eq!(secret.expose_secret()[0], 42);
+/// ```
+///
+/// For byte arrays (most common):
+/// ```
+/// use secure_gate::{fixed_alias, Fixed, ExposeSecret};
+/// fixed_alias!(Aes256Key, 32);
+/// let key_bytes = [0x42u8; 32];
+/// let key: Aes256Key = Fixed::from(key_bytes);
+/// assert_eq!(key.len(), 32);
+/// assert_eq!(key.expose_secret()[0], 0x42);
+/// ```
+///
+/// With `zeroize` feature (automatic wipe on drop):
+/// ```
+/// # #[cfg(feature = "zeroize")]
+/// # {
+/// use secure_gate::Fixed;
+/// let mut secret = Fixed::new([1u8, 2, 3]);
+/// drop(secret); // stack memory wiped automatically
+/// # }
+/// ```
 pub struct Fixed<T> {
     inner: T,
 }

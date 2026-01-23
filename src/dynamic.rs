@@ -66,10 +66,11 @@ fn try_decode(s: &str) -> Result<alloc::vec::Vec<u8>, crate::DecodingError> {
     Err(crate::DecodingError::InvalidEncoding)
 }
 
-/// Heap-allocated secure secret wrapper.
+/// Dynamic-sized heap-allocated secure secret wrapper.
 ///
 /// This is a thin wrapper around `Box<T>` with enforced explicit exposure.
 /// Suitable for dynamic-sized secrets like `String` or `Vec<u8>`.
+/// The inner field is private, forcing all access through explicit methods.
 ///
 /// Security invariants:
 /// - No `Deref` or `AsRef` — prevents silent access.
@@ -102,12 +103,13 @@ fn try_decode(s: &str) -> Result<alloc::vec::Vec<u8>, crate::DecodingError> {
 /// ```
 ///
 /// With `zeroize` (automatic wipe):
+/// With `zeroize` feature (automatic wipe on drop):
 /// ```
 /// # #[cfg(feature = "zeroize")]
 /// # {
 /// use secure_gate::Dynamic;
 /// let secret = Dynamic::<Vec<u8>>::new(vec![1u8; 32]);
-/// drop(secret); // heap wiped automatically
+/// drop(secret); // heap allocation wiped automatically
 /// # }
 /// ```
 pub struct Dynamic<T: ?Sized> {
