@@ -8,81 +8,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.7.0] - 2026-01-22
 
 ### Added
-
-+ **Refined `serde` feature** for JSON/TOML/YAML serialization support (addresses ROADMAP):
-  - Split into separate `serde-deserialize` and `serde-serialize` features for granular control
-  - `serde-deserialize`: Enables `Deserialize` impls for all secret wrapper types with secure construction and zeroizing of invalid inputs
-  - `serde-serialize`: Enables opt-in `Serialize` via new `SerializableType` marker trait (requires `serde::Serialize`), uniformly gated for all types
-  - `serde`: Meta-feature enabling both `serde-deserialize` and `serde-serialize`
-  - Implemented for core types (`Fixed<T>`, `Dynamic<T>`)
-  - No blanket implementations; purely user-opt-in serialization to maximize auditability
-  - Comprehensive tests in `tests/serde_tests.rs` covering validation, edge cases, and security
-
-- **Core polymorphism traits** in new `src/traits/` module for generic secret operations:
-  - `ExposeSecret` & `ExposeSecretMut` traits for polymorphic secret access with controlled mutability and metadata (length/emptiness queries without exposing contents)
-  - Implemented for all secret wrapper types: `Fixed`, `Dynamic`, and cloneable types
-  - Zero-cost abstractions with `#[inline(always)]` for optimal performance
-  - Comprehensive rustdoc with security guarantees and usage examples
-- `CloneableType` trait for opt-in cloning of secrets.
-  - Custom types can implement the trait for controlled duplication.
-  - Cloneable feature is independent of `zeroize` for embedded/stripped mode compatibility, allowing insecure cloning via raw types without zeroization (secure cloning still recommended).
-- Macros for creating custom cloneable type aliases (`cloneable_fixed_alias!`, `cloneable_dynamic_alias!`).
-- RNG methods: `from_random()` on `Fixed<N>` and `Dynamic`, for cryptographically secure initialization (panics on RNG failure).
-- `into_hex()` (consuming) and `to_hex()` (borrowing) methods on `Fixed<N>` and `Dynamic` (requires `encoding-hex`).
-- `into_base64()` (consuming) and `to_base64url()` (borrowing) methods on `Fixed<N>` and `Dynamic` (requires `encoding-base64`).
-- `into_bech32(hrp)` / `to_bech32(hrp)` and `into_bech32m(hrp)` / `to_bech32m(hrp)` methods on `Fixed<N>` and `Dynamic` (requires `encoding-bech32`).
-- Borrowing encoding methods (`to_hex()`, `to_hex_upper()`, `to_base64url()`, `to_bech32()`, `to_bech32m()`) available on any `&[u8]` via `SecureEncoding` trait.
-- Constant-time equality in `traits/constant_time_eq` module with `ConstantTimeEq` trait and inherent `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
-- Fallible construction: `impl TryFrom<&[u8]> for Fixed<[u8; N]>` with `FromSliceError`.
-  - Removed `from_slice` method on `Fixed<[u8; N]>`.
-  - Error types centralized in `error.rs` with `thiserror` for improved error handling.
-- Compile-fail testing infrastructure using `trybuild` for security invariant verification.
-- Conversions: `From<&str>` for `Dynamic<String>` and `From<&[u8]>` for `Dynamic<Vec<u8>>`.
-- Granular `encoding-bech32` feature and inclusion in meta-feature `encoding`.
-- Centralized error types in new `error.rs` module.
-- Implemented `thiserror` for automatic `Display` and `std::error::Error` trait implementations on error types.
-- `Bech32EncodingError` enum for Bech32 encoding operations (`InvalidHrp`, `EncodingFailed`).
-
-- **New encoding system**:
-  - Replaced `conversions` module/feature with `SecureEncoding` trait for byte encoding (renamed from `SecureEncodingExt`).
-  - Feature-gated methods for hex, base64, and bech32 encoding on any `AsRef<[u8]>`.
-  - Granular features: `encoding` enables `encoding-hex`, `encoding-base64`, and `encoding-bech32`.
-  - Removed `RandomHex` type; replaced with direct methods on `Fixed<N>` and `Dynamic`.
-- Fallible Bech32 encoding methods: `try_to_bech32()`, `try_to_bech32m()` on `SecureEncoding` (available on `Fixed<N>`, `Dynamic`).
-- SECURITY.md document with security considerations, module analysis, and mitigation strategies.
-- Enhanced `CloneableType` trait documentation with implementation examples and warnings.
-- Security Checklist section in README.md with best practices.
-
-- **Dedicated serde fuzz target** (`fuzz_targets/serde.rs`) for secure deserialization testing: covers JSON/TOML/YAML parsing, validation logic, zeroization on invalid inputs, temporary allocation handling, and edge cases to prevent deserialization-based vulnerabilities from untrusted structured data.
-- Optional custom rustdoc string support added to all non-generic alias macros (`fixed_alias!`, `dynamic_alias!`, `fixed_alias_random!`) for full consistency with generic variants. Accepts an optional third parameter for custom documentation, falling back to generated docs when omitted. Backward compatible and improves API discoverability.
-
-- **Opt-in raw serialization system** (`"serde-serialize"` feature) for deliberate secret export:
-  - Macros `serializable_fixed_alias!` and `serializable_dynamic_alias!` for creating custom serializable secret types.
-  - Benchmarks (`benches/serde.rs`) measuring minimal overhead vs. raw types.
-  - Unit tests, integration tests, compile-fail tests, and security tests ensuring no leaks.
-  - CI matrix in `.github/workflows/ci.yml` for comprehensive testing across 8 key feature combinations (default, full, insecure variants, no features).
-  - `insecure_tests.rs` for validating stripped mode functionality and cloneable independence in low-resource environments.
-  - Unconditional `#![forbid(unsafe_code)]` — paradigm shift from conditional forbid (only in minimal builds) to forbidding unsafe code everywhere, strengthening memory safety guarantees.
+- **Security Hardening for Secret Wrappers**: Complete overhaul of `Fixed<T>` and `Dynamic<T>` with explicit exposure model. Added private `inner` fields, requiring all access through controlled methods. Introduced dual exposure API: scoped `with_secret` (recommended for safety) and direct `expose_secret` (auditable escape hatch). Prevents accidental leaks via long-lived borrows.
+- **Opt-In Cloning**: New `CloneableType` marker trait for deliberate secret duplication. Independent of `zeroize` for embedded compatibility. Replaced implicit cloning with explicit marker implementation on inner types.
+- **Opt-In Serialization**: Split `serde` into `serde-deserialize` and `serde-serialize` features. `Deserialize` for all wrappers with secure construction; `Serialize` gated behind `SerializableType` marker trait for user-opt-in export.
+- **Polymorphic Traits**: Added `ExposeSecret` and `ExposeSecretMut` traits in `src/traits/` for generic secret access with metadata (length, emptiness) without exposing contents. Implemented for `Fixed<T>` and `Dynamic<T>` with zero-cost abstractions.
+- **Enhanced Encoding System**: Replaced old conversions with `SecureEncoding` trait. Added `to_hex`, `to_hex_upper`, `to_base64url`, `to_bech32`, `to_bech32m` methods on any `AsRef<[u8]>` (including consuming `into_*` variants). Granular features: `encoding-hex`, `encoding-base64`, `encoding-bech32`, meta `encoding`.
+- **Constant-Time Equality**: `ConstantTimeEq` trait in `src/traits/constant_time_eq` with `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>` for timing-attack resistance.
+- **Random Generation**: `from_random()` on `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` for cryptographically secure initialization (panics on RNG failure, requires `rand`).
+- **Error Handling Overhaul**: Centralized errors in `error.rs` with `thiserror`. Added `Bech32Error` (renamed from `Bech32EncodingError`) and `DecodingError` for unified failures. `SecureEncoding` now returns proper errors instead of panics.
+- **Fallible Construction**: `impl TryFrom<&[u8]> for Fixed<[u8; N]>` with `FromSliceError` for safe slicing.
+- **Testing Infrastructure**: Compile-fail tests with `trybuild` for invariant verification. Serde fuzz target (`fuzz_targets/serde.rs`) for deserialization security. CI matrix expanded to 8 feature combinations.
+- **Documentation**: `SECURITY.md` with considerations and mitigations. Enhanced README with Security Checklist. Custom rustdoc support for all alias macros.
+- **Conversions and Helpers**: `From<&str>` for `Dynamic<String>`, `From<&[u8]>` for `Dynamic<Vec<u8>>`. Zeroize integration with `Zeroize` and `ZeroizeOnDrop`.
+- **No Unsafe Code Guarantee**: Unconditional `#![forbid(unsafe_code)]` across all builds, strengthening memory safety.
 
 ### Changed (Breaking)
-- Default features changed to `secure` (new meta-feature bundling `zeroize` + `ct-eq`) to prioritize secure memory handling by default while minimizing dependencies; `insecure` for opt-out; updated `full = ["secure", "encoding"]`.
-- Cloning model: switched to opt-in via `CloneableType`, centered on macro-generated cloneable types via `cloneable_fixed_alias!` and `cloneable_dynamic_alias!` for maximum ergonomics and safety.
-  - All cloneable types are distinctly typed from non-cloneable counterparts — no accidental mixing.
-- `SecureEncoding` trait re-export cfg updated to include `encoding-bech32` feature.
-- Error handling overhaul: Renamed `Bech32EncodingError` to `Bech32Error` for broader use (encoding/decoding), added `DecodingError` enum for unified decoding failures (hex/base64/bech32), and updated `SecureEncoding` to use `Bech32Error`; internal decoding now returns proper error types instead of static strings.
+- **Default Features**: Switched to `secure` meta-feature (`zeroize` + `ct-eq`) for secure-by-default. `insecure` for opt-out. `full` now `["secure", "encoding"]`.
+- **Cloning Model**: Opt-in via `CloneableType` on inner types. No more implicit `Clone` on wrappers.
+- **Serialization**: Opt-in via `SerializableType` marker. No automatic `Serialize` impls.
+- **Exposure Model**: All access now explicit. No `Deref`, `AsRef`, or implicit borrowing. Direct `inner` access removed from public API.
+- **Error Types**: Renamed and unified error enums. `from_slice` removed in favor of `try_from`.
+- **Bech32**: Now fallible with `try_to_bech32`/`try_to_bech32m`, returning errors instead of panicking.
 
 ### Fixed
-
-- Doc-test compatibility across all feature configurations.
-- Bech32/Bech32m variant detection and normalization robustness.
-- **FromSliceError enhancement**: Manual `Display` and `Error` impls to fix deprecated auto-generated methods.
+- **Doc-Tests**: Compatibility across all feature configurations.
+- **Bech32 Robustness**: Improved variant detection and HRP handling.
+- **Error Display**: Manual `Display`/`Error` impls for `FromSliceError` to replace deprecated traits.
 
 ### Removed
-
-- `NoClone` wrapper types and `no_clone()` methods.
-- `Dynamic::new_boxed()` method (redundant with `From<Box<T>>` impl).
-- `from_slice` method on `Fixed<[u8; N]>` (panicking; use `try_from` for fallible construction).
-
+- **NoClone Wrappers**: `NoClone` types and `no_clone()` methods (replaced by opt-in model).
+- **Redundant Methods**: `Dynamic::new_boxed()` (superseded by `From<Box<T>>`). `from_slice` on `Fixed<[u8; N]>` (panicking, use `try_from`).
+- **Unsafe Code**: Conditional forbids removed; now forbidden unconditionally.
+- **Old Encoding**: `RandomHex` type and conversions module replaced by `SecureEncoding`.
+- **Implicit Behaviors**: Automatic `Clone`/`Serialize` on wrappers; replaced with markers.
 
 ## [0.6.1] - 2025-12-07
 
