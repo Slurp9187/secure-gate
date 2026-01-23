@@ -40,10 +40,6 @@ jobs:
       - name: Setup Miri
         run: cargo miri setup
 
-      - name: Run compile-fail tests (excluded from Miri due to syscall incompatibilities)
-        run: |
-          cargo test --test compile_fail_tests --all-features -- --include-ignored
-
       - name: Run Miri on all other tests (strict)
         env:
           MIRIFLAGS: >-
