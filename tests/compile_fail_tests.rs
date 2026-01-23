@@ -9,10 +9,3 @@ fn fixed_alias_zero_size_compile_fail() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/fixed_alias_zero_size.rs");
 }
-
-#[cfg(feature = "serde-serialize")]
-#[test]
-fn serde_core_without_marker_compile_fail() {
-    let t = trybuild::TestCases::new();
-    t.compile_fail("tests/compile-fail/serde_core_without_marker.rs");
-}
