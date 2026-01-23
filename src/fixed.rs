@@ -225,6 +225,50 @@ where
 /// # Byte-array specific helpers
 impl<const N: usize> Fixed<[u8; N]> {}
 
+// From impls for byte arrays and slices
+impl<const N: usize> From<&[u8]> for Fixed<[u8; N]> {
+    /// Create a `Fixed` from a byte slice, panicking on length mismatch.
+    ///
+    /// This is a fail-fast conversion for crypto contexts where exact length is expected.
+    /// Panics if the slice length does not match the array size `N`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `slice.len() != N`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use secure_gate::Fixed;
+    /// let key: Fixed<[u8; 4]> = (&[1, 2, 3, 4][..]).into();
+    /// ```
+    fn from(slice: &[u8]) -> Self {
+        if slice.len() != N {
+            core::panic!("slice length mismatch: expected {}, got {}", N, slice.len());
+        }
+        let mut arr = [0u8; N];
+        arr.copy_from_slice(slice);
+        Self::new(arr)
+    }
+}
+
+impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
+    /// Wrap a raw byte array in a `Fixed` secret.
+    ///
+    /// Zero-cost conversion.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use secure_gate::Fixed;
+    /// let key: Fixed<[u8; 4]> = [1, 2, 3, 4].into();
+    /// ```
+    #[inline(always)]
+    fn from(arr: [u8; N]) -> Self {
+        Self::new(arr)
+    }
+}
+
 /// Custom serde deserialization for byte arrays with auto-detection of hex/base64/bech32 strings.
 #[cfg(feature = "serde-deserialize")]
 impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
@@ -282,52 +326,6 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
         }
 
         deserializer.deserialize_any(FixedVisitor::<N>)
-    }
-}
-/// # Byte-array specific helpers
-impl<const N: usize> Fixed<[u8; N]> {}
-
-// From impls for byte arrays and slices
-impl<const N: usize> From<&[u8]> for Fixed<[u8; N]> {
-    /// Create a `Fixed` from a byte slice, panicking on length mismatch.
-    ///
-    /// This is a fail-fast conversion for crypto contexts where exact length is expected.
-    /// Panics if the slice length does not match the array size `N`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `slice.len() != N`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use secure_gate::Fixed;
-    /// let key: Fixed<[u8; 4]> = (&[1, 2, 3, 4][..]).into();
-    /// ```
-    fn from(slice: &[u8]) -> Self {
-        if slice.len() != N {
-            core::panic!("slice length mismatch: expected {}, got {}", N, slice.len());
-        }
-        let mut arr = [0u8; N];
-        arr.copy_from_slice(slice);
-        Self::new(arr)
-    }
-}
-
-impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
-    /// Wrap a raw byte array in a `Fixed` secret.
-    ///
-    /// Zero-cost conversion.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use secure_gate::Fixed;
-    /// let key: Fixed<[u8; 4]> = [1, 2, 3, 4].into();
-    /// ```
-    #[inline(always)]
-    fn from(arr: [u8; N]) -> Self {
-        Self::new(arr)
     }
 }
 
