@@ -6,20 +6,11 @@
 
 #![cfg(test)]
 
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32",
-    all(feature = "serde-deserialize", feature = "serde-serialize"),
-    feature = "ct-eq"
-))]
-use proptest::prelude::*;
-
 extern crate alloc;
 
 #[cfg(feature = "ct-eq")]
 mod ct_eq_proptests {
-    use super::*;
+    use proptest::prelude::*;
 
     #[cfg(feature = "ct-eq")]
     proptest! {
@@ -53,7 +44,7 @@ fn proptest_modules_present() {
 
 #[cfg(feature = "ct-eq")]
 mod ct_eq_wrapper_proptests {
-    use super::*;
+    use proptest::prelude::*;
     use secure_gate::{dynamic_alias, fixed_alias};
 
     fixed_alias!(TestFixed32, 32);
@@ -91,7 +82,7 @@ mod ct_eq_wrapper_proptests {
 ))]
 #[cfg(all(feature = "encoding-hex", feature = "serde-deserialize"))]
 mod encoding_roundtrip_proptests {
-    use super::*;
+    use proptest::prelude::*;
     #[cfg(feature = "serde-deserialize")]
     use secure_gate::ExposeSecret;
     #[cfg(feature = "encoding-bech32")]
@@ -136,7 +127,7 @@ mod encoding_roundtrip_proptests {
 
 #[cfg(feature = "hash-eq")]
 mod hash_eq_proptests {
-    use super::*;
+    use proptest::prelude::*;
     use secure_gate::{dynamic_alias, fixed_alias, HashEq};
 
     fixed_alias!(TestFixed32, 32);
