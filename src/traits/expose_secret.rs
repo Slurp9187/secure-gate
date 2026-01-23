@@ -15,22 +15,49 @@
 //!   only implement [`ExposeSecret`] to prevent mutation
 //! - **Zero-cost**: All implementations use `#[inline(always)]`
 //!
+/// Trait for read-only access to secrets, including metadata.
+///
 /// ## Usage
 ///
 /// Import these traits to access secret values and their metadata ergonomically.
-use crate::{Dynamic, Fixed};
-
-/// Trait for read-only access to secrets, including metadata.
 ///
-/// Import this to enable `.expose_secret()`, `.len()`, and `.is_empty()`.
+/// Import this to enable `.with_secret()`, `.expose_secret()`, `.len()`, and `.is_empty()`.
 /// For mutable access, see [`super::ExposeSecretMut`].
+///
+/// ## Security Note
+///
+/// Prefer `with_secret` for scoped access to avoid accidental leaks through long-lived borrows.
+/// `expose_secret` is provided for cases where a direct reference is needed, but use with caution.
 pub trait ExposeSecret {
     /// The inner secret type being exposed.
     ///
     /// This can be a sized type (like `[u8; N]`) or unsized (like `str` or `[u8]`).
     type Inner: ?Sized;
 
+    /// Provide scoped read-only access to the secret.
+    ///
+    /// This is the preferred method for accessing secrets, as it prevents accidental leaks
+    /// through long-lived borrows. The closure receives a reference to the inner secret
+    /// and returns a value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use secure_gate::{Fixed, ExposeSecret};
+    /// let secret = Fixed::new([42u8; 4]);
+    /// let sum: u32 = secret.with_secret(|bytes| bytes.iter().map(|&b| b as u32).sum());
+    /// assert_eq!(sum, 42 * 4);
+    /// ```
+    fn with_secret<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&Self::Inner) -> R;
+
     /// Expose the secret for read-only access.
+    ///
+    /// # Security Warning
+    ///
+    /// This returns a direct reference that can be accidentally leaked. Prefer `with_secret`
+    /// for most use cases to ensure the secret is only accessed within a controlled scope.
     fn expose_secret(&self) -> &Self::Inner;
 
     /// Returns the length of the secret.
@@ -40,63 +67,5 @@ pub trait ExposeSecret {
     #[inline(always)]
     fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-}
-
-// ============================================================================
-// Core Wrapper Implementations
-// ============================================================================
-
-/// Implementation for [`Fixed<[T; N]>`] - provides full read/write access for arrays.
-///
-/// [`Fixed`] is a core wrapper that allows both reading and mutation of secrets.
-/// This implementation directly accesses the inner field.
-impl<const N: usize, T> ExposeSecret for Fixed<[T; N]> {
-    type Inner = [T; N];
-
-    #[inline(always)]
-    fn expose_secret(&self) -> &[T; N] {
-        &self.inner
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        N
-    }
-}
-
-/// Implementation for [`Dynamic<String>`] - provides full read/write access.
-///
-/// [`Dynamic<String>`] is a core wrapper that allows both reading and mutation of secrets.
-/// This implementation directly accesses the inner field.
-impl ExposeSecret for Dynamic<String> {
-    type Inner = String;
-
-    #[inline(always)]
-    fn expose_secret(&self) -> &String {
-        &self.inner
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-}
-
-/// Implementation for [`Dynamic<Vec<T>>`] - provides full read/write access.
-///
-/// [`Dynamic<Vec<T>>`] is a core wrapper that allows both reading and mutation of secrets.
-/// This implementation directly accesses the inner field.
-impl<T> ExposeSecret for Dynamic<Vec<T>> {
-    type Inner = Vec<T>;
-
-    #[inline(always)]
-    fn expose_secret(&self) -> &Vec<T> {
-        &self.inner
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.inner.len()
     }
 }

@@ -44,18 +44,14 @@ pub use fixed::Fixed;
 
 #[cfg(feature = "cloneable")]
 pub use traits::CloneableType;
-#[cfg(feature = "serde-serialize")]
-pub use traits::SerializableType;
 /// Re-export of the traits.
-pub use traits::{ExposeSecret, ExposeSecretMut};
-
-/// Re-export of the [`ConstantTimeEq`] trait.
 #[cfg(feature = "ct-eq")]
 pub use traits::ConstantTimeEq;
-
-/// Re-export of the [`HashEq`] trait.
 #[cfg(feature = "hash-eq")]
 pub use traits::HashEq;
+#[cfg(feature = "serde-serialize")]
+pub use traits::SerializableType;
+pub use traits::{ExposeSecret, ExposeSecretMut};
 
 /// Type alias macros (always available).
 /// Convenient macros for creating custom secret wrapper types.

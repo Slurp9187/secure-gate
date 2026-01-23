@@ -12,7 +12,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use serde_json::{from_str, to_string};
 
 #[cfg(feature = "serde-serialize")]
-use secure_gate::{ExposeSecret, SerializableType};
+use secure_gate::SerializableType;
 
 #[cfg(feature = "serde-serialize")]
 #[derive(serde::Serialize)]

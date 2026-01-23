@@ -98,7 +98,7 @@ fn try_decode(s: &str) -> Result<alloc::vec::Vec<u8>, crate::DecodingError> {
 }
 
 pub struct Fixed<T> {
-    pub(crate) inner: T,
+    inner: T,
 }
 
 impl<T> Fixed<T> {
@@ -119,6 +119,106 @@ impl<T> Fixed<T> {
     #[inline(always)]
     pub const fn new(value: T) -> Self {
         Fixed { inner: value }
+    }
+}
+
+#[cfg(feature = "cloneable")]
+impl<T: crate::CloneableType> Clone for Fixed<T> {
+    fn clone(&self) -> Self {
+        Self::new(self.inner.clone())
+    }
+}
+
+#[cfg(feature = "serde-serialize")]
+impl<T: crate::SerializableType> serde::Serialize for Fixed<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.inner.serialize(serializer)
+    }
+}
+
+impl<const N: usize, T> crate::ExposeSecret for Fixed<[T; N]> {
+    type Inner = [T; N];
+
+    #[inline(always)]
+    fn with_secret<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&[T; N]) -> R,
+    {
+        f(&self.inner)
+    }
+
+    #[inline(always)]
+    fn expose_secret(&self) -> &[T; N] {
+        &self.inner
+    }
+
+    #[inline(always)]
+    fn len(&self) -> usize {
+        N
+    }
+}
+
+impl<const N: usize, T> crate::ExposeSecretMut for Fixed<[T; N]> {
+    #[inline(always)]
+    fn with_secret_mut<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut [T; N]) -> R,
+    {
+        f(&mut self.inner)
+    }
+
+    #[inline(always)]
+    fn expose_secret_mut(&mut self) -> &mut [T; N] {
+        &mut self.inner
+    }
+}
+
+#[cfg(feature = "ct-eq")]
+impl<T> crate::ConstantTimeEq for Fixed<T>
+where
+    T: crate::ConstantTimeEq,
+{
+    fn ct_eq(&self, other: &Self) -> bool {
+        self.inner.ct_eq(&other.inner)
+    }
+}
+
+#[cfg(feature = "hash-eq")]
+impl<T> crate::HashEq for Fixed<T>
+where
+    T: AsRef<[u8]>,
+{
+    fn hash_eq(&self, other: &Self) -> bool {
+        #[cfg(feature = "rand")]
+        {
+            use once_cell::sync::Lazy;
+            use rand::{rngs::OsRng, TryRngCore};
+            static HASH_EQ_KEY: Lazy<[u8; 32]> = Lazy::new(|| {
+                let mut key = [0u8; 32];
+                let mut rng = OsRng;
+                rng.try_fill_bytes(&mut key).unwrap();
+                key
+            });
+            let mut self_hasher = blake3::Hasher::new_keyed(&HASH_EQ_KEY);
+            let mut other_hasher = blake3::Hasher::new_keyed(&HASH_EQ_KEY);
+            self_hasher.update(self.inner.as_ref());
+            other_hasher.update(other.inner.as_ref());
+            use crate::ConstantTimeEq;
+            self_hasher
+                .finalize()
+                .as_bytes()
+                .ct_eq(other_hasher.finalize().as_bytes())
+        }
+        #[cfg(not(feature = "rand"))]
+        {
+            let self_hash = blake3::hash(self.inner.as_ref());
+            let other_hash = blake3::hash(other.inner.as_ref());
+            use crate::ConstantTimeEq;
+            self_hash.as_bytes().ct_eq(other_hash.as_bytes())
+        }
     }
 }
 
