@@ -11,6 +11,9 @@
 #[cfg(feature = "hash-eq")]
 use criterion::{criterion_group, criterion_main, Criterion};
 
+#[cfg(feature = "hash-eq")]
+use std::hint::black_box;
+
 // Small secret: 32 B (expect ct-eq to be faster)
 #[cfg(feature = "hash-eq")]
 #[allow(non_snake_case)]
@@ -22,12 +25,12 @@ fn bench_32B_secret_comparison(c: &mut Criterion) {
 
     // Hash-eq comparison (HashEq::hash_eq uses BLAKE3 hash equality)
     c.bench_function("small_fixed_hash_eq", |bencher| {
-        bencher.iter(|| criterion::black_box(a.hash_eq(&b)));
+        bencher.iter(|| black_box(a.hash_eq(&b)));
     });
 
     // Ct-eq comparison (direct byte comparison)
     c.bench_function("small_fixed_ct_eq", |bencher| {
-        bencher.iter(|| criterion::black_box(a.ct_eq(&b)));
+        bencher.iter(|| black_box(a.ct_eq(&b)));
     });
 }
 // Large secret: 1 KiB (1024 bytes) (expect hash-eq to be faster)
@@ -41,12 +44,12 @@ fn bench_1KiB_secret_comparison(c: &mut Criterion) {
 
     // Hash-eq comparison (HashEq::hash_eq uses BLAKE3 hash equality)
     c.bench_function("large_dynamic_hash_eq", |bencher| {
-        bencher.iter(|| criterion::black_box(a.hash_eq(&b)));
+        bencher.iter(|| black_box(a.hash_eq(&b)));
     });
 
     // Ct-eq comparison (direct byte comparison)
     c.bench_function("large_dynamic_ct_eq", |bencher| {
-        bencher.iter(|| criterion::black_box(a.ct_eq(&b)));
+        bencher.iter(|| black_box(a.ct_eq(&b)));
     });
 }
 
@@ -59,17 +62,17 @@ fn bench_100KiB_secret_comparison(c: &mut Criterion) {
     // Hash-eq comparison (HashEq::hash_eq uses BLAKE3 hash equality)
     c.bench_function("ultra_large_dynamic_hash_eq", |bencher| {
         bencher.iter(|| {
-            let a: secure_gate::Dynamic<Vec<u8>> = criterion::black_box(vec![42u8; 102_400]).into();
-            let b: secure_gate::Dynamic<Vec<u8>> = criterion::black_box(vec![42u8; 102_400]).into();
-            criterion::black_box(a.hash_eq(&b))
+            let a: secure_gate::Dynamic<Vec<u8>> = black_box(vec![42u8; 102_400]).into();
+            let b: secure_gate::Dynamic<Vec<u8>> = black_box(vec![42u8; 102_400]).into();
+            black_box(a.hash_eq(&b))
         });
     });
 
     c.bench_function("ultra_large_dynamic_ct_eq", |bencher| {
         bencher.iter(|| {
-            let a: secure_gate::Dynamic<Vec<u8>> = criterion::black_box(vec![42u8; 102_400]).into();
-            let b: secure_gate::Dynamic<Vec<u8>> = criterion::black_box(vec![42u8; 102_400]).into();
-            criterion::black_box(a.ct_eq(&b))
+            let a: secure_gate::Dynamic<Vec<u8>> = black_box(vec![42u8; 102_400]).into();
+            let b: secure_gate::Dynamic<Vec<u8>> = black_box(vec![42u8; 102_400]).into();
+            black_box(a.ct_eq(&b))
         });
     });
 }
@@ -83,21 +86,17 @@ fn bench_1MiB_secret_comparison(c: &mut Criterion) {
     // Hash-eq comparison (HashEq::hash_eq uses BLAKE3 hash equality)
     c.bench_function("massive_dynamic_hash_eq", |bencher| {
         bencher.iter(|| {
-            let a: secure_gate::Dynamic<Vec<u8>> =
-                criterion::black_box(vec![255u8; 1_048_576]).into(); // ~1MiB
-            let b: secure_gate::Dynamic<Vec<u8>> =
-                criterion::black_box(vec![255u8; 1_048_576]).into();
-            criterion::black_box(a.hash_eq(&b))
+            let a: secure_gate::Dynamic<Vec<u8>> = black_box(vec![255u8; 1_048_576]).into(); // ~1MiB
+            let b: secure_gate::Dynamic<Vec<u8>> = black_box(vec![255u8; 1_048_576]).into();
+            black_box(a.hash_eq(&b))
         });
     });
 
     c.bench_function("massive_dynamic_ct_eq", |bencher| {
         bencher.iter(|| {
-            let a: secure_gate::Dynamic<Vec<u8>> =
-                criterion::black_box(vec![255u8; 1_048_576]).into();
-            let b: secure_gate::Dynamic<Vec<u8>> =
-                criterion::black_box(vec![255u8; 1_048_576]).into();
-            criterion::black_box(a.ct_eq(&b))
+            let a: secure_gate::Dynamic<Vec<u8>> = black_box(vec![255u8; 1_048_576]).into();
+            let b: secure_gate::Dynamic<Vec<u8>> = black_box(vec![255u8; 1_048_576]).into();
+            black_box(a.ct_eq(&b))
         });
     });
 }
@@ -120,7 +119,7 @@ fn bench_worst_case_unequal_32B(c: &mut Criterion) {
             data_b[31] = 1;
             let b: Fixed<[u8; 32]> = Fixed::from(data_b);
 
-            criterion::black_box(a.hash_eq(&b))
+            black_box(a.hash_eq(&b))
         });
     });
 
@@ -134,7 +133,7 @@ fn bench_worst_case_unequal_32B(c: &mut Criterion) {
             data_b[31] = 1;
             let b: Fixed<[u8; 32]> = Fixed::from(data_b);
 
-            criterion::black_box(a.ct_eq(&b))
+            black_box(a.ct_eq(&b))
         });
     });
 
@@ -159,7 +158,7 @@ fn bench_worst_case_unequal_1KiB(c: &mut Criterion) {
             data_b[1023] = 1;
             let b: Dynamic<Vec<u8>> = data_b.into();
 
-            criterion::black_box(a.hash_eq(&b))
+            black_box(a.hash_eq(&b))
         });
     });
 
@@ -173,7 +172,7 @@ fn bench_worst_case_unequal_1KiB(c: &mut Criterion) {
             data_b[1023] = 1;
             let b: Dynamic<Vec<u8>> = data_b.into();
 
-            criterion::black_box(a.ct_eq(&b))
+            black_box(a.ct_eq(&b))
         });
     });
 
@@ -186,23 +185,19 @@ fn bench_worst_case_unequal_1KiB(c: &mut Criterion) {
 fn bench_hash_computation(c: &mut Criterion) {
     // Mitigate caching: Use fresh allocations with varying data
     c.bench_function("hash_compute_small", |bencher| {
-        bencher.iter(|| criterion::black_box(blake3::hash(criterion::black_box(&[1u8; 32]))));
+        bencher.iter(|| black_box(blake3::hash(black_box(&[1u8; 32]))));
     });
 
     c.bench_function("hash_compute_1KiB", |bencher| {
-        bencher.iter(|| criterion::black_box(blake3::hash(criterion::black_box(&vec![1u8; 1024]))));
+        bencher.iter(|| black_box(blake3::hash(black_box(&vec![1u8; 1024]))));
     });
 
     c.bench_function("hash_compute_100KiB", |bencher| {
-        bencher.iter(|| {
-            criterion::black_box(blake3::hash(criterion::black_box(&vec![42u8; 102_400])))
-        });
+        bencher.iter(|| black_box(blake3::hash(black_box(&vec![42u8; 102_400]))));
     });
 
     c.bench_function("hash_compute_1MiB", |bencher| {
-        bencher.iter(|| {
-            criterion::black_box(blake3::hash(criterion::black_box(&vec![255u8; 1_048_576])))
-        });
+        bencher.iter(|| black_box(blake3::hash(black_box(&vec![255u8; 1_048_576]))));
     });
 }
 
@@ -218,12 +213,12 @@ fn bench_keyed_vs_deterministic_hashing(c: &mut Criterion) {
     const BENCH_KEY: [u8; 32] = [42u8; 32];
 
     c.bench_function("blake3_deterministic_32B", |bencher| {
-        bencher.iter(|| criterion::black_box(blake3::hash(criterion::black_box(&[1u8; 32]))));
+        bencher.iter(|| black_box(blake3::hash(black_box(&[1u8; 32]))));
     });
 
     c.bench_function("blake3_keyed_32B", |bencher| {
         bencher.iter(|| {
-            criterion::black_box(
+            black_box(
                 blake3::Hasher::new_keyed(&BENCH_KEY)
                     .update(&[1u8; 32])
                     .finalize(),
@@ -232,12 +227,12 @@ fn bench_keyed_vs_deterministic_hashing(c: &mut Criterion) {
     });
 
     c.bench_function("blake3_deterministic_1KiB", |bencher| {
-        bencher.iter(|| criterion::black_box(blake3::hash(criterion::black_box(&vec![1u8; 1024]))));
+        bencher.iter(|| black_box(blake3::hash(black_box(&vec![1u8; 1024]))));
     });
 
     c.bench_function("blake3_keyed_1KiB", |bencher| {
         bencher.iter(|| {
-            criterion::black_box(
+            black_box(
                 blake3::Hasher::new_keyed(&BENCH_KEY)
                     .update(&vec![1u8; 1024])
                     .finalize(),
@@ -259,16 +254,16 @@ fn bench_hash_eq_caching_effects(c: &mut Criterion) {
     c.bench_function("hash_eq_fixed_data_32B", |bencher| {
         let a: Fixed<[u8; 32]> = Fixed::from([42u8; 32]);
         let b: Fixed<[u8; 32]> = Fixed::from([42u8; 32]);
-        bencher.iter(|| criterion::black_box(a.hash_eq(&b)));
+        bencher.iter(|| black_box(a.hash_eq(&b)));
     });
 
     // Varying data (hash cache miss)
     c.bench_function("hash_eq_varying_data_32B", |bencher| {
         bencher.iter(|| {
-            let seed = criterion::black_box(0u8); // Prevent const folding
+            let seed = black_box(0u8); // Prevent const folding
             let a: Fixed<[u8; 32]> = Fixed::from([seed.wrapping_add(1); 32]);
             let b: Fixed<[u8; 32]> = Fixed::from([seed.wrapping_add(1); 32]);
-            criterion::black_box(a.hash_eq(&b))
+            black_box(a.hash_eq(&b))
         });
     });
 
@@ -276,16 +271,16 @@ fn bench_hash_eq_caching_effects(c: &mut Criterion) {
     c.bench_function("hash_eq_fixed_data_1KiB", |bencher| {
         let a: Dynamic<Vec<u8>> = vec![42u8; 1024].into();
         let b: Dynamic<Vec<u8>> = vec![42u8; 1024].into();
-        bencher.iter(|| criterion::black_box(a.hash_eq(&b)));
+        bencher.iter(|| black_box(a.hash_eq(&b)));
     });
 
     // Varying data (hash cache miss)
     c.bench_function("hash_eq_varying_data_1KiB", |bencher| {
         bencher.iter(|| {
-            let seed = criterion::black_box(0u8);
+            let seed = black_box(0u8);
             let a: Dynamic<Vec<u8>> = vec![seed.wrapping_add(1); 1024].into();
             let b: Dynamic<Vec<u8>> = vec![seed.wrapping_add(1); 1024].into();
-            criterion::black_box(a.hash_eq(&b))
+            black_box(a.hash_eq(&b))
         });
     });
 }

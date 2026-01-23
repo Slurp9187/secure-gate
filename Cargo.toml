@@ -25,10 +25,10 @@ zeroize = { version = "1.7", default-features = false, optional = true, features
 ] }
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 proptest = "1.0"
 serde_json = "1.0"
-trybuild = "1.0.114"
+trybuild = "1.0"
 
 # ──────────────────────────────────────────────────────────────
 # Docs.rs metadata (enable features for online docs)

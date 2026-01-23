@@ -6,7 +6,9 @@
 extern crate alloc;
 
 #[cfg(any(feature = "serde-serialize", feature = "serde-deserialize"))]
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
+#[cfg(any(feature = "serde-serialize", feature = "serde-deserialize"))]
+use std::hint::black_box;
 
 #[cfg(any(feature = "serde-serialize", feature = "serde-deserialize"))]
 use serde_json::{from_str, to_string};
@@ -126,7 +128,7 @@ fn bench_large_dynamic_serialize(c: &mut Criterion) {
 
     group.bench_function("SerializableVec serialize", |b| {
         b.iter(|| {
-            let exportable_vec = SerializableVec(criterion::black_box(vec![42u8; 1_048_576]));
+            let exportable_vec = SerializableVec(black_box(vec![42u8; 1_048_576]));
             let json = to_string(black_box(&exportable_vec)).unwrap();
             black_box(json)
         })
@@ -134,7 +136,7 @@ fn bench_large_dynamic_serialize(c: &mut Criterion) {
 
     group.bench_function("SerializableString serialize", |b| {
         b.iter(|| {
-            let exportable_str = SerializableString(criterion::black_box("A".repeat(1_048_576)));
+            let exportable_str = SerializableString(black_box("A".repeat(1_048_576)));
             let json = to_string(black_box(&exportable_str)).unwrap();
             black_box(json)
         })
@@ -142,7 +144,7 @@ fn bench_large_dynamic_serialize(c: &mut Criterion) {
 
     group.bench_function("raw Vec<u8> serialize", |b| {
         b.iter(|| {
-            let data_vec = criterion::black_box(vec![42u8; 1_048_576]);
+            let data_vec = black_box(vec![42u8; 1_048_576]);
             let json = to_string(black_box(&data_vec)).unwrap();
             black_box(json)
         })
@@ -150,7 +152,7 @@ fn bench_large_dynamic_serialize(c: &mut Criterion) {
 
     group.bench_function("raw String serialize", |b| {
         b.iter(|| {
-            let data_str = criterion::black_box("A".repeat(1_048_576));
+            let data_str = black_box("A".repeat(1_048_576));
             let json = to_string(black_box(&data_str)).unwrap();
             black_box(json)
         })
@@ -167,7 +169,7 @@ fn bench_large_dynamic_roundtrip(c: &mut Criterion) {
 
     group.bench_function("SerializableVec → Dynamic<Vec<u8>>", |b| {
         b.iter(|| {
-            let exportable_vec = SerializableVec(criterion::black_box(vec![42u8; 1_048_576]));
+            let exportable_vec = SerializableVec(black_box(vec![42u8; 1_048_576]));
             let json = to_string(black_box(&exportable_vec)).unwrap();
             let deserialized: Dynamic<Vec<u8>> = from_str(&json).unwrap();
             black_box(deserialized)
@@ -176,7 +178,7 @@ fn bench_large_dynamic_roundtrip(c: &mut Criterion) {
 
     group.bench_function("SerializableString → Dynamic<String>", |b| {
         b.iter(|| {
-            let exportable_str = SerializableString(criterion::black_box("A".repeat(1_048_576)));
+            let exportable_str = SerializableString(black_box("A".repeat(1_048_576)));
             let json = to_string(black_box(&exportable_str)).unwrap();
             let deserialized: Dynamic<String> = from_str(&json).unwrap();
             black_box(deserialized)
@@ -185,7 +187,7 @@ fn bench_large_dynamic_roundtrip(c: &mut Criterion) {
 
     group.bench_function("raw Vec<u8> → Dynamic<Vec<u8>> roundtrip", |b| {
         b.iter(|| {
-            let data_vec = criterion::black_box(vec![42u8; 1_048_576]);
+            let data_vec = black_box(vec![42u8; 1_048_576]);
             let json = to_string(black_box(&data_vec)).unwrap();
             let deserialized: Dynamic<Vec<u8>> = from_str(&json).unwrap();
             black_box(deserialized)
@@ -194,7 +196,7 @@ fn bench_large_dynamic_roundtrip(c: &mut Criterion) {
 
     group.bench_function("raw String → Dynamic<String> roundtrip", |b| {
         b.iter(|| {
-            let data_str = criterion::black_box("A".repeat(1_048_576));
+            let data_str = black_box("A".repeat(1_048_576));
             let json = to_string(black_box(&data_str)).unwrap();
             let deserialized: Dynamic<String> = from_str(&json).unwrap();
             black_box(deserialized)
