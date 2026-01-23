@@ -1,4 +1,4 @@
-/// Creates a type alias for a fixed-size secure secret.
+/// Creates a type alias for a fixed-size stack-allocated secure secret.
 ///
 /// This macro generates a type alias to `Fixed<[u8; N]>` with optional visibility and custom documentation.
 /// The generated type inherits all methods from `Fixed`, including `.expose_secret()`.
@@ -12,14 +12,18 @@
 ///
 /// Public alias:
 /// ```
-/// use secure_gate::fixed_alias;
+/// use secure_gate::{fixed_alias, ExposeSecret};
 /// fixed_alias!(pub Aes256Key, 32);
+/// let key: Aes256Key = [42u8; 32].into();
+/// assert_eq!(key.expose_secret(), &[42u8; 32]);
 /// ```
 ///
 /// Private alias:
 /// ```
-/// use secure_gate::fixed_alias;
+/// use secure_gate::{fixed_alias, ExposeSecret};
 /// fixed_alias!(private_key, 32); // No visibility modifier = private
+/// let key: private_key = [0u8; 32].into();
+/// assert_eq!(key.expose_secret(), &[0u8; 32]);
 /// ```
 ///
 /// With custom visibility:
@@ -30,12 +34,11 @@
 ///
 /// With custom documentation:
 /// ```
-/// use secure_gate::fixed_alias;
+/// use secure_gate::{fixed_alias, ExposeSecret};
 /// fixed_alias!(pub ApiKey, 32, "API key for external service");
+/// let key: ApiKey = [0u8; 32].into();
+/// assert_eq!(key.expose_secret(), &[0u8; 32]);
 /// ```
-///
-/// The generated type is zero-cost and works with all features.
-/// For random initialization, use Type::generate() (requires 'rand' feature).
 #[macro_export]
 macro_rules! fixed_alias {
     ($vis:vis $name:ident, $size:literal, $doc:literal) => {

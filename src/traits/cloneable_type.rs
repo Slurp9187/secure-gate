@@ -9,14 +9,18 @@
 /// # Examples
 ///
 /// ```rust
-/// use secure_gate::CloneableType;
+/// #[cfg(feature = "cloneable")]
+/// {
+///     use secure_gate::{CloneableType, Dynamic};
 ///
-/// #[derive(Clone)]
-/// struct MySecret(Vec<u8>);
+///     #[derive(Clone)]
+///     struct MyKey([u8; 32]);
 ///
-/// impl CloneableType for MySecret {}
+///     impl CloneableType for MyKey {}  // Opt-in to safe cloning
 ///
-/// // Now MySecret can be safely cloned as it's marked with CloneableType
+///     let key: Dynamic<MyKey> = MyKey([0; 32]).into();
+///     let copy = key.clone();  // Now allowed, with zeroization on drop
+/// }
 /// ```
-#[allow(dead_code)]
+#[cfg(feature = "cloneable")]
 pub trait CloneableType: Clone {}
