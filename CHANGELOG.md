@@ -2,64 +2,64 @@
 
 All changes to this project are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),  
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.7.0] - 2026-01-24
 
 ### Added
 
-- **Secure-by-default exposure model**  
+- **Secure-by-default exposure model** 
   Private `inner` fields in `Dynamic<T>` and `Fixed<T>`; all access now requires explicit `.expose_secret()` / `.with_secret()` (scoped, recommended) or `.expose_secret_mut()` / `.with_secret_mut()`. No `Deref`, `AsRef`, or implicit borrowing — prevents accidental leaks.
 
-- **Opt-in cloning & serialization**  
+- **Opt-in cloning & serialization** 
   New marker traits `CloneableType` and `SerializableType`. Cloning and serde serialization now require explicit impls on the inner type — no automatic risk.
 
-- **Polymorphic access traits**  
+- **Polymorphic access traits** 
   `ExposeSecret` and `ExposeSecretMut` traits provide generic, zero-cost access with metadata (`len()`, `is_empty()`) without exposing contents. Implemented for both `Dynamic<T>` and `Fixed<T>`.
 
-- **SecureEncoding trait**  
+- **SecureEncoding trait** 
   Unified, explicit encoding API: `to_hex()`, `to_hex_upper()`, `to_base64url()`, `to_bech32(hrp)`, `try_to_bech32(hrp)`. Granular features: `encoding-hex`, `encoding-base64`, `encoding-bech32`.
 
-- **Timing-safe equality**  
+- **Timing-safe equality** 
   `ConstantTimeEq` trait (`ct-eq` feature) with `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
 
-- **Fast probabilistic equality for large secrets**  
+- **Fast probabilistic equality for large secrets** 
   `HashEq` trait (`hash-eq` feature) using BLAKE3 + constant-time digest comparison. New **recommended** method `hash_eq_opt(…, threshold: Option<usize>)` automatically switches between `ct_eq` (small inputs) and `hash_eq` (large inputs).
 
-- **Secure random generation**  
+- **Secure random generation** 
   `from_random()` on `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` using `OsRng` (panics on failure).
 
-- **Fallible fixed-size construction**  
+- **Fallible fixed-size construction** 
   `TryFrom<&[u8]>` for `Fixed<[u8; N]>` with `FromSliceError` (safe alternative to panicking conversions).
 
-- **Centralized errors**  
+- **Centralized errors** 
   Unified error types (`Bech32Error`, `DecodingError`, `FromSliceError`) via `thiserror`.
 
-- **Testing & CI**  
+- **Testing & CI** 
   `trybuild` compile-fail tests, serde fuzz target, expanded CI matrix covering all feature combinations.
 
-- **Documentation**  
+- **Documentation** 
   New `SECURITY.md`, enhanced README, custom rustdoc for alias macros.
 
 ### Changed (Breaking)
 
-- **Default features**  
+- **Default features** 
   Now `secure` meta-feature (`zeroize` + `ct-eq`). `full` includes `secure` + `encoding` + `hash-eq` + `cloneable`. Added `insecure` for explicit opt-out (testing/low-resource only — strongly discouraged).
 
-- **Cloning**  
+- **Cloning** 
   Removed implicit `Clone` on wrappers; now opt-in via `CloneableType` marker on inner type.
 
-- **Serialization**  
+- **Serialization** 
   Split `serde` into `serde-deserialize` (always available) and `serde-serialize` (gated by `SerializableType` marker).
 
-- **Exposure API**  
+- **Exposure API** 
   Removed any implicit borrowing paths. All access now explicit.
 
-- **Bech32 encoding**  
+- **Bech32 encoding** 
   Now fallible (`try_to_bech32` / `try_to_bech32m`); no panics on invalid HRP/data.
 
-- **Error handling**  
+- **Error handling** 
   Unified and renamed error types; removed panicking fallbacks.
 
 ### Fixed
@@ -197,8 +197,8 @@ fixed_alias!(pub(crate) Internal, 64); // Crate-visible type
 
 ### Security & API Improvement — `conversions` feature
 
-- **All conversion methods now require explicit `.expose_secret()`**  
-  This is a deliberate breaking change to restore the crate’s core security invariant:  
+- **All conversion methods now require explicit `.expose_secret()`** 
+  This is a deliberate breaking change to restore the crate’s core security invariant: 
   every access to secret bytes must be loud, visible, and grep-able.
 
   ```rust
@@ -291,7 +291,7 @@ assert!(key.ct_eq(&other_key));                    // secure
 
 ### Changed
 
-- **API: `view()` / `view_mut()` → `expose_secret()` / `expose_secret_mut()`**  
+- **API: `view()` / `view_mut()` → `expose_secret()` / `expose_secret_mut()`**
   The old `.view()` and `.view_mut()` methods are now **deprecated** and forward directly to the new canonical API:
 
   ```rust
