@@ -1,56 +1,57 @@
+//! Shared utility functions for the `secure-gate` crate.
+//!
+//! This module contains helpers used by both `Fixed` and `Dynamic` secret types,
+//! especially for random generation, constant-time / hash-based equality,
+//! and string decoding during deserialization.
+
 #[cfg(feature = "hash-eq")]
 use crate::ConstantTimeEq;
 
 #[cfg(feature = "rand")]
-use rand::TryRngCore;
+use rand::{rngs::OsRng, TryRngCore};
 
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-base64"))]
-use base64::{engine::general_purpose, Engine};
+use base64::{engine::general_purpose, Engine as _};
 
-/// Unpack 5-bit Fe32 values into 8-bit bytes for bech32 decoding.
+/// Fills a mutable byte slice with cryptographically secure random bytes
+/// using the OS-provided RNG.
 ///
-/// Bech32 encodes data into 5-bit groups; this reverses it by accumulating
-/// bits into an accumulator and extracting 8-bit chunks. Used internally
-/// for serde deserialization of bech32-encoded strings.
+/// # Panics
+/// Panics on RNG failure (fail-fast behavior suitable for cryptographic code).
 ///
-/// # Parameters
-/// - `data`: Vector of 5-bit values (0-31) to unpack.
-///
-/// # Returns
-/// Vector of unpacked 8-bit bytes.
-///
-/// # Safety
-/// Assumes `data` contains valid 5-bit values (0-31). No padding is applied
-/// as bech32 checksums ensure alignment.
-#[cfg(feature = "encoding-bech32")]
-pub(crate) fn fes_to_u8s(data: alloc::vec::Vec<u8>) -> alloc::vec::Vec<u8> {
-    let mut bytes = alloc::vec::Vec::new();
-    let mut acc = 0u64;
-    let mut bits = 0u8;
-    for fe in data {
-        acc = (acc << 5) | (fe as u64);
-        bits += 5;
-        while bits >= 8 {
-            bits -= 8;
-            bytes.push(((acc >> bits) & 0xFF) as u8);
-        }
-    }
-    // For bech32, assume no padding needed as checksum is separate
-    bytes
+/// # Example
+/// ```
+/// # #[cfg(feature = "rand")]
+/// # {
+/// use secure_gate::utilities::fill_random_bytes_mut;
+/// let mut key = [0u8; 32];
+/// fill_random_bytes_mut(&mut key);
+/// # }
+/// ```
+#[cfg(feature = "rand")]
+pub fn fill_random_bytes_mut(bytes: &mut [u8]) {
+    OsRng
+        .try_fill_bytes(bytes)
+        .expect("OsRng failure is a program error");
 }
 
-/// Shared hash_eq implementation for byte slices.
+// ─────────────────────────────────────────────────────────────────────────────
+//                Hash-based / constant-time equality helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Constant-time / hash-based equality check for arbitrary byte slices.
+///
+/// When the `rand` feature is enabled, uses a static random key + BLAKE3.
+/// Otherwise falls back to plain BLAKE3 (still constant-time via `ct_eq`).
 #[cfg(feature = "hash-eq")]
 pub(crate) fn hash_eq_bytes(data1: &[u8], data2: &[u8]) -> bool {
     #[cfg(feature = "rand")]
     {
         use once_cell::sync::Lazy;
-        use rand::{rngs::OsRng, TryRngCore};
 
         static HASH_EQ_KEY: Lazy<[u8; 32]> = Lazy::new(|| {
             let mut key = [0u8; 32];
-            let mut rng = OsRng;
-            rng.try_fill_bytes(&mut key).expect("RNG failure");
+            fill_random_bytes_mut(&mut key); // now reuses the shared helper
             key
         });
 
@@ -71,61 +72,104 @@ pub(crate) fn hash_eq_bytes(data1: &[u8], data2: &[u8]) -> bool {
     {
         let hash_a = blake3::hash(data1);
         let hash_b = blake3::hash(data2);
-
         hash_a.as_bytes().ct_eq(hash_b.as_bytes()).into()
     }
 }
 
-/// Shared hash_eq_opt implementation for byte slices.
+/// Equality check that uses direct constant-time comparison for small inputs
+/// and hash-based comparison for larger inputs (side-channel resistance).
 #[cfg(feature = "hash-eq")]
 pub(crate) fn hash_eq_opt_bytes(
     data1: &[u8],
     data2: &[u8],
     hash_threshold_bytes: Option<usize>,
 ) -> bool {
-    let threshold = hash_threshold_bytes.unwrap_or(32);
-
     if data1.len() != data2.len() {
         return false;
     }
 
-    let size = data1.len();
+    let threshold = hash_threshold_bytes.unwrap_or(32);
 
-    if size <= threshold {
+    if data1.len() <= threshold {
         data1.ct_eq(data2)
     } else {
         hash_eq_bytes(data1, data2)
     }
 }
 
-/// Helper function to try decoding a string as bech32, hex, or base64 in priority order.
-#[cfg(feature = "serde-deserialize")]
-pub(crate) fn try_decode(_s: &str) -> Result<alloc::vec::Vec<u8>, crate::DecodingError> {
-    #[cfg(feature = "encoding-bech32")]
-    if let Ok((_, data)) = ::bech32::decode(_s) {
-        let bytes = fes_to_u8s(data);
-        return Ok(bytes);
+// ─────────────────────────────────────────────────────────────────────────────
+//                   String → bytes decoding helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Convert 5-bit Fe32 values (from bech32 decode) back into 8-bit bytes.
+///
+/// Used internally during bech32 deserialization.
+#[cfg(feature = "encoding-bech32")]
+pub(crate) fn fes_to_u8s(data: Vec<u8>) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    let mut acc: u64 = 0;
+    let mut bits: u8 = 0;
+
+    for fe in data {
+        acc = (acc << 5) | (fe as u64);
+        bits += 5;
+
+        while bits >= 8 {
+            bits -= 8;
+            bytes.push(((acc >> bits) & 0xFF) as u8);
+        }
     }
+
+    bytes
+}
+
+/// Attempt to decode a string as bech32 → hex → base64 (in that priority order).
+///
+/// Returns `Ok(Vec<u8>)` on success or appropriate `DecodingError`.
+#[cfg(feature = "serde-deserialize")]
+pub(crate) fn try_decode(s: &str) -> Result<Vec<u8>, crate::DecodingError> {
+    #[cfg(feature = "encoding-bech32")]
+    if let Ok((_, data)) = bech32::decode(s) {
+        return Ok(fes_to_u8s(data));
+    }
+
     #[cfg(feature = "encoding-hex")]
-    if let Ok(data) = ::hex::decode(_s) {
+    if let Ok(data) = hex::decode(s) {
         return Ok(data);
     }
 
     #[cfg(feature = "encoding-base64")]
-    if let Ok(data) = general_purpose::URL_SAFE_NO_PAD.decode(_s) {
+    if let Ok(data) = general_purpose::URL_SAFE_NO_PAD.decode(s) {
         return Ok(data);
     }
 
     Err(crate::DecodingError::InvalidEncoding)
 }
 
-/// Fill a mutable byte slice with random bytes using the system RNG.
+/// Decode string to bytes using supported encodings (for serde error mapping).
 ///
-/// Panics on RNG failure for fail-fast crypto code. Guarantees secure entropy
-/// from system sources.
-#[cfg(feature = "rand")]
-pub fn fill_random_bytes_mut(bytes: &mut [u8]) {
-    rand::rngs::OsRng
-        .try_fill_bytes(bytes)
-        .expect("OsRng failure is a program error");
+/// Convenience wrapper that converts errors to `String` for serde visitors.
+#[cfg(feature = "serde-deserialize")]
+pub fn decode_string_to_bytes(s: &str) -> Result<Vec<u8>, String> {
+    try_decode(s).map_err(|e| e.to_string())
+}
+
+/// Serde visitor helper: decode string → check exact length → copy to `[u8; N]`.
+#[cfg(feature = "serde-deserialize")]
+pub fn visit_byte_string<E, const N: usize>(v: &str, expected_len: usize) -> Result<[u8; N], E>
+where
+    E: serde::de::Error,
+{
+    let bytes = decode_string_to_bytes(v).map_err(E::custom)?;
+
+    if bytes.len() != expected_len {
+        return Err(E::invalid_length(
+            bytes.len(),
+            &expected_len.to_string().as_str(),
+        ));
+    }
+
+    let mut arr = [0u8; N];
+    arr.copy_from_slice(&bytes);
+    Ok(arr)
 }

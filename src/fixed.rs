@@ -231,12 +231,7 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
             where
                 E: de::Error,
             {
-                let bytes = crate::utilities::try_decode(v).map_err(E::custom)?;
-                if bytes.len() != M {
-                    return Err(E::invalid_length(bytes.len(), &M.to_string().as_str()));
-                }
-                let mut arr = [0u8; M];
-                arr.copy_from_slice(&bytes);
+                let arr = crate::utilities::visit_byte_string::<E, M>(v, M)?;
                 Ok(Fixed::new(arr))
             }
 

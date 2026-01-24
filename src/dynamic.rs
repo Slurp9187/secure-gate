@@ -253,7 +253,7 @@ impl<'de> serde::Deserialize<'de> for Dynamic<alloc::vec::Vec<u8>> {
             where
                 E: de::Error,
             {
-                let bytes = crate::utilities::try_decode(v).map_err(E::custom)?;
+                let bytes = crate::utilities::decode_string_to_bytes(v).map_err(E::custom)?;
                 Ok(Dynamic::new(bytes))
             }
         }
