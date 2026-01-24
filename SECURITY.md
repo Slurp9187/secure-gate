@@ -109,5 +109,6 @@ The implementation relies on vetted dependencies (`zeroize`, `subtle`, `blake3`,
 - **Disclosure**: Public after coordinated fix.
 
 ## Disclaimer
-This document reflects design intent and observed properties as of January 2026.  
+This document reflects design intent and observed properties as of January 2026.
+
 **No warranties provided**. Users are responsible for their own security evaluation and audit.
