@@ -76,7 +76,7 @@ fn secure_encoding_roundtrip() {
 
     // Assuming we have a type with SecureEncoding
     let original: Fixed<[u8; 4]> = Fixed::new([1, 2, 3, 4]);
-    let encoded = original.expose_secret().to_hex();
+    let encoded = original.with_secret(|s| s.to_hex());
     // Note: This is a basic test; full roundtrip would require decoding functions if available
     assert!(!encoded.is_empty());
 }

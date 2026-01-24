@@ -206,11 +206,15 @@ mod hash_eq_tests {
             assert_eq!(a.hash_eq(&b), a.hash_eq_opt(&b, None));
 
             // mutate last byte → unequal
-            if !b.expose_secret().is_empty() {
-                let last = b.expose_secret().len() - 1;
-                let current = b.expose_secret()[last];
-                b.expose_secret_mut()[last] = current.wrapping_add(1);
-                assert_eq!(a.hash_eq(&b), a.hash_eq_opt(&b, None));
+            b.with_secret_mut(|s| {
+                if !s.is_empty() {
+                    let last = s.len() - 1;
+                    let current = s[last];
+                    s[last] = current.wrapping_add(1);
+                }
+            });
+            assert_eq!(a.hash_eq(&b), a.hash_eq_opt(&b, None));
+            if !b.is_empty() {
                 assert!(!a.hash_eq(&b));
             }
         }

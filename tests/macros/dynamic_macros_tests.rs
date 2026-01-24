@@ -15,10 +15,10 @@ fn dynamic_alias_basics() {
     dynamic_alias!(MyToken, Vec<u8>);
 
     let p: MyPass = "hunter2".into();
-    assert_eq!(p.expose_secret(), "hunter2");
+    p.with_secret(|s| assert_eq!(s, "hunter2"));
 
     let t: MyToken = vec![1, 2, 3].into();
-    assert_eq!(t.expose_secret(), &[1, 2, 3]);
+    t.with_secret(|s| assert_eq!(s, &[1, 2, 3]));
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -59,5 +59,5 @@ fn dynamic_alias_with_custom_doc() {
     dynamic_alias!(pub DynamicWithDoc, String, "Custom documentation for dynamic secret");
 
     let d: DynamicWithDoc = "secret".into();
-    assert_eq!(d.expose_secret(), "secret");
+    d.with_secret(|s| assert_eq!(s, "secret"));
 }

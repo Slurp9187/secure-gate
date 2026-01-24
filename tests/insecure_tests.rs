@@ -12,27 +12,27 @@ use secure_gate::*;
 #[test]
 fn insecure_dynamic_access() {
     let secret: Dynamic<String> = "insecure_secret".to_string().into();
-    assert_eq!(secret.expose_secret().as_str(), "insecure_secret");
+    secret.with_secret(|s| assert_eq!(s.as_str(), "insecure_secret"));
 }
 
 #[test]
 fn insecure_fixed_access() {
     let secret: Fixed<[u8; 4]> = Fixed::new([1, 2, 3, 4]);
-    assert_eq!(secret.expose_secret(), &[1, 2, 3, 4]);
+    secret.with_secret(|s| assert_eq!(s, &[1, 2, 3, 4]));
 }
 
 #[test]
 fn insecure_dynamic_mutability() {
     let mut secret: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
-    secret.expose_secret_mut().push(4);
-    assert_eq!(secret.expose_secret().as_slice(), &[1, 2, 3, 4]);
+    secret.with_secret_mut(|s| s.push(4));
+    secret.with_secret(|s| assert_eq!(s.as_slice(), &[1, 2, 3, 4]));
 }
 
 #[test]
 fn insecure_fixed_mutability() {
     let mut secret: Fixed<[u8; 4]> = Fixed::new([0; 4]);
-    secret.expose_secret_mut()[0] = 42;
-    assert_eq!(secret.expose_secret(), &[42, 0, 0, 0]);
+    secret.with_secret_mut(|s| s[0] = 42);
+    secret.with_secret(|s| assert_eq!(s, &[42, 0, 0, 0]));
 }
 
 // === Cloning in Insecure + Cloneable Mode ===

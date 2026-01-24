@@ -95,32 +95,37 @@ mod encoding_roundtrip_proptests {
         #[test]
         fn hex_roundtrip(data in prop::array::uniform4(any::<u8>())) {
             let secret = secure_gate::Fixed::new(data);
-            let hex = secret.expose_secret().as_slice().to_hex();
+            let hex = secret.with_secret(|s| s.as_slice().to_hex());
             let json = format!("\"{}\"", hex);
             let decoded: secure_gate::Fixed<[u8; 4]> = serde_json::from_str(&json).unwrap();
-            prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
+            let original_data = secret.with_secret(|s| *s);
+            let decoded_data = decoded.with_secret(|d| *d);
+            prop_assert_eq!(original_data, decoded_data);
         }
 
         #[cfg(all(feature = "encoding-hex", feature = "serde-deserialize"))]
         #[test]
         fn hex_try_roundtrip(data in prop::array::uniform4(any::<u8>())) {
             let secret = secure_gate::Fixed::new(data);
-            let hex = secret.expose_secret().as_slice().to_hex();
+            let hex = secret.with_secret(|s| s.as_slice().to_hex());
             let json = format!("\"{}\"", hex);
             let decoded: Result<secure_gate::Fixed<[u8; 4]>, _> = serde_json::from_str(&json);
             let decoded = decoded.unwrap();
-            prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
+            let original_data = secret.with_secret(|s| *s);
+            let decoded_data = decoded.with_secret(|d| *d);
+            prop_assert_eq!(original_data, decoded_data);
         }
 
         #[cfg(all(feature = "encoding-bech32", feature = "serde-deserialize"))]
         #[test]
         fn bech32_roundtrip(data in prop::collection::vec(any::<u8>(), 1..50)) {
             let secret: secure_gate::Dynamic<Vec<u8>> = secure_gate::Dynamic::new(data.clone());
-            let slice = secret.expose_secret().as_slice();
-            let bech = slice.to_bech32("test");
+            let bech = secret.with_secret(|s| s.as_slice().to_bech32("test"));
             let json = format!("\"{}\"", bech);
             let decoded: secure_gate::Dynamic<Vec<u8>> = serde_json::from_str(&json).unwrap();
-            prop_assert_eq!(secret.expose_secret(), decoded.expose_secret());
+            let original_data = secret.with_secret(|s| s.clone());
+            let decoded_data = decoded.with_secret(|d| d.clone());
+            prop_assert_eq!(original_data, decoded_data);
         }
     }
 }
@@ -202,7 +207,7 @@ mod hash_eq_proptests {
             let b: TestDynamic = data.into();
 
             let direct_ct = a.ct_eq(&b);
-            let len = a.expose_secret().len();
+            let len = a.with_secret(|s| s.len());
 
             let using_ct = len <= threshold;
 

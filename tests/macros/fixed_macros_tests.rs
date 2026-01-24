@@ -16,7 +16,7 @@ fn fixed_alias_basics() {
 
     let k: MyKey = [0u8; 32].into();
     assert_eq!(k.len(), 32);
-    assert_eq!(k.expose_secret().len(), 32);
+    k.with_secret(|s| assert_eq!(s.len(), 32));
 }
 
 #[test]

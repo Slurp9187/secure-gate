@@ -14,14 +14,14 @@ fn basic_usage_explicit_access() {
 
     assert_eq!(key.len(), 32);
     assert!(!key.is_empty());
-    assert_eq!(pw.expose_secret().len(), 7);
-    assert_eq!(pw.expose_secret(), "hunter2");
+    pw.with_secret(|s| assert_eq!(s.len(), 7));
+    pw.with_secret(|s| assert_eq!(s, "hunter2"));
 
-    pw.expose_secret_mut().push('!');
-    key.expose_secret_mut()[0] = 1;
+    pw.with_secret_mut(|s| s.push('!'));
+    key.with_secret_mut(|s| s[0] = 1);
 
-    assert_eq!(pw.expose_secret(), "hunter2!");
-    assert_eq!(key.expose_secret()[0], 1);
+    pw.with_secret(|s| assert_eq!(s, "hunter2!"));
+    key.with_secret(|s| assert_eq!(s[0], 1));
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn dynamic_generate_random() {
     let random: Dynamic<Vec<u8>> = Dynamic::from_random(64);
     assert_eq!(random.len(), 64);
     // Verify it's actually random
-    assert!(!random.expose_secret().iter().all(|&b| b == 0));
+    random.with_secret(|s| assert!(!s.iter().all(|&b| b == 0)));
 }
 
 // === Dynamic<Vec<u8>> from slice ===
@@ -97,7 +97,7 @@ fn dynamic_generate_random() {
 fn dynamic_vec_from_slice() {
     let slice: &[u8] = b"hello world";
     let dyn_vec: Dynamic<Vec<u8>> = slice.into();
-    assert_eq!(dyn_vec.expose_secret(), b"hello world");
+    dyn_vec.with_secret(|s| assert_eq!(s, b"hello world"));
 }
 
 // === TryFrom for Fixed ===
@@ -111,7 +111,7 @@ fn fixed_try_from_slice() {
     let result: Result<Fixed<[u8; 4]>, _> = slice.try_into();
     assert!(result.is_ok());
     let fixed = result.unwrap();
-    assert_eq!(fixed.expose_secret(), &[1, 2, 3, 4]);
+    fixed.with_secret(|s| assert_eq!(s, &[1, 2, 3, 4]));
 
     let short_slice: &[u8] = &[1u8, 2];
     let _fail: Result<Fixed<[u8; 4]>, _> = short_slice.try_into();

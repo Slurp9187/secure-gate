@@ -123,24 +123,24 @@ mod tests {
         let fixed2 = Fixed::new([1u8, 2, 3]);
         let fixed3 = Fixed::new([1u8, 2, 4]);
 
-        assert_eq!(fixed1.expose_secret(), fixed2.expose_secret());
-        assert_ne!(fixed1.expose_secret(), fixed3.expose_secret());
+        fixed1.with_secret(|s1| fixed2.with_secret(|s2| assert_eq!(s1, s2)));
+        fixed1.with_secret(|s1| fixed3.with_secret(|s3| assert_ne!(s1, s3)));
 
         // Test Dynamic<T> equality
         let dyn1: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
         let dyn2: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
         let dyn3: Dynamic<Vec<u8>> = vec![1, 2, 4].into();
 
-        assert_eq!(dyn1.expose_secret(), dyn2.expose_secret());
-        assert_ne!(dyn1.expose_secret(), dyn3.expose_secret());
+        dyn1.with_secret(|d1| dyn2.with_secret(|d2| assert_eq!(d1, d2)));
+        dyn1.with_secret(|d1| dyn3.with_secret(|d3| assert_ne!(d1, d3)));
 
         // Test with strings
         let str1: Dynamic<String> = "hello".into();
         let str2: Dynamic<String> = "hello".into();
         let str3: Dynamic<String> = "world".into();
 
-        assert_eq!(str1.expose_secret(), str2.expose_secret());
-        assert_ne!(str1.expose_secret(), str3.expose_secret());
+        str1.with_secret(|s1| str2.with_secret(|s2| assert_eq!(s1, s2)));
+        str1.with_secret(|s1| str3.with_secret(|s3| assert_ne!(s1, s3)));
     }
 
     #[cfg(feature = "ct-eq")]
