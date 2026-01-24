@@ -40,6 +40,9 @@ mod error;
 /// Core traits for wrapper polymorphism - always available.
 mod traits;
 
+/// Utilities for internal use.
+mod utilities;
+
 /// Re-export of the [`Dynamic`] type.
 pub use dynamic::Dynamic;
 /// Re-export of the [`Fixed`] type.
