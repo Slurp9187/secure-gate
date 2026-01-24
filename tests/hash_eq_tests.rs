@@ -3,7 +3,8 @@
 // ==========================================================================
 // Tests for hash-based equality (Blake3) for large/variable secrets
 
-#[cfg(all(test, feature = "hash-eq", feature = "ct-eq"))]
+// #[cfg(all(test, feature = "hash-eq", feature = "ct-eq"))]
+#[cfg(all(test, feature = "hash-eq"))]
 mod hash_eq_tests {
     use secure_gate::{Dynamic, ExposeSecret, ExposeSecretMut, Fixed, HashEq};
 
@@ -154,6 +155,8 @@ mod hash_eq_tests {
     // -------------------------------------------------------------------------
 
     #[test]
+    // This is a probabilistic smoke test only.
+    // BLAKE3 collision probability is ~2⁻¹²⁸ — extremely unlikely to hit in 5000 samples.
     fn no_false_positive_many_random_pairs() {
         use rand::{rngs::OsRng, TryRngCore};
 
@@ -211,5 +214,15 @@ mod hash_eq_tests {
                 assert!(!a.hash_eq(&b));
             }
         }
+    }
+
+    #[test]
+    fn basic_equal_fixed_tiny() {
+        let a = Fixed::new([0u8; 1]);
+        let b = Fixed::new([0u8; 1]);
+        let c = Fixed::new([1u8; 1]);
+        assert!(a.hash_eq(&b));
+        assert!(a.hash_eq_opt(&b, None)); // should use ct_eq
+        assert!(!a.hash_eq_opt(&c, None));
     }
 }

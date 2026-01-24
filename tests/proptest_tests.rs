@@ -17,12 +17,12 @@ mod ct_eq_proptests {
         #![proptest_config(proptest::prelude::ProptestConfig::with_cases(10))]
 
         #[test]
-        fn constant_time_eq_reflexive(a in prop::collection::vec(any::<u8>(), 0..256)) {
+        fn constant_time_eq_reflexive(a in prop::collection::vec(any::<u8>(), 0usize..256)) {
             prop_assert!(bool::from(::subtle::ConstantTimeEq::ct_eq(a.as_slice(), a.as_slice())));
         }
 
         #[test]
-        fn constant_time_eq_symmetric(a in prop::collection::vec(any::<u8>(), 0..256), b in prop::collection::vec(any::<u8>(), 0..256)) {
+        fn constant_time_eq_symmetric(a in prop::collection::vec(any::<u8>(), 0usize..256), b in prop::collection::vec(any::<u8>(), 0usize..256)) {
             prop_assert_eq!(bool::from(::subtle::ConstantTimeEq::ct_eq(a.as_slice(), b.as_slice())), bool::from(::subtle::ConstantTimeEq::ct_eq(b.as_slice(), a.as_slice())));
         }
     }
@@ -67,7 +67,7 @@ mod ct_eq_wrapper_proptests {
         }
 
         #[test]
-        fn dynamic_ct_eq_symmetric(a in prop::collection::vec(any::<u8>(), 0..256), b in prop::collection::vec(any::<u8>(), 0..256)) {
+        fn dynamic_ct_eq_symmetric(a in prop::collection::vec(any::<u8>(), 0usize..256), b in prop::collection::vec(any::<u8>(), 0usize..256)) {
             let da: TestDynamic = a.clone().into();
             let db: TestDynamic = b.clone().into();
             prop_assert_eq!(da.ct_eq(&db), db.ct_eq(&da));  // Symmetry
@@ -128,7 +128,7 @@ mod encoding_roundtrip_proptests {
 #[cfg(feature = "hash-eq")]
 mod hash_eq_proptests {
     use proptest::prelude::*;
-    use secure_gate::{dynamic_alias, fixed_alias, HashEq};
+    use secure_gate::{dynamic_alias, fixed_alias, ExposeSecret, HashEq};
 
     fixed_alias!(TestFixed32, 32);
     dynamic_alias!(TestDynamic, Vec<u8>);
@@ -153,19 +153,67 @@ mod hash_eq_proptests {
 
         #[cfg(feature = "hash-eq")]
         #[test]
-        fn dynamic_hash_eq_symmetric(a in prop::collection::vec(any::<u8>(), 0..256), b in prop::collection::vec(any::<u8>(), 0..256)) {
+        fn dynamic_hash_eq_symmetric(a in prop::collection::vec(any::<u8>(), 0usize..256), b in prop::collection::vec(any::<u8>(), 0usize..256)) {
             let da: TestDynamic = a.clone().into();
             let db: TestDynamic = b.clone().into();
             prop_assert_eq!(da.hash_eq(&db), db.hash_eq(&da));  // Symmetry
         }
 
-        #[cfg(feature = "hash-eq")]
         #[test]
-        fn hash_eq_consistency_with_ct_eq(a in prop::collection::vec(any::<u8>(), 0..256), b in prop::collection::vec(any::<u8>(), 0..256)) {
+        fn hash_eq_consistency_with_ct_eq(a in prop::collection::vec(any::<u8>(), 0usize..256), b in prop::collection::vec(any::<u8>(), 0usize..256)) {
             // Ensure hash_eq agrees with ct_eq (they should be logically equivalent, just different perf)
             let da: TestDynamic = a.clone().into();
             let db: TestDynamic = b.clone().into();
             prop_assert_eq!(da.hash_eq(&db), da.ct_eq(&db));
+        }
+
+        // Verify hash_eq_opt(None) behaves exactly like hash_eq
+        #[test]
+        fn hash_eq_opt_none_consistent_with_hash_eq(
+            a in prop::collection::vec(any::<u8>(), 0usize..512),
+            b in prop::collection::vec(any::<u8>(), 0usize..512)
+        ) {
+            let da: TestDynamic = a.clone().into();
+            let db: TestDynamic = b.into();
+            prop_assert_eq!(da.hash_eq(&db), da.hash_eq_opt(&db, None));
+        }
+
+        // Verify length mismatch → always false
+        #[test]
+        fn hash_eq_length_mismatch_always_false(
+            a in prop::collection::vec(any::<u8>(), 0usize..256),
+            len_b in 0usize..256
+        ) {
+            let mut b = vec![0u8; len_b];
+            if b.len() == a.len() { b.push(0); } // ensure different length
+            let da: TestDynamic = a.into();
+            let db: TestDynamic = b.into();
+            prop_assert!(!da.hash_eq(&db));
+            prop_assert!(!da.hash_eq_opt(&db, None));
+        }
+
+        // Check switching behavior around threshold
+        #[test]
+        fn hash_eq_opt_threshold_switch(
+            data in prop::collection::vec(any::<u8>(), 20..45),
+            threshold in 10usize..60
+        ) {
+            let a: TestDynamic = data.clone().into();
+            let b: TestDynamic = data.into();
+
+            let direct_ct = a.ct_eq(&b);
+            let len = a.expose_secret().len();
+
+            let using_ct = len <= threshold;
+
+            prop_assert_eq!(
+                a.hash_eq_opt(&b, Some(threshold)),
+                if using_ct { direct_ct } else { a.hash_eq(&b) },
+                "Mismatch at threshold {} (using_ct: {}, direct_ct: {})",
+                threshold,
+                using_ct,
+                direct_ct
+            );
         }
     }
 }
