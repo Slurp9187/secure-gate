@@ -12,8 +12,10 @@
 This document summarizes security-relevant design choices, strengths, potential weaknesses, and review points for the `secure-gate` crate. It is intended for developers performing threat modeling or security reviews.
 
 ## Audit Status
-`secure-gate` has **not** undergone independent security audit.  
-The implementation relies on vetted dependencies (`zeroize`, `subtle`, `blake3`, `rand`, encoding crates like `bech32`, `hex`, `base64`).  
+`secure-gate` has **not** undergone independent security audit.
+
+The implementation relies on vetted dependencies (`zeroize`, `subtle`, `blake3`, `rand`, encoding crates like `bech32`, `hex`, `base64`).
+
 **Review source code, tests, and dependencies** before using in security-critical applications.
 
 ## Core Security Model
