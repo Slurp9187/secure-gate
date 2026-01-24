@@ -14,7 +14,7 @@ Secure-gate provides `Dynamic<T>` (heap-allocated) and `Fixed<T>` (stack-allocat
 - **Timing-safe equality** (`ct-eq` feature)
 - **Fast probabilistic equality for large secrets** (`hash-eq` → BLAKE3 + fixed digest compare)
 - **Secure random generation** (`rand` feature)
-- **Encoding** (hex, base64url, bech32) + **serde** auto-detection (hex/base64/bech32)
+- **Encoding** (hex, base64url, **bech32 / bech32m**) + **serde** auto-detection (hex/base64/bech32/bech32m)
 - **Macros** for ergonomic aliases (`dynamic_alias!`, `fixed_alias!`)
 - **Auditable** — every exposure is grep-able
 
@@ -52,12 +52,12 @@ See [Features](#features) for the full list.
 | `hash-eq`              | `HashEq` trait: BLAKE3-based equality (fast for large/variable secrets)     | No       |
 | `rand`                 | Secure random via `OsRng` (`from_random()`)                                 | No       |
 | `serde`                | Meta: `serde-deserialize` + `serde-serialize`                               | No       |
-| `serde-deserialize`    | Auto-detect hex/base64/bech32 when loading secrets                          | No       |
+| `serde-deserialize`    | Auto-detect hex/base64/bech32/bech32m when loading secrets                  | No       |
 | `serde-serialize`      | Export secrets (gated by `SerializableType`)                                | No       |
-| `encoding`             | Meta: hex + base64url + bech32                                              | No       |
+| `encoding`             | Meta: hex + base64url + bech32/bech32m                                      | No       |
 | `encoding-hex`         | `.to_hex()` / `.to_hex_upper()`                                             | No       |
 | `encoding-base64`      | `.to_base64url()`                                                           | No       |
-| `encoding-bech32`      | `.to_bech32(hrp)` / `.try_to_bech32(hrp)`                                   | No       |
+| `encoding-bech32`      | `.to_bech32(hrp)` / `.to_bech32m(hrp)` / `.try_to_bech32(hrp)` / `.try_to_bech32m(hrp)` | No       |
 | `cloneable`            | Opt-in cloning via `CloneableType` marker                                   | No       |
 | `full`                 | All of the above (convenient for development)                               | No       |
 
@@ -66,16 +66,15 @@ See [Features](#features) for the full list.
 ## Quick Start
 
 ```rust
-use secure_gate::{dynamic_alias, fixed_alias, ExposeSecret, ExposeSecretMut};
-extern crate alloc;
+use secure_gate::{dynamic_alias, fixed_alias, ExposeSecret, ExposeSecretMut, SecureEncoding};
 
-dynamic_alias!(pub Password, String); // Dynamic<String>
-fixed_alias!(pub Aes256Key, 32);      // Fixed<[u8; 32]>
+dynamic_alias!(pub Password, String);      // Dynamic<String>
+fixed_alias!(pub Aes256Key, 32);           // Fixed<[u8; 32]>
 
 let mut pw: Password = "hunter2".into();
 let key: Aes256Key = [42u8; 32].into();
 
-// Scoped (preferred)
+// Scoped (recommended)
 pw.with_secret(|s| println!("length: {}", s.len()));
 
 // Direct (auditable)
@@ -84,6 +83,13 @@ assert_eq!(pw.expose_secret(), "hunter2");
 // Mutable
 pw.with_secret_mut(|s| s.push('!'));
 pw.expose_secret_mut().clear();
+
+// Bech32 / Bech32m encoding example
+#[cfg(feature = "encoding-bech32")]
+{
+    let bech32  = key.expose_secret().to_bech32("key");   // "key1q..."
+    let bech32m = key.expose_secret().to_bech32m("key");  // "key1p..." (newer standard)
+}
 ```
 
 ## Recommended Equality
@@ -97,11 +103,12 @@ Use **`hash_eq_opt`** — it automatically chooses the best method:
 #[cfg(feature = "hash-eq")]
 {
     use secure_gate::{Dynamic, HashEq};
+    extern crate alloc;
 
     let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();  // e.g. ML-DSA signature
     let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
 
-    // Recommended: uses ct_eq for small, hash_eq for large
+    // Recommended: smart path selection
     if sig_a.hash_eq_opt(&sig_b, None) {
         // equal
     }
@@ -142,37 +149,45 @@ fixed_alias!(pub ApiKey, 32, "32-byte API key");
 ```rust
 #[cfg(feature = "rand")]
 {
-    use secure_gate::{fixed_alias, Dynamic};
-    
-    fixed_alias!(Aes256Key, 32);
-    let key: Aes256Key = Aes256Key::from_random();
+    use secure_gate::{Dynamic, Fixed};
+    extern crate alloc;
+
     let token: Dynamic<Vec<u8>> = Dynamic::from_random(64);
+    let key: Fixed<[u8; 32]> = Fixed::from_random();
 }
 ```
 
-### Encoding
+### Encoding (hex / base64url / bech32 / bech32m)
 
 ```rust
-#[cfg(all(feature = "rand", feature = "encoding-hex"))]
+#[cfg(all(feature = "rand", feature = "encoding-bech32"))]
 {
-    use secure_gate::{dynamic_alias, fixed_alias, ExposeSecret, SecureEncoding};
+    use secure_gate::{fixed_alias, Fixed, ExposeSecret, SecureEncoding};
     extern crate alloc;
 
     fixed_alias!(Aes256Key, 32);
     let key: Aes256Key = Aes256Key::from_random();
-    let hex = key.expose_secret().to_hex(); // "2a2a2a..."
+
+    let hex    = key.expose_secret().to_hex();          // "2a2a2a..."
+    let bech32 = key.expose_secret().to_bech32("key");  // "key1q..."
+    let bech32m = key.expose_secret().to_bech32m("key"); // "key1p..." (BIP-350)
 }
 ```
 
-### Serde (auto-detects hex/base64/bech32 on deserialize)
+### Serde (auto-detects hex/base64/bech32/bech32m on deserialize)
 
 ```rust
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex", feature = "rand"))]
+#[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32", feature = "rand"))]
 {
-    use secure_gate::fixed_alias;
-    
+    use secure_gate::{fixed_alias, ExposeSecret, SecureEncoding};
+    use serde_json;
+    extern crate alloc;
+
     fixed_alias!(Aes256Key, 32);
-    let key: Aes256Key = serde_json::from_str(r#""000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f""#).unwrap();
+    // Generate a key and encode to bech32
+    let original: Aes256Key = Aes256Key::from_random();
+    let bech32 = original.with_secret(|s| s.to_bech32("key"));
+    let key: Aes256Key = serde_json::from_str(&format!("\"{}\"", bech32)).unwrap();
 }
 ```
 
