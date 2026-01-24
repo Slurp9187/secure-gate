@@ -19,7 +19,7 @@
 /// let bytes = base64_string.try_from_base64url().unwrap();
 /// // bytes is now Vec<u8>: [66, 66, 66]
 /// ```
-
+/// This trait is gated behind the `encoding-base64` feature.
 #[cfg(feature = "encoding-base64")]
 use ::base64 as base64_crate;
 #[cfg(feature = "encoding-base64")]

@@ -23,9 +23,9 @@
 use ::bech32;
 
 #[cfg(feature = "encoding-bech32")]
-use crate::utilities::encoding::fes_to_u8s;
-#[cfg(feature = "encoding-bech32")]
 use crate::error::Bech32Error;
+#[cfg(feature = "encoding-bech32")]
+use crate::utilities::encoding::fes_to_u8s;
 
 #[cfg(feature = "encoding-bech32")]
 pub trait FromBech32mStr {
@@ -42,7 +42,10 @@ impl<T: AsRef<str> + ?Sized> FromBech32mStr for T {
     fn try_from_bech32m(&self) -> Result<(String, Vec<u8>), Bech32Error> {
         let s = self.as_ref();
         let (hrp, data) = bech32::decode(s).map_err(|_| Bech32Error::OperationFailed)?;
-        let re_encoded = bech32::encode::<bech32::Bech32m>(hrp.clone(), &data)
+        if data.is_empty() {
+            return Err(Bech32Error::OperationFailed);
+        }
+        let re_encoded = bech32::encode::<bech32::Bech32m>(hrp, &data)
             .map_err(|_| Bech32Error::OperationFailed)?;
         if re_encoded == s {
             Ok((hrp.as_str().to_string(), fes_to_u8s(data)))

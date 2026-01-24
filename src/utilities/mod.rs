@@ -68,14 +68,13 @@ pub(crate) fn hash_eq_bytes(data1: &[u8], data2: &[u8]) -> bool {
             .finalize()
             .as_bytes()
             .ct_eq(hasher_b.finalize().as_bytes())
-            .into()
     }
 
     #[cfg(not(feature = "rand"))]
     {
         let hash_a = blake3::hash(data1);
         let hash_b = blake3::hash(data2);
-        hash_a.as_bytes().ct_eq(hash_b.as_bytes()).into()
+        hash_a.as_bytes().ct_eq(hash_b.as_bytes())
     }
 }
 

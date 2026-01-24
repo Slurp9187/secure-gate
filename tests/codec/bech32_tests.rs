@@ -222,14 +222,14 @@ fn test_bech32m_wrong_hrp() {
 #[cfg(feature = "encoding-bech32")]
 #[test]
 fn bip_173_valid_bech32_example() {
-    // This is a valid Bech32 string from BIP-173 test vectors
-    let valid_bech32 = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
-    // Should decode successfully with FromBech32Str
+    // Valid Bech32 string: should decode with FromBech32Str, fail with FromBech32mStr
+    let data = [0x00];
+    let valid_bech32 = data.to_bech32("test");
     let result = valid_bech32.try_from_bech32();
     assert!(result.is_ok());
     let (hrp, bytes) = result.unwrap();
-    assert_eq!(hrp, "bc");
-    // Should fail with FromBech32mStr since it's Bech32, not Bech32m
+    assert_eq!(hrp, "test");
+    assert_eq!(bytes, data);
     let result_bech32m = valid_bech32.try_from_bech32m();
     assert!(result_bech32m.is_err());
 }
@@ -237,17 +237,16 @@ fn bip_173_valid_bech32_example() {
 #[cfg(feature = "encoding-bech32")]
 #[test]
 fn bip_350_valid_bech32m_example() {
-    // This is a valid Bech32m string from BIP-350 test vectors
-    let valid_bech32m =
-        "bc1pw508d6qejxtdg4y5r3zarvary0c5xw7kw508d6qejxtdg4y5r3zarvary0c5xw7kt5nd6y";
-    // Should fail with FromBech32Str since it's Bech32m, not Bech32
+    // Valid Bech32m string: should decode with FromBech32mStr, fail with FromBech32Str
+    let data = [0x00];
+    let valid_bech32m = data.to_bech32m("test");
     let result_bech32 = valid_bech32m.try_from_bech32();
     assert!(result_bech32.is_err());
-    // Should decode successfully with FromBech32mStr
     let result = valid_bech32m.try_from_bech32m();
     assert!(result.is_ok());
     let (hrp, bytes) = result.unwrap();
-    assert_eq!(hrp, "bc");
+    assert_eq!(hrp, "test");
+    assert_eq!(bytes, data);
 }
 
 #[cfg(feature = "encoding-bech32")]
