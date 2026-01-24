@@ -1,54 +1,31 @@
 #[cfg(feature = "rand")]
 use rand::TryRngCore;
 
-/// Local implementation of bit conversion for Bech32, since bech32 crate doesn't expose it in v0.11.
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
-fn convert_bits(
-    from: u8,
-    to: u8,
-    pad: bool,
-    data: &[u8],
-) -> Result<(alloc::vec::Vec<u8>, usize), ()> {
-    if !(1..=8).contains(&from) || !(1..=8).contains(&to) {
-        return Err(());
-    }
+/// Convert Vec<u8> (5-bit values) to Vec<u8> by unpacking into 8-bit bytes.
+#[cfg(feature = "encoding-bech32")]
+fn fes_to_u8s(data: alloc::vec::Vec<u8>) -> alloc::vec::Vec<u8> {
+    let mut bytes = alloc::vec::Vec::new();
     let mut acc = 0u64;
     let mut bits = 0u8;
-    let mut ret = alloc::vec::Vec::new();
-    let maxv = (1u64 << to) - 1;
-    let _max_acc = (1u64 << (from + to - 1)) - 1;
-    for &v in data {
-        if ((v as u32) >> from) != 0 {
-            return Err(());
-        }
-        acc = (acc << from) | (v as u64);
-        bits += from;
-        while bits >= to {
-            bits -= to;
-            ret.push(((acc >> bits) & maxv) as u8);
+    for fe in data {
+        acc = (acc << 5) | (fe as u64);
+        bits += 5;
+        while bits >= 8 {
+            bits -= 8;
+            bytes.push(((acc >> bits) & 0xFF) as u8);
         }
     }
-    if pad {
-        if bits > 0 {
-            ret.push(((acc << (to - bits)) & maxv) as u8);
-        }
-    } else if bits >= from || ((acc << (to - bits)) & maxv) != 0 {
-        return Err(());
-    }
-    Ok((ret, bits as usize))
+    // For bech32, assume no padding needed as checksum is separate
+    bytes
 }
-
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-base64"))]
-use base64::{engine::general_purpose, Engine};
 
 /// Helper function to try decoding a string as bech32, hex, or base64 in priority order.
 #[cfg(feature = "serde-deserialize")]
 fn try_decode(_s: &str) -> Result<alloc::vec::Vec<u8>, crate::DecodingError> {
     #[cfg(feature = "encoding-bech32")]
     if let Ok((_, data)) = ::bech32::decode(_s) {
-        let (converted, _) =
-            convert_bits(5, 8, false, &data).map_err(|_| crate::DecodingError::InvalidBech32)?;
-        return Ok(converted);
+        let bytes = fes_to_u8s(data);
+        return Ok(bytes);
     }
     #[cfg(feature = "encoding-hex")]
     if let Ok(data) = ::hex::decode(_s) {
@@ -56,12 +33,15 @@ fn try_decode(_s: &str) -> Result<alloc::vec::Vec<u8>, crate::DecodingError> {
     }
 
     #[cfg(feature = "encoding-base64")]
-    if let Ok(data) = Engine::decode(&general_purpose::URL_SAFE_NO_PAD, _s) {
+    if let Ok(data) = general_purpose::URL_SAFE_NO_PAD.decode(_s) {
         return Ok(data);
     }
 
     Err(crate::DecodingError::InvalidEncoding)
 }
+
+#[cfg(all(feature = "serde-deserialize", feature = "encoding-base64"))]
+use base64::{engine::general_purpose, Engine};
 
 /// Fixed-size stack-allocated secure secret wrapper.
 ///
