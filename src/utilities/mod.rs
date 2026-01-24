@@ -4,6 +4,9 @@
 //! especially for random generation, constant-time / hash-based equality,
 //! and string decoding during deserialization.
 
+pub mod decoding;
+pub mod encoding;
+
 #[cfg(feature = "hash-eq")]
 use crate::ConstantTimeEq;
 
@@ -101,57 +104,12 @@ pub(crate) fn hash_eq_opt_bytes(
 //                   String → bytes decoding helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Convert 5-bit Fe32 values (from bech32 decode) back into 8-bit bytes.
-///
-/// Used internally during bech32 deserialization.
-#[cfg(feature = "encoding-bech32")]
-pub(crate) fn fes_to_u8s(data: Vec<u8>) -> Vec<u8> {
-    let mut bytes = Vec::new();
-    let mut acc: u64 = 0;
-    let mut bits: u8 = 0;
-
-    for fe in data {
-        acc = (acc << 5) | (fe as u64);
-        bits += 5;
-
-        while bits >= 8 {
-            bits -= 8;
-            bytes.push(((acc >> bits) & 0xFF) as u8);
-        }
-    }
-
-    bytes
-}
-
-/// Attempt to decode a string as bech32 → hex → base64 (in that priority order).
-///
-/// Returns `Ok(Vec<u8>)` on success or appropriate `DecodingError`.
-#[cfg(feature = "serde-deserialize")]
-pub(crate) fn try_decode(s: &str) -> Result<Vec<u8>, crate::DecodingError> {
-    #[cfg(feature = "encoding-bech32")]
-    if let Ok((_, data)) = bech32::decode(s) {
-        return Ok(fes_to_u8s(data));
-    }
-
-    #[cfg(feature = "encoding-hex")]
-    if let Ok(data) = hex::decode(s) {
-        return Ok(data);
-    }
-
-    #[cfg(feature = "encoding-base64")]
-    if let Ok(data) = general_purpose::URL_SAFE_NO_PAD.decode(s) {
-        return Ok(data);
-    }
-
-    Err(crate::DecodingError::InvalidEncoding)
-}
-
 /// Decode string to bytes using supported encodings (for serde error mapping).
 ///
 /// Convenience wrapper that converts errors to `String` for serde visitors.
 #[cfg(feature = "serde-deserialize")]
 pub fn decode_string_to_bytes(s: &str) -> Result<Vec<u8>, String> {
-    try_decode(s).map_err(|e| e.to_string())
+    decoding::try_decode_any(s).map_err(|e| e.to_string())
 }
 
 /// Serde visitor helper: decode string → check exact length → copy to `[u8; N]`.

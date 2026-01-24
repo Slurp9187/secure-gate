@@ -63,19 +63,36 @@ pub use traits::{ExposeSecret, ExposeSecretMut};
 /// Convenient macros for creating custom secret wrapper types.
 mod macros;
 
+#[cfg(feature = "encoding-base64")]
+pub use traits::FromBase64UrlStr;
+#[cfg(feature = "encoding-bech32")]
+pub use traits::FromBech32Str;
+#[cfg(feature = "encoding-bech32")]
+pub use traits::FromBech32mStr;
 /// Available macros (exported globally for convenience):
 /// - `dynamic_alias!`: Create type aliases for heap-allocated secrets (`Dynamic<T>`).
 /// - `dynamic_generic_alias!`: Create generic heap-allocated secret aliases.
 /// - `fixed_alias!`: Create type aliases for fixed-size secrets (`Fixed<[u8; N]>`).
 /// - `fixed_generic_alias!`: Create generic fixed-size secret aliases.
-///   Re-export of [`SecureEncoding`] trait for convenient encoding extensions.
-///   Re-export of the [`SecureEncoding`] trait.
+///   Re-exports of encoding and decoding traits for convenient byte encoding/decoding extensions.
+#[cfg(feature = "encoding-hex")]
+pub use traits::FromHexStr;
+
+#[cfg(feature = "encoding-base64")]
+pub use traits::ToBase64Url;
+#[cfg(feature = "encoding-bech32")]
+pub use traits::ToBech32;
+#[cfg(feature = "encoding-bech32")]
+pub use traits::ToBech32m;
+#[cfg(feature = "encoding-hex")]
+pub use traits::ToHex;
+
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
-pub use traits::SecureEncoding;
+pub use traits::{SecureDecoding, SecureEncoding};
 
 /// Re-export of [`Bech32Error`] for convenience when using bech32 encoding/decoding.
 #[cfg(feature = "encoding-bech32")]
