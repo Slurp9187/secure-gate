@@ -1,479 +1,352 @@
 # secure-gate Examples
 
-This document contains copy-paste-ready, real-world examples for `secure-gate` v0.7.0.
+Real-world, copy-paste-ready examples for `secure-gate`.
 
-All examples assume `"full"` features for completeness:
+All examples assume the **recommended secure defaults**:
+```toml
+[dependencies]
+secure-gate = { version = "0.7.0-rc.10", features = ["secure"] } # zeroize + ct-eq
+```
+For maximum functionality (including `hash-eq`, encodings, serde, etc.), use:
 ```toml
 secure-gate = { version = "0.7.0-rc.10", features = ["full"] }
 ```
-Adjust features for minimal builds (e.g., `default-features = false`).
 
-**Notes**:
-- Audit all `.expose_secret()`/`.with_secret()` calls—these are explicit access points.
-- Keep `secure` feature (`zeroize` + `ct-eq`) enabled in production.
-- Examples include `extern crate alloc;` for doctest compatibility (real-world code may not need it).
+**Important notes**
+- Always audit `.expose_secret()` / `.with_secret()` calls — these are the only access points.
+- Prefer scoped `with_secret()` / `with_secret_mut()` over long-lived direct exposure.
+- Use `hash_eq_opt(…, None)` for most equality checks.
+- All examples include `extern crate alloc;` for doctest compatibility (real code usually omits it).
 
 ## Table of Contents
+
 1. [Basic Construction & Access](#1-basic-construction--access)
-2. [Dynamic Secrets (Heap)](#2-dynamic-secrets-heap)
-3. [Fixed-Size Secrets (Stack)](#3-fixed-size-secrets-stack)
-4. [Cryptographic Randomness (`rand`)](#4-cryptographic-randomness-rand)
-5. [Encoding & Decoding (`encoding-*`)](#5-encoding--decoding-encoding-)
-6. [Opt-In Cloning (`cloneable`)](#6-opt-in-cloning-cloneable)
-7. [Opt-In Serialization (`serde-serialize`)](#7-opt-in-serialization-serde-serialize)
-8. [Loading Secrets (`serde-deserialize`)](#8-loading-secrets-serde-deserialize)
-9. [Polymorphic Traits](#9-polymorphic-traits)
-10. [Hash-Based Equality (`hash-eq`)](#10-hash-based-equality-hash-eq)
-11. [Construction & Fallibility](#11-construction--fallibility)
-12. [Macros Overview](#12-macros-overview)
+2. [Semantic Aliases with Macros](#2-semantic-aliases-with-macros)
+3. [Random Generation](#3-random-generation)
+4. [Equality Comparison](#4-equality-comparison)
+5. [Encoding & Decoding](#5-encoding--decoding)
+6. [Serde (Deserialize & Serialize)](#6-serde-deserialize--serialize)
+7. [Opt-In Cloning](#7-opt-in-cloning)
+8. [Polymorphic / Generic Code](#8-polymorphic--generic-code)
+9. [Construction Patterns (Infallible & Fallible)](#9-construction-patterns-infallible--fallible)
 
 ## 1. Basic Construction & Access
 
+### Dynamic (heap-allocated, variable size)
 
-
-### Fixed (Stack) – Immutable
 ```rust
-use secure_gate::*;
+use secure_gate::{Dynamic, ExposeSecret, ExposeSecretMut};
 extern crate alloc;
+
+let mut pw: Dynamic<String> = "hunter2".into();
+let data: Dynamic<Vec<u8>> = vec![1, 2, 3, 4].into();
+
+// Scoped (recommended)
+pw.with_secret(|s| println!("length: {}", s.len()));
+
+// Direct (auditable)
+assert_eq!(pw.expose_secret(), "hunter2");
+
+// Mutable
+pw.with_secret_mut(|s| s.push('!'));
+pw.expose_secret_mut().clear();
+```
+
+### Fixed (stack-allocated, fixed size)
+
+```rust
+use secure_gate::{Fixed, ExposeSecret, ExposeSecretMut};
 
 let key: Fixed<[u8; 32]> = Fixed::new([0u8; 32]);
 
-// Scoped access (preferred)
+// Scoped access (recommended)
 let len = key.with_secret(|bytes| bytes.len());
 assert_eq!(len, 32);
 
-// Direct access (auditable)
-let bytes = key.expose_secret();
-assert_eq!(bytes[0], 0);
-```
+// Direct access (auditable escape hatch)
+assert_eq!(key.expose_secret()[0], 0);
 
-### Fixed (Stack) – Mutable
-```rust
-use secure_gate::*;
-extern crate alloc;
-
+// Mutable
 let mut nonce: Fixed<[u8; 12]> = Fixed::new([0u8; 12]);
-
-// Scoped mutation
 nonce.with_secret_mut(|bytes| bytes[0] = 0xFF);
-
-// Direct mutation
 nonce.expose_secret_mut()[1] = 0xAA;
-
-assert_eq!(nonce.expose_secret()[0], 0xFF);
-assert_eq!(nonce.expose_secret()[1], 0xAA);
 ```
 
-## 2. Dynamic Secrets (Heap)
+## 2. Semantic Aliases with Macros
 
-### From Array/Slice (Infallible)
 ```rust
-use secure_gate::*;
-extern crate alloc;
+use secure_gate::{dynamic_alias, fixed_alias};
 
-let arr = [0u8; 16];
-let fixed: Fixed<[u8; 16]> = arr.into();  // Exact match
-```
+dynamic_alias!(pub Password, String);      // Dynamic<String>
+let pw: Password = "secret123".into();
 
-### From Slice (Fallible)
-```rust
-use secure_gate::*;
-extern crate alloc;
+dynamic_alias!(pub AuthToken, Vec<u8>);    // Dynamic<Vec<u8>>
+let token: AuthToken = vec![0u8; 64].into();
 
-let slice: &[u8] = &[0u8; 16];
-let result: Result<Fixed<[u8; 16]>, _> = slice.try_into();
-assert!(result.is_ok());
-
-let short: &[u8] = &[0u8; 8];
-let fail: Result<Fixed<[u8; 16]>, _> = short.try_into();
-assert!(fail.is_err());
-```
-
-### Semantic Aliases
-```rust
-use secure_gate::*;
-extern crate alloc;
-
-fixed_alias!(pub Aes256Key, 32);
-fixed_alias!(pub ApiKey, 32, "API key for service");
-
+fixed_alias!(pub Aes256Key, 32);           // Fixed<[u8; 32]>
 let key: Aes256Key = [42u8; 32].into();
-let api_key: ApiKey = [0u8; 32].into();
 ```
 
-### Generic Fixed Alias
+With custom docs:
+
 ```rust
-use secure_gate::*;
-extern crate alloc;
+use secure_gate::{dynamic_alias, fixed_alias};
 
-fixed_generic_alias!(SecureBuffer);
-
-let buffer: SecureBuffer<64> = [0u8; 64].into();
+dynamic_alias!(pub RefreshToken, String, "OAuth refresh token");
+fixed_alias!(pub ApiKey, 32, "32-byte API key");
 ```
 
-## 3. Fixed-Size Secrets (Stack)
+Generic aliases:
 
-### From Owned Values
 ```rust
-use secure_gate::*;
-extern crate alloc;
-
-let str_dyn: Dynamic<String> = "password".to_string().into();
-let vec_dyn: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
-```
-
-### From Slices (Copies)
-```rust
-use secure_gate::*;
-extern crate alloc;
-
-let slice = [1u8, 2, 3, 4].as_slice();
-let dyn_vec: Dynamic<Vec<u8>> = slice.into();  // Copies
-assert_eq!(dyn_vec.expose_secret(), &[1, 2, 3, 4]);
-```
-
-### Semantic Aliases
-```rust
-use secure_gate::*;
-extern crate alloc;
-
-dynamic_alias!(Password, String);
-dynamic_alias!(Token, Vec<u8>, "OAuth token");
-
-let pw: Password = "secret".into();
-let token: Token = vec![0u8; 32].into();
-```
-
-### Generic Dynamic Alias
-```rust
-use secure_gate::*;
-extern crate alloc;
+use secure_gate::{dynamic_generic_alias, fixed_generic_alias};
 
 dynamic_generic_alias!(Secret);
-
-let data: Secret<Vec<u8>> = vec![42; 64].into();
 let text: Secret<String> = "hidden".into();
+
+fixed_generic_alias!(SecureBuffer);
+let buf: SecureBuffer<64> = [0u8; 64].into();
 ```
 
-## 4. Cryptographic Randomness (`rand`)
+## 3. Random Generation
 
-### Fixed Random
 ```rust
 #[cfg(feature = "rand")]
 {
-    use secure_gate::*;
+    use secure_gate::{Dynamic, Fixed};
     extern crate alloc;
 
+    // Dynamic (variable size)
+    let token: Dynamic<Vec<u8>> = Dynamic::from_random(64);
+
+    // Fixed (fixed size)
     let key: Fixed<[u8; 32]> = Fixed::from_random();
-    assert_eq!(key.len(), 32);
-    // Panics on RNG failure
+
+    // Panics on RNG failure — use in trusted environments
 }
 ```
 
-### Dynamic Random
+## 4. Equality Comparison
+
+**Recommended: `hash_eq_opt`** — automatically uses `ct_eq` for small inputs, `hash_eq` for large.
+
 ```rust
-#[cfg(feature = "rand")]
+#[cfg(feature = "hash-eq")]
 {
-    use secure_gate::*;
+    use secure_gate::{Dynamic, Fixed, HashEq};
     extern crate alloc;
 
-    let data: Dynamic<Vec<u8>> = Dynamic::from_random(128);
-    assert_eq!(data.len(), 128);
+    // Dynamic (large example)
+    let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
+    let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
+    let sig_c: Dynamic<Vec<u8>> = vec![0xBB; 2048].into();
+
+    // Fixed (small example)
+    let small_a: Fixed<[u8; 16]> = Fixed::new([1u8; 16]);
+    let small_b: Fixed<[u8; 16]> = Fixed::new([1u8; 16]);
+    let small_c: Fixed<[u8; 16]> = Fixed::new([2u8; 16]);
+
+    // Recommended: smart path selection
+    assert!(sig_a.hash_eq_opt(&sig_b, None));
+    assert!(small_a.hash_eq_opt(&small_b, None));
+
+    assert!(!sig_a.hash_eq_opt(&sig_c, None));
+    assert!(!small_a.hash_eq_opt(&small_c, None));
+
+    // Force ct_eq on large
+    assert!(sig_a.hash_eq_opt(&sig_b, Some(4096)));
+
+    // Force hash_eq on small
+    assert!(small_a.hash_eq_opt(&small_b, Some(0)));
 }
 ```
 
-## 5. Encoding & Decoding (`encoding-*`)
+Plain `hash_eq` (uniform probabilistic behavior):
 
-### Hex Encoding
+```rust
+#[cfg(feature = "hash-eq")]
+{
+    use secure_gate::{Dynamic, Fixed, HashEq};
+    extern crate alloc;
+
+    // Dynamic (large example)
+    let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
+    let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
+    let sig_c: Dynamic<Vec<u8>> = vec![0xBB; 2048].into();
+
+    // Fixed (small example)
+    let small_a: Fixed<[u8; 16]> = Fixed::new([1u8; 16]);
+    let small_b: Fixed<[u8; 16]> = Fixed::new([1u8; 16]);
+    let small_c: Fixed<[u8; 16]> = Fixed::new([2u8; 16]);
+
+    assert!(sig_a.hash_eq(&sig_b));
+    assert!(small_a.hash_eq(&small_b));
+    assert!(!sig_a.hash_eq(&sig_c));
+    assert!(!small_a.hash_eq(&small_c));
+}
+```
+
+**Timing-safe direct comparison** (`ct-eq`):
+
+```rust
+#[cfg(feature = "ct-eq")]
+{
+    use secure_gate::{ConstantTimeEq, Dynamic, Fixed};
+    extern crate alloc;
+
+    // Dynamic (large example)
+    let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
+    let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
+
+    // Fixed (small example)
+    let small_a: Fixed<[u8; 16]> = Fixed::new([1u8; 16]);
+    let small_b: Fixed<[u8; 16]> = Fixed::new([1u8; 16]);
+
+    assert!(sig_a.ct_eq(&sig_b));
+    assert!(small_a.ct_eq(&small_b));
+}
+```
+
+## 5. Encoding & Decoding
+
 ```rust
 #[cfg(feature = "encoding-hex")]
 {
-    use secure_gate::*;
-    extern crate alloc;
-
-    let secret = [0xDE, 0xAD, 0xBE, 0xEF];
-    let hex = secret.to_hex();  // "deadbeef"
-    let upper = secret.to_hex_upper();  // "DEADBEEF"
+    use secure_gate::SecureEncoding;
+    let bytes = [0xDE, 0xAD, 0xBE, 0xEF];
+    let hex = bytes.to_hex();        // "deadbeef"
+    let upper = bytes.to_hex_upper(); // "DEADBEEF"
 }
-```
 
-### Base64 Encoding
-```rust
 #[cfg(feature = "encoding-base64")]
 {
-    use secure_gate::*;
-    extern crate alloc;
-
+    use secure_gate::SecureEncoding;
     let data = b"Hello World";
-    let b64 = data.to_base64url();  // "SGVsbG8gV29ybGQ"
+    let b64 = data.to_base64url(); // "SGVsbG8gV29ybGQ"
 }
-```
 
-### Bech32 Encoding
-```rust
 #[cfg(feature = "encoding-bech32")]
 {
-    use secure_gate::*;
-    extern crate alloc;
-
+    use secure_gate::SecureEncoding;
     let data = b"test data";
-
-    // Infallible (panics on error)
-    let bech32 = data.to_bech32("test");  // e.g., "test1..."
-
-    // Fallible
-    match data.try_to_bech32("test", None) {
-        Ok(encoded) => println!("Encoded: {}", encoded),
-        Err(e) => eprintln!("Error: {:?}", e),
-    }
+    let bech32 = data.to_bech32("test");           // infallible
+    let maybe = data.try_to_bech32("test", None);  // fallible
 }
 ```
 
-### Serde Auto-Decoding
+Serde auto-decoding (hex/base64/bech32):
+
 ```rust
-// #[cfg(all(feature = "serde-deserialize", any(feature = "encoding-hex", feature = "encoding-base64", feature = "encoding-bech32")))]
-// {
-//     use secure_gate::*;
-//     use serde_json;
-//     extern crate alloc;
-
-//     // Hex: "deadbeef"
-//     let hex: Dynamic<Vec<u8>> = serde_json::from_str(r#""deadbeef""#).expect("Failed to decode hex string");
-
-//     // Base64: "SGVsbG8"
-//     let b64: Dynamic<Vec<u8>> = serde_json::from_str(r#""SGVsbG8""#).unwrap();
-
-//     // Bech32 (valid HRP required)
-//     #[cfg(feature = "encoding-bech32")]
-//     let bech32: Dynamic<Vec<u8>> = serde_json::from_str(r#""test1..."#).unwrap();
-// }
-```
-
-## 6. Opt-In Cloning (`cloneable`)
-
-### Implement CloneableType
-```rust
-#[cfg(feature = "cloneable")]
+#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
 {
-    use secure_gate::CloneableType;
-
-    #[derive(Clone)]
-    struct MySecret([u8; 32]);
-
-    impl CloneableType for MySecret {}
-
-    let original = MySecret([42; 32]);
-    let cloned = original.clone();  // Now allowed on Fixed/Dynamic
-}
-```
-
-### Wrapping for Cloning
-```rust
-#[cfg(feature = "cloneable")]
-{
-    use secure_gate::*;
+    use secure_gate::{Dynamic, ExposeSecret};
+    use serde_json;
     extern crate alloc;
 
-    #[derive(Clone)]
-    struct MyKey(Vec<u8>);
-
-    impl CloneableType for MyKey {}
-
-    let key: Dynamic<MyKey> = MyKey(vec![1, 2, 3]).into();
-    let copy = key.clone();  // Deep clone
+    let key: Dynamic<Vec<u8>> = serde_json::from_str(r#""deadbeef""#).unwrap();
+    assert_eq!(key.expose_secret(), &[0xDE, 0xAD, 0xBE, 0xEF]);
 }
 ```
 
-## 7. Opt-In Serialization (`serde-serialize`)
+## 6. Serde (Deserialize & Serialize)
 
-### Implement SerializableType
+Deserialize (auto-detects encoding):
+
+```rust
+#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
+{
+    use secure_gate::Dynamic;
+    use serde_json;
+    extern crate alloc;
+
+    let json = r#""2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a""#;
+    let key: Dynamic<Vec<u8>> = serde_json::from_str(json).unwrap();
+}
+```
+
+Serialize (opt-in):
+
 ```rust
 #[cfg(feature = "serde-serialize")]
 {
-    use secure_gate::{SerializableType, Dynamic};
+    use secure_gate::{Dynamic, SerializableType};
     use serde::Serialize;
+    extern crate alloc;
 
     #[derive(Serialize)]
     struct MyData { secret: Vec<u8> }
-
     impl SerializableType for MyData {}
 
     let data = MyData { secret: vec![1, 2, 3] };
     let wrapped: Dynamic<MyData> = data.into();
-    let json = serde_json::to_string(&wrapped).unwrap();  // Allowed
+    let json = serde_json::to_string(&wrapped).unwrap();
 }
 ```
 
-## 8. Loading Secrets (`serde-deserialize`)
+## 7. Opt-In Cloning
 
-### Config with Secrets
 ```rust
-#[cfg(feature = "serde-deserialize")]
+#[cfg(feature = "cloneable")]
 {
-    use secure_gate::*;
-    use serde::Deserialize;
-    use serde_json;
+    use secure_gate::{CloneableType, Dynamic};
     extern crate alloc;
 
-    #[derive(Deserialize)]
-    struct Config {
-        api_key: Fixed<[u8; 32]>,
-        password: Dynamic<String>,
+    #[derive(Clone)]
+    struct MyKey(Vec<u8>);
+    impl CloneableType for MyKey {}
+
+    let key: Dynamic<MyKey> = MyKey(vec![1, 2, 3]).into();
+    let copy = key.clone(); // Deep clone allowed
+}
+```
+
+## 8. Polymorphic / Generic Code
+
+```rust
+#[cfg(all(feature = "ct-eq", feature = "hash-eq"))]
+{
+    use secure_gate::{ExposeSecret, ConstantTimeEq, HashEq};
+    
+    fn get_len<S: ExposeSecret>(secret: &S) -> usize {
+        secret.len()
     }
-
-    let json = r#"{
-        "api_key": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31],
-        "password": "secret123"
-    }"#;
-
-    let config: Config = serde_json::from_str(json).unwrap();
-    assert_eq!(config.password.expose_secret(), "secret123");
-}
-```
-
-## 9. Polymorphic Traits
-
-### Generic Access
-```rust
-use secure_gate::*;
-extern crate alloc;
-
-fn get_len<S: ExposeSecret>(secret: &S) -> usize {
-    secret.len()
-}
-
-let dynamic: Dynamic<Vec<u8>> = vec![1; 8].into();
-let fixed: Fixed<[u8; 16]> = [0; 16].into();
-
-assert_eq!(get_len(&dynamic), 8);
-assert_eq!(get_len(&fixed), 16);
-```
-
-### Constant-Time Equality
-```rust
-#[cfg(feature = "ct-eq")]
-{
-    use secure_gate::*;
-    extern crate alloc;
-
+    
     fn safe_eq<S: ConstantTimeEq>(a: &S, b: &S) -> bool {
         a.ct_eq(b)
     }
-
-    let a: Dynamic<Vec<u8>> = vec![1; 4].into();
-    let b: Dynamic<Vec<u8>> = vec![1; 4].into();
-    assert!(safe_eq(&a, &b));
-}
-```
-
-### Hash Equality
-```rust
-#[cfg(feature = "hash-eq")]
-{
-    use secure_gate::*;
-    extern crate alloc;
-
-    fn hash_eq<S: HashEq>(a: &S, b: &S) -> bool {
-        a.hash_eq(b)
+    
+    fn fast_eq<S: HashEq>(a: &S, b: &S) -> bool {
+        a.hash_eq_opt(b, None)  // recommended
     }
-
-    let large_a: Dynamic<Vec<u8>> = vec![42; 1000].into();
-    let large_b: Dynamic<Vec<u8>> = vec![42; 1000].into();
-    assert!(hash_eq(&large_a, &large_b));  // Fast
 }
 ```
 
-## 10. Hash-Based Equality (`hash-eq`)
+## 9. Construction Patterns (Infallible & Fallible)
 
-### Basic Usage
 ```rust
-#[cfg(feature = "hash-eq")]
-{
-    use secure_gate::*;
-    extern crate alloc;
-
-    let a: Fixed<[u8; 32]> = [1; 32].into();
-    let b: Fixed<[u8; 32]> = [1; 32].into();
-    let c: Fixed<[u8; 32]> = [2; 32].into();
-
-    assert!(a.hash_eq(&b));
-    assert!(!a.hash_eq(&c));
-}
-```
-
-### Performance for Large Data
-```rust
-#[cfg(feature = "hash-eq")]
-{
-    use secure_gate::*;
-    extern crate alloc;
-
-    let big_a: Dynamic<Vec<u8>> = vec![0; 10000].into();
-    let big_b: Dynamic<Vec<u8>> = vec![0; 10000].into();
-
-    // BLAKE3 hash comparison (fast for large secrets)
-    assert!(big_a.hash_eq(&big_b));
-}
-```
-
-## 11. Construction & Fallibility
-
-### Fixed Construction
-```rust
-use secure_gate::*;
+use secure_gate::{Dynamic, Fixed};
 extern crate alloc;
 
-// Infallible from exact array
+// Dynamic (always infallible — copies)
+let dyn_vec: Dynamic<Vec<u8>> = vec![5, 6, 7].into();
+let dyn_str: Dynamic<String> = "hello".into();
+let dyn_slice: Dynamic<Vec<u8>> = [8u8, 9, 10].as_slice().into();
+
+// Fixed (infallible from exact array)
 let fixed: Fixed<[u8; 4]> = [1, 2, 3, 4].into();
 
-// Fallible from slice
-let slice: &[u8] = &[5, 6, 7, 8];
+// Fixed (fallible from slice)
+let slice = [8u8, 9, 10, 11];
 let ok: Result<Fixed<[u8; 4]>, _> = slice.try_into();
 assert!(ok.is_ok());
 
-let mismatch: &[u8] = &[9, 10];
-let err: Result<Fixed<[u8; 4]>, _> = mismatch.try_into();
+let short = [12u8, 13];
+let err: Result<Fixed<[u8; 4]>, _> = short.as_slice().try_into();
 assert!(err.is_err());
 ```
 
-### Dynamic Construction
-```rust
-use secure_gate::*;
-extern crate alloc;
+---
 
-// Always infallible (copies)
-let from_vec: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
-let from_str: Dynamic<String> = "hello".into();
-let from_slice: Dynamic<Vec<u8>> = [4u8, 5, 6].as_slice().into();
-```
+All examples are tested with `"full"` features and should compile cleanly.
 
-## 12. Macros Overview
-
-```rust
-use secure_gate::*;
-extern crate alloc;
-
-// Fixed aliases
-fixed_alias!(MyKey, 32);
-fixed_alias!(pub ApiKey, 16, "API key");  // Doc version with custom documentation
-
-// Dynamic aliases
-dynamic_alias!(Password, String);
-dynamic_alias!(pub Token, Vec<u8>, "Auth token");  // Doc version with custom documentation
-
-// Generics
-fixed_generic_alias!(Buffer);
-dynamic_generic_alias!(Secret);
-
-// Usage
-let key: MyKey = [0u8; 32].into();
-let api: ApiKey = [1u8; 16].into();
-let pw: Password = "pass".into();
-let tok: Token = vec![2u8; 8].into();
-let buf: Buffer<64> = [1u8; 64].into();
-let sec: Secret<String> = "hidden".into();
-```
-
-All examples are copy-paste ready for real-world use.
-
-All examples compile with `"full"` features. Adjust feature set as needed.
+Adjust feature flags as needed for minimal builds.
