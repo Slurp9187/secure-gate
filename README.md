@@ -1,8 +1,8 @@
 # secure-gate
 `no_std`-compatible wrappers for sensitive data with explicit, auditable exposure.
 
-> 🔒 **Security Notice**: This crate has **not undergone independent audit**.  
-> Review the code and [SECURITY.md](SECURITY.md) before production use.  
+> 🔒 **Security Notice**: This crate has **not undergone independent audit**.
+> Review the code and [SECURITY.md](SECURITY.md) before production use.
 > Memory safety is guaranteed — **no unsafe code** (`#![forbid(unsafe_code)]`).
 
 Secure-gate provides `Dynamic<T>` (heap-allocated) and `Fixed<T>` (stack-allocated) wrappers that **force explicit access** to secrets via `.expose_secret()` or scoped `.with_secret()` — preventing accidental leaks while remaining zero-cost and `no_std` + `alloc` compatible.
