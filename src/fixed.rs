@@ -193,35 +193,68 @@ where
 #[cfg(feature = "hash-eq")]
 impl<T> crate::HashEq for Fixed<T>
 where
-    T: AsRef<[u8]>,
+    T: AsRef<[u8]> + crate::ConstantTimeEq,
 {
     fn hash_eq(&self, other: &Self) -> bool {
+        // Early length check — length is public metadata, safe to compare normally
+        if self.inner.as_ref().len() != other.inner.as_ref().len() {
+            return false;
+        }
+
         #[cfg(feature = "rand")]
         {
             use once_cell::sync::Lazy;
             use rand::{rngs::OsRng, TryRngCore};
+
             static HASH_EQ_KEY: Lazy<[u8; 32]> = Lazy::new(|| {
                 let mut key = [0u8; 32];
                 let mut rng = OsRng;
-                rng.try_fill_bytes(&mut key).unwrap();
+                rng.try_fill_bytes(&mut key).expect("RNG failure");
                 key
             });
-            let mut self_hasher = blake3::Hasher::new_keyed(&HASH_EQ_KEY);
-            let mut other_hasher = blake3::Hasher::new_keyed(&HASH_EQ_KEY);
-            self_hasher.update(self.inner.as_ref());
-            other_hasher.update(other.inner.as_ref());
-            use crate::ConstantTimeEq;
-            self_hasher
+
+            let mut hasher_a = blake3::Hasher::new_keyed(&HASH_EQ_KEY);
+            let mut hasher_b = blake3::Hasher::new_keyed(&HASH_EQ_KEY);
+
+            hasher_a.update(self.inner.as_ref());
+            hasher_b.update(other.inner.as_ref());
+
+            use crate::traits::ConstantTimeEq;
+            hasher_a
                 .finalize()
                 .as_bytes()
-                .ct_eq(other_hasher.finalize().as_bytes())
+                .ct_eq(hasher_b.finalize().as_bytes())
+                .into()
         }
+
         #[cfg(not(feature = "rand"))]
         {
-            let self_hash = blake3::hash(self.inner.as_ref());
-            let other_hash = blake3::hash(other.inner.as_ref());
-            use crate::ConstantTimeEq;
-            self_hash.as_bytes().ct_eq(other_hash.as_bytes())
+            let hash_a = blake3::hash(self.inner.as_ref());
+            let hash_b = blake3::hash(other.inner.as_ref());
+
+            use crate::traits::ConstantTimeEq;
+            hash_a.as_bytes().ct_eq(hash_b.as_bytes()).into()
+        }
+    }
+
+    fn hash_eq_opt(&self, other: &Self, hash_threshold_bytes: Option<usize>) -> bool {
+        use crate::traits::ConstantTimeEq;
+        let threshold = hash_threshold_bytes.unwrap_or(32);
+
+        let self_bytes = self.inner.as_ref();
+        let other_bytes = other.inner.as_ref();
+
+        // Early length check — safe (public metadata)
+        if self_bytes.len() != other_bytes.len() {
+            return false;
+        }
+
+        let size = self_bytes.len();
+
+        if size <= threshold {
+            self.ct_eq(other)
+        } else {
+            self.hash_eq(other)
         }
     }
 }
