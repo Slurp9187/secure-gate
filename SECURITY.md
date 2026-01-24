@@ -1,7 +1,6 @@
 # Security Considerations for secure-gate
 
 ## TL;DR
-
 - **No independent audit** — review the source code yourself before production use.
 - **No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally.
 - **Explicit exposure only** — all secret access requires `.expose_secret()` / `.with_secret()` or mutable equivalents; no `Deref`, `AsRef`, or implicit borrowing.
@@ -14,14 +13,15 @@ This document outlines the security model, design choices, strengths, known limi
 
 ## Audit Status
 
-`secure-gate` has **not** undergone an independent security audit.  
+`secure-gate` has **not** undergone an independent security audit.
+
 The crate is intentionally small and relies on well-vetted dependencies:
 
 - `zeroize` — memory wiping
 - `subtle` — constant-time comparison primitives
 - `blake3` — cryptographic hashing
 - `rand_core` + `getrandom` — secure randomness
-- Encoding crates (`hex`, `base64`, `bech32`) — battle-tested
+- Encoding crates (`hex`, `base64`, `bech32`) — battle-tested (supports bech32 / bech32m)
 
 **Before production use**, review:
 
@@ -51,9 +51,9 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `secure` (default)   | Enables `zeroize` + `ct-eq` — secure-by-default baseline                         | Always enable unless extreme constraints    |
 | `zeroize`            | Wipes memory on drop; enables safe opt-in cloning/serialization                  | Strongly recommended                        |
 | `ct-eq`              | Timing-safe direct byte comparison                                               | Strongly recommended; avoid `==`            |
-| `hash-eq`            | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Use `hash_eq_opt` for most cases            |
+| `hash-eq`            | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `hash_eq_opt` for most cases         |
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
-| `serde-deserialize`  | Auto-decodes hex/base64/bech32; temporary buffers zeroized on failure            | Enable only for trusted input sources       |
+| `serde-deserialize`  | Auto-decodes hex/base64/bech32/bech32m; temporary buffers zeroized on failure    | Enable only for trusted input sources       |
 | `serde-serialize`    | Opt-in export via marker trait; audit all implementations                        | Enable sparingly; monitor exfiltration risk |
 | `encoding-*`         | Explicit encoding/decoding; fallible; zeroizes invalid inputs                    | Validate inputs upstream                    |
 | `cloneable`          | Opt-in cloning via marker trait; increases exposure surface                      | Use minimally; prefer move semantics        |
@@ -96,18 +96,18 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 **Strengths**
 - Explicit methods; typed errors; fallible operations
-- Bech32 HRP validation prevents injection
+- Bech32 / Bech32m HRP validation prevents injection
 
 **Potential weaknesses**
 - Temporary allocations during decoding
 - Length/format hints in errors
 
 **Mitigations**
-- Fuzz parsers; upstream input validation
+- Fuzz parsers; validate inputs upstream
 
 ## Best Practices
 
-- Enable `secure` feature unless you have extreme constraints
+- Enable the `secure` feature unless you have extreme constraints
 - Prefer scoped `with_secret()` over long-lived `expose_secret()`
 - Use `hash_eq_opt(…, None)` for general-purpose equality checks
 - Audit every `CloneableType` / `SerializableType` impl
@@ -124,7 +124,6 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 ## Disclaimer
 
-This document reflects design intent and observed properties as of the current release.  
-**No warranties are provided**. Users are solely responsible for their own security evaluation, threat modeling, and audit.
+This document reflects design intent and observed properties as of the current release.
 
-Thank you for reviewing `secure-gate` carefully.
+**No warranties are provided**. Users are solely responsible for their own security evaluation, threat modeling, and audit.
