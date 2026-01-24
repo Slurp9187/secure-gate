@@ -266,9 +266,9 @@ impl<const N: usize> Fixed<[u8; N]> {}
 impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
     type Error = crate::error::FromSliceError;
 
-    /// Attempt to create a `Fixed` from a byte slice, returning an error on length mismatch.
-    ///
-    /// This is the safe alternative to panicking conversions.
+    /// Attempt to create a `Fixed` from a byte slice.
+    /// In debug builds, panics with detailed information on length mismatch to aid development.
+    /// In release builds, returns an error on length mismatch to prevent information leaks.
     ///
     /// # Example
     ///
@@ -277,17 +277,18 @@ impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
     /// let slice: &[u8] = &[1u8, 2, 3, 4];
     /// let key: Result<Fixed<[u8; 4]>, _> = slice.try_into();
     /// assert!(key.is_ok());
-    ///
-    /// let short_slice: &[u8] = &[1u8, 2];
-    /// let fail: Result<Fixed<[u8; 4]>, _> = short_slice.try_into();
-    /// assert!(fail.is_err());
     /// ```
     fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
         if slice.len() != N {
-            return Err(crate::error::FromSliceError::LengthMismatch {
-                expected: N,
-                got: slice.len(),
-            });
+            #[cfg(debug_assertions)]
+            panic!(
+                "Fixed<{}> from_slice: expected exactly {} bytes, got {}",
+                N,
+                N,
+                slice.len()
+            );
+            #[cfg(not(debug_assertions))]
+            return Err(crate::error::FromSliceError::LengthMismatch);
         }
         let mut arr = [0u8; N];
         arr.copy_from_slice(slice);

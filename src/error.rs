@@ -5,8 +5,8 @@
 /// Error type for slice conversion operations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum FromSliceError {
-    #[error("slice length mismatch: expected {expected}, got {got}")]
-    LengthMismatch { expected: usize, got: usize },
+    #[error("slice length mismatch")]
+    LengthMismatch,
 }
 
 #[cfg(feature = "encoding-bech32")]
