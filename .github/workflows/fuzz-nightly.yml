@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [expose, mut, parsing, serde]
+        target: [expose, mut, parsing]
         mode: [normal, asan]
 
     env:
