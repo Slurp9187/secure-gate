@@ -306,15 +306,15 @@ Serialize (opt-in):
 #[cfg(all(feature = "ct-eq", feature = "hash-eq"))]
 {
     use secure_gate::{ExposeSecret, ConstantTimeEq, HashEq};
-    
+   
     fn get_len<S: ExposeSecret>(secret: &S) -> usize {
         secret.len()
     }
-    
+   
     fn safe_eq<S: ConstantTimeEq>(a: &S, b: &S) -> bool {
         a.ct_eq(b)
     }
-    
+   
     fn fast_eq<S: HashEq>(a: &S, b: &S) -> bool {
         a.hash_eq_opt(b, None)  // recommended
     }
