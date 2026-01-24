@@ -20,7 +20,6 @@
 /// let base64_string = bytes.to_base64url();
 /// // base64_string is now a URL-safe base64 encoded String
 /// ```
-
 #[cfg(feature = "encoding-base64")]
 use ::base64 as base64_crate;
 #[cfg(feature = "encoding-base64")]

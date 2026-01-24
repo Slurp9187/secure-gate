@@ -20,7 +20,6 @@
 /// let hex_string = bytes.to_hex();
 /// // hex_string is now String: "424242..."
 /// ```
-
 #[cfg(feature = "encoding-hex")]
 use ::hex as hex_crate;
 

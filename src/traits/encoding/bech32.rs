@@ -2,7 +2,6 @@
 use ::bech32;
 
 #[cfg(feature = "encoding-bech32")]
-#[cfg(feature = "encoding-bech32")]
 use crate::error::Bech32Error;
 #[cfg(feature = "encoding-bech32")]
 use crate::utilities::encoding::convert_bits;

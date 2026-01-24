@@ -92,7 +92,7 @@ fn test_bech32_encoding_failure() {
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
 #[test]
 fn fixed_deserialize_bech32_roundtrip() {
-    use secure_gate::{ExposeSecret, Fixed, SecureEncoding};
+    use secure_gate::{ExposeSecret, Fixed};
     let original: Fixed<[u8; 4]> = Fixed::new([1, 2, 3, 4]);
     let encoded = original.with_secret(|s| s.to_bech32("test"));
     let json = format!("\"{}\"", encoded);
@@ -103,7 +103,7 @@ fn fixed_deserialize_bech32_roundtrip() {
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
 #[test]
 fn dynamic_deserialize_bech32_roundtrip() {
-    use secure_gate::{Dynamic, ExposeSecret, SecureEncoding};
+    use secure_gate::{Dynamic, ExposeSecret};
     let original: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3, 4]);
     let encoded = original.with_secret(|s| s.to_bech32("test"));
     let json = format!("\"{}\"", encoded);
@@ -114,7 +114,7 @@ fn dynamic_deserialize_bech32_roundtrip() {
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
 #[test]
 fn fixed_deserialize_bech32m_roundtrip() {
-    use secure_gate::{ExposeSecret, Fixed, SecureEncoding};
+    use secure_gate::{ExposeSecret, Fixed};
     let original: Fixed<[u8; 4]> = Fixed::new([1, 2, 3, 4]);
     let encoded = original.with_secret(|s| s.to_bech32m("test"));
     let json = format!("\"{}\"", encoded);
@@ -125,7 +125,7 @@ fn fixed_deserialize_bech32m_roundtrip() {
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
 #[test]
 fn dynamic_deserialize_bech32m_roundtrip() {
-    use secure_gate::{Dynamic, ExposeSecret, SecureEncoding};
+    use secure_gate::{Dynamic, ExposeSecret};
     let original: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3, 4]);
     let encoded = original.with_secret(|s| s.to_bech32m("test"));
     let json = format!("\"{}\"", encoded);

@@ -13,9 +13,6 @@ use crate::ConstantTimeEq;
 #[cfg(feature = "rand")]
 use rand::{rngs::OsRng, TryRngCore};
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-base64"))]
-use base64::{engine::general_purpose, Engine as _};
-
 /// Fills a mutable byte slice with cryptographically secure random bytes
 /// using the OS-provided RNG.
 ///
