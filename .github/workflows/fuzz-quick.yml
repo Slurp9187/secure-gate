@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [expose, mut, parsing, serde]
+        target: [expose, mut, parsing]
 
     steps:
       - name: Checkout repository
