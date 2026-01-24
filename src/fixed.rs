@@ -1,6 +1,3 @@
-#[cfg(feature = "rand")]
-use rand::TryRngCore;
-
 /// Fixed-size stack-allocated secure secret wrapper.
 ///
 /// This is a zero-cost wrapper for fixed-size secrets like byte arrays or primitives.
@@ -289,9 +286,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     #[inline]
     pub fn from_random() -> Self {
         let mut bytes = [0u8; N];
-        rand::rngs::OsRng
-            .try_fill_bytes(&mut bytes)
-            .expect("OsRng failure is a program error");
+        crate::utilities::fill_random_bytes_mut(&mut bytes);
         Self::from(bytes)
     }
 }

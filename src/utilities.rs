@@ -1,7 +1,27 @@
-// Convert Vec<u8> (5-bit values) to Vec<u8> by unpacking into 8-bit bytes.
 #[cfg(feature = "hash-eq")]
 use crate::ConstantTimeEq;
 
+#[cfg(feature = "rand")]
+use rand::TryRngCore;
+
+#[cfg(all(feature = "serde-deserialize", feature = "encoding-base64"))]
+use base64::{engine::general_purpose, Engine};
+
+/// Unpack 5-bit Fe32 values into 8-bit bytes for bech32 decoding.
+///
+/// Bech32 encodes data into 5-bit groups; this reverses it by accumulating
+/// bits into an accumulator and extracting 8-bit chunks. Used internally
+/// for serde deserialization of bech32-encoded strings.
+///
+/// # Parameters
+/// - `data`: Vector of 5-bit values (0-31) to unpack.
+///
+/// # Returns
+/// Vector of unpacked 8-bit bytes.
+///
+/// # Safety
+/// Assumes `data` contains valid 5-bit values (0-31). No padding is applied
+/// as bech32 checksums ensure alignment.
 #[cfg(feature = "encoding-bech32")]
 pub(crate) fn fes_to_u8s(data: alloc::vec::Vec<u8>) -> alloc::vec::Vec<u8> {
     let mut bytes = alloc::vec::Vec::new();
@@ -99,5 +119,13 @@ pub(crate) fn try_decode(_s: &str) -> Result<alloc::vec::Vec<u8>, crate::Decodin
     Err(crate::DecodingError::InvalidEncoding)
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-base64"))]
-use base64::{engine::general_purpose, Engine};
+/// Fill a mutable byte slice with random bytes using the system RNG.
+///
+/// Panics on RNG failure for fail-fast crypto code. Guarantees secure entropy
+/// from system sources.
+#[cfg(feature = "rand")]
+pub fn fill_random_bytes_mut(bytes: &mut [u8]) {
+    rand::rngs::OsRng
+        .try_fill_bytes(bytes)
+        .expect("OsRng failure is a program error");
+}

@@ -1,9 +1,6 @@
 extern crate alloc;
 use alloc::boxed::Box;
 
-#[cfg(feature = "rand")]
-use rand::TryRngCore;
-
 /// Dynamic-sized heap-allocated secure secret wrapper.
 ///
 /// This is a thin wrapper around `Box<T>` with enforced explicit exposure.
@@ -232,9 +229,7 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     #[inline]
     pub fn from_random(len: usize) -> Self {
         let mut bytes = vec![0u8; len];
-        rand::rngs::OsRng
-            .try_fill_bytes(&mut bytes)
-            .expect("OsRng failure is a program error");
+        crate::utilities::fill_random_bytes_mut(&mut bytes);
         Self::from(bytes)
     }
 }
