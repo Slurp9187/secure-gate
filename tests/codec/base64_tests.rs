@@ -5,7 +5,7 @@
 
 extern crate alloc;
 
-use secure_gate::SecureEncoding;
+use secure_gate::{FromBase64UrlStr, ToBase64Url};
 
 #[cfg(feature = "encoding-base64")]
 #[test]
@@ -58,4 +58,20 @@ fn dynamic_deserialize_base64_string() {
     // Valid base64
     let result: Dynamic<Vec<u8>> = serde_json::from_str("\"AQIDBA\"").unwrap();
     result.with_secret(|r| assert_eq!(r, &[1, 2, 3, 4]));
+}
+
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn test_string_from_base64url() {
+    let b64 = "QkNE";
+    let bytes = b64.try_from_base64url().unwrap();
+    assert_eq!(bytes, vec![0x42, 0x43, 0x44]);
+}
+
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn test_invalid_base64url_string() {
+    let invalid_b64 = "@@"; // Invalid base64 chars
+    let result = invalid_b64.try_from_base64url();
+    assert!(result.is_err());
 }

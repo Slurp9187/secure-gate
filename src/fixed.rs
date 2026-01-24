@@ -222,7 +222,7 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 write!(
                     formatter,
-                    "a hex/base64/bech32 string or byte array of length {}",
+                    "a hex/base64url/bech32 string or byte array of length {}",
                     M
                 )
             }
@@ -231,7 +231,14 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
             where
                 E: de::Error,
             {
-                let arr = crate::utilities::visit_byte_string::<E, M>(v, M)?;
+                let bytes = crate::utilities::decoding::try_decode_any(v).map_err(E::custom)?;
+
+                if bytes.len() != M {
+                    return Err(E::invalid_length(bytes.len(), &M.to_string().as_str()));
+                }
+
+                let mut arr = [0u8; M];
+                arr.copy_from_slice(&bytes);
                 Ok(Fixed::new(arr))
             }
 

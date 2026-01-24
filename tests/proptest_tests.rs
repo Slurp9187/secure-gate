@@ -86,7 +86,7 @@ mod encoding_roundtrip_proptests {
     #[cfg(feature = "serde-deserialize")]
     use secure_gate::ExposeSecret;
     #[cfg(feature = "encoding-bech32")]
-    use secure_gate::SecureEncoding;
+    use secure_gate::{ToBech32, ToBech32m, ToHex};
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(50))]

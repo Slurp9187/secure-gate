@@ -5,7 +5,7 @@
 
 extern crate alloc;
 
-use secure_gate::SecureEncoding;
+use secure_gate::{FromBech32Str, FromBech32mStr, ToBech32, ToBech32m};
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
@@ -144,5 +144,138 @@ fn bech32_deserialize_invalid_checksums() {
     // Invalid bech32m checksum (using bech32 string)
     let result: Result<Fixed<[u8; 4]>, _> =
         serde_json::from_str("\"test1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw\"");
+    assert!(result.is_err());
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn test_string_from_bech32() {
+    let data = [0x00];
+    let encoded = data.to_bech32("test");
+    let (hrp, decoded) = encoded.try_from_bech32().unwrap();
+    assert_eq!(hrp, "test");
+    assert_eq!(decoded, data);
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn test_string_from_bech32_expect_hrp() {
+    let data = [0x00];
+    let encoded = data.to_bech32("test");
+    let decoded = encoded.try_from_bech32_expect_hrp("test").unwrap();
+    assert_eq!(decoded, data);
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn test_invalid_bech32_string() {
+    let invalid = "invalid";
+    let result = invalid.try_from_bech32();
+    assert!(result.is_err());
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn test_bech32_wrong_hrp() {
+    let bech32 = "test1vejq2p";
+    let result = bech32.try_from_bech32_expect_hrp("wrong");
+    assert!(result.is_err());
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn test_string_from_bech32m() {
+    let data = [0x00];
+    let encoded = data.to_bech32m("test");
+    let (hrp, decoded) = encoded.try_from_bech32m().unwrap();
+    assert_eq!(hrp, "test");
+    assert_eq!(decoded, data);
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn test_string_from_bech32m_expect_hrp() {
+    let data = [0x00];
+    let encoded = data.to_bech32m("test");
+    let decoded = encoded.try_from_bech32m_expect_hrp("test").unwrap();
+    assert_eq!(decoded, data);
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn test_invalid_bech32m_string() {
+    let invalid = "invalid";
+    let result = invalid.try_from_bech32m();
+    assert!(result.is_err());
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn test_bech32m_wrong_hrp() {
+    let bech32m = "test1vw3q3p";
+    let result = bech32m.try_from_bech32m_expect_hrp("wrong");
+    assert!(result.is_err());
+}
+
+// Additional BIP-173/BIP-350 validation tests based on standard test vectors
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bip_173_valid_bech32_example() {
+    // This is a valid Bech32 string from BIP-173 test vectors
+    let valid_bech32 = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
+    // Should decode successfully with FromBech32Str
+    let result = valid_bech32.try_from_bech32();
+    assert!(result.is_ok());
+    let (hrp, bytes) = result.unwrap();
+    assert_eq!(hrp, "bc");
+    // Should fail with FromBech32mStr since it's Bech32, not Bech32m
+    let result_bech32m = valid_bech32.try_from_bech32m();
+    assert!(result_bech32m.is_err());
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bip_350_valid_bech32m_example() {
+    // This is a valid Bech32m string from BIP-350 test vectors
+    let valid_bech32m =
+        "bc1pw508d6qejxtdg4y5r3zarvary0c5xw7kw508d6qejxtdg4y5r3zarvary0c5xw7kt5nd6y";
+    // Should fail with FromBech32Str since it's Bech32m, not Bech32
+    let result_bech32 = valid_bech32m.try_from_bech32();
+    assert!(result_bech32.is_err());
+    // Should decode successfully with FromBech32mStr
+    let result = valid_bech32m.try_from_bech32m();
+    assert!(result.is_ok());
+    let (hrp, bytes) = result.unwrap();
+    assert_eq!(hrp, "bc");
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bip_173_invalid_checksum() {
+    // Invalid Bech32 checksum from BIP-173 test vectors
+    let invalid = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5";
+    let result = invalid.try_from_bech32();
+    assert!(result.is_err());
+    let result_bech32m = invalid.try_from_bech32m();
+    assert!(result_bech32m.is_err()); // Also invalid as Bech32m
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bip_350_invalid_bech32m_checksum() {
+    // String valid as Bech32 but invalid as Bech32m (checksum mismatch for Bech32m)
+    let bech32_valid = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
+    // This should be invalid for Bech32m
+    let result = bech32_valid.try_from_bech32m();
+    assert!(result.is_err());
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bip_173_empty_data_invalid() {
+    // Empty data section from BIP-173 test vectors (invalid)
+    let invalid = "bc1gmk9yu";
+    let result = invalid.try_from_bech32();
     assert!(result.is_err());
 }

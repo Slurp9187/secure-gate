@@ -103,31 +103,3 @@ pub(crate) fn hash_eq_opt_bytes(
 // ─────────────────────────────────────────────────────────────────────────────
 //                   String → bytes decoding helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-/// Decode string to bytes using supported encodings (for serde error mapping).
-///
-/// Convenience wrapper that converts errors to `String` for serde visitors.
-#[cfg(feature = "serde-deserialize")]
-pub fn decode_string_to_bytes(s: &str) -> Result<Vec<u8>, String> {
-    decoding::try_decode_any(s).map_err(|e| e.to_string())
-}
-
-/// Serde visitor helper: decode string → check exact length → copy to `[u8; N]`.
-#[cfg(feature = "serde-deserialize")]
-pub fn visit_byte_string<E, const N: usize>(v: &str, expected_len: usize) -> Result<[u8; N], E>
-where
-    E: serde::de::Error,
-{
-    let bytes = decode_string_to_bytes(v).map_err(E::custom)?;
-
-    if bytes.len() != expected_len {
-        return Err(E::invalid_length(
-            bytes.len(),
-            &expected_len.to_string().as_str(),
-        ));
-    }
-
-    let mut arr = [0u8; N];
-    arr.copy_from_slice(&bytes);
-    Ok(arr)
-}

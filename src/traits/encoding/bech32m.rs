@@ -2,7 +2,7 @@
 use ::bech32;
 
 #[cfg(feature = "encoding-bech32")]
-use crate::encoding::encoding_utilities::convert_bits;
+use crate::utilities::encoding::convert_bits;
 #[cfg(feature = "encoding-bech32")]
 use crate::error::Bech32Error;
 

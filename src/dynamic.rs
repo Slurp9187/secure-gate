@@ -247,13 +247,13 @@ impl<'de> serde::Deserialize<'de> for Dynamic<alloc::vec::Vec<u8>> {
         impl<'de> Visitor<'de> for DynamicVecVisitor {
             type Value = Dynamic<alloc::vec::Vec<u8>>;
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                write!(formatter, "a hex/base64/bech32 string or byte vector")
+                write!(formatter, "a hex/base64url/bech32 string or byte vector")
             }
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
-                let bytes = crate::utilities::decode_string_to_bytes(v).map_err(E::custom)?;
+                let bytes = crate::utilities::decoding::try_decode_any(v).map_err(E::custom)?;
                 Ok(Dynamic::new(bytes))
             }
         }

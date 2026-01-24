@@ -4,7 +4,7 @@
 use ::bech32;
 
 #[cfg(feature = "encoding-bech32")]
-use crate::encoding::encoding_utilities::fes_to_u8s;
+use crate::utilities::encoding::fes_to_u8s;
 #[cfg(feature = "encoding-bech32")]
 use crate::error::Bech32Error;
 

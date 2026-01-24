@@ -5,7 +5,7 @@
 
 extern crate alloc;
 
-use secure_gate::SecureEncoding;
+use secure_gate::{FromHexStr, ToHex};
 
 #[cfg(feature = "encoding-hex")]
 #[test]
@@ -45,6 +45,22 @@ fn test_hex_prefix() {
     let data: [u8; 4] = [1, 2, 3, 4];
     assert_eq!(data.to_hex_prefix(2), "0102…");
     assert_eq!(data.to_hex_prefix(4), "01020304");
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn test_string_from_hex() {
+    let hex = "424344";
+    let bytes = hex.try_from_hex().unwrap();
+    assert_eq!(bytes, vec![0x42, 0x43, 0x44]);
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn test_invalid_hex_string() {
+    let invalid_hex = "gg"; // 'g' is not a hex char
+    let result = invalid_hex.try_from_hex();
+    assert!(result.is_err());
 }
 
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]

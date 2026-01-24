@@ -278,10 +278,15 @@ fn dynamic_roundtrip() {
     feature = "encoding-hex"
 ))]
 #[test]
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "serde-serialize",
+    feature = "encoding-hex"
+))]
 fn secure_encoding_roundtrip() {
-    use secure_gate::{Fixed, SecureEncoding};
+    use secure_gate::{Fixed, ToHex};
 
-    // Assuming we have a type with SecureEncoding
+    // Assuming we have a type with ToHex
     let original: Fixed<[u8; 4]> = Fixed::new([1, 2, 3, 4]);
     let encoded = original.with_secret(|s| s.to_hex());
     // Note: This is a basic test; full roundtrip would require decoding functions if available
