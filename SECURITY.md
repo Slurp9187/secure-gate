@@ -55,7 +55,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `ct-eq`              | Timing-safe direct byte comparison                                               | Strongly recommended; avoid `==`            |
 | `ct-eq-hash`         | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `ct_eq_opt` for most cases           |
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
-| `serde-deserialize`  | Auto-decodes hex/base64url/bech32/bech32m via fallible per-format traits; temporary buffers in `try_decode_any` and per-format decoders are zeroized on both success (after copy) and failure (`zeroize` feature) | Enable only for trusted input sources       |
+| `serde-deserialize`  | Auto-decodes hex/base64url/bech32/bech32m via fallible per-format traits; decoded buffers are zeroized when the containing `Dynamic`/`Fixed` wrapper drops (`zeroize` feature) | Enable only for trusted input sources       |
 | `serde-serialize`    | Opt-in export via marker trait; audit all implementations                        | Enable sparingly; monitor exfiltration risk |
 | `encoding-*`         | Per-format symmetric encoding/decoding traits (e.g., `ToHex`/`FromHexStr`); explicit, fallible, rejects invalid formats | Validate inputs upstream; prefer specific traits over umbrellas for strictness |
 | `cloneable`          | Opt-in cloning via marker trait; increases exposure surface                      | Use minimally; prefer move semantics        |
