@@ -7,9 +7,10 @@
 //!
 //! ## Security Warning
 //!
+//!
 //! These methods produce human-readable strings containing the full secret.
 //! Use only when intentionally exposing the secret (e.g., QR codes, user export, audited logging).
-//! For debugging/logging, prefer redacted helpers like `to_hex_prefix`.
+//! For debugging/logging, prefer redacted helpers like `to_hex_left`.
 //! All calls require explicit `.expose_secret()` first — no implicit paths exist.
 //!
 /// # Example
@@ -34,7 +35,7 @@ use ::hex as hex_crate;
 ///
 /// These methods produce human-readable strings containing the full secret.
 /// Use only when intentionally exposing the secret (e.g., QR codes, user export, audited logging).
-/// For debugging/logging, prefer redacted helpers like `to_hex_prefix`.
+/// For debugging/logging, prefer redacted helpers like `to_hex_left`.
 /// All calls require explicit `.expose_secret()` first — no implicit paths exist.
 ///
 /// # Example
@@ -56,14 +57,14 @@ pub trait ToHex {
     /// Encode secret bytes as uppercase hexadecimal.
     fn to_hex_upper(&self) -> alloc::string::String;
 
-    /// Encode secret bytes as lowercase hexadecimal, truncated to `prefix_bytes` with "…" if longer.
+    /// Encode secret bytes as lowercase hexadecimal, truncated to the first `bytes` with '…' if longer.
     /// Useful for redacted logging or debugging without exposing the full secret.
-    fn to_hex_prefix(&self, prefix_bytes: usize) -> alloc::string::String {
+    fn to_hex_left(&self, bytes: usize) -> alloc::string::String {
         let full = self.to_hex();
-        if full.len() <= prefix_bytes * 2 {
+        if full.len() <= bytes * 2 {
             full
         } else {
-            format!("{}…", &full[..prefix_bytes * 2])
+            format!("{}…", &full[..bytes * 2])
         }
     }
 }

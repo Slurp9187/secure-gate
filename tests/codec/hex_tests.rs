@@ -41,10 +41,10 @@ fn test_string_to_hex() {
 
 #[cfg(feature = "encoding-hex")]
 #[test]
-fn test_hex_prefix() {
+fn test_hex_left() {
     let data: [u8; 4] = [1, 2, 3, 4];
-    assert_eq!(data.to_hex_prefix(2), "0102…");
-    assert_eq!(data.to_hex_prefix(4), "01020304");
+    assert_eq!(data.to_hex_left(2), "0102…");
+    assert_eq!(data.to_hex_left(4), "01020304");
 }
 
 #[cfg(feature = "encoding-hex")]

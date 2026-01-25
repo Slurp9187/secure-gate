@@ -9,7 +9,7 @@
 //!
 //! These methods produce human-readable strings containing the full secret.
 //! Use only when intentionally exposing the secret (e.g., QR codes, user export, audited logging).
-//! For debugging/logging, prefer redacted helpers like `to_hex_prefix` from `ToHex`.
+//! For debugging/logging, prefer redacted helpers like `to_hex_left`.
 //! All calls require explicit `.expose_secret()` first — no implicit paths exist.
 //!
 /// ## Example
@@ -39,8 +39,8 @@ use base64_crate::Engine;
 ///
 /// These methods produce human-readable strings containing the full secret.
 /// Use only when intentionally exposing the secret (e.g., QR codes, user export, audited logging).
-/// For debugging/logging, prefer redacted helpers like `to_hex_prefix` from `ToHex`.
-/// All calls require explicit `.expose_secret()` first — no implicit paths exist.
+/// For debugging/logging, prefer redacted helpers like `to_hex_left` from `ToHex`.
+// All calls require explicit `.expose_secret()` first — no implicit paths exist.
 ///
 /// # Example
 ///
