@@ -5,47 +5,55 @@ All changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.0] - 2026-01-24
+## [0.7.0] - 2026-01-25
 
 ### Added
 
-- **Secure-by-default exposure model** 
-  Private `inner` fields in `Dynamic<T>` and `Fixed<T>`; all access now requires explicit `.expose_secret()` / `.with_secret()` (scoped, recommended) or `.expose_secret_mut()` / `.with_secret_mut()`. No `Deref`, `AsRef`, or implicit borrowing — prevents accidental leaks.
-
-- **Opt-in cloning & serialization** 
-  New marker traits `CloneableType` and `SerializableType`. Cloning and serde serialization now require explicit impls on the inner type — no automatic risk.
-
-- **Polymorphic access traits** 
+- **Polymorphic access traits**
   `ExposeSecret` and `ExposeSecretMut` traits provide generic, zero-cost access with metadata (`len()`, `is_empty()`) without exposing contents. Implemented for both `Dynamic<T>` and `Fixed<T>`.
 
-- **Per-format encoding/decoding traits**
-  Symmetric, orthogonal traits (e.g., `ToHex`/`FromHexStr`, `ToBech32`/`FromBech32Str`). Umbrella traits `SecureEncoding`/`SecureDecoding` for aggregation. Multi-format auto-decoding (`try_decode_any`). Granular features: `encoding-hex`, `encoding-base64`, `encoding-bech32`.
-
-- **Timing-safe equality** 
+- **Timing-safe equality**
   `ConstantTimeEq` trait (`ct-eq` feature) with `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
 
-- **Fast probabilistic equality for large secrets** 
-  `HashEq` trait (`hash-eq` feature) using BLAKE3 + constant-time digest comparison. New **recommended** method `hash_eq_opt(…, threshold: Option<usize>)` automatically switches between `ct_eq` (small inputs) and `hash_eq` (large inputs).
+- **Fast probabilistic equality for large secrets**
+  `ConstantTimeEqExt` trait (requires `ct-eq-hash` feature) extends `ConstantTimeEq` with methods for fast probabilistic equality using BLAKE3 hashing. Includes `ct_eq_hash()` for direct hash comparison and `ct_eq_opt()` for smart hybrid selection between strict equality (small inputs) and hash equality (large inputs). Centralized threshold logic with default 32-byte crossover point. Enhanced documentation with security warnings for probabilistic methods and keyed mode when `rand` feature is enabled.
 
-- **Secure random generation** 
+- **Per-format encoding/decoding traits**
+  Symmetric, orthogonal traits (e.g., `ToHex`/`FromHexStr`, `ToBase64Url`/`FromBase64UrlStr`, `ToBech32`/`FromBech32Str`, `ToBech32m`/`FromBech32mStr`). Umbrella traits `SecureEncoding`/`SecureDecoding` for aggregation. Multi-format auto-decoding (`try_decode_any`). Granular features: `encoding-hex`, `encoding-base64`, `encoding-bech32`.
+
+- **Opt-in cloning & serialization**
+  New marker traits `CloneableType` and `SerializableType`. Cloning and serde serialization now require explicit impls on the inner type — no automatic risk.
+
+- **Secure random generation**
   `from_random()` on `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` using `OsRng` (panics on failure).
 
-- **Fallible fixed-size construction** 
+- **Fallible fixed-size construction**
   `TryFrom<&[u8]>` for `Fixed<[u8; N]>` with `FromSliceError` (safe alternative to panicking conversions).
 
-- **Centralized errors** 
+- **Centralized errors**
   Unified error types (`Bech32Error`, `DecodingError`, `FromSliceError`) via `thiserror`.
 
-- **Testing & CI** 
+- **Additional alias macros**
+  `dynamic_generic_alias!` and `fixed_generic_alias!` for generic (const-sized) aliases with optional custom documentation.
+
+- **Testing & CI**
   `trybuild` compile-fail tests, serde fuzz target, expanded CI matrix covering all feature combinations.
 
-- **Documentation** 
+- **Documentation**
   New `SECURITY.md`, enhanced README, custom rustdoc for alias macros.
+
+### Changed
+
+- **Secure-by-default exposure model**
+  Private `inner` fields in `Dynamic<T>` and `Fixed<T>`; all access now requires explicit `.expose_secret()` / `.with_secret()` (scoped, recommended) or `.expose_secret_mut()` / `.with_secret_mut()`. No `Deref`, `AsRef`, or implicit borrowing — prevents accidental leaks.
+
+- **Bech32 encoding**
+  Now fallible (`try_to_bech32` / `try_to_bech32m`); no panics on invalid HRP/data. Strict variant differentiation.
 
 ### Changed (Breaking)
 
 - **Default features**
-  Now `secure` meta-feature (`zeroize` + `ct-eq`). `full` includes `secure` + `encoding` + `hash-eq` + `cloneable` + `serde` + `rand`. Added `insecure` for explicit opt-out (testing/low-resource only — strongly discouraged).
+  Now `secure` meta-feature (`zeroize` + `ct-eq`). `full` includes `secure` + `encoding` + `ct-eq-hash` + `cloneable` + `serde` + `rand`. Added `insecure` for explicit opt-out (testing/low-resource only — strongly discouraged).
 
 - **Cloning**
   Removed implicit `Clone` on wrappers; now opt-in via `CloneableType` marker on inner type.
@@ -62,33 +70,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Equality traits refactor**
   Renamed `HashEq` trait to `ConstantTimeEqExt` (extends `ConstantTimeEq`). Renamed feature `hash-eq` to `ct-eq-hash`. Methods renamed: `hash_eq` to `ct_eq_hash`, `hash_eq_opt` to `ct_eq_opt` with centralized logic in default impl. Enhanced documentation and warnings.
 
-- **Bech32 encoding**
-  Now fallible (`try_to_bech32` / `try_to_bech32m`); no panics on invalid HRP/data. Strict variant differentiation.
-
 - **Error handling**
   Unified and renamed error types; removed panicking fallbacks.
 
 ### Migration (Encoding Refactor)
 - Bounds: `T: SecureEncoding` → same (umbrella) or explicit `T: ToHex + …`
 - Calls: `.to_hex()` → same via blanket impl; `.to_bech32(hrp)` → same
-- Decoding: use `str.try_from_hex()?` / `try_decode_any()?` for auto-detection
-
-### Migration (Equality Traits Refactor)
-- Bounds: `T: HashEq` → `T: ConstantTimeEqExt`
-- Calls: `.hash_eq(&other)` → `.ct_eq_hash(&other)`
-- Calls: `.hash_eq_opt(&other, thresh)` → `.ct_eq_opt(&other, thresh)`
-- Most users can switch to `.ct_eq_opt(&other, None)` as default
+- Decoding: use `str.try_from_hex()?` / `try_decode_any()?` for auto-decoding
 
 ### Fixed
-
-- Doc-tests now pass across all feature combinations
 - Improved Bech32/BIP-173 & Bech32m/BIP-350 variant/HRP handling
 - Proper `Display`/`Error` impls for custom errors
 - Strict format validation in per-format traits (rejects invalid checksums/variants)
 
 ### Removed
-
-- Monolithic `SecureEncoding` trait
 - Implicit `Clone` and `Serialize` on wrappers
 - Panicking `from_slice` and `new_boxed` methods
 - Old encoding helpers (`RandomHex`, etc.)
