@@ -122,27 +122,19 @@ where
     }
 }
 
-#[cfg(feature = "hash-eq")]
-impl<T> crate::HashEq for Dynamic<T>
+#[cfg(feature = "ct-eq-hash")]
+impl<T> crate::ConstantTimeEqExt for Dynamic<T>
 where
     T: AsRef<[u8]> + crate::ConstantTimeEq + ?Sized,
 {
-    fn hash_eq(&self, other: &Self) -> bool {
-        // Length is public metadata — safe to compare in variable time
-        if (*self.inner).as_ref().len() != (*other.inner).as_ref().len() {
-            return false;
-        }
-
-        crate::utilities::hash_eq_bytes((*self.inner).as_ref(), (*other.inner).as_ref())
+    fn len(&self) -> usize {
+        (*self.inner).as_ref().len()
     }
 
-    fn hash_eq_opt(&self, other: &Self, hash_threshold_bytes: Option<usize>) -> bool {
-        crate::utilities::hash_eq_opt_bytes(
-            (*self.inner).as_ref(),
-            (*other.inner).as_ref(),
-            hash_threshold_bytes,
-        )
+    fn ct_eq_hash(&self, other: &Self) -> bool {
+        crate::utilities::ct_eq_hash_bytes((*self.inner).as_ref(), (*other.inner).as_ref())
     }
+    // ct_eq_opt uses default impl
 }
 
 /// # Ergonomic helpers for common heap types

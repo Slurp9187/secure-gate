@@ -7,7 +7,7 @@
 pub mod conversion;
 pub mod decoding;
 
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 use crate::ConstantTimeEq;
 
 #[cfg(feature = "rand")]
@@ -43,8 +43,12 @@ pub fn fill_random_bytes_mut(bytes: &mut [u8]) {
 ///
 /// When the `rand` feature is enabled, uses a static random key + BLAKE3.
 /// Otherwise falls back to plain BLAKE3 (still constant-time via `ct_eq`).
-#[cfg(feature = "hash-eq")]
-pub(crate) fn hash_eq_bytes(data1: &[u8], data2: &[u8]) -> bool {
+#[cfg(feature = "ct-eq-hash")]
+pub(crate) fn ct_eq_hash_bytes(data1: &[u8], data2: &[u8]) -> bool {
+    if data1.len() != data2.len() {
+        return false;
+    }
+
     #[cfg(feature = "rand")]
     {
         use once_cell::sync::Lazy;
@@ -72,27 +76,6 @@ pub(crate) fn hash_eq_bytes(data1: &[u8], data2: &[u8]) -> bool {
         let hash_a = blake3::hash(data1);
         let hash_b = blake3::hash(data2);
         hash_a.as_bytes().ct_eq(hash_b.as_bytes())
-    }
-}
-
-/// Equality check that uses direct constant-time comparison for small inputs
-/// and hash-based comparison for larger inputs (side-channel resistance).
-#[cfg(feature = "hash-eq")]
-pub(crate) fn hash_eq_opt_bytes(
-    data1: &[u8],
-    data2: &[u8],
-    hash_threshold_bytes: Option<usize>,
-) -> bool {
-    if data1.len() != data2.len() {
-        return false;
-    }
-
-    let threshold = hash_threshold_bytes.unwrap_or(32);
-
-    if data1.len() <= threshold {
-        data1.ct_eq(data2)
-    } else {
-        hash_eq_bytes(data1, data2)
     }
 }
 

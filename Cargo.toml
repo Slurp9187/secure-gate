@@ -51,15 +51,14 @@ secure = ["zeroize", "ct-eq"]
 # Zeroize: Secure zeroing of secrets on drop or explicit calls (uses 'zeroize' crate with alloc and derives)
 zeroize = ["dep:zeroize", "blake3/zeroize"]
 
+# Rand: Random number generation for securely creating secrets (uses rand with getrandom for seeding; rand_core is transitive)
+rand = ["dep:rand", "dep:once_cell"]
+
 # ct-eq: Constant-time equality checks (prevents timing attacks in comparisons; uses 'subtle' crate)
 ct-eq = ["dep:subtle"]
 
 # Hash-based equality (uses blake3 for fast, secure hashing without caching overhead)
-hash-eq = ["ct-eq", "dep:blake3", "dep:once_cell", "dep:rand"]
-
-# Full: batteries-included for most real-world usage
-# Includes secure defaults + all encodings + fast equality + cloning + serde round-trip + secure RNG
-full = ["secure", "encoding", "hash-eq", "cloneable", "serde", "rand"]
+ct-eq-hash = ["ct-eq", "dep:blake3"]
 
 # Insecure: Opt-out feature for no-default-features builds (disables zeroize, ct-eq; use only for testing/low-resource scenarios—strongly discouraged for production)
 insecure = []
@@ -73,9 +72,6 @@ encoding-base64 = ["dep:base64"]
 # Bech32 encoding support (uses the 'bech32' crate)
 encoding-bech32 = ["dep:bech32"]
 
-# Rand: Random number generation for securely creating secrets (uses rand with getrandom for seeding; rand_core is transitive)
-rand = ["dep:rand"]
-
 # Cloneable: Opt-in safe cloning for secrets
 cloneable = []
 
@@ -86,12 +82,16 @@ serde-deserialize = ["dep:serde"]
 # Serde serialize: Enables serde Serialize only (requires SerializableSecret marker)
 serde-serialize = ["dep:serde"]
 
+# Full: batteries-included for most real-world usage
+# Includes secure defaults + all encodings + fast equality + cloning + serde round-trip + secure RNG
+full = ["secure", "rand", "encoding", "ct-eq-hash", "cloneable", "serde"]
+
 [[bench]]
 name = "fixed_vs_raw"
 harness = false
 
 [[bench]]
-name = "hash_eq_vs_ct_eq"
+name = "ct_eq_hash_vs_ct_eq"
 harness = false
 
 [[bench]]

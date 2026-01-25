@@ -40,10 +40,10 @@ pub mod constant_time_eq;
 #[cfg(feature = "ct-eq")]
 pub use constant_time_eq::ConstantTimeEq;
 
-#[cfg(feature = "hash-eq")]
-pub mod hash_eq;
-#[cfg(feature = "hash-eq")]
-pub use hash_eq::HashEq;
+#[cfg(feature = "ct-eq-hash")]
+pub mod constant_time_eq_ext;
+#[cfg(feature = "ct-eq-hash")]
+pub use constant_time_eq_ext::ConstantTimeEqExt;
 
 pub mod decoding;
 pub mod encoding;

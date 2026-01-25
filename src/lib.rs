@@ -19,11 +19,11 @@
 //! [`ConstantTimeEq`] (via `ct-eq` feature): Direct byte-by-byte constant-time comparison using `subtle`.
 //! Best for small/fixed-size secrets (< ~256–512 bytes) where speed matters most.
 //!
-//! [`HashEq`] (via `hash-eq` feature): BLAKE3 hash -> constant-time compare on fixed 32-byte digest.
+//! [`ConstantTimeEqExt`] (via `ct-eq-hash` feature): BLAKE3 hash -> constant-time compare on fixed 32-byte digest.
 //! Faster for large/variable secrets (e.g. ML-KEM ciphertexts ~1–1.5 KiB, ML-DSA signatures ~2–4 KiB),
 //! with length hiding and optional keyed mode (`rand` for per-process random key).
 //!
-//! See the HashEq trait documentation for performance numbers, security properties (probabilistic, timing-safe), and guidance on when to choose each (or hybrid).
+//! See the ConstantTimeEqExt trait documentation for performance numbers, security properties (probabilistic, timing-safe), and guidance on when to choose each (or hybrid).
 extern crate alloc;
 
 /// Dynamic secret wrapper types - always available with zero dependencies.
@@ -53,8 +53,8 @@ pub use traits::CloneableType;
 /// Re-export of the traits.
 #[cfg(feature = "ct-eq")]
 pub use traits::ConstantTimeEq;
-#[cfg(feature = "hash-eq")]
-pub use traits::HashEq;
+#[cfg(feature = "ct-eq-hash")]
+pub use traits::ConstantTimeEqExt;
 #[cfg(feature = "serde-serialize")]
 pub use traits::SerializableType;
 pub use traits::{ExposeSecret, ExposeSecretMut};

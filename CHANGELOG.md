@@ -59,6 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Encoding API refactor: per-format orthogonal traits**
   Removed monolithic `SecureEncoding` trait (clean slate). Introduced symmetric per-format traits: `ToHex`/`FromHexStr`, `ToBase64Url`/`FromBase64UrlStr`, `ToBech32`/`FromBech32Str`, `ToBech32m`/`FromBech32mStr`. Umbrella traits `SecureEncoding`/`SecureDecoding` (feature-gated). Added `try_decode_any` for multi-format auto-decoding. Bech32/BIP-173 & Bech32m/BIP-350 now distinct.
 
+- **Equality traits refactor**
+  Renamed `HashEq` trait to `ConstantTimeEqExt` (extends `ConstantTimeEq`). Renamed feature `hash-eq` to `ct-eq-hash`. Methods renamed: `hash_eq` to `ct_eq_hash`, `hash_eq_opt` to `ct_eq_opt` with centralized logic in default impl. Enhanced documentation and warnings.
+
 - **Bech32 encoding**
   Now fallible (`try_to_bech32` / `try_to_bech32m`); no panics on invalid HRP/data. Strict variant differentiation.
 
@@ -69,6 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bounds: `T: SecureEncoding` → same (umbrella) or explicit `T: ToHex + …`
 - Calls: `.to_hex()` → same via blanket impl; `.to_bech32(hrp)` → same
 - Decoding: use `str.try_from_hex()?` / `try_decode_any()?` for auto-detection
+
+### Migration (Equality Traits Refactor)
+- Bounds: `T: HashEq` → `T: ConstantTimeEqExt`
+- Calls: `.hash_eq(&other)` → `.ct_eq_hash(&other)`
+- Calls: `.hash_eq_opt(&other, thresh)` → `.ct_eq_opt(&other, thresh)`
+- Most users can switch to `.ct_eq_opt(&other, None)` as default
 
 ### Fixed
 

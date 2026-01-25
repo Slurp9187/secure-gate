@@ -5,7 +5,7 @@
 - **No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally.
 - **Explicit exposure only** — all secret access requires `.expose_secret()` / `.with_secret()` or mutable equivalents; no `Deref`, `AsRef`, or implicit borrowing.
 - **Zeroization on drop** — full buffer (including slack capacity) wiped when `zeroize` feature is enabled.
-- **Timing-safe equality** — use `ConstantTimeEq` (`ct-eq`) or `HashEq` / `hash_eq_opt` (`hash-eq`); `==` is deliberately not implemented.
+- **Timing-safe equality** — use `ConstantTimeEq` (`ct-eq`) or `ConstantTimeEqExt` / `ct_eq_opt` (`ct-eq-hash`); `==` is deliberately not implemented.
 - **Opt-in risk** — cloning and serialization require explicit marker traits (`CloneableType`, `SerializableType`).
 - **Vulnerability reporting** — preferred: GitHub private vulnerability reporting (Security tab); public issues acceptable.
 
@@ -38,8 +38,8 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | Direct exposure (escape hatch)    | `expose_secret()` / `expose_secret_mut()` — grep-able, auditable                           |
 | No implicit leaks                 | No `Deref`, `AsRef`, `Copy`, `Clone` (unless `cloneable` + marker)                         |
 | Zeroization                       | Full allocation wiped on drop (`zeroize` feature); includes `Vec`/`String` slack capacity |
-| Timing safety                     | `ConstantTimeEq` for direct comparison; `HashEq` / `hash_eq_opt` for large/variable data   |
-| Probabilistic equality (`hash-eq`) | BLAKE3 + fixed 32-byte digest compare; collision risk ~2⁻¹²⁸ (negligible)                 |
+| Timing safety                     | `ConstantTimeEq` for direct comparison; `ConstantTimeEqExt` / `ct_eq_opt` for large/variable data   |
+| Probabilistic equality (`ct-eq-hash`) | BLAKE3 + fixed 32-byte digest compare; collision risk ~2⁻¹²⁸ (negligible)                 |
 | Opt-in risky features             | Cloning/serialization gated by marker traits (`CloneableType`, `SerializableType`)         |
 | Redacted debug                    | `Debug` impl always prints `[REDACTED]`                                                    |
 | No unsafe code                    | `#![forbid(unsafe_code)]` enforced at crate level                                          |
@@ -51,7 +51,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `secure` (default)   | Enables `zeroize` + `ct-eq` — secure-by-default baseline                         | Always enable unless extreme constraints    |
 | `zeroize`            | Wipes memory on drop; enables safe opt-in cloning/serialization                  | Strongly recommended                        |
 | `ct-eq`              | Timing-safe direct byte comparison                                               | Strongly recommended; avoid `==`            |
-| `hash-eq`            | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `hash_eq_opt` for most cases         |
+| `ct-eq-hash`         | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `ct_eq_opt` for most cases           |
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
 | `serde-deserialize`  | Auto-decodes hex/base64url/bech32/bech32m via fallible per-format traits; temporary buffers zeroized on failure | Enable only for trusted input sources       |
 | `serde-serialize`    | Opt-in export via marker trait; audit all implementations                        | Enable sparingly; monitor exfiltration risk |
@@ -83,7 +83,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 **Strengths**
 - Marker traits (`CloneableType`, `SerializableType`) force deliberate opt-in
-- `ConstantTimeEq` and `HashEq` provide safe equality alternatives
+- `ConstantTimeEq` and `ConstantTimeEqExt` provide safe equality alternatives
 
 **Potential weaknesses**
 - Generic impls assume caller trustworthiness

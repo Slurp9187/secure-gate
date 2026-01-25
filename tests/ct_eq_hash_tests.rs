@@ -1,12 +1,11 @@
 // ==========================================================================
-// tests/hash_eq_tests.rs
+// tests/ct_eq_hash_tests.rs
 // ==========================================================================
 // Tests for hash-based equality (Blake3) for large/variable secrets
 
-// #[cfg(all(test, feature = "hash-eq", feature = "ct-eq"))]
-#[cfg(all(test, feature = "hash-eq"))]
-mod hash_eq_tests {
-    use secure_gate::{Dynamic, ExposeSecret, ExposeSecretMut, Fixed, HashEq};
+#[cfg(all(test, feature = "ct-eq-hash"))]
+mod ct_eq_hash_tests {
+    use secure_gate::{ConstantTimeEqExt, Dynamic, ExposeSecret, ExposeSecretMut, Fixed};
 
     // -------------------------------------------------------------------------
     // Basic correctness – same type, same length
@@ -16,34 +15,34 @@ mod hash_eq_tests {
     fn basic_equal_fixed() {
         let a = Fixed::new([17u8; 23]);
         let b = Fixed::new([17u8; 23]);
-        assert!(a.hash_eq(&b));
-        assert!(a.hash_eq_opt(&b, None));
-        assert!(a.hash_eq_opt(&b, Some(10)));
-        assert!(a.hash_eq_opt(&b, Some(50)));
+        assert!(a.ct_eq_hash(&b));
+        assert!(a.ct_eq_opt(&b, None));
+        assert!(a.ct_eq_opt(&b, Some(10)));
+        assert!(a.ct_eq_opt(&b, Some(50)));
     }
 
     #[test]
     fn basic_unequal_fixed_same_length() {
         let a = Fixed::new([17u8; 23]);
         let b = Fixed::new([18u8; 23]);
-        assert!(!a.hash_eq(&b));
-        assert!(!a.hash_eq_opt(&b, None));
+        assert!(!a.ct_eq_hash(&b));
+        assert!(!a.ct_eq_opt(&b, None));
     }
 
     #[test]
     fn basic_equal_dynamic_vec() {
         let a: Dynamic<Vec<u8>> = vec![99u8; 0].into(); // empty
         let b: Dynamic<Vec<u8>> = vec![99u8; 0].into();
-        assert!(a.hash_eq(&b));
-        assert!(a.hash_eq_opt(&b, None));
+        assert!(a.ct_eq_hash(&b));
+        assert!(a.ct_eq_opt(&b, None));
     }
 
     #[test]
     fn basic_equal_dynamic_string() {
         let a: Dynamic<String> = "café".into();
         let b: Dynamic<String> = "café".into();
-        assert!(a.hash_eq(&b));
-        assert!(a.hash_eq_opt(&b, None));
+        assert!(a.ct_eq_hash(&b));
+        assert!(a.ct_eq_opt(&b, None));
     }
 
     // -------------------------------------------------------------------------
@@ -51,19 +50,19 @@ mod hash_eq_tests {
     // -------------------------------------------------------------------------
 
     #[test]
-    fn length_mismatch_hash_eq() {
+    fn length_mismatch_ct_eq_hash() {
         let a: Dynamic<Vec<u8>> = vec![0u8; 50].into();
         let b: Dynamic<Vec<u8>> = vec![0u8; 51].into();
-        assert!(!a.hash_eq(&b));
+        assert!(!a.ct_eq_hash(&b));
     }
 
     #[test]
-    fn length_mismatch_hash_eq_opt() {
+    fn length_mismatch_ct_eq_opt() {
         let a: Dynamic<Vec<u8>> = vec![0u8; 50].into();
         let b: Dynamic<Vec<u8>> = vec![0u8; 51].into();
-        assert!(!a.hash_eq_opt(&b, None));
-        assert!(!a.hash_eq_opt(&b, Some(0)));
-        assert!(!a.hash_eq_opt(&b, Some(1000)));
+        assert!(!a.ct_eq_opt(&b, None));
+        assert!(!a.ct_eq_opt(&b, Some(0)));
+        assert!(!a.ct_eq_opt(&b, Some(1000)));
     }
 
     #[test]
@@ -79,54 +78,54 @@ mod hash_eq_tests {
     // -------------------------------------------------------------------------
 
     #[test]
-    fn hash_eq_opt_small_input_default_threshold() {
+    fn ct_eq_opt_small_input_default_threshold() {
         let a = Fixed::new([77u8; 20]);
         let b = Fixed::new([77u8; 20]);
         let c = Fixed::new([78u8; 20]);
 
         // Should use ct_eq path (20 ≤ 32)
-        assert!(a.hash_eq_opt(&b, None));
-        assert!(!a.hash_eq_opt(&c, None));
+        assert!(a.ct_eq_opt(&b, None));
+        assert!(!a.ct_eq_opt(&c, None));
     }
 
     #[test]
-    fn hash_eq_opt_large_input_default_threshold() {
+    fn ct_eq_opt_large_input_default_threshold() {
         let a: Dynamic<Vec<u8>> = vec![55u8; 1500].into();
         let b: Dynamic<Vec<u8>> = vec![55u8; 1500].into();
         let c: Dynamic<Vec<u8>> = vec![56u8; 1500].into();
 
-        // Should use hash_eq path (1500 > 32)
-        assert!(a.hash_eq_opt(&b, None));
-        assert!(!a.hash_eq_opt(&c, None));
+        // Should use ct_eq_hash path (1500 > 32)
+        assert!(a.ct_eq_opt(&b, None));
+        assert!(!a.ct_eq_opt(&c, None));
     }
 
     #[test]
-    fn hash_eq_opt_exact_threshold_boundary() {
+    fn ct_eq_opt_exact_threshold_boundary() {
         let data = vec![0xA5u8; 32];
         let a: Dynamic<Vec<u8>> = data.clone().into();
         let b: Dynamic<Vec<u8>> = data.into();
 
-        assert!(a.hash_eq_opt(&b, Some(31))); // > 31 → hash_eq
-        assert!(a.hash_eq_opt(&b, Some(32))); // ≤ 32 → ct_eq
-        assert!(a.hash_eq_opt(&b, Some(33))); // ≤ 33 → ct_eq
+        assert!(a.ct_eq_opt(&b, Some(31))); // > 31 → ct_eq_hash
+        assert!(a.ct_eq_opt(&b, Some(32))); // ≤ 32 → ct_eq
+        assert!(a.ct_eq_opt(&b, Some(33))); // ≤ 33 → ct_eq
     }
 
     #[test]
-    fn hash_eq_opt_force_ct_eq_on_large() {
+    fn ct_eq_opt_force_ct_eq_on_large() {
         let a: Dynamic<Vec<u8>> = vec![0u8; 8192].into();
         let b: Dynamic<Vec<u8>> = vec![0u8; 8192].into();
 
         // Force ct_eq even though large
-        assert!(a.hash_eq_opt(&b, Some(16384)));
+        assert!(a.ct_eq_opt(&b, Some(16384)));
     }
 
     #[test]
-    fn hash_eq_opt_force_hash_on_small() {
+    fn ct_eq_opt_force_hash_on_small() {
         let a = Fixed::new([0xFFu8; 8]);
         let b = Fixed::new([0xFFu8; 8]);
 
-        // Force hash_eq even though small
-        assert!(a.hash_eq_opt(&b, Some(0)));
+        // Force ct_eq_hash even though small
+        assert!(a.ct_eq_opt(&b, Some(0)));
     }
 
     // -------------------------------------------------------------------------
@@ -137,23 +136,24 @@ mod hash_eq_tests {
     fn empty_dynamic_equal() {
         let a: Dynamic<Vec<u8>> = vec![].into();
         let b: Dynamic<Vec<u8>> = vec![].into();
-        assert!(a.hash_eq(&b));
-        assert!(a.hash_eq_opt(&b, None));
-        assert!(a.hash_eq_opt(&b, Some(0)));
+        assert!(a.ct_eq_hash(&b));
+        assert!(a.ct_eq_opt(&b, None));
+        assert!(a.ct_eq_opt(&b, Some(0)));
     }
 
     #[test]
     fn empty_vs_non_empty() {
         let empty: Dynamic<Vec<u8>> = vec![].into();
         let one_byte: Dynamic<Vec<u8>> = vec![0].into();
-        assert!(!empty.hash_eq(&one_byte));
-        assert!(!empty.hash_eq_opt(&one_byte, None));
+        assert!(!empty.ct_eq_hash(&one_byte));
+        assert!(!empty.ct_eq_opt(&one_byte, None));
     }
 
     // -------------------------------------------------------------------------
     // Probabilistic collision safety (smoke test)
     // -------------------------------------------------------------------------
 
+    #[cfg(feature = "rand")]
     #[test]
     // This is a probabilistic smoke test only.
     // BLAKE3 collision probability is ~2⁻¹²⁸ — extremely unlikely to hit in 5000 samples.
@@ -178,13 +178,13 @@ mod hash_eq_tests {
             let a: Dynamic<Vec<u8>> = left.into();
             let b: Dynamic<Vec<u8>> = right.into();
 
-            assert!(!a.hash_eq(&b), "False positive detected");
-            assert!(!a.hash_eq_opt(&b, None));
+            assert!(!a.ct_eq_hash(&b), "False positive detected");
+            assert!(!a.ct_eq_opt(&b, None));
         }
     }
 
     // -------------------------------------------------------------------------
-    // Consistency between hash_eq and hash_eq_opt(None)
+    // Consistency between ct_eq_hash and ct_eq_opt(None)
     // -------------------------------------------------------------------------
 
     #[test]
@@ -203,19 +203,18 @@ mod hash_eq_tests {
             let mut b: Dynamic<Vec<u8>> = data.into();
 
             // equal
-            assert_eq!(a.hash_eq(&b), a.hash_eq_opt(&b, None));
+            assert_eq!(a.ct_eq_hash(&b), a.ct_eq_opt(&b, None));
 
             // mutate last byte → unequal
             b.with_secret_mut(|s| {
                 if !s.is_empty() {
                     let last = s.len() - 1;
-                    let current = s[last];
-                    s[last] = current.wrapping_add(1);
+                    s[last] = s[last].wrapping_add(1);
                 }
             });
-            assert_eq!(a.hash_eq(&b), a.hash_eq_opt(&b, None));
+            assert_eq!(a.ct_eq_hash(&b), a.ct_eq_opt(&b, None));
             if !b.is_empty() {
-                assert!(!a.hash_eq(&b));
+                assert!(!a.ct_eq_hash(&b));
             }
         }
     }
@@ -225,8 +224,8 @@ mod hash_eq_tests {
         let a = Fixed::new([0u8; 1]);
         let b = Fixed::new([0u8; 1]);
         let c = Fixed::new([1u8; 1]);
-        assert!(a.hash_eq(&b));
-        assert!(a.hash_eq_opt(&b, None)); // should use ct_eq
-        assert!(!a.hash_eq_opt(&c, None));
+        assert!(a.ct_eq_hash(&b));
+        assert!(a.ct_eq_opt(&b, None)); // should use ct_eq
+        assert!(!a.ct_eq_opt(&c, None));
     }
 }

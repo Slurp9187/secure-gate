@@ -15,7 +15,7 @@ Secure-gate provides `Dynamic<T>` (heap-allocated) and `Fixed<T>` (stack-allocat
 - **Explicit exposure** — no silent `Deref`/`AsRef` leaks
 - **Zeroize on drop** (`zeroize` feature)
 - **Timing-safe equality** (`ct-eq` feature)
-- **Fast probabilistic equality for large secrets** (`hash-eq` → BLAKE3 + fixed digest compare)
+- **Fast probabilistic equality for large secrets** (`ct-eq-hash` → BLAKE3 + fixed digest compare)
 - **Secure random generation** (`rand` feature)
 - **Encoding** (symmetric per-format traits: hex, base64url, bech32/BIP-173, bech32m/BIP-350) + **serde** auto-detection (hex/base64url/bech32/bech32m)
 - **Macros** for ergonomic aliases (`dynamic_alias!`, `fixed_alias!`)
@@ -52,7 +52,7 @@ See [Features](#features) for the full list.
 | `secure` (default)     | Meta: `zeroize` + `ct-eq` (wiping + timing-safe equality)                   |
 | `zeroize`              | Zero memory on drop                                                         |
 | `ct-eq`                | `ConstantTimeEq` trait (prevents timing attacks)                            |
-| `hash-eq`              | `HashEq` trait: BLAKE3-based equality (fast for large/variable secrets)     |
+| `ct-eq-hash`           | `ConstantTimeEqExt` trait: BLAKE3-based equality (fast for large/variable secrets)     |
 | `rand`                 | Secure random via `OsRng` (`from_random()`)                                 |
 | `serde`                | Meta: `serde-deserialize` + `serde-serialize`                               |
 | `serde-deserialize`    | Auto-detect hex/base64/bech32/bech32m when loading secrets                  |
@@ -107,21 +107,18 @@ Use **`hash_eq_opt`** — it automatically chooses the best method:
 - Large/variable inputs: fast BLAKE3 hashing + digest compare
 
 ```rust
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 {
-    use secure_gate::{Dynamic, HashEq};
+    use secure_gate::{Dynamic, ConstantTimeEqExt};
     extern crate alloc;
 
     let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();  // e.g. ML-DSA signature
     let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
 
     // Recommended: smart path selection
-    if sig_a.hash_eq_opt(&sig_b, None) {
+    if sig_a.ct_eq_opt(&sig_b, None) {
         // equal
     }
-
-    // Force ct_eq even on large input
-    sig_a.hash_eq_opt(&sig_b, Some(4096));
 }
 ```
 
