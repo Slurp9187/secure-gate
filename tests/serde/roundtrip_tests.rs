@@ -27,7 +27,7 @@ pub struct SerializableArray4([u8; 4]);
 impl SerializableType for SerializableArray4 {}
 
 #[cfg(feature = "serde-serialize")]
-#[derive(serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 pub struct SerializableArray32([u8; 32]);
 
 #[cfg(feature = "serde-serialize")]
@@ -291,4 +291,15 @@ fn secure_encoding_roundtrip() {
     let encoded = original.with_secret(|s| s.to_hex());
     // Note: This is a basic test; full roundtrip would require decoding functions if available
     assert!(!encoded.is_empty());
+}
+
+#[cfg(all(feature = "serde-serialize", feature = "serde-deserialize"))]
+#[test]
+fn fixed_binary_roundtrip_bincode() {
+    use bincode::{deserialize, serialize};
+
+    let original = SerializableArray32([0xab; 32]);
+    let bytes = serialize(&original).unwrap();
+    let round: SerializableArray32 = deserialize(&bytes).unwrap();
+    assert_eq!(original.0, round.0);
 }

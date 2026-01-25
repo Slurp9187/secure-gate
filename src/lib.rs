@@ -68,7 +68,6 @@ mod macros;
 /// - `fixed_alias!`: Create type aliases for fixed-size secrets (`Fixed<[u8; N]>`).
 /// - `fixed_generic_alias!`: Create generic fixed-size secret aliases.
 ///   Re-exports of encoding and decoding traits for convenient byte encoding/decoding extensions.
-
 #[cfg(feature = "encoding-base64")]
 pub use traits::FromBase64UrlStr;
 #[cfg(feature = "encoding-bech32")]

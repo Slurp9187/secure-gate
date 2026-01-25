@@ -40,20 +40,56 @@ pub(crate) fn convert_bits(
 ///
 /// Used internally during bech32 deserialization.
 #[cfg(feature = "encoding-bech32")]
-pub(crate) fn fes_to_u8s(data: Vec<u8>) -> Vec<u8> {
-    let mut bytes = Vec::new();
-    let mut acc: u64 = 0;
-    let mut bits: u8 = 0;
+pub(crate) fn fes_to_u8s<T: Into<u8>>(data: Vec<T>) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(data.len() * 5 / 8 + 1);
+    let mut carry: u16 = 0;
+    let mut carry_bits: u8 = 0;
 
     for fe in data {
-        acc = (acc << 5) | (fe as u64);
-        bits += 5;
+        carry = (carry << 5) | (fe.into() as u16);
+        carry_bits += 5;
 
-        while bits >= 8 {
-            bits -= 8;
-            bytes.push(((acc >> bits) & 0xFF) as u8);
+        while carry_bits >= 8 {
+            carry_bits -= 8;
+            let byte = (carry >> carry_bits) as u8;
+            bytes.push(byte);
+            carry &= (1 << carry_bits) - 1;
         }
     }
 
     bytes
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fes_to_u8s_small() {
+        // Small input: [0] (version 0) -> should produce empty or partial byte, but discarded
+        let data = vec![0];
+        let result = fes_to_u8s(data);
+        assert_eq!(result, vec![]); // No full byte
+    }
+
+    #[test]
+    fn test_fes_to_u8s_bip173() {
+        // Test with BIP173 vector to ensure no overflow
+        let s = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
+        let (hrp, data_5bit) = ::bech32::decode(s).expect("decode failed");
+        assert_eq!(hrp.as_str(), "bc");
+        let bytes = fes_to_u8s(data_5bit);
+        // Should produce some bytes without panicking
+        assert!(!bytes.is_empty());
+    }
+
+    #[test]
+    fn fes_to_u8s_large_input() {
+        let large_input = vec![31u8; 8192]; // 8192 × 5 = 40 960 bits ≈ 5 KB
+        let result = fes_to_u8s(large_input);
+        assert_eq!(result.len(), 5120); // exact if no remainder
+                                        // Optional: check no panic, some non-zero bytes, etc.
+        assert!(result.iter().all(|&b| b == 255)); // since 31 is 11111, packed to 11111111
+    }
 }

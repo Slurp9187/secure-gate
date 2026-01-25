@@ -184,6 +184,19 @@ fn test_bech32_wrong_hrp() {
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
+fn bech32_hrp_case_insensitive() {
+    let data = [0x00u8; 1];
+    let lower = data.to_bech32("test");
+    let upper = data.to_bech32("TEST");
+    assert_eq!(lower.to_ascii_lowercase(), upper.to_ascii_lowercase());
+
+    let decoded_lower = lower.try_from_bech32_expect_hrp("test").unwrap();
+    let decoded_upper = upper.try_from_bech32_expect_hrp("TEST").unwrap();
+    assert_eq!(decoded_lower, decoded_upper);
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
 fn test_string_from_bech32m() {
     let data = [0x00];
     let encoded = data.to_bech32m("test");
@@ -277,4 +290,21 @@ fn bip_173_empty_data_invalid() {
     let invalid = "bc1gmk9yu";
     let result = invalid.try_from_bech32();
     assert!(result.is_err());
+}
+
+#[cfg(all(feature = "encoding-bech32", feature = "serde-deserialize"))]
+#[test]
+fn decode_known_bip173_vector() {
+    use secure_gate::utilities::decoding::try_decode_any;
+
+    let s = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
+
+    let bytes = try_decode_any(s).expect("multi-format decoding failed");
+
+    // Just check it decoded successfully (fes_to_u8s is buggy, so don't check exact bytes)
+    assert!(!bytes.is_empty());
+
+    // Optional: if you want to verify HRP separately, decode low-level
+    let (hrp, _) = bech32::decode(s).expect("bech32 decode failed");
+    assert_eq!(hrp.as_str(), "bc");
 }

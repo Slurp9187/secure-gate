@@ -35,7 +35,7 @@ impl<T: AsRef<str> + ?Sized> FromBech32mStr for T {
         let (hrp, data) =
             bech32::decode(self.as_ref()).map_err(|_| Bech32Error::OperationFailed)?;
         // Validate that it is Bech32m variant by re-encoding
-        let re_encoded = bech32::encode::<bech32::Bech32m>(hrp.clone(), &data)
+        let re_encoded = bech32::encode::<bech32::Bech32m>(hrp, &data)
             .map_err(|_| Bech32Error::OperationFailed)?;
         if re_encoded != self.as_ref() {
             return Err(Bech32Error::OperationFailed);
@@ -48,7 +48,7 @@ impl<T: AsRef<str> + ?Sized> FromBech32mStr for T {
 
     fn try_from_bech32m_expect_hrp(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error> {
         let (hrp, data) = self.try_from_bech32m()?;
-        if hrp != expected_hrp {
+        if !hrp.eq_ignore_ascii_case(expected_hrp) {
             return Err(Bech32Error::UnexpectedHrp {
                 expected: expected_hrp.to_string(),
                 got: hrp,

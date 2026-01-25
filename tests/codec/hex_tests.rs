@@ -74,6 +74,16 @@ fn test_secure_encoding_umbrella() {
     assert!(data.to_hex() == "deadbeef");
 }
 
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn test_hex_left_exact_and_truncated() {
+    let data = (0u8..=15).collect::<Vec<u8>>(); // 16 bytes → 32 hex chars
+    assert_eq!(data.to_hex_left(16), "000102030405060708090a0b0c0d0e0f");
+    assert_eq!(data.to_hex_left(8), "0001020304050607…");
+    assert_eq!(data.to_hex_left(0), "…");
+    assert_eq!(data.to_hex_left(100), "000102030405060708090a0b0c0d0e0f");
+}
+
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
 #[test]
 fn fixed_deserialize_hex_string() {
@@ -84,4 +94,15 @@ fn fixed_deserialize_hex_string() {
     // Invalid length: hex for 2 bytes
     let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str("\"dead\"");
     assert!(result.is_err());
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn umbrella_secure_encoding_works() {
+    use secure_gate::{SecureEncoding, ToHex};
+    fn takes_secure<T: SecureEncoding + ToHex>(t: &T) {
+        let _ = t.to_hex();
+    }
+    let data = vec![0x42u8; 8];
+    takes_secure(&data);
 }
