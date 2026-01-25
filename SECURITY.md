@@ -55,7 +55,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `ct-eq`              | Timing-safe direct byte comparison                                               | Strongly recommended; avoid `==`            |
 | `ct-eq-hash`         | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `ct_eq_opt` for most cases           |
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
-| `serde-deserialize`  | Auto-decodes hex/base64url/bech32/bech32m via fallible per-format traits; decoded buffers are zeroized when the containing `Dynamic`/`Fixed` wrapper drops (`zeroize` feature) | Enable only for trusted input sources       |
+| `serde-deserialize`  | Auto-decodes hex/base64url/bech32/bech32m via fallible per-format traits; decoded buffers are zeroized when the containing `Dynamic`/`Fixed` wrapper drops (`zeroize` feature). Auto-detection may misparse ambiguous inputs; validate sources upstream to avoid DoS via large allocations. | Enable only for trusted input sources       |
 | `serde-serialize`    | Opt-in export via marker trait; audit all implementations                        | Enable sparingly; monitor exfiltration risk |
 | `encoding-*`         | Per-format symmetric encoding/decoding traits (e.g., `ToHex`/`FromHexStr`); explicit, fallible, rejects invalid formats | Validate inputs upstream; prefer specific traits over umbrellas for strictness |
 | `cloneable`          | Opt-in cloning via marker trait; increases exposure surface                      | Use minimally; prefer move semantics        |
@@ -107,11 +107,14 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Decoding is inherently fallible; untrusted input may cause errors or temporary allocations
 - Length/format hints in errors (e.g., invalid HRP)
 - Temporary buffers during multi-format auto-detection (`try_decode_any`)
+- Bech32 edge cases: Strict validation covers most, but test empty/invalid HRP/data to confirm no panics/leaks
 
 **Mitigations**
 - Treat all decoding input as untrusted; validate upstream
 - Use specific traits (e.g., `FromBech32Str`) for strict format enforcement
 - Fuzz parsers; sanitize inputs before decoding
+- Temporary decoding buffers: While mostly handled by zeroize on `Vec<u8>`, ensure no long-lived undecoded secrets in custom deserialization paths
+- Opt-in markers (`Cloneable`/`Serializable`): Rely on correct user implementations; audit custom impls to preserve zeroization
 
 ## Best Practices
 
@@ -121,6 +124,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Audit every `CloneableType` / `SerializableType` impl
 - Validate and sanitize all inputs before encoding/decoding
 - Prefer specific format traits (`FromBech32Str`, `FromHexStr`, …) over `try_decode_any` when the expected format is known
+- Probabilistic equality (`ct-eq-hash`): Negligible collision risk (~2⁻¹²⁸), but use `ct_eq` for deterministic needs; bound input sizes to prevent DoS
 - Monitor dependency CVEs and update regularly
 - Treat secrets as radioactive — minimize exposure surface
 
