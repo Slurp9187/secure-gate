@@ -12,8 +12,7 @@ use crate::utilities::conversion::convert_bits;
 ///
 /// # Bech32m Feature Note
 ///
-/// Currently identical to `encoding-bech32` because the underlying `bech32` crate handles both Bech32 and Bech32m variants.
-/// Use this feature when your protocol strictly requires BIP-350 (Bech32m) checksums, or for forward-compatibility with future strict variant separation.
+/// Currently shares implementation with Bech32; reserved for future strict variant enforcement.
 ///
 /// # Security Warning
 ///

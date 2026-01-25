@@ -185,7 +185,7 @@
 
   Umbrellas (`SecureEncoding` / `SecureDecoding`) aggregate all enabled traits for convenience. Each format is independent—adding base58 later requires only one new pair.
 
-  For multi-format auto-decoding with configurable priority (e.g., strict protocols), see `try_decode_any` in the docs.
+  For multi-format auto-decoding with configurable priority (e.g., strict protocols), see `try_decode_any` in the docs. It includes configurable priority for decoding order and helpful error hints for strict-mode usage (e.g., protocol-specific validation).
 
   All methods are blanket-implemented over `AsRef<[u8]>` (encoding) or `AsRef<str>` (decoding) for zero-overhead ergonomics.
   

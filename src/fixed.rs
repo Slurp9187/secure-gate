@@ -223,6 +223,7 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
             where
                 E: de::Error,
             {
+                // Uses None for hints, maintaining historical decode priority for backward compatibility
                 let bytes =
                     crate::utilities::decoding::try_decode_any(v, None).map_err(E::custom)?;
 

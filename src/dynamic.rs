@@ -251,6 +251,7 @@ impl<'de> serde::Deserialize<'de> for Dynamic<alloc::vec::Vec<u8>> {
             where
                 E: de::Error,
             {
+                // Uses None for hints, maintaining historical decode priority for backward compatibility
                 let bytes =
                     crate::utilities::decoding::try_decode_any(v, None).map_err(E::custom)?;
                 Ok(Dynamic::new(bytes))
