@@ -53,9 +53,9 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `ct-eq`              | Timing-safe direct byte comparison                                               | Strongly recommended; avoid `==`            |
 | `hash-eq`            | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `hash_eq_opt` for most cases         |
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
-| `serde-deserialize`  | Auto-decodes hex/base64/bech32/bech32m; temporary buffers zeroized on failure    | Enable only for trusted input sources       |
+| `serde-deserialize`  | Auto-decodes hex/base64url/bech32/bech32m via fallible per-format traits; temporary buffers zeroized on failure | Enable only for trusted input sources       |
 | `serde-serialize`    | Opt-in export via marker trait; audit all implementations                        | Enable sparingly; monitor exfiltration risk |
-| `encoding-*`         | Explicit encoding/decoding; fallible; zeroizes invalid inputs                    | Validate inputs upstream                    |
+| `encoding-*`         | Per-format symmetric encoding/decoding traits (e.g., `ToHex`/`FromHexStr`); explicit, fallible, rejects invalid formats | Validate inputs upstream; prefer specific traits over umbrellas for strictness |
 | `cloneable`          | Opt-in cloning via marker trait; increases exposure surface                      | Use minimally; prefer move semantics        |
 | `full`               | All features enabled — convenient but increases attack surface                   | Development only; audit for production      |
 
@@ -92,18 +92,23 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Audit custom marker impls
 - Validate inputs before trait usage
 
-### Encoding & Errors
+### Encoding/Decoding (Traits & Errors)
 
 **Strengths**
-- Explicit methods; typed errors; fallible operations
-- Bech32 / Bech32m HRP validation prevents injection
+- Symmetric per-format traits: encoding (e.g., `ToHex`, `ToBech32`) and decoding (e.g., `FromHexStr`, `FromBech32Str`)
+- Explicit, fallible methods; typed errors prevent silent failures
+- Bech32/BIP-173 & Bech32m/BIP-350 HRP validation prevents injection attacks
+- Strict format adherence: invalid strings rejected; only valid decodings accepted
 
 **Potential weaknesses**
-- Temporary allocations during decoding
-- Length/format hints in errors
+- Decoding is inherently fallible; untrusted input may cause errors or temporary allocations
+- Length/format hints in errors (e.g., invalid HRP)
+- Temporary buffers during multi-format auto-detection (`try_decode_any`)
 
 **Mitigations**
-- Fuzz parsers; validate inputs upstream
+- Treat all decoding input as untrusted; validate upstream
+- Use specific traits (e.g., `FromBech32Str`) for strict format enforcement
+- Fuzz parsers; sanitize inputs before decoding
 
 ## Best Practices
 

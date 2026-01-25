@@ -9,14 +9,17 @@ Secure-gate provides `Dynamic<T>` (heap-allocated) and `Fixed<T>` (stack-allocat
 
 ## Why secure-gate?
 
+- **Orthogonal encoding/decoding** — per-format traits (e.g., `ToHex`/`FromHexStr`) with symmetric APIs and umbrella traits for aggregation
+- **Extensible** — adding new formats (e.g., base58) requires only one new trait pair + impls
+
 - **Explicit exposure** — no silent `Deref`/`AsRef` leaks
 - **Zeroize on drop** (`zeroize` feature)
 - **Timing-safe equality** (`ct-eq` feature)
 - **Fast probabilistic equality for large secrets** (`hash-eq` → BLAKE3 + fixed digest compare)
 - **Secure random generation** (`rand` feature)
-- **Encoding** (hex, base64url, **bech32 / bech32m**) + **serde** auto-detection (hex/base64/bech32/bech32m)
+- **Encoding** (symmetric per-format traits: hex, base64url, bech32/BIP-173, bech32m/BIP-350) + **serde** auto-detection (hex/base64url/bech32/bech32m)
 - **Macros** for ergonomic aliases (`dynamic_alias!`, `fixed_alias!`)
-- **Auditable** — every exposure is grep-able
+- **Auditable** — every exposure and encoding call is grep-able
 
 ## Installation
 
@@ -54,10 +57,10 @@ See [Features](#features) for the full list.
 | `serde`                | Meta: `serde-deserialize` + `serde-serialize`                               | No       |
 | `serde-deserialize`    | Auto-detect hex/base64/bech32/bech32m when loading secrets                  | No       |
 | `serde-serialize`      | Export secrets (gated by `SerializableType`)                                | No       |
-| `encoding`             | Meta: hex + base64url + bech32/bech32m                                      | No       |
-| `encoding-hex`         | `.to_hex()` / `.to_hex_upper()`                                             | No       |
-| `encoding-base64`      | `.to_base64url()`                                                           | No       |
-| `encoding-bech32`      | `.to_bech32(hrp)` / `.to_bech32m(hrp)` / `.try_to_bech32(hrp)` / `.try_to_bech32m(hrp)` | No       |
+| `encoding`             | Meta: symmetric per-format encoding/decoding (hex, base64url, bech32/bech32m) | No       |
+| `encoding-hex`         | `ToHex` (`.to_hex()`, `.to_hex_upper()`) + `FromHexStr` (`.try_from_hex()`)  | No       |
+| `encoding-base64`      | `ToBase64Url` (`.to_base64url()`) + `FromBase64UrlStr` (`.try_from_base64url()`) | No       |
+| `encoding-bech32`      | Bech32/BIP-173 & Bech32m/BIP-350: `ToBech32`, `ToBech32m`, `FromBech32Str`, `FromBech32mStr` | No       |
 | `cloneable`            | Opt-in cloning via `CloneableType` marker                                   | No       |
 | `full`                 | All of the above (convenient for development)                               | No       |
 
@@ -66,7 +69,7 @@ See [Features](#features) for the full list.
 ## Quick Start
 
 ```rust
-use secure_gate::{dynamic_alias, fixed_alias, ExposeSecret, ExposeSecretMut, SecureEncoding};
+use secure_gate::{dynamic_alias, fixed_alias, ExposeSecret, ExposeSecretMut};
 
 dynamic_alias!(pub Password, String);      // Dynamic<String>
 fixed_alias!(pub Aes256Key, 32);           // Fixed<[u8; 32]>
@@ -84,13 +87,17 @@ assert_eq!(pw.expose_secret(), "hunter2");
 pw.with_secret_mut(|s| s.push('!'));
 pw.expose_secret_mut().clear();
 
-// Bech32 / Bech32m encoding example
-#[cfg(feature = "encoding-bech32")]
+// Symmetric encoding/decoding example (new per-format traits)
+#[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
 {
-    let bech32  = key.expose_secret().to_bech32("key");   // "key1q..."
-    let bech32m = key.expose_secret().to_bech32m("key");  // "key1p..." (newer standard)
+    use secure_gate::{FromHexStr, ToBech32, ToHex};
+    let hex    = key.expose_secret().to_hex();          // "2a2a2a..."
+    let bech32 = key.expose_secret().to_bech32("key");  // "key1q..." (BIP-173)
+    let roundtrip = hex.try_from_hex().unwrap();        // Decode back
 }
 ```
+
+> **Note**: Encoding API updated in 0.7.0 — old `SecureEncoding` removed in favor of per-format traits (e.g., `ToHex`, `FromHexStr`). Existing code like `data.to_hex()` still works via blanket impls. For new symmetric encoding/decoding, use individual traits or umbrellas (`SecureEncoding`/`SecureDecoding`).
 
 ## Recommended Equality
 
@@ -157,29 +164,44 @@ fixed_alias!(pub ApiKey, 32, "32-byte API key");
 }
 ```
 
-### Encoding (hex / base64url / bech32 / bech32m)
+### Encoding (symmetric per-format traits)
+
+secure-gate provides **orthogonal, symmetric encoding/decoding traits** for extensibility:
+
+- `ToHex` / `FromHexStr`: Hex encoding/decoding
+- `ToBase64Url` / `FromBase64UrlStr`: Base64url encoding/decoding
+- `ToBech32` / `FromBech32Str`: BIP-173 Bech32 encoding/decoding
+- `ToBech32m` / `FromBech32mStr`: BIP-350 Bech32m encoding/decoding
+
+Umbrellas (`SecureEncoding` / `SecureDecoding`) aggregate all enabled traits for convenience. Each format is independent—adding base58 later requires only one new pair.
+
+All methods are blanket-implemented over `AsRef<[u8]>` (encoding) or `AsRef<str>` (decoding) for zero-overhead ergonomics.
 
 ```rust
-#[cfg(all(feature = "rand", feature = "encoding-bech32"))]
+#[cfg(all(feature = "rand", feature = "encoding-bech32", feature = "encoding-hex"))]
 {
-    use secure_gate::{fixed_alias, Fixed, ExposeSecret, SecureEncoding};
+    use secure_gate::{fixed_alias, Fixed, ExposeSecret, ToBech32, ToHex, FromHexStr};
     extern crate alloc;
 
     fixed_alias!(Aes256Key, 32);
     let key: Aes256Key = Aes256Key::from_random();
 
     let hex    = key.expose_secret().to_hex();          // "2a2a2a..."
-    let bech32 = key.expose_secret().to_bech32("key");  // "key1q..."
+    let bech32 = key.expose_secret().to_bech32("key");  // "key1q..." (BIP-173)
     let bech32m = key.expose_secret().to_bech32m("key"); // "key1p..." (BIP-350)
+
+    // Symmetric decoding
+    let decoded_hex: Vec<u8> = "2a2a2a".try_from_hex().unwrap();
+    let decoded_bech32 = "key1q...".try_from_bech32_expect_hrp("key").unwrap();
 }
 ```
 
-### Serde (auto-detects hex/base64/bech32/bech32m on deserialize)
+### Serde (auto-detects hex/base64url/bech32/bech32m on deserialize)
 
 ```rust
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32", feature = "rand"))]
 {
-    use secure_gate::{fixed_alias, ExposeSecret, SecureEncoding};
+    use secure_gate::{fixed_alias, ExposeSecret, ToBech32};
     use serde_json;
     extern crate alloc;
 
@@ -187,7 +209,8 @@ fixed_alias!(pub ApiKey, 32, "32-byte API key");
     // Generate a key and encode to bech32
     let original: Aes256Key = Aes256Key::from_random();
     let bech32 = original.with_secret(|s| s.to_bech32("key"));
-    let key: Aes256Key = serde_json::from_str(&format!("\"{}\"", bech32)).unwrap();
+    let decoded: Aes256Key = serde_json::from_str(&format!("\"{}\"", bech32)).unwrap();
+    // Auto-detection handles decoding transparently
 }
 ```
 

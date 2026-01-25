@@ -209,32 +209,63 @@ Plain `hash_eq` (uniform probabilistic behavior):
 
 ## 5. Encoding & Decoding
 
+Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `FromHexStr`).
+
+### Hex Encoding/Decoding
+
 ```rust
 #[cfg(feature = "encoding-hex")]
 {
-    use secure_gate::SecureEncoding;
+    use secure_gate::{FromHexStr, ToHex};
     let bytes = [0xDE, 0xAD, 0xBE, 0xEF];
+
+    // Encoding
     let hex = bytes.to_hex();        // "deadbeef"
     let upper = bytes.to_hex_upper(); // "DEADBEEF"
-}
 
-#[cfg(feature = "encoding-base64")]
-{
-    use secure_gate::SecureEncoding;
-    let data = b"Hello World";
-    let b64 = data.to_base64url(); // "SGVsbG8gV29ybGQ"
-}
-
-#[cfg(feature = "encoding-bech32")]
-{
-    use secure_gate::SecureEncoding;
-    let data = b"test data";
-    let bech32 = data.to_bech32("test");           // infallible
-    let maybe = data.try_to_bech32("test", None);  // fallible
+    // Decoding
+    let decoded: Vec<u8> = "deadbeef".try_from_hex().unwrap();
+    assert_eq!(decoded, bytes);
 }
 ```
 
-Serde auto-decoding (hex/base64/bech32):
+### Base64url Encoding/Decoding
+
+```rust
+#[cfg(feature = "encoding-base64")]
+{
+    use secure_gate::{FromBase64UrlStr, ToBase64Url};
+    let data = b"Hello World";
+
+    // Encoding
+    let b64 = data.to_base64url(); // "SGVsbG8gV29ybGQ"
+
+    // Decoding
+    let decoded: Vec<u8> = "SGVsbG8gV29ybGQ".try_from_base64url().unwrap();
+    assert_eq!(decoded, data);
+}
+```
+
+### Bech32/BIP-173 & Bech32m/BIP-350 Encoding/Decoding
+
+```rust
+#[cfg(feature = "encoding-bech32")]
+{
+    use secure_gate::{FromBech32Str, FromBech32mStr, ToBech32, ToBech32m};
+    let data = b"test data";
+
+    // Bech32 encoding/decoding
+    let bech32 = data.to_bech32("test");           // infallible
+    let maybe = data.try_to_bech32("test", None);  // fallible with validation
+    let (hrp, decoded) = "test1vejq2p".try_from_bech32().unwrap();
+
+    // Bech32m encoding/decoding (distinct from Bech32)
+    let bech32m = data.to_bech32m("test");
+    let (hrp_m, decoded_m) = "test1vw3q3p".try_from_bech32m().unwrap();
+}
+```
+
+### Serde Auto-Decoding (hex/base64url/bech32/bech32m)
 
 ```rust
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
@@ -243,8 +274,23 @@ Serde auto-decoding (hex/base64/bech32):
     use serde_json;
     extern crate alloc;
 
+    // Auto-decodes based on format
     let key: Dynamic<Vec<u8>> = serde_json::from_str(r#""deadbeef""#).unwrap();
     assert_eq!(key.expose_secret(), &[0xDE, 0xAD, 0xBE, 0xEF]);
+}
+```
+
+### Umbrella Traits (aggregates all enabled formats)
+
+```rust
+#[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
+{
+    use secure_gate::{SecureEncoding, ToHex, ToBech32};  // umbrella includes individual traits
+    let bytes = [0xDE, 0xAD, 0xBE, 0xEF];
+
+    // Works via umbrella (same as individual)
+    let hex = bytes.to_hex();
+    let bech32 = bytes.to_bech32("key");
 }
 ```
 

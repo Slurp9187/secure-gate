@@ -18,8 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Polymorphic access traits** 
   `ExposeSecret` and `ExposeSecretMut` traits provide generic, zero-cost access with metadata (`len()`, `is_empty()`) without exposing contents. Implemented for both `Dynamic<T>` and `Fixed<T>`.
 
-- **SecureEncoding trait** 
-  Unified, explicit encoding API: `to_hex()`, `to_hex_upper()`, `to_base64url()`, `to_bech32(hrp)`, `try_to_bech32(hrp)`. Granular features: `encoding-hex`, `encoding-base64`, `encoding-bech32`.
+- **Per-format encoding/decoding traits**
+  Symmetric, orthogonal traits (e.g., `ToHex`/`FromHexStr`, `ToBech32`/`FromBech32Str`). Umbrella traits `SecureEncoding`/`SecureDecoding` for aggregation. Multi-format auto-decoding (`try_decode_any`). Granular features: `encoding-hex`, `encoding-base64`, `encoding-bech32`.
 
 - **Timing-safe equality** 
   `ConstantTimeEq` trait (`ct-eq` feature) with `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
@@ -44,32 +44,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (Breaking)
 
-- **Default features** 
+- **Default features**
   Now `secure` meta-feature (`zeroize` + `ct-eq`). `full` includes `secure` + `encoding` + `hash-eq` + `cloneable`. Added `insecure` for explicit opt-out (testing/low-resource only — strongly discouraged).
 
-- **Cloning** 
+- **Cloning**
   Removed implicit `Clone` on wrappers; now opt-in via `CloneableType` marker on inner type.
 
-- **Serialization** 
+- **Serialization**
   Split `serde` into `serde-deserialize` (always available) and `serde-serialize` (gated by `SerializableType` marker).
 
-- **Exposure API** 
+- **Exposure API**
   Removed any implicit borrowing paths. All access now explicit.
 
-- **Bech32 encoding** 
-  Now fallible (`try_to_bech32` / `try_to_bech32m`); no panics on invalid HRP/data.
+- **Encoding API refactor: per-format orthogonal traits**
+  Removed monolithic `SecureEncoding` trait (clean slate). Introduced symmetric per-format traits: `ToHex`/`FromHexStr`, `ToBase64Url`/`FromBase64UrlStr`, `ToBech32`/`FromBech32Str`, `ToBech32m`/`FromBech32mStr`. Umbrella traits `SecureEncoding`/`SecureDecoding` (feature-gated). Added `try_decode_any` for multi-format auto-decoding. Bech32/BIP-173 & Bech32m/BIP-350 now distinct.
 
-- **Error handling** 
+- **Bech32 encoding**
+  Now fallible (`try_to_bech32` / `try_to_bech32m`); no panics on invalid HRP/data. Strict variant differentiation.
+
+- **Error handling**
   Unified and renamed error types; removed panicking fallbacks.
+
+### Migration (Encoding Refactor)
+- Bounds: `T: SecureEncoding` → same (umbrella) or explicit `T: ToHex + …`
+- Calls: `.to_hex()` → same via blanket impl; `.to_bech32(hrp)` → same
+- Decoding: use `str.try_from_hex()?` / `try_decode_any()?` for auto-detection
 
 ### Fixed
 
 - Doc-tests now pass across all feature combinations
-- Improved Bech32 variant/HRP handling
+- Improved Bech32/BIP-173 & Bech32m/BIP-350 variant/HRP handling
 - Proper `Display`/`Error` impls for custom errors
+- Strict format validation in per-format traits (rejects invalid checksums/variants)
 
 ### Removed
 
+- Monolithic `SecureEncoding` trait
 - Implicit `Clone` and `Serialize` on wrappers
 - Panicking `from_slice` and `new_boxed` methods
 - Old encoding helpers (`RandomHex`, etc.)
