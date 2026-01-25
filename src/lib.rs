@@ -40,8 +40,8 @@ mod error;
 /// Core traits for wrapper polymorphism - always available.
 mod traits;
 
-/// Utilities for internal use.
-mod utilities;
+/// Public utility functions.
+pub mod utilities;
 
 /// Re-export of the [`Dynamic`] type.
 pub use dynamic::Dynamic;
@@ -62,6 +62,12 @@ pub use traits::{ExposeSecret, ExposeSecretMut};
 /// Type alias macros (always available).
 /// Convenient macros for creating custom secret wrapper types.
 mod macros;
+/// Available macros (exported globally for convenience):
+/// - `dynamic_alias!`: Create type aliases for heap-allocated secrets (`Dynamic<T>`).
+/// - `dynamic_generic_alias!`: Create generic heap-allocated secret aliases.
+/// - `fixed_alias!`: Create type aliases for fixed-size secrets (`Fixed<[u8; N]>`).
+/// - `fixed_generic_alias!`: Create generic fixed-size secret aliases.
+///   Re-exports of encoding and decoding traits for convenient byte encoding/decoding extensions.
 
 #[cfg(feature = "encoding-base64")]
 pub use traits::FromBase64UrlStr;
@@ -69,12 +75,6 @@ pub use traits::FromBase64UrlStr;
 pub use traits::FromBech32Str;
 #[cfg(feature = "encoding-bech32")]
 pub use traits::FromBech32mStr;
-/// Available macros (exported globally for convenience):
-/// - `dynamic_alias!`: Create type aliases for heap-allocated secrets (`Dynamic<T>`).
-/// - `dynamic_generic_alias!`: Create generic heap-allocated secret aliases.
-/// - `fixed_alias!`: Create type aliases for fixed-size secrets (`Fixed<[u8; N]>`).
-/// - `fixed_generic_alias!`: Create generic fixed-size secret aliases.
-///   Re-exports of encoding and decoding traits for convenient byte encoding/decoding extensions.
 #[cfg(feature = "encoding-hex")]
 pub use traits::FromHexStr;
 

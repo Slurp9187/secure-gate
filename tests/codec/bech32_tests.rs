@@ -238,7 +238,7 @@ fn bip_173_valid_bech32_example() {
 #[test]
 fn bip_350_valid_bech32m_example() {
     // Valid Bech32m string: should decode with FromBech32mStr, fail with FromBech32Str
-    let data = [0x00];
+    let data = [0x01, 0x02];
     let valid_bech32m = data.to_bech32m("test");
     let result_bech32 = valid_bech32m.try_from_bech32();
     assert!(result_bech32.is_err());

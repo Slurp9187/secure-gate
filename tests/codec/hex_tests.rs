@@ -63,6 +63,17 @@ fn test_invalid_hex_string() {
     assert!(result.is_err());
 }
 
+// Demonstrate umbrella trait: types implementing AsRef<[u8]> get SecureEncoding
+// Demonstrate umbrella trait: types implementing AsRef<[u8]> get SecureEncoding when encoding features are enabled
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn test_secure_encoding_umbrella() {
+    // Any AsRef<[u8]> type implements SecureEncoding when encoding features are enabled
+    let data: Vec<u8> = vec![0xDE, 0xAD, 0xBE, 0xEF];
+    // This works because ToHex is blanket-implemented over AsRef<[u8]>
+    assert!(data.to_hex() == "deadbeef");
+}
+
 #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
 #[test]
 fn fixed_deserialize_hex_string() {
