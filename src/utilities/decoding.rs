@@ -14,7 +14,7 @@ pub fn try_decode_any(s: &str) -> Result<Vec<u8>, crate::DecodingError> {
     #[cfg(feature = "encoding-bech32")]
     {
         use ::bech32;
-        // Try Bech32 first (bech32::decode prioritizes Bech32 over Bech32m)
+        // Try Bech32 first; the bech32 crate's decode function automatically handles both Bech32 (BIP-173) and Bech32m (BIP-350), prioritizing Bech32 checksum validation first
         if let Ok((_, data)) = bech32::decode(s) {
             return Ok(fes_to_u8s(data));
         }
