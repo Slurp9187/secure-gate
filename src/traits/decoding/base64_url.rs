@@ -14,8 +14,11 @@
 /// ## Example
 ///
 /// ```rust
-/// use secure_gate::traits::FromBase64UrlStr;
+/// # #[cfg(feature = "encoding-base64")]
+/// use secure_gate::FromBase64UrlStr;
+/// # #[cfg(feature = "encoding-base64")]
 /// let base64_string = "QkJC";
+/// # #[cfg(feature = "encoding-base64")]
 /// let bytes = base64_string.try_from_base64url().unwrap();
 /// // bytes is now Vec<u8>: [66, 66, 66]
 /// ```
@@ -42,8 +45,11 @@ use crate::error::Base64Error;
 /// ## Example
 ///
 /// ```rust
-/// use secure_gate::traits::FromBase64UrlStr;
+/// # #[cfg(feature = "encoding-base64")]
+/// use secure_gate::FromBase64UrlStr;
+/// # #[cfg(feature = "encoding-base64")]
 /// let base64_string = "QkJC";
+/// # #[cfg(feature = "encoding-base64")]
 /// let bytes = base64_string.try_from_base64url().unwrap();
 /// // bytes is now Vec<u8>: [66, 66, 66]
 /// ```

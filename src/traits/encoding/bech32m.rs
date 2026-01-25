@@ -2,9 +2,9 @@
 use ::bech32;
 
 #[cfg(feature = "encoding-bech32")]
-use crate::utilities::encoding::convert_bits;
-#[cfg(feature = "encoding-bech32")]
 use crate::error::Bech32Error;
+#[cfg(feature = "encoding-bech32")]
+use crate::utilities::encoding::convert_bits;
 
 /// Extension trait for encoding byte data to Bech32m strings with a specified Human-Readable Part (HRP).
 ///
@@ -22,8 +22,11 @@ use crate::error::Bech32Error;
 /// # Example
 ///
 /// ```rust
-/// use secure_gate::traits::ToBech32m;
+/// # #[cfg(feature = "encoding-bech32")]
+/// use secure_gate::ToBech32m;
+/// # #[cfg(feature = "encoding-bech32")]
 /// let bytes = [0x42u8; 20];
+/// # #[cfg(feature = "encoding-bech32")]
 /// let bech32m_string = bytes.to_bech32m("bc");
 /// // bech32m_string is now a Bech32m encoded String with "bc" HRP
 /// ```

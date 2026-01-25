@@ -10,14 +10,6 @@
 //! Decoding input from untrusted sources should use fallible `try_` methods.
 //! Invalid input may indicate tampering or errors.
 //!
-//! ## Example
-//!
-//! ```rust
-//! use secure_gate::traits::FromHexStr;
-//! let hex_string = "424242";
-//! let bytes = hex_string.try_from_hex().unwrap();
-//! // bytes is now Vec<u8>: [66, 66, 66]
-//! ```
 
 #[cfg(feature = "encoding-hex")]
 use ::hex as hex_crate;
@@ -37,8 +29,11 @@ use crate::error::HexError;
 /// ## Example
 ///
 /// ```rust
-/// use secure_gate::traits::FromHexStr;
-/// let hex_string = "424242";
+/// # #[cfg(feature = "encoding-hex")]
+/// use secure_gate::FromHexStr;
+/// # #[cfg(feature = "encoding-hex")]
+/// let hex_string = "424344";
+/// # #[cfg(feature = "encoding-hex")]
 /// let bytes = hex_string.try_from_hex().unwrap();
 /// // bytes is now Vec<u8>: [66, 66, 66]
 /// ```

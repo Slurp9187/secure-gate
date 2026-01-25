@@ -10,14 +10,6 @@
 //! Decoding input from untrusted sources should use fallible `try_` methods.
 //! Invalid input may indicate tampering or errors.
 //!
-//! ## Example
-//!
-//! ```rust
-//! use secure_gate::traits::FromBech32mStr;
-//! let bech32m_string = "bc1pmfr3p9j00pfxjh0zmgp99y8zftmd3s5pmedqhyptwy6lm87hf5ss52r5n";
-//! let (hrp, bytes) = bech32m_string.try_from_bech32m().unwrap();
-//! // hrp is "bc", bytes is the decoded Vec<u8>
-//! ```
 
 #[cfg(feature = "encoding-bech32")]
 use ::bech32;

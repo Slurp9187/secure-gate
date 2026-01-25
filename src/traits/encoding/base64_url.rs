@@ -15,8 +15,11 @@
 /// ## Example
 ///
 /// ```rust
-/// use secure_gate::traits::ToBase64Url;
+/// # #[cfg(feature = "encoding-base64")]
+/// use secure_gate::ToBase64Url;
+/// # #[cfg(feature = "encoding-base64")]
 /// let bytes = [0x42u8; 32];
+/// # #[cfg(feature = "encoding-base64")]
 /// let base64_string = bytes.to_base64url();
 /// // base64_string is now a URL-safe base64 encoded String
 /// ```
@@ -42,7 +45,7 @@ use base64_crate::Engine;
 /// # Example
 ///
 /// ```rust
-/// use secure_gate::traits::ToBase64Url;
+/// use secure_gate::ToBase64Url;
 /// let bytes = [0x42u8; 32];
 /// let base64_string = bytes.to_base64url();
 /// // base64_string is now a URL-safe base64 encoded String

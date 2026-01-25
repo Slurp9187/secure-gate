@@ -12,11 +12,14 @@
 //! For debugging/logging, prefer redacted helpers like `to_hex_prefix`.
 //! All calls require explicit `.expose_secret()` first — no implicit paths exist.
 //!
-/// ## Example
+/// # Example
 ///
 /// ```rust
-/// use secure_gate::traits::ToHex;
+/// # #[cfg(feature = "encoding-hex")]
+/// use secure_gate::ToHex;
+/// # #[cfg(feature = "encoding-hex")]
 /// let bytes = [0x42u8; 32];
+/// # #[cfg(feature = "encoding-hex")]
 /// let hex_string = bytes.to_hex();
 /// // hex_string is now String: "424242..."
 /// ```
@@ -34,11 +37,14 @@ use ::hex as hex_crate;
 /// For debugging/logging, prefer redacted helpers like `to_hex_prefix`.
 /// All calls require explicit `.expose_secret()` first — no implicit paths exist.
 ///
-/// ## Example
+/// # Example
 ///
 /// ```rust
-/// use secure_gate::traits::ToHex;
+/// # #[cfg(feature = "encoding-hex")]
+/// use secure_gate::ToHex;
+/// # #[cfg(feature = "encoding-hex")]
 /// let bytes = [0x42u8; 32];
+/// # #[cfg(feature = "encoding-hex")]
 /// let hex_string = bytes.to_hex();
 /// // hex_string is now String: "424242..."
 /// ```
