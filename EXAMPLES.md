@@ -292,12 +292,15 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
     use secure_gate::DecodingError;
 
     // Auto-detect format
-    let hex_bytes = try_decode_any("deadbeef").unwrap();           // detects hex
-    let b64_bytes = try_decode_any("SGVsbG8").unwrap();            // detects base64url
-    let bech32_bytes = try_decode_any("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4").unwrap();  // detects bech32
+    let hex_result = try_decode_any("deadbeef", None); // detects hex
+    assert!(hex_result.is_ok());
+    let b64_result = try_decode_any("SGVsbG8=", None); // detects base64url
+    assert!(b64_result.is_ok());
+    let bech32_result = try_decode_any("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", None); // detects bech32
+    assert!(bech32_result.is_ok());
     // Errors in unified DecodingError type
-    let bad = try_decode_any("invalid");
-    assert!(matches!(bad, Err(DecodingError::InvalidEncoding)));
+    let bad = try_decode_any("invalid", None);
+    assert!(matches!(bad, Err(DecodingError::InvalidEncoding { .. })));
 }
 ```
 
