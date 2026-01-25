@@ -115,4 +115,10 @@ pub use error::DecodingError;
 #[cfg(feature = "serde-deserialize")]
 pub use utilities::decoding::try_decode_any;
 /// Re-export decoding utilities for multi-format auto-decoding.
-pub use utilities::decoding::{Format, DEFAULT_ORDER};
+#[cfg(any(
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m",
+    feature = "encoding-hex",
+    feature = "encoding-base64"
+))]
+pub use utilities::decoding::Format;

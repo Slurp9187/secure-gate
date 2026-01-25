@@ -2,20 +2,52 @@
 //! Multi-format decoding helpers for secure-gate.!
 //! This module provides utilities for decoding strings that may be encoded in various formats.
 
+#[cfg(any(
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m",
+    feature = "encoding-hex",
+    feature = "encoding-base64"
+))]
+use alloc::vec::Vec;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(docsrs, doc(cfg(feature = "encoding-bech32")))]
+#[cfg(feature = "encoding-bech32")]
 pub enum Format {
+    #[cfg_attr(docsrs, doc(cfg(feature = "encoding-bech32")))]
+    #[cfg(feature = "encoding-bech32")]
     Bech32,
+    #[cfg_attr(docsrs, doc(cfg(feature = "encoding-bech32m")))]
+    #[cfg(feature = "encoding-bech32m")]
     Bech32m,
+    #[cfg_attr(docsrs, doc(cfg(feature = "encoding-hex")))]
+    #[cfg(feature = "encoding-hex")]
     Hex,
+    #[cfg_attr(docsrs, doc(cfg(feature = "encoding-base64")))]
+    #[cfg(feature = "encoding-base64")]
     Base64Url,
 }
 
-// Default order: Bech32 → Hex → Base64Url
-pub const DEFAULT_ORDER: &[Format] = &[Format::Bech32, Format::Hex, Format::Base64Url];
+#[cfg(any(
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m",
+    feature = "encoding-hex",
+    feature = "encoding-base64"
+))]
+pub fn default_order() -> Vec<Format> {
+    let mut order = Vec::new();
+    #[cfg(feature = "encoding-bech32")]
+    order.push(Format::Bech32);
+    #[cfg(feature = "encoding-hex")]
+    order.push(Format::Hex);
+    #[cfg(feature = "encoding-base64")]
+    order.push(Format::Base64Url);
+    order
+}
 
 /// Attempt to decode a string in a configurable priority order.
 ///
-/// Tries formats in the order specified by `priority`, or defaults to `DEFAULT_ORDER`
+/// Tries formats in the order specified by `priority`, or defaults to the default order
 /// (Bech32 → Hex → Base64Url) if `None`. This allows strict protocols to restrict formats
 /// (e.g., only Hex) or customize order for performance.
 ///
@@ -46,12 +78,18 @@ pub const DEFAULT_ORDER: &[Format] = &[Format::Bech32, Format::Hex, Format::Base
 ///
 /// Returns `Ok(Vec<u8>)` on success or `Err(DecodingError)` if no format matches.
 #[cfg(feature = "serde-deserialize")]
+#[cfg(any(
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m",
+    feature = "encoding-hex",
+    feature = "encoding-base64"
+))]
 pub fn try_decode_any(
     s: &str,
     priority: Option<&[Format]>,
 ) -> Result<Vec<u8>, crate::DecodingError> {
-    let order = priority.unwrap_or(DEFAULT_ORDER);
-    let attempted: Vec<Format> = order.to_vec();
+    let order = priority.map(|p| p.to_vec()).unwrap_or_else(default_order);
+    let attempted: Vec<Format> = order.clone();
     for fmt in attempted.iter() {
         match fmt {
             #[cfg(feature = "encoding-bech32")]
@@ -85,6 +123,13 @@ pub fn try_decode_any(
                     return Ok(data);
                 }
             }
+            #[cfg(not(any(
+                feature = "encoding-bech32",
+                feature = "encoding-bech32m",
+                feature = "encoding-hex",
+                feature = "encoding-base64"
+            )))]
+            _ => unreachable!("No encoding features enabled"),
         }
     }
 

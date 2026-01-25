@@ -70,7 +70,7 @@ mod tests {
         // Small input: [0] (version 0) -> should produce empty or partial byte, but discarded
         let data = vec![0];
         let result = fes_to_u8s(data);
-        assert_eq!(result, vec![]); // No full byte
+        assert_eq!(result, Vec::<u8>::new()); // No full ...
     }
 
     #[test]

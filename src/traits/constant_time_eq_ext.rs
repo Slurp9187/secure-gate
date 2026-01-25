@@ -38,6 +38,9 @@
 //! use secure_gate::{Dynamic, ConstantTimeEqExt};
 //! let a: Dynamic<Vec<u8>> = vec![42u8; 2048].into();  // e.g. ML-DSA signature
 //! let b: Dynamic<Vec<u8>> = vec![42u8; 2048].into();  // matching value
+//! assert!(a.ct_eq_hash(&b));  // Efficient comparison for large data
+//! # }
+//! ```
 #[cfg(feature = "ct-eq-hash")]
 #[allow(clippy::len_without_is_empty)]
 pub trait ConstantTimeEqExt: crate::ConstantTimeEq {

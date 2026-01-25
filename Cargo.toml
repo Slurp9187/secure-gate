@@ -58,7 +58,7 @@ zeroize = ["dep:zeroize", "blake3/zeroize", "alloc"]
 rand = ["dep:rand", "dep:once_cell", "alloc"]
 
 # ct-eq: Constant-time equality checks (prevents timing attacks in comparisons; uses 'subtle' crate)
-ct-eq = ["dep:subtle"]
+ct-eq = ["dep:subtle", "alloc"]
 
 # Hash-based equality (uses blake3 for fast, secure hashing without caching overhead)
 ct-eq-hash = ["ct-eq", "dep:blake3", "alloc"]
@@ -67,7 +67,7 @@ ct-eq-hash = ["ct-eq", "dep:blake3", "alloc"]
 insecure = []
 
 # Encoding: Secure conversions (hex/base64) for displaying or serializing secrets without leaks
-encoding = ["encoding-hex", "encoding-base64", "encoding-bech32"]
+encoding = ["encoding-hex", "encoding-base64", "encoding-bech32", "encoding-bech32m"]
 # Hex encoding support (uses the 'hex' crate)
 encoding-hex = ["dep:hex", "alloc"]
 # Base64 encoding support (uses the 'base64' crate)
