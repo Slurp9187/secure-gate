@@ -52,6 +52,7 @@ PACKAGES = [
     {
         "suffix": "docs",
         "root_files": [
+            "Cargo.toml",
             "CHANGELOG.md",
             "README.md",
             "ROADMAP.md",
@@ -65,10 +66,10 @@ PACKAGES = [
         "suffix": "src",
         "root_files": [
             "Cargo.toml",
-            "CHANGELOG.md",
+            # "CHANGELOG.md",
             # "EXAMPLES.md",
-            "README.md",
-            "SECURITY.md",
+            # "README.md",
+            # "SECURITY.md",
         ],
         "include_dirs": ["src"],
         "file_pattern": "*.rs",
