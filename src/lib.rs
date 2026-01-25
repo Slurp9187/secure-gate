@@ -75,7 +75,7 @@ mod macros;
 pub use traits::FromBase64UrlStr;
 #[cfg(feature = "encoding-bech32")]
 pub use traits::FromBech32Str;
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 pub use traits::FromBech32mStr;
 #[cfg(feature = "encoding-hex")]
 pub use traits::FromHexStr;
@@ -84,7 +84,7 @@ pub use traits::FromHexStr;
 pub use traits::ToBase64Url;
 #[cfg(feature = "encoding-bech32")]
 pub use traits::ToBech32;
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 pub use traits::ToBech32m;
 #[cfg(feature = "encoding-hex")]
 pub use traits::ToHex;

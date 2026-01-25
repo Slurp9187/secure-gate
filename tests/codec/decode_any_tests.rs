@@ -44,6 +44,7 @@ fn decode_any_hex_only() {
     assert!(try_decode_any(non_hex, Some(&[Format::Hex])).is_err());
 }
 
+#[cfg(feature = "encoding-base64")]
 #[test]
 fn decode_any_base64_only() {
     let base64_input = "SGVsbG8=";
@@ -55,6 +56,7 @@ fn decode_any_base64_only() {
     assert!(try_decode_any(non_base64, Some(&[Format::Base64Url])).is_err());
 }
 
+#[cfg(feature = "encoding-base64")]
 #[test]
 fn decode_any_custom_order() {
     let base64_input = "SGVsbG8=";

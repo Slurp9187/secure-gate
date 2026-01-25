@@ -1,6 +1,7 @@
 // secure-gate/src/traits/encoding/mod.rs
 pub mod base64_url;
 pub mod bech32;
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 pub mod bech32m;
 pub mod hex;
 
@@ -8,7 +9,7 @@ pub mod hex;
 pub use base64_url::ToBase64Url;
 #[cfg(feature = "encoding-bech32")]
 pub use bech32::ToBech32;
-#[cfg(feature = "encoding-bech32")]
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 pub use bech32m::ToBech32m;
 #[cfg(feature = "encoding-hex")]
 pub use hex::ToHex;

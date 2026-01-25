@@ -72,7 +72,7 @@ pub fn default_order() -> Vec<Format> {
 /// Custom order for multi-format protocol:
 /// ```
 /// use secure_gate::utilities::decoding::{try_decode_any, Format};
-/// let bytes = try_decode_any("SGVsbG8=", Some(&[Format::Base64Url, Format::Hex]))?;
+/// let bytes = try_decode_any("deadbeef", Some(&[Format::Bech32, Format::Hex]))?;
 /// # Ok::<(), secure_gate::DecodingError>(())
 /// ```
 ///
