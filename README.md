@@ -25,22 +25,22 @@ Secure-gate provides `Dynamic<T>` (heap-allocated) and `Fixed<T>` (stack-allocat
 
 ```toml
 [dependencies]
-secure-gate = "0.7.0-rc.10"  # or latest stable version
+secure-gate = "0.7.0-rc.11"  # or latest stable version
 ```
 
 **Recommended secure defaults**:
 ```toml
-secure-gate = { version = "0.7.0-rc.10", features = ["secure"] }  # zeroize + ct-eq
+secure-gate = { version = "0.7.0-rc.11", features = ["secure"] }  # zeroize + ct-eq
 ```
 
 **Batteries-included** (most features):
 ```toml
-secure-gate = { version = "0.7.0-rc.10", features = ["full"] }
+secure-gate = { version = "0.7.0-rc.11", features = ["full"] }
 ```
 
 **Minimal** (no zeroize/ct-eq — discouraged for production):
 ```toml
-secure-gate = { version = "0.7.0-rc.10", default-features = false }
+secure-gate = { version = "0.7.0-rc.11", default-features = false }
 ```
 
 See [Features](#features) for the full list.
