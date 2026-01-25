@@ -4,8 +4,8 @@
 //! especially for random generation, constant-time / hash-based equality,
 //! and string decoding during deserialization.
 
+pub mod conversion;
 pub mod decoding;
-pub mod encoding;
 
 #[cfg(feature = "hash-eq")]
 use crate::ConstantTimeEq;

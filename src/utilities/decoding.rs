@@ -4,7 +4,7 @@
 //! This module provides utilities for decoding strings that may be encoded in various formats.
 
 #[cfg(all(feature = "encoding-bech32", feature = "serde-deserialize"))]
-use super::encoding::fes_to_u8s;
+use super::conversion::fes_to_u8s;
 
 /// Attempt to decode a string in priority order: Bech32 → Bech32m → Hex → Base64url.
 ///
