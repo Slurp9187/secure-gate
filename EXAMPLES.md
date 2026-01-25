@@ -118,10 +118,10 @@ let buf: SecureBuffer<64> = [0u8; 64].into();
     extern crate alloc;
 
     // Dynamic (variable size)
-    let token: Dynamic<Vec<u8>> = Dynamic::generate_random(64);
+    let token: Dynamic<Vec<u8>> = Dynamic::from_random(64);
 
     // Fixed (fixed size)
-    let key: Fixed<[u8; 32]> = Fixed::generate_random();
+    let key: Fixed<[u8; 32]> = Fixed::from_random();
 
     // Panics on RNG failure — use in trusted environments
 }
@@ -275,8 +275,8 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
     extern crate alloc;
 
     // Round-trip: encode to hex, serialize to JSON, then deserialize with auto-decoding
-    let original: Dynamic<Vec<u8>> = Dynamic::generate_random(4);
-    let hex = original.with_secret(|s| s.to_hex());
+    let original: Dynamic<Vec<u8>> = Dynamic::from_random(4);
+    let hex = original.with_secret(|s: &Vec<u8>| s.to_hex());
     let decoded: Dynamic<Vec<u8>> = serde_json::from_str(&format!("\"{}\"", hex)).unwrap();
     // Auto-decoding handles hex format transparently
     assert_eq!(original.expose_secret(), decoded.expose_secret());
@@ -288,16 +288,16 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
 ```rust
 #[cfg(all(feature = "serde-deserialize", feature = "encoding"))]
 {
-    use secure_gate::try_decode_any;
+    use secure_gate::utilities::decoding::try_decode_any;
     use secure_gate::DecodingError;
 
     // Auto-detect format
     let hex_bytes = try_decode_any("deadbeef").unwrap();           // detects hex
     let b64_bytes = try_decode_any("SGVsbG8").unwrap();            // detects base64url
-    let bech32_bytes = try_decode_any("bc1qw5...").unwrap();       // detects bech32
+    let bech32_bytes = try_decode_any("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4").unwrap();  // detects bech32
     // Errors in unified DecodingError type
     let bad = try_decode_any("invalid");
-    assert!(matches!(bad, Err(DecodingError::UnsupportedFormat)));
+    assert!(matches!(bad, Err(DecodingError::InvalidEncoding)));
 }
 ```
 
