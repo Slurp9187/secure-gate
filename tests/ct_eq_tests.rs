@@ -5,11 +5,10 @@
 
 #[cfg(test)]
 mod tests {
+    #[cfg(all(feature = "ct-eq", feature = "alloc"))]
+    use secure_gate::Dynamic;
     #[cfg(feature = "ct-eq")]
-    use secure_gate::{ConstantTimeEq, Dynamic, Fixed};
-
-    #[cfg(not(feature = "ct-eq"))]
-    use secure_gate::ExposeSecret;
+    use secure_gate::{ConstantTimeEq, Fixed};
 
     #[cfg(feature = "ct-eq")]
     #[test]
@@ -62,16 +61,19 @@ mod tests {
         // Compile-fail guard: ensures type safety for ct_eq
     }
 
-    #[cfg(feature = "ct-eq")]
+    #[cfg(all(feature = "ct-eq", feature = "alloc"))]
     #[test]
     fn dynamic_ct_eq_negative_cases() {
         let a: Dynamic<Vec<u8>> = vec![1u8; 32].into();
         let b: Dynamic<Vec<u8>> = vec![1u8; 31].into(); // different length
         let c: Dynamic<Vec<u8>> = vec![2u8; 32].into(); // same length, different content
 
-        assert!(!a.ct_eq(&b));
-        assert!(!a.ct_eq(&c));
-        assert!(a.ct_eq(&a));
+        #[cfg(feature = "alloc")]
+        assert!(!a.ct_eq(&b)); // different length
+        #[cfg(feature = "alloc")]
+        assert!(!a.ct_eq(&c)); // different content
+        #[cfg(feature = "alloc")]
+        assert!(a.ct_eq(&a)); // self equality
     }
 
     #[cfg(feature = "ct-eq")]
@@ -86,6 +88,7 @@ mod tests {
     }
 
     #[cfg(feature = "ct-eq")]
+    #[cfg(feature = "alloc")]
     #[test]
     fn test_wrapper_equality_with_ct_eq() {
         // Test Fixed<T> ct_eq
@@ -113,10 +116,13 @@ mod tests {
         assert!(!str1.ct_eq(&str3));
     }
 
-    #[cfg(not(feature = "ct-eq"))]
+    #[cfg(all(not(feature = "ct-eq"), feature = "alloc"))]
     #[test]
     fn partial_eq_fallback() {
-        use secure_gate::{Dynamic, Fixed};
+        #[cfg(feature = "alloc")]
+        use secure_gate::Dynamic;
+        use secure_gate::ExposeSecret;
+        use secure_gate::Fixed;
 
         // Test Fixed<T> equality
         let fixed1 = Fixed::new([1u8, 2, 3]);

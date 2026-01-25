@@ -51,8 +51,10 @@ pub enum DecodingError {
     #[cfg(feature = "encoding-hex")]
     #[error("invalid hex string")]
     InvalidHex,
-    #[error(
-        "invalid encoding: string does not match any supported format (bech32, hex, or base64)"
-    )]
-    InvalidEncoding,
+    #[error("invalid encoding: {hint}")]
+    InvalidEncoding {
+        /// Additional hint for debugging, e.g., "string does not match any supported format. Attempted order: [Bech32, Hex, Base64Url]".
+        /// In production, this can be redacted if it risks leaking metadata.
+        hint: String,
+    },
 }

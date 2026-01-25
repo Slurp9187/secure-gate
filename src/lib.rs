@@ -19,15 +19,17 @@
 //! [`ConstantTimeEq`] (via `ct-eq` feature): Direct byte-by-byte constant-time comparison using `subtle`.
 //! Best for small/fixed-size secrets (< ~256–512 bytes) where speed matters most.
 //!
-//! [`HashEq`] (via `hash-eq` feature): BLAKE3 hash -> constant-time compare on fixed 32-byte digest.
+//! [`ConstantTimeEqExt`] (via `ct-eq-hash` feature): BLAKE3 hash -> constant-time compare on fixed 32-byte digest.
 //! Faster for large/variable secrets (e.g. ML-KEM ciphertexts ~1–1.5 KiB, ML-DSA signatures ~2–4 KiB),
 //! with length hiding and optional keyed mode (`rand` for per-process random key).
 //!
-//! See the HashEq trait documentation for performance numbers, security properties (probabilistic, timing-safe), and guidance on when to choose each (or hybrid).
+//! See the ConstantTimeEqExt trait documentation for performance numbers, security properties (probabilistic, timing-safe), and guidance on when to choose each (or hybrid).
+#[cfg(feature = "alloc")]
 extern crate alloc;
 
-/// Dynamic secret wrapper types - always available with zero dependencies.
+/// Dynamic secret wrapper types - available with `alloc` feature.
 /// These provide fundamental secure storage abstractions for dynamic data.
+#[cfg(feature = "alloc")]
 mod dynamic;
 
 /// Fixed-size secret wrapper types - always available with zero dependencies.
@@ -43,6 +45,7 @@ mod traits;
 /// Public utility functions.
 pub mod utilities;
 
+#[cfg(feature = "alloc")]
 /// Re-export of the [`Dynamic`] type.
 pub use dynamic::Dynamic;
 /// Re-export of the [`Fixed`] type.
@@ -53,8 +56,8 @@ pub use traits::CloneableType;
 /// Re-export of the traits.
 #[cfg(feature = "ct-eq")]
 pub use traits::ConstantTimeEq;
-#[cfg(feature = "hash-eq")]
-pub use traits::HashEq;
+#[cfg(feature = "ct-eq-hash")]
+pub use traits::ConstantTimeEqExt;
 #[cfg(feature = "serde-serialize")]
 pub use traits::SerializableType;
 pub use traits::{ExposeSecret, ExposeSecretMut};
@@ -72,7 +75,7 @@ mod macros;
 pub use traits::FromBase64UrlStr;
 #[cfg(feature = "encoding-bech32")]
 pub use traits::FromBech32Str;
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 pub use traits::FromBech32mStr;
 #[cfg(feature = "encoding-hex")]
 pub use traits::FromHexStr;
@@ -81,7 +84,7 @@ pub use traits::FromHexStr;
 pub use traits::ToBase64Url;
 #[cfg(feature = "encoding-bech32")]
 pub use traits::ToBech32;
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 pub use traits::ToBech32m;
 #[cfg(feature = "encoding-hex")]
 pub use traits::ToHex;
@@ -89,7 +92,8 @@ pub use traits::ToHex;
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",
-    feature = "encoding-bech32"
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m"
 ))]
 pub use traits::{SecureDecoding, SecureEncoding};
 
@@ -107,3 +111,14 @@ pub use error::HexError;
 
 /// Re-export of [`DecodingError`] for convenience in decoding operations.
 pub use error::DecodingError;
+
+#[cfg(feature = "serde-deserialize")]
+pub use utilities::decoding::try_decode_any;
+/// Re-export decoding utilities for multi-format auto-decoding.
+#[cfg(any(
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m",
+    feature = "encoding-hex",
+    feature = "encoding-base64"
+))]
+pub use utilities::decoding::Format;

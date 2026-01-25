@@ -36,6 +36,9 @@
 /// drop(secret); // stack memory wiped automatically
 /// # }
 /// ```
+
+#[cfg(feature = "rand")]
+use rand::{rngs::OsRng, TryRngCore};
 pub struct Fixed<T> {
     inner: T,
 }
@@ -125,26 +128,17 @@ where
     }
 }
 
-#[cfg(feature = "hash-eq")]
-impl<T> crate::HashEq for Fixed<T>
+#[cfg(feature = "ct-eq-hash")]
+impl<T> crate::ConstantTimeEqExt for Fixed<T>
 where
     T: AsRef<[u8]> + crate::ConstantTimeEq,
 {
-    fn hash_eq(&self, other: &Self) -> bool {
-        // Early length check — length is public metadata, safe to compare normally
-        if self.inner.as_ref().len() != other.inner.as_ref().len() {
-            return false;
-        }
-
-        crate::utilities::hash_eq_bytes(self.inner.as_ref(), other.inner.as_ref())
+    fn len(&self) -> usize {
+        self.inner.as_ref().len()
     }
 
-    fn hash_eq_opt(&self, other: &Self, hash_threshold_bytes: Option<usize>) -> bool {
-        crate::utilities::hash_eq_opt_bytes(
-            self.inner.as_ref(),
-            other.inner.as_ref(),
-            hash_threshold_bytes,
-        )
+    fn ct_eq_hash(&self, other: &Self) -> bool {
+        crate::utilities::ct_eq_hash_bytes(self.inner.as_ref(), other.inner.as_ref())
     }
 }
 
@@ -229,7 +223,8 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
             where
                 E: de::Error,
             {
-                let bytes = crate::utilities::decoding::try_decode_any(v).map_err(E::custom)?;
+                let bytes =
+                    crate::utilities::decoding::try_decode_any(v, None).map_err(E::custom)?;
 
                 if bytes.len() != M {
                     return Err(E::invalid_length(bytes.len(), &M.to_string().as_str()));
@@ -286,7 +281,9 @@ impl<const N: usize> Fixed<[u8; N]> {
     #[inline]
     pub fn from_random() -> Self {
         let mut bytes = [0u8; N];
-        crate::utilities::fill_random_bytes_mut(&mut bytes);
+        OsRng
+            .try_fill_bytes(&mut bytes)
+            .expect("OsRng failure is a program error");
         Self::from(bytes)
     }
 }

@@ -69,14 +69,14 @@ impl<const N: usize> ConstantTimeEq for [u8; N] {
     }
 }
 
-#[cfg(feature = "ct-eq")]
+#[cfg(all(feature = "ct-eq", feature = "alloc"))]
 impl ConstantTimeEq for alloc::vec::Vec<u8> {
     fn ct_eq(&self, other: &Self) -> bool {
         self.as_slice().ct_eq(other.as_slice())
     }
 }
 
-#[cfg(feature = "ct-eq")]
+#[cfg(all(feature = "ct-eq", feature = "alloc"))]
 impl ConstantTimeEq for alloc::string::String {
     fn ct_eq(&self, other: &Self) -> bool {
         self.as_bytes().ct_eq(other.as_bytes())

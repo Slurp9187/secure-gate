@@ -1,31 +1,31 @@
 // ==========================================================================
-// benches/hash_eq_vs_ct_eq.rs
+// benches/ct_eq_hash_vs_ct_eq.rs
 // ==========================================================================
-// Benchmarks comparing hash-eq (Blake3-based) vs ct-eq (subtle-based) performance.
-// Expect hash-eq to outperform ct-eq for secrets >128 bytes due to fixed 32b comparison.
+// Benchmarks comparing ct-eq-hash (Blake3-based) vs ct-eq (subtle-based) performance.
+// Expect ct-eq-hash to outperform ct-eq for secrets >128 bytes due to fixed 32b comparison.
 //
-// Note: When "rand" feature is enabled, hash_eq uses a random key for enhanced security
+// Note: When "rand" feature is enabled, ct_eq_hash uses a random key for enhanced security
 // (variable output, prevents precomputed rainbow tables). Without "rand", it uses
 // deterministic hashing. These benchmarks run in the configured mode.
 
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 use criterion::{criterion_group, criterion_main, Criterion};
 
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 use std::hint::black_box;
 
 // 32b secret (expect ct-eq to be faster)
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
 fn bench_32B_secret_comparison(c: &mut Criterion) {
-    use secure_gate::{Fixed, HashEq};
+    use secure_gate::{ConstantTimeEqExt, Fixed};
 
     let a: Fixed<[u8; 32]> = Fixed::from([1u8; 32]);
     let b: Fixed<[u8; 32]> = Fixed::from([1u8; 32]);
 
-    // Hash-eq comparison (HashEq::hash_eq uses BLAKE3 hash equality)
-    c.bench_function("fixed_hash_eq_32b", |bencher| {
-        bencher.iter(|| black_box(a.hash_eq(&b)));
+    // ct-eq-hash comparison (ConstantTimeEqExt::ct_eq_hash uses BLAKE3 hash equality)
+    c.bench_function("fixed_ct_eq_hash_32b", |bencher| {
+        bencher.iter(|| black_box(a.ct_eq_hash(&b)));
     });
 
     // Ct-eq comparison (direct byte comparison)
@@ -33,18 +33,18 @@ fn bench_32B_secret_comparison(c: &mut Criterion) {
         bencher.iter(|| black_box(a.ct_eq(&b)));
     });
 }
-// 1kb secret (1024 bytes) (expect hash-eq to be faster)
-#[cfg(feature = "hash-eq")]
+// 1kb secret (1024 bytes) (expect ct-eq-hash to be faster)
+#[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
 fn bench_1KiB_secret_comparison(c: &mut Criterion) {
-    use secure_gate::{Dynamic, HashEq};
+    use secure_gate::{ConstantTimeEqExt, Dynamic};
 
     let a: Dynamic<Vec<u8>> = vec![1u8; 1024].into();
     let b: Dynamic<Vec<u8>> = vec![1u8; 1024].into();
 
-    // Hash-eq comparison (HashEq::hash_eq uses BLAKE3 hash equality)
-    c.bench_function("dynamic_hash_eq_1kb", |bencher| {
-        bencher.iter(|| black_box(a.hash_eq(&b)));
+    // ct-eq-hash comparison (ConstantTimeEqExt::ct_eq_hash uses BLAKE3 hash equality)
+    c.bench_function("dynamic_ct_eq_hash_1kb", |bencher| {
+        bencher.iter(|| black_box(a.ct_eq_hash(&b)));
     });
 
     // Ct-eq comparison (direct byte comparison)
@@ -54,17 +54,17 @@ fn bench_1KiB_secret_comparison(c: &mut Criterion) {
 }
 
 // 100kb secret (102,400 bytes) (massive hash-eq advantage expected)
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
 fn bench_100KiB_secret_comparison(c: &mut Criterion) {
-    use secure_gate::HashEq;
+    use secure_gate::ConstantTimeEqExt;
     // Mitigate caching: Use fresh allocations with varying data
-    // Hash-eq comparison (HashEq::hash_eq uses BLAKE3 hash equality)
-    c.bench_function("dynamic_hash_eq_100kb", |bencher| {
+    // ct-eq-hash comparison (ConstantTimeEqExt::ct_eq_hash uses BLAKE3 hash equality)
+    c.bench_function("dynamic_ct_eq_hash_100kb", |bencher| {
         bencher.iter(|| {
             let a: secure_gate::Dynamic<Vec<u8>> = black_box(vec![42u8; 102_400]).into();
             let b: secure_gate::Dynamic<Vec<u8>> = black_box(vec![42u8; 102_400]).into();
-            black_box(a.hash_eq(&b))
+            black_box(a.ct_eq_hash(&b))
         });
     });
 
@@ -78,17 +78,17 @@ fn bench_100KiB_secret_comparison(c: &mut Criterion) {
 }
 
 // 1mb secret (1,048,576 bytes) (extreme bound for hash-eq fixed overhead)
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
 fn bench_1MiB_secret_comparison(c: &mut Criterion) {
-    use secure_gate::HashEq;
+    use secure_gate::ConstantTimeEqExt;
     // Mitigate caching: Use fresh allocations with varying data
-    // Hash-eq comparison (HashEq::hash_eq uses BLAKE3 hash equality)
-    c.bench_function("dynamic_hash_eq_1mb", |bencher| {
+    // ct-eq-hash comparison (ConstantTimeEqExt::ct_eq_hash uses BLAKE3 hash equality)
+    c.bench_function("dynamic_ct_eq_hash_1mb", |bencher| {
         bencher.iter(|| {
             let a: secure_gate::Dynamic<Vec<u8>> = black_box(vec![255u8; 1_048_576]).into(); // ~1mb
             let b: secure_gate::Dynamic<Vec<u8>> = black_box(vec![255u8; 1_048_576]).into();
-            black_box(a.hash_eq(&b))
+            black_box(a.ct_eq_hash(&b))
         });
     });
 
@@ -102,14 +102,14 @@ fn bench_1MiB_secret_comparison(c: &mut Criterion) {
 }
 
 // Worst-case unequal comparisons: differ at end (detect timing leaks)
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
 fn bench_worst_case_unequal_32B(c: &mut Criterion) {
-    use secure_gate::{Fixed, HashEq};
+    use secure_gate::{ConstantTimeEqExt, Fixed};
 
     let mut group = c.benchmark_group("fixed_unequal_end_32b");
 
-    group.bench_function("hash_eq_differ_at_end", |bencher| {
+    group.bench_function("ct_eq_hash_differ_at_end", |bencher| {
         bencher.iter(|| {
             let mut data_a = [0u8; 32];
             data_a[31] = 0;
@@ -119,7 +119,7 @@ fn bench_worst_case_unequal_32B(c: &mut Criterion) {
             data_b[31] = 1;
             let b: Fixed<[u8; 32]> = Fixed::from(data_b);
 
-            black_box(a.hash_eq(&b))
+            black_box(a.ct_eq_hash(&b))
         });
     });
 
@@ -141,14 +141,14 @@ fn bench_worst_case_unequal_32B(c: &mut Criterion) {
 }
 
 // Worst-case unequal comparisons: differ at end (detect timing leaks)
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
 fn bench_worst_case_unequal_1KiB(c: &mut Criterion) {
-    use secure_gate::{Dynamic, HashEq};
+    use secure_gate::{ConstantTimeEqExt, Dynamic};
 
     let mut group = c.benchmark_group("dynamic_unequal_end_1kb");
 
-    group.bench_function("hash_eq_differ_at_end", |bencher| {
+    group.bench_function("ct_eq_hash_differ_at_end", |bencher| {
         bencher.iter(|| {
             let mut data_a = vec![0u8; 1024];
             data_a[1023] = 0;
@@ -158,7 +158,7 @@ fn bench_worst_case_unequal_1KiB(c: &mut Criterion) {
             data_b[1023] = 1;
             let b: Dynamic<Vec<u8>> = data_b.into();
 
-            black_box(a.hash_eq(&b))
+            black_box(a.ct_eq_hash(&b))
         });
     });
 
@@ -180,7 +180,7 @@ fn bench_worst_case_unequal_1KiB(c: &mut Criterion) {
 }
 
 // Hash computation overhead
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 #[allow(dead_code)]
 fn bench_hash_computation(c: &mut Criterion) {
     // Mitigate caching: Use fresh allocations with varying data
@@ -202,7 +202,7 @@ fn bench_hash_computation(c: &mut Criterion) {
 }
 
 // Compare keyed (secure, with random key) vs deterministic BLAKE3 hashing performance
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
 fn bench_keyed_vs_deterministic_hashing(c: &mut Criterion) {
     // Note: This benchmark compares raw hashing; hash_eq adds caching overhead.
@@ -245,57 +245,57 @@ fn bench_keyed_vs_deterministic_hashing(c: &mut Criterion) {
 
 // Hash caching effects: Demonstrates performance difference between cached (precomputed hash)
 // and non-cached (fresh computation) equality checks.
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
-fn bench_hash_eq_caching_effects(c: &mut Criterion) {
-    use secure_gate::{Dynamic, Fixed, HashEq};
+fn bench_ct_eq_hash_caching_effects(c: &mut Criterion) {
+    use secure_gate::{ConstantTimeEqExt, Dynamic, Fixed};
 
     // Fixed data (hash may be cached internally if same)
-    c.bench_function("hash_eq_fixed_data_32b", |bencher| {
+    c.bench_function("ct_eq_hash_fixed_data_32b", |bencher| {
         let a: Fixed<[u8; 32]> = Fixed::from([42u8; 32]);
         let b: Fixed<[u8; 32]> = Fixed::from([42u8; 32]);
-        bencher.iter(|| black_box(a.hash_eq(&b)));
+        bencher.iter(|| black_box(a.ct_eq_hash(&b)));
     });
 
     // Varying data (hash cache miss)
-    c.bench_function("hash_eq_varying_data_32b", |bencher| {
+    c.bench_function("ct_eq_hash_varying_data_32b", |bencher| {
         bencher.iter(|| {
             let seed = black_box(0u8); // Prevent const folding
             let a: Fixed<[u8; 32]> = Fixed::from([seed.wrapping_add(1); 32]);
             let b: Fixed<[u8; 32]> = Fixed::from([seed.wrapping_add(1); 32]);
-            black_box(a.hash_eq(&b))
+            black_box(a.ct_eq_hash(&b))
         });
     });
 
     // Fixed data (hash may be cached)
-    c.bench_function("hash_eq_fixed_data_1kb", |bencher| {
+    c.bench_function("ct_eq_hash_fixed_data_1kb", |bencher| {
         let a: Dynamic<Vec<u8>> = vec![42u8; 1024].into();
         let b: Dynamic<Vec<u8>> = vec![42u8; 1024].into();
-        bencher.iter(|| black_box(a.hash_eq(&b)));
+        bencher.iter(|| black_box(a.ct_eq_hash(&b)));
     });
 
     // Varying data (hash cache miss)
-    c.bench_function("hash_eq_varying_data_1kb", |bencher| {
+    c.bench_function("ct_eq_hash_varying_data_1kb", |bencher| {
         bencher.iter(|| {
             let seed = black_box(0u8);
             let a: Dynamic<Vec<u8>> = vec![seed.wrapping_add(1); 1024].into();
             let b: Dynamic<Vec<u8>> = vec![seed.wrapping_add(1); 1024].into();
-            black_box(a.hash_eq(&b))
+            black_box(a.ct_eq_hash(&b))
         });
     });
 }
 
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 criterion_group!(
-    name = hash_eq_vs_ct_eq;
+    name = ct_eq_hash_vs_ct_eq;
     config = Criterion::default();
-    targets = bench_32B_secret_comparison, bench_1KiB_secret_comparison, bench_100KiB_secret_comparison, bench_1MiB_secret_comparison, bench_hash_computation, bench_hash_eq_caching_effects, bench_keyed_vs_deterministic_hashing, bench_worst_case_unequal_32B, bench_worst_case_unequal_1KiB
+    targets = bench_32B_secret_comparison, bench_1KiB_secret_comparison, bench_100KiB_secret_comparison, bench_1MiB_secret_comparison, bench_hash_computation, bench_ct_eq_hash_caching_effects, bench_keyed_vs_deterministic_hashing, bench_worst_case_unequal_32B, bench_worst_case_unequal_1KiB
 );
-#[cfg(feature = "hash-eq")]
-criterion_main!(hash_eq_vs_ct_eq);
+#[cfg(feature = "ct-eq-hash")]
+criterion_main!(ct_eq_hash_vs_ct_eq);
 
 // No benches when required features are not enabled
-#[cfg(not(feature = "hash-eq"))]
+#[cfg(not(feature = "ct-eq-hash"))]
 fn main() {
-    println!("Benchmarks require the 'hash-eq' feature to be enabled.");
+    eprintln!("Benchmark requires 'ct-eq-hash' feature. Run with --features ct-eq-hash");
 }

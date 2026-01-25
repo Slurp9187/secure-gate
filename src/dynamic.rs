@@ -1,5 +1,9 @@
+#[cfg(feature = "alloc")]
 extern crate alloc;
 use alloc::boxed::Box;
+
+#[cfg(feature = "rand")]
+use rand::{rngs::OsRng, TryRngCore};
 
 /// Dynamic-sized heap-allocated secure secret wrapper.
 ///
@@ -122,27 +126,19 @@ where
     }
 }
 
-#[cfg(feature = "hash-eq")]
-impl<T> crate::HashEq for Dynamic<T>
+#[cfg(feature = "ct-eq-hash")]
+impl<T> crate::ConstantTimeEqExt for Dynamic<T>
 where
     T: AsRef<[u8]> + crate::ConstantTimeEq + ?Sized,
 {
-    fn hash_eq(&self, other: &Self) -> bool {
-        // Length is public metadata — safe to compare in variable time
-        if (*self.inner).as_ref().len() != (*other.inner).as_ref().len() {
-            return false;
-        }
-
-        crate::utilities::hash_eq_bytes((*self.inner).as_ref(), (*other.inner).as_ref())
+    fn len(&self) -> usize {
+        (*self.inner).as_ref().len()
     }
 
-    fn hash_eq_opt(&self, other: &Self, hash_threshold_bytes: Option<usize>) -> bool {
-        crate::utilities::hash_eq_opt_bytes(
-            (*self.inner).as_ref(),
-            (*other.inner).as_ref(),
-            hash_threshold_bytes,
-        )
+    fn ct_eq_hash(&self, other: &Self) -> bool {
+        crate::utilities::ct_eq_hash_bytes((*self.inner).as_ref(), (*other.inner).as_ref())
     }
+    // ct_eq_opt uses default impl
 }
 
 /// # Ergonomic helpers for common heap types
@@ -229,7 +225,9 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     #[inline]
     pub fn from_random(len: usize) -> Self {
         let mut bytes = vec![0u8; len];
-        crate::utilities::fill_random_bytes_mut(&mut bytes);
+        OsRng
+            .try_fill_bytes(&mut bytes)
+            .expect("OsRng failure is a program error");
         Self::from(bytes)
     }
 }
@@ -253,7 +251,8 @@ impl<'de> serde::Deserialize<'de> for Dynamic<alloc::vec::Vec<u8>> {
             where
                 E: de::Error,
             {
-                let bytes = crate::utilities::decoding::try_decode_any(v).map_err(E::custom)?;
+                let bytes =
+                    crate::utilities::decoding::try_decode_any(v, None).map_err(E::custom)?;
                 Ok(Dynamic::new(bytes))
             }
         }

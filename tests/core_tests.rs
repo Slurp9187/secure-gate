@@ -3,10 +3,13 @@
 // ==========================================================================
 // Core integration tests — pure v0.6.0 API
 
-use secure_gate::{Dynamic, ExposeSecret, ExposeSecretMut, Fixed};
+#[cfg(feature = "alloc")]
+use secure_gate::Dynamic;
+use secure_gate::{ExposeSecret, ExposeSecretMut, Fixed};
 
 // === Basic Functionality ===
 
+#[cfg(feature = "alloc")]
 #[test]
 fn basic_usage_explicit_access() {
     let mut key = Fixed::new([0u8; 32]);
@@ -24,6 +27,7 @@ fn basic_usage_explicit_access() {
     key.with_secret(|s| assert_eq!(s[0], 1));
 }
 
+#[cfg(feature = "alloc")]
 #[test]
 fn expose_secret_provides_access() {
     let key = Fixed::new([1u8; 32]);
@@ -43,6 +47,7 @@ fn fixed_is_truly_zero_cost() {
 
 // === Security Features ===
 
+#[cfg(feature = "alloc")]
 #[test]
 fn debug_is_redacted() {
     let key = Fixed::new([0u8; 32]);
@@ -71,6 +76,7 @@ fn explicit_access_for_byte_arrays() {
 
 // === Length and Size Methods ===
 
+#[cfg(feature = "alloc")]
 #[test]
 fn dynamic_len_is_empty() {
     let pw: Dynamic<String> = "hunter2".into();
@@ -83,6 +89,7 @@ fn dynamic_len_is_empty() {
 }
 
 #[cfg(feature = "rand")]
+#[cfg(feature = "alloc")]
 #[test]
 fn dynamic_generate_random() {
     use secure_gate::Dynamic;
@@ -93,6 +100,7 @@ fn dynamic_generate_random() {
 }
 
 // === Dynamic<Vec<u8>> from slice ===
+#[cfg(feature = "alloc")]
 #[test]
 fn dynamic_vec_from_slice() {
     let slice: &[u8] = b"hello world";

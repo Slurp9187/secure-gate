@@ -48,6 +48,6 @@ fn insecure_fixed_mutability() {
 fn insecure_trait_access() {
     // ExposeSecret etc. should still work
     let secret: Dynamic<String> = "test".into();
-    assert!(secret.len() > 0);
+    assert!(ExposeSecret::len(&secret) > 0);
     assert!(!secret.is_empty());
 }

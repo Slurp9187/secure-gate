@@ -22,6 +22,12 @@ jobs:
             features: "--features full"
           - name: Secure + encoding
             features: "--features encoding"
+          - name: ct-eq only
+            features: "--no-default-features --features ct-eq"
+          - name: ct-eq-hash deterministic
+            features: "--no-default-features --features ct-eq-hash"
+          - name: ct-eq-hash + rand
+            features: "--no-default-features --features ct-eq-hash,rand"
           - name: Insecure only
             features: "--no-default-features --features insecure"
           - name: Insecure + cloneable
@@ -32,6 +38,12 @@ jobs:
             features: "--no-default-features --features insecure,serde"
           - name: Insecure + rand
             features: "--no-default-features --features insecure,rand"
+          - name: Insecure + ct-eq
+            features: "--no-default-features --features insecure,ct-eq"
+          - name: Insecure + ct-eq-hash
+            features: "--no-default-features --features insecure,ct-eq-hash"
+          - name: Insecure + ct-eq-hash + rand
+            features: "--no-default-features --features insecure,ct-eq-hash,rand"
           - name: No features
             features: "--no-default-features"
 

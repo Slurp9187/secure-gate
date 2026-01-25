@@ -4,11 +4,16 @@ use ::bech32;
 #[cfg(feature = "encoding-bech32")]
 use crate::error::Bech32Error;
 #[cfg(feature = "encoding-bech32")]
-use crate::utilities::encoding::convert_bits;
+use crate::utilities::conversion::convert_bits;
 
 /// Extension trait for encoding byte data to Bech32m strings with a specified Human-Readable Part (HRP).
 ///
 /// All methods require the caller to first call `.expose_secret()` (or similar).
+///
+/// # Bech32m Feature Note
+///
+/// Currently identical to `encoding-bech32` because the underlying `bech32` crate handles both Bech32 and Bech32m variants.
+/// Use this feature when your protocol strictly requires BIP-350 (Bech32m) checksums, or for forward-compatibility with future strict variant separation.
 ///
 /// # Security Warning
 ///

@@ -1,15 +1,20 @@
 # Security Considerations for secure-gate
 
+Last updated: 2026-01 (for v0.7.0-rc.11 / upcoming v0.7.0)
+
 ## TL;DR
 - **No independent audit** — review the source code yourself before production use.
 - **No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally.
 - **Explicit exposure only** — all secret access requires `.expose_secret()` / `.with_secret()` or mutable equivalents; no `Deref`, `AsRef`, or implicit borrowing.
-- **Zeroization on drop** — full buffer (including slack capacity) wiped when `zeroize` feature is enabled.
-- **Timing-safe equality** — use `ConstantTimeEq` (`ct-eq`) or `HashEq` / `hash_eq_opt` (`hash-eq`); `==` is deliberately not implemented.
+- **Zeroization on drop** — full buffer (including spare capacity) wiped when `zeroize` feature is enabled.
+- **Timing-safe equality** — use `ConstantTimeEq` (`ct-eq`) or `ConstantTimeEqExt` / `ct_eq_opt` (`ct-eq-hash`); `==` is deliberately not implemented.
 - **Opt-in risk** — cloning and serialization require explicit marker traits (`CloneableType`, `SerializableType`).
 - **Vulnerability reporting** — preferred: GitHub private vulnerability reporting (Security tab); public issues acceptable.
 
 This document outlines the security model, design choices, strengths, known limitations, and review guidance for `secure-gate`.
+
+### No-Alloc Builds
+No-alloc builds reduce attack surface by eliminating heap code and heap-related vulnerabilities.
 
 ## Audit Status
 
@@ -37,9 +42,9 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | Scoped exposure (preferred)       | Closures limit borrow lifetime; prevents long-lived references                             |
 | Direct exposure (escape hatch)    | `expose_secret()` / `expose_secret_mut()` — grep-able, auditable                           |
 | No implicit leaks                 | No `Deref`, `AsRef`, `Copy`, `Clone` (unless `cloneable` + marker)                         |
-| Zeroization                       | Full allocation wiped on drop (`zeroize` feature); includes `Vec`/`String` slack capacity |
-| Timing safety                     | `ConstantTimeEq` for direct comparison; `HashEq` / `hash_eq_opt` for large/variable data   |
-| Probabilistic equality (`hash-eq`) | BLAKE3 + fixed 32-byte digest compare; collision risk ~2⁻¹²⁸ (negligible)                 |
+| Zeroization                       | Full allocation wiped on drop (`zeroize` feature); includes `Vec`/`String` spare capacity |
+| Timing safety                     | `ConstantTimeEq` for direct comparison; `ConstantTimeEqExt` / `ct_eq_opt` for large/variable data   |
+| Probabilistic equality (`ct-eq-hash`) | keyed BLAKE3 (when `rand` enabled) or unkeyed; collision risk ~2⁻¹²⁸ either way (negligible for practical purposes) |
 | Opt-in risky features             | Cloning/serialization gated by marker traits (`CloneableType`, `SerializableType`)         |
 | Redacted debug                    | `Debug` impl always prints `[REDACTED]`                                                    |
 | No unsafe code                    | `#![forbid(unsafe_code)]` enforced at crate level                                          |
@@ -51,12 +56,15 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `secure` (default)   | Enables `zeroize` + `ct-eq` — secure-by-default baseline                         | Always enable unless extreme constraints    |
 | `zeroize`            | Wipes memory on drop; enables safe opt-in cloning/serialization                  | Strongly recommended                        |
 | `ct-eq`              | Timing-safe direct byte comparison                                               | Strongly recommended; avoid `==`            |
-| `hash-eq`            | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `hash_eq_opt` for most cases         |
+| `ct-eq-hash`         | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `ct_eq_opt` for most cases           |
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
-| `serde-deserialize`  | Auto-decodes hex/base64url/bech32/bech32m via fallible per-format traits; temporary buffers zeroized on failure | Enable only for trusted input sources       |
+| `serde-deserialize`  | Auto-decodes hex/base64url/bech32/bech32m via fallible per-format traits; decoded buffers are zeroized when the containing `Dynamic`/`Fixed` wrapper drops (`zeroize` feature). Auto-detection may misparse ambiguous inputs; validate sources upstream to avoid DoS via large allocations. | Enable only for trusted input sources       |
 | `serde-serialize`    | Opt-in export via marker trait; audit all implementations                        | Enable sparingly; monitor exfiltration risk |
-| `encoding-*`         | Per-format symmetric encoding/decoding traits (e.g., `ToHex`/`FromHexStr`); explicit, fallible, rejects invalid formats | Validate inputs upstream; prefer specific traits over umbrellas for strictness |
+| `encoding-bech32`    | Bech32/BIP-173 encoding/decoding: `ToBech32`, `FromBech32Str`                    | Validate inputs upstream; test empty/invalid HRP |
+| `encoding-bech32m`   | Bech32m/BIP-350 encoding/decoding: `ToBech32m`, `FromBech32mStr`                 | Validate inputs upstream; test empty/invalid HRP |
 | `cloneable`          | Opt-in cloning via marker trait; increases exposure surface                      | Use minimally; prefer move semantics        |
+| `alloc`              | Enables heap-dependent code (`Dynamic<T>`, `Vec<String>` support); required for most features | Required for heap usage; opt-out for no-alloc |
+| `std`                | Enables std-specific enhancements; depends on `alloc`                           | Optional; future-proofs std integration      |
 | `full`               | All features enabled — convenient but increases attack surface                   | Development only; audit for production      |
 
 ## Module-by-Module Security Notes
@@ -72,7 +80,8 @@ The crate is intentionally small and relies on well-vetted dependencies:
 **Potential weaknesses**
 - Long-lived `expose_secret()` references can defeat scoping
 - Macro-generated aliases lack runtime size checks
-- Error messages may leak length metadata
+- Certain error variants may indirectly leak length information (e.g. wrong decoded length)
+  In most real-world usage (logging, API responses), length is already public metadata anyway (e.g. key length in JWT headers, signature length). Still, contextualize or redact errors when possible.
 
 **Mitigations**
 - Prefer `with_secret()` / `with_secret_mut()`
@@ -83,7 +92,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 **Strengths**
 - Marker traits (`CloneableType`, `SerializableType`) force deliberate opt-in
-- `ConstantTimeEq` and `HashEq` provide safe equality alternatives
+- `ConstantTimeEq` and `ConstantTimeEqExt` provide safe equality alternatives
 
 **Potential weaknesses**
 - Generic impls assume caller trustworthiness
@@ -104,11 +113,15 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Decoding is inherently fallible; untrusted input may cause errors or temporary allocations
 - Length/format hints in errors (e.g., invalid HRP)
 - Temporary buffers during multi-format auto-detection (`try_decode_any`)
+- Bech32 edge cases: Strict validation covers most, but test empty/invalid HRP/data to confirm no panics/leaks
 
 **Mitigations**
 - Treat all decoding input as untrusted; validate upstream
 - Use specific traits (e.g., `FromBech32Str`) for strict format enforcement
 - Fuzz parsers; sanitize inputs before decoding
+- Temporary decoding buffers: While mostly handled by zeroize on `Vec<u8>`, ensure no long-lived undecoded secrets in custom deserialization paths
+- Decoding errors may include format hints (e.g., 'attempted order: [Bech32, Hex]') — treat as potential metadata leaks in sensitive contexts; redact logs or use custom error display in production
+- Opt-in markers (`Cloneable`/`Serializable`): Rely on correct user implementations; audit custom impls to preserve zeroization
 
 ## Best Practices
 
@@ -117,6 +130,8 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Use `hash_eq_opt(…, None)` for general-purpose equality checks
 - Audit every `CloneableType` / `SerializableType` impl
 - Validate and sanitize all inputs before encoding/decoding
+- Prefer specific format traits (`FromBech32Str`, `FromHexStr`, …) over `try_decode_any` when the expected format is known
+- Probabilistic equality (`ct-eq-hash`): Negligible collision risk (~2⁻¹²⁸), but use `ct_eq` for deterministic needs; bound input sizes to prevent DoS
 - Monitor dependency CVEs and update regularly
 - Treat secrets as radioactive — minimize exposure surface
 

@@ -100,7 +100,11 @@ fn fixed_deserialize_bech32_roundtrip() {
     original.with_secret(|o| decoded.with_secret(|d| assert_eq!(o, d)));
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "encoding-bech32",
+    feature = "alloc"
+))]
 #[test]
 fn dynamic_deserialize_bech32_roundtrip() {
     use secure_gate::{Dynamic, ExposeSecret};
@@ -299,7 +303,7 @@ fn decode_known_bip173_vector() {
 
     let s = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
 
-    let bytes = try_decode_any(s).expect("multi-format decoding failed");
+    let bytes = try_decode_any(s, None).expect("multi-format decoding failed");
 
     // Just check it decoded successfully (fes_to_u8s is buggy, so don't check exact bytes)
     assert!(!bytes.is_empty());

@@ -7,7 +7,8 @@ All examples assume the **recommended secure defaults**:
 [dependencies]
 secure-gate = { version = "0.7.0-rc.11", features = ["secure"] } # zeroize + ct-eq
 ```
-For maximum functionality (including `hash-eq`, encodings, serde, etc.), use:
+
+For maximum functionality (including `ct-eq-hash`, encodings, serde, etc.), use:
 ```toml
 secure-gate = { version = "0.7.0-rc.11", features = ["full"] }
 ```
@@ -128,12 +129,12 @@ let buf: SecureBuffer<64> = [0u8; 64].into();
 
 ## 4. Equality Comparison
 
-**Recommended: `hash_eq_opt`** — automatically uses `ct_eq` for small inputs, `hash_eq` for large.
+**Recommended: `ct_eq_opt`** — automatically uses `ct_eq` for ≤32 bytes, `ct_eq_hash` (BLAKE3) for larger inputs.
 
 ```rust
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 {
-    use secure_gate::{Dynamic, Fixed, HashEq};
+    use secure_gate::{Dynamic, Fixed, ConstantTimeEqExt};
     extern crate alloc;
 
     // Dynamic (large example)
@@ -147,26 +148,26 @@ let buf: SecureBuffer<64> = [0u8; 64].into();
     let small_c: Fixed<[u8; 16]> = Fixed::new([2u8; 16]);
 
     // Recommended: smart path selection
-    assert!(sig_a.hash_eq_opt(&sig_b, None));
-    assert!(small_a.hash_eq_opt(&small_b, None));
+    assert!(sig_a.ct_eq_opt(&sig_b, None));
+    assert!(small_a.ct_eq_opt(&small_b, None));
 
-    assert!(!sig_a.hash_eq_opt(&sig_c, None));
-    assert!(!small_a.hash_eq_opt(&small_c, None));
+    assert!(!sig_a.ct_eq_opt(&sig_c, None));
+    assert!(!small_a.ct_eq_opt(&small_c, None));
 
-    // Force ct_eq on large
-    assert!(sig_a.hash_eq_opt(&sig_b, Some(4096)));
+    // Force ct_eq (small inputs only makes sense)
+    assert!(sig_a.ct_eq_opt(&sig_b, Some(16)));
 
-    // Force hash_eq on small
-    assert!(small_a.hash_eq_opt(&small_b, Some(0)));
+    // Force hash path even on small data
+    assert!(small_a.ct_eq_opt(&small_b, Some(0)));
 }
 ```
 
-Plain `hash_eq` (uniform probabilistic behavior):
+Plain `ct_eq_hash` (uniform probabilistic behavior):
 
 ```rust
-#[cfg(feature = "hash-eq")]
+#[cfg(feature = "ct-eq-hash")]
 {
-    use secure_gate::{Dynamic, Fixed, HashEq};
+    use secure_gate::{Dynamic, Fixed, ConstantTimeEqExt};
     extern crate alloc;
 
     // Dynamic (large example)
@@ -179,10 +180,10 @@ Plain `hash_eq` (uniform probabilistic behavior):
     let small_b: Fixed<[u8; 16]> = Fixed::new([1u8; 16]);
     let small_c: Fixed<[u8; 16]> = Fixed::new([2u8; 16]);
 
-    assert!(sig_a.hash_eq(&sig_b));
-    assert!(small_a.hash_eq(&small_b));
-    assert!(!sig_a.hash_eq(&sig_c));
-    assert!(!small_a.hash_eq(&small_c));
+    assert!(sig_a.ct_eq_hash(&sig_b));
+    assert!(small_a.ct_eq_hash(&small_b));
+    assert!(!sig_a.ct_eq_hash(&sig_c));
+    assert!(!small_a.ct_eq_hash(&small_c));
 }
 ```
 
@@ -254,12 +255,13 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
     use secure_gate::{ToBech32, ToBech32m};
     let data = b"test data";
 
-    // Bech32 encoding
-    let bech32 = data.to_bech32("test");           // infallible
-    let maybe = data.try_to_bech32("test", None);  // fallible with validation
+    // Preferred: fallible with optional HRP validation
+    let bech32  = data.try_to_bech32("test", None).unwrap();
+    let bech32m = data.try_to_bech32m("test", None).unwrap();
 
-    // Bech32m encoding (distinct from Bech32)
-    let bech32m = data.to_bech32m("test");
+    // Infallible versions still exist but may panic on invalid input
+    let _ = data.to_bech32("test");
+    let _ = data.to_bech32m("test");
 }
 ```
 
@@ -274,10 +276,28 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
 
     // Round-trip: encode to hex, serialize to JSON, then deserialize with auto-decoding
     let original: Dynamic<Vec<u8>> = Dynamic::from_random(4);
-    let hex = original.with_secret(|s| s.to_hex());
+    let hex = original.with_secret(|s: &Vec<u8>| s.to_hex());
     let decoded: Dynamic<Vec<u8>> = serde_json::from_str(&format!("\"{}\"", hex)).unwrap();
     // Auto-decoding handles hex format transparently
     assert_eq!(original.expose_secret(), decoded.expose_secret());
+}
+```
+
+### Multi-Format Decoding & Unified Errors
+
+```rust
+#[cfg(all(feature = "serde-deserialize", feature = "encoding"))]
+{
+    use secure_gate::utilities::decoding::try_decode_any;
+    use secure_gate::DecodingError;
+
+    // Auto-detect format
+    let hex_bytes = try_decode_any("deadbeef").unwrap();           // detects hex
+    let b64_bytes = try_decode_any("SGVsbG8").unwrap();            // detects base64url
+    let bech32_bytes = try_decode_any("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4").unwrap();  // detects bech32
+    // Errors in unified DecodingError type
+    let bad = try_decode_any("invalid");
+    assert!(matches!(bad, Err(DecodingError::InvalidEncoding)));
 }
 ```
 
@@ -311,7 +331,7 @@ Deserialize (auto-detects encoding):
 }
 ```
 
-Serialize (opt-in):
+Serialize (opt-in, requires `SerializableType` marker):
 
 ```rust
 #[cfg(feature = "serde-serialize")]
@@ -350,20 +370,20 @@ Serialize (opt-in):
 ## 8. Polymorphic / Generic Code
 
 ```rust
-#[cfg(all(feature = "ct-eq", feature = "hash-eq"))]
+#[cfg(all(feature = "ct-eq", feature = "ct-eq-hash"))]
 {
-    use secure_gate::{ExposeSecret, ConstantTimeEq, HashEq};
-   
+    use secure_gate::{ExposeSecret, ConstantTimeEq, ConstantTimeEqExt};
+
     fn get_len<S: ExposeSecret>(secret: &S) -> usize {
         secret.len()
     }
-   
+
     fn safe_eq<S: ConstantTimeEq>(a: &S, b: &S) -> bool {
         a.ct_eq(b)
     }
-   
-    fn fast_eq<S: HashEq>(a: &S, b: &S) -> bool {
-        a.hash_eq_opt(b, None)  // recommended
+
+    fn fast_eq<S: ConstantTimeEqExt>(a: &S, b: &S) -> bool {
+        a.ct_eq_opt(b, None)  // recommended
     }
 }
 ```
@@ -394,4 +414,4 @@ assert!(ok.is_ok());
 
 All examples are tested with `"full"` features and should compile cleanly.
 
-Adjust feature flags as needed for minimal builds.
+Adjust feature flags as needed for minimal builds. Test with Rust 1.70+.

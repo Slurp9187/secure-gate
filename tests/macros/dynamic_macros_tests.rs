@@ -1,7 +1,7 @@
 // secure-gate/tests/macros/dynamic_macros_tests.rs
 // Tests for dynamic (heap) alias macros.
 
-#![cfg(test)]
+#![cfg(all(test, feature = "alloc"))]
 
 use secure_gate::dynamic_alias;
 use secure_gate::ExposeSecret;
