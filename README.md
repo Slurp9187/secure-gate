@@ -47,22 +47,22 @@ See [Features](#features) for the full list.
 
 ## Features
 
-| Feature                | Description                                                                 | Default? |
-|------------------------|-----------------------------------------------------------------------------|----------|
-| `secure`               | Meta: `zeroize` + `ct-eq` (wiping + timing-safe equality)                   | Yes      |
-| `zeroize`              | Zero memory on drop                                                         | No       |
-| `ct-eq`                | `ConstantTimeEq` trait (prevents timing attacks)                            | No       |
-| `hash-eq`              | `HashEq` trait: BLAKE3-based equality (fast for large/variable secrets)     | No       |
-| `rand`                 | Secure random via `OsRng` (`from_random()`)                                 | No       |
-| `serde`                | Meta: `serde-deserialize` + `serde-serialize`                               | No       |
-| `serde-deserialize`    | Auto-detect hex/base64/bech32/bech32m when loading secrets                  | No       |
-| `serde-serialize`      | Export secrets (gated by `SerializableType`)                                | No       |
-| `encoding`             | Meta: symmetric per-format encoding/decoding (hex, base64url, bech32/bech32m) | No       |
-| `encoding-hex`         | `ToHex` (`.to_hex()`, `.to_hex_upper()`) + `FromHexStr` (`.try_from_hex()`)  | No       |
-| `encoding-base64`      | `ToBase64Url` (`.to_base64url()`) + `FromBase64UrlStr` (`.try_from_base64url()`) | No       |
-| `encoding-bech32`      | Bech32/BIP-173 & Bech32m/BIP-350: `ToBech32`, `ToBech32m`, `FromBech32Str`, `FromBech32mStr` | No       |
-| `cloneable`            | Opt-in cloning via `CloneableType` marker                                   | No       |
-| `full`                 | All of the above (convenient for development)                               | No       |
+| Feature                | Description                                                                 |
+|------------------------|-----------------------------------------------------------------------------|
+| `secure` (default)     | Meta: `zeroize` + `ct-eq` (wiping + timing-safe equality)                   |
+| `zeroize`              | Zero memory on drop                                                         |
+| `ct-eq`                | `ConstantTimeEq` trait (prevents timing attacks)                            |
+| `hash-eq`              | `HashEq` trait: BLAKE3-based equality (fast for large/variable secrets)     |
+| `rand`                 | Secure random via `OsRng` (`from_random()`)                                 |
+| `serde`                | Meta: `serde-deserialize` + `serde-serialize`                               |
+| `serde-deserialize`    | Auto-detect hex/base64/bech32/bech32m when loading secrets                  |
+| `serde-serialize`      | Export secrets (gated by `SerializableType`)                                |
+| `encoding`             | Meta: symmetric per-format encoding/decoding (hex, base64url, bech32/bech32m) |
+| `encoding-hex`         | `ToHex` (`.to_hex()`, `.to_hex_upper()`) + `FromHexStr` (`.try_from_hex()`)  |
+| `encoding-base64`      | `ToBase64Url` (`.to_base64url()`) + `FromBase64UrlStr` (`.try_from_base64url()`) |
+| `encoding-bech32`      | Bech32/BIP-173 & Bech32m/BIP-350: `ToBech32`, `ToBech32m`, `FromBech32Str`, `FromBech32mStr` |
+| `cloneable`            | Opt-in cloning via `CloneableType` marker                                   |
+| `full`                 | All of the above (convenient for development)                               |
 
 `no_std` + `alloc` compatible. Disabled features have **zero overhead**.
 

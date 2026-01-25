@@ -5,11 +5,11 @@ Real-world, copy-paste-ready examples for `secure-gate`.
 All examples assume the **recommended secure defaults**:
 ```toml
 [dependencies]
-secure-gate = { version = "0.7.0-rc.10", features = ["secure"] } # zeroize + ct-eq
+secure-gate = { version = "0.7.0-rc.11", features = ["secure"] } # zeroize + ct-eq
 ```
 For maximum functionality (including `hash-eq`, encodings, serde, etc.), use:
 ```toml
-secure-gate = { version = "0.7.0-rc.10", features = ["full"] }
+secure-gate = { version = "0.7.0-rc.11", features = ["full"] }
 ```
 
 **Important notes**

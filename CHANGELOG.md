@@ -45,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed (Breaking)
 
 - **Default features**
-  Now `secure` meta-feature (`zeroize` + `ct-eq`). `full` includes `secure` + `encoding` + `hash-eq` + `cloneable`. Added `insecure` for explicit opt-out (testing/low-resource only — strongly discouraged).
+  Now `secure` meta-feature (`zeroize` + `ct-eq`). `full` includes `secure` + `encoding` + `hash-eq` + `cloneable` + `serde` + `rand`. Added `insecure` for explicit opt-out (testing/low-resource only — strongly discouraged).
 
 - **Cloning**
   Removed implicit `Clone` on wrappers; now opt-in via `CloneableType` marker on inner type.
