@@ -173,14 +173,16 @@
   ### Encoding (symmetric per-format traits)
   
   secure-gate provides **orthogonal, symmetric encoding/decoding traits** for extensibility:
-  
+
   - `ToHex` / `FromHexStr`: Hex encoding/decoding
   - `ToBase64Url` / `FromBase64UrlStr`: Base64url encoding/decoding
   - `ToBech32` / `FromBech32Str`: BIP-173 Bech32 encoding/decoding
   - `ToBech32m` / `FromBech32mStr`: BIP-350 Bech32m encoding/decoding
-  
+
   Umbrellas (`SecureEncoding` / `SecureDecoding`) aggregate all enabled traits for convenience. Each format is independent—adding base58 later requires only one new pair.
-  
+
+  For multi-format auto-decoding with configurable priority (e.g., strict protocols), see `try_decode_any` in the docs.
+
   All methods are blanket-implemented over `AsRef<[u8]>` (encoding) or `AsRef<str>` (decoding) for zero-overhead ergonomics.
   
   ```rust

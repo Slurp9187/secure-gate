@@ -62,11 +62,13 @@ fn bech32_error_display() {
 ))]
 #[test]
 fn decoding_error_variants() {
-    let invalid_encoding = DecodingError::InvalidEncoding;
+    let invalid_encoding = DecodingError::InvalidEncoding {
+        hint: "test hint".to_string(),
+    };
 
     // Check that InvalidEncoding is present
     match invalid_encoding {
-        DecodingError::InvalidEncoding => (),
+        DecodingError::InvalidEncoding { hint: _ } => (),
         _ => panic!("Expected InvalidEncoding"),
     }
 

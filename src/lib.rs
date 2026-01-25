@@ -107,3 +107,8 @@ pub use error::HexError;
 
 /// Re-export of [`DecodingError`] for convenience in decoding operations.
 pub use error::DecodingError;
+
+#[cfg(feature = "serde-deserialize")]
+pub use utilities::decoding::try_decode_any;
+/// Re-export decoding utilities for multi-format auto-decoding.
+pub use utilities::decoding::{Format, DEFAULT_ORDER};

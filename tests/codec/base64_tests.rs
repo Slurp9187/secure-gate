@@ -44,7 +44,7 @@ fn test_string_to_base64url() {
 fn fixed_deserialize_base64_string() {
     use secure_gate::{ExposeSecret, Fixed};
     // Valid base64 for 4 bytes: "AQIDBA=="
-    let result: Fixed<[u8; 4]> = serde_json::from_str("\"AQIDBA\"").unwrap();
+    let result: Fixed<[u8; 4]> = serde_json::from_str("\"AQIDBA==\"").unwrap();
     result.with_secret(|r| assert_eq!(r, &[1, 2, 3, 4]));
     // Invalid: wrong length
     let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str("\"AQ\""); // 1 byte
@@ -56,7 +56,7 @@ fn fixed_deserialize_base64_string() {
 fn dynamic_deserialize_base64_string() {
     use secure_gate::{Dynamic, ExposeSecret};
     // Valid base64
-    let result: Dynamic<Vec<u8>> = serde_json::from_str("\"AQIDBA\"").unwrap();
+    let result: Dynamic<Vec<u8>> = serde_json::from_str("\"AQIDBA==\"").unwrap();
     result.with_secret(|r| assert_eq!(r, &[1, 2, 3, 4]));
 }
 

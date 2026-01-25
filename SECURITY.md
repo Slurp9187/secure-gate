@@ -114,6 +114,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Use specific traits (e.g., `FromBech32Str`) for strict format enforcement
 - Fuzz parsers; sanitize inputs before decoding
 - Temporary decoding buffers: While mostly handled by zeroize on `Vec<u8>`, ensure no long-lived undecoded secrets in custom deserialization paths
+- Decoding errors may include format hints (e.g., 'attempted order: [Bech32, Hex]') — treat as potential metadata leaks in sensitive contexts; redact logs or use custom error display in production
 - Opt-in markers (`Cloneable`/`Serializable`): Rely on correct user implementations; audit custom impls to preserve zeroization
 
 ## Best Practices

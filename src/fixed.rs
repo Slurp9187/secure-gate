@@ -222,7 +222,8 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
             where
                 E: de::Error,
             {
-                let bytes = crate::utilities::decoding::try_decode_any(v).map_err(E::custom)?;
+                let bytes =
+                    crate::utilities::decoding::try_decode_any(v, None).map_err(E::custom)?;
 
                 if bytes.len() != M {
                     return Err(E::invalid_length(bytes.len(), &M.to_string().as_str()));

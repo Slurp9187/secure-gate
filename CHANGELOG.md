@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fast probabilistic equality for large secrets**
   `ConstantTimeEqExt` trait (requires `ct-eq-hash` feature) extends `ConstantTimeEq` with methods for fast probabilistic equality using BLAKE3 hashing. Includes `ct_eq_hash()` for direct hash comparison and `ct_eq_opt()` for smart hybrid selection between strict equality (small inputs) and hash equality (large inputs). Centralized threshold logic with default 32-byte crossover point. Enhanced documentation with security warnings for probabilistic methods and keyed mode when `rand` feature is enabled.
 
+- **Configurable decode priority in `try_decode_any`**
+  Added optional `priority: Option<&[Format]>` parameter to `try_decode_any` for customizable decode order (e.g., strict protocols can enforce single formats like only Hex). Backward compatible with default order (Bech32 → Hex → Base64url).
+
+- **Enhanced decoding errors with hints**
+  `DecodingError` variants now include hints (e.g., attempted formats) for better debugging of failed decodes, while allowing production redaction to avoid metadata leaks.
+
 - **Per-format encoding/decoding traits**
   Symmetric, orthogonal traits (e.g., `ToHex`/`FromHexStr`, `ToBase64Url`/`FromBase64UrlStr`, `ToBech32`/`FromBech32Str`, `ToBech32m`/`FromBech32mStr`). Umbrella traits `SecureEncoding`/`SecureDecoding` for aggregation. Multi-format auto-decoding (`try_decode_any`). Granular features: `encoding-hex`, `encoding-base64`, `encoding-bech32`.
 
