@@ -35,14 +35,17 @@ pub enum Format {
     feature = "encoding-base64"
 ))]
 pub fn default_order() -> Vec<Format> {
-    let mut order = Vec::new();
-    #[cfg(feature = "encoding-bech32")]
-    order.push(Format::Bech32);
-    #[cfg(feature = "encoding-hex")]
-    order.push(Format::Hex);
-    #[cfg(feature = "encoding-base64")]
-    order.push(Format::Base64Url);
-    order
+    [
+        #[cfg(feature = "encoding-bech32")]
+        Some(Format::Bech32),
+        #[cfg(feature = "encoding-hex")]
+        Some(Format::Hex),
+        #[cfg(feature = "encoding-base64")]
+        Some(Format::Base64Url),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
 }
 
 /// Attempt to decode a string in a configurable priority order.

@@ -260,6 +260,8 @@ fn serde_benchmarks(c: &mut Criterion) {
     bench_fixed_roundtrip(c);
 
     bench_dynamic_serialize(c);
+    #[cfg(feature = "serde-deserialize")]
+    bench_dynamic_roundtrip(c);
 
     bench_large_dynamic_serialize(c);
     #[cfg(feature = "serde-deserialize")]

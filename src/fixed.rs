@@ -36,7 +36,6 @@
 /// drop(secret); // stack memory wiped automatically
 /// # }
 /// ```
-
 #[cfg(feature = "rand")]
 use rand::{rngs::OsRng, TryRngCore};
 pub struct Fixed<T> {
