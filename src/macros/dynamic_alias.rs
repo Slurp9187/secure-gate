@@ -1,3 +1,10 @@
+// <file_path>
+// secure-gate\src\macros\dynamic_alias.rs
+// </file_path>
+// <edit_description>
+// Fix the macro file and add cfg
+// </edit_description>
+
 /// Creates a type alias for a dynamic-sized heap-allocated secure secret.
 ///
 /// This macro generates a type alias to `Dynamic<T>` with optional visibility and custom documentation.
@@ -42,6 +49,7 @@
 ///
 /// The generated type is zero-cost and works with all features.
 /// For random initialization, use `Type::from_random(n)` (requires 'rand' feature).
+#[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! dynamic_alias {
     ($vis:vis $name:ident, $inner:ty, $doc:literal) => {

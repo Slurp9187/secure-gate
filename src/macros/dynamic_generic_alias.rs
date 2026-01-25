@@ -16,6 +16,7 @@
 /// use secure_gate::dynamic_generic_alias;
 /// dynamic_generic_alias!(pub(crate) Wrapper);
 /// ```
+#[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! dynamic_generic_alias {
     ($vis:vis $name:ident, $doc:literal) => {
