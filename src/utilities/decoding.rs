@@ -51,9 +51,8 @@ pub fn try_decode_any(
     priority: Option<&[Format]>,
 ) -> Result<Vec<u8>, crate::DecodingError> {
     let order = priority.unwrap_or(DEFAULT_ORDER);
-    let mut attempted: Vec<Format> = Vec::new();
-
-    for &fmt in order {
+    let attempted: Vec<Format> = order.to_vec();
+    for fmt in attempted.iter() {
         match fmt {
             #[cfg(feature = "encoding-bech32")]
             Format::Bech32 => {

@@ -38,14 +38,14 @@
 //! use secure_gate::{Dynamic, ConstantTimeEqExt};
 //! let a: Dynamic<Vec<u8>> = vec![42u8; 2048].into();  // e.g. ML-DSA signature
 //! let b: Dynamic<Vec<u8>> = vec![42u8; 2048].into();  // matching value
-//! if a.ct_eq_opt(&b, None) {
-//!     // constant-time, fast for large blobs
-//! }
-//! # }
-//! ```
 #[cfg(feature = "ct-eq-hash")]
+#[allow(clippy::len_without_is_empty)]
 pub trait ConstantTimeEqExt: crate::ConstantTimeEq {
     /// Get the length of the secret data in bytes.
+    ///
+    /// Note: This trait does **not** provide `.is_empty()` to avoid method ambiguity with
+    /// [`ExposeSecret::is_empty`], which already offers the same functionality via `len()`.
+    /// Use `.len() == 0` or `.expose_secret().is_empty()` when you need emptiness checks.
     fn len(&self) -> usize;
 
     /// Force BLAKE3 digest comparison (constant-time on 32-byte output).

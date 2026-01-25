@@ -10,9 +10,6 @@ mod tests {
     #[cfg(feature = "ct-eq")]
     use secure_gate::{ConstantTimeEq, Fixed};
 
-    #[cfg(not(feature = "ct-eq"))]
-    use secure_gate::ExposeSecret;
-
     #[cfg(feature = "ct-eq")]
     #[test]
     fn slice_ct_eq_basic() {
@@ -124,6 +121,7 @@ mod tests {
     fn partial_eq_fallback() {
         #[cfg(feature = "alloc")]
         use secure_gate::Dynamic;
+        use secure_gate::ExposeSecret;
         use secure_gate::Fixed;
 
         // Test Fixed<T> equality
