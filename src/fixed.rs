@@ -202,8 +202,6 @@ impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
     }
 }
 
-// Fallible conversion from byte slice.
-
 /// Custom serde deserialization for byte arrays with auto-detection of hex/base64/bech32 strings.
 #[cfg(feature = "serde-deserialize")]
 impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
