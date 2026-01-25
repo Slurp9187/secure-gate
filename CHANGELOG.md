@@ -24,8 +24,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enhanced decoding errors with hints**
   `DecodingError` variants now include hints (e.g., attempted formats) for better debugging of failed decodes, while allowing production redaction to avoid metadata leaks.
 
+- `alloc` feature: Gates heap-dependent code (e.g., `Dynamic<T>`) for true no-alloc builds.
+
+- `std` feature: Depends on `alloc`; enables std-specific enhancements.
+
 - **Per-format encoding/decoding traits**
   Symmetric, orthogonal traits (e.g., `ToHex`/`FromHexStr`, `ToBase64Url`/`FromBase64UrlStr`, `ToBech32`/`FromBech32Str`, `ToBech32m`/`FromBech32mStr`). Umbrella traits `SecureEncoding`/`SecureDecoding` for aggregation. Multi-format auto-decoding (`try_decode_any`). Granular features: `encoding-hex`, `encoding-base64`, `encoding-bech32`.
+
+### Changed
+
+- Default features now include `alloc` to preserve behavior.
+- Features like `zeroize`, `rand`, `ct-eq-hash`, `serde-deserialize` now depend on `alloc` where needed.
+- `encoding-bech32` now includes both Bech32/BIP-173 and Bech32m/BIP-350 support (merged from separate `encoding-bech32m`).
 
 - **Opt-in cloning & serialization**
   New marker traits `CloneableType` and `SerializableType`. Cloning and serde serialization now require explicit impls on the inner type — no automatic risk.

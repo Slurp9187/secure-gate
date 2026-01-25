@@ -51,7 +51,11 @@ fn fixed_deserialize_base64_string() {
     assert!(result.is_err());
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-base64"))]
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "encoding-base64",
+    feature = "alloc"
+))]
 #[test]
 fn dynamic_deserialize_base64_string() {
     use secure_gate::{Dynamic, ExposeSecret};

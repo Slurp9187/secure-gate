@@ -13,6 +13,9 @@ Last updated: 2026-01 (for v0.7.0-rc.11 / upcoming v0.7.0)
 
 This document outlines the security model, design choices, strengths, known limitations, and review guidance for `secure-gate`.
 
+### No-Alloc Builds
+No-alloc builds reduce attack surface by eliminating heap code and heap-related vulnerabilities.
+
 ## Audit Status
 
 `secure-gate` has **not** undergone an independent security audit.
@@ -57,8 +60,11 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
 | `serde-deserialize`  | Auto-decodes hex/base64url/bech32/bech32m via fallible per-format traits; decoded buffers are zeroized when the containing `Dynamic`/`Fixed` wrapper drops (`zeroize` feature). Auto-detection may misparse ambiguous inputs; validate sources upstream to avoid DoS via large allocations. | Enable only for trusted input sources       |
 | `serde-serialize`    | Opt-in export via marker trait; audit all implementations                        | Enable sparingly; monitor exfiltration risk |
-| `encoding-*`         | Per-format symmetric encoding/decoding traits (e.g., `ToHex`/`FromHexStr`); explicit, fallible, rejects invalid formats | Validate inputs upstream; prefer specific traits over umbrellas for strictness |
+| `encoding-bech32`    | Bech32/BIP-173 encoding/decoding: `ToBech32`, `FromBech32Str`                    | Validate inputs upstream; test empty/invalid HRP |
+| `encoding-bech32m`   | Bech32m/BIP-350 encoding/decoding: `ToBech32m`, `FromBech32mStr`                 | Validate inputs upstream; test empty/invalid HRP |
 | `cloneable`          | Opt-in cloning via marker trait; increases exposure surface                      | Use minimally; prefer move semantics        |
+| `alloc`              | Enables heap-dependent code (`Dynamic<T>`, `Vec<String>` support); required for most features | Required for heap usage; opt-out for no-alloc |
+| `std`                | Enables std-specific enhancements; depends on `alloc`                           | Optional; future-proofs std integration      |
 | `full`               | All features enabled — convenient but increases attack surface                   | Development only; audit for production      |
 
 ## Module-by-Module Security Notes

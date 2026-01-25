@@ -24,10 +24,12 @@
 //! with length hiding and optional keyed mode (`rand` for per-process random key).
 //!
 //! See the ConstantTimeEqExt trait documentation for performance numbers, security properties (probabilistic, timing-safe), and guidance on when to choose each (or hybrid).
+#[cfg(feature = "alloc")]
 extern crate alloc;
 
-/// Dynamic secret wrapper types - always available with zero dependencies.
+/// Dynamic secret wrapper types - available with `alloc` feature.
 /// These provide fundamental secure storage abstractions for dynamic data.
+#[cfg(feature = "alloc")]
 mod dynamic;
 
 /// Fixed-size secret wrapper types - always available with zero dependencies.
@@ -43,6 +45,7 @@ mod traits;
 /// Public utility functions.
 pub mod utilities;
 
+#[cfg(feature = "alloc")]
 /// Re-export of the [`Dynamic`] type.
 pub use dynamic::Dynamic;
 /// Re-export of the [`Fixed`] type.
@@ -72,7 +75,7 @@ mod macros;
 pub use traits::FromBase64UrlStr;
 #[cfg(feature = "encoding-bech32")]
 pub use traits::FromBech32Str;
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 pub use traits::FromBech32mStr;
 #[cfg(feature = "encoding-hex")]
 pub use traits::FromHexStr;
@@ -81,7 +84,7 @@ pub use traits::FromHexStr;
 pub use traits::ToBase64Url;
 #[cfg(feature = "encoding-bech32")]
 pub use traits::ToBech32;
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 pub use traits::ToBech32m;
 #[cfg(feature = "encoding-hex")]
 pub use traits::ToHex;
@@ -89,7 +92,8 @@ pub use traits::ToHex;
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",
-    feature = "encoding-bech32"
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m"
 ))]
 pub use traits::{SecureDecoding, SecureEncoding};
 

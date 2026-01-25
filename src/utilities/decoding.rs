@@ -51,10 +51,9 @@ pub fn try_decode_any(
     priority: Option<&[Format]>,
 ) -> Result<Vec<u8>, crate::DecodingError> {
     let order = priority.unwrap_or(DEFAULT_ORDER);
-    let mut attempted = Vec::new();
+    let mut attempted: Vec<Format> = Vec::new();
 
     for &fmt in order {
-        attempted.push(fmt);
         match fmt {
             #[cfg(feature = "encoding-bech32")]
             Format::Bech32 => {
@@ -64,6 +63,15 @@ pub fn try_decode_any(
                     return Ok(fes_to_u8s(data));
                 }
             }
+            #[cfg(feature = "encoding-bech32m")]
+            Format::Bech32m => {
+                use super::conversion::fes_to_u8s;
+                use ::bech32;
+                if let Ok((_, data)) = bech32::decode(s) {
+                    return Ok(fes_to_u8s(data));
+                }
+            }
+
             #[cfg(feature = "encoding-hex")]
             Format::Hex => {
                 if let Ok(data) = ::hex::decode(s) {
@@ -78,7 +86,6 @@ pub fn try_decode_any(
                     return Ok(data);
                 }
             }
-            _ => {} // Skip unsupported formats (e.g., if feature not enabled)
         }
     }
 

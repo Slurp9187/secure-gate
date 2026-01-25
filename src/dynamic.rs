@@ -1,3 +1,4 @@
+#[cfg(feature = "alloc")]
 extern crate alloc;
 use alloc::boxed::Box;
 

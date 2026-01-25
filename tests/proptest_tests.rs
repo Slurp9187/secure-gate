@@ -42,7 +42,7 @@ fn proptest_modules_present() {
     assert_eq!(2 + 2, 4);
 }
 
-#[cfg(feature = "ct-eq")]
+#[cfg(all(feature = "ct-eq", feature = "alloc"))]
 mod ct_eq_wrapper_proptests {
     use proptest::prelude::*;
     use secure_gate::{dynamic_alias, fixed_alias};
@@ -116,7 +116,7 @@ mod encoding_roundtrip_proptests {
             prop_assert_eq!(original_data, decoded_data);
         }
 
-        #[cfg(all(feature = "encoding-bech32", feature = "serde-deserialize"))]
+        #[cfg(all(feature = "encoding-bech32", feature = "serde-deserialize", feature = "alloc"))]
         #[test]
         fn bech32_roundtrip(data in prop::collection::vec(any::<u8>(), 1..50)) {
             let secret: secure_gate::Dynamic<Vec<u8>> = secure_gate::Dynamic::new(data.clone());
@@ -130,7 +130,7 @@ mod encoding_roundtrip_proptests {
     }
 }
 
-#[cfg(feature = "ct-eq-hash")]
+#[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
 mod ct_eq_hash_proptests {
     use proptest::prelude::*;
     use secure_gate::{dynamic_alias, fixed_alias, ConstantTimeEqExt, ExposeSecret};

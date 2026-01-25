@@ -42,23 +42,26 @@ rustdoc-args = ["--cfg", "docsrs"]
 # Features
 # ──────────────────────────────────────────────────────────────
 [features]
+alloc = []
+std = ["alloc"]
+
 # Default feature: Enforces secure handling with zeroization and constant-time operations
-default = ["secure"]
+default = ["secure", "alloc"]
 
 # Secure: Essential for secure secret handling (includes zeroize and ct-eq)
 secure = ["zeroize", "ct-eq"]
 
 # Zeroize: Secure zeroing of secrets on drop or explicit calls (uses 'zeroize' crate with alloc and derives)
-zeroize = ["dep:zeroize", "blake3/zeroize"]
+zeroize = ["dep:zeroize", "blake3/zeroize", "alloc"]
 
 # Rand: Random number generation for securely creating secrets (uses rand with getrandom for seeding; rand_core is transitive)
-rand = ["dep:rand", "dep:once_cell"]
+rand = ["dep:rand", "dep:once_cell", "alloc"]
 
 # ct-eq: Constant-time equality checks (prevents timing attacks in comparisons; uses 'subtle' crate)
 ct-eq = ["dep:subtle"]
 
 # Hash-based equality (uses blake3 for fast, secure hashing without caching overhead)
-ct-eq-hash = ["ct-eq", "dep:blake3"]
+ct-eq-hash = ["ct-eq", "dep:blake3", "alloc"]
 
 # Insecure: Opt-out feature for no-default-features builds (disables zeroize, ct-eq; use only for testing/low-resource scenarios—strongly discouraged for production)
 insecure = []
@@ -66,11 +69,13 @@ insecure = []
 # Encoding: Secure conversions (hex/base64) for displaying or serializing secrets without leaks
 encoding = ["encoding-hex", "encoding-base64", "encoding-bech32"]
 # Hex encoding support (uses the 'hex' crate)
-encoding-hex = ["dep:hex"]
+encoding-hex = ["dep:hex", "alloc"]
 # Base64 encoding support (uses the 'base64' crate)
-encoding-base64 = ["dep:base64"]
-# Bech32 encoding support (uses the 'bech32' crate)
-encoding-bech32 = ["dep:bech32"]
+encoding-base64 = ["dep:base64", "alloc"]
+# Bech32/BIP-173 encoding support (uses the 'bech32' crate)
+encoding-bech32 = ["dep:bech32", "alloc"]
+# Bech32m/BIP-350 encoding support (uses the 'bech32' crate)
+encoding-bech32m = ["dep:bech32", "alloc"]
 
 # Cloneable: Opt-in safe cloning for secrets
 cloneable = []
@@ -78,13 +83,13 @@ cloneable = []
 # Serde: Meta-feature enabling both deserialize and serialize
 serde = ["serde-deserialize", "serde-serialize"]
 # Serde deserialize: Enables serde Deserialize only (safe loading)
-serde-deserialize = ["dep:serde"]
+serde-deserialize = ["dep:serde", "alloc"]
 # Serde serialize: Enables serde Serialize only (requires SerializableSecret marker)
 serde-serialize = ["dep:serde"]
 
 # Full: batteries-included for most real-world usage
 # Includes secure defaults + all encodings + fast equality + cloning + serde round-trip + secure RNG
-full = ["secure", "rand", "encoding", "ct-eq-hash", "cloneable", "serde"]
+full = ["secure", "rand", "encoding", "ct-eq-hash", "cloneable", "serde", "alloc", "std"]
 
 [[bench]]
 name = "fixed_vs_raw"

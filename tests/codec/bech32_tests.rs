@@ -100,7 +100,11 @@ fn fixed_deserialize_bech32_roundtrip() {
     original.with_secret(|o| decoded.with_secret(|d| assert_eq!(o, d)));
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "encoding-bech32",
+    feature = "alloc"
+))]
 #[test]
 fn dynamic_deserialize_bech32_roundtrip() {
     use secure_gate::{Dynamic, ExposeSecret};
