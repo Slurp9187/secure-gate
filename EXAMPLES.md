@@ -44,6 +44,8 @@ secure-gate = { version = "0.7.0-rc.11", features = ["secure", "no-alloc"] } # s
 ### Dynamic (heap-allocated, variable size)
 
 ```rust
+#[cfg(feature = "alloc")]
+{
 use secure_gate::{Dynamic, ExposeSecret, ExposeSecretMut};
 extern crate alloc;
 
@@ -59,6 +61,7 @@ assert_eq!(pw.expose_secret(), "hunter2");
 // Mutable
 pw.with_secret_mut(|s| s.push('!'));
 pw.expose_secret_mut().clear();
+}
 ```
 
 *Note: `Dynamic<T>` requires the `alloc` feature (included by default with `secure`). In no-alloc builds, use `Fixed<T>` for fixed-size secrets.*
@@ -107,6 +110,8 @@ In no-alloc builds (`no-alloc` feature), only `Fixed<T>` is available — `Dynam
 ## 2. Semantic Aliases with Macros
 
 ```rust
+#[cfg(feature = "alloc")]
+{
 use secure_gate::{dynamic_alias, fixed_alias};
 
 dynamic_alias!(pub Password, String);      // Dynamic<String>
@@ -114,6 +119,9 @@ let pw: Password = "secret123".into();
 
 dynamic_alias!(pub AuthToken, Vec<u8>);    // Dynamic<Vec<u8>>
 let token: AuthToken = vec![0u8; 64].into();
+}
+
+use secure_gate::fixed_alias;
 
 fixed_alias!(pub Aes256Key, 32);           // Fixed<[u8; 32]>
 let key: Aes256Key = [42u8; 32].into();
@@ -122,19 +130,30 @@ let key: Aes256Key = [42u8; 32].into();
 With custom docs:
 
 ```rust
+#[cfg(feature = "alloc")]
+{
 use secure_gate::{dynamic_alias, fixed_alias};
 
 dynamic_alias!(pub RefreshToken, String, "OAuth refresh token");
+}
+
+use secure_gate::fixed_alias;
+
 fixed_alias!(pub ApiKey, 32, "32-byte API key");
 ```
 
 Generic aliases:
 
 ```rust
+#[cfg(feature = "alloc")]
+{
 use secure_gate::{dynamic_generic_alias, fixed_generic_alias};
 
 dynamic_generic_alias!(Secret);
 let text: Secret<String> = "hidden".into();
+}
+
+use secure_gate::fixed_generic_alias;
 
 fixed_generic_alias!(SecureBuffer);
 let buf: SecureBuffer<64> = [0u8; 64].into();
@@ -145,10 +164,14 @@ let buf: SecureBuffer<64> = [0u8; 64].into();
 ```rust
 #[cfg(feature = "rand")]
 {
-    use secure_gate::{Dynamic, Fixed};
+    #[cfg(feature = "alloc")]
+    use secure_gate::Dynamic;
+    use secure_gate::Fixed;
+    #[cfg(feature = "alloc")]
     extern crate alloc;
 
     // Dynamic (variable size)
+    #[cfg(feature = "alloc")]
     let token: Dynamic<Vec<u8>> = Dynamic::from_random(64);
 
     // Fixed (fixed size)
@@ -165,12 +188,18 @@ let buf: SecureBuffer<64> = [0u8; 64].into();
 ```rust
 #[cfg(feature = "ct-eq-hash")]
 {
-    use secure_gate::{Dynamic, Fixed, ConstantTimeEqExt};
+    #[cfg(feature = "alloc")]
+    use secure_gate::Dynamic;
+    use secure_gate::{Fixed, ConstantTimeEqExt};
+    #[cfg(feature = "alloc")]
     extern crate alloc;
 
     // Dynamic (large example)
+    #[cfg(feature = "alloc")]
     let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
+    #[cfg(feature = "alloc")]
     let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
+    #[cfg(feature = "alloc")]
     let sig_c: Dynamic<Vec<u8>> = vec![0xBB; 2048].into();
 
     // Fixed (small example)
@@ -179,14 +208,17 @@ let buf: SecureBuffer<64> = [0u8; 64].into();
     let small_c: Fixed<[u8; 16]> = Fixed::new([2u8; 16]);
 
     // Recommended: smart path selection
+    #[cfg(feature = "alloc")]
     assert!(sig_a.ct_eq_auto(&sig_b, None));
     assert!(small_a.ct_eq_auto(&small_b, None));
 
+    #[cfg(feature = "alloc")]
     assert!(!sig_a.ct_eq_auto(&sig_c, None));
     assert!(!small_a.ct_eq_auto(&small_c, None));
 
     // Customize threshold for performance tuning on your hardware
     // Example: Force ct_eq path up to 16 bytes (if benchmarks show it's still faster)
+    #[cfg(feature = "alloc")]
     assert!(sig_a.ct_eq_auto(&sig_b, Some(16)));
 
     // Example: Force hash path for all sizes (uniform probabilistic behavior)
@@ -198,19 +230,24 @@ let buf: SecureBuffer<64> = [0u8; 64].into();
 
 For detailed justification, benchmarks, and tuning guidance, see [CT_EQ_AUTO.md](CT_EQ_AUTO.md).
 }
-```
 
 Plain `ct_eq_hash` (uniform probabilistic behavior):
 
 ```rust
 #[cfg(feature = "ct-eq-hash")]
 {
-    use secure_gate::{Dynamic, Fixed, ConstantTimeEqExt};
+    #[cfg(feature = "alloc")]
+    use secure_gate::Dynamic;
+    use secure_gate::{Fixed, ConstantTimeEqExt};
+    #[cfg(feature = "alloc")]
     extern crate alloc;
 
     // Dynamic (large example)
+    #[cfg(feature = "alloc")]
     let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
+    #[cfg(feature = "alloc")]
     let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
+    #[cfg(feature = "alloc")]
     let sig_c: Dynamic<Vec<u8>> = vec![0xBB; 2048].into();
 
     // Fixed (small example)
@@ -218,8 +255,10 @@ Plain `ct_eq_hash` (uniform probabilistic behavior):
     let small_b: Fixed<[u8; 16]> = Fixed::new([1u8; 16]);
     let small_c: Fixed<[u8; 16]> = Fixed::new([2u8; 16]);
 
+    #[cfg(feature = "alloc")]
     assert!(sig_a.ct_eq_hash(&sig_b));
     assert!(small_a.ct_eq_hash(&small_b));
+    #[cfg(feature = "alloc")]
     assert!(!sig_a.ct_eq_hash(&sig_c));
     assert!(!small_a.ct_eq_hash(&small_c));
 }
@@ -230,17 +269,23 @@ Plain `ct_eq_hash` (uniform probabilistic behavior):
 ```rust
 #[cfg(feature = "ct-eq")]
 {
-    use secure_gate::{ConstantTimeEq, Dynamic, Fixed};
+    use secure_gate::{ConstantTimeEq, Fixed};
+    #[cfg(feature = "alloc")]
+    use secure_gate::Dynamic;
+    #[cfg(feature = "alloc")]
     extern crate alloc;
 
     // Dynamic (large example)
+    #[cfg(feature = "alloc")]
     let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
+    #[cfg(feature = "alloc")]
     let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
 
     // Fixed (small example)
     let small_a: Fixed<[u8; 16]> = Fixed::new([1u8; 16]);
     let small_b: Fixed<[u8; 16]> = Fixed::new([1u8; 16]);
 
+    #[cfg(feature = "alloc")]
     assert!(sig_a.ct_eq(&sig_b));
     assert!(small_a.ct_eq(&small_b));
 }
@@ -306,7 +351,7 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
 ### Serde Auto-Decoding (hex/base64url/bech32/bech32m)
 
 ```rust
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex", feature = "rand"))]
+#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex", feature = "alloc", feature = "rand"))]
 {
     use secure_gate::{Dynamic, ExposeSecret, ToHex};
     use serde_json;
@@ -328,6 +373,8 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
 {
     use secure_gate::utilities::decoding::try_decode_any;
     use secure_gate::DecodingError;
+    #[cfg(feature = "alloc")]
+    extern crate alloc;
 
     // Auto-detect format
     let hex_result = try_decode_any("deadbeef", None); // detects hex
@@ -352,7 +399,7 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
 
     // Works via umbrella (same as individual)
     let hex = bytes.to_hex();
-    let bech32 = bytes.to_bech32("key");
+    let bech32 = bytes.try_to_bech32("key", None).unwrap();
 }
 ```
 
@@ -361,7 +408,7 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
 Deserialize (auto-detects encoding):
 
 ```rust
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
+#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex", feature = "alloc"))]
 {
     use secure_gate::Dynamic;
     use serde_json;
@@ -375,7 +422,7 @@ Deserialize (auto-detects encoding):
 Serialize (opt-in, requires `SerializableType` marker):
 
 ```rust
-#[cfg(feature = "serde-serialize")]
+#[cfg(all(feature = "serde-serialize", feature = "alloc"))]
 {
     use secure_gate::{Dynamic, SerializableType};
     use serde::Serialize;
@@ -394,7 +441,7 @@ Serialize (opt-in, requires `SerializableType` marker):
 ## 7. Opt-In Cloning
 
 ```rust
-#[cfg(feature = "cloneable")]
+#[cfg(all(feature = "cloneable", feature = "alloc"))]
 {
     use secure_gate::{CloneableType, Dynamic};
     extern crate alloc;
@@ -432,12 +479,18 @@ Serialize (opt-in, requires `SerializableType` marker):
 ## 9. Construction Patterns (Infallible & Fallible)
 
 ```rust
-use secure_gate::{Dynamic, Fixed};
+#[cfg(feature = "alloc")]
+use secure_gate::Dynamic;
+use secure_gate::Fixed;
+#[cfg(feature = "alloc")]
 extern crate alloc;
 
 // Dynamic (always infallible — copies)
+#[cfg(feature = "alloc")]
 let dyn_vec: Dynamic<Vec<u8>> = vec![5, 6, 7].into();
+#[cfg(feature = "alloc")]
 let dyn_str: Dynamic<String> = "hello".into();
+#[cfg(feature = "alloc")]
 let dyn_slice: Dynamic<Vec<u8>> = [8u8, 9, 10].as_slice().into();
 
 // Fixed (infallible from exact array)
@@ -447,8 +500,6 @@ let fixed: Fixed<[u8; 4]> = [1, 2, 3, 4].into();
 let slice = [8u8, 9, 10, 11];
 let ok: Result<Fixed<[u8; 4]>, _> = slice.try_into();
 assert!(ok.is_ok());
-
-
 ```
 
 ---
