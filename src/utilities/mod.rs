@@ -6,7 +6,6 @@
 
 pub mod conversion;
 pub mod decoding;
-pub mod encoding;
 
 #[cfg(feature = "ct-eq-hash")]
 use crate::ConstantTimeEq;

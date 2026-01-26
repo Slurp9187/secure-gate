@@ -1,5 +1,12 @@
-// secure-gate/src/utilities/encoding.rs
-/// Local implementation of bit conversion for Bech32, since bech32 crate doesn't expose it in v0.11.
+//! Conversion utilities for secure-gate.
+//!
+//! This module provides helper functions for converting between different data representations,
+//! primarily for use in encoding/decoding operations like Bech32.
+//!
+//! The functions here are used internally for bit manipulation and data transformation
+//! required by various encoding formats.
+
+//! Local implementation of bit conversion for Bech32, since bech32 crate doesn't expose it in v0.11.
 #[cfg(feature = "encoding-bech32")]
 pub(crate) fn convert_bits(
     from: u8,

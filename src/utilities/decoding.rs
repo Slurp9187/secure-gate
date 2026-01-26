@@ -1,5 +1,5 @@
-// secure-gate/src/utilities/decoding.rs
-//! Multi-format decoding helpers for secure-gate.!
+//! Multi-format decoding helpers for secure-gate.
+//!
 //! This module provides utilities for decoding strings that may be encoded in various formats.
 
 #[cfg(any(
@@ -33,6 +33,20 @@ pub enum Format {
     Base64Url,
 }
 
+/// Returns the default priority order for format detection in decoding functions.
+///
+/// This function provides the standard order used by [`try_decode_any`] when no custom
+/// priority is specified: Bech32 (if enabled), Hex (if enabled), then Base64Url (if enabled).
+/// Only enabled encoding features are included in the list.
+///
+/// The order prioritizes Bech32 for its structure, then common formats like Hex for compactness,
+/// and Base64Url for web-safe encoding. This helps in unambiguous decoding for protocols
+/// that may use multiple formats.
+///
+/// # Returns
+///
+/// A `Vec<Format>` containing the enabled formats in default priority order.
+/// If no encoding features are enabled, the vector will be empty.
 #[cfg(any(
     feature = "encoding-bech32",
     feature = "encoding-bech32m",
