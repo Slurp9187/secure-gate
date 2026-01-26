@@ -76,5 +76,4 @@ jobs:
         run: cargo test --doc ${{ matrix.features }}
 
       - name: Run clippy (${{ matrix.name }})
-        run: cargo clippy --tests ${{ matrix.features }}
-        if: matrix.name == 'All features (--all-features)' || matrix.name == 'No default features only'
+        run: cargo clippy --tests --benches ${{ matrix.features }}
