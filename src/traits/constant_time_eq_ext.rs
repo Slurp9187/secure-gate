@@ -47,7 +47,7 @@ pub trait ConstantTimeEqExt: crate::ConstantTimeEq {
     /// Get the length of the secret data in bytes.
     ///
     /// Note: This trait does **not** provide `.is_empty()` to avoid method ambiguity with
-    /// [`ExposeSecret::is_empty`], which already offers the same functionality via `len()`.
+    /// `ExposeSecret::len`, which already offers the same functionality via `len()`.
     /// Use `.len() == 0` or `.expose_secret().is_empty()` when you need emptiness checks.
     fn len(&self) -> usize;
 

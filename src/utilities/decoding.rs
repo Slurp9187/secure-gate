@@ -12,7 +12,12 @@ use alloc::vec::Vec;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(docsrs, doc(cfg(feature = "encoding-bech32")))]
-#[cfg(feature = "encoding-bech32")]
+#[cfg(any(
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m",
+    feature = "encoding-hex",
+    feature = "encoding-base64"
+))]
 pub enum Format {
     #[cfg_attr(docsrs, doc(cfg(feature = "encoding-bech32")))]
     #[cfg(feature = "encoding-bech32")]

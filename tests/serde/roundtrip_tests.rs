@@ -194,7 +194,11 @@ fn serializable_vec_mutability_before_serialization() {
     assert_eq!(deserialized, vec![1, 2, 3, 4]);
 }
 
-#[cfg(all(feature = "zeroize", not(feature = "serde-serialize")))]
+#[cfg(all(
+    feature = "zeroize",
+    feature = "alloc",
+    not(feature = "serde-serialize")
+))]
 #[test]
 #[allow(unused)]
 fn raw_dynamic_not_serializable() {

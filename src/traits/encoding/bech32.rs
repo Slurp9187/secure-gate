@@ -42,7 +42,7 @@ pub trait ToBech32 {
     ) -> Result<alloc::string::String, Bech32Error>;
 }
 
-/// Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
+/// Blanket impl to cover any AsRef<[u8]> (e.g., `&[u8]`, `Vec<u8>`, `[u8; N]`, etc.)
 #[cfg(feature = "encoding-bech32")]
 impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
     #[inline(always)]

@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `alloc` feature: Gates heap-dependent code (e.g., `Dynamic<T>`) for true no-alloc builds.
 
+- `no-alloc` feature: Explicit opt-out for heap support — disables `Dynamic<T>` and heap-dependent code for true no-heap/embedded builds. Enabling both `alloc` and `no-alloc` allows `alloc` to take precedence (e.g., with `--all-features`).
+
+- `secure` includes `alloc` by default → heap-enabled secure wrappers out-of-the-box.
+
 - `std` feature: Depends on `alloc`; enables std-specific enhancements.
 
 - **Per-format encoding/decoding traits**
@@ -36,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default features now include `alloc` to preserve behavior.
 - Features like `zeroize`, `rand`, `ct-eq-hash`, `serde-deserialize` now depend on `alloc` where needed.
 - `encoding-bech32` now includes both Bech32/BIP-173 and Bech32m/BIP-350 support (merged from separate `encoding-bech32m`).
+- Updated docs for heap/no-heap builds; added compile-time checks for feature conflicts.
 
 - **Opt-in cloning & serialization**
   New marker traits `CloneableType` and `SerializableType`. Cloning and serde serialization now require explicit impls on the inner type — no automatic risk.

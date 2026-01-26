@@ -4,6 +4,7 @@
 
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
+
 //! Zero-cost secure wrappers for secrets — [`Dynamic<T>`] for heap-allocated variable-length data,
 //! [`Fixed<T>`] for stack-allocated fixed-size data.
 //!
@@ -24,6 +25,11 @@
 //! with length hiding and optional keyed mode (`rand` for per-process random key).
 //!
 //! See the ConstantTimeEqExt trait documentation for performance numbers, security properties (probabilistic, timing-safe), and guidance on when to choose each (or hybrid).
+
+// Note: Enabling both 'alloc' and 'no-alloc' allows 'alloc' to take precedence.
+// This is permitted for docs.rs compatibility (--all-features) but should be avoided in normal builds.
+// Prefer using 'no-alloc' alone for true no-heap builds.
+
 #[cfg(feature = "alloc")]
 extern crate alloc;
 

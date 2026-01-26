@@ -18,6 +18,10 @@ jobs:
         include:
           - name: Default features
             features: ""
+          - name: Test secure with heap
+            features: "--no-default-features --features=secure"
+          - name: Test no-alloc
+            features: "--no-default-features --features=no-alloc"
           - name: All features
             features: "--features full"
           - name: Secure + encoding

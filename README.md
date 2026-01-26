@@ -47,7 +47,7 @@
 
   | Feature                | Description                                                                 |
   |------------------------|-----------------------------------------------------------------------------|
-  | `secure` (default)     | Meta: `zeroize` + `ct-eq` (wiping + timing-safe equality)                   |
+  | `secure` (default)     | Meta: `zeroize` + `ct-eq` + `alloc` (wiping + timing-safe equality + heap support) |
   | `zeroize`              | Zero memory on drop                                                         |
   | `ct-eq`                | `ConstantTimeEq` trait (prevents timing attacks)                            |
   | `ct-eq-hash`           | `ConstantTimeEqExt` trait: BLAKE3-based equality (fast for large/variable secrets)     |
@@ -63,13 +63,31 @@
   | `cloneable`            | Opt-in cloning via `CloneableType` marker                                   |
   | `insecure`             | Disables `zeroize` + `ct-eq` (testing/low-resource only — strongly discouraged) |
   | `alloc`                | Enables heap-dependent code (`Dynamic<T>`, `Vec<String>` support). Required for most real-world usage. Included in `default`. | Usually enabled |
+  | no-alloc       | Explicitly disables heap support (`Dynamic<T>`, Vec/String zeroize, encodings). Use for true no-heap/embedded builds. Conflicts with `alloc` (both can be enabled, but `alloc` takes precedence). | Optional (embedded only) |
   | `std`                  | Enables std-specific enhancements (currently minimal; future-proof). Depends on `alloc`. | Optional |
   | `full`                 | All of the above (convenient for development)                               |
 
   `no_std` + `alloc` compatible. Disabled features have **zero overhead**.
 
-  ### No-Alloc Usage
-  For heapless environments (e.g., embedded systems), build with `--no-default-features --features=secure`. This enables only `Fixed<T>` (stack-only). `Dynamic<T>` requires the `alloc` feature.
+  ### Heap vs No-Heap Builds
+
+  secure-gate **defaults to heap-enabled** (via `secure` pulling `alloc`):
+
+  ```toml
+  secure-gate = "0.7"  # Fixed<T> + Dynamic<T> + zeroize/ct-eq
+  ```
+
+  For **no-heap / embedded** (only `Fixed<T>`):
+
+  ```toml
+  secure-gate = { version = "0.7", default-features = false, features = ["no-alloc"] }  # Minimal, no-heap
+  # or with secure (zeroize/ct-eq on Fixed<T>):
+  secure-gate = { version = "0.7", features = ["secure", "no-alloc"] }
+  ```
+
+  Note: The "pass-through wrapper" principle holds for `Fixed<T>` in all builds (zero-cost explicit exposure + optional zeroize). `Dynamic<T>` requires heap and is unavailable in no-alloc mode.
+
+  **Warning**: Enabling both `alloc` and `no-alloc` features allows `alloc` to take precedence (e.g., with `--all-features` for docs generation or CI). Prefer enabling only one feature for predictable builds.
 
   ## Quick Start
   

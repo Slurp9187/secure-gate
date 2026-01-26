@@ -87,8 +87,7 @@ mod tests {
         assert!(!a.ct_eq(&c));
     }
 
-    #[cfg(feature = "ct-eq")]
-    #[cfg(feature = "alloc")]
+    #[cfg(all(feature = "ct-eq", feature = "alloc"))]
     #[test]
     fn test_wrapper_equality_with_ct_eq() {
         // Test Fixed<T> ct_eq
@@ -171,7 +170,7 @@ mod tests {
         assert!(!a.ct_eq(&c));
     }
 
-    #[cfg(feature = "ct-eq")]
+    #[cfg(all(feature = "ct-eq", feature = "alloc"))]
     #[test]
     fn test_vec_ct_eq() {
         let a: Vec<u8> = vec![1, 2, 3];
@@ -182,7 +181,7 @@ mod tests {
         assert!(!a.ct_eq(&c));
     }
 
-    #[cfg(feature = "ct-eq")]
+    #[cfg(all(feature = "ct-eq", feature = "alloc"))]
     #[test]
     fn test_string_ct_eq() {
         let a: String = "hello".to_string();

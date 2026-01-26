@@ -14,7 +14,7 @@ Last updated: 2026-01 (for v0.7.0-rc.11 / upcoming v0.7.0)
 This document outlines the security model, design choices, strengths, known limitations, and review guidance for `secure-gate`.
 
 ### No-Alloc Builds
-No-alloc builds reduce attack surface by eliminating heap code and heap-related vulnerabilities.
+No-alloc builds (via `no-alloc` feature) reduce attack surface by excluding heap code (`Dynamic<T>`) and heap-related vulnerabilities.
 
 ## Audit Status
 
@@ -63,8 +63,9 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `encoding-bech32`    | Bech32/BIP-173 encoding/decoding: `ToBech32`, `FromBech32Str`                    | Validate inputs upstream; test empty/invalid HRP |
 | `encoding-bech32m`   | Bech32m/BIP-350 encoding/decoding: `ToBech32m`, `FromBech32mStr`                 | Validate inputs upstream; test empty/invalid HRP |
 | `cloneable`          | Opt-in cloning via marker trait; increases exposure surface                      | Use minimally; prefer move semantics        |
-| `alloc`              | Enables heap-dependent code (`Dynamic<T>`, `Vec<String>` support); required for most features | Required for heap usage; opt-out for no-alloc |
+| `alloc`              | Enables heap-dependent code (`Dynamic<T>`, `Vec<String>` support); required for most features. Enabling both `alloc` and `no-alloc` allows `alloc` to take precedence (e.g., with `--all-features`) — prefer enabling only one. | Required for heap usage; opt-out for no-alloc |
 | `std`                | Enables std-specific enhancements; depends on `alloc`                           | Optional; future-proofs std integration      |
+| `no-alloc`           | Disables heap-dependent code (`Dynamic<T>`, heap zeroizing, encodings); reduces attack surface by excluding heap vulnerabilities. Enabling both `alloc` and `no-alloc` allows `alloc` to take precedence (e.g., with `--all-features`) — prefer enabling only one. | Optional (embedded only) |
 | `full`               | All features enabled — convenient but increases attack surface                   | Development only; audit for production      |
 
 ## Module-by-Module Security Notes

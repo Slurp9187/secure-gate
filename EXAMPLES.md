@@ -2,10 +2,10 @@
 
 Real-world, copy-paste-ready examples for `secure-gate`.
 
-All examples assume the **recommended secure defaults**:
+All examples assume the **recommended secure defaults** (includes zeroize, ct-eq, and alloc for heap support):
 ```toml
 [dependencies]
-secure-gate = { version = "0.7.0-rc.11", features = ["secure"] } # zeroize + ct-eq
+secure-gate = { version = "0.7.0-rc.11", features = ["secure"] } # zeroize + ct-eq + alloc
 ```
 
 For maximum functionality (including `ct-eq-hash`, encodings, serde, etc.), use:
@@ -13,15 +13,23 @@ For maximum functionality (including `ct-eq-hash`, encodings, serde, etc.), use:
 secure-gate = { version = "0.7.0-rc.11", features = ["full"] }
 ```
 
+For **no-heap builds**, enable `no-alloc` to restrict to `Fixed<T>` (stack-allocated). `Dynamic<T>` requires alloc (included by default with `secure`):
+```toml
+secure-gate = { version = "0.7.0-rc.11", features = ["secure", "no-alloc"] } # stack-only with security
+```
+
 **Important notes**
 - Always audit `.expose_secret()` / `.with_secret()` calls — these are the only access points.
 - Prefer scoped `with_secret()` / `with_secret_mut()` over long-lived direct exposure.
 - Use `hash_eq_opt(…, None)` for most equality checks.
-- All examples include `extern crate alloc;` for doctest compatibility (real code usually omits it).
+- All examples include `extern crate alloc;` for doctest compatibility (real code usually omits it); in no-alloc builds, avoid heap types entirely.
+
+**Warning**: Enabling both `alloc` and `no-alloc` features allows `alloc` to take precedence (e.g., with `--all-features` for docs generation or CI). Prefer enabling only one feature for predictable builds.
 
 ## Table of Contents
 
 1. [Basic Construction & Access](#1-basic-construction--access)
+1.1. [No-Alloc Builds](#11-no-alloc-builds)
 2. [Semantic Aliases with Macros](#2-semantic-aliases-with-macros)
 3. [Random Generation](#3-random-generation)
 4. [Equality Comparison](#4-equality-comparison)
@@ -53,6 +61,8 @@ pw.with_secret_mut(|s| s.push('!'));
 pw.expose_secret_mut().clear();
 ```
 
+*Note: `Dynamic<T>` requires the `alloc` feature (included by default with `secure`). In no-alloc builds, use `Fixed<T>` for fixed-size secrets.*
+
 ### Fixed (stack-allocated, fixed size)
 
 ```rust
@@ -71,6 +81,27 @@ assert_eq!(key.expose_secret()[0], 0);
 let mut nonce: Fixed<[u8; 12]> = Fixed::new([0u8; 12]);
 nonce.with_secret_mut(|bytes| bytes[0] = 0xFF);
 nonce.expose_secret_mut()[1] = 0xAA;
+```
+
+## 1.1. No-Alloc Builds
+
+In no-alloc builds (`no-alloc` feature), only `Fixed<T>` is available — `Dynamic<T>` is unavailable as it requires heap allocation.
+
+```rust
+#[cfg(feature = "no-alloc")]
+{
+    use secure_gate::{Fixed, ExposeSecret};
+    // Only Fixed<T> available — no heap
+    let key: Fixed<[u8; 32]> = Fixed::new([0u8; 32]);
+    key.with_secret(|bytes| assert_eq!(bytes.len(), 32));
+}
+
+#[cfg(all(feature = "rand", feature = "no-alloc"))]
+{
+    use secure_gate::Fixed;
+    // Random Fixed<T> works even in no-alloc (Dynamic::from_random requires alloc)
+    let random_key: Fixed<[u8; 32]> = Fixed::from_random();
+}
 ```
 
 ## 2. Semantic Aliases with Macros
@@ -415,6 +446,6 @@ assert!(ok.is_ok());
 
 ---
 
-All examples are tested with `"full"` features and should compile cleanly.
+All examples are tested with `"full"` features (includes alloc) and should compile cleanly.
 
-Adjust feature flags as needed for minimal builds. Test with Rust 1.70+.
+For no-alloc builds, test with `["secure", "no-alloc"]` and adjust for stack-only usage. Adjust feature flags as needed for minimal builds. Test with Rust 1.70+.
