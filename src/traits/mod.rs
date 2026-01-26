@@ -66,6 +66,15 @@ pub use encoding::ToBech32m;
 #[cfg(feature = "encoding-hex")]
 pub use encoding::ToHex;
 
+/// Marker trait for types that support secure encoding operations.
+///
+/// This trait is automatically implemented for any type that can be viewed as a byte slice
+/// (i.e., implements `AsRef<[u8]>`), such as `&[u8]`, `Vec<u8>`, and byte arrays.
+/// It serves as a bound for blanket implementations of encoding traits like [`ToHex`],
+/// [`ToBase64Url`], and [`ToBech32`], ensuring only appropriate types can perform encoding.
+///
+/// Since this is a marker trait with no methods, it does not add functionality but enables
+/// extension traits to be available where relevant.
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",
@@ -80,6 +89,15 @@ pub trait SecureEncoding {}
 ))]
 impl<T: AsRef<[u8]> + ?Sized> SecureEncoding for T {}
 
+/// Marker trait for types that support secure decoding operations.
+///
+/// This trait is automatically implemented for any type that can be viewed as a string slice
+/// (i.e., implements `AsRef<str>`), such as `&str`, `String`, and string slices.
+/// It serves as a bound for blanket implementations of decoding traits like [`FromHexStr`],
+/// [`FromBase64UrlStr`], and [`FromBech32Str`], ensuring only appropriate types can perform decoding.
+///
+/// Since this is a marker trait with no methods, it does not add functionality but enables
+/// extension traits to be available where relevant.
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",

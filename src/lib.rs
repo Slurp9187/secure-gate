@@ -68,15 +68,10 @@ pub use traits::ConstantTimeEqExt;
 pub use traits::SerializableType;
 pub use traits::{ExposeSecret, ExposeSecretMut};
 
-/// Type alias macros (always available).
-/// Convenient macros for creating custom secret wrapper types.
+// Type alias macros (always available).
+// Convenient macros for creating custom secret wrapper types.
 mod macros;
-/// Available macros (exported globally for convenience):
-/// - `dynamic_alias!`: Create type aliases for heap-allocated secrets (`Dynamic<T>`).
-/// - `dynamic_generic_alias!`: Create generic heap-allocated secret aliases.
-/// - `fixed_alias!`: Create type aliases for fixed-size secrets (`Fixed<[u8; N]>`).
-/// - `fixed_generic_alias!`: Create generic fixed-size secret aliases.
-///   Re-exports of encoding and decoding traits for convenient byte encoding/decoding extensions.
+
 #[cfg(feature = "encoding-base64")]
 pub use traits::FromBase64UrlStr;
 #[cfg(feature = "encoding-bech32")]
