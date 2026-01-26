@@ -240,8 +240,7 @@
   ```
   
   ### Serde (auto-detects hex/base64url/bech32/bech32m on deserialize; serialization requires `SerializableType`)
-  ### Serde (auto-detects hex/base64url/bech32/bech32m on deserialize)
-  
+
   ```rust
   #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex", feature = "rand"))]
   {
