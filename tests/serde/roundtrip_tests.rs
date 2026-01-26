@@ -21,6 +21,7 @@ use secure_gate::ExposeSecret;
 // Define additional serializable types using marker traits
 #[cfg(feature = "serde-serialize")]
 #[derive(serde::Serialize)]
+#[allow(dead_code)]
 pub struct SerializableArray4([u8; 4]);
 
 #[cfg(feature = "serde-serialize")]
@@ -35,6 +36,7 @@ impl SerializableType for SerializableArray32 {}
 
 #[cfg(feature = "serde-serialize")]
 #[derive(serde::Serialize)]
+#[allow(dead_code)]
 pub struct SerializableString(String);
 
 #[cfg(feature = "serde-serialize")]
@@ -42,6 +44,7 @@ impl SerializableType for SerializableString {}
 
 #[cfg(feature = "serde-serialize")]
 #[derive(serde::Serialize)]
+#[allow(dead_code)]
 pub struct SerializableVec(Vec<u8>);
 
 #[cfg(feature = "serde-serialize")]

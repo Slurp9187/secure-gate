@@ -9,14 +9,14 @@
 /// ```rust
 /// #[cfg(feature = "cloneable")]
 /// {
-///     use secure_gate::{CloneableType, Dynamic};
+///     use secure_gate::{CloneableType, Fixed};
 ///
 ///     #[derive(Clone)]
 ///     struct MyKey([u8; 32]);
 ///
 ///     impl CloneableType for MyKey {}  // Opt-in to safe cloning
 ///
-///     let key: Dynamic<MyKey> = MyKey([0; 32]).into();
+///     let key: Fixed<MyKey> = Fixed::new(MyKey([0; 32]));
 ///     let copy = key.clone();  // Now allowed, with zeroization on drop
 /// }
 /// ```

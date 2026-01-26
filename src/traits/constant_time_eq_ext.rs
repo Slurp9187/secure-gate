@@ -35,9 +35,9 @@
 //! ```
 //! # #[cfg(feature = "ct-eq-hash")]
 //! # {
-//! use secure_gate::{Dynamic, ConstantTimeEqExt};
-//! let a: Dynamic<Vec<u8>> = vec![42u8; 2048].into();  // e.g. ML-DSA signature
-//! let b: Dynamic<Vec<u8>> = vec![42u8; 2048].into();  // matching value
+//! use secure_gate::{Fixed, ConstantTimeEqExt};
+//! let a: Fixed<[u8; 2048]> = Fixed::new([42u8; 2048]);  // e.g. large fixed data
+//! let b: Fixed<[u8; 2048]> = Fixed::new([42u8; 2048]);  // matching value
 //! assert!(a.ct_eq_hash(&b));  // Efficient comparison for large data
 //! # }
 //! ```

@@ -5,7 +5,9 @@
 
 #[cfg(all(test, feature = "ct-eq-hash"))]
 mod ct_eq_hash_tests {
-    use secure_gate::{ConstantTimeEqExt, Dynamic, ExposeSecret, ExposeSecretMut, Fixed};
+    use secure_gate::{ConstantTimeEqExt, Fixed};
+    #[cfg(feature = "alloc")]
+    use secure_gate::{Dynamic, ExposeSecret, ExposeSecretMut};
 
     // -------------------------------------------------------------------------
     // Basic correctness – same type, same length
@@ -29,6 +31,7 @@ mod ct_eq_hash_tests {
         assert!(!a.ct_eq_opt(&b, None));
     }
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn basic_equal_dynamic_vec() {
         let a: Dynamic<Vec<u8>> = vec![99u8; 0].into(); // empty
@@ -37,6 +40,7 @@ mod ct_eq_hash_tests {
         assert!(a.ct_eq_opt(&b, None));
     }
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn basic_equal_dynamic_string() {
         let a: Dynamic<String> = "café".into();
@@ -50,6 +54,7 @@ mod ct_eq_hash_tests {
     // -------------------------------------------------------------------------
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn length_mismatch_ct_eq_hash() {
         let a: Dynamic<Vec<u8>> = vec![0u8; 50].into();
         let b: Dynamic<Vec<u8>> = vec![0u8; 51].into();
@@ -57,6 +62,7 @@ mod ct_eq_hash_tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn length_mismatch_ct_eq_opt() {
         let a: Dynamic<Vec<u8>> = vec![0u8; 50].into();
         let b: Dynamic<Vec<u8>> = vec![0u8; 51].into();
@@ -89,6 +95,7 @@ mod ct_eq_hash_tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn ct_eq_opt_large_input_default_threshold() {
         let a: Dynamic<Vec<u8>> = vec![55u8; 1500].into();
         let b: Dynamic<Vec<u8>> = vec![55u8; 1500].into();
@@ -100,6 +107,7 @@ mod ct_eq_hash_tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn ct_eq_opt_exact_threshold_boundary() {
         let data = vec![0xA5u8; 32];
         let a: Dynamic<Vec<u8>> = data.clone().into();
@@ -111,6 +119,7 @@ mod ct_eq_hash_tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn ct_eq_opt_force_ct_eq_on_large() {
         let a: Dynamic<Vec<u8>> = vec![0u8; 8192].into();
         let b: Dynamic<Vec<u8>> = vec![0u8; 8192].into();
@@ -132,6 +141,7 @@ mod ct_eq_hash_tests {
     // Empty & very small cases
     // -------------------------------------------------------------------------
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn empty_dynamic_equal() {
         let a: Dynamic<Vec<u8>> = vec![].into();
@@ -142,6 +152,7 @@ mod ct_eq_hash_tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn empty_vs_non_empty() {
         let empty: Dynamic<Vec<u8>> = vec![].into();
         let one_byte: Dynamic<Vec<u8>> = vec![0].into();
@@ -175,10 +186,14 @@ mod ct_eq_hash_tests {
             let pos = (rng.try_next_u64().expect("RNG failure") as usize) % LEN;
             right[pos] = right[pos].wrapping_add(1);
 
+            #[cfg(feature = "alloc")]
             let a: Dynamic<Vec<u8>> = left.into();
+            #[cfg(feature = "alloc")]
             let b: Dynamic<Vec<u8>> = right.into();
 
+            #[cfg(feature = "alloc")]
             assert!(!a.ct_eq_hash(&b), "False positive detected");
+            #[cfg(feature = "alloc")]
             assert!(!a.ct_eq_opt(&b, None));
         }
     }
@@ -187,6 +202,7 @@ mod ct_eq_hash_tests {
     // Consistency between ct_eq_hash and ct_eq_opt(None)
     // -------------------------------------------------------------------------
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn hash_eq_and_opt_none_are_consistent() {
         let cases = vec![
@@ -198,13 +214,17 @@ mod ct_eq_hash_tests {
             vec![0xAAu8; 4096], // large
         ];
 
+        #[cfg(feature = "alloc")]
         for data in cases {
             let a: Dynamic<Vec<u8>> = data.clone().into();
+            #[cfg(feature = "alloc")]
             let mut b: Dynamic<Vec<u8>> = data.into();
 
+            #[cfg(feature = "alloc")]
             // equal
             assert_eq!(a.ct_eq_hash(&b), a.ct_eq_opt(&b, None));
 
+            #[cfg(feature = "alloc")]
             // mutate last byte → unequal
             b.with_secret_mut(|s| {
                 if !s.is_empty() {

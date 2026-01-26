@@ -202,7 +202,7 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
     where
         D: serde::Deserializer<'de>,
     {
-        use serde::de::{self, Visitor};
+        use serde::de::Visitor;
         use std::fmt;
 
         struct FixedVisitor<const M: usize>;
@@ -218,9 +218,15 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
                 )
             }
 
+            #[cfg(any(
+                feature = "encoding-hex",
+                feature = "encoding-base64",
+                feature = "encoding-bech32",
+                feature = "encoding-bech32m"
+            ))]
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
             where
-                E: de::Error,
+                E: serde::de::Error,
             {
                 // Uses None for hints, maintaining historical decode priority for backward compatibility
                 let bytes =

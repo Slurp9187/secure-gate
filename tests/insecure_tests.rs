@@ -9,6 +9,7 @@ use secure_gate::*;
 
 // === Core Functionality in Insecure Mode ===
 
+#[cfg(feature = "alloc")]
 #[test]
 fn insecure_dynamic_access() {
     let secret: Dynamic<String> = "insecure_secret".to_string().into();
@@ -21,6 +22,7 @@ fn insecure_fixed_access() {
     secret.with_secret(|s| assert_eq!(s, &[1, 2, 3, 4]));
 }
 
+#[cfg(feature = "alloc")]
 #[test]
 fn insecure_dynamic_mutability() {
     let mut secret: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
@@ -44,6 +46,7 @@ fn insecure_fixed_mutability() {
 
 // === Macro and Trait Availability ===
 
+#[cfg(feature = "alloc")]
 #[test]
 fn insecure_trait_access() {
     // ExposeSecret etc. should still work

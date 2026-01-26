@@ -240,16 +240,23 @@ impl<'de> serde::Deserialize<'de> for Dynamic<alloc::vec::Vec<u8>> {
         D: serde::Deserializer<'de>,
     {
         use alloc::fmt;
-        use serde::de::{self, Visitor};
+        use serde::de::Visitor;
         struct DynamicVecVisitor;
         impl<'de> Visitor<'de> for DynamicVecVisitor {
             type Value = Dynamic<alloc::vec::Vec<u8>>;
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 write!(formatter, "a hex/base64url/bech32 string or byte vector")
             }
+
+            #[cfg(any(
+                feature = "encoding-hex",
+                feature = "encoding-base64",
+                feature = "encoding-bech32",
+                feature = "encoding-bech32m"
+            ))]
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
             where
-                E: de::Error,
+                E: serde::de::Error,
             {
                 // Uses None for hints, maintaining historical decode priority for backward compatibility
                 let bytes =
