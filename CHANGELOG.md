@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ConstantTimeEq` trait (`ct-eq` feature) with `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
 
 - **Fast probabilistic equality for large secrets**
-  `ConstantTimeEqExt` trait (requires `ct-eq-hash` feature) extends `ConstantTimeEq` with methods for fast probabilistic equality using BLAKE3 hashing. Includes `ct_eq_hash()` for direct hash comparison and `ct_eq_opt()` for smart hybrid selection between strict equality (small inputs) and hash equality (large inputs). Centralized threshold logic with default 32-byte crossover point. Enhanced documentation with security warnings for probabilistic methods and keyed mode when `rand` feature is enabled.
+  `ConstantTimeEqExt` trait (requires `ct-eq-hash` feature) extends `ConstantTimeEq` with methods for fast probabilistic equality using BLAKE3 hashing. Includes `ct_eq_hash()` for direct hash comparison and `ct_eq_auto()` for smart hybrid selection between strict equality (small inputs) and hash equality (large inputs). Centralized threshold logic with default 32-byte crossover point. Enhanced documentation with security warnings for probabilistic methods and keyed mode when `rand` feature is enabled.
 
 - **Configurable decode priority in `try_decode_any`**
   Added optional `priority: Option<&[Format]>` parameter to `try_decode_any` for customizable decode order (e.g., strict protocols can enforce single formats like only Hex). Backward compatible with default order (Bech32 → Hex → Base64url).
@@ -87,9 +87,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Encoding API refactor: per-format orthogonal traits**
   Removed monolithic `SecureEncoding` trait (clean slate). Introduced symmetric per-format traits: `ToHex`/`FromHexStr`, `ToBase64Url`/`FromBase64UrlStr`, `ToBech32`/`FromBech32Str`, `ToBech32m`/`FromBech32mStr`. Umbrella traits `SecureEncoding`/`SecureDecoding` (feature-gated). Added `try_decode_any` for multi-format auto-decoding. Bech32/BIP-173 & Bech32m/BIP-350 now distinct.
-
-- **Equality traits refactor**
-  Renamed `HashEq` trait to `ConstantTimeEqExt` (extends `ConstantTimeEq`). Renamed feature `hash-eq` to `ct-eq-hash`. Methods renamed: `hash_eq` to `ct_eq_hash`, `hash_eq_opt` to `ct_eq_opt` with centralized logic in default impl. Enhanced documentation and warnings.
 
 - **Error handling**
   Unified and renamed error types; removed panicking fallbacks.

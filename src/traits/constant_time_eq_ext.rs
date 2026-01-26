@@ -18,7 +18,7 @@
 //!   but use [`crate::ConstantTimeEq`] for strict deterministic equality.
 //!
 //! ## Usage Recommendations
-//! - For most use cases, prefer [`ConstantTimeEqExt::ct_eq_opt`] — it automatically selects the best strategy based on size.
+//! - For most use cases, prefer [`ConstantTimeEqExt::ct_eq_auto`] — it automatically selects the best strategy based on size.
 //! - Use plain [`ConstantTimeEqExt::ct_eq_hash`] only for large inputs (>32 bytes) or when uniform probabilistic behavior is needed.
 //! - Use [`crate::ConstantTimeEq`] for small deterministic equality (<32 bytes).
 //!
@@ -70,12 +70,13 @@ pub trait ConstantTimeEqExt: crate::ConstantTimeEq {
     /// - Size ≤ threshold → `self.ct_eq(other)` (strict deterministic)
     /// - Size > threshold → `self.ct_eq_hash(other)` (probabilistic, fast)
     ///
-    /// Default threshold: **32 bytes** (tuned via your 2019 laptop benches)
+    /// Default threshold: **32 bytes**
+    /// Customize with `threshold_bytes: Some(n)` if your benchmarks show a different optimal crossover point (e.g., `64`, `1024`, or `0` for always using `ct_eq`).
     ///
     /// Prefer this method in almost all cases unless you need:
     /// - Guaranteed zero-collision → use `ct_eq`
     /// - Uniform probabilistic behavior → use `ct_eq_hash`
-    fn ct_eq_opt(&self, other: &Self, threshold_bytes: Option<usize>) -> bool {
+    fn ct_eq_auto(&self, other: &Self, threshold_bytes: Option<usize>) -> bool {
         // Default implementation (can be overridden if desired)
         if self.len() != other.len() {
             return false;

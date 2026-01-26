@@ -173,16 +173,16 @@ mod ct_eq_hash_proptests {
             prop_assert!(da.ct_eq_hash(&db));  // ct_eq_hash should be true for same data
         }
 
-        // Verify ct_eq_opt(None) behaves exactly like ct_eq_hash
+        // Verify ct_eq_auto(None) behaves exactly like ct_eq_hash
         #[cfg(feature = "ct-eq-hash")]
         #[test]
-        fn ct_eq_opt_none_consistent_with_ct_eq_hash(
+        fn ct_eq_auto_none_consistent_with_ct_eq_hash(
             a in prop::collection::vec(any::<u8>(), 0usize..512),
             b in prop::collection::vec(any::<u8>(), 0usize..512)
         ) {
             let da: TestDynamic = a.clone().into();
             let db: TestDynamic = b.into();
-            prop_assert_eq!(da.ct_eq_hash(&db), da.ct_eq_opt(&db, None));
+            prop_assert_eq!(da.ct_eq_hash(&db), da.ct_eq_auto(&db, None));
         }
 
         // Verify length mismatch → always false
@@ -197,13 +197,13 @@ mod ct_eq_hash_proptests {
             let da: TestDynamic = a.into();
             let db: TestDynamic = b.into();
             prop_assert!(!da.ct_eq_hash(&db));
-            prop_assert!(!da.ct_eq_opt(&db, None));
+            prop_assert!(!da.ct_eq_auto(&db, None));
         }
 
         // Check switching behavior around threshold
         #[cfg(feature = "ct-eq-hash")]
         #[test]
-        fn ct_eq_opt_threshold_switch(
+        fn ct_eq_auto_threshold_switch(
             data in prop::collection::vec(any::<u8>(), 20..45),
             threshold in 10usize..60
         ) {
@@ -216,7 +216,7 @@ mod ct_eq_hash_proptests {
             let using_ct = len <= threshold;
 
             prop_assert_eq!(
-                a.ct_eq_opt(&b, Some(threshold)),
+                a.ct_eq_auto(&b, Some(threshold)),
                 if using_ct { direct_ct } else { a.ct_eq_hash(&b) },
                 "Mismatch at threshold {} (using_ct: {}, direct_ct: {})",
                 threshold,

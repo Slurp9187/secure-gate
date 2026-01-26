@@ -135,11 +135,13 @@
   
   ## Recommended Equality
   
-  Use **`ct_eq_opt`** — it automatically chooses the best method:
+  Use **`ct_eq_auto`** — it automatically chooses the best method:
   
   - Small inputs (≤32 bytes default): fast deterministic `ct_eq`
   - Large/variable inputs: fast BLAKE3 hashing + digest compare
-  
+
+  **Performance Tuning**: If benchmarks show a different optimal crossover point on your hardware (e.g., `ct_eq` remains faster up to 64 or 1024 bytes), customize with `ct_eq_auto(&sig_b, Some(n))`.
+
   ```rust
   #[cfg(feature = "ct-eq-hash")]
   {
@@ -149,7 +151,7 @@
       let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
   
       // Recommended: smart path selection
-      if sig_a.ct_eq_opt(&sig_b, None) {
+      if sig_a.ct_eq_auto(&sig_b, None) {
           // equal
       }
   }

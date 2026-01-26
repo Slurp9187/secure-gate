@@ -21,7 +21,7 @@ secure-gate = { version = "0.7.0-rc.11", features = ["secure", "no-alloc"] } # s
 **Important notes**
 - Always audit `.expose_secret()` / `.with_secret()` calls — these are the only access points.
 - Prefer scoped `with_secret()` / `with_secret_mut()` over long-lived direct exposure.
-- Use `hash_eq_opt(…, None)` for most equality checks.
+- Use `ct_eq_auto(…, None)` for most equality checks.
 - All examples include `extern crate alloc;` for doctest compatibility (real code usually omits it); in no-alloc builds, avoid heap types entirely.
 
 **Warning**: Enabling both `alloc` and `no-alloc` features allows `alloc` to take precedence (e.g., with `--all-features` for docs generation or CI). Prefer enabling only one feature for predictable builds.
@@ -160,7 +160,7 @@ let buf: SecureBuffer<64> = [0u8; 64].into();
 
 ## 4. Equality Comparison
 
-**Recommended: `ct_eq_opt`** — automatically uses `ct_eq` for ≤32 bytes, `ct_eq_hash` (BLAKE3) for larger inputs.
+**Recommended: `ct_eq_auto`** — automatically uses `ct_eq` for ≤32 bytes, `ct_eq_hash` (BLAKE3) for larger inputs.
 
 ```rust
 #[cfg(feature = "ct-eq-hash")]
@@ -179,17 +179,22 @@ let buf: SecureBuffer<64> = [0u8; 64].into();
     let small_c: Fixed<[u8; 16]> = Fixed::new([2u8; 16]);
 
     // Recommended: smart path selection
-    assert!(sig_a.ct_eq_opt(&sig_b, None));
-    assert!(small_a.ct_eq_opt(&small_b, None));
+    assert!(sig_a.ct_eq_auto(&sig_b, None));
+    assert!(small_a.ct_eq_auto(&small_b, None));
 
-    assert!(!sig_a.ct_eq_opt(&sig_c, None));
-    assert!(!small_a.ct_eq_opt(&small_c, None));
+    assert!(!sig_a.ct_eq_auto(&sig_c, None));
+    assert!(!small_a.ct_eq_auto(&small_c, None));
 
-    // Force ct_eq (small inputs only makes sense)
-    assert!(sig_a.ct_eq_opt(&sig_b, Some(16)));
+    // Customize threshold for performance tuning on your hardware
+    // Example: Force ct_eq path up to 16 bytes (if benchmarks show it's still faster)
+    assert!(sig_a.ct_eq_auto(&sig_b, Some(16)));
 
-    // Force hash path even on small data
-    assert!(small_a.ct_eq_opt(&small_b, Some(0)));
+    // Example: Force hash path for all sizes (uniform probabilistic behavior)
+    assert!(small_a.ct_eq_auto(&small_b, Some(0)));
+}
+```
+
+**Performance Tuning**: If your benchmarks indicate `ct_eq` remains more performant beyond 32 bytes (e.g., on specialized hardware or for large caches), set a higher threshold like `Some(64)` or `Some(1024)`. Conversely, use lower values for conservative probabilistic equality. Always profile your target system!
 }
 ```
 
@@ -417,7 +422,7 @@ Serialize (opt-in, requires `SerializableType` marker):
     }
 
     fn fast_eq<S: ConstantTimeEqExt>(a: &S, b: &S) -> bool {
-        a.ct_eq_opt(b, None)  // recommended
+        a.ct_eq_auto(b, None)  // recommended
     }
 }
 ```
