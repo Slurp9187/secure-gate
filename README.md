@@ -90,33 +90,36 @@
   **Warning**: Enabling both `alloc` and `no-alloc` features allows `alloc` to take precedence (e.g., with `--all-features` for docs generation or CI). Prefer enabling only one feature for predictable builds.
 
   ## Quick Start
-  
+
   ```rust
-  use secure_gate::{dynamic_alias, fixed_alias, ExposeSecret, ExposeSecretMut};
-  
-  dynamic_alias!(pub Password, String);      // Dynamic<String>
-  fixed_alias!(pub Aes256Key, 32);           // Fixed<[u8; 32]>
-  
-  let mut pw: Password = "hunter2".into();
-  let key: Aes256Key = Aes256Key::new([42u8; 32]);  // or [42u8; 32].into() / try_from
-  
-  // Scoped (recommended)
-  pw.with_secret(|s| println!("length: {}", s.len()));
-  
-  // Direct (auditable)
-  assert_eq!(pw.expose_secret(), "hunter2");
-  
-  // Mutable
-  pw.with_secret_mut(|s| s.push('!'));
-  pw.expose_secret_mut().clear();
-  
-  // Symmetric encoding/decoding example (new per-format traits)
-  #[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
+  #[cfg(feature = "alloc")]
   {
-      use secure_gate::{FromHexStr, ToBech32, ToHex};
-      let hex    = key.expose_secret().to_hex();          // "2a2a2a..."
-      let bech32 = key.expose_secret().try_to_bech32("key", None).unwrap();  // "key1q..." (BIP-173)
-      let roundtrip = hex.try_from_hex().unwrap();        // Decode back
+      use secure_gate::{dynamic_alias, fixed_alias, ExposeSecret, ExposeSecretMut};
+
+      dynamic_alias!(pub Password, String);      // Dynamic<String>
+      fixed_alias!(pub Aes256Key, 32);           // Fixed<[u8; 32]>
+
+      let mut pw: Password = "hunter2".into();
+      let key: Aes256Key = Aes256Key::new([42u8; 32]);  // or [42u8; 32].into() / try_from
+
+      // Scoped (recommended)
+      pw.with_secret(|s| println!("length: {}", s.len()));
+
+      // Direct (auditable)
+      assert_eq!(pw.expose_secret(), "hunter2");
+
+      // Mutable
+      pw.with_secret_mut(|s: &mut String| s.push('!'));
+      pw.expose_secret_mut().clear();
+
+      // Symmetric encoding/decoding example (new per-format traits)
+      #[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
+      {
+          use secure_gate::{FromHexStr, ToBech32, ToHex};
+          let hex    = key.expose_secret().to_hex();          // "2a2a2a..."
+          let bech32 = key.expose_secret().try_to_bech32("key", None).unwrap();  // "key1q..." (BIP-173)
+          let roundtrip = hex.try_from_hex().unwrap();        // Decode back
+      }
   }
   ```
   
@@ -180,9 +183,8 @@
   ### Macros for Aliases
   
   ```rust
-  use secure_gate::{dynamic_alias, fixed_alias};
-  
-  dynamic_alias!(pub RefreshToken, String, "OAuth refresh token");
+  use secure_gate::fixed_alias;
+
   fixed_alias!(pub ApiKey, 32, "32-byte API key");
   ```
   
