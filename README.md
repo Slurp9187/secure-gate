@@ -167,12 +167,34 @@
   For detailed justification, benchmarks, and tuning guidance, see [CT_EQ_AUTO.md](CT_EQ_AUTO.md).
 
   ## Advanced Usage
-  
+
+  ### Using Fixed<T> and Dynamic<T> Directly
+
+  For macro-averse users, use the types directly:
+
+  ```rust
+  use secure_gate::{Fixed, ExposeSecret};
+
+  let key: Fixed<[u8; 32]> = Fixed::new([42u8; 32]);
+  key.with_secret(|bytes| assert_eq!(bytes.len(), 32));
+
+  #[cfg(feature = "alloc")]
+  {
+      use secure_gate::{Dynamic, ExposeSecret};
+      extern crate alloc;
+
+      let pw: Dynamic<String> = "password".into();
+      pw.with_secret(|s| println!("secret: {}", s));
+  }
+  ```
+
   ### Polymorphic / Generic Code
-  
+
+  Write functions that work with any secure wrapper (`Fixed<T>` or `Dynamic<T>`) via the `ExposeSecret` trait:
+
   ```rust
   use secure_gate::ExposeSecret;
-  
+
   fn log_length<S: ExposeSecret>(secret: &S) {
       println!("length = {}", secret.len());
   }
@@ -180,28 +202,59 @@
   
   ### Macros for Aliases
   
+  #### Dynamic Alias
+  
+  ```rust
+  #[cfg(feature = "alloc")]
+  {
+    use secure_gate::dynamic_alias;
+
+    dynamic_alias!(pub Password, String, "variable-length password");
+    let key: Password = "Super Secret Password".into();
+  }
+  ```
+  
+  #### Dynamic **Generic** Alias
+
+  ```rust
+  #[cfg(feature = "alloc")]
+  {
+    use secure_gate::dynamic_generic_alias;
+
+    dynamic_generic_alias!(Secret);
+    let text: Secret<String> = "hidden".into();
+  }
+  ```
+
+  #### Fixed Alias
+
   ```rust
   use secure_gate::fixed_alias;
 
   fixed_alias!(pub ApiKey, 32, "32-byte API key");
-
-  #[cfg(feature = "alloc")]
-  use secure_gate::dynamic_alias;
-
-  #[cfg(feature = "alloc")]
-  dynamic_alias!(pub ApiKey, 32, "32-byte API key");
-
   ```
-  
+
+  #### Fixed **Generic** Alias
+
+  ```rust
+  use secure_gate::fixed_generic_alias;
+
+  fixed_generic_alias!(SecureBuffer, "Secure fixed-size buffer");
+  let buf: SecureBuffer<64> = [0u8; 64].into();
+  ```
+
   ### Random Generation
   
   ```rust
   #[cfg(feature = "rand")]
   {
       use secure_gate::{Dynamic, Fixed};
-  
+
       let token: Dynamic<Vec<u8>> = Dynamic::from_random(64);
       let key: Fixed<[u8; 32]> = Fixed::from_random();
+
+      // For extreme cases, e.g., 128-byte keys
+      let large_key: Fixed<[u8; 128]> = Fixed::from_random();
   }
   ```
   
