@@ -35,7 +35,7 @@ fn bench_32B_secret_comparison(c: &mut Criterion) {
 }
 // 1kb secret (1024 bytes) (expect ct-eq-hash to be faster)
 #[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
-#[allow(non_snake_case, dead_code)]
+#[allow(non_snake_case)]
 fn bench_1KiB_secret_comparison(c: &mut Criterion) {
     use secure_gate::{ConstantTimeEqExt, Dynamic};
 
@@ -55,7 +55,7 @@ fn bench_1KiB_secret_comparison(c: &mut Criterion) {
 
 // 100kb secret (102,400 bytes) (massive hash-eq advantage expected)
 #[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
-#[allow(non_snake_case, dead_code)]
+#[allow(non_snake_case)]
 fn bench_100KiB_secret_comparison(c: &mut Criterion) {
     use secure_gate::ConstantTimeEqExt;
     // Mitigate caching: Use fresh allocations with varying data
@@ -79,7 +79,7 @@ fn bench_100KiB_secret_comparison(c: &mut Criterion) {
 
 // 1mb secret (1,048,576 bytes) (extreme bound for hash-eq fixed overhead)
 #[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
-#[allow(non_snake_case, dead_code)]
+#[allow(non_snake_case)]
 fn bench_1MiB_secret_comparison(c: &mut Criterion) {
     use secure_gate::ConstantTimeEqExt;
     // Mitigate caching: Use fresh allocations with varying data
@@ -142,7 +142,7 @@ fn bench_worst_case_unequal_32B(c: &mut Criterion) {
 
 // Worst-case unequal comparisons: differ at end (detect timing leaks)
 #[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
-#[allow(non_snake_case, dead_code)]
+#[allow(non_snake_case)]
 fn bench_worst_case_unequal_1KiB(c: &mut Criterion) {
     use secure_gate::{ConstantTimeEqExt, Dynamic};
 
@@ -181,7 +181,6 @@ fn bench_worst_case_unequal_1KiB(c: &mut Criterion) {
 
 // Hash computation overhead
 #[cfg(feature = "ct-eq-hash")]
-#[allow(dead_code)]
 fn bench_hash_computation(c: &mut Criterion) {
     // Mitigate caching: Use fresh allocations with varying data
     c.bench_function("hash_compute_32b", |bencher| {
@@ -246,7 +245,7 @@ fn bench_keyed_vs_deterministic_hashing(c: &mut Criterion) {
 // Hash caching effects: Demonstrates performance difference between cached (precomputed hash)
 // and non-cached (fresh computation) equality checks.
 #[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
-#[allow(non_snake_case, dead_code)]
+#[allow(non_snake_case)]
 fn bench_ct_eq_hash_caching_effects(c: &mut Criterion) {
     use secure_gate::{ConstantTimeEqExt, Dynamic, Fixed};
 
@@ -289,7 +288,7 @@ fn bench_ct_eq_hash_caching_effects(c: &mut Criterion) {
 criterion_group!(
     name = ct_eq_hash_vs_ct_eq;
     config = Criterion::default();
-    targets = bench_32B_secret_comparison, bench_hash_computation, bench_keyed_vs_deterministic_hashing, bench_worst_case_unequal_32B
+    targets = bench_32B_secret_comparison, bench_1KiB_secret_comparison, bench_100KiB_secret_comparison, bench_1MiB_secret_comparison, bench_worst_case_unequal_1KiB, bench_ct_eq_hash_caching_effects, bench_hash_computation, bench_keyed_vs_deterministic_hashing, bench_worst_case_unequal_32B
 );
 #[cfg(feature = "ct-eq-hash")]
 criterion_main!(ct_eq_hash_vs_ct_eq);
