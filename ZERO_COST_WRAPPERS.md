@@ -1,4 +1,4 @@
-# Justification for Zero-Cost Wrappers in secure-gate
+# Justification for Using `secure-gate` Zero-Cost Wrappers
 
 ## Benchmark Environment
 Benchmarks run on a 2019-era consumer laptop (Intel Core i7-10510U @ 1.80GHz, 8 logical cores, 16GB RAM, Windows 11 Pro) – typical for developers and many production scenarios. Results generalize to similar mid-tier hardware; high-end servers may see even tighter performance.
