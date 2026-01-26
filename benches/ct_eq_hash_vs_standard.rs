@@ -17,7 +17,6 @@ use std::hint::black_box;
 
 #[cfg(feature = "ct-eq-hash")]
 // 32b secret (expect ct-eq to be faster)
-#[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
 fn bench_32B_secret_comparison(c: &mut Criterion) {
     use secure_gate::{ConstantTimeEqExt, Fixed};
@@ -287,12 +286,23 @@ fn bench_ct_eq_hash_caching_effects(c: &mut Criterion) {
 }
 
 #[cfg(feature = "ct-eq-hash")]
+#[cfg(all(feature = "ct-eq-hash", not(feature = "alloc")))]
+criterion_group!(
+    name = ct_eq_hash_vs_standard;
+    config = Criterion::default();
+    targets = bench_32B_secret_comparison, bench_hash_computation, bench_keyed_vs_deterministic_hashing, bench_worst_case_unequal_32B
+);
+
+#[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
 criterion_group!(
     name = ct_eq_hash_vs_standard;
     config = Criterion::default();
     targets = bench_32B_secret_comparison, bench_1KiB_secret_comparison, bench_100KiB_secret_comparison, bench_1MiB_secret_comparison, bench_worst_case_unequal_1KiB, bench_ct_eq_hash_caching_effects, bench_hash_computation, bench_keyed_vs_deterministic_hashing, bench_worst_case_unequal_32B
 );
-#[cfg(feature = "ct-eq-hash")]
+#[cfg(all(feature = "ct-eq-hash", not(feature = "alloc")))]
+criterion_main!(ct_eq_hash_vs_standard);
+
+#[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
 criterion_main!(ct_eq_hash_vs_standard);
 
 // No benches when required features are not enabled

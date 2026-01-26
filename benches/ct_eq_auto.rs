@@ -136,14 +136,24 @@ fn bench_ct_eq_auto_1KiB_dynamic_thresholds(c: &mut Criterion) {
     group.finish();
 }
 
-#[cfg(feature = "ct-eq-hash")]
+#[cfg(all(feature = "ct-eq-hash", not(feature = "alloc")))]
+criterion_group!(
+    name = ct_eq_auto_benches;
+    config = Criterion::default();
+    targets = bench_ct_eq_auto_16B_thresholds, bench_ct_eq_auto_32B_thresholds, bench_ct_eq_auto_64B_thresholds
+);
+
+#[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
 criterion_group!(
     name = ct_eq_auto_benches;
     config = Criterion::default();
     targets = bench_ct_eq_auto_16B_thresholds, bench_ct_eq_auto_32B_thresholds, bench_ct_eq_auto_64B_thresholds,
              bench_ct_eq_auto_128B_dynamic_thresholds, bench_ct_eq_auto_1KiB_dynamic_thresholds
 );
-#[cfg(feature = "ct-eq-hash")]
+#[cfg(all(feature = "ct-eq-hash", not(feature = "alloc")))]
+criterion_main!(ct_eq_auto_benches);
+
+#[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
 criterion_main!(ct_eq_auto_benches);
 
 // No benches when required features are not enabled
