@@ -24,8 +24,16 @@ jobs:
             features: "--no-default-features --features=no-alloc"
           - name: All features
             features: "--features full"
+          - name: All features (--all-features)
+            features: "--all-features"
+          - name: No default features only
+            features: "--no-default-features"
           - name: Secure + encoding
             features: "--features encoding"
+          - name: Alloc only
+            features: "--no-default-features --features=alloc"
+          - name: Encoding only
+            features: "--no-default-features --features=encoding"
           - name: ct-eq only
             features: "--no-default-features --features ct-eq"
           - name: ct-eq-hash deterministic
