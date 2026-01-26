@@ -3,6 +3,8 @@
 ## Benchmark Environment
 Benchmarks run on a 2019-era consumer laptop (Intel Core i7-10510U @ 1.80GHz, 8 logical cores, 16GB RAM, Windows 11 Pro) – typical for developers and many production scenarios. Results generalize to similar mid-tier hardware; high-end servers may see even tighter performance.
 
+**Note**: Hardware variance may affect absolute timings—test on your target hardware for precision.
+
 ## Overview
 secure-gate's `Fixed<T>` and `Dynamic<T>` wrappers enforce explicit, auditable access to sensitive data via methods like `.expose_secret()` or `.with_secret()`, preventing accidental leaks while adding zero runtime overhead. This "zero-cost" design means security is compiled in without performance penalties—timings match raw arrays within measurement noise. Benchmarks confirm operations like indexing, array XOR (simulating crypto), and mutable access are indistinguishable from raw `[u8; 32]` access.
 

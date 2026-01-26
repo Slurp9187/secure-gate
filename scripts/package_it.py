@@ -54,9 +54,12 @@ PACKAGES = [
         "root_files": [
             "Cargo.toml",
             "CHANGELOG.md",
+            "CT_EQ_AUTO.md",
+            "EXAMPLES.md",
             "README.md",
             "ROADMAP.md",
             "SECURITY.md",
+            "ZERO_COST_WRAPPERS.md",
         ],
         "include_dirs": [],
         "file_pattern": "*.md",

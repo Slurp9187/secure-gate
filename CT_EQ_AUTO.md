@@ -38,7 +38,7 @@ Multi-run benchmarks (3x on 2019 Intel i7-10510U/16GB/Windows 11) show high vari
 - **No leaks**: Indirect channels (errors, timing) mitigated; zero-copy when possible.
 
 ## Customization & Practical Benefits
-- **Easy tuning**: Pass `Some(n)` to `ct_eq_auto` for custom thresholds (e.g., `Some(64)` to favor ct_eq longer). Benchmark for gains.
+- **Easy tuning**: Pass `Some(n)` to `ct_eq_auto` for custom thresholds (e.g., `ct_eq_auto(&a, &b, Some(64))` for larger small-input cutoff). Benchmark for gains.
 - **Auto-selection pros**: Zero overhead for small data; security for large. Justifies "auto" name.
 - **Cons**: Probabilistic for >32B; tune threshold if benchmarks show >10% gains.
 - **When to use**: 99% of cases — ideal for unknown/variable secret sizes. Fall back to `ct_eq` (deterministic) or `ct_eq_hash` (uniform probabilistic) only if needed.

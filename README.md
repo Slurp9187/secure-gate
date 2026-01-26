@@ -71,6 +71,15 @@
 
   `no_std` + `alloc` compatible. Disabled features have **zero overhead**.
 
+  ### Quick Feature Guide
+
+  | Goal | Features | Result |
+  |------------------|-----------------------------|------------------------------------------------------|
+  | Default secure (heap + stack) | `secure` (default) | `Fixed<T>` + `Dynamic<T>`, zeroize, ct-eq |
+  | Secure with no-heap | `secure + no-alloc` | `Fixed<T>` only, zeroize, ct-eq |
+  | Minimal (discouraged) | `no-alloc` | `Fixed<T>` only, no zeroize/ct-eq |
+  | Full featured | `full` | All features enabled |
+
   ### Heap vs No-Heap Builds
 
   secure-gate **defaults to heap-enabled** (via `secure` pulling `alloc`):
