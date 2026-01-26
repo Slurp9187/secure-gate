@@ -161,6 +161,8 @@
 
   For detailed justification, benchmarks, and tuning guidance, see [CT_EQ_AUTO.md](CT_EQ_AUTO.md).
 
+  For zero-cost performance justification, see [ZERO_COST_WRAPPERS.md](ZERO_COST_WRAPPERS.md).
+
   See [docs](https://docs.rs/secure-gate) for full API.
   
   ## Advanced Usage

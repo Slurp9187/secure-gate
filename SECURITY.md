@@ -77,6 +77,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Dual exposure model: scoped closures (leak-resistant) + direct refs (auditable)
 - Full-capacity zeroization (`zeroize`)
 - Redacted `Debug` output
+- Zero-cost: Performance indistinguishable from raw arrays; for detailed benchmarks, see [ZERO_COST_WRAPPERS.md](ZERO_COST_WRAPPERS.md)
 
 **Potential weaknesses**
 - Long-lived `expose_secret()` references can defeat scoping

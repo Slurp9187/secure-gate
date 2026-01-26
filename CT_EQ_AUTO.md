@@ -27,6 +27,9 @@ Benchmarks confirm `ct_eq_auto`'s default selection is near-optimal, outperformi
 
 Crossover validated at ~32B: Default minimizes total latency for mixed sizes without manual tuning.
 
+### Benchmark Variance & Hardware Sensitivity
+Multi-run benchmarks (3x on 2019 Intel i7-10510U/16GB/Windows 11) show high variance: regressions up to 25% (e.g., small ct_eq_hash +23%, 1MB ct_eq +15%) due to system noise/cache effects. Changes between runs: 5-25%—averages reliable, but absolute numbers vary. Outliers ≤17%. Key insight: Core trends (crossover ~32B, hash wins large data) hold; profile per-system for tuning if variance affects critical paths.
+
 ## Security Justification
 - **Timing safety**: Both paths constant-time; `ct_eq_hash` hides length/cache differences.
 - **Probabilistic but safe**: 2^-128 collision risk (negligible for equality); use `ct_eq` for zero-risk if <32B dominates.
