@@ -48,7 +48,7 @@ std = ["alloc"]
 no-alloc = [] # Explicit opt-out: disables heap (conflicts with alloc — document it)
 
 # Default feature: Enforces secure handling with zeroization and constant-time operations
-default = ["secure", "alloc"]
+default = ["secure"]
 
 # Secure: Essential for secure secret handling (includes zeroize and ct-eq)
 secure = ["zeroize", "ct-eq", "alloc"]
