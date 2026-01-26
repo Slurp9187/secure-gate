@@ -5,7 +5,9 @@
   > Review the code and [SECURITY.md](SECURITY.md) before production use.
   > Memory safety is guaranteed — **no unsafe code** (`#![forbid(unsafe_code)]`).
   
-  Secure-gate provides `Dynamic<T>` (heap-allocated) and `Fixed<T>` (stack-allocated) wrappers that **force explicit access** to secrets via `.expose_secret()` or scoped `.with_secret()` — preventing accidental leaks while remaining zero-cost and `no_std` + `alloc` compatible.
+  `secure-gate` provides `Dynamic<T>` (heap-allocated) and `Fixed<T>` (stack-allocated) wrappers that **force explicit access** to secrets via `.expose_secret()` or scoped `.with_secret()` — preventing accidental leaks while remaining zero-cost and `no_std` + `alloc` compatible.
+
+  For zero-cost performance justification, see [ZERO_COST_WRAPPERS.md](ZERO_COST_WRAPPERS.md).
   
   ## Why secure-gate?
   
@@ -20,7 +22,7 @@
   - **Encoding** (symmetric per-format traits: hex, base64url, bech32/BIP-173, bech32m/BIP-350) + **serde** auto-detection (hex/base64url/bech32/bech32m)
   - **Macros** for ergonomic aliases (`dynamic_alias!`, `fixed_alias!`)
   - **Auditable** — every exposure and encoding call is grep-able
-  
+
   ## Installation
   
   ```toml
@@ -127,7 +129,7 @@
   
   ## Security Model
   
-  - **Explicit access only** — `.expose_secret()` / `.with_secret()` required
+  - **Explicit access only** — `.with_secret()` / `.expose_secret()` required
   - **No implicit leaks** — no `Deref`/`AsRef`/`Copy` by default
   - **Zeroize** on drop (`zeroize` feature)
   - **Timing-safe** equality (`ct-eq`)
@@ -164,10 +166,6 @@
 
   For detailed justification, benchmarks, and tuning guidance, see [CT_EQ_AUTO.md](CT_EQ_AUTO.md).
 
-  For zero-cost performance justification, see [ZERO_COST_WRAPPERS.md](ZERO_COST_WRAPPERS.md).
-
-  See [docs](https://docs.rs/secure-gate) for full API.
-  
   ## Advanced Usage
   
   ### Polymorphic / Generic Code
@@ -186,6 +184,13 @@
   use secure_gate::fixed_alias;
 
   fixed_alias!(pub ApiKey, 32, "32-byte API key");
+
+  #[cfg(feature = "alloc")]
+  use secure_gate::dynamic_alias;
+
+  #[cfg(feature = "alloc")]
+  dynamic_alias!(pub ApiKey, 32, "32-byte API key");
+
   ```
   
   ### Random Generation
@@ -256,6 +261,8 @@
       let decoded: Aes256Key = serde_json::from_str(&format!("\"{}\"", hex)).unwrap();
   }
   ```
+
+  See [docs](https://docs.rs/secure-gate) for full API.
   
   ## License
   
