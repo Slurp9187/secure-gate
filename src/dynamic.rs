@@ -245,7 +245,10 @@ impl<'de> serde::Deserialize<'de> for Dynamic<alloc::vec::Vec<u8>> {
         impl<'de> Visitor<'de> for DynamicVecVisitor {
             type Value = Dynamic<alloc::vec::Vec<u8>>;
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                write!(formatter, "a hex/base64url/bech32 string or byte vector")
+                write!(
+                    formatter,
+                    "a hex/base64url/bech32 string, a byte vector, or a sequence of bytes"
+                )
             }
 
             #[cfg(any(
@@ -263,9 +266,20 @@ impl<'de> serde::Deserialize<'de> for Dynamic<alloc::vec::Vec<u8>> {
                     crate::utilities::decoding::try_decode_any(v, None).map_err(E::custom)?;
                 Ok(Dynamic::new(bytes))
             }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut vec = alloc::vec::Vec::new();
+                while let Some(value) = seq.next_element()? {
+                    vec.push(value);
+                }
+                Ok(Dynamic::new(vec))
+            }
         }
         if deserializer.is_human_readable() {
-            deserializer.deserialize_str(DynamicVecVisitor)
+            deserializer.deserialize_any(DynamicVecVisitor)
         } else {
             let vec: alloc::vec::Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
             Ok(Dynamic::new(vec))
