@@ -146,19 +146,21 @@
   #[cfg(feature = "ct-eq-hash")]
   {
       use secure_gate::{Dynamic, ConstantTimeEqExt};
-  
+
       let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();  // e.g. ML-DSA signature
       let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
-  
+
       // Recommended: smart path selection
       if sig_a.ct_eq_auto(&sig_b, None) {
           // equal
       }
   }
   ```
-  
+
   Plain `ct_eq_hash` is still available for uniform probabilistic behavior.
-  
+
+  For detailed justification, benchmarks, and tuning guidance, see [CT_EQ_AUTO.md](CT_EQ_AUTO.md).
+
   See [docs](https://docs.rs/secure-gate) for full API.
   
   ## Advanced Usage

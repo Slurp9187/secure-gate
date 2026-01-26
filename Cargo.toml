@@ -106,11 +106,15 @@ full = [
 ]
 
 [[bench]]
-name = "fixed_vs_raw"
+name = "ct_eq_auto"
 harness = false
 
 [[bench]]
-name = "ct_eq_hash_vs_ct_eq"
+name = "ct_eq_hash_vs_standard"
+harness = false
+
+[[bench]]
+name = "fixed_vs_raw"
 harness = false
 
 [[bench]]

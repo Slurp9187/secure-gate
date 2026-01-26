@@ -128,7 +128,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 - Enable the `secure` feature unless you have extreme constraints
 - Prefer scoped `with_secret()` over long-lived `expose_secret()`
-- Use `ct_eq_auto(…, None)` for general-purpose equality checks; customize the threshold (e.g., `Some(64)`, `Some(1024)`) based on your benchmarks if the default 32 bytes isn't optimal
+- Use `ct_eq_auto(…, None)` for general-purpose equality checks; customize the threshold (e.g., `Some(64)`, `Some(1024)`) based on your benchmarks if the default 32 bytes isn't optimal. For detailed justification, see [CT_EQ_AUTO.md](CT_EQ_AUTO.md)
 - Audit every `CloneableType` / `SerializableType` impl
 - Validate and sanitize all inputs before encoding/decoding
 - Prefer specific format traits (`FromBech32Str`, `FromHexStr`, …) over `try_decode_any` when the expected format is known

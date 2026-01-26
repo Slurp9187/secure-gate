@@ -1,12 +1,13 @@
 // ==========================================================================
-// benches/ct_eq_hash_vs_ct_eq.rs
+// benches/ct_eq_hash_vs_standard.rs
 // ==========================================================================
 // Benchmarks comparing ct-eq-hash (Blake3-based) vs ct-eq (subtle-based) performance.
 // Expect ct-eq-hash to outperform ct-eq for secrets >128 bytes due to fixed 32b comparison.
+// ct-eq-auto (hybrid, auto-selecting) is benchmarked separately in ct_eq_auto.rs.
 //
-// Note: When "rand" feature is enabled, ct_eq_hash uses a random key for enhanced security
-// (variable output, prevents precomputed rainbow tables). Without "rand", it uses
-// deterministic hashing. These benchmarks run in the configured mode.
+// Note: When "rand" feature is enabled, ct_eq_hash/ct_eq_auto use a random key for enhanced security
+// (variable output, prevents precomputed rainbow tables). Without "rand", deterministic hashing.
+// These benchmarks run in the configured mode.
 
 #[cfg(feature = "ct-eq-hash")]
 use criterion::{criterion_group, criterion_main, Criterion};
@@ -14,6 +15,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 #[cfg(feature = "ct-eq-hash")]
 use std::hint::black_box;
 
+#[cfg(feature = "ct-eq-hash")]
 // 32b secret (expect ct-eq to be faster)
 #[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
@@ -286,12 +288,12 @@ fn bench_ct_eq_hash_caching_effects(c: &mut Criterion) {
 
 #[cfg(feature = "ct-eq-hash")]
 criterion_group!(
-    name = ct_eq_hash_vs_ct_eq;
+    name = ct_eq_hash_vs_standard;
     config = Criterion::default();
     targets = bench_32B_secret_comparison, bench_1KiB_secret_comparison, bench_100KiB_secret_comparison, bench_1MiB_secret_comparison, bench_worst_case_unequal_1KiB, bench_ct_eq_hash_caching_effects, bench_hash_computation, bench_keyed_vs_deterministic_hashing, bench_worst_case_unequal_32B
 );
 #[cfg(feature = "ct-eq-hash")]
-criterion_main!(ct_eq_hash_vs_ct_eq);
+criterion_main!(ct_eq_hash_vs_standard);
 
 // No benches when required features are not enabled
 #[cfg(not(feature = "ct-eq-hash"))]

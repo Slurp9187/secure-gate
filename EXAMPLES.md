@@ -195,6 +195,8 @@ let buf: SecureBuffer<64> = [0u8; 64].into();
 ```
 
 **Performance Tuning**: If your benchmarks indicate `ct_eq` remains more performant beyond 32 bytes (e.g., on specialized hardware or for large caches), set a higher threshold like `Some(64)` or `Some(1024)`. Conversely, use lower values for conservative probabilistic equality. Always profile your target system!
+
+For detailed justification, benchmarks, and tuning guidance, see [CT_EQ_AUTO.md](CT_EQ_AUTO.md).
 }
 ```
 
