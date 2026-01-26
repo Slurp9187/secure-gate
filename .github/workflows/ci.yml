@@ -70,7 +70,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run tests (${{ matrix.name }})
-        run: cargo test ${{ matrix.features }}
+        run: cargo test --tests ${{ matrix.features }}
 
       - name: Run doctests (${{ matrix.name }})
         run: cargo test --doc ${{ matrix.features }}
+
+      - name: Run clippy (${{ matrix.name }})
+        run: cargo clippy --tests ${{ matrix.features }}
+        if: matrix.name == 'All features (--all-features)' || matrix.name == 'No default features only'
