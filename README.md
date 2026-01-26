@@ -51,7 +51,7 @@
   | `zeroize`              | Zero memory on drop                                                         |
   | `ct-eq`                | `ConstantTimeEq` trait (prevents timing attacks)                            |
   | `ct-eq-hash`           | `ConstantTimeEqExt` trait: BLAKE3-based equality (fast for large/variable secrets)     |
-  | `rand`                 | Secure random via `OsRng` (`from_random()` / `generate_random()`)          |
+  | `rand`                 | Secure random via `OsRng` (`from_random()`)          |
   | `serde`                | Meta: `serde-deserialize` + `serde-serialize`                               |
   | `serde-deserialize`    | Auto-detect hex/base64/bech32/bech32m when loading secrets                  |
   | `serde-serialize`      | Export secrets (requires `SerializableType` marker on inner type)          |
