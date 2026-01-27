@@ -29,18 +29,24 @@ fn fixed_deserialize_wrong_length() {
 
 #[cfg(feature = "serde-deserialize")]
 #[test]
-fn fixed_deserialize_invalid_string() {
-    use secure_gate::Fixed;
-    // Invalid encoding: not hex/base64/bech32
-    let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str("\"invalid\"");
-    assert!(result.is_err());
+fn fixed_deserialize_from_array() {
+    use secure_gate::{Fixed, ExposeSecret};
+    let result: Fixed<[u8; 4]> = serde_json::from_str("[1,2,3,4]").unwrap();
+    assert_eq!(result.expose_secret(), &[1,2,3,4]);
 }
 
 #[cfg(feature = "serde-deserialize")]
 #[test]
-fn dynamic_deserialize_invalid_string() {
-    use secure_gate::Dynamic;
-    // Invalid encoding
-    let result: Result<Dynamic<Vec<u8>>, _> = serde_json::from_str("\"invalid\"");
-    assert!(result.is_err());
+fn dynamic_deserialize_from_array() {
+    use secure_gate::{Dynamic, ExposeSecret};
+    let result: Dynamic<Vec<u8>> = serde_json::from_str("[1,2,3,4]").unwrap();
+    assert_eq!(result.expose_secret(), &[1,2,3,4]);
+}
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_deserialize_from_string() {
+    use secure_gate::{Dynamic, ExposeSecret};
+    let result: Dynamic<String> = serde_json::from_str("\"hello\"").unwrap();
+    assert_eq!(result.expose_secret(), "hello");
 }

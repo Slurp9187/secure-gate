@@ -79,27 +79,32 @@ pub fn default_order() -> Vec<Format> {
 /// # Examples
 /// Default order (Bech32 → Hex → Base64Url):
 /// ```
+/// # #[cfg(feature = "encoding-bech32")]
 /// use secure_gate::utilities::decoding::try_decode_any;
-/// let bytes = try_decode_any("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", None)?;  // Tries Bech32 first
-/// # Ok::<(), secure_gate::DecodingError>(())
+/// # #[cfg(feature = "encoding-bech32")]
+/// let bytes = try_decode_any("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", None).unwrap();  // Tries Bech32 first
+/// # #[cfg(feature = "encoding-bech32")]
+/// assert!(!bytes.is_empty());
 /// ```
 ///
 /// Strict Hex-only for API keys:
 /// ```
 /// use secure_gate::utilities::decoding::{try_decode_any, Format};
-/// let bytes = try_decode_any("deadbeef", Some(&[Format::Hex]))?;
-/// # Ok::<(), secure_gate::DecodingError>(())
+/// let bytes = try_decode_any("deadbeef", Some(&[Format::Hex])).unwrap();
+/// assert_eq!(bytes, vec![0xde, 0xad, 0xbe, 0xef]);
 /// ```
 ///
 /// Custom order for multi-format protocol:
 /// ```
+/// # #[cfg(feature = "encoding-bech32")]
 /// use secure_gate::utilities::decoding::{try_decode_any, Format};
-/// let bytes = try_decode_any("deadbeef", Some(&[Format::Bech32, Format::Hex]))?;
-/// # Ok::<(), secure_gate::DecodingError>(())
+/// # #[cfg(feature = "encoding-bech32")]
+/// let bytes = try_decode_any("deadbeef", Some(&[Format::Bech32, Format::Hex])).unwrap();
+/// # #[cfg(feature = "encoding-bech32")]
+/// assert_eq!(bytes, vec![0xde, 0xad, 0xbe, 0xef]);
 /// ```
 ///
 /// Returns `Ok(Vec<u8>)` on success or `Err(DecodingError)` if no format matches.
-#[cfg(feature = "serde-deserialize")]
 #[cfg(any(
     feature = "encoding-bech32",
     feature = "encoding-bech32m",

@@ -84,17 +84,7 @@ fn test_hex_left_exact_and_truncated() {
     assert_eq!(data.to_hex_left(100), "000102030405060708090a0b0c0d0e0f");
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
-#[test]
-fn fixed_deserialize_hex_string() {
-    use secure_gate::{ExposeSecret, Fixed};
-    // Valid hex string for 4 bytes
-    let result: Fixed<[u8; 4]> = serde_json::from_str("\"deadbeef\"").unwrap();
-    result.with_secret(|r| assert_eq!(r, &[0xde, 0xad, 0xbe, 0xef]));
-    // Invalid length: hex for 2 bytes
-    let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str("\"dead\"");
-    assert!(result.is_err());
-}
+
 
 #[cfg(feature = "encoding-hex")]
 #[test]

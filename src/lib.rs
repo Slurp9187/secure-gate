@@ -113,14 +113,11 @@ pub use error::HexError;
 /// Re-export of [`DecodingError`] for convenience in decoding operations.
 pub use error::DecodingError;
 
-#[cfg(all(
-    feature = "serde-deserialize",
-    any(
-        feature = "encoding-hex",
-        feature = "encoding-base64",
-        feature = "encoding-bech32",
-        feature = "encoding-bech32m"
-    )
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m"
 ))]
 pub use utilities::decoding::try_decode_any;
 /// Re-export decoding utilities for multi-format auto-decoding.

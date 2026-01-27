@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.0] - 2026-01-25
 
+### Changed
+- **Serde deserialization simplified**: Removed auto-decoding from strings (hex/base64/bech32) for direct binary deserialization only. Aligns with secrecy crate security model. Users must manually decode encoded strings using `FromHexStr`, `FromBase64UrlStr`, `FromBech32Str` traits before serde deserialization. Encoding traits unchanged.
+
 ### Added
 
 - **Polymorphic access traits**

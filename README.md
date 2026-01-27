@@ -19,7 +19,7 @@
   - **Timing-safe equality** (`ct-eq` feature)
   - **Fast probabilistic equality for large secrets** (`ct-eq-hash` → BLAKE3 + fixed digest compare)
   - **Secure random generation** (`rand` feature)
-  - **Encoding** (symmetric per-format traits: hex, base64url, bech32/BIP-173, bech32m/BIP-350) + **serde** auto-detection (hex/base64url/bech32/bech32m)
+  - **Encoding** (symmetric per-format traits: hex, base64url, bech32/BIP-173, bech32m/BIP-350) + **serde** direct deserialization (binary-safe)
   - **Macros** for ergonomic aliases (`dynamic_alias!`, `fixed_alias!`)
   - **Auditable** — every exposure and encoding call is grep-able
 
@@ -55,7 +55,7 @@
   | `ct-eq-hash`           | `ConstantTimeEqExt` trait: BLAKE3-based equality (fast for large/variable secrets)     |
   | `rand`                 | Secure random via `OsRng` (`from_random()`)          |
   | `serde`                | Meta: `serde-deserialize` + `serde-serialize`                               |
-  | `serde-deserialize`    | Auto-detect hex/base64/bech32/bech32m when loading secrets                  |
+  | `serde-deserialize`    | Direct deserialization to inner types (binary-safe)                        |
   | `serde-serialize`      | Export secrets (requires `SerializableType` marker on inner type)          |
   | `encoding`             | Meta: symmetric per-format encoding/decoding (hex, base64url, bech32/bech32m) — granular sub-features available |
   | `encoding-hex`         | `ToHex` (`.to_hex()`, `.to_hex_upper()`) + `FromHexStr` (`.try_from_hex()`)  |
@@ -308,21 +308,22 @@
   }
   ```
   
-  ### Serde (auto-detects hex/base64url/bech32/bech32m on deserialize; serialization requires `SerializableType`)
+  ### Serde (direct deserialization to inner types; serialization requires `SerializableType`)
 
   ```rust
   #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex", feature = "rand"))]
   {
-      use secure_gate::{fixed_alias, ExposeSecret, ToHex};
+      use secure_gate::{fixed_alias, ExposeSecret, ToHex, FromHexStr};
       use serde_json;
-  
+
       fixed_alias!(Aes256Key, 32);
-  
+
       // Generate a key and encode to hex
       let original: Aes256Key = Aes256Key::from_random();
       let hex = original.with_secret(|s: &[u8; 32]| s.to_hex());
-      // Deserialize: auto-detection
-      let decoded: Aes256Key = serde_json::from_str(&format!("\"{}\"", hex)).unwrap();
+      // Deserialize: manual decode + direct binary deserialization
+      let bytes = hex.try_from_hex().unwrap();
+      let decoded: Aes256Key = serde_json::from_str(&format!("[{}]", bytes.iter().map(|b| b.to_string()).collect::<Vec<_>>().join(","))).unwrap();
   }
   ```
 

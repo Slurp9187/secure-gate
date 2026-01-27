@@ -366,26 +366,32 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
 }
 ```
 
-### Multi-Format Decoding & Unified Errors
+### Manual Decoding with Specific Traits
 
 ```rust
-#[cfg(all(feature = "serde-deserialize", feature = "encoding"))]
+#[cfg(all(feature = "encoding-hex", feature = "encoding-base64", feature = "encoding-bech32"))]
+{
+    use secure_gate::{FromHexStr, FromBase64UrlStr, FromBech32Str};
+
+    // Decode specific formats manually
+    let hex_bytes = "deadbeef".try_from_hex().unwrap();
+    let b64_bytes = "SGVsbG8=".try_from_base64url().unwrap();
+    let bech32_bytes = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4".try_from_bech32().unwrap();
+
+    // Then wrap in secure types
+    let key = secure_gate::Fixed::new(hex_bytes.as_slice().try_into().unwrap());
+}
+```
+
+### Multi-Format Decoding Utility (Standalone)
+
+```rust
+#[cfg(feature = "encoding")]
 {
     use secure_gate::utilities::decoding::try_decode_any;
-    use secure_gate::DecodingError;
-    #[cfg(feature = "alloc")]
-    extern crate alloc;
 
-    // Auto-detect format
-    let hex_result = try_decode_any("deadbeef", None); // detects hex
-    assert!(hex_result.is_ok());
-    let b64_result = try_decode_any("SGVsbG8=", None); // detects base64url
-    assert!(b64_result.is_ok());
-    let bech32_result = try_decode_any("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", None); // detects bech32
-    assert!(bech32_result.is_ok());
-    // Errors in unified DecodingError type
-    let bad = try_decode_any("invalid", None);
-    assert!(matches!(bad, Err(DecodingError::InvalidEncoding { .. })));
+    // For non-serde use cases, try_decode_any still works
+    let bytes = try_decode_any("deadbeef", None).unwrap(); // detects hex
 }
 ```
 

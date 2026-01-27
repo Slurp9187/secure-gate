@@ -58,7 +58,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `ct-eq`              | Timing-safe direct byte comparison                                               | Strongly recommended; avoid `==`            |
 | `ct-eq-hash`         | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `ct_eq_auto` for most cases           |
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
-| `serde-deserialize`  | Auto-decodes hex/base64url/bech32/bech32m via fallible per-format traits; decoded buffers are zeroized when the containing `Dynamic`/`Fixed` wrapper drops (`zeroize` feature). Auto-detection may misparse ambiguous inputs; validate sources upstream to avoid DoS via large allocations. | Enable only for trusted input sources       |
+| `serde-deserialize`  | Direct binary deserialization (arrays/seqs only); no string auto-parsing. Binary-safe, no temporary buffers or ambiguous parsing. | Enable for trusted JSON sources             |
 | `serde-serialize`    | Opt-in export via marker trait; audit all implementations                        | Enable sparingly; monitor exfiltration risk |
 | `encoding-bech32`    | Bech32/BIP-173 encoding/decoding: `ToBech32`, `FromBech32Str`                    | Validate inputs upstream; test empty/invalid HRP |
 | `encoding-bech32m`   | Bech32m/BIP-350 encoding/decoding: `ToBech32m`, `FromBech32mStr`                 | Validate inputs upstream; test empty/invalid HRP |
@@ -114,15 +114,13 @@ The crate is intentionally small and relies on well-vetted dependencies:
 **Potential weaknesses**
 - Decoding is inherently fallible; untrusted input may cause errors or temporary allocations
 - Length/format hints in errors (e.g., invalid HRP)
-- Temporary buffers during multi-format auto-detection (`try_decode_any`)
 - Bech32 edge cases: Strict validation covers most, but test empty/invalid HRP/data to confirm no panics/leaks
 
 **Mitigations**
 - Treat all decoding input as untrusted; validate upstream
 - Use specific traits (e.g., `FromBech32Str`) for strict format enforcement
 - Fuzz parsers; sanitize inputs before decoding
-- Temporary decoding buffers: While mostly handled by zeroize on `Vec<u8>`, ensure no long-lived undecoded secrets in custom deserialization paths
-- Decoding errors may include format hints (e.g., 'attempted order: [Bech32, Hex]') — treat as potential metadata leaks in sensitive contexts; redact logs or use custom error display in production
+- Decoding errors may include format hints — treat as potential metadata leaks in sensitive contexts; redact logs or use custom error display in production
 - Opt-in markers (`Cloneable`/`Serializable`): Rely on correct user implementations; audit custom impls to preserve zeroization
 
 ## Best Practices

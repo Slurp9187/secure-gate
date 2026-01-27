@@ -80,52 +80,49 @@ mod ct_eq_wrapper_proptests {
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
-#[cfg(all(feature = "encoding-hex", feature = "serde-deserialize"))]
+#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
 mod encoding_roundtrip_proptests {
     use proptest::prelude::*;
     #[cfg(feature = "serde-deserialize")]
     use secure_gate::ExposeSecret;
+    #[cfg(feature = "serde-serialize")]
+    use secure_gate::SerializableType;
     #[cfg(feature = "encoding-bech32")]
     use secure_gate::{ToBech32, ToHex};
+
+    #[cfg(feature = "serde-serialize")]
+    #[derive(serde::Serialize, serde::Deserialize)]
+    struct SerializableArray4([u8; 4]);
+
+    #[cfg(feature = "serde-serialize")]
+    impl SerializableType for SerializableArray4 {}
+
+    #[cfg(feature = "serde-serialize")]
+    #[derive(serde::Serialize, serde::Deserialize)]
+    struct SerializableVec(Vec<u8>);
+
+    #[cfg(feature = "serde-serialize")]
+    impl SerializableType for SerializableVec {}
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(50))]
 
-        #[cfg(all(feature = "encoding-hex", feature = "serde-deserialize"))]
+        #[cfg(feature = "serde-serialize")]
         #[test]
-        fn hex_roundtrip(data in prop::array::uniform4(any::<u8>())) {
-            let secret = secure_gate::Fixed::new(data);
-            let hex = secret.with_secret(|s| s.as_slice().to_hex());
-            let json = format!("\"{}\"", hex);
-            let decoded: secure_gate::Fixed<[u8; 4]> = serde_json::from_str(&json).unwrap();
-            let original_data = secret.with_secret(|s| *s);
-            let decoded_data = decoded.with_secret(|d| *d);
-            prop_assert_eq!(original_data, decoded_data);
+        fn fixed_array_roundtrip(data in prop::array::uniform4(any::<u8>())) {
+            let secret = SerializableArray4(data);
+            let json = serde_json::to_string(&secret).unwrap();
+            let decoded: SerializableArray4 = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(secret.0, decoded.0);
         }
 
-        #[cfg(all(feature = "encoding-hex", feature = "serde-deserialize"))]
+        #[cfg(all(feature = "serde-serialize", feature = "alloc"))]
         #[test]
-        fn hex_try_roundtrip(data in prop::array::uniform4(any::<u8>())) {
-            let secret = secure_gate::Fixed::new(data);
-            let hex = secret.with_secret(|s| s.as_slice().to_hex());
-            let json = format!("\"{}\"", hex);
-            let decoded: Result<secure_gate::Fixed<[u8; 4]>, _> = serde_json::from_str(&json);
-            let decoded = decoded.unwrap();
-            let original_data = secret.with_secret(|s| *s);
-            let decoded_data = decoded.with_secret(|d| *d);
-            prop_assert_eq!(original_data, decoded_data);
-        }
-
-        #[cfg(all(feature = "encoding-bech32", feature = "serde-deserialize", feature = "alloc"))]
-        #[test]
-        fn bech32_roundtrip(data in prop::collection::vec(any::<u8>(), 1..50)) {
-            let secret: secure_gate::Dynamic<Vec<u8>> = secure_gate::Dynamic::new(data.clone());
-            let bech = secret.with_secret(|s| s.as_slice().to_bech32("test"));
-            let json = format!("\"{}\"", bech);
-            let decoded: secure_gate::Dynamic<Vec<u8>> = serde_json::from_str(&json).unwrap();
-            let original_data = secret.with_secret(|s| s.clone());
-            let decoded_data = decoded.with_secret(|d| d.clone());
-            prop_assert_eq!(original_data, decoded_data);
+        fn dynamic_array_roundtrip(data in prop::collection::vec(any::<u8>(), 0..50)) {
+            let secret = SerializableVec(data.clone());
+            let json = serde_json::to_string(&secret).unwrap();
+            let decoded: SerializableVec = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(secret.0, decoded.0);
         }
     }
 }
