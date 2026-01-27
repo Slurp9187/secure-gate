@@ -90,7 +90,7 @@ mod ct_eq_hash_tests {
     #[cfg(feature = "rand")]
     #[test]
     // This is a probabilistic smoke test only.
-    // BLAKE3 collision probability is ~2⁻¹²⁸ — extremely unlikely to hit in 5000 samples.
+    // BLAKE3 collision probability is ~2⁻²⁵⁶ — extremely unlikely to hit in 5000 samples.
     fn no_false_positive_many_random_pairs() {
         use rand::{rngs::OsRng, TryRngCore};
 

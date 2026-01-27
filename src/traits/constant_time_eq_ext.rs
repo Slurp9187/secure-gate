@@ -14,7 +14,7 @@
 //! - **Length hiding**: Original length not observable via timing/cache.
 //! - **Keyed mode** (with `"rand"` feature): Per-process random key resists precomputation /
 //!   multi-target attacks across comparisons.
-//! - **Probabilistic**: Collision probability ~2⁻¹²⁸ — negligible for equality checks,
+//! - **Probabilistic**: Collision probability ~2⁻²⁵⁶ — negligible for equality checks,
 //!   but use [`crate::ConstantTimeEq`] for strict deterministic equality.
 //!
 //! ## Usage Recommendations
@@ -56,7 +56,7 @@ pub trait ConstantTimeEqExt: crate::ConstantTimeEq {
     /// **Probabilistic** when `"rand"` feature is enabled (per-process random key).
     /// **Deterministic** otherwise.
     ///
-    /// Collision probability ~2⁻¹²⁸ — negligible for equality checks,
+    /// Collision probability ~2⁻²⁵⁶ — negligible for equality checks,
     /// but **not zero**. Use `ct_eq` when strict determinism is required.
     ///
     /// Keyed mode resists multi-target precomputation attacks across many comparisons.

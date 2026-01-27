@@ -44,7 +44,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | No implicit leaks                 | No `Deref`, `AsRef`, `Copy`, `Clone` (unless `cloneable` + marker)                         |
 | Zeroization                       | Full allocation wiped on drop (`zeroize` feature); includes `Vec`/`String` spare capacity |
 | Timing safety                     | `ConstantTimeEq` for direct comparison; `ConstantTimeEqExt` / `ct_eq_auto` for large/variable data   |
-| Probabilistic equality (`ct-eq-hash`) | keyed BLAKE3 (when `rand` enabled) or unkeyed; collision risk ~2⁻¹²⁸ either way (negligible for practical purposes) |
+| Probabilistic equality (`ct-eq-hash`) | keyed BLAKE3 (when `rand` enabled) or unkeyed; collision risk ~2⁻²⁵⁶ either way (negligible for practical purposes) |
 | Opt-in risky features             | Cloning/serialization gated by marker traits (`CloneableType`, `SerializableType`)         |
 | Redacted debug                    | `Debug` impl always prints `[REDACTED]`                                                    |
 | No unsafe code                    | `#![forbid(unsafe_code)]` enforced at crate level                                          |
@@ -131,7 +131,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Audit every `CloneableType` / `SerializableType` impl
 - Validate and sanitize all inputs before encoding/decoding
 - Prefer specific format traits (`FromBech32Str`, `FromHexStr`, …) over `try_decode_any` when the expected format is known
-- Probabilistic equality (`ct-eq-hash`): Negligible collision risk (~2⁻¹²⁸), but use `ct_eq` for deterministic needs; bound input sizes to prevent DoS
+- Probabilistic equality (`ct-eq-hash`): Negligible collision risk (~2⁻²⁵⁶), but use `ct_eq` for deterministic needs; bound input sizes to prevent DoS
 - Monitor dependency CVEs and update regularly
 - Treat secrets as radioactive — minimize exposure surface
 
