@@ -17,7 +17,7 @@ use ::bech32;
 #[cfg(feature = "encoding-bech32")]
 use crate::error::Bech32Error;
 #[cfg(feature = "encoding-bech32")]
-use crate::utilities::conversion::fes_to_u8s;
+use crate::utilities::fes_to_u8s;
 
 #[cfg(feature = "encoding-bech32")]
 pub trait FromBech32mStr {

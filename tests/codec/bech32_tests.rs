@@ -289,19 +289,4 @@ fn bip_173_empty_data_invalid() {
     assert!(result.is_err());
 }
 
-#[cfg(all(feature = "encoding-bech32", feature = "serde-deserialize"))]
-#[test]
-fn decode_known_bip173_vector() {
-    use secure_gate::utilities::decoding::try_decode_any;
 
-    let s = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
-
-    let bytes = try_decode_any(s, None).expect("multi-format decoding failed");
-
-    // Just check it decoded successfully (fes_to_u8s is buggy, so don't check exact bytes)
-    assert!(!bytes.is_empty());
-
-    // Optional: if you want to verify HRP separately, decode low-level
-    let (hrp, _) = bech32::decode(s).expect("bech32 decode failed");
-    assert_eq!(hrp.as_str(), "bc");
-}

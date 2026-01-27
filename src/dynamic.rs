@@ -174,7 +174,7 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// ```
     /// # #[cfg(feature = "encoding-hex")]
-    /// use secure_gate::Dynamic;
+    /// use secure_gate::{Dynamic, ExposeSecret};
     /// let hex_string = "424344";
     /// let secret = Dynamic::try_from_hex(hex_string).unwrap();
     /// assert_eq!(secret.expose_secret().len(), 3);
@@ -212,10 +212,11 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// ```
     /// # #[cfg(feature = "encoding-bech32")]
-    /// use secure_gate::Dynamic;
-    /// let bech32_string = "abc1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw";
-    /// let secret = Dynamic::try_from_bech32(bech32_string).unwrap();
-    /// // HRP "abc" is discarded, bytes are stored
+    /// use secure_gate::{Dynamic, ExposeSecret, ToBech32};
+    /// let original: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3, 4]);
+    /// let bech32_string = original.with_secret(|s| s.to_bech32("test"));
+    /// let decoded = Dynamic::try_from_bech32(&bech32_string).unwrap();
+    /// // HRP "test" is discarded, bytes are stored
     /// ```
     pub fn try_from_bech32(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes) = s.try_from_bech32()?;

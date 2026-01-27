@@ -130,7 +130,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Use `ct_eq_auto(…, None)` for general-purpose equality checks; customize the threshold (e.g., `Some(64)`, `Some(1024)`) based on your benchmarks if the default 32 bytes isn't optimal. For detailed justification, see [CT_EQ_AUTO.md](CT_EQ_AUTO.md)
 - Audit every `CloneableType` / `SerializableType` impl
 - Validate and sanitize all inputs before encoding/decoding
-- Prefer specific format traits (`FromBech32Str`, `FromHexStr`, …) over `try_decode_any` when the expected format is known
+- Use specific format traits (`FromBech32Str`, `FromHexStr`, …) when the expected format is known
 - Probabilistic equality (`ct-eq-hash`): Negligible collision risk (~2⁻²⁵⁶), but use `ct_eq` for deterministic needs; bound input sizes to prevent DoS
 - Monitor dependency CVEs and update regularly
 - Treat secrets as radioactive — minimize exposure surface

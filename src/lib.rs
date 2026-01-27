@@ -48,7 +48,7 @@ mod error;
 /// Core traits for wrapper polymorphism - always available.
 mod traits;
 
-/// Public utility functions.
+/// Shared utility functions - always available.
 pub mod utilities;
 
 #[cfg(feature = "alloc")]
@@ -112,19 +112,3 @@ pub use error::HexError;
 
 /// Re-export of [`DecodingError`] for convenience in decoding operations.
 pub use error::DecodingError;
-
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32",
-    feature = "encoding-bech32m"
-))]
-pub use utilities::decoding::try_decode_any;
-/// Re-export decoding utilities for multi-format auto-decoding.
-#[cfg(any(
-    feature = "encoding-bech32",
-    feature = "encoding-bech32m",
-    feature = "encoding-hex",
-    feature = "encoding-base64"
-))]
-pub use utilities::decoding::Format;

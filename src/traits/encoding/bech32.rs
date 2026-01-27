@@ -4,7 +4,7 @@ use ::bech32;
 #[cfg(feature = "encoding-bech32")]
 use crate::error::Bech32Error;
 #[cfg(feature = "encoding-bech32")]
-use crate::utilities::conversion::convert_bits;
+use crate::utilities::convert_bits;
 
 //
 // Extension trait for encoding byte data to Bech32 strings with a specified Human-Readable Part (HRP).

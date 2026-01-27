@@ -203,7 +203,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// ```
     /// # #[cfg(feature = "encoding-hex")]
-    /// use secure_gate::Fixed;
+    /// use secure_gate::{Fixed, ExposeSecret};
     /// let hex_string = "424344"; // 3 bytes
     /// let secret: Fixed<[u8; 3]> = Fixed::try_from_hex(hex_string).unwrap();
     /// assert_eq!(secret.expose_secret()[0], 0x42);
@@ -261,10 +261,11 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// ```
     /// # #[cfg(feature = "encoding-bech32")]
-    /// use secure_gate::Fixed;
-    /// let bech32_string = "abc1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw"; // 32 bytes
-    /// let secret: Fixed<[u8; 32]> = Fixed::try_from_bech32(bech32_string).unwrap();
-    /// // HRP "abc" is discarded
+    /// use secure_gate::{Fixed, ExposeSecret, ToBech32};
+    /// let original = Fixed::new([1, 2, 3, 4]);
+    /// let bech32_string = original.with_secret(|s| s.to_bech32("test"));
+    /// let decoded = Fixed::<[u8; 4]>::try_from_bech32(&bech32_string).unwrap();
+    /// // HRP "test" is discarded
     /// ```
     pub fn try_from_bech32(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes): (_, Vec<u8>) = s.try_from_bech32()?;

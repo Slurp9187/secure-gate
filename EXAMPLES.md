@@ -383,18 +383,6 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
 }
 ```
 
-### Multi-Format Decoding Utility (Standalone)
-
-```rust
-#[cfg(feature = "encoding")]
-{
-    use secure_gate::utilities::decoding::try_decode_any;
-
-    // For non-serde use cases, try_decode_any still works
-    let bytes = try_decode_any("deadbeef", None).unwrap(); // detects hex
-}
-```
-
 ### Umbrella Traits (aggregates all enabled formats)
 
 ```rust
