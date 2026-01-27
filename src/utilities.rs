@@ -1,21 +1,15 @@
 //! Shared utility functions for the `secure-gate` crate.
 //!
-//! This module contains helpers used by both `Fixed` and `Dynamic` secret types,
-//! especially for random generation, constant-time / hash-based equality,
-//! and string decoding during deserialization.
+//! This module contains internal helpers for cryptographic operations,
+//! constant-time equality, and encoding utilities.
 
 #[cfg(feature = "ct-eq-hash")]
 use crate::ConstantTimeEq;
 
-// ─────────────────────────────────────────────────────────────────────────────
-//                Hash-based / constant-time equality helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Constant-time / hash-based equality check for arbitrary byte slices.
-///
-/// When the `rand` feature is enabled, uses a static random key + BLAKE3.
-/// Otherwise falls back to plain BLAKE3 (still constant-time via `ct_eq`).
+/// Constant-time hash-based equality check.
+/// Uses BLAKE3 with optional random keying for collision resistance.
 #[cfg(feature = "ct-eq-hash")]
+#[inline]
 pub(crate) fn ct_eq_hash_bytes(data1: &[u8], data2: &[u8]) -> bool {
     if data1.len() != data2.len() {
         return false;
@@ -54,12 +48,10 @@ pub(crate) fn ct_eq_hash_bytes(data1: &[u8], data2: &[u8]) -> bool {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//                   String → bytes decoding helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Local implementation of bit conversion for Bech32, since bech32 crate doesn't expose it in v0.11.
+/// Bit conversion utility for Bech32 encoding.
+/// Converts between different bit widths (e.g., 8-bit bytes to 5-bit values).
 #[cfg(feature = "encoding-bech32")]
+#[inline]
 pub(crate) fn convert_bits(
     from: u8,
     to: u8,
@@ -95,10 +87,10 @@ pub(crate) fn convert_bits(
     Ok((ret, bits as usize))
 }
 
-/// Convert 5-bit Fe32 values (from bech32 decode) back into 8-bit bytes.
-///
-/// Used internally during bech32 deserialization.
+/// Convert 5-bit values back to 8-bit bytes.
+/// Used during Bech32 decoding to reconstruct original byte data.
 #[cfg(feature = "encoding-bech32")]
+#[inline]
 pub(crate) fn fes_to_u8s<T: Into<u8>>(data: Vec<T>) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(data.len() * 5 / 8 + 1);
     let mut carry: u16 = 0;
@@ -126,29 +118,26 @@ mod tests {
 
     #[test]
     fn test_fes_to_u8s_small() {
-        // Small input: [0] (version 0) -> should produce empty or partial byte, but discarded
         let data = vec![0];
         let result = fes_to_u8s(data);
-        assert_eq!(result, Vec::<u8>::new()); // No full ...
+        assert_eq!(result, Vec::<u8>::new());
     }
 
     #[test]
     fn test_fes_to_u8s_bip173() {
-        // Test with BIP173 vector to ensure no overflow
+        // Test with BIP173 test vector
         let s = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
         let (hrp, data_5bit) = ::bech32::decode(s).expect("decode failed");
         assert_eq!(hrp.as_str(), "bc");
         let bytes = fes_to_u8s(data_5bit);
-        // Should produce some bytes without panicking
         assert!(!bytes.is_empty());
     }
 
     #[test]
     fn fes_to_u8s_large_input() {
-        let large_input = vec![31u8; 8192]; // 8192 × 5 = 40 960 bits ≈ 5 KB
+        let large_input = vec![31u8; 8192]; // 8192 × 5 = 40,960 bits ≈ 5 KB
         let result = fes_to_u8s(large_input);
-        assert_eq!(result.len(), 5120); // exact if no remainder
-                                        // Optional: check no panic, some non-zero bytes, etc.
-        assert!(result.iter().all(|&b| b == 255)); // since 31 is 11111, packed to 11111111
+        assert_eq!(result.len(), 5120);
+        assert!(result.iter().all(|&b| b == 255)); // 31 (11111) packs to 255 (11111111)
     }
 }
