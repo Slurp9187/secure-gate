@@ -386,7 +386,7 @@ where
     }
 }
 
-/// Custom serde deserialization for byte arrays with auto-detection of hex/base64/bech32 strings.
+/// Custom serde deserialization for byte arrays (direct to sequence).
 #[cfg(feature = "serde-deserialize")]
 impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -425,7 +425,7 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
             }
         }
 
-        deserializer.deserialize_any(FixedVisitor::<N>)
+        deserializer.deserialize_seq(FixedVisitor::<N>)
     }
 }
 
