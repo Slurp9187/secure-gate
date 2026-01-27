@@ -5,6 +5,15 @@ use alloc::boxed::Box;
 #[cfg(feature = "rand")]
 use rand::{rngs::OsRng, TryRngCore};
 
+#[cfg(feature = "encoding-base64")]
+use crate::traits::decoding::base64_url::FromBase64UrlStr;
+#[cfg(feature = "encoding-bech32")]
+use crate::traits::decoding::bech32::FromBech32Str;
+#[cfg(feature = "encoding-bech32m")]
+use crate::traits::decoding::bech32m::FromBech32mStr;
+#[cfg(feature = "encoding-hex")]
+use crate::traits::decoding::hex::FromHexStr;
+
 /// Dynamic-sized heap-allocated secure secret wrapper.
 ///
 /// This is a thin wrapper around `Box<T>` with enforced explicit exposure.
@@ -153,6 +162,83 @@ impl Dynamic<alloc::vec::Vec<u8>> {
             .try_fill_bytes(&mut bytes)
             .expect("OsRng failure is a program error");
         Self::from(bytes)
+    }
+}
+
+// Decoding constructors — only available with encoding features.
+#[cfg(feature = "encoding-hex")]
+impl Dynamic<alloc::vec::Vec<u8>> {
+    /// Decode a hex string into a Dynamic secret.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "encoding-hex")]
+    /// use secure_gate::Dynamic;
+    /// let hex_string = "424344";
+    /// let secret = Dynamic::try_from_hex(hex_string).unwrap();
+    /// assert_eq!(secret.expose_secret().len(), 3);
+    /// ```
+    pub fn try_from_hex(s: &str) -> Result<Self, crate::error::HexError> {
+        let bytes = s.try_from_hex()?;
+        Ok(Self::new(bytes))
+    }
+}
+
+#[cfg(feature = "encoding-base64")]
+impl Dynamic<alloc::vec::Vec<u8>> {
+    /// Decode a base64url string into a Dynamic secret.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "encoding-base64")]
+    /// use secure_gate::Dynamic;
+    /// let b64_string = "QkNE";
+    /// let secret = Dynamic::try_from_base64url(b64_string).unwrap();
+    /// assert_eq!(secret.expose_secret().len(), 3);
+    /// ```
+    pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
+        let bytes = s.try_from_base64url()?;
+        Ok(Self::new(bytes))
+    }
+}
+
+#[cfg(feature = "encoding-bech32")]
+impl Dynamic<alloc::vec::Vec<u8>> {
+    /// Decode a bech32 string into a Dynamic secret, discarding the HRP.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "encoding-bech32")]
+    /// use secure_gate::Dynamic;
+    /// let bech32_string = "abc1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw";
+    /// let secret = Dynamic::try_from_bech32(bech32_string).unwrap();
+    /// // HRP "abc" is discarded, bytes are stored
+    /// ```
+    pub fn try_from_bech32(s: &str) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes) = s.try_from_bech32()?;
+        Ok(Self::new(bytes))
+    }
+}
+
+#[cfg(feature = "encoding-bech32m")]
+impl Dynamic<alloc::vec::Vec<u8>> {
+    /// Decode a bech32m string into a Dynamic secret, discarding the HRP.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "encoding-bech32m")]
+    /// use secure_gate::Dynamic;
+    /// let bech32m_string = "abc1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw";
+    /// let secret = Dynamic::try_from_bech32m(bech32m_string).unwrap();
+    /// // HRP "abc" is discarded, bytes are stored
+    /// ```
+    pub fn try_from_bech32m(s: &str) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes) = s.try_from_bech32m()?;
+        Ok(Self::new(bytes))
     }
 }
 

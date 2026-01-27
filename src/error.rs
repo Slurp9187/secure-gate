@@ -21,22 +21,28 @@ pub enum Bech32Error {
     OperationFailed,
     #[error("unexpected HRP: expected {expected}, got {got}")]
     UnexpectedHrp { expected: String, got: String },
+    #[error("decoded length mismatch: expected {expected}, got {got}")]
+    InvalidLength { expected: usize, got: usize },
 }
 
 #[cfg(feature = "encoding-base64")]
 /// Error type for Base64 decoding operations.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Base64Error {
     #[error("invalid base64 string")]
     InvalidBase64,
+    #[error("decoded length mismatch: expected {expected}, got {got}")]
+    InvalidLength { expected: usize, got: usize },
 }
 
 #[cfg(feature = "encoding-hex")]
 /// Error type for Hex decoding operations.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum HexError {
     #[error("invalid hex string")]
     InvalidHex,
+    #[error("decoded length mismatch: expected {expected}, got {got}")]
+    InvalidLength { expected: usize, got: usize },
 }
 
 /// Unified error type for decoding operations across formats.

@@ -39,28 +39,24 @@ fn test_string_to_base64url() {
     assert_eq!(b64, "aGVsbG8");
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-base64"))]
+#[cfg(feature = "encoding-base64")]
 #[test]
-fn fixed_deserialize_base64_string() {
+fn fixed_try_from_base64url() {
     use secure_gate::{ExposeSecret, Fixed};
-    // Valid base64 for 4 bytes: "AQIDBA=="
-    let result: Fixed<[u8; 4]> = serde_json::from_str("\"AQIDBA==\"").unwrap();
+    // Valid base64url for 4 bytes: "AQIDBA"
+    let result = Fixed::try_from_base64url("AQIDBA").unwrap();
     result.with_secret(|r| assert_eq!(r, &[1, 2, 3, 4]));
     // Invalid: wrong length
-    let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str("\"AQ\""); // 1 byte
+    let result: Result<Fixed<[u8; 4]>, _> = Fixed::try_from_base64url("AQ"); // 1 byte
     assert!(result.is_err());
 }
 
-#[cfg(all(
-    feature = "serde-deserialize",
-    feature = "encoding-base64",
-    feature = "alloc"
-))]
+#[cfg(feature = "encoding-base64")]
 #[test]
-fn dynamic_deserialize_base64_string() {
+fn dynamic_try_from_base64url() {
     use secure_gate::{Dynamic, ExposeSecret};
-    // Valid base64
-    let result: Dynamic<Vec<u8>> = serde_json::from_str("\"AQIDBA==\"").unwrap();
+    // Valid base64url
+    let result = Dynamic::try_from_base64url("AQIDBA").unwrap();
     result.with_secret(|r| assert_eq!(r, &[1, 2, 3, 4]));
 }
 

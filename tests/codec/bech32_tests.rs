@@ -1,5 +1,6 @@
 #![cfg(any(
     feature = "encoding-bech32",
+    feature = "encoding-bech32m",
     all(feature = "serde-deserialize", feature = "encoding-bech32")
 ))]
 
@@ -89,51 +90,43 @@ fn test_bech32_encoding_failure() {
     let _ = data.to_bech32("test");
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
+#[cfg(feature = "encoding-bech32")]
 #[test]
-fn fixed_deserialize_bech32_roundtrip() {
+fn fixed_try_from_bech32_roundtrip() {
     use secure_gate::{ExposeSecret, Fixed};
     let original: Fixed<[u8; 4]> = Fixed::new([1, 2, 3, 4]);
     let encoded = original.with_secret(|s| s.to_bech32("test"));
-    let json = format!("\"{}\"", encoded);
-    let decoded: Fixed<[u8; 4]> = serde_json::from_str(&json).unwrap();
+    let decoded = Fixed::try_from_bech32(&encoded).unwrap();
     original.with_secret(|o| decoded.with_secret(|d| assert_eq!(o, d)));
 }
 
-#[cfg(all(
-    feature = "serde-deserialize",
-    feature = "encoding-bech32",
-    feature = "alloc"
-))]
+#[cfg(feature = "encoding-bech32")]
 #[test]
-fn dynamic_deserialize_bech32_roundtrip() {
+fn dynamic_try_from_bech32_roundtrip() {
     use secure_gate::{Dynamic, ExposeSecret};
     let original: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3, 4]);
     let encoded = original.with_secret(|s| s.to_bech32("test"));
-    let json = format!("\"{}\"", encoded);
-    let decoded: Dynamic<Vec<u8>> = serde_json::from_str(&json).unwrap();
+    let decoded = Dynamic::try_from_bech32(&encoded).unwrap();
     original.with_secret(|o| decoded.with_secret(|d| assert_eq!(o, d)));
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
+#[cfg(feature = "encoding-bech32m")]
 #[test]
-fn fixed_deserialize_bech32m_roundtrip() {
+fn fixed_try_from_bech32m_roundtrip() {
     use secure_gate::{ExposeSecret, Fixed};
     let original: Fixed<[u8; 4]> = Fixed::new([1, 2, 3, 4]);
     let encoded = original.with_secret(|s| s.to_bech32m("test"));
-    let json = format!("\"{}\"", encoded);
-    let decoded: Fixed<[u8; 4]> = serde_json::from_str(&json).unwrap();
+    let decoded = Fixed::try_from_bech32m(&encoded).unwrap();
     original.with_secret(|o| decoded.with_secret(|d| assert_eq!(o, d)));
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-bech32"))]
+#[cfg(feature = "encoding-bech32m")]
 #[test]
-fn dynamic_deserialize_bech32m_roundtrip() {
+fn dynamic_try_from_bech32m_roundtrip() {
     use secure_gate::{Dynamic, ExposeSecret};
     let original: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3, 4]);
     let encoded = original.with_secret(|s| s.to_bech32m("test"));
-    let json = format!("\"{}\"", encoded);
-    let decoded: Dynamic<Vec<u8>> = serde_json::from_str(&json).unwrap();
+    let decoded = Dynamic::try_from_bech32m(&encoded).unwrap();
     original.with_secret(|o| decoded.with_secret(|d| assert_eq!(o, d)));
 }
 
@@ -199,7 +192,7 @@ fn bech32_hrp_case_insensitive() {
     assert_eq!(decoded_lower, decoded_upper);
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 #[test]
 fn test_string_from_bech32m() {
     let data = [0x00];
@@ -209,7 +202,7 @@ fn test_string_from_bech32m() {
     assert_eq!(decoded, data);
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 #[test]
 fn test_string_from_bech32m_expect_hrp() {
     let data = [0x00];
@@ -218,7 +211,7 @@ fn test_string_from_bech32m_expect_hrp() {
     assert_eq!(decoded, data);
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 #[test]
 fn test_invalid_bech32m_string() {
     let invalid = "invalid";
@@ -226,7 +219,7 @@ fn test_invalid_bech32m_string() {
     assert!(result.is_err());
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 #[test]
 fn test_bech32m_wrong_hrp() {
     let bech32m = "test1vw3q3p";
@@ -251,7 +244,7 @@ fn bip_173_valid_bech32_example() {
     assert!(result_bech32m.is_err());
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 #[test]
 fn bip_350_valid_bech32m_example() {
     // Valid Bech32m string: should decode with FromBech32mStr, fail with FromBech32Str
@@ -277,7 +270,7 @@ fn bip_173_invalid_checksum() {
     assert!(result_bech32m.is_err()); // Also invalid as Bech32m
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 #[test]
 fn bip_350_invalid_bech32m_checksum() {
     // String valid as Bech32 but invalid as Bech32m (checksum mismatch for Bech32m)

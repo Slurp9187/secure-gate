@@ -38,6 +38,15 @@
 /// ```
 #[cfg(feature = "rand")]
 use rand::{rngs::OsRng, TryRngCore};
+
+#[cfg(feature = "encoding-base64")]
+use crate::traits::decoding::base64_url::FromBase64UrlStr;
+#[cfg(feature = "encoding-bech32")]
+use crate::traits::decoding::bech32::FromBech32Str;
+#[cfg(feature = "encoding-bech32m")]
+use crate::traits::decoding::bech32m::FromBech32mStr;
+#[cfg(feature = "encoding-hex")]
+use crate::traits::decoding::hex::FromHexStr;
 pub struct Fixed<T> {
     inner: T,
 }
@@ -180,6 +189,123 @@ impl<const N: usize> Fixed<[u8; N]> {
             .try_fill_bytes(&mut bytes)
             .expect("OsRng failure is a program error");
         Self::from(bytes)
+    }
+}
+
+// Decoding constructors — only available with encoding features.
+#[cfg(feature = "encoding-hex")]
+impl<const N: usize> Fixed<[u8; N]> {
+    /// Decode a hex string into a Fixed secret.
+    ///
+    /// The decoded bytes must exactly match the array length `N`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "encoding-hex")]
+    /// use secure_gate::Fixed;
+    /// let hex_string = "424344"; // 3 bytes
+    /// let secret: Fixed<[u8; 3]> = Fixed::try_from_hex(hex_string).unwrap();
+    /// assert_eq!(secret.expose_secret()[0], 0x42);
+    /// ```
+    pub fn try_from_hex(s: &str) -> Result<Self, crate::error::HexError> {
+        let bytes: Vec<u8> = s.try_from_hex()?;
+        if bytes.len() != N {
+            return Err(crate::error::HexError::InvalidLength {
+                expected: N,
+                got: bytes.len(),
+            });
+        }
+        let mut arr = [0u8; N];
+        arr.copy_from_slice(&bytes);
+        Ok(Self::new(arr))
+    }
+}
+
+#[cfg(feature = "encoding-base64")]
+impl<const N: usize> Fixed<[u8; N]> {
+    /// Decode a base64url string into a Fixed secret.
+    ///
+    /// The decoded bytes must exactly match the array length `N`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "encoding-base64")]
+    /// use secure_gate::Fixed;
+    /// let b64_string = "QkNE"; // 3 bytes
+    /// let secret: Fixed<[u8; 3]> = Fixed::try_from_base64url(b64_string).unwrap();
+    /// assert_eq!(secret.expose_secret()[0], 0x42);
+    /// ```
+    pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
+        let bytes: Vec<u8> = s.try_from_base64url()?;
+        if bytes.len() != N {
+            return Err(crate::error::Base64Error::InvalidLength {
+                expected: N,
+                got: bytes.len(),
+            });
+        }
+        let mut arr = [0u8; N];
+        arr.copy_from_slice(&bytes);
+        Ok(Self::new(arr))
+    }
+}
+
+#[cfg(feature = "encoding-bech32")]
+impl<const N: usize> Fixed<[u8; N]> {
+    /// Decode a bech32 string into a Fixed secret, discarding the HRP.
+    ///
+    /// The decoded bytes must exactly match the array length `N`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "encoding-bech32")]
+    /// use secure_gate::Fixed;
+    /// let bech32_string = "abc1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw"; // 32 bytes
+    /// let secret: Fixed<[u8; 32]> = Fixed::try_from_bech32(bech32_string).unwrap();
+    /// // HRP "abc" is discarded
+    /// ```
+    pub fn try_from_bech32(s: &str) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes): (_, Vec<u8>) = s.try_from_bech32()?;
+        if bytes.len() != N {
+            return Err(crate::error::Bech32Error::InvalidLength {
+                expected: N,
+                got: bytes.len(),
+            });
+        }
+        let mut arr = [0u8; N];
+        arr.copy_from_slice(&bytes);
+        Ok(Self::new(arr))
+    }
+}
+
+#[cfg(feature = "encoding-bech32m")]
+impl<const N: usize> Fixed<[u8; N]> {
+    /// Decode a bech32m string into a Fixed secret, discarding the HRP.
+    ///
+    /// The decoded bytes must exactly match the array length `N`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(feature = "encoding-bech32m")]
+    /// use secure_gate::Fixed;
+    /// let bech32m_string = "abc1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw"; // 32 bytes
+    /// let secret: Fixed<[u8; 32]> = Fixed::try_from_bech32m(bech32m_string).unwrap();
+    /// // HRP "abc" is discarded
+    /// ```
+    pub fn try_from_bech32m(s: &str) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes): (_, Vec<u8>) = s.try_from_bech32m()?;
+        if bytes.len() != N {
+            return Err(crate::error::Bech32Error::InvalidLength {
+                expected: N,
+                got: bytes.len(),
+            });
+        }
+        let mut arr = [0u8; N];
+        arr.copy_from_slice(&bytes);
+        Ok(Self::new(arr))
     }
 }
 

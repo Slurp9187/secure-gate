@@ -83,12 +83,8 @@ mod ct_eq_wrapper_proptests {
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
 mod encoding_roundtrip_proptests {
     use proptest::prelude::*;
-    #[cfg(feature = "serde-deserialize")]
-    use secure_gate::ExposeSecret;
     #[cfg(feature = "serde-serialize")]
     use secure_gate::SerializableType;
-    #[cfg(feature = "encoding-bech32")]
-    use secure_gate::{ToBech32, ToHex};
 
     #[cfg(feature = "serde-serialize")]
     #[derive(serde::Serialize, serde::Deserialize)]
