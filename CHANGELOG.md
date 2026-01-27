@@ -7,9 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.0] - 2026-01-25
 
-### Changed
-- **Serde deserialization simplified**: Removed auto-decoding from strings (hex/base64/bech32) for direct binary deserialization only. Aligns with secrecy crate security model. Users must manually decode encoded strings using `FromHexStr`, `FromBase64UrlStr`, `FromBech32Str` traits before serde deserialization. Encoding traits unchanged.
-
 ### Added
 
 - **Polymorphic access traits**
@@ -38,13 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Per-format encoding/decoding traits**
   Symmetric, orthogonal traits (e.g., `ToHex`/`FromHexStr`, `ToBase64Url`/`FromBase64UrlStr`, `ToBech32`/`FromBech32Str`, `ToBech32m`/`FromBech32mStr`). Umbrella traits `SecureEncoding`/`SecureDecoding` for aggregation. Multi-format auto-decoding (`try_decode_any`). Granular features: `encoding-hex`, `encoding-base64`, `encoding-bech32`.
 
-### Changed
-
-- Default features now include `alloc` to preserve behavior.
-- Features like `zeroize`, `rand`, `ct-eq-hash`, `serde-deserialize` now depend on `alloc` where needed.
-- `encoding-bech32` now includes both Bech32/BIP-173 and Bech32m/BIP-350 support (merged from separate `encoding-bech32m`).
-- Updated docs for heap/no-heap builds; added compile-time checks for feature conflicts.
-
 - **Opt-in cloning & serialization**
   New marker traits `CloneableType` and `SerializableType`. Cloning and serde serialization now require explicit impls on the inner type — no automatic risk.
 
@@ -66,7 +56,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Documentation**
   New `SECURITY.md`, enhanced README, custom rustdoc for alias macros.
 
+- **Serde support**
+  Bare-bones deserialization for direct binary data only (no auto-decoding from strings). Aligns with secrecy crate security model. Encoding traits unchanged. Split into `serde-deserialize` (always available) and `serde-serialize` (gated by `SerializableType` marker).
+
 ### Changed
+
+- Default features now include `alloc` to preserve behavior.
+- Features like `zeroize`, `rand`, `ct-eq-hash`, `serde-deserialize` now depend on `alloc` where needed.
+- `encoding-bech32` now includes both Bech32/BIP-173 and Bech32m/BIP-350 support (merged from separate `encoding-bech32m`).
+- Updated docs for heap/no-heap builds; added compile-time checks for feature conflicts.
 
 - **Secure-by-default exposure model**
   Private `inner` fields in `Dynamic<T>` and `Fixed<T>`; all access now requires explicit `.expose_secret()` / `.with_secret()` (scoped, recommended) or `.expose_secret_mut()` / `.with_secret_mut()`. No `Deref`, `AsRef`, or implicit borrowing — prevents accidental leaks.
@@ -81,9 +79,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Cloning**
   Removed implicit `Clone` on wrappers; now opt-in via `CloneableType` marker on inner type.
-
-- **Serialization**
-  Split `serde` into `serde-deserialize` (always available) and `serde-serialize` (gated by `SerializableType` marker).
 
 - **Exposure API**
   Removed any implicit borrowing paths. All access now explicit.
