@@ -348,20 +348,19 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
 }
 ```
 
-### Serde Auto-Decoding (hex/base64url/bech32/bech32m)
+### Serde Direct Binary Deserialization
 
 ```rust
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex", feature = "alloc", feature = "rand"))]
+#[cfg(all(feature = "serde-deserialize", feature = "alloc", feature = "rand"))]
 {
-    use secure_gate::{Dynamic, ExposeSecret, ToHex};
+    use secure_gate::{Dynamic, ExposeSecret};
     use serde_json;
     extern crate alloc;
 
-    // Round-trip: encode to hex, serialize to JSON, then deserialize with auto-decoding
+    // Round-trip: serialize binary data to JSON array, then deserialize directly
     let original: Dynamic<Vec<u8>> = Dynamic::from_random(4);
-    let hex = original.with_secret(|s: &Vec<u8>| s.to_hex());
-    let decoded: Dynamic<Vec<u8>> = serde_json::from_str(&format!("\"{}\"", hex)).unwrap();
-    // Auto-decoding handles hex format transparently
+    let json = serde_json::to_string(original.expose_secret()).unwrap();
+    let decoded: Dynamic<Vec<u8>> = serde_json::from_str(&json).unwrap();
     assert_eq!(original.expose_secret(), decoded.expose_secret());
 }
 ```
@@ -369,17 +368,33 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
 ### Manual Decoding with Specific Traits
 
 ```rust
-#[cfg(all(feature = "encoding-hex", feature = "encoding-base64", feature = "encoding-bech32"))]
+#[cfg(all(feature = "encoding-hex", feature = "encoding-base64"))]
 {
-    use secure_gate::{FromHexStr, FromBase64UrlStr, FromBech32Str};
+    use secure_gate::{Fixed, FromHexStr, FromBase64UrlStr};
 
     // Decode specific formats manually
     let hex_bytes = "deadbeef".try_from_hex().unwrap();
-    let b64_bytes = "SGVsbG8=".try_from_base64url().unwrap();
-    let bech32_bytes = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4".try_from_bech32().unwrap();
+    let b64_bytes = "aGVsbG8".try_from_base64url().unwrap();
 
     // Then wrap in secure types
-    let key = secure_gate::Fixed::new(hex_bytes.as_slice().try_into().unwrap());
+    let key: Fixed<[u8; 4]> = secure_gate::Fixed::new(hex_bytes.as_slice().try_into().unwrap());
+}
+```
+
+### Explicit Decoding Constructors on Wrappers
+
+```rust
+#[cfg(all(feature = "encoding-hex", feature = "encoding-base64", feature = "alloc"))]
+{
+    use secure_gate::{Dynamic, Fixed, ExposeSecret};
+    extern crate alloc;
+
+    // Direct construction from encoded strings (new in v0.7.0)
+    let fixed_key = Fixed::<[u8; 4]>::try_from_hex("deadbeef").unwrap();
+    let dynamic_data = Dynamic::<Vec<u8>>::try_from_base64url("aGVsbG8").unwrap();
+
+    assert_eq!(fixed_key.expose_secret(), &[0xde, 0xad, 0xbe, 0xef]);
+    assert_eq!(dynamic_data.expose_secret(), b"hello");
 }
 ```
 
@@ -399,16 +414,16 @@ Per-format symmetric traits for orthogonal encoding/decoding (e.g., `ToHex` / `F
 
 ## 6. Serde (Deserialize & Serialize)
 
-Deserialize (auto-detects encoding):
+Deserialize (direct binary from JSON array):
 
 ```rust
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex", feature = "alloc"))]
+#[cfg(all(feature = "serde-deserialize", feature = "alloc"))]
 {
     use secure_gate::Dynamic;
     use serde_json;
     extern crate alloc;
 
-    let json = r#""2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a""#;
+    let json = r#"[42,42,42,42]"#;
     let key: Dynamic<Vec<u8>> = serde_json::from_str(json).unwrap();
 }
 ```
