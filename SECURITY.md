@@ -53,7 +53,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 | Feature              | Security Impact                                                                 | Recommendation                              |
 |----------------------|----------------------------------------------------------------------------------|---------------------------------------------|
-| `secure` (default)   | Enables `zeroize` + `ct-eq` — secure-by-default baseline                         | Always enable unless extreme constraints    |
+| `secure` (default)   | Enables `zeroize` + `alloc` — secure-by-default baseline with heap support      | Always enable unless extreme constraints    |
 | `zeroize`            | Wipes memory on drop; enables safe opt-in cloning/serialization                  | Strongly recommended                        |
 | `ct-eq`              | Timing-safe direct byte comparison                                               | Strongly recommended; avoid `==`            |
 | `ct-eq-hash`         | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `ct_eq_auto` for most cases           |

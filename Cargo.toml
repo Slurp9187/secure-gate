@@ -50,8 +50,8 @@ no-alloc = [] # Explicit opt-out: disables heap (conflicts with alloc — docume
 # Default feature: Enforces secure handling with zeroization and constant-time operations
 default = ["secure"]
 
-# Secure: Essential for secure secret handling (includes zeroize and ct-eq)
-secure = ["zeroize", "ct-eq", "alloc"]
+# Secure: Essential for secure secret handling (includes zeroize and alloc)
+secure = ["zeroize", "alloc"]
 
 # Zeroize: Secure zeroing of secrets on drop or explicit calls (uses 'zeroize' crate with alloc and derives)
 zeroize = ["dep:zeroize", "blake3/zeroize", "zeroize/alloc"]

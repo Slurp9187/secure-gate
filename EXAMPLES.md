@@ -5,7 +5,7 @@ Real-world, copy-paste-ready examples for `secure-gate`.
 All examples assume the **recommended secure defaults** (includes zeroize, ct-eq, and alloc for heap support):
 ```toml
 [dependencies]
-secure-gate = { version = "0.7.0-rc.11", features = ["secure"] } # zeroize + ct-eq + alloc
+secure-gate = { version = "0.7.0-rc.11", features = ["secure"] } # zeroize + alloc
 ```
 
 For maximum functionality (including `ct-eq-hash`, encodings, serde, etc.), use:

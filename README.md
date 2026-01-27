@@ -32,7 +32,7 @@
   
   **Recommended secure defaults**:
   ```toml
-  secure-gate = { version = "0.7.0-rc.11", features = ["secure"] }  # zeroize + ct-eq
+  secure-gate = { version = "0.7.0-rc.11", features = ["secure"] }  # zeroize + alloc
   ```
   
   **Batteries-included** (most features):
@@ -49,7 +49,7 @@
 
   | Feature                | Description                                                                 |
   |------------------------|-----------------------------------------------------------------------------|
-  | `secure` (default)     | Meta: `zeroize` + `ct-eq` + `alloc` (wiping + timing-safe equality + heap support) |
+  | `secure` (default)     | Meta: `zeroize` + `alloc` (wiping + heap support) |
   | `zeroize`              | Zero memory on drop                                                         |
   | `ct-eq`                | `ConstantTimeEq` trait (prevents timing attacks)                            |
   | `ct-eq-hash`           | `ConstantTimeEqExt` trait: BLAKE3-based equality (fast for large/variable secrets)     |
@@ -75,9 +75,9 @@
 
   | Goal | Features | Result |
   |------------------|-----------------------------|------------------------------------------------------|
-  | Default secure (heap + stack) | `secure` (default) | `Fixed<T>` + `Dynamic<T>`, zeroize, ct-eq |
-  | Secure with no-heap | `secure + no-alloc` | `Fixed<T>` only, zeroize, ct-eq |
-  | Minimal (discouraged) | `no-alloc` | `Fixed<T>` only, no zeroize/ct-eq |
+  | Default secure (heap + stack) | `secure` (default) | `Fixed<T>` + `Dynamic<T>`, zeroize, alloc |
+  | Secure with no-heap | `secure + no-alloc` | `Fixed<T>` only, zeroize |
+  | Minimal (discouraged) | `no-alloc` | `Fixed<T>` only, no zeroize |
   | Full featured | `full` | All features enabled |
 
   ### Heap vs No-Heap Builds
@@ -85,20 +85,22 @@
   secure-gate **defaults to heap-enabled** (via `secure` pulling `alloc`):
 
   ```toml
-  secure-gate = "0.7"  # Fixed<T> + Dynamic<T> + zeroize/ct-eq
+  secure-gate = "0.7"  # Fixed<T> + Dynamic<T> + zeroize/alloc
   ```
 
   For **no-heap / embedded** (only `Fixed<T>`):
 
   ```toml
   secure-gate = { version = "0.7", default-features = false, features = ["no-alloc"] }  # Minimal, no-heap
-  # or with secure (zeroize/ct-eq on Fixed<T>):
+  # or with secure (zeroize on Fixed<T>):
   secure-gate = { version = "0.7", features = ["secure", "no-alloc"] }
   ```
 
   Note: The "pass-through wrapper" principle holds for `Fixed<T>` in all builds (zero-cost explicit exposure + optional zeroize). `Dynamic<T>` requires heap and is unavailable in no-alloc mode.
 
   **Warning**: Enabling both `alloc` and `no-alloc` features allows `alloc` to take precedence (e.g., with `--all-features` for docs generation or CI). Prefer enabling only one feature for predictable builds.
+
+
 
   ## Quick Start
 
@@ -141,7 +143,7 @@
   - **Explicit access only** — `.with_secret()` / `.expose_secret()` required
   - **No implicit leaks** — no `Deref`/`AsRef`/`Copy` by default
   - **Zeroize** on drop (`zeroize` feature)
-  - **Timing-safe** equality (`ct-eq`)
+  - **Timing-safe** equality (optional `ct-eq` feature)
   - **Probabilistic fast equality** for big data (`hash-eq`)
   - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
   
