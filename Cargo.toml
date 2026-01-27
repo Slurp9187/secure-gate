@@ -1,6 +1,6 @@
 [package]
 name = "secure-gate"
-version = "0.7.0-rc.11"
+version = "0.7.0-rc.12"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Zero-cost secure wrappers for secrets — heap for dynamic, stack for fixed"
@@ -45,7 +45,8 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 alloc = []
 std = ["alloc"]
-no-alloc = [] # Explicit opt-out: disables heap (conflicts with alloc — document it)
+no-alloc = [
+] # Explicit opt-out: disables heap (conflicts with alloc — document it)
 
 # Default feature: Enforces secure handling with zeroization and constant-time operations
 default = ["secure"]
@@ -96,14 +97,7 @@ serde-serialize = ["dep:serde", "serde/alloc", "alloc"]
 
 # Full: batteries-included for most real-world usage (no redundancies)
 # Includes secure defaults + all encodings + fast equality + cloning + serde round-trip + secure RNG
-full = [
-  "secure",
-  "rand",
-  "encoding",
-  "ct-eq-hash",
-  "cloneable",
-  "serde",
-]
+full = ["secure", "rand", "encoding", "ct-eq-hash", "cloneable", "serde"]
 
 [[bench]]
 name = "ct_eq_auto"

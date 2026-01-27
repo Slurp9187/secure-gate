@@ -69,11 +69,11 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
+      - name: Run clippy (${{ matrix.name }})
+        run: cargo clippy --tests --benches ${{ matrix.features }}
+
       - name: Run tests (${{ matrix.name }})
         run: cargo test --tests ${{ matrix.features }}
 
       - name: Run doctests (${{ matrix.name }})
         run: cargo test --doc ${{ matrix.features }}
-
-      - name: Run clippy (${{ matrix.name }})
-        run: cargo clippy --tests --benches ${{ matrix.features }}
