@@ -118,16 +118,26 @@ pub fn try_decode_any(
             Format::Bech32 => {
                 use super::conversion::fes_to_u8s;
                 use ::bech32;
-                if let Ok((_, data)) = bech32::decode(s) {
-                    return Ok(fes_to_u8s(data));
+                if let Ok((hrp, data)) = bech32::decode(s) {
+                    // Validate that it is Bech32 variant by re-encoding
+                    if let Ok(re_encoded) = bech32::encode::<bech32::Bech32>(hrp, &data) {
+                        if re_encoded == s {
+                            return Ok(fes_to_u8s(data));
+                        }
+                    }
                 }
             }
             #[cfg(feature = "encoding-bech32m")]
             Format::Bech32m => {
                 use super::conversion::fes_to_u8s;
                 use ::bech32;
-                if let Ok((_, data)) = bech32::decode(s) {
-                    return Ok(fes_to_u8s(data));
+                if let Ok((hrp, data)) = bech32::decode(s) {
+                    // Validate that it is Bech32m variant by re-encoding
+                    if let Ok(re_encoded) = bech32::encode::<bech32::Bech32m>(hrp, &data) {
+                        if re_encoded == s {
+                            return Ok(fes_to_u8s(data));
+                        }
+                    }
                 }
             }
 
@@ -139,9 +149,9 @@ pub fn try_decode_any(
             }
             #[cfg(feature = "encoding-base64")]
             Format::Base64Url => {
-                use ::base64::engine::general_purpose::URL_SAFE;
+                use ::base64::engine::general_purpose::URL_SAFE_NO_PAD;
                 use ::base64::Engine as _;
-                if let Ok(data) = URL_SAFE.decode(s) {
+                if let Ok(data) = URL_SAFE_NO_PAD.decode(s) {
                     return Ok(data);
                 }
             }
