@@ -47,9 +47,6 @@ mod error;
 /// Core traits for wrapper polymorphism - always available.
 mod traits;
 
-/// Shared utility functions - always available.
-pub mod utilities;
-
 #[cfg(feature = "alloc")]
 /// Re-export of the [`Dynamic`] type.
 pub use dynamic::Dynamic;

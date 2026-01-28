@@ -48,6 +48,11 @@ pub use constant_time_eq_ext::ConstantTimeEqExt;
 pub mod decoding;
 pub mod encoding;
 
+pub(crate) mod helpers;
+
+#[cfg(feature = "ct-eq-hash")]
+pub(crate) use helpers::ct_eq_hash::ct_eq_hash_bytes;
+
 #[cfg(feature = "encoding-base64")]
 pub use decoding::FromBase64UrlStr;
 #[cfg(feature = "encoding-bech32")]

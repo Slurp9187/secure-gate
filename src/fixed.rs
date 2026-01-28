@@ -353,7 +353,7 @@ where
     }
 
     fn ct_eq_hash(&self, other: &Self) -> bool {
-        crate::utilities::ct_eq_hash_bytes(self.inner.as_ref(), other.inner.as_ref())
+        crate::traits::ct_eq_hash_bytes(self.inner.as_ref(), other.inner.as_ref())
     }
 }
 

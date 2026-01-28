@@ -83,11 +83,15 @@ fn test_invalid_hrp_bech32() {
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
-#[should_panic(expected = "bech32 encoding failed")]
-fn test_bech32_encoding_failure() {
-    // This might not actually fail, but as an example of potential encoding errors
-    let data: Vec<u8> = vec![255; 1000]; // Very long data might cause issues, but bech32 can handle large data
-    let _ = data.to_bech32("test");
+fn test_bech32_large_success() {
+    let data: Vec<u8> = vec![255u8; 1000]; // Large data, with Bech32 checksum (CODE_LENGTH=4096)
+    let bech = data.to_bech32("test");
+    assert!(bech.starts_with("test1"));
+
+    // Roundtrip verify
+    let (hrp, decoded) = bech.try_from_bech32().unwrap();
+    assert_eq!(hrp, "test");
+    assert_eq!(decoded, data);
 }
 
 #[cfg(feature = "encoding-bech32")]

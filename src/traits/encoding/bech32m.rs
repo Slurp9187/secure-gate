@@ -1,10 +1,7 @@
 #[cfg(feature = "encoding-bech32")]
-use ::bech32;
-
+use super::super::helpers::bech32::{encode_lower, Bech32m, Hrp};
 #[cfg(feature = "encoding-bech32")]
-use crate::error::Bech32Error;
-#[cfg(feature = "encoding-bech32")]
-use crate::utilities::convert_bits;
+use crate::error::Bech32Error; // Capped mode
 
 /// Extension trait for encoding byte data to Bech32m strings with a specified Human-Readable Part (HRP).
 ///
@@ -52,10 +49,8 @@ pub trait ToBech32m {
 impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
     #[inline(always)]
     fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
-        let (converted, _) =
-            convert_bits(8, 5, true, self.as_ref()).expect("bech32 bit conversion failed");
-        let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
-        bech32::encode::<bech32::Bech32m>(hrp_parsed, &converted).expect("bech32m encoding failed")
+        let hrp_parsed = Hrp::parse(hrp).expect("invalid hrp");
+        encode_lower::<Bech32m>(hrp_parsed, self.as_ref()).expect("bech32m encoding failed")
     }
 
     #[inline(always)]
@@ -64,9 +59,7 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
         hrp: &str,
         expected_hrp: Option<&str>,
     ) -> Result<alloc::string::String, Bech32Error> {
-        let (converted, _) =
-            convert_bits(8, 5, true, self.as_ref()).map_err(|_| Bech32Error::ConversionFailed)?;
-        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
+        let hrp_parsed = Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
         if let Some(exp) = expected_hrp {
             if hrp != exp {
                 return Err(Bech32Error::UnexpectedHrp {
@@ -75,7 +68,6 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
                 });
             }
         }
-        bech32::encode::<bech32::Bech32m>(hrp_parsed, &converted)
-            .map_err(|_| Bech32Error::OperationFailed)
+        encode_lower::<Bech32m>(hrp_parsed, self.as_ref()).map_err(|_| Bech32Error::OperationFailed)
     }
 }

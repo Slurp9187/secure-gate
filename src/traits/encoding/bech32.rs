@@ -1,10 +1,7 @@
 #[cfg(feature = "encoding-bech32")]
-use ::bech32;
-
+use super::super::helpers::bech32::{encode_lower, Bech32Large, Hrp};
 #[cfg(feature = "encoding-bech32")]
-use crate::error::Bech32Error;
-#[cfg(feature = "encoding-bech32")]
-use crate::utilities::convert_bits;
+use crate::error::Bech32Error; // With checksum, large CODE_LENGTH
 
 //
 // Extension trait for encoding byte data to Bech32 strings with a specified Human-Readable Part (HRP).
@@ -47,10 +44,8 @@ pub trait ToBech32 {
 impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
     #[inline(always)]
     fn to_bech32(&self, hrp: &str) -> alloc::string::String {
-        let (converted, _) =
-            convert_bits(8, 5, true, self.as_ref()).expect("bech32 bit conversion failed");
-        let hrp_parsed = bech32::Hrp::parse(hrp).expect("invalid hrp");
-        bech32::encode::<bech32::Bech32>(hrp_parsed, &converted).expect("bech32 encoding failed")
+        let hrp_parsed = Hrp::parse(hrp).expect("invalid hrp");
+        encode_lower::<Bech32Large>(hrp_parsed, self.as_ref()).expect("bech32 encoding failed")
     }
 
     #[inline(always)]
@@ -59,9 +54,7 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
         hrp: &str,
         expected_hrp: Option<&str>,
     ) -> Result<alloc::string::String, Bech32Error> {
-        let (converted, _) =
-            convert_bits(8, 5, true, self.as_ref()).map_err(|_| Bech32Error::ConversionFailed)?;
-        let hrp_parsed = bech32::Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
+        let hrp_parsed = Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
         if let Some(exp) = expected_hrp {
             if hrp != exp {
                 return Err(Bech32Error::UnexpectedHrp {
@@ -70,7 +63,7 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
                 });
             }
         }
-        bech32::encode::<bech32::Bech32>(hrp_parsed, &converted)
+        encode_lower::<Bech32Large>(hrp_parsed, self.as_ref())
             .map_err(|_| Bech32Error::OperationFailed)
     }
 }
