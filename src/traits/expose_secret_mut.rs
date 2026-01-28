@@ -19,12 +19,7 @@ use crate::ExposeSecret;
 /// Trait for mutable access to secrets.
 ///
 /// Extends [`ExposeSecret`], so metadata and read access are included.
-/// Inherits:
-/// ```ignore
-/// .len()
-/// .is_empty()
-/// ```
-/// from [`ExposeSecret`].
+/// Inherits `.len()` and `.is_empty()` from [`ExposeSecret`].
 /// Import this for `.with_secret_mut()` and `.expose_secret_mut()`.
 ///
 /// ## Security Note
