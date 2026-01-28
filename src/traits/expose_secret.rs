@@ -10,7 +10,7 @@
 //!
 //! ## Security Model
 //!
-//! - **Full access**: Core wrappers ([`crate::Fixed`], [`crate::Dynamic`]) implement [`ExposeSecret`], with mutable variants implementing [`ExposeSecretMut`]
+//! - **Full access**: Core wrappers ([`crate::Fixed`], [`crate::Dynamic`]) implement [`ExposeSecret`], with mutable variants implementing [`crate::ExposeSecretMut`]
 //! - **Read-only**: Encoding wrappers only implement [`ExposeSecret`] to prevent mutation
 //! - **Zero-cost**: All implementations use `#[inline(always)]`
 //!

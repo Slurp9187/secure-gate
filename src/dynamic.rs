@@ -193,7 +193,7 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// ```
     /// # #[cfg(feature = "encoding-base64")]
-    /// use secure_gate::Dynamic;
+    /// use secure_gate::{Dynamic, ExposeSecret};
     /// let b64_string = "QkNE";
     /// let secret = Dynamic::try_from_base64url(b64_string).unwrap();
     /// assert_eq!(secret.expose_secret().len(), 3);
@@ -233,9 +233,10 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// ```
     /// # #[cfg(feature = "encoding-bech32m")]
     /// use secure_gate::Dynamic;
+    /// // Note: Bech32m strings must be valid Bech32m format
     /// let bech32m_string = "abc1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw";
-    /// let secret = Dynamic::try_from_bech32m(bech32m_string).unwrap();
-    /// // HRP "abc" is discarded, bytes are stored
+    /// let secret = Dynamic::try_from_bech32m(bech32m_string);
+    /// // Returns Result<Dynamic<Vec<u8>>, Bech32Error>
     /// ```
     pub fn try_from_bech32m(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes) = s.try_from_bech32m()?;
