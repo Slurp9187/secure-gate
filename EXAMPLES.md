@@ -5,17 +5,17 @@ Real-world, copy-paste-ready examples for `secure-gate`.
 All examples assume the **recommended secure defaults** (includes zeroize, ct-eq, and alloc for heap support):
 ```toml
 [dependencies]
-secure-gate = { version = "0.7.0-rc.12", features = ["secure"] } # zeroize + alloc
+secure-gate = { version = "0.7.0-rc.14", features = ["secure"] } # zeroize + alloc
 ```
 
 For maximum functionality (including `ct-eq-hash`, encodings, serde, etc.), use:
 ```toml
-secure-gate = { version = "0.7.0-rc.12", features = ["full"] }
+secure-gate = { version = "0.7.0-rc.14", features = ["full"] }
 ```
 
 For **no-heap builds**, enable `no-alloc` to restrict to `Fixed<T>` (stack-allocated). `Dynamic<T>` requires alloc (included by default with `secure`):
 ```toml
-secure-gate = { version = "0.7.0-rc.12", features = ["secure", "no-alloc"] } # stack-only with security
+secure-gate = { version = "0.7.0-rc.14", features = ["secure", "no-alloc"] } # stack-only with security
 ```
 
 **Important notes**

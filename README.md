@@ -27,22 +27,22 @@
   
   ```toml
   [dependencies]
-  secure-gate = "0.7.0-rc.12"  # or latest stable version
+  secure-gate = "0.7.0-rc.14"  # or latest stable version
   ```
   
   **Recommended secure defaults**:
   ```toml
-  secure-gate = { version = "0.7.0-rc.12", features = ["secure"] }  # zeroize + alloc
+  secure-gate = { version = "0.7.0-rc.14", features = ["secure"] }  # zeroize + alloc
   ```
   
   **Batteries-included** (most features):
   ```toml
-  secure-gate = { version = "0.7.0-rc.12", features = ["full"] }
+  secure-gate = { version = "0.7.0-rc.14", features = ["full"] }
   ```
   
   **Minimal** (no zeroize/ct-eq — discouraged for production):
   ```toml
-  secure-gate = { version = "0.7.0-rc.12", default-features = false }
+  secure-gate = { version = "0.7.0-rc.14", default-features = false }
   ```
 
   ## Features

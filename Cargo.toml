@@ -1,6 +1,6 @@
 [package]
 name = "secure-gate"
-version = "0.7.0-rc.12"
+version = "0.7.0-rc.14"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Zero-cost secure wrappers for secrets — heap for dynamic, stack for fixed"
