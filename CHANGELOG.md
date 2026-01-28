@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Symmetric, orthogonal traits (e.g., `ToHex`/`FromHexStr`, `ToBase64Url`/`FromBase64UrlStr`, `ToBech32`/`FromBech32Str`, `ToBech32m`/`FromBech32mStr`). Umbrella traits `SecureEncoding`/`SecureDecoding` for aggregation. Multi-format auto-decoding (`try_decode_any`). Granular features: `encoding-hex`, `encoding-base64`, `encoding-bech32`.
 
 - **Opt-in cloning & serialization**
-  New marker traits `CloneableType` and `SerializableType`. Cloning and serde serialization now require explicit impls on the inner type — no automatic risk.
+  New marker traits `CloneableSecret` and `SerializableSecret`. Cloning and serde serialization now require explicit impls on the inner type — no automatic risk.
 
 - **Secure random generation**
   `from_random()` on `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` using `OsRng` (panics on failure).
@@ -57,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   New `SECURITY.md`, enhanced README, custom rustdoc for alias macros.
 
 - **Serde support**
-  Bare-bones deserialization for direct binary data only (no auto-decoding from strings). Aligns with secrecy crate security model. Encoding traits unchanged. Split into `serde-deserialize` (always available) and `serde-serialize` (gated by `SerializableType` marker).
+  Bare-bones deserialization for direct binary data only (no auto-decoding from strings). Aligns with secrecy crate security model. Encoding traits unchanged. Split into `serde-deserialize` (always available) and `serde-serialize` (gated by `SerializableSecret` marker).
 
 ### Changed
 
@@ -78,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Now `secure` meta-feature (`zeroize` + `alloc`). `full` includes `secure` + `encoding` + `ct-eq-hash` + `cloneable` + `serde` + `rand`. Added `insecure` for explicit opt-out (testing/low-resource only — strongly discouraged).
 
 - **Cloning**
-  Removed implicit `Clone` on wrappers; now opt-in via `CloneableType` marker on inner type.
+  Removed implicit `Clone` on wrappers; now opt-in via `CloneableSecret` marker on inner type.
 
 - **Exposure API**
   Removed any implicit borrowing paths. All access now explicit.

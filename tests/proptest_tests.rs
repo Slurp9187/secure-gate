@@ -84,21 +84,21 @@ mod ct_eq_wrapper_proptests {
 mod encoding_roundtrip_proptests {
     use proptest::prelude::*;
     #[cfg(feature = "serde-serialize")]
-    use secure_gate::SerializableType;
+    use secure_gate::SerializableSecret;
 
     #[cfg(feature = "serde-serialize")]
     #[derive(serde::Serialize, serde::Deserialize)]
     struct SerializableArray4([u8; 4]);
 
     #[cfg(feature = "serde-serialize")]
-    impl SerializableType for SerializableArray4 {}
+    impl SerializableSecret for SerializableArray4 {}
 
     #[cfg(feature = "serde-serialize")]
     #[derive(serde::Serialize, serde::Deserialize)]
     struct SerializableVec(Vec<u8>);
 
     #[cfg(feature = "serde-serialize")]
-    impl SerializableType for SerializableVec {}
+    impl SerializableSecret for SerializableVec {}
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(50))]

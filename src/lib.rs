@@ -54,14 +54,14 @@ pub use dynamic::Dynamic;
 pub use fixed::Fixed;
 
 #[cfg(feature = "cloneable")]
-pub use traits::CloneableType;
+pub use traits::CloneableSecret;
 /// Re-export of the traits.
 #[cfg(feature = "ct-eq")]
 pub use traits::ConstantTimeEq;
 #[cfg(feature = "ct-eq-hash")]
 pub use traits::ConstantTimeEqExt;
 #[cfg(feature = "serde-serialize")]
-pub use traits::SerializableType;
+pub use traits::SerializableSecret;
 pub use traits::{ExposeSecret, ExposeSecretMut};
 
 // Type alias macros (always available).

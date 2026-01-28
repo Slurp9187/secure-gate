@@ -9,7 +9,7 @@
 /// ```rust
 /// # #[cfg(feature = "serde-serialize")]
 /// # {
-/// use secure_gate::SerializableType;
+/// use secure_gate::SerializableSecret;
 /// use serde::{Deserialize, Serialize};
 ///
 /// #[derive(Serialize, Deserialize)]
@@ -17,10 +17,10 @@
 ///     data: Vec<u8>,
 /// }
 ///
-/// impl SerializableType for MySecret {}
+/// impl SerializableSecret for MySecret {}
 ///
-/// // Now MySecret can be serialized securely, as it's marked with SerializableType
+/// // Now MySecret can be serialized securely, as it's marked with SerializableSecret
 /// # }
 /// ```
 #[cfg(feature = "serde-serialize")]
-pub trait SerializableType: serde::Serialize {}
+pub trait SerializableSecret: serde::Serialize {}

@@ -304,7 +304,7 @@ impl<T: ?Sized> core::fmt::Debug for Dynamic<T> {
 }
 
 #[cfg(feature = "cloneable")]
-impl<T: crate::CloneableType> Clone for Dynamic<T> {
+impl<T: crate::CloneableSecret> Clone for Dynamic<T> {
     fn clone(&self) -> Self {
         Self::new(self.inner.clone())
     }
@@ -313,7 +313,7 @@ impl<T: crate::CloneableType> Clone for Dynamic<T> {
 #[cfg(feature = "serde-serialize")]
 impl<T> serde::Serialize for Dynamic<T>
 where
-    T: crate::SerializableType,
+    T: crate::SerializableSecret,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

@@ -56,13 +56,13 @@
   | `rand`                 | Secure random via `OsRng` (`from_random()`)          |
   | `serde`                | Meta: `serde-deserialize` + `serde-serialize`                               |
   | `serde-deserialize`    | Direct deserialization to inner types (binary-safe)                        |
-  | `serde-serialize`      | Export secrets (requires `SerializableType` marker on inner type)          |
+  | `serde-serialize`      | Export secrets (requires `SerializableSecret` marker on inner type)          |
   | `encoding`             | Meta: symmetric per-format encoding/decoding (hex, base64url, bech32/bech32m) — granular sub-features available |
   | `encoding-hex`         | `ToHex` (`.to_hex()`, `.to_hex_upper()`) + `FromHexStr` (`.try_from_hex()`)  |
   | `encoding-base64`      | `ToBase64Url` (`.to_base64url()`) + `FromBase64UrlStr` (`.try_from_base64url()`) |
   | `encoding-bech32`      | Enables Bech32 (BIP-173) encoding/decoding support via the `bech32` crate. Also includes Bech32m compatibility. |
   | `encoding-bech32m`     | Enables strict Bech32m (BIP-350) support. Currently identical to `encoding-bech32` (same dependency), but reserved for future strict variant separation or stricter validation. |
-  | `cloneable`            | Opt-in cloning via `CloneableType` marker                                   |
+  | `cloneable`            | Opt-in cloning via `CloneableSecret` marker                                   |
   | `insecure`             | Disables `zeroize` + `ct-eq` (testing/low-resource only — strongly discouraged) |
   | `alloc`                | Enables heap-dependent code (`Dynamic<T>`, `Vec<String>` support). Required for most real-world usage. Included in `default`. | Usually enabled |
   | no-alloc       | Explicitly disables heap support (`Dynamic<T>`, Vec/String zeroize, encodings). Use for true no-heap/embedded builds. Conflicts with `alloc` (both can be enabled, but `alloc` takes precedence). | Optional (embedded only) |
@@ -308,7 +308,7 @@
   }
   ```
   
-  ### Serde (direct deserialization to inner types; serialization requires `SerializableType`)
+  ### Serde (direct deserialization to inner types; serialization requires `SerializableSecret`)
 
   ```rust
   #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex", feature = "rand"))]

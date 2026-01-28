@@ -8,11 +8,11 @@
 //
 // - [`ExposeSecret`] - Read-only secret access with metadata
 // - [`ExposeSecretMut`] - Mutable secret access
-// - [`CloneableType`] - Opt-in safe cloning with zeroization (requires cloneable feature)
+// - [`CloneableSecret`] - Opt-in safe cloning with zeroization (requires cloneable feature)
 // - [`ConstantTimeEq`] - Constant-time equality to prevent timing attacks (requires ct-eq feature)
 // - [`SecureEncoding`] - Umbrella trait for secure byte encoding to strings (requires encoding features)
 // - [`SecureDecoding`] - Umbrella trait for secure decoding from strings (requires encoding features)
-// - [`SerializableType`] - Marker for types allowing secure serialization (requires serde-serialize feature)
+// - [`SerializableSecret`] - Marker for types allowing secure serialization (requires serde-serialize feature)
 //
 // ## Security Guarantees
 //
@@ -25,10 +25,10 @@
 //
 // Some traits require optional Cargo features:
 // - rand: Enables random wrapper implementations
-// - cloneable: Enables [`CloneableType`] for safe cloning
+// - cloneable: Enables [`CloneableSecret`] for safe cloning
 // - ct-eq: Enables [`ConstantTimeEq`] for constant-time comparisons
 // - encoding (or encoding-hex, encoding-base64, encoding-bech32): Enables [`SecureEncoding`] and [`SecureDecoding`] for byte encoding/decoding
-// - serde-serialize: Enables [`SerializableType`] for opt-in serialization
+// - serde-serialize: Enables [`SerializableSecret`] for opt-in serialization
 pub mod expose_secret;
 pub use expose_secret::ExposeSecret;
 
@@ -118,11 +118,11 @@ pub trait SecureDecoding {}
 impl<T: AsRef<str> + ?Sized> SecureDecoding for T {}
 
 #[cfg(feature = "cloneable")]
-pub mod cloneable_type;
+pub mod cloneable_secret;
 #[cfg(feature = "cloneable")]
-pub use cloneable_type::CloneableType;
+pub use cloneable_secret::CloneableSecret;
 
 #[cfg(feature = "serde-serialize")]
-pub mod serializable_type;
+pub mod serializable_secret;
 #[cfg(feature = "serde-serialize")]
-pub use serializable_type::SerializableType;
+pub use serializable_secret::SerializableSecret;

@@ -14,28 +14,28 @@ use std::hint::black_box;
 use serde_json::{from_str, to_string};
 
 #[cfg(feature = "serde-serialize")]
-use secure_gate::SerializableType;
+use secure_gate::SerializableSecret;
 
 #[cfg(feature = "serde-serialize")]
 #[derive(serde::Serialize)]
 struct SerializableArray32([u8; 32]);
 
 #[cfg(feature = "serde-serialize")]
-impl SerializableType for SerializableArray32 {}
+impl SerializableSecret for SerializableArray32 {}
 
 #[cfg(feature = "serde-serialize")]
 #[derive(serde::Serialize)]
 struct SerializableVec(Vec<u8>);
 
 #[cfg(feature = "serde-serialize")]
-impl SerializableType for SerializableVec {}
+impl SerializableSecret for SerializableVec {}
 
 #[cfg(feature = "serde-serialize")]
 #[derive(serde::Serialize)]
 struct SerializableString(String);
 
 #[cfg(feature = "serde-serialize")]
-impl SerializableType for SerializableString {}
+impl SerializableSecret for SerializableString {}
 
 #[cfg(feature = "serde-serialize")]
 fn bench_fixed_serialize(c: &mut Criterion) {

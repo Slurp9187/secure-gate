@@ -9,16 +9,16 @@
 /// ```rust
 /// #[cfg(feature = "cloneable")]
 /// {
-///     use secure_gate::{CloneableType, Fixed};
+///     use secure_gate::{CloneableSecret, Fixed};
 ///
 ///     #[derive(Clone)]
 ///     struct MyKey([u8; 32]);
 ///
-///     impl CloneableType for MyKey {}  // Opt-in to safe cloning
+///     impl CloneableSecret for MyKey {}  // Opt-in to safe cloning
 ///
 ///     let key: Fixed<MyKey> = Fixed::new(MyKey([0; 32]));
 ///     let copy = key.clone();  // Now allowed, with zeroization on drop
 /// }
 /// ```
 #[cfg(feature = "cloneable")]
-pub trait CloneableType: Clone {}
+pub trait CloneableSecret: Clone {}

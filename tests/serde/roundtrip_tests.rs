@@ -9,7 +9,7 @@
 extern crate alloc;
 
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
-use secure_gate::SerializableType;
+use secure_gate::SerializableSecret;
 
 #[cfg(all(
     feature = "serde-deserialize",
@@ -25,14 +25,14 @@ use secure_gate::ExposeSecret;
 pub struct SerializableArray4([u8; 4]);
 
 #[cfg(feature = "serde-serialize")]
-impl SerializableType for SerializableArray4 {}
+impl SerializableSecret for SerializableArray4 {}
 
 #[cfg(feature = "serde-serialize")]
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct SerializableArray32([u8; 32]);
 
 #[cfg(feature = "serde-serialize")]
-impl SerializableType for SerializableArray32 {}
+impl SerializableSecret for SerializableArray32 {}
 
 #[cfg(feature = "serde-serialize")]
 #[derive(serde::Serialize)]
@@ -40,7 +40,7 @@ impl SerializableType for SerializableArray32 {}
 pub struct SerializableString(String);
 
 #[cfg(feature = "serde-serialize")]
-impl SerializableType for SerializableString {}
+impl SerializableSecret for SerializableString {}
 
 #[cfg(feature = "serde-serialize")]
 #[derive(serde::Serialize)]
@@ -48,7 +48,7 @@ impl SerializableType for SerializableString {}
 pub struct SerializableVec(Vec<u8>);
 
 #[cfg(feature = "serde-serialize")]
-impl SerializableType for SerializableVec {}
+impl SerializableSecret for SerializableVec {}
 
 // Custom type for testing
 #[cfg(all(feature = "zeroize", feature = "serde-serialize"))]
@@ -57,7 +57,7 @@ impl SerializableType for SerializableVec {}
 struct MyKey([u8; 16]);
 
 #[cfg(all(feature = "zeroize", feature = "serde-serialize"))]
-impl SerializableType for MyKey {}
+impl SerializableSecret for MyKey {}
 
 #[cfg(all(feature = "zeroize", feature = "serde-serialize"))]
 impl zeroize::Zeroize for MyKey {
@@ -238,14 +238,14 @@ fn nested_serializable_type() {
 pub struct TestSerializableArray([u8; 4]);
 
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
-impl SerializableType for TestSerializableArray {}
+impl SerializableSecret for TestSerializableArray {}
 
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct TestSerializableVec(Vec<u8>);
 
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
-impl SerializableType for TestSerializableVec {}
+impl SerializableSecret for TestSerializableVec {}
 
 // Add Deserialize for roundtrips
 #[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]

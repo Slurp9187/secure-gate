@@ -365,7 +365,7 @@ impl<T> core::fmt::Debug for Fixed<T> {
 }
 
 #[cfg(feature = "cloneable")]
-impl<T: crate::CloneableType> Clone for Fixed<T> {
+impl<T: crate::CloneableSecret> Clone for Fixed<T> {
     fn clone(&self) -> Self {
         Self::new(self.inner.clone())
     }
@@ -374,7 +374,7 @@ impl<T: crate::CloneableType> Clone for Fixed<T> {
 #[cfg(feature = "serde-serialize")]
 impl<T> serde::Serialize for Fixed<T>
 where
-    T: crate::SerializableType,
+    T: crate::SerializableSecret,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

@@ -428,18 +428,18 @@ Deserialize (direct binary from JSON array):
 }
 ```
 
-Serialize (opt-in, requires `SerializableType` marker):
+Serialize (opt-in, requires `SerializableSecret` marker):
 
 ```rust
 #[cfg(all(feature = "serde-serialize", feature = "alloc"))]
 {
-    use secure_gate::{Dynamic, SerializableType};
+    use secure_gate::{Dynamic, SerializableSecret};
     use serde::Serialize;
     extern crate alloc;
 
     #[derive(Serialize)]
     struct MyData { secret: Vec<u8> }
-    impl SerializableType for MyData {}
+    impl SerializableSecret for MyData {}
 
     let data = MyData { secret: vec![1, 2, 3] };
     let wrapped: Dynamic<MyData> = data.into();
@@ -452,12 +452,12 @@ Serialize (opt-in, requires `SerializableType` marker):
 ```rust
 #[cfg(all(feature = "cloneable", feature = "alloc"))]
 {
-    use secure_gate::{CloneableType, Dynamic};
+    use secure_gate::{CloneableSecret, Dynamic};
     extern crate alloc;
 
     #[derive(Clone)]
     struct MyKey(Vec<u8>);
-    impl CloneableType for MyKey {}
+    impl CloneableSecret for MyKey {}
 
     let key: Dynamic<MyKey> = MyKey(vec![1, 2, 3]).into();
     let copy = key.clone(); // Deep clone allowed

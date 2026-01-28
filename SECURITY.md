@@ -8,7 +8,7 @@ Last updated: 2026-01 (for v0.7.0-rc.12 / upcoming v0.7.0)
 - **Explicit exposure only** — all secret access requires `.expose_secret()` / `.with_secret()` or mutable equivalents; no `Deref`, `AsRef`, or implicit borrowing.
 - **Zeroization on drop** — full buffer (including spare capacity) wiped when `zeroize` feature is enabled.
 - **Timing-safe equality** — use `ConstantTimeEq` (`ct-eq`) or `ConstantTimeEqExt` / `ct_eq_auto` (`ct-eq-hash`); `==` is deliberately not implemented.
-- **Opt-in risk** — cloning and serialization require explicit marker traits (`CloneableType`, `SerializableType`).
+- **Opt-in risk** — cloning and serialization require explicit marker traits (`CloneableSecret`, `SerializableSecret`).
 - **Vulnerability reporting** — preferred: GitHub private vulnerability reporting (Security tab); public issues acceptable.
 
 This document outlines the security model, design choices, strengths, known limitations, and review guidance for `secure-gate`.
@@ -45,7 +45,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | Zeroization                       | Full allocation wiped on drop (`zeroize` feature); includes `Vec`/`String` spare capacity |
 | Timing safety                     | `ConstantTimeEq` for direct comparison; `ConstantTimeEqExt` / `ct_eq_auto` for large/variable data   |
 | Probabilistic equality (`ct-eq-hash`) | keyed BLAKE3 (when `rand` enabled) or unkeyed; collision risk ~2⁻²⁵⁶ either way (negligible for practical purposes) |
-| Opt-in risky features             | Cloning/serialization gated by marker traits (`CloneableType`, `SerializableType`)         |
+| Opt-in risky features             | Cloning/serialization gated by marker traits (`CloneableSecret`, `SerializableSecret`)         |
 | Redacted debug                    | `Debug` impl always prints `[REDACTED]`                                                    |
 | No unsafe code                    | `#![forbid(unsafe_code)]` enforced at crate level                                          |
 
@@ -93,7 +93,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 ### Traits (`traits/`)
 
 **Strengths**
-- Marker traits (`CloneableType`, `SerializableType`) force deliberate opt-in
+- Marker traits (`CloneableSecret`, `SerializableSecret`) force deliberate opt-in
 - `ConstantTimeEq` and `ConstantTimeEqExt` provide safe equality alternatives
 
 **Potential weaknesses**
@@ -128,7 +128,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Enable the `secure` feature unless you have extreme constraints
 - Prefer scoped `with_secret()` over long-lived `expose_secret()`
 - Use `ct_eq_auto(…, None)` for general-purpose equality checks; customize the threshold (e.g., `Some(64)`, `Some(1024)`) based on your benchmarks if the default 32 bytes isn't optimal. For detailed justification, see [CT_EQ_AUTO.md](CT_EQ_AUTO.md)
-- Audit every `CloneableType` / `SerializableType` impl
+- Audit every `CloneableSecret` / `SerializableSecret` impl
 - Validate and sanitize all inputs before encoding/decoding
 - Use specific format traits (`FromBech32Str`, `FromHexStr`, …) when the expected format is known
 - Probabilistic equality (`ct-eq-hash`): Negligible collision risk (~2⁻²⁵⁶), but use `ct_eq` for deterministic needs; bound input sizes to prevent DoS
