@@ -17,7 +17,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! secure-gate = "0.7.0-rc.14"
+//! secure-gate = "0.7.0-rc.15"
 //! ```
 //!
 //! Here's a basic example with `Fixed` for a stack-allocated secret (no extra features needed):
@@ -37,7 +37,7 @@
 //!
 //! For dynamic secrets, enable the `alloc` feature and use `Dynamic<T>` similarly.
 //!
-//! Check [README.md](https://github.com/Slurp9187/secure-gate/blob/v0.7.0-rc.14/README.md) for more examples and feature flags.
+//! Check [README.md](https://github.com/Slurp9187/secure-gate/blob/v0.7.0-rc.15/README.md) for more examples and feature flags.
 //!
 //! ## Equality Options
 //!
