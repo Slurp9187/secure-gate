@@ -11,7 +11,33 @@
 //! with controlled exposure via `.expose_secret()` / `.expose_secret_mut()`. No accidental leaks via
 //! `Deref`, `AsRef`, or implicit conversions.
 //!
-//! See [README.md](../README.md) for usage examples, feature overview, and macros for custom aliases.
+//! ## Quickstart
+//!
+//! Add this to your `Cargo.toml`:
+//!
+//! ```toml
+//! [dependencies]
+//! secure-gate = "0.7.0-rc.14"
+//! ```
+//!
+//! Here's a basic example with `Fixed` for a stack-allocated secret (no extra features needed):
+//!
+//! ```rust
+//! use secure_gate::Fixed;
+//!
+//! // Wrap a fixed-size secret (e.g., a 32-byte key)
+//! let secret = Fixed::<[u8; 32]>::new([42; 32]);
+//!
+//! // Expose it temporarily for use, zeroizing afterward
+//! let value = secret.expose_secret(|exposed| {
+//!     // Do something with `exposed` (e.g., encrypt)
+//!     exposed[0]
+//! });
+//! ```
+//!
+//! For dynamic secrets, enable the `alloc` feature and use `Dynamic<T>` similarly.
+//!
+//! Check [README.md](https://github.com/Slurp9187/secure-gate/blob/v0.7.0-rc.14/README.md) for more examples and feature flags.
 //!
 //! ## Equality Options
 //!
