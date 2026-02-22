@@ -293,4 +293,24 @@ fn bip_173_empty_data_invalid() {
     assert!(result.is_err());
 }
 
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn test_bech32_hrp_containing_1() {
+    let data = [0x00u8; 1];
+    let bech = data.to_bech32("test1");
+    assert!(bech.starts_with("test11"));
+    let (hrp, decoded) = bech.try_from_bech32().unwrap();
+    assert_eq!(hrp, "test1");
+    assert_eq!(decoded, data);
+}
 
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn test_bech32m_hrp_containing_1() {
+    let data = [0x00u8; 1];
+    let bech = data.to_bech32m("test1");
+    assert!(bech.starts_with("test11"));
+    let (hrp, decoded) = bech.try_from_bech32m().unwrap();
+    assert_eq!(hrp, "test1");
+    assert_eq!(decoded, data);
+}

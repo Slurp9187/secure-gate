@@ -27,7 +27,7 @@ pub trait FromBech32Str {
 impl<T: AsRef<str> + ?Sized> FromBech32Str for T {
     fn try_from_bech32(&self) -> Result<(String, Vec<u8>), Bech32Error> {
         let s = self.as_ref();
-        if let Some(pos) = s.find('1') {
+        if let Some(pos) = s.rfind('1') {
             let hrp_str = &s[..pos];
             let data_str = &s[pos + 1..];
             let hrp = Hrp::parse(hrp_str).map_err(|_| Bech32Error::InvalidHrp)?;

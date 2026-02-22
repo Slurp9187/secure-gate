@@ -23,16 +23,13 @@
 //! Here's a basic example with `Fixed` for a stack-allocated secret (no extra features needed):
 //!
 //! ```rust
-//! use secure_gate::Fixed;
+//! use secure_gate::{Fixed, ExposeSecret};
 //!
 //! // Wrap a fixed-size secret (e.g., a 32-byte key)
 //! let secret = Fixed::<[u8; 32]>::new([42; 32]);
 //!
 //! // Expose it temporarily for use, zeroizing afterward
-//! let value = secret.expose_secret(|exposed| {
-//!     // Do something with `exposed` (e.g., encrypt)
-//!     exposed[0]
-//! });
+//! let value = secret.with_secret(|exposed| exposed[0]);
 //! ```
 //!
 //! For dynamic secrets, enable the `alloc` feature and use `Dynamic<T>` similarly.

@@ -63,7 +63,7 @@ mod tests {
 
         // Manual decode for NoChecksum (no checksum validation)
         let s = &encoded;
-        let pos = s.find('1').unwrap();
+        let pos = s.rfind('1').unwrap();
         let hrp_str = &s[..pos];
         let data_str = &s[pos + 1..];
         let decoded_hrp = Hrp::parse(hrp_str).unwrap();
@@ -102,7 +102,7 @@ mod tests {
         let hrp = Hrp::parse("test").unwrap();
         let encoded = encode_lower::<Bech32Large>(hrp, &large_data).unwrap();
         // Manual decode: parse HRP and data part (without checksum)
-        let pos = encoded.find('1').unwrap();
+        let pos = encoded.rfind('1').unwrap();
         let hrp_str = &encoded[..pos];
         let data_str = &encoded[pos + 1..];
         let decoded_hrp = Hrp::parse(hrp_str).unwrap();
