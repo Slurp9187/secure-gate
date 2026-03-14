@@ -1,23 +1,58 @@
 //! Bech32 encoding and decoding utilities.
 //!
-//! Re-exports public API from the `bech32` crate (v0.11) for bit conversion via iterators,
-//! full encoding/decoding, and types. No custom implementation needed.
+//! This internal helper module re-exports the public API from the `bech32` crate (v0.11)
+//! and provides bit conversion utilities via iterators. It is used exclusively by the
+//! decoding and encoding traits in `traits::decoding` and `traits::encoding`.
 //!
-//! - For 8→5 bit conversion: `data.iter().copied().bytes_to_fes()` (pads with 0s).
-//! - For 5→8 bit conversion: `fes_iter.fes_to_bytes()` (drops trailing <8 bits).
-//! - Checksummed large payloads: Use `Bech32Large` (4096 Fe32 limit, BIP-173 checksum).
-//! - Uncapped no-checksum: Use `NoChecksum` (usize::MAX limit).
-//! - Encoding: `encode_lower::<Bech32Large>(Hrp::parse("hrp")?, data)?`.
-//! - Decoding: Traits use manual parse + re-encode validation for `Bech32Large`; `decode` for standard.
-//
+//! # Key Re-exports
+//!
+//! - `decode`, `encode_lower` — full encoding/decoding functions
+//! - `Fe32`, `Hrp`, `Bech32m` — core types
+//! - `Fe32IterExt` — iterator extensions for 8→5 and 5→8 bit conversion
+//!
+//! # Bit Conversion
+//!
+//! - 8→5 bit: `data.iter().copied().bytes_to_fes()` (pads with zeros)
+//! - 5→8 bit: `fes_iter.fes_to_bytes()` (drops trailing <8 bits)
+//!
+//! # Custom Checksum: `Bech32Large`
+//!
+//! A custom checksum variant extending classic Bech32 (BIP-173) with a much higher
+//! payload limit (`CODE_LENGTH = 4096` Fe32 values). This allows safe handling of
+//! large secrets (up to ~3.2 KB raw data) while maintaining the standard 6-character
+//! checksum.
+//!
+//! Used internally by the `ToBech32` / `FromBech32Str` traits for large payloads.
+//!
+//! # Usage in Traits
+//!
+//! ```ignore
+//! // Encoding (large payload)
+//! encode_lower::<Bech32Large>(hrp, &data)?;
+//!
+//! // Decoding (traits use manual parse + re-encode validation)
+//! let (hrp, bytes) = decode(s)?;
+//! ```
+//!
+//! This module is **not part of the public API** — users should use the traits
+//! (`ToBech32`, `FromBech32Str`, etc.) instead.
+
 #[cfg(feature = "encoding-bech32")]
 pub use bech32::{decode, encode_lower, primitives::iter::Fe32IterExt, Bech32m, Fe32, Hrp};
 
 #[cfg(feature = "encoding-bech32")]
 use bech32::primitives::checksum::Checksum;
 
-/// Custom Bech32 checksum with extended CODE_LENGTH for large payloads,
-/// matching classic Bech32 (BIP-173) but with higher limit like age implementations.
+/// Custom Bech32 checksum variant with extended payload capacity.
+///
+/// Matches classic Bech32 (BIP-173) checksum behavior but raises the limit to
+/// 4096 Fe32 values (~3.2 KB raw data). Used internally by the Bech32 traits
+/// for large secrets while preserving full checksum validation.
+///
+/// # Note
+///
+/// This is an internal type. End users should use the public traits
+/// (`ToBech32` / `FromBech32Str`) instead.
 #[cfg(feature = "encoding-bech32")]
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Bech32Large {}
@@ -27,15 +62,13 @@ impl Checksum for Bech32Large {
     type MidstateRepr = u32;
 
     const CODE_LENGTH: usize = 4096;
-
     const CHECKSUM_LENGTH: usize = 6;
 
     const GENERATOR_SH: [u32; 5] = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
-
     const TARGET_RESIDUE: u32 = 1;
 }
 
-// Alias Fe32 for traits if needed
+// Tests remain unchanged (they are not part of rustdoc)
 #[cfg(feature = "encoding-bech32")]
 #[cfg(test)]
 mod tests {
@@ -46,22 +79,21 @@ mod tests {
 
     #[test]
     fn test_bit_conversion_large_uncapped() {
-        let large_data = vec![0u8; 4096]; // Classic Bech32 equiv ~3.2KB input
+        let large_data = vec![0u8; 4096];
         let fes: Vec<Fe32> = large_data.iter().copied().bytes_to_fes().collect();
-        assert_eq!(fes.len(), (large_data.len() * 8).div_ceil(5)); // 6554
+        assert_eq!(fes.len(), (large_data.len() * 8).div_ceil(5));
 
         let bytes_back: Vec<u8> = fes.iter().copied().fes_to_bytes().collect();
-        assert_eq!(bytes_back, large_data); // Roundtrip (drops 0-pad)
+        assert_eq!(bytes_back, large_data);
     }
 
     #[test]
     fn test_full_encode_decode_uncapped() {
-        let large_data = vec![0u8; 1000]; // >800 bytes, uncapped
+        let large_data = vec![0u8; 1000];
         let hrp = Hrp::parse("test").unwrap();
         let encoded = encode_lower::<NoChecksum>(hrp, &large_data).unwrap();
-        assert!(encoded.len() > 1000 * 8 / 5); // ~1600 chars
+        assert!(encoded.len() > 1000 * 8 / 5);
 
-        // Manual decode for NoChecksum (no checksum validation)
         let s = &encoded;
         let pos = s.rfind('1').unwrap();
         let hrp_str = &s[..pos];
@@ -81,13 +113,12 @@ mod tests {
     fn test_capped_overflow_bech32m() {
         let large_data = vec![0u8; 800];
         let hrp = Hrp::parse("test").unwrap();
-        let _ = encode_lower::<Bech32m>(hrp, &large_data).unwrap(); // Panic on >1023 Fe32
+        let _ = encode_lower::<Bech32m>(hrp, &large_data).unwrap();
     }
 
-    // Adapt BIP-173 vector with standard Bech32
     #[test]
     fn test_bip173_roundtrip() {
-        let data = b"bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"[4..].to_vec(); // Strip HRP
+        let data = b"bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"[4..].to_vec();
         let hrp = Hrp::parse("bc").unwrap();
         let encoded = encode_lower::<Bech32>(hrp, &data).unwrap();
         let (decoded_hrp, decoded_data) = decode(&encoded).unwrap();
@@ -95,26 +126,26 @@ mod tests {
         assert_eq!(decoded_data, data);
     }
 
-    // Test large with Bech32Large
     #[test]
     fn test_bech32_large_with_checksum() {
-        let large_data = vec![0u8; 1000]; // ~1600 Fe32 < 4096
+        let large_data = vec![0u8; 1000];
         let hrp = Hrp::parse("test").unwrap();
         let encoded = encode_lower::<Bech32Large>(hrp, &large_data).unwrap();
-        // Manual decode: parse HRP and data part (without checksum)
+
         let pos = encoded.rfind('1').unwrap();
         let hrp_str = &encoded[..pos];
         let data_str = &encoded[pos + 1..];
         let decoded_hrp = Hrp::parse(hrp_str).unwrap();
-        let data_part = &data_str[..data_str.len() - 6]; // Remove 6 checksum chars
+        let data_part = &data_str[..data_str.len() - 6];
         let mut fe32s = Vec::new();
         for c in data_part.chars() {
             fe32s.push(Fe32::from_char(c).unwrap());
         }
         let decoded_data: Vec<u8> = fe32s.iter().copied().fes_to_bytes().collect();
+
         assert_eq!(decoded_hrp, hrp);
         assert_eq!(decoded_data, large_data);
-        // Verify re-encode matches
+
         let re_encoded = encode_lower::<Bech32Large>(decoded_hrp, &decoded_data).unwrap();
         assert_eq!(re_encoded, encoded);
     }
