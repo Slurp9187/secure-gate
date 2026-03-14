@@ -62,16 +62,113 @@ fn bech32_error_display() {
 ))]
 #[test]
 fn decoding_error_variants() {
+    #[cfg(debug_assertions)]
     let invalid_encoding = DecodingError::InvalidEncoding {
         hint: "test hint".to_string(),
     };
+    #[cfg(not(debug_assertions))]
+    let invalid_encoding = DecodingError::InvalidEncoding;
 
     // Check that InvalidEncoding is present
+    #[cfg(debug_assertions)]
     match invalid_encoding {
         DecodingError::InvalidEncoding { hint: _ } => (),
+        _ => panic!("Expected InvalidEncoding"),
+    }
+    #[cfg(not(debug_assertions))]
+    match invalid_encoding {
+        DecodingError::InvalidEncoding => (),
         _ => panic!("Expected InvalidEncoding"),
     }
 
     // Test Display
     assert!(format!("{}", invalid_encoding).contains("invalid encoding"));
+}
+
+/// Test HexError InvalidLength cfg-split
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn hex_error_invalid_length_cfg() {
+    #[cfg(debug_assertions)]
+    {
+        let err = secure_gate::HexError::InvalidLength {
+            expected: 32,
+            got: 31,
+        };
+        assert_eq!(
+            format!("{}", err),
+            "decoded length mismatch: expected 32, got 31"
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let err = secure_gate::HexError::InvalidLength;
+        assert_eq!(format!("{}", err), "decoded length mismatch");
+    }
+}
+
+/// Test Base64Error InvalidLength cfg-split
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn base64_error_invalid_length_cfg() {
+    #[cfg(debug_assertions)]
+    {
+        let err = secure_gate::Base64Error::InvalidLength {
+            expected: 32,
+            got: 31,
+        };
+        assert_eq!(
+            format!("{}", err),
+            "decoded length mismatch: expected 32, got 31"
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let err = secure_gate::Base64Error::InvalidLength;
+        assert_eq!(format!("{}", err), "decoded length mismatch");
+    }
+}
+
+/// Test Bech32Error InvalidLength cfg-split
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bech32_error_invalid_length_cfg() {
+    #[cfg(debug_assertions)]
+    {
+        let err = secure_gate::Bech32Error::InvalidLength {
+            expected: 32,
+            got: 31,
+        };
+        assert_eq!(
+            format!("{}", err),
+            "decoded length mismatch: expected 32, got 31"
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let err = secure_gate::Bech32Error::InvalidLength;
+        assert_eq!(format!("{}", err), "decoded length mismatch");
+    }
+}
+
+/// Test Bech32Error UnexpectedHrp cfg-split
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bech32_error_unexpected_hrp_cfg() {
+    #[cfg(debug_assertions)]
+    {
+        let err = secure_gate::Bech32Error::UnexpectedHrp {
+            expected: "key".to_string(),
+            got: "wrong".to_string(),
+        };
+        assert_eq!(
+            format!("{}", err),
+            "unexpected HRP: expected key, got wrong"
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let err = secure_gate::Bech32Error::UnexpectedHrp;
+        assert_eq!(format!("{}", err), "unexpected HRP");
+    }
 }

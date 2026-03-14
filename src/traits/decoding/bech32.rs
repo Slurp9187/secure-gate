@@ -60,10 +60,13 @@ impl<T: AsRef<str> + ?Sized> FromBech32Str for T {
     fn try_from_bech32_expect_hrp(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error> {
         let (hrp, data) = self.try_from_bech32()?;
         if !hrp.to_string().eq_ignore_ascii_case(expected_hrp) {
+            #[cfg(debug_assertions)]
             return Err(Bech32Error::UnexpectedHrp {
                 expected: expected_hrp.to_string(),
                 got: hrp.to_string(),
             });
+            #[cfg(not(debug_assertions))]
+            return Err(Bech32Error::UnexpectedHrp);
         }
         Ok(data)
     }

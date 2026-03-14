@@ -48,6 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Unified error types (`Bech32Error`, `DecodingError`, `FromSliceError`) via `thiserror`.
 
 - **Additional alias macros**
+
+### Changed
+
+- **Breaking: Error hardening with debug/release split**
+  Encoding error variants (`HexError::InvalidLength`, `Base64Error::InvalidLength`, `Bech32Error::UnexpectedHrp`/`InvalidLength`, `DecodingError::InvalidEncoding`) now split based on `#[cfg(debug_assertions)]`. Debug builds include detailed length/HRP information for development; release builds use generic messages to prevent information leaks. Closes #90.
   `dynamic_generic_alias!` and `fixed_generic_alias!` for generic (const-sized) aliases with optional custom documentation.
 
 - **Testing & CI**

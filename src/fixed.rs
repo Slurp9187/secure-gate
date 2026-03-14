@@ -207,10 +207,13 @@ impl<const N: usize> Fixed<[u8; N]> {
     pub fn try_from_hex(s: &str) -> Result<Self, crate::error::HexError> {
         let bytes: Vec<u8> = s.try_from_hex()?;
         if bytes.len() != N {
+            #[cfg(debug_assertions)]
             return Err(crate::error::HexError::InvalidLength {
                 expected: N,
                 got: bytes.len(),
             });
+            #[cfg(not(debug_assertions))]
+            return Err(crate::error::HexError::InvalidLength);
         }
         let mut arr = [0u8; N];
         arr.copy_from_slice(&bytes);
@@ -236,10 +239,13 @@ impl<const N: usize> Fixed<[u8; N]> {
     pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
         let bytes: Vec<u8> = s.try_from_base64url()?;
         if bytes.len() != N {
+            #[cfg(debug_assertions)]
             return Err(crate::error::Base64Error::InvalidLength {
                 expected: N,
                 got: bytes.len(),
             });
+            #[cfg(not(debug_assertions))]
+            return Err(crate::error::Base64Error::InvalidLength);
         }
         let mut arr = [0u8; N];
         arr.copy_from_slice(&bytes);
@@ -266,10 +272,13 @@ impl<const N: usize> Fixed<[u8; N]> {
     pub fn try_from_bech32(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes): (_, Vec<u8>) = s.try_from_bech32()?;
         if bytes.len() != N {
+            #[cfg(debug_assertions)]
             return Err(crate::error::Bech32Error::InvalidLength {
                 expected: N,
                 got: bytes.len(),
             });
+            #[cfg(not(debug_assertions))]
+            return Err(crate::error::Bech32Error::InvalidLength);
         }
         let mut arr = [0u8; N];
         arr.copy_from_slice(&bytes);
@@ -296,10 +305,13 @@ impl<const N: usize> Fixed<[u8; N]> {
     pub fn try_from_bech32m(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes): (_, Vec<u8>) = s.try_from_bech32m()?;
         if bytes.len() != N {
+            #[cfg(debug_assertions)]
             return Err(crate::error::Bech32Error::InvalidLength {
                 expected: N,
                 got: bytes.len(),
             });
+            #[cfg(not(debug_assertions))]
+            return Err(crate::error::Bech32Error::InvalidLength);
         }
         let mut arr = [0u8; N];
         arr.copy_from_slice(&bytes);

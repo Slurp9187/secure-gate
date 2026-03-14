@@ -62,10 +62,13 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
         let hrp_parsed = Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
         if let Some(exp) = expected_hrp {
             if hrp != exp {
+                #[cfg(debug_assertions)]
                 return Err(Bech32Error::UnexpectedHrp {
                     expected: exp.to_string(),
                     got: hrp.to_string(),
                 });
+                #[cfg(not(debug_assertions))]
+                return Err(Bech32Error::UnexpectedHrp);
             }
         }
         encode_lower::<Bech32m>(hrp_parsed, self.as_ref()).map_err(|_| Bech32Error::OperationFailed)
