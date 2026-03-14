@@ -15,3 +15,8 @@ Cargo.lock
 *.errors
 *.log
 *.results
+
+# Agent internal docs (keep local/private)
+architecture.md
+GROK.md
+state.md
