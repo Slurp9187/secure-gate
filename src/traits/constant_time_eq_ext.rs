@@ -102,6 +102,8 @@ pub trait ConstantTimeEqExt: crate::ConstantTimeEq {
     /// Prefer this method in almost all cases unless you need:
     /// - Guaranteed zero-collision → use `ct_eq`
     /// - Uniform probabilistic behavior → use `ct_eq_hash`
+    ///
+    /// See [CT_EQ_AUTO.md](../CT_EQ_AUTO.md) for benchmarks and threshold tuning guidance.
     fn ct_eq_auto(&self, other: &Self, threshold_bytes: Option<usize>) -> bool {
         // Default implementation (can be overridden if desired)
         if self.len() != other.len() {
