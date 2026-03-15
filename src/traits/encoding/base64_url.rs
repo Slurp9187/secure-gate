@@ -1,57 +1,50 @@
-//! # ToBase64Url Trait
+//! URL-safe Base64 encoding trait.
 //!
-//! Extension trait for encoding byte data to URL-safe base64 strings (no padding).
+//! This trait provides secure, explicit encoding of byte data to URL-safe
+//! base64 strings (no padding, RFC 4648). It is intended for intentional
+//! export scenarios only (QR codes, API responses, audited logging).
 //!
-//! This trait provides secure, explicit encoding of byte slices to base64url strings.
-//! All methods require the caller to first call `.expose_secret()` (or similar).
+//! Requires the `encoding-base64` feature.
 //!
-//! ## Security Warning
+//! # Security Notes
+//! - **Full secret exposure**: The resulting string contains the **entire** secret.
+//!   Use only after explicit `.expose_secret()` and only when the exposure is
+//!   deliberate and protected (encryption, short-lived, etc.).
+//! - **No implicit paths**: You **must** call `.expose_secret()` (or equivalent)
+//!   first — no `Deref` or automatic conversion exists.
+//! - **URL-safe**: No padding (`=`), safe for URLs/JSON/filenames.
+//! - **Redacted alternatives**: For logging/debugging use `to_hex_left` (from `ToHex`).
 //!
-//! These methods produce human-readable strings containing the full secret.
-//! Use only when intentionally exposing the secret (e.g., QR codes, user export, audited logging).
-//! For debugging/logging, prefer redacted helpers like `to_hex_left`.
-//! All calls require explicit `.expose_secret()` first — no implicit paths exist.
+//! # Example
 //!
-/// ## Example
-///
-/// ```rust
-/// # #[cfg(feature = "encoding-base64")]
-/// use secure_gate::ToBase64Url;
-/// # #[cfg(feature = "encoding-base64")]
-/// let bytes = [0x42u8; 32];
-/// # #[cfg(feature = "encoding-base64")]
-/// let base64_string = bytes.to_base64url();
-/// // base64_string is now a URL-safe base64 encoded String
-/// ```
+//! ```rust
+//! # #[cfg(feature = "encoding-base64")]
+//! use secure_gate::{Fixed, ToBase64Url, ExposeSecret};
+//!
+//! # #[cfg(feature = "encoding-base64")]
+//! {
+//! let secret = Fixed::new([0x42u8; 4]);
+//! let b64 = secret.expose_secret().to_base64url();
+//! assert_eq!(b64, "QkJCQg");
+//! # }
+//! ```
 #[cfg(feature = "encoding-base64")]
 use ::base64 as base64_crate;
+
 #[cfg(feature = "encoding-base64")]
 use base64_crate::engine::general_purpose::URL_SAFE_NO_PAD;
+
 #[cfg(feature = "encoding-base64")]
 use base64_crate::Engine;
 
-#[cfg(feature = "encoding-base64")]
 /// Extension trait for encoding byte data to URL-safe base64 strings (no padding).
 ///
-/// All methods require the caller to first call `.expose_secret()` (or similar).
+/// Requires `encoding-base64` feature.
 ///
-/// # Security Warning
-///
-/// These methods produce human-readable strings containing the full secret.
-/// Use only when intentionally exposing the secret (e.g., QR codes, user export, audited logging).
-/// For debugging/logging, prefer redacted helpers like `to_hex_left` from `ToHex`.
-// All calls require explicit `.expose_secret()` first — no implicit paths exist.
-///
-/// # Example
-///
-/// ```rust
-/// use secure_gate::ToBase64Url;
-/// let bytes = [0x42u8; 32];
-/// let base64_string = bytes.to_base64url();
-/// // base64_string is now a URL-safe base64 encoded String
-/// ```
+/// All methods require explicit `.expose_secret()` access first.
+#[cfg(feature = "encoding-base64")]
 pub trait ToBase64Url {
-    /// Encode secret bytes as URL-safe base64 (no padding).
+    /// Encode bytes as URL-safe base64 (no padding).
     fn to_base64url(&self) -> alloc::string::String;
 }
 

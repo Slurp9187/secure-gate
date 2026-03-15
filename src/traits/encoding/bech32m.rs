@@ -1,42 +1,46 @@
-#[cfg(feature = "encoding-bech32")]
+//! Bech32m encoding trait.
+//!
+//! This trait provides secure, explicit encoding of byte data to Bech32m strings
+//! (BIP-350 checksum) with a specified HRP. Designed for intentional export.
+//!
+//! Requires the `encoding-bech32m` feature.
+//!
+//! # Security Notes
+//! - **BIP-350 variant**: Enhanced checksum for better error detection.
+//! - **Full secret exposure**: Use only after explicit `.expose_secret()`.
+//! - **HRP validation**: `try_to_bech32m` allows optional expected-HRP check.
+//! - **Scoped access enforced**: No implicit exposure paths.
+//!
+//! # Example
+//!
+//! ```rust
+//! # #[cfg(feature = "encoding-bech32m")]
+//! use secure_gate::{Fixed, ToBech32m, ExposeSecret};
+//!
+//! # #[cfg(feature = "encoding-bech32m")]
+//! {
+//! let secret = Fixed::new([0x42u8; 20]);
+//! let bech32m = secret.expose_secret().to_bech32m("test");
+//! assert!(bech32m.starts_with("test1p"));
+//! # }
+//! ```
+#[cfg(feature = "encoding-bech32m")]
 use super::super::helpers::bech32::{encode_lower, Bech32m, Hrp};
-#[cfg(feature = "encoding-bech32")]
-use crate::error::Bech32Error; // Capped mode
 
-/// Extension trait for encoding byte data to Bech32m strings with a specified Human-Readable Part (HRP).
+#[cfg(feature = "encoding-bech32m")]
+use crate::error::Bech32Error;
+
+/// Extension trait for encoding byte data to Bech32m strings with a specified HRP.
 ///
-/// All methods require the caller to first call `.expose_secret()` (or similar).
+/// Requires `encoding-bech32m` feature.
 ///
-/// # Bech32m Feature Note
-///
-/// Currently shares implementation with Bech32; reserved for future strict variant enforcement.
-///
-/// # Security Warning
-///
-/// These methods produce human-readable strings containing the full secret.
-/// Use only when intentionally exposing the secret (e.g., QR codes, user export, audited logging).
-/// For debugging/logging, prefer redacted helpers like `to_hex_left` from `ToHex`.
-/// All calls require explicit `.expose_secret()` first — no implicit paths exist.
-///
-/// Decoding input from untrusted sources should use fallible `try_` methods.
-///
-/// # Example
-///
-/// ```rust
-/// # #[cfg(feature = "encoding-bech32")]
-/// use secure_gate::ToBech32m;
-/// # #[cfg(feature = "encoding-bech32")]
-/// let bytes = [0x42u8; 20];
-/// # #[cfg(feature = "encoding-bech32")]
-/// let bech32m_string = bytes.to_bech32m("bc");
-/// // bech32m_string is now a Bech32m encoded String with "bc" HRP
-/// ```
-#[cfg(feature = "encoding-bech32")]
+/// All methods require explicit `.expose_secret()` access first.
+#[cfg(feature = "encoding-bech32m")]
 pub trait ToBech32m {
-    /// Encode secret bytes as Bech32m with the specified HRP.
+    /// Encode bytes as Bech32m with the specified HRP (infallible version).
     fn to_bech32m(&self, hrp: &str) -> alloc::string::String;
 
-    /// Fallibly encode secret bytes as Bech32m with the specified HRP and optional expected HRP validation.
+    /// Fallibly encode bytes as Bech32m with the specified HRP and optional expected-HRP validation.
     fn try_to_bech32m(
         &self,
         hrp: &str,
@@ -45,7 +49,7 @@ pub trait ToBech32m {
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
     #[inline(always)]
     fn to_bech32m(&self, hrp: &str) -> alloc::string::String {

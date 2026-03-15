@@ -1,64 +1,56 @@
-//! # ToHex Trait
+//! Hexadecimal encoding trait.
 //!
-//! Extension trait for encoding byte data to lowercase hexadecimal strings.
+//! This trait provides secure, explicit encoding of byte data to lowercase
+//! (or uppercase) hexadecimal strings. It is intended for intentional export
+//! only (QR codes, audited logs, API responses).
 //!
-//! This trait provides secure, explicit encoding of byte slices to hex strings.
-//! All methods require the caller to first call `.expose_secret()` (or similar).
+//! Requires the `encoding-hex` feature.
 //!
-//! ## Security Warning
+//! # Security Notes
+//! - **Full secret exposure**: The resulting string contains the **entire** secret.
+//!   Use only after explicit `.expose_secret()`.
+//! - **Redacted helper**: `to_hex_left` is provided for safe partial display in logs.
+//! - **Scoped access enforced**: No implicit exposure paths exist.
 //!
+//! # Example
 //!
-//! These methods produce human-readable strings containing the full secret.
-//! Use only when intentionally exposing the secret (e.g., QR codes, user export, audited logging).
-//! For debugging/logging, prefer redacted helpers like `to_hex_left`.
-//! All calls require explicit `.expose_secret()` first — no implicit paths exist.
+//! ```rust
+//! # #[cfg(feature = "encoding-hex")]
+//! use secure_gate::{Fixed, ToHex, ExposeSecret};
 //!
-/// # Example
-///
-/// ```rust
-/// # #[cfg(feature = "encoding-hex")]
-/// use secure_gate::ToHex;
-/// # #[cfg(feature = "encoding-hex")]
-/// let bytes = [0x42u8; 32];
-/// # #[cfg(feature = "encoding-hex")]
-/// let hex_string = bytes.to_hex();
-/// // hex_string is now String: "424242..."
-/// ```
+//! # #[cfg(feature = "encoding-hex")]
+//! {
+//! let secret = Fixed::new([0x42u8; 4]);
+//! let hex = secret.expose_secret().to_hex();
+//! assert_eq!(hex, "42424242");
+//!
+//! let hex_upper = secret.expose_secret().to_hex_upper();
+//! assert_eq!(hex_upper, "42424242");
+//!
+//! // Redacted for logs
+//! let redacted = secret.expose_secret().to_hex_left(2);
+//! assert_eq!(redacted, "42…");
+//! # }
+//! ```
 #[cfg(feature = "encoding-hex")]
 use ::hex as hex_crate;
 
-/// Extension trait for encoding byte data to lowercase hexadecimal strings.
+/// Extension trait for encoding byte data to hexadecimal strings.
 ///
-/// All methods require the caller to first call `.expose_secret()` (or similar).
+/// Requires `encoding-hex` feature.
 ///
-/// # Security Warning
-///
-/// These methods produce human-readable strings containing the full secret.
-/// Use only when intentionally exposing the secret (e.g., QR codes, user export, audited logging).
-/// For debugging/logging, prefer redacted helpers like `to_hex_left`.
-/// All calls require explicit `.expose_secret()` first — no implicit paths exist.
-///
-/// # Example
-///
-/// ```rust
-/// # #[cfg(feature = "encoding-hex")]
-/// use secure_gate::ToHex;
-/// # #[cfg(feature = "encoding-hex")]
-/// let bytes = [0x42u8; 32];
-/// # #[cfg(feature = "encoding-hex")]
-/// let hex_string = bytes.to_hex();
-/// // hex_string is now String: "424242..."
-/// ```
+/// All methods require explicit `.expose_secret()` access first.
 #[cfg(feature = "encoding-hex")]
 pub trait ToHex {
-    /// Encode secret bytes as lowercase hexadecimal.
+    /// Encode bytes as lowercase hexadecimal.
     fn to_hex(&self) -> alloc::string::String;
 
-    /// Encode secret bytes as uppercase hexadecimal.
+    /// Encode bytes as uppercase hexadecimal.
     fn to_hex_upper(&self) -> alloc::string::String;
 
-    /// Encode secret bytes as lowercase hexadecimal, truncated to the first `bytes` with '…' if longer.
-    /// Useful for redacted logging or debugging without exposing the full secret.
+    /// Encode bytes as lowercase hexadecimal, truncated to the first `bytes` with '…' if longer.
+    ///
+    /// Useful for redacted logging/debugging without exposing the full secret.
     fn to_hex_left(&self, bytes: usize) -> alloc::string::String {
         let full = self.to_hex();
         if full.len() <= bytes * 2 {
