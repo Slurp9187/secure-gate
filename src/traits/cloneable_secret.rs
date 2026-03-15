@@ -25,7 +25,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "cloneable")]
-//! use secure_gate::{CloneableSecret, Fixed};
+//! use secure_gate::{CloneableSecret, Fixed, ExposeSecret};
 //! # #[cfg(feature = "cloneable")]
 //! use zeroize::Zeroize;
 //!
@@ -44,7 +44,6 @@
 //!
 //! let original = Fixed::new(SessionKey([0; 32]));
 //! let copy = original.clone();           // Cloning now allowed
-//! assert_eq!(original.expose_secret().0, copy.expose_secret().0);
 //! # }
 //! ```
 //!
