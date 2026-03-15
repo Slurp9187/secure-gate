@@ -107,7 +107,7 @@ mod fixed;
 mod error;
 
 /// Core traits for wrapper polymorphism - always available.
-mod traits;
+pub mod traits;
 
 #[cfg(feature = "alloc")]
 /// Zero-cost heap-allocated secret wrapper with explicit access and zeroize.
@@ -350,6 +350,7 @@ pub use traits::FromBech32Str;
 /// # Errors
 ///
 /// Returns [`Bech32Error`] on invalid bech32m or unexpected HRP.
+#[cfg(feature = "encoding-bech32m")]
 pub use traits::FromBech32mStr;
 
 #[cfg(feature = "encoding-hex")]
@@ -434,7 +435,32 @@ pub use traits::ToBech32;
 /// // bech32m is a BIP-350 encoded string
 /// # }
 /// ```
+#[cfg(feature = "encoding-bech32m")]
 pub use traits::ToBech32m;
+
+/// Bech32 checksum variant with extended payload capacity.
+///
+/// Allows encoding large secrets (up to ~3.2 KB) with Bech32 checksum.
+/// For most use cases, prefer the `ToBech32` trait instead.
+///
+/// # Examples
+///
+/// ```rust
+/// # #[cfg(feature = "encoding-bech32")]
+/// use bech32::{encode_lower, Hrp};
+/// # #[cfg(feature = "encoding-bech32")]
+/// use secure_gate::Bech32Large;
+///
+/// # #[cfg(feature = "encoding-bech32")]
+/// {
+/// let hrp = Hrp::parse("test").unwrap();
+/// let data = vec![0u8; 1000];
+/// let encoded = encode_lower::<Bech32Large>(hrp, &data).unwrap();
+/// assert!(encoded.starts_with("test"));
+/// # }
+/// ```
+#[cfg(feature = "encoding-bech32")]
+pub use traits::encoding::bech32::Bech32Large;
 
 #[cfg(feature = "encoding-hex")]
 /// Hex encoding trait.

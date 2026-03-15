@@ -28,7 +28,34 @@
 //! # }
 //! ```
 #[cfg(feature = "encoding-bech32")]
-use super::super::helpers::bech32::{encode_lower, Bech32Large, Hrp};
+use super::super::helpers::bech32::{encode_lower, Hrp};
+
+#[cfg(feature = "encoding-bech32")]
+use bech32::primitives::checksum::Checksum;
+
+/// Custom Bech32 checksum variant with extended payload capacity.
+///
+/// Matches classic Bech32 (BIP-173) checksum behavior but raises the limit to
+/// 4096 Fe32 values (~3.2 KB raw data). Used by the `ToBech32` trait
+/// for large secrets while preserving full checksum validation.
+///
+/// # Note
+///
+/// This is a public type for advanced users. For most use cases, prefer the `ToBech32` trait instead.
+#[cfg(feature = "encoding-bech32")]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Bech32Large {}
+
+#[cfg(feature = "encoding-bech32")]
+impl Checksum for Bech32Large {
+    type MidstateRepr = u32;
+
+    const CODE_LENGTH: usize = 4096;
+    const CHECKSUM_LENGTH: usize = 6;
+
+    const GENERATOR_SH: [u32; 5] = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+    const TARGET_RESIDUE: u32 = 1;
+}
 
 #[cfg(feature = "encoding-bech32")]
 use crate::error::Bech32Error;

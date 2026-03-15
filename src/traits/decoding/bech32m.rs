@@ -19,24 +19,26 @@
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "encoding-bech32m")]
-//! use secure_gate::FromBech32mStr;
+//! # use secure_gate::FromBech32mStr;
+//! #
+//! # #[cfg(feature = "encoding-bech32m")] {
+//! // Official BIP-350 minimal valid Bech32m test vector
+//! let bech32m = "A1LQFN3A";
 //!
-//! # #[cfg(feature = "encoding-bech32m")]
-//! {
-//! let bech32m = "test1qqltm9dq";
-//! let (hrp, bytes) = bech32m.try_from_bech32m().unwrap();
-//! assert_eq!(hrp, "test");
-//! assert_eq!(bytes, vec![0u8]);
+//! // Basic decoding
+//! let (hrp, data) = bech32m.try_from_bech32m()
+//!     .expect("valid bech32m string");
+//! assert_eq!(hrp.to_ascii_lowercase(), "a");
+//! assert!(data.is_empty());
 //!
-//! // Expect specific HRP
-//! let data = bech32m.try_from_bech32m_expect_hrp("test").unwrap();
-//! assert_eq!(data, vec![0u8]);
+//! // With expected HRP
+//! let data = bech32m.try_from_bech32m_expect_hrp("A")
+//!     .expect("HRP should match");
+//! assert!(data.is_empty());
 //! # }
 //! ```
 #[cfg(feature = "encoding-bech32m")]
-use super::super::helpers::bech32::{decode, encode_lower, Bech32m};
-
+use super::super::helpers::bech32::{Bech32m, CheckedHrpstring};
 #[cfg(feature = "encoding-bech32m")]
 use crate::error::Bech32Error;
 
@@ -66,18 +68,18 @@ pub trait FromBech32mStr {
 #[cfg(feature = "encoding-bech32m")]
 impl<T: AsRef<str> + ?Sized> FromBech32mStr for T {
     fn try_from_bech32m(&self) -> Result<(String, Vec<u8>), Bech32Error> {
-        // Capped + checksum validate
-        let (hrp, data) = decode(self.as_ref()).map_err(|_| Bech32Error::OperationFailed)?;
-        // Validate that it is Bech32m variant by re-encoding
-        let re_encoded =
-            encode_lower::<Bech32m>(hrp, &data).map_err(|_| Bech32Error::OperationFailed)?;
-        if re_encoded != self.as_ref() {
-            return Err(Bech32Error::OperationFailed);
-        }
-        if data.is_empty() {
-            return Err(Bech32Error::OperationFailed);
-        }
-        Ok((hrp.to_string(), data))
+        let s = self.as_ref();
+        // Use CheckedHrpstring to validate Bech32m checksum (no-alloc)
+        let checked =
+            CheckedHrpstring::new::<Bech32m>(s).map_err(|_| Bech32Error::OperationFailed)?;
+
+        // Get HRP (lowercase)
+        let hrp = checked.hrp().to_string();
+
+        // Collect data as 8-bit bytes (handles empty)
+        let data: Vec<u8> = checked.byte_iter().collect();
+
+        Ok((hrp, data))
     }
 
     fn try_from_bech32m_expect_hrp(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error> {

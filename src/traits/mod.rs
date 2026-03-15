@@ -60,7 +60,7 @@ pub use constant_time_eq_ext::ConstantTimeEqExt;
 pub mod decoding;
 pub mod encoding;
 
-pub(crate) mod helpers;
+pub mod helpers;
 
 #[cfg(feature = "ct-eq-hash")]
 pub(crate) use helpers::ct_eq_hash::ct_eq_hash_bytes;
@@ -72,7 +72,7 @@ pub use decoding::FromBase64UrlStr;
 #[cfg(feature = "encoding-bech32")]
 pub use decoding::FromBech32Str;
 
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32m")]
 pub use decoding::FromBech32mStr;
 
 #[cfg(feature = "encoding-hex")]
@@ -85,7 +85,7 @@ pub use encoding::ToBase64Url;
 #[cfg(feature = "encoding-bech32")]
 pub use encoding::ToBech32;
 
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32m")]
 pub use encoding::ToBech32m;
 
 #[cfg(feature = "encoding-hex")]
