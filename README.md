@@ -285,7 +285,7 @@
   All methods are blanket-implemented over `AsRef<[u8]>` (encoding) or `AsRef<str>` (decoding) for zero-overhead ergonomics.
   
   ```rust
-  #[cfg(all(feature = "encoding-bech32", feature = "encoding-hex"))]
+  #[cfg(all(feature = "encoding-bech32", feature = "encoding-bech32m", feature = "encoding-hex"))]
   {
       use secure_gate::{fixed_alias, Fixed, ExposeSecret, ToBech32, ToBech32m, ToHex, FromHexStr, FromBech32Str};
   
@@ -307,7 +307,8 @@
       assert_eq!(decoded_hex.len(), 20);
   }
   ```
-  
+
+
   ### Serde (direct deserialization to inner types; serialization requires `SerializableSecret`)
 
   ```rust

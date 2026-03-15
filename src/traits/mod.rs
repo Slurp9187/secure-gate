@@ -60,10 +60,8 @@ pub use constant_time_eq_ext::ConstantTimeEqExt;
 pub mod decoding;
 pub mod encoding;
 
-pub mod helpers;
-
 #[cfg(feature = "ct-eq-hash")]
-pub(crate) use helpers::ct_eq_hash::ct_eq_hash_bytes;
+pub(crate) use constant_time_eq_ext::ct_eq_hash_bytes;
 
 // Re-export per-format decoding traits (feature-gated)
 #[cfg(feature = "encoding-base64")]

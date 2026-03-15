@@ -26,7 +26,7 @@
 //! # }
 //! ```
 #[cfg(feature = "encoding-bech32m")]
-use super::super::helpers::bech32::{encode_lower, Bech32m, Hrp};
+use bech32::{encode_lower, Bech32m, Hrp};
 
 #[cfg(feature = "encoding-bech32m")]
 use crate::error::Bech32Error;
@@ -77,5 +77,19 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
             }
         }
         encode_lower::<Bech32m>(hrp_parsed, self.as_ref()).map_err(|_| Bech32Error::OperationFailed)
+    }
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[cfg(test)]
+mod tests {
+    use bech32::{encode_lower, Bech32m, Hrp};
+
+    #[test]
+    #[should_panic(expected = "TooLong")]
+    fn test_capped_overflow_bech32m() {
+        let large_data = vec![0u8; 800];
+        let hrp = Hrp::parse("test").unwrap();
+        let _ = encode_lower::<Bech32m>(hrp, &large_data).unwrap();
     }
 }

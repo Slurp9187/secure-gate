@@ -37,7 +37,9 @@
 //! # }
 //! ```
 #[cfg(feature = "encoding-bech32")]
-use super::super::helpers::bech32::{Bech32Large, CheckedHrpstring};
+use super::super::encoding::bech32::Bech32Large;
+#[cfg(feature = "encoding-bech32")]
+use bech32::primitives::decode::CheckedHrpstring;
 #[cfg(feature = "encoding-bech32")]
 use crate::error::Bech32Error;
 
