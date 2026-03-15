@@ -39,7 +39,7 @@
 //! ```rust
 //! # #[cfg(feature = "rand")]
 //! {
-//! use secure_gate::Fixed;
+//! use secure_gate::{Fixed, ExposeSecret};
 //!
 //! let key = Fixed::<[u8; 32]>::from_random();
 //! assert_eq!(key.len(), 32);
