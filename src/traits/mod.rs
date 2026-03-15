@@ -1,34 +1,46 @@
-// # Traits for Polymorphic Secret Handling
-//
-// This module provides the fundamental traits for working with secrets in a polymorphic,
-// zero-cost way. These traits enable generic code that can operate on different secret
-// wrapper types while maintaining strong security guarantees.
-//
-// ## Traits Overview
-//
-// - [`ExposeSecret`] - Read-only secret access with metadata
-// - [`ExposeSecretMut`] - Mutable secret access
-// - [`CloneableSecret`] - Opt-in safe cloning with zeroization (requires cloneable feature)
-// - [`ConstantTimeEq`] - Constant-time equality to prevent timing attacks (requires ct-eq feature)
-// - [`SecureEncoding`] - Umbrella trait for secure byte encoding to strings (requires encoding features)
-// - [`SecureDecoding`] - Umbrella trait for secure decoding from strings (requires encoding features)
-// - [`SerializableSecret`] - Marker for types allowing secure serialization (requires serde-serialize feature)
-//
-// ## Security Guarantees
-//
-// - **Read-only enforcement**: Random and encoding wrappers only expose read-only access
-// - **Controlled mutability**: Core wrappers provide full access while others remain read-only
-// - **Zero-cost abstractions**: All traits use `#[inline(always)]` for optimal performance
-// - **Type safety**: Polymorphic operations preserve secret wrapper invariants
-//
-// ## Feature Gates
-//
-// Some traits require optional Cargo features:
-// - rand: Enables random wrapper implementations
-// - cloneable: Enables [`CloneableSecret`] for safe cloning
-// - ct-eq: Enables [`ConstantTimeEq`] for constant-time comparisons
-// - encoding (or encoding-hex, encoding-base64, encoding-bech32): Enables [`SecureEncoding`] and [`SecureDecoding`] for byte encoding/decoding
-// - serde-serialize: Enables [`SerializableSecret`] for opt-in serialization
+//! Traits for polymorphic secret handling.
+//!
+//! This module defines the core traits that enable generic, zero-cost, and secure
+//! operations across different secret wrapper types (`Fixed<T>`, `Dynamic<T>`, etc.).
+//! These traits allow writing polymorphic code that preserves strong security invariants:
+//! explicit access, controlled mutability, timing safety, and opt-in risk features.
+//!
+//! # Core Traits
+//!
+//! | Trait                  | Purpose                                      | Requires Feature         | Notes                                                                 |
+//! |------------------------|----------------------------------------------|--------------------------|-----------------------------------------------------------------------|
+//! | [`ExposeSecret`]       | Read-only scoped / direct access + metadata  | Always available         | Preferred: `with_secret` (scoped); escape hatch: `expose_secret`      |
+//! | [`ExposeSecretMut`]    | Mutable scoped / direct access               | Always available         | Same preference: `with_secret_mut` over `expose_secret_mut`           |
+//! | [`ConstantTimeEq`]     | Deterministic constant-time equality         | `ct-eq`                  | Timing-attack resistant byte comparison                               |
+//! | [`ConstantTimeEqExt`]  | Probabilistic fast equality (BLAKE3 hash)    | `ct-eq-hash`             | Recommended for large/variable secrets; see `ct_eq_auto`              |
+//! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved               |
+//! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution               |
+//! | [`SecureEncoding`]     | Marker + blanket impl for encoding traits    | Any `encoding-*`         | Enables `ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`               |
+//! | [`SecureDecoding`]     | Marker + blanket impl for decoding traits    | Any `encoding-*`         | Enables `FromHexStr`, `FromBase64UrlStr`, `FromBech32Str`, etc.       |
+//!
+//! # Security Guarantees
+//!
+//! - **No implicit access** — All secret data access requires explicit trait methods
+//! - **Scoped preference** — `with_secret` / `with_secret_mut` limit borrow lifetime
+//! - **Zero-cost** — All methods use `#[inline(always)]` where possible
+//! - **Timing safety** — `ConstantTimeEq` / `ConstantTimeEqExt` prevent side-channels
+//! - **Opt-in risk** — Cloning and serialization require deliberate marker impls
+//! - **Read-only enforcement** — Encoding wrappers and random types only expose immutable access
+//!
+//! # Feature Gates
+//!
+//! Some traits are only available when their corresponding Cargo features are enabled:
+//!
+//! - `ct-eq`          → [`ConstantTimeEq`]
+//! - `ct-eq-hash`     → [`ConstantTimeEqExt`] (recommended for large secrets)
+//! - `cloneable`      → [`CloneableSecret`]
+//! - `serde-serialize`→ [`SerializableSecret`]
+//! - `encoding-*`     → [`SecureEncoding`], [`SecureDecoding`], and per-format traits
+//!
+//! The encoding traits (`ToHex`, `FromHexStr`, etc.) are re-exported from submodules for convenience.
+//!
+//! See individual trait docs for detailed usage and examples.
+
 pub mod expose_secret;
 pub use expose_secret::ExposeSecret;
 
@@ -53,67 +65,81 @@ pub(crate) mod helpers;
 #[cfg(feature = "ct-eq-hash")]
 pub(crate) use helpers::ct_eq_hash::ct_eq_hash_bytes;
 
+// Re-export per-format decoding traits (feature-gated)
 #[cfg(feature = "encoding-base64")]
 pub use decoding::FromBase64UrlStr;
+
 #[cfg(feature = "encoding-bech32")]
 pub use decoding::FromBech32Str;
-#[cfg(feature = "encoding-bech32")]
+
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 pub use decoding::FromBech32mStr;
+
 #[cfg(feature = "encoding-hex")]
 pub use decoding::FromHexStr;
 
+// Re-export per-format encoding traits (feature-gated)
 #[cfg(feature = "encoding-base64")]
 pub use encoding::ToBase64Url;
+
 #[cfg(feature = "encoding-bech32")]
 pub use encoding::ToBech32;
-#[cfg(feature = "encoding-bech32")]
+
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 pub use encoding::ToBech32m;
+
 #[cfg(feature = "encoding-hex")]
 pub use encoding::ToHex;
 
 /// Marker trait for types that support secure encoding operations.
 ///
-/// This trait is automatically implemented for any type that can be viewed as a byte slice
-/// (i.e., implements `AsRef<[u8]>`), such as `&[u8]`, `Vec<u8>`, and byte arrays.
-/// It serves as a bound for blanket implementations of encoding traits like [`ToHex`],
-/// [`ToBase64Url`], and [`ToBech32`], ensuring only appropriate types can perform encoding.
+/// Automatically implemented for any type that implements `AsRef<[u8]>`,
+/// such as `&[u8]`, `Vec<u8>`, `[u8; N]`, etc. This enables blanket impls
+/// of the individual encoding traits (`ToHex`, `ToBase64Url`, `ToBech32`, etc.).
 ///
-/// Since this is a marker trait with no methods, it does not add functionality but enables
-/// extension traits to be available where relevant.
+/// Since this is a marker trait (no methods), it exists only to allow trait
+/// bounds and extension methods to be available where appropriate.
+///
+/// Requires at least one `encoding-*` feature to be enabled.
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",
-    feature = "encoding-bech32"
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m"
 ))]
 pub trait SecureEncoding {}
 
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",
-    feature = "encoding-bech32"
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m"
 ))]
 impl<T: AsRef<[u8]> + ?Sized> SecureEncoding for T {}
 
 /// Marker trait for types that support secure decoding operations.
 ///
-/// This trait is automatically implemented for any type that can be viewed as a string slice
-/// (i.e., implements `AsRef<str>`), such as `&str`, `String`, and string slices.
-/// It serves as a bound for blanket implementations of decoding traits like [`FromHexStr`],
-/// [`FromBase64UrlStr`], and [`FromBech32Str`], ensuring only appropriate types can perform decoding.
+/// Automatically implemented for any type that implements `AsRef<str>`,
+/// such as `&str`, `String`, etc. This enables blanket impls of the
+/// individual decoding traits (`FromHexStr`, `FromBase64UrlStr`, etc.).
 ///
-/// Since this is a marker trait with no methods, it does not add functionality but enables
-/// extension traits to be available where relevant.
+/// Like `SecureEncoding`, this is a marker trait with no methods — it exists
+/// to allow trait bounds and extension methods where relevant.
+///
+/// Requires at least one `encoding-*` feature to be enabled.
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",
-    feature = "encoding-bech32"
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m"
 ))]
 pub trait SecureDecoding {}
 
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base64",
-    feature = "encoding-bech32"
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m"
 ))]
 impl<T: AsRef<str> + ?Sized> SecureDecoding for T {}
 
