@@ -13,8 +13,8 @@
 //! | [`ExposeSecretMut`]    | Mutable scoped / direct access               | Always available         | Same preference: `with_secret_mut` over `expose_secret_mut`           |
 //! | [`ConstantTimeEq`]     | Deterministic constant-time equality         | `ct-eq`                  | Timing-attack resistant byte comparison                               |
 //! | [`ConstantTimeEqExt`]  | Probabilistic fast equality (BLAKE3 hash)    | `ct-eq-hash`             | Recommended for large/variable secrets; see `ct_eq_auto`              |
-//! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved               |
-//! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution               |
+//! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved. See [SECURITY.md](../SECURITY.md) for opt-in risk details. |
+//! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution. See [SECURITY.md](../SECURITY.md) for opt-in risk details. |
 //! | [`SecureEncoding`]     | Marker + blanket impl for encoding traits    | Any `encoding-*`         | Enables `ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`               |
 //! | [`SecureDecoding`]     | Marker + blanket impl for decoding traits    | Any `encoding-*`         | Enables `FromHexStr`, `FromBase64UrlStr`, `FromBech32Str`, etc.       |
 //!

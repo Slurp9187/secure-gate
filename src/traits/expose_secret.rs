@@ -58,7 +58,7 @@
 //! Mutable scoped:
 //!
 //! ```rust
-//! use secure_gate::{Fixed, ExposeSecretMut};
+//! use secure_gate::{Fixed, ExposeSecret, ExposeSecretMut};
 //!
 //! let mut secret = Fixed::new([0u8; 4]);
 //! secret.with_secret_mut(|bytes| bytes[0] = 99);
@@ -104,18 +104,7 @@ pub trait ExposeSecret {
 
     /// Exposes the secret for read-only access.
     ///
-    /// # Security Warning
-    ///
-    /// This returns a direct reference that **can be accidentally leaked** if held too long
-    /// or stored in a long-lived variable. Prefer [`with_secret`] in most cases to keep
-    /// exposure strictly scoped to a closure.
-    ///
-    /// Use `expose_secret` only when you need a reference that outlives a single statement,
-    /// such as:
-    ///
-    /// - Passing raw pointer + length to C FFI
-    /// - Interfacing with third-party APIs that require `&T` directly
-    /// - Rare cases where the borrow must cross function boundaries
+    /// See [`ExposeSecret`] for the full security model and scoping recommendations.
     ///
     /// # Examples
     ///

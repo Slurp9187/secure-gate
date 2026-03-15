@@ -30,32 +30,20 @@
 //! Scoped mutable access (recommended):
 //!
 //! ```rust
-//! use secure_gate::{Fixed, ExposeSecretMut};
+//! use secure_gate::{Fixed, ExposeSecretMut, ExposeSecret};
 //!
 //! let mut secret = Fixed::new([0u8; 4]);
 //! secret.with_secret_mut(|bytes| bytes[0] = 42);
 //! assert_eq!(secret.expose_secret()[0], 42);
 //! ```
 //!
-//! Direct mutable exposure (escape hatch – use with caution):
-//!
-//! ```rust
-//! use secure_gate::{Fixed, ExposeSecretMut};
-//!
-//! let mut secret = Fixed::new([0u8; 4]);
-//!
-//! // Typical FFI use case needing mutable reference
-//! // unsafe {
-//! //     c_library_function_mut(secret.expose_secret_mut().as_mut_ptr(), secret.len());
-//! // }
-//! ```
 //!
 //! Polymorphic generic code (works for any mutable secret wrapper):
 //!
 //! ```rust
 //! use secure_gate::ExposeSecretMut;
 //!
-//! fn mutate_first_byte<S: ExposeSecretMut>(secret: &mut S) {
+//! fn mutate_first_byte<S: ExposeSecretMut>(secret: &mut S) where S::Inner: AsMut<[u8]> {
 //!     secret.with_secret_mut(|bytes| {
 //!         if let Some(first) = bytes.as_mut().first_mut() {
 //!             *first = 99;
@@ -94,17 +82,6 @@ pub trait ExposeSecretMut: ExposeSecret {
 
     /// Exposes the secret for mutable access.
     ///
-    /// # Security Warning
-    ///
-    /// This returns a direct mutable reference that **can be accidentally leaked**
-    /// if held too long. Prefer [`with_secret_mut`] in most cases to keep mutation
-    /// strictly scoped to a closure.
-    ///
-    /// Use `expose_secret_mut` only when you need a reference that outlives a
-    /// single statement, such as:
-    ///
-    /// - Passing raw pointer to C FFI
-    /// - Interfacing with third-party APIs that require `&mut T`
-    /// - Rare cases where the mutable borrow must cross function boundaries
+    /// See [`ExposeSecretMut`] for the full security model and scoping recommendations.
     fn expose_secret_mut(&mut self) -> &mut Self::Inner;
 }
