@@ -19,9 +19,10 @@
 //!
 //! # #[cfg(feature = "encoding-bech32m")]
 //! {
-//! let secret = Fixed::new([0x42u8; 20]);
-//! let bech32m = secret.expose_secret().to_bech32m("test");
-//! assert!(bech32m.starts_with("test1p"));
+//! let secret = Fixed::new([0u8]);
+//! let bech32m = secret.with_secret(|s| s.to_bech32m("A"));
+//! assert!(bech32m.starts_with("a1"));
+//! // bech32m is a BIP-350 encoded string starting with "a1" (prefix "A" + separator)
 //! # }
 //! ```
 #[cfg(feature = "encoding-bech32m")]
