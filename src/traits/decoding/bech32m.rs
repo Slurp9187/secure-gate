@@ -4,7 +4,7 @@
 //! to byte vectors, with optional HRP validation. It is designed for handling
 //! untrusted input in cryptographic contexts, such as decoding encoded addresses or keys.
 //!
-//! Requires the `encoding-bech32` or `encoding-bech32m` feature.
+//! **Requires the `encoding-bech32m` feature** (distinct from classic Bech32).
 //!
 //! # Security Notes
 //! - **Untrusted input**: Always treat decoded data as potentially malicious.
@@ -19,10 +19,10 @@
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+//! # #[cfg(feature = "encoding-bech32m")]
 //! use secure_gate::FromBech32mStr;
 //!
-//! # #[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+//! # #[cfg(feature = "encoding-bech32m")]
 //! {
 //! let bech32m = "test1qqltm9dq";
 //! let (hrp, bytes) = bech32m.try_from_bech32m().unwrap();
@@ -34,38 +34,36 @@
 //! assert_eq!(data, vec![0u8]);
 //! # }
 //! ```
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 use super::super::helpers::bech32::{decode, encode_lower, Bech32m};
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 use crate::error::Bech32Error;
 
 /// Extension trait for decoding Bech32m strings to byte data.
 ///
-/// Requires `encoding-bech32` or `encoding-bech32m` feature.
+/// **Requires the `encoding-bech32m` feature.**
 ///
 /// # Security Warning
 ///
 /// Treat all input as untrusted — invalid Bech32m may indicate tampering.
 /// Always use the fallible `try_from_bech32m` / `try_from_bech32m_expect_hrp`
 /// and handle errors securely.
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 pub trait FromBech32mStr {
     /// Fallibly decodes a Bech32m string to (HRP, bytes).
     ///
     /// Validates BIP-350 checksum and returns the human-readable part and data.
-    /// Requires `encoding-bech32` feature.
     fn try_from_bech32m(&self) -> Result<(String, Vec<u8>), Bech32Error>;
 
     /// Fallibly decodes a Bech32m string, expecting the specified HRP, returning bytes.
     ///
     /// Validates checksum and HRP match; returns [`Bech32Error::UnexpectedHrp`] if HRP mismatch.
-    /// Requires `encoding-bech32` feature.
     fn try_from_bech32m_expect_hrp(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error>;
 }
 
 // Blanket impl to cover any AsRef<str> (e.g., &str, String, etc.)
-#[cfg(feature = "encoding-bech32")]
+#[cfg(feature = "encoding-bech32m")]
 impl<T: AsRef<str> + ?Sized> FromBech32mStr for T {
     fn try_from_bech32m(&self) -> Result<(String, Vec<u8>), Bech32Error> {
         // Capped + checksum validate
