@@ -12,26 +12,26 @@
 //! - **Redacted helper**: `to_hex_left` is provided for safe partial display in logs.
 //! - **Scoped access enforced**: No implicit exposure paths exist.
 //!
-//! # Example
-//!
-//! ```rust
-//! # #[cfg(feature = "encoding-hex")]
-//! use secure_gate::{Fixed, ToHex, ExposeSecret};
-//!
-//! # #[cfg(feature = "encoding-hex")]
-//! {
-//! let secret = Fixed::new([0x42u8; 4]);
-//! let hex = secret.expose_secret().to_hex();
-//! assert_eq!(hex, "42424242");
-//!
-//! let hex_upper = secret.expose_secret().to_hex_upper();
-//! assert_eq!(hex_upper, "42424242");
-//!
-//! // Redacted for logs
-//! let redacted = secret.expose_secret().to_hex_left(2);
-//! assert_eq!(redacted, "42…");
-//! # }
-//! ```
+/// # Example
+///
+/// ```rust
+/// # #[cfg(feature = "encoding-hex")]
+/// use secure_gate::{Fixed, ToHex, ExposeSecret};
+///
+/// # #[cfg(feature = "encoding-hex")]
+/// {
+/// let secret = Fixed::new([0x0au8, 0x0bu8, 0x0cu8, 0x0du8]);
+/// let hex = secret.with_secret(|s| s.to_hex());
+/// assert_eq!(hex, "0a0b0c0d");
+///
+/// let hex_upper = secret.with_secret(|s| s.to_hex_upper());
+/// assert_eq!(hex_upper, "0A0B0C0D");
+///
+/// // Redacted for logs
+/// let redacted = secret.with_secret(|s| s.to_hex_left(2));
+/// assert_eq!(redacted, "0a0b…");
+/// # }
+/// ```
 #[cfg(feature = "encoding-hex")]
 use ::hex as hex_crate;
 
