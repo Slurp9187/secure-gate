@@ -42,7 +42,7 @@
 //! ```rust
 //! # #[cfg(all(feature = "alloc", feature = "rand"))]
 //! {
-//! use secure_gate::Dynamic;
+//! use secure_gate::{Dynamic, ExposeSecret};
 //!
 //! let key = Dynamic::from_random(32);
 //! assert_eq!(key.len(), 32);
