@@ -1,24 +1,65 @@
-// secure-gate/src/traits/decoding/bech32.rs
-
+//! Bech32 decoding trait.
+//!
+//! This trait provides secure, explicit decoding of Bech32 strings (BIP-173 checksum)
+//! to byte vectors, with optional HRP validation. It is designed for handling
+//! untrusted input in cryptographic contexts, such as decoding encoded addresses or keys.
+//!
+//! Requires the `encoding-bech32` feature.
+//!
+//! # Security Notes
+//! - **Untrusted input**: Always treat decoded data as potentially malicious.
+//!   Use fallible methods and validate lengths/content after decoding.
+//! - **Invalid input**: May indicate tampering, injection attempts, or errors —
+//!   log/handle carefully without leaking details.
+//! - **HRP validation**: Use `try_from_bech32_expect_hrp` to enforce expected HRPs
+//!   and prevent cross-protocol confusion attacks.
+//! - **Heap allocation**: Returns `Vec<u8>` — wrap in `Fixed` or `Dynamic` for secrets.
+//!
+//! # Example
+//!
+//! ```rust
+//! # #[cfg(feature = "encoding-bech32")]
+//! use secure_gate::FromBech32Str;
+//!
+//! # #[cfg(feature = "encoding-bech32")]
+//! {
+//! let bech32 = "test1qq2htfgz";
+//! let (hrp, bytes) = bech32.try_from_bech32().unwrap();
+//! assert_eq!(hrp, "test");
+//! assert_eq!(bytes, vec![0u8]);
+//!
+//! // Expect specific HRP
+//! let data = bech32.try_from_bech32_expect_hrp("test").unwrap();
+//! assert_eq!(data, vec![0u8]);
+//! # }
+//! ```
 #[cfg(feature = "encoding-bech32")]
 use super::super::helpers::bech32::{encode_lower, Bech32Large, Fe32, Fe32IterExt, Hrp};
+
 #[cfg(feature = "encoding-bech32")]
 use crate::error::Bech32Error;
 
-#[cfg(feature = "encoding-bech32")]
 /// Extension trait for decoding Bech32 strings to byte data.
 ///
-/// Input should be treated as untrusted; use fallible methods.
+/// Requires `encoding-bech32` feature.
 ///
 /// # Security Warning
 ///
-/// Decoding input from untrusted sources should use fallible `try_` methods.
-/// Invalid input may indicate tampering or errors.
+/// Treat all input as untrusted — invalid Bech32 may indicate tampering.
+/// Always use the fallible `try_from_bech32` / `try_from_bech32_expect_hrp`
+/// and handle errors securely.
+#[cfg(feature = "encoding-bech32")]
 pub trait FromBech32Str {
-    /// Fallibly decode a Bech32 string to (HRP, bytes).
+    /// Fallibly decodes a Bech32 string to (HRP, bytes).
+    ///
+    /// Validates checksum and returns the human-readable part and data.
+    /// Requires `encoding-bech32` feature.
     fn try_from_bech32(&self) -> Result<(String, Vec<u8>), Bech32Error>;
 
-    /// Fallibly decode a Bech32 string, expecting the specified HRP, returning bytes.
+    /// Fallibly decodes a Bech32 string, expecting the specified HRP, returning bytes.
+    ///
+    /// Validates checksum and HRP match; returns [`Bech32Error::UnexpectedHrp`] if HRP mismatch.
+    /// Requires `encoding-bech32` feature.
     fn try_from_bech32_expect_hrp(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error>;
 }
 

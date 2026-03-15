@@ -1,32 +1,38 @@
-// secure-gate/src/traits/decoding/base64_url.rs
-//! # FromBase64UrlStr Trait
+//! URL-safe Base64 decoding trait.
 //!
-//! Extension trait for decoding URL-safe base64 strings to byte data.
+//! This trait provides secure, explicit decoding of base64url-encoded strings
+//! (URL-safe alphabet, no padding) to byte vectors. It is designed for handling
+//! untrusted input in cryptographic contexts, such as decoding encoded keys or tokens.
 //!
-//! This trait provides secure, explicit decoding of base64url strings to byte vectors.
-//! Input should be treated as untrusted; use fallible methods.
+//! Requires the `encoding-base64` feature.
 //!
-//! ## Security Warning
+//! # Security Notes
+//! - **Untrusted input**: Always treat decoded data as potentially malicious.
+//!   Use fallible methods and validate lengths/content after decoding.
+//! - **Invalid input**: May indicate tampering, injection attempts, or errors —
+//!   log/handle carefully without leaking details.
+//! - **Heap allocation**: Returns `Vec<u8>` — wrap in `Fixed` or `Dynamic` for secrets.
+//! - **No auto-padding**: Strict base64url (no '=' padding) per RFC 4648.
 //!
-//! Decoding input from untrusted sources should use fallible `try_` methods.
-//! Invalid input may indicate tampering or errors.
+//! # Example
 //!
-/// ## Example
-///
-/// ```rust
-/// # #[cfg(feature = "encoding-base64")]
-/// use secure_gate::FromBase64UrlStr;
-/// # #[cfg(feature = "encoding-base64")]
-/// let base64_string = "QkJC";
-/// # #[cfg(feature = "encoding-base64")]
-/// let bytes = base64_string.try_from_base64url().unwrap();
-/// // bytes is now Vec<u8>: [66, 66, 66]
-/// ```
-/// This trait is gated behind the `encoding-base64` feature.
+//! ```rust
+//! # #[cfg(feature = "encoding-base64")]
+//! use secure_gate::FromBase64UrlStr;
+//!
+//! # #[cfg(feature = "encoding-base64")]
+//! {
+//! let b64 = "AQIDBA";
+//! let bytes = b64.try_from_base64url().unwrap();
+//! assert_eq!(bytes, vec![1, 2, 3, 4]);
+//! # }
+//! ```
 #[cfg(feature = "encoding-base64")]
 use ::base64 as base64_crate;
+
 #[cfg(feature = "encoding-base64")]
 use base64_crate::engine::general_purpose::URL_SAFE_NO_PAD;
+
 #[cfg(feature = "encoding-base64")]
 use base64_crate::Engine;
 
@@ -35,27 +41,18 @@ use crate::error::Base64Error;
 
 /// Extension trait for decoding URL-safe base64 strings to byte data.
 ///
-/// Input should be treated as untrusted; use fallible methods.
+/// Requires `encoding-base64` feature.
 ///
 /// # Security Warning
 ///
-/// Decoding input from untrusted sources should use fallible `try_` methods.
-/// Invalid input may indicate tampering or errors.
-///
-/// ## Example
-///
-/// ```rust
-/// # #[cfg(feature = "encoding-base64")]
-/// use secure_gate::FromBase64UrlStr;
-/// # #[cfg(feature = "encoding-base64")]
-/// let base64_string = "QkJC";
-/// # #[cfg(feature = "encoding-base64")]
-/// let bytes = base64_string.try_from_base64url().unwrap();
-/// // bytes is now Vec<u8>: [66, 66, 66]
-/// ```
+/// Treat all input as untrusted — invalid base64 may indicate tampering.
+/// Always use the fallible `try_from_base64url` and handle errors securely.
 #[cfg(feature = "encoding-base64")]
 pub trait FromBase64UrlStr {
-    /// Fallibly decode a URL-safe base64 string to bytes.
+    /// Fallibly decodes a URL-safe base64 string to bytes.
+    ///
+    /// Returns [`Base64Error::InvalidBase64`] for invalid characters or padding.
+    /// Requires `encoding-base64` feature.
     fn try_from_base64url(&self) -> Result<Vec<u8>, Base64Error>;
 }
 

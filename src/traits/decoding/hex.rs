@@ -1,16 +1,32 @@
-//! # FromHexStr Trait
+//! Hexadecimal decoding trait.
 //!
-//! Extension trait for decoding hex strings to byte data.
+//! This trait provides secure, explicit decoding of hexadecimal strings
+//! to byte vectors. It is designed for handling untrusted input in
+//! cryptographic contexts, such as decoding hex-encoded keys or nonces.
 //!
-//! This trait provides secure, explicit decoding of hex strings to byte vectors.
-//! Input should be treated as untrusted; use fallible methods.
+//! Requires the `encoding-hex` feature.
 //!
-//! ## Security Warning
+//! # Security Notes
+//! - **Untrusted input**: Always treat decoded data as potentially malicious.
+//!   Use fallible methods and validate lengths/content after decoding.
+//! - **Invalid input**: May indicate tampering, injection attempts, or errors —
+//!   log/handle carefully without leaking details.
+//! - **Heap allocation**: Returns `Vec<u8>` — wrap in `Fixed` or `Dynamic` for secrets.
+//! - **Case insensitive**: Accepts both upper and lower case hex digits.
 //!
-//! Decoding input from untrusted sources should use fallible `try_` methods.
-//! Invalid input may indicate tampering or errors.
+//! # Example
 //!
-
+//! ```rust
+//! # #[cfg(feature = "encoding-hex")]
+//! use secure_gate::FromHexStr;
+//!
+//! # #[cfg(feature = "encoding-hex")]
+//! {
+//! let hex = "01234567";
+//! let bytes = hex.try_from_hex().unwrap();
+//! assert_eq!(bytes, vec![0x01, 0x23, 0x45, 0x67]);
+//! # }
+//! ```
 #[cfg(feature = "encoding-hex")]
 use ::hex as hex_crate;
 
@@ -19,27 +35,18 @@ use crate::error::HexError;
 
 /// Extension trait for decoding hex strings to byte data.
 ///
-/// Input should be treated as untrusted; use fallible methods.
+/// Requires `encoding-hex` feature.
 ///
 /// # Security Warning
 ///
-/// Decoding input from untrusted sources should use fallible `try_` methods.
-/// Invalid input may indicate tampering or errors.
-///
-/// ## Example
-///
-/// ```rust
-/// # #[cfg(feature = "encoding-hex")]
-/// use secure_gate::FromHexStr;
-/// # #[cfg(feature = "encoding-hex")]
-/// let hex_string = "424344";
-/// # #[cfg(feature = "encoding-hex")]
-/// let bytes = hex_string.try_from_hex().unwrap();
-/// // bytes is now Vec<u8>: [66, 66, 66]
-/// ```
+/// Treat all input as untrusted — invalid hex may indicate tampering.
+/// Always use the fallible `try_from_hex` and handle errors securely.
 #[cfg(feature = "encoding-hex")]
 pub trait FromHexStr {
-    /// Fallibly decode a hex string to bytes.
+    /// Fallibly decodes a hex string to bytes.
+    ///
+    /// Returns [`HexError::InvalidHex`] for invalid characters or odd length.
+    /// Requires `encoding-hex` feature.
     fn try_from_hex(&self) -> Result<Vec<u8>, HexError>;
 }
 
