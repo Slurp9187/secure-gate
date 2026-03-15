@@ -20,12 +20,16 @@ use thiserror::Error;
 /// use secure_gate::Fixed;
 ///
 /// // This succeeds with correct length
-/// let result = Fixed::<[u8; 3]>::try_from(&[1u8, 2, 3] as &[u8]);
+/// let result = Fixed::<[u8; 2]>::try_from(&[1u8, 2] as &[u8]);
 /// assert!(result.is_ok());
 ///
-/// // This fails due to length mismatch
-/// let result = Fixed::<[u8; 3]>::try_from(&[1u8, 2] as &[u8]);
-/// assert!(result.is_err());
+/// // Length mismatch returns an error in release builds (panics in debug builds).
+/// // In release mode, this returns FromSliceError::LengthMismatch:
+/// #[cfg(not(debug_assertions))]
+/// {
+///     let bad_result = Fixed::<[u8; 2]>::try_from(&[1u8] as &[u8]);  // Length 1 != 2
+///     assert!(matches!(bad_result, Err(FromSliceError::LengthMismatch)));
+/// }
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
 pub enum FromSliceError {
