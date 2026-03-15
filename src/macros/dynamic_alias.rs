@@ -1,10 +1,3 @@
-// <file_path>
-// secure-gate\src\macros\dynamic_alias.rs
-// </file_path>
-// <edit_description>
-// Fix the macro file and add cfg
-// </edit_description>
-
 /// Creates a type alias for a dynamic-sized heap-allocated secure secret.
 ///
 /// This macro generates a type alias to `Dynamic<T>` with optional visibility and custom documentation.
