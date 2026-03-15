@@ -140,9 +140,8 @@ pub use dynamic::Dynamic;
 /// ```rust
 /// use secure_gate::{Fixed, ExposeSecret};
 ///
-/// let secret = Fixed::<[u8; 32]>::new([0; 32]);
-/// let len = secret.len();
-/// assert_eq!(len, 32);
+/// let key = Fixed::<[u8; 32]>::new([0; 32]);
+/// assert_eq!(key.len(), 32);
 /// ```
 pub use fixed::Fixed;
 
