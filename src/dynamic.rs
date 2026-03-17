@@ -25,6 +25,9 @@ extern crate alloc;
 use alloc::boxed::Box;
 use zeroize::Zeroize;
 
+#[cfg(any(feature = "encoding-hex", feature = "encoding-base64"))]
+use crate::ExposeSecret;
+
 // Encoding traits
 #[cfg(feature = "encoding-base64")]
 use crate::traits::encoding::base64_url::ToBase64Url;
