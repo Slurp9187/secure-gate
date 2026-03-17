@@ -1,15 +1,15 @@
 //! Convenience macros for creating type aliases to secure secret wrappers.
 //!
-//! This module provides macros that generate type aliases for common secure secret patterns,
-//! making it easier to define custom secret types in your application.
+//! All macros generate zero-cost type aliases. The compile-time zero-size guard in
+//! [`fixed_alias!`] and const-generic variants is the only automated size validation —
+//! always validate expected sizes in unit tests.
 //!
-//! - `dynamic_alias!`: For heap-allocated secrets (`Dynamic<T>`)
-//! - `dynamic_generic_alias!`: For generic heap-allocated secrets
-//! - `fixed_alias!`: For fixed-size secrets (`Fixed<[u8; N]>`)
-//! - `fixed_generic_alias!`: For generic fixed-size secrets
-
-/// Public type-alias macros.
-/// Dynamic and fixed aliases.
+//! | Macro                   | Generates                   | Feature   |
+//! |-------------------------|-----------------------------|-----------|
+//! | [`fixed_alias!`]        | `Fixed<[u8; N]>` alias      | Always    |
+//! | [`fixed_generic_alias!`]| `Name<const N: usize>` alias| Always    |
+//! | [`dynamic_alias!`]      | `Dynamic<T>` alias          | `alloc`   |
+//! | [`dynamic_generic_alias!`]| `Name<T>` alias           | `alloc`   |
 mod dynamic_alias;
 mod dynamic_generic_alias;
 mod fixed_alias;

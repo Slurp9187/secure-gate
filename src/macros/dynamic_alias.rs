@@ -1,47 +1,56 @@
-/// Creates a type alias for a dynamic-sized heap-allocated secure secret.
+/// Creates a type alias for [`Dynamic<T>`](crate::Dynamic).
 ///
-/// This macro generates a type alias to `Dynamic<T>` with optional visibility and custom documentation.
-/// The generated type inherits all methods from `Dynamic`, including `.expose_secret()`.
+/// Generates a named, optionally-documented type alias. The generated type inherits
+/// all `Dynamic<T>` methods including `expose_secret()`, `with_secret()`, `to_hex()`, etc.
+///
+/// *Requires feature `alloc`.*
 ///
 /// # Syntax
 ///
-/// - `dynamic_alias!(vis Name, Type);` — visibility required (e.g., `pub`, `pub(crate)`, or omit for private)
-/// - `dynamic_alias!(vis Name, Type, doc);` — with optional custom doc string
+/// ```text
+/// dynamic_alias!(pub Name, T);                // public, auto-generated doc
+/// dynamic_alias!(pub(crate) Name, T);         // crate-visible
+/// dynamic_alias!(Name, T);                    // private
+/// dynamic_alias!(pub Name, T, "doc string");  // with custom doc
+/// ```
 ///
 /// # Examples
 ///
-/// Public alias:
-/// ```
+/// All three visibility forms:
+///
+/// ```rust
 /// use secure_gate::{dynamic_alias, ExposeSecret};
-/// dynamic_alias!(pub Password, String);
+///
+/// dynamic_alias!(pub Password, String);            // public
+/// dynamic_alias!(pub(crate) SessionToken, Vec<u8>); // crate-visible
+/// dynamic_alias!(private_key_bytes, Vec<u8>);      // private
+///
 /// let pw: Password = "hunter2".into();
-/// assert_eq!(pw.expose_secret(), "hunter2");
+/// pw.with_secret(|s| assert!(!s.is_empty()));
 /// ```
 ///
-/// Private alias:
-/// ```
+/// With a custom doc string:
+///
+/// ```rust
 /// use secure_gate::{dynamic_alias, ExposeSecret};
-/// dynamic_alias!(SecretString, String); // No visibility modifier = private
-/// let secret: SecretString = "hidden".to_string().into();
-/// assert_eq!(secret.expose_secret(), "hidden");
-/// ```
 ///
-/// With custom visibility:
-/// ```
-/// use secure_gate::dynamic_alias;
-/// dynamic_alias!(pub(crate) InternalSecret, String); // Crate-visible
-/// ```
-///
-/// With custom documentation:
-/// ```
-/// use secure_gate::{dynamic_alias, ExposeSecret};
-/// dynamic_alias!(pub Token, Vec<u8>, "OAuth token for API access");
-/// let token: Token = vec![1, 2, 3].into();
+/// dynamic_alias!(pub Token, Vec<u8>, "OAuth 2.0 bearer token.");
+/// let token: Token = vec![1u8, 2, 3].into();
 /// assert_eq!(token.expose_secret(), &[1, 2, 3]);
 /// ```
 ///
-/// The generated type is zero-cost and works with all features.
-/// For random initialization, use `Type::from_random(n)` (requires 'rand' feature).
+/// # Implementation Notes
+///
+/// `dynamic_alias!` has **no zero-size or type-level guard** — any `T` is accepted.
+/// Macro-generated aliases lack runtime size checks beyond what `Dynamic<T>` itself provides.
+/// Validate expected inner types and sizes in unit tests:
+///
+/// ```rust
+/// use secure_gate::dynamic_alias;
+///
+/// dynamic_alias!(pub ApiToken, Vec<u8>);
+/// // In your tests: assert!(token.len() > 0);
+/// ```
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! dynamic_alias {
