@@ -15,6 +15,10 @@
 //! - **Heap allocation**: Returns `Vec<u8>` — wrap in [`Fixed`](crate::Fixed) or
 //!   [`Dynamic`](crate::Dynamic) to store as a secret.
 //! - **BIP-350 checksum**: Enhanced error detection over BIP-173 Bech32.
+//! - **Standard 90-byte payload limit (by design)**: decodes only spec-compliant
+//!   Bech32m strings intended for Bitcoin address formats. Strings produced by
+//!   the extended [`ToBech32`](crate::ToBech32) / `Bech32Large` variant are a
+//!   distinct format — decode those with [`FromBech32Str`](crate::FromBech32Str).
 //!
 //! # Example
 //!
@@ -50,10 +54,10 @@ use crate::error::Bech32Error;
 /// Blanket-implemented for all `AsRef<str>` types. Treat all input as untrusted;
 /// HRP validation prevents injection attacks and cross-protocol confusion.
 ///
-/// **Payload size limit**: Bech32m uses the standard 90-byte limit. Encoded strings
-/// produced by [`ToBech32`](crate::ToBech32) (which uses the extended `Bech32Large`
-/// variant, ~3.2 KB) **cannot** be decoded by this trait. Use
-/// [`FromBech32Str`](crate::FromBech32Str) for large-payload round-trips.
+/// **Design note — standard BIP-350 compliance**: decodes only standard-length
+/// Bech32m strings (Bitcoin Taproot/SegWit v1+ compatible). The `Bech32Large`
+/// variant used by [`ToBech32`](crate::ToBech32) is a distinct non-standard format
+/// for large payloads; decode those with [`FromBech32Str`](crate::FromBech32Str).
 #[cfg(feature = "encoding-bech32m")]
 pub trait FromBech32mStr {
     /// Decodes a Bech32m (BIP-350) string into `(HRP, data_bytes)`.

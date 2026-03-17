@@ -13,7 +13,9 @@
 //! - **HRP validation prevents injection attacks**: use `try_to_bech32` with an
 //!   expected HRP to enforce protocol separation; test empty and invalid HRP inputs.
 //! - **Extended limit**: Uses [`Bech32Large`] (8191 Fe32 values, ~3.2 KB) instead
-//!   of the 90-character standard limit — suitable for large secrets.
+//!   of the 90-character standard limit — suitable for large secrets such as
+//!   age-style encryption recipients, ciphertexts, and arbitrary binary payloads.
+//!   For Bitcoin address formats, use [`ToBech32m`](crate::ToBech32m) (BIP-350).
 //! - **Treat all input as untrusted**: validate data upstream before wrapping.
 //!
 //! # Example

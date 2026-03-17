@@ -13,8 +13,11 @@
 //!   Always treat output as sensitive.
 //! - **HRP validation prevents injection attacks**: use `try_to_bech32m` with an
 //!   expected HRP to enforce protocol separation; test empty and invalid HRP inputs.
-//! - **Payload size capped at 90 bytes**: standard Bech32m checksum `CODE_LENGTH`
-//!   limit. For larger secrets use [`ToBech32`](crate::ToBech32) with `Bech32Large`.
+//! - **Standard BIP-350 payload limit (~90 bytes)**: intentionally kept at spec
+//!   compliance for interoperability with Bitcoin Taproot/SegWit v1+ tooling.
+//!   For non-address use cases with large payloads (age-style encryption recipients,
+//!   ciphertexts), use [`ToBech32`](crate::ToBech32) / [`FromBech32Str`](crate::FromBech32Str)
+//!   which use the extended `Bech32Large` variant (~3.2 KB).
 //! - **Treat all input as untrusted**: validate data upstream before wrapping.
 //!
 //! # Example
@@ -42,11 +45,11 @@ use crate::error::Bech32Error;
 /// to validate the HRP and prevent cross-protocol confusion attacks.
 /// Test empty and invalid HRP inputs in security-critical code.
 ///
-/// **Payload size limit**: Bech32m uses the standard 90-byte limit, unlike
-/// [`ToBech32`](crate::ToBech32) which uses the extended `Bech32Large` variant (~3.2 KB).
-/// Payloads that encode successfully via `try_to_bech32` may fail here with
-/// [`Bech32Error::OperationFailed`](crate::Bech32Error). Use `ToBech32`/`FromBech32Str`
-/// for large secrets.
+/// **Design note — intentional size asymmetry**: `ToBech32m` targets BIP-350
+/// (Bitcoin Taproot/SegWit v1+ addresses, typically 20–40 bytes). The 90-byte spec
+/// limit is deliberate; oversized Bech32m strings break interoperability with wallets
+/// and address parsers. For large secrets (encryption recipients, ciphertexts,
+/// arbitrary keys ≥ ~50 bytes), use [`ToBech32`](crate::ToBech32) / `Bech32Large`.
 #[cfg(feature = "encoding-bech32m")]
 pub trait ToBech32m {
     /// Fallibly encodes bytes as a Bech32m (BIP-350) string with optional HRP validation.
