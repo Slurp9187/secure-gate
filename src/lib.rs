@@ -1,18 +1,19 @@
 // uncomment for doctest runs
-// #![doc = include_str!("../EXAMPLES.md")]
 // #![doc = include_str!("../README.md")]
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
 
-//! Zero-cost secure wrappers for secrets — [`Dynamic<T>`] for heap-allocated variable-length data,
-//! [`Fixed<T>`] for stack-allocated fixed-size data.
+//! Zero-cost secure wrappers for secrets. Treat secrets as radioactive — minimize exposure surface.
 //!
-//! This crate provides explicit, guarded wrappers for sensitive values (e.g. keys, tokens, ciphertexts)
-//! with controlled exposure via [`ExposeSecret`] and [`ExposeSecretMut`].
-//! No accidental leaks via `Deref`, `AsRef`, or implicit conversions. Secrets are zeroized on drop.
+//! - [`Fixed<T>`] — stack-allocated, compile-time-sized secrets (keys, nonces, tokens)
+//! - [`Dynamic<T>`] — heap-allocated, variable-length secrets (passwords, API keys, ciphertexts)
 //!
-//! Decoding errors are hardened for security: debug builds show detailed context (e.g., expected vs. actual lengths);
-//! release builds show generic messages to prevent information leaks.
+//! All access is explicit via [`ExposeSecret`]/[`ExposeSecretMut`].
+//! No accidental leaks via `Deref`, `AsRef`, or `Copy`. `Debug` always prints `[REDACTED]`.
+//! Secrets are zeroized on drop when `zeroize` is enabled.
+//!
+//! Decoding errors are hardened: debug builds show detailed context (expected vs. actual lengths,
+//! HRP values); release builds use generic messages to prevent information leaks.
 //!
 //! # Examples
 //!
@@ -328,28 +329,27 @@ pub use traits::FromBase64UrlStr;
 /// Returns [`Bech32Error`] on invalid bech32 or unexpected HRP.
 pub use traits::FromBech32Str;
 
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 /// Bech32m (BIP-350) string decoding trait.
 ///
-/// Provides `try_from_bech32m()` method for decoding bech32m strings.
-/// Requires `encoding-bech32` or `encoding-bech32m` feature.
+/// Provides `try_from_bech32m()` method for decoding Bech32m strings.
+///
+/// *Requires feature `encoding-bech32m`.*
 ///
 /// # Examples
 ///
 /// ```rust
-/// # #[cfg(feature = "encoding-bech32m")]
 /// use secure_gate::FromBech32mStr;
-///
 /// # #[cfg(feature = "encoding-bech32m")]
-/// {
-/// let (hrp, data) = "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0".try_from_bech32m().unwrap();
-/// assert_eq!(hrp, "bc");
+/// # {
+/// let (hrp, data) = "A1LQFN3A".try_from_bech32m().unwrap();
+/// assert_eq!(hrp.to_ascii_lowercase(), "a");
+/// assert!(data.is_empty());
 /// # }
 /// ```
 ///
 /// # Errors
 ///
-/// Returns [`Bech32Error`] on invalid bech32m or unexpected HRP.
+/// Returns [`Bech32Error`] on invalid Bech32m or unexpected HRP.
 #[cfg(feature = "encoding-bech32m")]
 pub use traits::FromBech32mStr;
 
@@ -417,22 +417,20 @@ pub use traits::ToBase64Url;
 /// ```
 pub use traits::ToBech32;
 
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 /// Bech32m (BIP-350) encoding trait.
 ///
-/// Provides `to_bech32m()` method for encoding byte slices to bech32m strings.
-/// Requires `encoding-bech32` or `encoding-bech32m` feature.
+/// Provides `to_bech32m()` method for encoding byte slices as Bech32m strings.
+///
+/// *Requires feature `encoding-bech32m`.*
 ///
 /// # Examples
 ///
 /// ```rust
-/// # #[cfg(feature = "encoding-bech32m")]
 /// use secure_gate::ToBech32m;
-///
 /// # #[cfg(feature = "encoding-bech32m")]
-/// {
-/// let bech32m = [0, 1, 2].to_bech32m("bc");
-/// // bech32m is a BIP-350 encoded string
+/// # {
+/// let encoded = [0u8, 1, 2].to_bech32m("key");
+/// assert!(encoded.starts_with("key1"));
 /// # }
 /// ```
 #[cfg(feature = "encoding-bech32m")]
