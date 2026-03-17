@@ -1,3 +1,13 @@
+//! Re-exports for all decoding traits.
+//!
+//! Each decoding trait has its own feature gate:
+//!
+//! | Trait               | Feature             |
+//! |---------------------|---------------------|
+//! | [`FromHexStr`]      | `encoding-hex`      |
+//! | [`FromBase64UrlStr`]| `encoding-base64`   |
+//! | [`FromBech32Str`]   | `encoding-bech32`   |
+//! | [`FromBech32mStr`]  | `encoding-bech32m`  |
 pub mod base64_url;
 pub mod bech32;
 #[cfg(feature = "encoding-bech32m")]

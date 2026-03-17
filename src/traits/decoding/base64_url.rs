@@ -7,25 +7,31 @@
 //! Requires the `encoding-base64` feature.
 //!
 //! # Security Notes
-//! - **Untrusted input**: Always treat decoded data as potentially malicious.
-//!   Use fallible methods and validate lengths/content after decoding.
-//! - **Invalid input**: May indicate tampering, injection attempts, or errors —
-//!   log/handle carefully without leaking details.
-//! - **Heap allocation**: Returns `Vec<u8>` — wrap in `Fixed` or `Dynamic` for secrets.
-//! - **No auto-padding**: Strict base64url (no '=' padding) per RFC 4648.
+//!
+//! - **Treat all input as untrusted**: validate base64url strings upstream before
+//!   wrapping in secrets. Invalid input may indicate tampering or injection attempts.
+//! - **Heap allocation**: Returns `Vec<u8>` — wrap in [`Fixed`](crate::Fixed) or
+//!   [`Dynamic`](crate::Dynamic) to store as a secret.
+//! - **No padding**: Strict base64url (no `=` padding) per RFC 4648 §5.
+//! - **URL-safe alphabet**: Uses `-` and `_` instead of `+` and `/`.
 //!
 //! # Example
 //!
 //! ```rust
 //! # #[cfg(feature = "encoding-base64")]
-//! use secure_gate::FromBase64UrlStr;
-//!
+//! use secure_gate::{FromBase64UrlStr, Fixed};
 //! # #[cfg(feature = "encoding-base64")]
 //! {
-//! let b64 = "AQIDBA";
-//! let bytes = b64.try_from_base64url().unwrap();
+//! // "AQIDBA" decodes to [1, 2, 3, 4]
+//! let bytes = "AQIDBA".try_from_base64url().unwrap();
 //! assert_eq!(bytes, vec![1, 2, 3, 4]);
-//! # }
+//!
+//! // Wrap result in a secret immediately
+//! let secret: Fixed<[u8; 3]> = Fixed::try_from_base64url("AQID").unwrap();
+//!
+//! // Error on invalid input
+//! assert!("!!!".try_from_base64url().is_err());
+//! }
 //! ```
 #[cfg(feature = "encoding-base64")]
 use ::base64 as base64_crate;
@@ -39,20 +45,33 @@ use base64_crate::Engine;
 #[cfg(feature = "encoding-base64")]
 use crate::error::Base64Error;
 
-/// Extension trait for decoding URL-safe base64 strings to byte data.
+/// Extension trait for decoding URL-safe base64 strings into byte vectors.
 ///
-/// Requires `encoding-base64` feature.
+/// *Requires feature `encoding-base64`.*
 ///
-/// # Security Warning
-///
-/// Treat all input as untrusted — invalid base64 may indicate tampering.
-/// Always use the fallible `try_from_base64url` and handle errors securely.
+/// Blanket-implemented for all `AsRef<str>` types. Uses the RFC 4648 URL-safe
+/// alphabet without `=` padding. Treat all input as untrusted; validate lengths
+/// and content upstream before wrapping decoded bytes in secrets.
 #[cfg(feature = "encoding-base64")]
 pub trait FromBase64UrlStr {
-    /// Fallibly decodes a URL-safe base64 string to bytes.
+    /// Decodes a URL-safe base64 string (no padding) into a byte vector.
     ///
-    /// Returns [`Base64Error::InvalidBase64`] for invalid characters or padding.
-    /// Requires `encoding-base64` feature.
+    /// # Errors
+    ///
+    /// - [`Base64Error::InvalidBase64`] — invalid characters or unexpected padding.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::FromBase64UrlStr;
+    ///
+    /// // "AQIDBA" decodes to [1, 2, 3, 4]
+    /// let bytes = "AQIDBA".try_from_base64url()?;
+    /// assert_eq!(bytes, [1, 2, 3, 4]);
+    ///
+    /// assert!("!!!".try_from_base64url().is_err()); // invalid chars
+    /// # Ok::<(), secure_gate::Base64Error>(())
+    /// ```
     fn try_from_base64url(&self) -> Result<Vec<u8>, Base64Error>;
 }
 

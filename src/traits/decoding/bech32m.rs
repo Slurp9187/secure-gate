@@ -7,34 +7,35 @@
 //! **Requires the `encoding-bech32m` feature** (distinct from classic Bech32).
 //!
 //! # Security Notes
-//! - **Untrusted input**: Always treat decoded data as potentially malicious.
-//!   Use fallible methods and validate lengths/content after decoding.
-//! - **Invalid input**: May indicate tampering, injection attempts, or errors —
-//!   log/handle carefully without leaking details.
-//! - **HRP validation**: Use `try_from_bech32m_expect_hrp` to enforce expected HRPs
-//!   and prevent cross-protocol confusion attacks.
-//! - **Heap allocation**: Returns `Vec<u8>` — wrap in `Fixed` or `Dynamic` for secrets.
-//! - **BIP-350 checksum**: Enhanced error detection over BIP-173.
+//!
+//! - **Treat all input as untrusted**: validate Bech32m strings upstream before wrapping
+//!   in secrets. HRP validation prevents cross-protocol confusion attacks.
+//! - **HRP validation**: use `try_from_bech32m_expect_hrp` to enforce expected HRPs;
+//!   test empty and invalid HRP inputs in security-critical code.
+//! - **Heap allocation**: Returns `Vec<u8>` — wrap in [`Fixed`](crate::Fixed) or
+//!   [`Dynamic`](crate::Dynamic) to store as a secret.
+//! - **BIP-350 checksum**: Enhanced error detection over BIP-173 Bech32.
 //!
 //! # Example
 //!
 //! ```rust
-//! # use secure_gate::FromBech32mStr;
-//! #
-//! # #[cfg(feature = "encoding-bech32m")] {
-//! // Official BIP-350 minimal valid Bech32m test vector
+//! use secure_gate::FromBech32mStr;
+//! # #[cfg(feature = "encoding-bech32m")]
+//! # {
+//!
+//! // BIP-350 minimal valid Bech32m test vector
 //! let bech32m = "A1LQFN3A";
 //!
-//! // Basic decoding
-//! let (hrp, data) = bech32m.try_from_bech32m()
-//!     .expect("valid bech32m string");
+//! let (hrp, data) = bech32m.try_from_bech32m().expect("valid bech32m");
 //! assert_eq!(hrp.to_ascii_lowercase(), "a");
 //! assert!(data.is_empty());
 //!
-//! // With expected HRP
-//! let data = bech32m.try_from_bech32m_expect_hrp("A")
-//!     .expect("HRP should match");
+//! // HRP validation — prevents cross-protocol confusion
+//! let data = bech32m.try_from_bech32m_expect_hrp("A").expect("HRP matches");
 //! assert!(data.is_empty());
+//!
+//! // Error on invalid input
+//! assert!("not-bech32m".try_from_bech32m().is_err());
 //! # }
 //! ```
 #[cfg(feature = "encoding-bech32m")]
@@ -42,25 +43,59 @@ use bech32::{Bech32m, primitives::decode::CheckedHrpstring};
 #[cfg(feature = "encoding-bech32m")]
 use crate::error::Bech32Error;
 
-/// Extension trait for decoding Bech32m strings to byte data.
+/// Extension trait for decoding Bech32m (BIP-350) strings into byte vectors.
 ///
-/// **Requires the `encoding-bech32m` feature.**
+/// *Requires feature `encoding-bech32m`.*
 ///
-/// # Security Warning
-///
-/// Treat all input as untrusted — invalid Bech32m may indicate tampering.
-/// Always use the fallible `try_from_bech32m` / `try_from_bech32m_expect_hrp`
-/// and handle errors securely.
+/// Blanket-implemented for all `AsRef<str>` types. Treat all input as untrusted;
+/// HRP validation prevents injection attacks and cross-protocol confusion.
 #[cfg(feature = "encoding-bech32m")]
 pub trait FromBech32mStr {
-    /// Fallibly decodes a Bech32m string to (HRP, bytes).
+    /// Decodes a Bech32m (BIP-350) string into `(HRP, data_bytes)`.
     ///
-    /// Validates BIP-350 checksum and returns the human-readable part and data.
+    /// Validates the BIP-350 checksum.
+    ///
+    /// # Errors
+    ///
+    /// - [`Bech32Error::OperationFailed`] — invalid checksum or malformed string.
+    /// - [`Bech32Error::ConversionFailed`] — bit-conversion failure.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::FromBech32mStr;
+    ///
+    /// // BIP-350 minimal valid test vector
+    /// let (hrp, data) = "A1LQFN3A".try_from_bech32m()?;
+    /// assert_eq!(hrp.to_ascii_lowercase(), "a");
+    /// assert!(data.is_empty());
+    /// # Ok::<(), secure_gate::Bech32Error>(())
+    /// ```
     fn try_from_bech32m(&self) -> Result<(String, Vec<u8>), Bech32Error>;
 
-    /// Fallibly decodes a Bech32m string, expecting the specified HRP, returning bytes.
+    /// Decodes a Bech32m (BIP-350) string, validating that the HRP matches `expected_hrp`.
     ///
-    /// Validates checksum and HRP match; returns [`Bech32Error::UnexpectedHrp`] if HRP mismatch.
+    /// The HRP comparison is case-insensitive. Returns only the data bytes — the HRP
+    /// is validated and discarded.
+    ///
+    /// # Errors
+    ///
+    /// - [`Bech32Error::OperationFailed`] — invalid checksum or malformed string.
+    /// - [`Bech32Error::UnexpectedHrp`] — decoded HRP does not match `expected_hrp`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::FromBech32mStr;
+    ///
+    /// // BIP-350 minimal valid test vector
+    /// let data = "A1LQFN3A".try_from_bech32m_expect_hrp("A")?;
+    /// assert!(data.is_empty());
+    ///
+    /// // HRP mismatch returns an error
+    /// assert!("A1LQFN3A".try_from_bech32m_expect_hrp("bc").is_err());
+    /// # Ok::<(), secure_gate::Bech32Error>(())
+    /// ```
     fn try_from_bech32m_expect_hrp(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error>;
 }
 
