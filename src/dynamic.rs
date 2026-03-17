@@ -25,8 +25,6 @@ extern crate alloc;
 use alloc::boxed::Box;
 use zeroize::Zeroize;
 
-use crate::ExposeSecret;
-
 // Encoding traits
 #[cfg(feature = "encoding-base64")]
 use crate::traits::encoding::base64_url::ToBase64Url;
@@ -117,7 +115,6 @@ impl Dynamic<Vec<u8>> {
     pub fn to_base64url(&self) -> alloc::string::String {
         self.with_secret(|s: &Vec<u8>| s.to_base64url())
     }
-
 }
 
 // ExposeSecret
