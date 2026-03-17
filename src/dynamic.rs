@@ -1,52 +1,33 @@
-//! Secure heap-allocated secrets for variable-length data.
+//! Heap-allocated wrapper for variable-length secrets.
 //!
-//! This module provides [`Dynamic<T>`], a zero-cost wrapper around `Box<T>` designed for
-//! storing secrets like API keys, passwords, or cryptographic material. It enforces explicit
-//! access patterns to minimize accidental exposure and integrates with security features like
-//! zeroization.
+//! Provides [`Dynamic<T>`], a zero-cost wrapper enforcing explicit access to sensitive data.
+//! Treat secrets as radioactive — minimize exposure surface.
 //!
 //! # Features
 //!
-//! - **Core**: Requires `alloc`. Provides basic wrapping and explicit exposure.
-//! - **Zeroization**: With `zeroize` (default), wipes memory on drop.
-//! - **Random Generation**: With `rand`, generate secure random bytes.
-//! - **Encoding/Decoding**: With `encoding-*` features, decode from hex, base64url, bech32, etc.
-//! - **Constant-Time Eq**: With `ct-eq` or `ct-eq-hash`, secure comparisons.
-//! - **Serde**: With `serde-*`, serialize/deserialize (note: serialization exposes secrets).
-//! - **Cloneable**: With `cloneable`, clone secrets where inner type allows.
-//!
-//! # Security Considerations
-//!
-//! - No implicit deref or borrowing—use [`ExposeSecret`] or [`ExposeSecretMut`] traits.
-//! - Debug redacts contents to `[REDACTED]`.
-//! - Prefer scoped access with `with_secret` over `expose_secret` to limit lifetime.
-//! - For large secrets, use hash-based constant-time eq to avoid timing attacks.
+//! - **Core**: Requires `alloc` — basic wrapping and explicit exposure
+//! - **Zeroization**: With `zeroize` — wipes memory on drop (including spare capacity)
+//! - **Random Generation**: With `rand` — generate secure random bytes via `from_random()`
+//! - **Encoding/Decoding**: With `encoding-*` — hex, base64url, bech32, bech32m support
+//! - **Constant-Time Eq**: With `ct-eq` or `ct-eq-hash` — secure comparisons
+//! - **Serde**: With `serde-*` — serialize/deserialize (exposes secrets; use with care)
+//! - **Cloneable**: With `cloneable` — clone where inner type allows
 //!
 //! # Examples
 //!
-//! Basic usage:
+//! Basic construction and access:
 //!
 //! ```rust
-//! # #[cfg(feature = "alloc")]
-//! {
 //! use secure_gate::{Dynamic, ExposeSecret};
 //!
-//! let secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3]);
-//! let sum: u8 = secret.with_secret(|s| s.iter().sum());
-//! assert_eq!(sum, 6);
-//! }
-//! ```
+//! let secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3, 4]);
 //!
-//! With random generation (requires `rand`):
+//! // Scoped access (recommended — minimizes exposure lifetime)
+//! let sum = secret.with_secret(|s| s.iter().sum::<u8>());
+//! assert_eq!(sum, 10);
 //!
-//! ```rust
-//! # #[cfg(all(feature = "alloc", feature = "rand"))]
-//! {
-//! use secure_gate::{Dynamic, ExposeSecret};
-//!
-//! let key = Dynamic::from_random(32);
-//! assert_eq!(key.len(), 32);
-//! }
+//! // Direct access (auditable escape hatch)
+//! assert_eq!(secret.expose_secret()[0], 1);
 //! ```
 
 #[cfg(feature = "alloc")]
@@ -81,32 +62,34 @@ use crate::traits::decoding::bech32m::FromBech32mStr;
 #[cfg(feature = "encoding-hex")]
 use crate::traits::decoding::hex::FromHexStr;
 
-/// Zero-cost heap-allocated secure secret wrapper for variable-length data.
+/// Zero-cost heap-allocated wrapper for variable-length secrets.
 ///
-/// Wraps `Box<T>` with enforced explicit exposure. Requires `alloc` feature.
-/// Suitable for dynamic secrets like `String` or `Vec<u8>`.
+/// Requires `alloc`. Suitable for API keys, passwords, tokens, and any secret
+/// whose size is not known at compile time.
 ///
-/// # Security
-///
-/// - No `Deref` or `AsRef` — prevents accidental access.
-/// - `Debug` always redacts contents.
-/// - Zeroizes entire allocation on drop (including spare capacity) with `zeroize` feature.
-/// - Explicit access via [`ExposeSecret`] and [`ExposeSecretMut`].
+/// No `Deref`, `AsRef`, or `Copy` by default — all access requires
+/// [`expose_secret()`](crate::ExposeSecret::expose_secret) (direct, auditable) or
+/// [`with_secret()`](crate::ExposeSecret::with_secret) (scoped, recommended).
+/// `Debug` always prints `[REDACTED]`. When `zeroize` is enabled, the full
+/// allocation (including `Vec`/`String` spare capacity) is wiped on drop.
+/// Performance indistinguishable from raw types;
+/// see [ZERO_COST_WRAPPERS.md](https://github.com/Slurp9187/secure-gate/blob/main/ZERO_COST_WRAPPERS.md).
 ///
 /// # Examples
 ///
+/// Basic construction and access:
+///
 /// ```rust
-/// # #[cfg(feature = "alloc")]
-/// {
 /// use secure_gate::{Dynamic, ExposeSecret};
 ///
-/// let secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3, 4]);
-/// let len = ExposeSecret::len(&secret);
-/// assert_eq!(len, 4);
+/// let secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3, 4]);
 ///
-/// let sum: u8 = secret.with_secret(|s| s.iter().sum());
+/// // Scoped access (recommended — minimizes exposure lifetime)
+/// let sum = secret.with_secret(|s| s.iter().sum::<u8>());
 /// assert_eq!(sum, 10);
-/// # }
+///
+/// // Direct access (auditable escape hatch)
+/// assert_eq!(secret.expose_secret()[0], 1);
 /// ```
 pub struct Dynamic<T: ?Sized> {
     inner: Box<T>,
@@ -247,47 +230,97 @@ impl<T: 'static> From<T> for Dynamic<T> {
     }
 }
 
-/// Ergonomic encoding and access helpers for common heap types.
+/// Ergonomic encoding helpers for `Dynamic<Vec<u8>>`.
 ///
-/// These forward the encoding traits while still enforcing `with_secret` access.
+/// These methods forward the encoding traits internally via `with_secret`,
+/// giving a clean API without breaking the no-[`core::ops::Deref`] rule.
 impl Dynamic<Vec<u8>> {
-    /// Encodes the secret as lowercase hexadecimal.
+    /// Encodes the secret as a lowercase hexadecimal string.
     ///
-    /// Requires the `encoding-hex` feature.
+    /// *Requires feature `encoding-hex`.*
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::Dynamic;
+    ///
+    /// let key: Dynamic<Vec<u8>> = Dynamic::new(vec![0xde, 0xad, 0xbe, 0xef]);
+    /// assert_eq!(key.to_hex(), "deadbeef");
+    /// ```
     #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex(&self) -> alloc::string::String {
         self.with_secret(|s: &Vec<u8>| s.to_hex())
     }
 
-    /// Encodes the secret as uppercase hexadecimal.
+    /// Encodes the secret as an uppercase hexadecimal string.
+    ///
+    /// *Requires feature `encoding-hex`.*
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::Dynamic;
+    ///
+    /// let key: Dynamic<Vec<u8>> = Dynamic::new(vec![0xde, 0xad, 0xbe, 0xef]);
+    /// assert_eq!(key.to_hex_upper(), "DEADBEEF");
+    /// ```
     #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex_upper(&self) -> alloc::string::String {
         self.with_secret(|s: &Vec<u8>| s.to_hex_upper())
     }
 
-    /// Encodes the secret as base64url (URL-safe, no padding).
+    /// Encodes the secret as a base64url string (URL-safe, no padding).
     ///
-    /// Requires the `encoding-base64` feature.
+    /// *Requires feature `encoding-base64`.*
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::Dynamic;
+    ///
+    /// let data: Dynamic<Vec<u8>> = Dynamic::new(vec![0xff, 0x00, 0xaa]);
+    /// assert_eq!(data.to_base64url(), "_wCq");
+    /// ```
     #[cfg(feature = "encoding-base64")]
     #[inline]
     pub fn to_base64url(&self) -> alloc::string::String {
         self.with_secret(|s: &Vec<u8>| s.to_base64url())
     }
 
-    /// Encodes the secret as Bech32 (BIP-173) with the given HRP.
+    /// Encodes the secret as a Bech32 string (BIP-173) with the given HRP.
     ///
-    /// Requires the `encoding-bech32` feature.
+    /// *Requires feature `encoding-bech32`.*
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::Dynamic;
+    ///
+    /// let data: Dynamic<Vec<u8>> = Dynamic::new(vec![0x00, 0x01]);
+    /// let encoded = data.to_bech32("key");
+    /// assert!(encoded.starts_with("key1"));
+    /// ```
     #[cfg(feature = "encoding-bech32")]
     #[inline]
     pub fn to_bech32(&self, hrp: &str) -> alloc::string::String {
         self.with_secret(|s: &Vec<u8>| s.to_bech32(hrp))
     }
 
-    /// Encodes the secret as Bech32m (BIP-350) with the given HRP.
+    /// Encodes the secret as a Bech32m string (BIP-350) with the given HRP.
     ///
-    /// Requires the `encoding-bech32m` feature.
+    /// *Requires feature `encoding-bech32m`.*
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::Dynamic;
+    ///
+    /// let data: Dynamic<Vec<u8>> = Dynamic::new(vec![0x00, 0x01]);
+    /// let encoded = data.to_bech32m("key");
+    /// assert!(encoded.starts_with("key1"));
+    /// ```
     #[cfg(feature = "encoding-bech32m")]
     #[inline]
     pub fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
@@ -310,23 +343,19 @@ impl Dynamic<String> {
 impl crate::ExposeSecret for Dynamic<String> {
     type Inner = String;
 
-    /// Provides scoped immutable access to the inner `String`.
+    /// Provides scoped (recommended) immutable access to the inner `String`.
     ///
-    /// This is the preferred way to access the secret, as it limits the lifetime
-    /// of the reference to the closure.
+    /// The closure receives a reference that cannot escape — minimizing the
+    /// lifetime of the exposed secret.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(feature = "alloc")]
     /// use secure_gate::{Dynamic, ExposeSecret};
     ///
-    /// # #[cfg(feature = "alloc")]
-    /// {
     /// let secret: Dynamic<String> = Dynamic::new("hello".to_string());
     /// let len = secret.with_secret(|s| s.len());
     /// assert_eq!(len, 5);
-    /// # }
     /// ```
     #[inline(always)]
     fn with_secret<F, R>(&self, f: F) -> R
@@ -336,34 +365,20 @@ impl crate::ExposeSecret for Dynamic<String> {
         f(&self.inner)
     }
 
-    /// Returns an immutable reference to the inner `String`.
+    /// Returns a direct (auditable) immutable reference to the inner `String`.
     ///
-    /// # Security
-    ///
-    /// **Prefer [`with_secret`]** in most code — it limits exposure to the closure scope,
-    /// reducing the chance of accidental leaks.
-    ///
-    /// Use `expose_secret` only when you truly need a long-lived reference, such as:
-    ///
-    /// - **FFI** calls to C libraries (e.g. `as_ptr()` + `len()`)
-    /// - Third-party APIs that only accept `&T` directly
-    /// - When the reference must outlive a single statement
+    /// Long-lived `expose_secret()` references can defeat scoping — prefer
+    /// `with_secret` in application code.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(feature = "alloc")]
-    /// use secure_gate::Dynamic;
+    /// use secure_gate::{Dynamic, ExposeSecret};
     ///
-    /// # #[cfg(feature = "alloc")]
-    /// {
-    /// let secret: Dynamic<String> = Dynamic::new("my-secret-key".to_owned());
-    ///
-    /// // Typical FFI use case
-    /// // unsafe {
-    /// //     c_library_function(secret.expose_secret().as_ptr(), secret.len());
-    /// // }
-    /// }
+    /// let secret: Dynamic<String> = Dynamic::new("my-key".to_owned());
+    /// // FFI example (auditable escape hatch):
+    /// // unsafe { c_fn(secret.expose_secret().as_ptr(), secret.len()); }
+    /// let _ = secret.expose_secret();
     /// ```
     #[inline(always)]
     fn expose_secret(&self) -> &String {
@@ -381,23 +396,19 @@ impl crate::ExposeSecret for Dynamic<String> {
 impl<T> crate::ExposeSecret for Dynamic<Vec<T>> {
     type Inner = Vec<T>;
 
-    /// Provides scoped immutable access to the inner `Vec<T>`.
+    /// Provides scoped (recommended) immutable access to the inner `Vec<T>`.
     ///
-    /// This is the preferred way to access the secret, as it limits the lifetime
-    /// of the reference to the closure.
+    /// The closure receives a reference that cannot escape — minimizing the
+    /// lifetime of the exposed secret.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(feature = "alloc")]
     /// use secure_gate::{Dynamic, ExposeSecret};
     ///
-    /// # #[cfg(feature = "alloc")]
-    /// {
-    /// let secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3]);
-    /// let sum = secret.with_secret(|s: &Vec<u8>| s.iter().sum::<u8>());
+    /// let secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3]);
+    /// let sum = secret.with_secret(|s| s.iter().sum::<u8>());
     /// assert_eq!(sum, 6);
-    /// # }
     /// ```
     #[inline(always)]
     fn with_secret<F, R>(&self, f: F) -> R
@@ -407,24 +418,16 @@ impl<T> crate::ExposeSecret for Dynamic<Vec<T>> {
         f(&self.inner)
     }
 
-    /// Returns an immutable reference to the inner `Vec<T>`.
+    /// Returns a direct (auditable) immutable reference to the inner `Vec<T>`.
     ///
-    /// # Security
-    ///
-    /// **Prefer [`with_secret`]** in most code — it limits exposure to the closure scope,
-    /// reducing the chance of accidental leaks.
-    ///
-    /// Use `expose_secret` only when you truly need a long-lived reference, such as:
-    ///
-    /// - **FFI** calls to C libraries (e.g. `as_ptr()` + `len()`)
-    /// - Third-party APIs that only accept `&T` directly
-    /// - When the reference must outlive a single statement
+    /// Long-lived `expose_secret()` references can defeat scoping — prefer
+    /// `with_secret` in application code.
     #[inline(always)]
     fn expose_secret(&self) -> &Vec<T> {
         &self.inner
     }
 
-    /// Returns the length of the inner `Vec<T>` in bytes (len * size_of::<T>()).
+    /// Returns the length of the inner `Vec<T>` in bytes (`len * size_of::<T>()`).
     #[inline(always)]
     fn len(&self) -> usize {
         self.inner.len() * core::mem::size_of::<T>()
@@ -433,22 +436,19 @@ impl<T> crate::ExposeSecret for Dynamic<Vec<T>> {
 
 /// Explicit access to mutable [`Dynamic<String>`] contents.
 impl crate::ExposeSecretMut for Dynamic<String> {
-    /// Provides scoped mutable access to the inner `String`.
+    /// Provides scoped (recommended) mutable access to the inner `String`.
     ///
-    /// This is the preferred way to mutate the secret, as it limits the lifetime
-    /// of the reference to the closure.
+    /// The closure receives a `&mut` reference that cannot escape — minimizing
+    /// the mutable exposure window.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(feature = "alloc")]
-    /// use secure_gate::{Dynamic, ExposeSecretMut};
+    /// use secure_gate::{Dynamic, ExposeSecretMut, ExposeSecret};
     ///
-    /// # #[cfg(feature = "alloc")]
-    /// {
     /// let mut secret: Dynamic<String> = Dynamic::new("hello".to_string());
-    /// secret.with_secret_mut(|s: &mut String| s.push_str(" world"));
-    /// # }
+    /// secret.with_secret_mut(|s| s.push('!'));
+    /// assert_eq!(secret.expose_secret().as_str(), "hello!");
     /// ```
     #[inline(always)]
     fn with_secret_mut<F, R>(&mut self, f: F) -> R
@@ -458,17 +458,9 @@ impl crate::ExposeSecretMut for Dynamic<String> {
         f(&mut self.inner)
     }
 
-    /// Returns a mutable reference to the inner `String`.
+    /// Returns a direct (auditable) mutable reference to the inner `String`.
     ///
-    /// # Security
-    ///
-    /// **Prefer [`with_secret_mut`]** in most code — it limits exposure to the closure scope,
-    /// reducing the chance of accidental leaks.
-    ///
-    /// Use `expose_secret_mut` only when you truly need a long-lived reference, such as:
-    ///
-    /// - **FFI** calls to C libraries
-    /// - Third-party APIs that only accept `&mut T` directly
+    /// Long-lived mutable references can defeat scoping — prefer `with_secret_mut`.
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut String {
         &mut self.inner
@@ -477,22 +469,19 @@ impl crate::ExposeSecretMut for Dynamic<String> {
 
 /// Explicit access to mutable [`Dynamic<Vec<T>>`] contents.
 impl<T> crate::ExposeSecretMut for Dynamic<Vec<T>> {
-    /// Provides scoped mutable access to the inner `Vec<T>`.
+    /// Provides scoped (recommended) mutable access to the inner `Vec<T>`.
     ///
-    /// This is the preferred way to mutate the secret, as it limits the lifetime
-    /// of the reference to the closure.
+    /// The closure receives a `&mut` reference that cannot escape — minimizing
+    /// the mutable exposure window.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(feature = "alloc")]
-    /// use secure_gate::{Dynamic, ExposeSecretMut};
+    /// use secure_gate::{Dynamic, ExposeSecretMut, ExposeSecret};
     ///
-    /// # #[cfg(feature = "alloc")]
-    /// {
-    /// let mut secret: Dynamic<Vec<i32>> = Dynamic::new(vec![1, 2, 3]);
-    /// secret.with_secret_mut(|v: &mut Vec<i32>| v.push(4));
-    /// # }
+    /// let mut secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3]);
+    /// secret.with_secret_mut(|v| v.push(4));
+    /// assert_eq!(secret.expose_secret().len(), 4);
     /// ```
     #[inline(always)]
     fn with_secret_mut<F, R>(&mut self, f: F) -> R
@@ -502,17 +491,9 @@ impl<T> crate::ExposeSecretMut for Dynamic<Vec<T>> {
         f(&mut self.inner)
     }
 
-    /// Returns a mutable reference to the inner `Vec<T>`.
+    /// Returns a direct (auditable) mutable reference to the inner `Vec<T>`.
     ///
-    /// # Security
-    ///
-    /// **Prefer [`with_secret_mut`]** in most code — it limits exposure to the closure scope,
-    /// reducing the chance of accidental leaks.
-    ///
-    /// Use `expose_secret_mut` only when you truly need a long-lived reference, such as:
-    ///
-    /// - **FFI** calls to C libraries
-    /// - Third-party APIs that only accept `&mut T` directly
+    /// Long-lived mutable references can defeat scoping — prefer `with_secret_mut`.
     #[inline(always)]
     fn expose_secret_mut(&mut self) -> &mut Vec<T> {
         &mut self.inner
@@ -522,27 +503,24 @@ impl<T> crate::ExposeSecretMut for Dynamic<Vec<T>> {
 // Random generation — only available with `rand` feature.
 #[cfg(feature = "rand")]
 impl Dynamic<alloc::vec::Vec<u8>> {
-    /// Creates a [`Dynamic<Vec<u8>>`] filled with random bytes from the system RNG.
+    /// Creates a [`Dynamic<Vec<u8>>`] filled with cryptographically secure random bytes.
     ///
-    /// Uses `OsRng` for cryptographically secure entropy. Panics on RNG failure.
-    /// Requires `rand` feature.
+    /// *Requires feature `rand`.*
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # #[cfg(all(feature = "alloc", feature = "rand"))]
-    /// use secure_gate::{Dynamic, ExposeSecret};
-    ///
-    /// # #[cfg(all(feature = "alloc", feature = "rand"))]
-    /// {
-    /// let secret = Dynamic::from_random(32);
-    /// assert_eq!(secret.len(), 32);
-    /// # }
-    /// ```
+    /// Uses `OsRng` (the operating system's CSPRNG) for entropy.
     ///
     /// # Panics
     ///
-    /// Panics if the system RNG fails.
+    /// Panics on RNG failure — standard for high-assurance crypto code.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use secure_gate::{Dynamic, ExposeSecret};
+    ///
+    /// let key: Dynamic<Vec<u8>> = Dynamic::from_random(32);
+    /// assert_eq!(key.len(), 32);
+    /// ```
     #[inline]
     pub fn from_random(len: usize) -> Self {
         let mut bytes = vec![0u8; len];
@@ -556,26 +534,25 @@ impl Dynamic<alloc::vec::Vec<u8>> {
 // Decoding constructors — only available with encoding features.
 #[cfg(feature = "encoding-hex")]
 impl Dynamic<alloc::vec::Vec<u8>> {
-    /// Decodes a hex string into a [`Dynamic<Vec<u8>>`] secret.
+    /// Parses a hexadecimal string into a heap-allocated secret.
     ///
-    /// Requires `encoding-hex` feature.
+    /// *Requires feature `encoding-hex`.*
+    ///
+    /// # Errors
+    ///
+    /// - [`crate::error::HexError::InvalidHex`] — `s` contains non-hex characters.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(all(feature = "alloc", feature = "encoding-hex"))]
     /// use secure_gate::{Dynamic, ExposeSecret};
     ///
-    /// # #[cfg(all(feature = "alloc", feature = "encoding-hex"))]
-    /// {
-    /// let secret = Dynamic::try_from_hex("0123456789abcdef").unwrap();
-    /// assert_eq!(secret.len(), 8);
-    /// # }
+    /// let secret = Dynamic::try_from_hex("deadbeef")?;
+    /// secret.with_secret(|b| assert_eq!(b, &[0xde, 0xad, 0xbe, 0xef]));
+    ///
+    /// assert!(Dynamic::try_from_hex("xyz").is_err()); // invalid chars
+    /// # Ok::<(), secure_gate::HexError>(())
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::error::HexError`] on invalid hex or length mismatches.
     pub fn try_from_hex(s: &str) -> Result<Self, crate::error::HexError> {
         let bytes = s.try_from_hex()?;
         Ok(Self::new(bytes))
@@ -584,26 +561,26 @@ impl Dynamic<alloc::vec::Vec<u8>> {
 
 #[cfg(feature = "encoding-base64")]
 impl Dynamic<alloc::vec::Vec<u8>> {
-    /// Decodes a base64url string into a [`Dynamic<Vec<u8>>`] secret.
+    /// Parses a base64url string into a heap-allocated secret.
     ///
-    /// Requires `encoding-base64` feature.
+    /// *Requires feature `encoding-base64`.*
+    ///
+    /// # Errors
+    ///
+    /// - [`crate::error::Base64Error::InvalidBase64`] — invalid base64url characters.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(all(feature = "alloc", feature = "encoding-base64"))]
     /// use secure_gate::{Dynamic, ExposeSecret};
     ///
-    /// # #[cfg(all(feature = "alloc", feature = "encoding-base64"))]
-    /// {
-    /// let secret = Dynamic::try_from_base64url("AQIDBA").unwrap();
-    /// assert_eq!(secret.len(), 4);
-    /// # }
+    /// // "AQIDBA" decodes to [1, 2, 3, 4]
+    /// let secret = Dynamic::try_from_base64url("AQIDBA")?;
+    /// secret.with_secret(|b| assert_eq!(b, &[1, 2, 3, 4]));
+    ///
+    /// assert!(Dynamic::try_from_base64url("!!!").is_err()); // invalid chars
+    /// # Ok::<(), secure_gate::Base64Error>(())
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::error::Base64Error`] on invalid base64 or length mismatches.
     pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
         let bytes = s.try_from_base64url()?;
         Ok(Self::new(bytes))
@@ -612,28 +589,26 @@ impl Dynamic<alloc::vec::Vec<u8>> {
 
 #[cfg(feature = "encoding-bech32")]
 impl Dynamic<alloc::vec::Vec<u8>> {
-    /// Decodes a bech32 string into a [`Dynamic<Vec<u8>>`] secret, discarding the HRP.
+    /// Parses a Bech32 (BIP-173) string into a heap-allocated secret, discarding the HRP.
     ///
-    /// Requires `encoding-bech32` feature.
+    /// *Requires feature `encoding-bech32`.*
+    ///
+    /// # Errors
+    ///
+    /// - [`crate::error::Bech32Error::InvalidHrp`] — malformed HRP.
+    /// - [`crate::error::Bech32Error::ConversionFailed`] — bit-conversion failure.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(all(feature = "alloc", feature = "encoding-bech32"))]
-    /// use secure_gate::{Dynamic, ToBech32, ExposeSecret};
+    /// use secure_gate::{Dynamic, ExposeSecret};
     ///
-    /// # #[cfg(all(feature = "alloc", feature = "encoding-bech32"))]
-    /// {
     /// let original: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3, 4]);
-    /// let bech32 = original.with_secret(|s: &Vec<u8>| s.to_bech32("test"));
-    /// let decoded = Dynamic::try_from_bech32(&bech32).unwrap();
-    /// // HRP discarded, bytes stored
-    /// # }
+    /// let encoded = original.to_bech32("test");
+    /// let decoded = Dynamic::try_from_bech32(&encoded)?;
+    /// decoded.with_secret(|b| assert_eq!(b, &[1, 2, 3, 4]));
+    /// # Ok::<(), secure_gate::Bech32Error>(())
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::error::Bech32Error`] on invalid bech32.
     pub fn try_from_bech32(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes) = s.try_from_bech32()?;
         Ok(Self::new(bytes))
@@ -642,27 +617,26 @@ impl Dynamic<alloc::vec::Vec<u8>> {
 
 #[cfg(feature = "encoding-bech32m")]
 impl Dynamic<alloc::vec::Vec<u8>> {
-    /// Decodes a bech32m string into a [`Dynamic<Vec<u8>>`] secret, discarding the HRP.
+    /// Parses a Bech32m (BIP-350) string into a heap-allocated secret, discarding the HRP.
     ///
-    /// Requires `encoding-bech32m` feature.
+    /// *Requires feature `encoding-bech32m`.*
+    ///
+    /// # Errors
+    ///
+    /// - [`crate::error::Bech32Error::InvalidHrp`] — malformed HRP.
+    /// - [`crate::error::Bech32Error::ConversionFailed`] — bit-conversion failure.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(all(feature = "alloc", feature = "encoding-bech32m"))]
-    /// use secure_gate::Dynamic;
+    /// use secure_gate::{Dynamic, ExposeSecret};
     ///
-    /// # #[cfg(all(feature = "alloc", feature = "encoding-bech32m"))]
-    /// {
-    /// let bech32m = "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0";
-    /// let secret = Dynamic::try_from_bech32m(bech32m).unwrap();
-    /// // HRP discarded, bytes stored
-    /// # }
+    /// let original: Dynamic<Vec<u8>> = Dynamic::new(vec![0xde, 0xad, 0xbe, 0xef]);
+    /// let encoded = original.to_bech32m("key");
+    /// let decoded = Dynamic::try_from_bech32m(&encoded)?;
+    /// decoded.with_secret(|b| assert_eq!(b, &[0xde, 0xad, 0xbe, 0xef]));
+    /// # Ok::<(), secure_gate::Bech32Error>(())
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::error::Bech32Error`] on invalid bech32m.
     pub fn try_from_bech32m(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes) = s.try_from_bech32m()?;
         Ok(Self::new(bytes))
@@ -677,20 +651,19 @@ where
 {
     /// Compares two [`Dynamic<T>`] instances in constant time.
     ///
-    /// Requires `ct-eq` feature.
+    /// *Requires feature `ct-eq`.* `==` is deliberately not implemented on secret
+    /// wrappers — always use `ct_eq` to prevent timing side-channel attacks.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(all(feature = "alloc", feature = "ct-eq"))]
     /// use secure_gate::{Dynamic, ConstantTimeEq};
     ///
-    /// # #[cfg(all(feature = "alloc", feature = "ct-eq"))]
-    /// {
-    /// let a: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3]);
-    /// let b: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3]);
+    /// let a: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3]);
+    /// let b: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3]);
+    /// let c: Dynamic<Vec<u8>> = Dynamic::new(vec![9u8, 2, 3]);
     /// assert!(a.ct_eq(&b));
-    /// # }
+    /// assert!(!a.ct_eq(&c));
     /// ```
     fn ct_eq(&self, other: &Self) -> bool {
         self.inner.ct_eq(&other.inner)
@@ -701,20 +674,21 @@ where
 impl Dynamic<Vec<u8>> {
     /// Compares two [`Dynamic<Vec<u8>>`] instances in constant time.
     ///
-    /// Compares byte contents to prevent timing attacks. Requires `ct-eq` feature.
+    /// Compares two `Dynamic<Vec<u8>>` instances in constant time.
+    ///
+    /// *Requires feature `ct-eq`.* The only safe way to compare heap-secret byte
+    /// vectors — `==` is deliberately not implemented.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(all(feature = "alloc", feature = "ct-eq"))]
     /// use secure_gate::Dynamic;
     ///
-    /// # #[cfg(all(feature = "alloc", feature = "ct-eq"))]
-    /// {
-    /// let a: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8; 1000]);
-    /// let b: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8; 1000]);
+    /// let a: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8; 32]);
+    /// let b: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8; 32]);
+    /// let c: Dynamic<Vec<u8>> = Dynamic::new(vec![2u8; 32]);
     /// assert!(a.ct_eq(&b));
-    /// # }
+    /// assert!(!a.ct_eq(&c));
     /// ```
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
@@ -734,22 +708,20 @@ where
         (*self.inner).as_ref().len()
     }
 
-    /// Compares using BLAKE3 hash for large secrets.
+    /// Compares using keyed BLAKE3 hashing — recommended for large secrets.
     ///
-    /// Requires `ct-eq-hash` feature.
+    /// *Requires feature `ct-eq-hash`.* Collision probability is 2⁻²⁵⁶ per comparison.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(all(feature = "alloc", feature = "ct-eq-hash"))]
     /// use secure_gate::{Dynamic, ConstantTimeEqExt};
     ///
-    /// # #[cfg(all(feature = "alloc", feature = "ct-eq-hash"))]
-    /// {
     /// let a: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8; 1000]);
     /// let b: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8; 1000]);
+    /// let c: Dynamic<Vec<u8>> = Dynamic::new(vec![2u8; 1000]);
     /// assert!(a.ct_eq_hash(&b));
-    /// # }
+    /// assert!(!a.ct_eq_hash(&c));
     /// ```
     fn ct_eq_hash(&self, other: &Self) -> bool {
         crate::traits::ct_eq_hash_bytes((*self.inner).as_ref(), (*other.inner).as_ref())

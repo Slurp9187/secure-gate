@@ -6,29 +6,36 @@
 //! about decoding failures or secret properties.
 //!
 //! All decoding-related errors follow this hardening pattern.
+//!
+//! # Implementation Notes
+//!
+//! In **debug builds** length-mismatch and HRP-validation variants carry structured
+//! fields (`expected`/`got`) to aid development. In **release builds** those variants
+//! are opaque — preventing expected-length or HRP metadata from leaking to attackers.
+//! The `#[cfg(debug_assertions)]` split is used throughout for this purpose.
 
 use thiserror::Error;
 
-/// Error type for slice conversion operations.
+/// Error returned when a byte slice cannot be converted to a fixed-size array.
 ///
-/// Used when converting slices to fixed-size arrays fails due to length mismatch.
-/// Always available.
+/// Always available. In **debug builds** the conversion panics with full context
+/// instead of returning this error (for development ergonomics). In **release
+/// builds** this variant is returned to prevent leaking expected-length metadata.
 ///
 /// # Examples
 ///
 /// ```rust
-/// use secure_gate::Fixed;
+/// use secure_gate::{Fixed, FromSliceError};
 ///
-/// // This succeeds with correct length
-/// let result = Fixed::<[u8; 2]>::try_from(&[1u8, 2] as &[u8]);
-/// assert!(result.is_ok());
+/// // Correct length — succeeds.
+/// let ok = Fixed::<[u8; 2]>::try_from(&[1u8, 2] as &[u8]);
+/// assert!(ok.is_ok());
 ///
-/// // Length mismatch returns an error in release builds (panics in debug builds).
-/// // In release mode, this returns FromSliceError::LengthMismatch:
+/// // Wrong length — returns error in release builds; panics in debug builds.
 /// #[cfg(not(debug_assertions))]
 /// {
-///     let bad_result = Fixed::<[u8; 2]>::try_from(&[1u8] as &[u8]);  // Length 1 != 2
-///     assert!(matches!(bad_result, Err(FromSliceError::LengthMismatch)));
+///     let err = Fixed::<[u8; 2]>::try_from(&[1u8] as &[u8]);
+///     assert!(matches!(err, Err(FromSliceError::LengthMismatch)));
 /// }
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
@@ -38,24 +45,27 @@ pub enum FromSliceError {
     LengthMismatch,
 }
 
-/// Error type for Bech32 and Bech32m operations (encoding and decoding).
+/// Errors produced when decoding Bech32 (BIP-173) or Bech32m (BIP-350) strings.
 ///
-/// Debug builds provide detailed context (e.g., expected vs. actual HRP, lengths);
-/// release builds use generic messages to prevent information leaks.
+/// *Requires feature `encoding-bech32` or `encoding-bech32m`.*
 ///
-/// Requires `encoding-bech32` or `encoding-bech32m` feature.
+/// In **debug builds** `UnexpectedHrp` and `InvalidLength` carry `expected`/`got`
+/// fields for development debugging. In **release builds** these variants are opaque
+/// to prevent leaking expected-length or HRP metadata.
 ///
 /// # Examples
 ///
 /// ```rust
-/// # #[cfg(feature = "encoding-bech32")]
 /// use secure_gate::{FromBech32Str, Bech32Error};
 ///
-/// # #[cfg(feature = "encoding-bech32")]
-/// {
-/// let result = "invalid".try_from_bech32();
-/// assert!(result.is_err());
-/// # }
+/// match "invalid".try_from_bech32() {
+///     Err(Bech32Error::InvalidHrp)           => { /* invalid HRP characters */ }
+///     Err(Bech32Error::UnexpectedHrp { .. }) => { /* HRP did not match expected */ }
+///     Err(Bech32Error::InvalidLength { .. }) => { /* decoded length mismatch */ }
+///     Err(Bech32Error::ConversionFailed)     => { /* bit-conversion failure */ }
+///     Err(Bech32Error::OperationFailed)      => { /* other bech32 failure */ }
+///     Ok(_) => unreachable!(),
+/// }
 /// ```
 #[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -93,24 +103,24 @@ pub enum Bech32Error {
     InvalidLength,
 }
 
-/// Error type for Base64url decoding operations.
+/// Errors produced when decoding base64url strings.
 ///
-/// Debug builds provide detailed context (e.g., expected vs. actual lengths);
-/// release builds use generic messages to prevent information leaks.
+/// *Requires feature `encoding-base64`.*
 ///
-/// Requires `encoding-base64` feature.
+/// In **debug builds** `InvalidLength` carries `expected`/`got` fields for
+/// development debugging. In **release builds** this variant is opaque to
+/// prevent leaking expected-length metadata.
 ///
 /// # Examples
 ///
 /// ```rust
-/// # #[cfg(feature = "encoding-base64")]
 /// use secure_gate::{FromBase64UrlStr, Base64Error};
 ///
-/// # #[cfg(feature = "encoding-base64")]
-/// {
-/// let result = "invalid!".try_from_base64url();
-/// assert!(matches!(result, Err(Base64Error::InvalidBase64)));
-/// # }
+/// match "invalid!".try_from_base64url() {
+///     Err(Base64Error::InvalidBase64)        => { /* invalid characters */ }
+///     Err(Base64Error::InvalidLength { .. }) => { /* wrong decoded length */ }
+///     Ok(_) => unreachable!(),
+/// }
 /// ```
 #[cfg(feature = "encoding-base64")]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -130,24 +140,24 @@ pub enum Base64Error {
     InvalidLength,
 }
 
-/// Error type for Hex decoding operations.
+/// Errors produced when decoding hexadecimal strings.
 ///
-/// Debug builds provide detailed context (e.g., expected vs. actual lengths);
-/// release builds use generic messages to prevent information leaks.
+/// *Requires feature `encoding-hex`.*
 ///
-/// Requires `encoding-hex` feature.
+/// In **debug builds** `InvalidLength` carries `expected`/`got` fields for
+/// development debugging. In **release builds** this variant is opaque to
+/// prevent leaking expected-length metadata.
 ///
 /// # Examples
 ///
 /// ```rust
-/// # #[cfg(feature = "encoding-hex")]
 /// use secure_gate::{FromHexStr, HexError};
 ///
-/// # #[cfg(feature = "encoding-hex")]
-/// {
-/// let result = "invalid!".try_from_hex();
-/// assert!(matches!(result, Err(HexError::InvalidHex)));
-/// # }
+/// match "invalid!".try_from_hex() {
+///     Err(HexError::InvalidHex)            => { /* non-hex characters */ }
+///     Err(HexError::InvalidLength { .. })  => { /* wrong decoded length */ }
+///     Ok(_) => unreachable!(),
+/// }
 /// ```
 #[cfg(feature = "encoding-hex")]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -167,26 +177,28 @@ pub enum HexError {
     InvalidLength,
 }
 
-/// Unified error type for decoding operations across formats.
+/// Unified error type for multi-format decoding operations.
 ///
-/// Combines errors from different encoding schemes. Debug builds include
-/// format-specific hints for development; release builds use generic messages
-/// to prevent leaking metadata about secret formats or lengths.
-///
-/// Always available, but variants depend on enabled features.
+/// Wraps format-specific errors from hex, base64url, bech32, and bech32m decoders.
+/// Always available; variants depend on enabled features.
 ///
 /// # Examples
 ///
 /// ```rust
 /// # #[cfg(feature = "encoding-hex")]
-/// use secure_gate::{FromHexStr, DecodingError};
-///
+/// use secure_gate::{DecodingError, HexError};
 /// # #[cfg(feature = "encoding-hex")]
 /// {
-/// let result = "invalid!".try_from_hex();
-/// // Would map to DecodingError variant if using unified error handling
-/// # }
+/// let err = DecodingError::InvalidHex(HexError::InvalidHex);
+/// assert!(matches!(err, DecodingError::InvalidHex(_)));
+/// }
 /// ```
+///
+/// # Implementation Notes
+///
+/// `DecodingError` does not derive `PartialEq` because the `#[source]`-annotated
+/// variants wrap nested error types (`HexError`, `Base64Error`, `Bech32Error`)
+/// that may not implement `PartialEq` consistently across all feature combinations.
 #[derive(Clone, Debug, Error)]
 pub enum DecodingError {
     #[cfg(feature = "encoding-bech32")]
