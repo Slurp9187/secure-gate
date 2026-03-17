@@ -53,4 +53,4 @@
 //! This trait is a **marker only** — it has no methods and adds no runtime behavior.
 //! It exists solely to gate the `Clone` impl on wrapper types.
 #[cfg(feature = "cloneable")]
-pub trait CloneableSecret: Clone {}
+pub trait CloneableSecret: Clone + zeroize::Zeroize {}

@@ -25,12 +25,9 @@
 //! {
 //! let secret = Fixed::new([0x42u8; 4]);
 //!
-//! // Blanket impl on the inner byte array (via with_secret):
-//! let encoded = secret.with_secret(|s| s.to_bech32("test"));
+//! // Use try_to_bech32 — the sole encoding API:
+//! let encoded = secret.with_secret(|s| s.try_to_bech32("test", None)).unwrap();
 //! assert!(encoded.starts_with("test1"));
-//!
-//! // Wrapper method (Direct Fixed<[u8; N]> API — same result):
-//! assert!(secret.to_bech32("test").starts_with("test1"));
 //! }
 //! ```
 #[cfg(feature = "encoding-bech32")]
@@ -71,27 +68,11 @@ use crate::error::Bech32Error;
 ///
 /// *Requires feature `encoding-bech32`.*
 ///
-/// Blanket-implemented for all `AsRef<[u8]>` types. Prefer [`try_to_bech32`](Self::try_to_bech32)
-/// over the infallible [`to_bech32`](Self::to_bech32) — it validates the HRP and
-/// prevents cross-protocol confusion attacks. HRP validation prevents injection attacks;
-/// test empty and invalid HRP inputs in security-critical code.
+/// Blanket-implemented for all `AsRef<[u8]>` types. Use [`try_to_bech32`](Self::try_to_bech32)
+/// to validate the HRP and prevent cross-protocol confusion attacks.
+/// Test empty and invalid HRP inputs in security-critical code.
 #[cfg(feature = "encoding-bech32")]
 pub trait ToBech32 {
-    /// Encodes bytes as a Bech32 (BIP-173) string with the given HRP.
-    ///
-    /// Panics if `hrp` is invalid. Prefer [`try_to_bech32`](Self::try_to_bech32)
-    /// for any untrusted or user-supplied HRP.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use secure_gate::ToBech32;
-    ///
-    /// let encoded = b"hello".to_bech32("test");
-    /// assert!(encoded.starts_with("test1"));
-    /// ```
-    fn to_bech32(&self, hrp: &str) -> alloc::string::String;
-
     /// Fallibly encodes bytes as a Bech32 (BIP-173) string with optional HRP validation.
     ///
     /// Pass `expected_hrp: Some("hrp")` to enforce that the encoded HRP matches;
@@ -126,12 +107,6 @@ pub trait ToBech32 {
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
 #[cfg(feature = "encoding-bech32")]
 impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
-    #[inline(always)]
-    fn to_bech32(&self, hrp: &str) -> alloc::string::String {
-        let hrp_parsed = Hrp::parse(hrp).expect("invalid hrp");
-        encode_lower::<Bech32Large>(hrp_parsed, self.as_ref()).expect("bech32 encoding failed")
-    }
-
     #[inline(always)]
     fn try_to_bech32(
         &self,

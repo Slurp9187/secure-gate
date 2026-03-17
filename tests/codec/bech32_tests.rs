@@ -13,7 +13,7 @@ use secure_gate::{
 macro_rules! test_encoding {
     ($method:ident, $try_from:ident, $data:expr, $hrp:expr) => {{
         let data_ref: &[u8] = $data.as_ref();
-        let encoded = data_ref.$method($hrp);
+        let encoded = data_ref.$method($hrp, None).unwrap();
         assert!(encoded.starts_with($hrp));
         let (decoded_hrp, decoded) = encoded.$try_from().expect("valid encoding");
         assert_eq!(decoded_hrp.to_ascii_lowercase(), $hrp.to_ascii_lowercase());
@@ -25,72 +25,70 @@ macro_rules! test_encoding {
 #[test]
 fn test_slice_to_bech32() {
     let data = [0x42u8, 0x43, 0x44];
-    test_encoding!(to_bech32, try_from_bech32, &data[..], "test");
+    test_encoding!(try_to_bech32, try_from_bech32, &data[..], "test");
 }
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
 fn test_array_to_bech32() {
     let data: [u8; 4] = [1, 2, 3, 4];
-    test_encoding!(to_bech32, try_from_bech32, &data, "test");
+    test_encoding!(try_to_bech32, try_from_bech32, &data, "test");
 }
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
 fn test_vec_to_bech32() {
     let data: Vec<u8> = vec![255, 0, 128];
-    test_encoding!(to_bech32, try_from_bech32, &data, "test");
+    test_encoding!(try_to_bech32, try_from_bech32, &data, "test");
 }
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
 fn test_string_to_bech32() {
     let data: String = "hi".to_string();
-    test_encoding!(to_bech32, try_from_bech32, data.as_bytes(), "test");
+    test_encoding!(try_to_bech32, try_from_bech32, data.as_bytes(), "test");
 }
 
 #[cfg(feature = "encoding-bech32m")]
 #[test]
 fn test_slice_to_bech32m() {
     let data = [0x42u8, 0x43, 0x44];
-    test_encoding!(to_bech32m, try_from_bech32m, &data[..], "test");
+    test_encoding!(try_to_bech32m, try_from_bech32m, &data[..], "test");
 }
 
 #[cfg(feature = "encoding-bech32m")]
 #[test]
 fn test_array_to_bech32m() {
     let data: [u8; 4] = [1, 2, 3, 4];
-    test_encoding!(to_bech32m, try_from_bech32m, &data, "test");
+    test_encoding!(try_to_bech32m, try_from_bech32m, &data, "test");
 }
 
 #[cfg(feature = "encoding-bech32m")]
 #[test]
 fn test_vec_to_bech32m() {
     let data: Vec<u8> = vec![255, 0, 128];
-    test_encoding!(to_bech32m, try_from_bech32m, &data, "test");
+    test_encoding!(try_to_bech32m, try_from_bech32m, &data, "test");
 }
 
 #[cfg(feature = "encoding-bech32m")]
 #[test]
 fn test_string_to_bech32m() {
     let data: String = "hi".to_string();
-    test_encoding!(to_bech32m, try_from_bech32m, data.as_bytes(), "test");
+    test_encoding!(try_to_bech32m, try_from_bech32m, data.as_bytes(), "test");
 }
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
-#[should_panic(expected = "invalid hrp")]
 fn test_invalid_hrp_bech32() {
     let data: [u8; 4] = [1, 2, 3, 4];
-    // Invalid HRP: empty string
-    let _ = data.to_bech32("");
+    assert!(data.try_to_bech32("", None).is_err());
 }
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
 fn test_bech32_large_success() {
     let data: Vec<u8> = vec![255u8; 1000]; // Large data, with Bech32 checksum (CODE_LENGTH=4096)
-    let bech = data.to_bech32("test");
+    let bech = data.try_to_bech32("test", None).unwrap();
     assert!(bech.starts_with("test1"));
     // Roundtrip verify
     let (hrp, decoded) = bech.try_from_bech32().unwrap();
@@ -100,17 +98,16 @@ fn test_bech32_large_success() {
 
 #[cfg(feature = "encoding-bech32m")]
 #[test]
-#[should_panic(expected = "TooLong")]
 fn test_bech32m_large_failure() {
     let data: Vec<u8> = vec![255u8; 1000]; // Standard Bech32m is limited (~520 bytes max)
-    let _ = data.to_bech32m("test");
+    assert!(data.try_to_bech32m("test", None).is_err());
 }
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
 fn fixed_try_from_bech32_roundtrip() {
     let original: Fixed<[u8; 4]> = Fixed::new([1, 2, 3, 4]);
-    let encoded = original.with_secret(|s| s.to_bech32("test"));
+    let encoded = original.with_secret(|s| s.try_to_bech32("test", None)).unwrap();
     let decoded = Fixed::try_from_bech32(&encoded).unwrap();
     original.with_secret(|o| decoded.with_secret(|d| assert_eq!(o, d)));
 }
@@ -119,7 +116,7 @@ fn fixed_try_from_bech32_roundtrip() {
 #[test]
 fn dynamic_try_from_bech32_roundtrip() {
     let original: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3, 4]);
-    let encoded = original.with_secret(|s| s.to_bech32("test"));
+    let encoded = original.with_secret(|s| s.try_to_bech32("test", None)).unwrap();
     let decoded = Dynamic::try_from_bech32(&encoded).unwrap();
     original.with_secret(|o| decoded.with_secret(|d| assert_eq!(o, d)));
 }
@@ -128,7 +125,7 @@ fn dynamic_try_from_bech32_roundtrip() {
 #[test]
 fn fixed_try_from_bech32m_roundtrip() {
     let original: Fixed<[u8; 4]> = Fixed::new([1, 2, 3, 4]);
-    let encoded = original.with_secret(|s| s.to_bech32m("test"));
+    let encoded = original.with_secret(|s| s.try_to_bech32m("test", None)).unwrap();
     let decoded = Fixed::try_from_bech32m(&encoded).unwrap();
     original.with_secret(|o| decoded.with_secret(|d| assert_eq!(o, d)));
 }
@@ -137,7 +134,7 @@ fn fixed_try_from_bech32m_roundtrip() {
 #[test]
 fn dynamic_try_from_bech32m_roundtrip() {
     let original: Dynamic<Vec<u8>> = Dynamic::new(vec![1, 2, 3, 4]);
-    let encoded = original.with_secret(|s| s.to_bech32m("test"));
+    let encoded = original.with_secret(|s| s.try_to_bech32m("test", None)).unwrap();
     let decoded = Dynamic::try_from_bech32m(&encoded).unwrap();
     original.with_secret(|o| decoded.with_secret(|d| assert_eq!(o, d)));
 }
@@ -171,7 +168,7 @@ fn bech32_deserialize_invalid_checksums() {
 fn bech32_serde_roundtrip() {
     use serde_json;
     let original: Fixed<[u8; 4]> = Fixed::new([1, 2, 3, 4]);
-    let encoded = original.with_secret(|s| s.to_bech32("test"));
+    let encoded = original.with_secret(|s| s.try_to_bech32("test", None)).unwrap();
     let json = serde_json::to_string(&encoded).unwrap();
     let decoded_str: String = serde_json::from_str(&json).unwrap();
     let decoded: Fixed<[u8; 4]> = Fixed::try_from_bech32(&decoded_str).unwrap();
@@ -182,7 +179,7 @@ fn bech32_serde_roundtrip() {
 #[test]
 fn test_string_from_bech32() {
     let data = [0x00];
-    let encoded = data.to_bech32("test");
+    let encoded = data.try_to_bech32("test", None).unwrap();
     let (hrp, decoded) = encoded.try_from_bech32().unwrap();
     assert_eq!(hrp, "test");
     assert_eq!(decoded, data);
@@ -192,7 +189,7 @@ fn test_string_from_bech32() {
 #[test]
 fn test_string_from_bech32_expect_hrp() {
     let data = [0x00];
-    let encoded = data.to_bech32("test");
+    let encoded = data.try_to_bech32("test", None).unwrap();
     let decoded = encoded.try_from_bech32_expect_hrp("test").unwrap();
     assert_eq!(decoded, data);
 }
@@ -217,8 +214,8 @@ fn test_bech32_wrong_hrp() {
 #[test]
 fn bech32_hrp_case_insensitive() {
     let data = [0x00u8; 1];
-    let lower = data.to_bech32("test");
-    let upper = data.to_bech32("TEST");
+    let lower = data.try_to_bech32("test", None).unwrap();
+    let upper = data.try_to_bech32("TEST", None).unwrap();
     assert_eq!(lower.to_ascii_lowercase(), upper.to_ascii_lowercase());
     let decoded_lower = lower.try_from_bech32_expect_hrp("test").unwrap();
     let decoded_upper = upper.try_from_bech32_expect_hrp("TEST").unwrap();
@@ -229,7 +226,7 @@ fn bech32_hrp_case_insensitive() {
 #[test]
 fn test_string_from_bech32m() {
     let data = [0x00];
-    let encoded = data.to_bech32m("test");
+    let encoded = data.try_to_bech32m("test", None).unwrap();
     let (hrp, decoded) = encoded.try_from_bech32m().unwrap();
     assert_eq!(hrp, "test");
     assert_eq!(decoded, data);
@@ -239,7 +236,7 @@ fn test_string_from_bech32m() {
 #[test]
 fn test_string_from_bech32m_expect_hrp() {
     let data = [0x00];
-    let encoded = data.to_bech32m("test");
+    let encoded = data.try_to_bech32m("test", None).unwrap();
     let decoded = encoded.try_from_bech32m_expect_hrp("test").unwrap();
     assert_eq!(decoded, data);
 }
@@ -266,7 +263,7 @@ fn test_bech32m_wrong_hrp() {
 fn bip_173_valid_bech32_example() {
     // Valid Bech32 string: should decode with FromBech32Str, fail with FromBech32mStr
     let data = [0x00];
-    let valid_bech32 = data.to_bech32("test");
+    let valid_bech32 = data.try_to_bech32("test", None).unwrap();
     let result = valid_bech32.try_from_bech32();
     assert!(result.is_ok());
     let (hrp, bytes) = result.unwrap();
@@ -284,7 +281,7 @@ fn bip_173_valid_bech32_example() {
 fn bip_350_valid_bech32m_example() {
     // Valid Bech32m string: should decode with FromBech32mStr, fail with FromBech32Str
     let data = [0x01, 0x02];
-    let valid_bech32m = data.to_bech32m("test");
+    let valid_bech32m = data.try_to_bech32m("test", None).unwrap();
     #[cfg(feature = "encoding-bech32")]
     {
         let result_bech32 = valid_bech32m.try_from_bech32();
@@ -355,7 +352,7 @@ fn bip_173_empty_data_example() {
 #[test]
 fn test_bech32_hrp_containing_1() {
     let data = [0x00u8; 1];
-    let bech = data.to_bech32("test1");
+    let bech = data.try_to_bech32("test1", None).unwrap();
     assert!(bech.starts_with("test11"));
     let (hrp, decoded) = bech.try_from_bech32().unwrap();
     assert_eq!(hrp, "test1");
@@ -366,7 +363,7 @@ fn test_bech32_hrp_containing_1() {
 #[test]
 fn test_bech32m_hrp_containing_1() {
     let data = [0x00u8; 1];
-    let bech = data.to_bech32m("test1");
+    let bech = data.try_to_bech32m("test1", None).unwrap();
     assert!(bech.starts_with("test11"));
     let (hrp, decoded) = bech.try_from_bech32m().unwrap();
     assert_eq!(hrp, "test1");
@@ -377,7 +374,7 @@ fn test_bech32m_hrp_containing_1() {
 proptest::proptest! {
     #[test]
     fn proptest_bech32_roundtrip(data in proptest::collection::vec(0u8..=255, 0..100)) {
-        let encoded = data.to_bech32("test");
+        let encoded = data.try_to_bech32("test", None).unwrap();
         let (_, decoded) = encoded.try_from_bech32().expect("valid roundtrip");
         proptest::prop_assert_eq!(decoded, data);
     }
@@ -387,7 +384,7 @@ proptest::proptest! {
 proptest::proptest! {
     #[test]
     fn proptest_bech32m_roundtrip(data in proptest::collection::vec(0u8..=255, 0..100)) {
-        let encoded = data.to_bech32m("test");
+        let encoded = data.try_to_bech32m("test", None).unwrap();
         let (_, decoded) = encoded.try_from_bech32m().expect("valid roundtrip");
         proptest::prop_assert_eq!(decoded, data);
     }

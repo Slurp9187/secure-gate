@@ -147,6 +147,12 @@ pub(crate) fn ct_eq_hash_bytes(data1: &[u8], data2: &[u8]) -> bool {
     {
         use once_cell::sync::Lazy;
         use rand::{rngs::OsRng, TryRngCore};
+        // HASH_EQ_KEY is process-lifetime and intentionally not zeroized.
+        // An attacker with process memory read access can recover it, enabling
+        // offline forgery of ct_eq_hash results. For secrets requiring post-use
+        // erasure of all derived material, use ct_eq (deterministic) instead.
+        // This is a known, accepted trade-off: the key's purpose is to resist
+        // multi-target precomputation across sessions, not single-session forgery.
         static HASH_EQ_KEY: Lazy<[u8; 32]> = Lazy::new(|| {
             let mut key = [0u8; 32];
             OsRng

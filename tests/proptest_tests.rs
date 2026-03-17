@@ -45,7 +45,7 @@ fn proptest_modules_present() {
 #[cfg(all(feature = "ct-eq", feature = "alloc"))]
 mod ct_eq_wrapper_proptests {
     use proptest::prelude::*;
-    use secure_gate::{dynamic_alias, fixed_alias};
+    use secure_gate::{dynamic_alias, fixed_alias, ConstantTimeEq};
 
     fixed_alias!(TestFixed32, 32);
     dynamic_alias!(TestDynamic, Vec<u8>);
@@ -126,7 +126,7 @@ mod encoding_roundtrip_proptests {
 #[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
 mod ct_eq_hash_proptests {
     use proptest::prelude::*;
-    use secure_gate::{dynamic_alias, fixed_alias, ConstantTimeEqExt, ExposeSecret};
+    use secure_gate::{dynamic_alias, fixed_alias, ConstantTimeEq, ConstantTimeEqExt, ExposeSecret};
 
     fixed_alias!(TestFixed32, 32);
     dynamic_alias!(TestDynamic, Vec<u8>);

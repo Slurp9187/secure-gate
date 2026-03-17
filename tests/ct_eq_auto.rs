@@ -7,7 +7,7 @@
 mod ct_eq_auto_tests {
     #[cfg(feature = "alloc")]
     use secure_gate::Dynamic;
-    use secure_gate::{ConstantTimeEqExt, Fixed};
+    use secure_gate::{ConstantTimeEq, ConstantTimeEqExt, Fixed};
 
     // -------------------------------------------------------------------------
     // Basic correctness – same type, same length

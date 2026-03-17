@@ -50,6 +50,11 @@ use crate::error::Bech32Error;
 ///
 /// Blanket-implemented for all `AsRef<str>` types. Treat all input as untrusted;
 /// HRP validation prevents injection attacks and cross-protocol confusion.
+///
+/// **Extended payload capacity**: Uses the custom `Bech32Large` variant (8191 Fe32
+/// values, ~3.2 KB raw data) — significantly larger than Bech32m's standard 90-byte
+/// limit. Strings encoded via [`ToBech32`](crate::ToBech32) round-trip correctly here
+/// but will fail with [`FromBech32mStr`](crate::FromBech32mStr) when they exceed ~90 bytes.
 #[cfg(feature = "encoding-bech32")]
 pub trait FromBech32Str {
     /// Decodes a Bech32 (BIP-173) string into `(HRP, data_bytes)`.

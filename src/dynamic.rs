@@ -30,10 +30,6 @@ use crate::ExposeSecret;
 // Encoding traits
 #[cfg(feature = "encoding-base64")]
 use crate::traits::encoding::base64_url::ToBase64Url;
-#[cfg(feature = "encoding-bech32")]
-use crate::traits::encoding::bech32::ToBech32;
-#[cfg(feature = "encoding-bech32m")]
-use crate::traits::encoding::bech32m::ToBech32m;
 #[cfg(feature = "encoding-hex")]
 use crate::traits::encoding::hex::ToHex;
 
@@ -122,24 +118,6 @@ impl Dynamic<Vec<u8>> {
         self.with_secret(|s: &Vec<u8>| s.to_base64url())
     }
 
-    #[cfg(feature = "encoding-bech32")]
-    #[inline]
-    pub fn to_bech32(&self, hrp: &str) -> alloc::string::String {
-        self.with_secret(|s: &Vec<u8>| s.to_bech32(hrp))
-    }
-
-    #[cfg(feature = "encoding-bech32m")]
-    #[inline]
-    pub fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
-        self.with_secret(|s: &Vec<u8>| s.to_bech32m(hrp))
-    }
-}
-
-impl Dynamic<String> {
-    #[inline]
-    pub fn as_str(&self) -> &str {
-        self.expose_secret().as_str()
-    }
 }
 
 // ExposeSecret
@@ -165,7 +143,7 @@ impl crate::ExposeSecret for Dynamic<String> {
     }
 }
 
-impl<T: zeroize::Zeroize + zeroize::DefaultIsZeroes> crate::ExposeSecret for Dynamic<Vec<T>> {
+impl<T: zeroize::Zeroize> crate::ExposeSecret for Dynamic<Vec<T>> {
     type Inner = Vec<T>;
 
     #[inline(always)]
@@ -203,7 +181,7 @@ impl crate::ExposeSecretMut for Dynamic<String> {
     }
 }
 
-impl<T: zeroize::Zeroize + zeroize::DefaultIsZeroes> crate::ExposeSecretMut for Dynamic<Vec<T>> {
+impl<T: zeroize::Zeroize> crate::ExposeSecretMut for Dynamic<Vec<T>> {
     #[inline(always)]
     fn with_secret_mut<F, R>(&mut self, f: F) -> R
     where
@@ -272,15 +250,6 @@ where
 {
     fn ct_eq(&self, other: &Self) -> bool {
         self.inner.ct_eq(&other.inner)
-    }
-}
-
-#[cfg(feature = "ct-eq")]
-impl Dynamic<Vec<u8>> {
-    #[inline]
-    pub fn ct_eq(&self, other: &Self) -> bool {
-        use crate::traits::ConstantTimeEq;
-        self.inner.as_slice().ct_eq(other.inner.as_slice())
     }
 }
 

@@ -20,10 +20,6 @@ use crate::ExposeSecretMut;
 
 #[cfg(feature = "encoding-base64")]
 use crate::traits::encoding::base64_url::ToBase64Url;
-#[cfg(feature = "encoding-bech32")]
-use crate::traits::encoding::bech32::ToBech32;
-#[cfg(feature = "encoding-bech32m")]
-use crate::traits::encoding::bech32m::ToBech32m;
 #[cfg(feature = "encoding-hex")]
 use crate::traits::encoding::hex::ToHex;
 
@@ -108,17 +104,6 @@ impl<const N: usize> Fixed<[u8; N]> {
         self.with_secret(|s: &[u8; N]| s.to_base64url())
     }
 
-    #[cfg(feature = "encoding-bech32")]
-    #[inline]
-    pub fn to_bech32(&self, hrp: &str) -> alloc::string::String {
-        self.with_secret(|s: &[u8; N]| s.to_bech32(hrp))
-    }
-
-    #[cfg(feature = "encoding-bech32m")]
-    #[inline]
-    pub fn to_bech32m(&self, hrp: &str) -> alloc::string::String {
-        self.with_secret(|s: &[u8; N]| s.to_bech32m(hrp))
-    }
 }
 
 /// Explicit access to immutable [`Fixed<[T; N]>`] contents.
@@ -175,7 +160,7 @@ impl<const N: usize> Fixed<[u8; N]> {
 #[cfg(feature = "encoding-hex")]
 impl<const N: usize> Fixed<[u8; N]> {
     pub fn try_from_hex(hex: &str) -> Result<Self, crate::error::HexError> {
-        let bytes = hex.try_from_hex()?;
+        let bytes = zeroize::Zeroizing::new(hex.try_from_hex()?);
         if bytes.len() != N {
             #[cfg(debug_assertions)]
             return Err(crate::error::HexError::InvalidLength {
@@ -194,7 +179,7 @@ impl<const N: usize> Fixed<[u8; N]> {
 #[cfg(feature = "encoding-base64")]
 impl<const N: usize> Fixed<[u8; N]> {
     pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
-        let bytes: Vec<u8> = s.try_from_base64url()?;
+        let bytes = zeroize::Zeroizing::new(s.try_from_base64url()?);
         if bytes.len() != N {
             #[cfg(debug_assertions)]
             return Err(crate::error::Base64Error::InvalidLength {
@@ -213,7 +198,8 @@ impl<const N: usize> Fixed<[u8; N]> {
 #[cfg(feature = "encoding-bech32")]
 impl<const N: usize> Fixed<[u8; N]> {
     pub fn try_from_bech32(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes): (_, Vec<u8>) = s.try_from_bech32()?;
+        let (_hrp, bytes_raw) = s.try_from_bech32()?;
+        let bytes = zeroize::Zeroizing::new(bytes_raw);
         if bytes.len() != N {
             #[cfg(debug_assertions)]
             return Err(crate::error::Bech32Error::InvalidLength {
@@ -232,7 +218,8 @@ impl<const N: usize> Fixed<[u8; N]> {
 #[cfg(feature = "encoding-bech32m")]
 impl<const N: usize> Fixed<[u8; N]> {
     pub fn try_from_bech32m(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes): (_, Vec<u8>) = s.try_from_bech32m()?;
+        let (_hrp, bytes_raw) = s.try_from_bech32m()?;
+        let bytes = zeroize::Zeroizing::new(bytes_raw);
         if bytes.len() != N {
             #[cfg(debug_assertions)]
             return Err(crate::error::Bech32Error::InvalidLength {
@@ -254,15 +241,6 @@ where
     T: crate::ConstantTimeEq,
 {
     fn ct_eq(&self, other: &Self) -> bool {
-        self.inner.ct_eq(&other.inner)
-    }
-}
-
-#[cfg(feature = "ct-eq")]
-impl<const N: usize> Fixed<[u8; N]> {
-    #[inline]
-    pub fn ct_eq(&self, other: &Self) -> bool {
-        use crate::traits::ConstantTimeEq;
         self.inner.ct_eq(&other.inner)
     }
 }
@@ -311,7 +289,7 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
         D: serde::Deserializer<'de>,
     {
         use serde::de::Visitor;
-        use std::fmt;
+        use core::fmt;
         struct FixedVisitor<const M: usize>;
         impl<'de, const M: usize> Visitor<'de> for FixedVisitor<M> {
             type Value = Fixed<[u8; M]>;
@@ -322,7 +300,8 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
             where
                 A: serde::de::SeqAccess<'de>,
             {
-                let mut vec = alloc::vec::Vec::with_capacity(M);
+                let mut vec: zeroize::Zeroizing<alloc::vec::Vec<u8>> =
+                    zeroize::Zeroizing::new(alloc::vec::Vec::with_capacity(M));
                 while let Some(value) = seq.next_element()? {
                     vec.push(value);
                 }

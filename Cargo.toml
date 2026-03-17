@@ -50,7 +50,7 @@ rand = ["dep:rand", "dep:once_cell", "rand/alloc", "once_cell/alloc"]
 ct-eq = ["dep:subtle"]
 
 # ct-eq-hash: BLAKE3-based fast probabilistic equality
-ct-eq-hash = ["ct-eq", "dep:blake3"]
+ct-eq-hash = ["ct-eq", "dep:blake3", "blake3/zeroize"]
 
 # Encoding features (unchanged)
 encoding = [

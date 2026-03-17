@@ -29,10 +29,17 @@
 //! `no_std` compatible. [`Fixed<T>`] works without `alloc`. Enable `alloc` (default) for
 //! [`Dynamic<T>`]. Use `no-alloc` for pure stack / embedded builds.
 //!
-//! Note: Enabling both `alloc` and `no-alloc` lets `alloc` take precedence (useful with `--all-features`).
+//! Note: Enabling both `alloc` and `no-alloc` is a compile error unless the `full` feature is also active
+//! (the `full`/`--all-features` case is allowed so that `cargo doc --all-features` continues to work).
 //!
 //! See [README](https://github.com/Slurp9187/secure-gate) and
 //! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for full details.
+
+#[cfg(all(feature = "alloc", feature = "no-alloc", not(feature = "full")))]
+compile_error!(
+    "Features `alloc` and `no-alloc` are mutually exclusive. \
+     Enable only one. Use `no-alloc` alone for embedded/no-heap builds."
+);
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
