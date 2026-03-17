@@ -13,8 +13,8 @@
 //!
 //! | Trait                  | Access     | Preferred Method          | Escape Hatch             | Metadata          | Feature     |
 //! |------------------------|------------|---------------------------|--------------------------|-------------------|-------------|
-//! | [`ExposeSecret`]       | Read-only  | `with_secret` (scoped)    | `expose_secret`          | `len`, `is_empty` | Always      |
-//! | [`ExposeSecretMut`]    | Mutable    | `with_secret_mut` (scoped)| `expose_secret_mut`      | Inherits from above | Always      |
+//! | [`ExposeSecret`]                | Read-only  | `with_secret` (scoped)    | `expose_secret`     | `len`, `is_empty` | Always |
+//! | [`crate::ExposeSecretMut`]      | Mutable    | `with_secret_mut` (scoped)| `expose_secret_mut` | Inherits above    | Always |
 //!
 //! # Security Model
 //!
@@ -77,17 +77,23 @@
 //!
 //! These traits are the foundation of secure-gate's security model: all secret access is
 //! explicit, auditable, and controlled. Prefer scoped methods in nearly all cases.
+//!
+//! # Implementation Notes
+//!
+//! Long-lived `expose_secret()` references can defeat scoping — the borrow outlives the
+//! call site and the compiler cannot enforce that the secret is not retained. This is an
+//! intentional escape hatch for FFI and legacy APIs; audit every call site.
 pub trait ExposeSecret {
     /// The inner secret type being exposed.
     ///
     /// This can be a sized type (e.g. `[u8; N]`, `u32`) or unsized (e.g. `str`, `[u8]`).
     type Inner: ?Sized;
 
-    /// Provides scoped read-only access to the secret.
+    /// Provides scoped (recommended) read-only access to the secret.
     ///
-    /// **This is the preferred method** for accessing secrets.
-    /// The closure receives a reference to the inner secret and returns a value.
-    /// The borrow ends when the closure returns, minimizing exposure time.
+    /// The closure receives a reference that cannot escape — the borrow ends when
+    /// the closure returns, minimizing the lifetime of the exposed secret.
+    /// Prefer this over [`expose_secret`](Self::expose_secret) in all application code.
     ///
     /// # Examples
     ///
@@ -102,21 +108,22 @@ pub trait ExposeSecret {
     where
         F: FnOnce(&Self::Inner) -> R;
 
-    /// Exposes the secret for read-only access.
+    /// Returns a direct (auditable) read-only reference to the secret.
     ///
-    /// See [`ExposeSecret`] for the full security model and scoping recommendations.
+    /// Long-lived `expose_secret()` references can defeat scoping — prefer
+    /// [`with_secret`](Self::with_secret) in application code. Use this only when
+    /// a long-lived reference is unavoidable (e.g. FFI, third-party APIs).
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use secure_gate::Fixed;
+    /// use secure_gate::{Fixed, ExposeSecret};
     ///
     /// let secret = Fixed::new([42u8; 4]);
     ///
-    /// // Typical FFI use case (direct reference needed)
-    /// // unsafe {
-    /// //     c_library_function(secret.expose_secret().as_ptr(), secret.len());
-    /// // }
+    /// // Auditable escape hatch — FFI use case:
+    /// // unsafe { c_fn(secret.expose_secret().as_ptr(), secret.len()); }
+    /// let _ = secret.expose_secret();
     /// ```
     fn expose_secret(&self) -> &Self::Inner;
 

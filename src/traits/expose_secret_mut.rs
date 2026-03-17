@@ -62,26 +62,28 @@ use crate::ExposeSecret;
 /// Extends [`ExposeSecret`] (so you get read-only access, `len()`, `is_empty()`, etc.).
 /// Only core wrappers (`Fixed<T>`, `Dynamic<T>`) implement this trait.
 pub trait ExposeSecretMut: ExposeSecret {
-    /// Provides scoped mutable access to the secret.
+    /// Provides scoped (recommended) mutable access to the secret.
     ///
-    /// **This is the preferred method** for mutating secrets.
-    /// The closure receives a mutable reference to the inner secret and returns a value.
-    /// The borrow ends when the closure returns, minimizing exposure time.
+    /// The closure receives a `&mut` reference that cannot escape — the borrow ends
+    /// when the closure returns, minimizing the mutable exposure window.
+    /// Prefer this over [`expose_secret_mut`](Self::expose_secret_mut).
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use secure_gate::{Fixed, ExposeSecretMut};
+    /// use secure_gate::{Fixed, ExposeSecretMut, ExposeSecret};
     ///
     /// let mut secret = Fixed::new([0u8; 4]);
     /// secret.with_secret_mut(|bytes| bytes[0] = 42);
+    /// assert_eq!(secret.expose_secret()[0], 42);
     /// ```
     fn with_secret_mut<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut Self::Inner) -> R;
 
-    /// Exposes the secret for mutable access.
+    /// Returns a direct (auditable) mutable reference to the secret.
     ///
-    /// See [`ExposeSecretMut`] for the full security model and scoping recommendations.
+    /// Long-lived mutable references can defeat scoping — prefer
+    /// [`with_secret_mut`](Self::with_secret_mut) in application code.
     fn expose_secret_mut(&mut self) -> &mut Self::Inner;
 }

@@ -26,7 +26,7 @@
 //!
 //! # Usage Recommendations
 //!
-//! - **Preferred**: [`ct_eq_auto`] — automatically selects:
+//! - **Preferred**: [`ConstantTimeEqExt::ct_eq_auto`] — automatically selects:
 //!   - `ct_eq` for small inputs (≤ 32 bytes default)
 //!   - `ct_eq_hash` for larger inputs
 //! - Use `ct_eq_hash` directly only when you need uniform probabilistic behavior.
@@ -43,35 +43,38 @@
 //! Hashing very large **untrusted** inputs is computationally expensive.
 //! Always bound input sizes or rate-limit before calling these methods on user data.
 //!
+//! `==` is deliberately not implemented on secret wrappers — use `ct_eq_auto`.
+//!
 //! # Example
 //!
-//! ```rust
-//! # #[cfg(feature = "ct-eq-hash")]
+//! ```rust,no_run
 //! use secure_gate::{Fixed, ConstantTimeEqExt};
 //!
-//! # #[cfg(feature = "ct-eq-hash")]
-//! {
 //! let large_a = Fixed::<[u8; 2048]>::new([42u8; 2048]);
 //! let large_b = Fixed::<[u8; 2048]>::new([42u8; 2048]);
 //! let large_c = Fixed::<[u8; 2048]>::new([99u8; 2048]);
 //!
-//! // Fast probabilistic comparison for large secrets
+//! // Recommended: automatic strategy selection (hash path uses OsRng when `rand` enabled)
+//! assert!(large_a.ct_eq_auto(&large_b, None));       // default 32-byte crossover
+//! assert!(!large_a.ct_eq_auto(&large_c, None));
+//! assert!(large_a.ct_eq_auto(&large_b, Some(0)));    // force hash path for all sizes
+//! assert!(large_a.ct_eq_auto(&large_b, Some(4096))); // hardware-tuned threshold
+//!
+//! // Direct hash path (uniform probabilistic behavior):
 //! assert!(large_a.ct_eq_hash(&large_b));
 //! assert!(!large_a.ct_eq_hash(&large_c));
-//!
-//! // Recommended: automatic selection
-//! assert!(large_a.ct_eq_auto(&large_b, None));      // uses ct_eq_hash
-//! assert!(large_a.ct_eq_auto(&large_b, Some(4096))); // forces ct_eq_hash
-//! # }
 //! ```
 #[cfg(feature = "ct-eq-hash")]
 #[allow(clippy::len_without_is_empty)]
 pub trait ConstantTimeEqExt: crate::ConstantTimeEq {
     /// Returns the length of the secret data in bytes.
     ///
-    /// Note: This trait intentionally does **not** provide `.is_empty()` to avoid
-    /// method name conflicts with [`ExposeSecret::len`] / `.is_empty()`.
-    /// Use `.len() == 0` or `.expose_secret().is_empty()` when you need emptiness checks.
+    /// # Implementation Notes
+    ///
+    /// This trait intentionally does **not** provide an `is_empty()` method
+    /// (`#[allow(clippy::len_without_is_empty)]`). Adding `is_empty` would shadow the
+    /// same method from [`crate::ExposeSecret`], causing ambiguous-method-call errors
+    /// in generic contexts. Use `.len() == 0` when an emptiness check is needed.
     fn len(&self) -> usize;
 
     /// Force BLAKE3 digest comparison (constant-time on 32-byte output).
@@ -121,10 +124,19 @@ pub trait ConstantTimeEqExt: crate::ConstantTimeEq {
 #[cfg(feature = "ct-eq-hash")]
 use crate::ConstantTimeEq;
 
-/// Constant-time hash-based equality check.
+/// Internal constant-time hash-based equality helper.
 ///
-/// Uses BLAKE3 (keyed when the `rand` feature is enabled) to compare two byte
-/// slices. Returns `false` immediately on length mismatch.
+/// Uses BLAKE3 (keyed with a per-process random key when `rand` is enabled;
+/// plain when `rand` is disabled) to compare two byte slices in constant time.
+/// Returns `false` immediately on length mismatch (length is public metadata).
+///
+/// Collision probability: 2⁻²⁵⁶ per comparison.
+///
+/// # Implementation Notes
+///
+/// The per-process key is generated once via `OsRng` and stored in a `Lazy<[u8; 32]>`.
+/// This resists multi-target precomputation and rainbow-table attacks across many
+/// comparisons. Without `rand`, plain BLAKE3 is still cryptographically secure.
 #[cfg(feature = "ct-eq-hash")]
 #[inline]
 pub(crate) fn ct_eq_hash_bytes(data1: &[u8], data2: &[u8]) -> bool {

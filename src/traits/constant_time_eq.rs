@@ -21,26 +21,25 @@
 //! - Large or variable-length secrets: Prefer `ConstantTimeEqExt::ct_eq_auto()` or `.ct_eq_hash()`
 //!   (requires `ct-eq-hash`) for better performance with negligible collision risk.
 //!
+//! `==` is deliberately not implemented on secret wrappers — always use `ct_eq`.
+//!
 //! # Examples
 //!
 //! ```rust
-//! # #[cfg(feature = "ct-eq")]
 //! use secure_gate::ConstantTimeEq;
 //!
-//! # #[cfg(feature = "ct-eq")]
-//! {
 //! let a = [1u8, 2, 3, 4].as_slice();
 //! let b = [1u8, 2, 3, 4].as_slice();
 //! let c = [1u8, 5, 3, 4].as_slice();
 //!
-//! assert!(a.ct_eq(&b));     // true, constant time
-//! assert!(!a.ct_eq(&c));    // false, same time as true case
+//! assert!(a.ct_eq(b));    // equal — constant time
+//! assert!(!a.ct_eq(c));   // not equal — same time as equal case
 //!
-//! // Works on fixed-size arrays too
-//! let key1 = [0u8; 32];
-//! let key2 = [0u8; 32];
+//! // Works on fixed-size arrays and secret wrappers
+//! use secure_gate::{Fixed, ConstantTimeEq as _};
+//! let key1: Fixed<[u8; 32]> = Fixed::new([0u8; 32]);
+//! let key2: Fixed<[u8; 32]> = Fixed::new([0u8; 32]);
 //! assert!(key1.ct_eq(&key2));
-//! # }
 //! ```
 //!
 //! # Trait Implementations

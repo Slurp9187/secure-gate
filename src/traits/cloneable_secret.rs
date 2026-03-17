@@ -24,27 +24,23 @@
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "cloneable")]
 //! use secure_gate::{CloneableSecret, Fixed, ExposeSecret};
-//! # #[cfg(feature = "cloneable")]
 //! use zeroize::Zeroize;
 //!
-//! # #[cfg(feature = "cloneable")]
-//! {
 //! #[derive(Clone)]
 //! struct SessionKey([u8; 32]);
 //!
 //! impl Zeroize for SessionKey {
-//!     fn zeroize(&mut self) {
-//!         self.0.zeroize();
-//!     }
+//!     fn zeroize(&mut self) { self.0.zeroize(); }
 //! }
 //!
+//! // Every impl is a deliberate security decision — audit all usages.
 //! impl CloneableSecret for SessionKey {}
 //!
-//! let original = Fixed::new(SessionKey([0; 32]));
-//! let copy = original.clone();           // Cloning now allowed
-//! # }
+//! let original = Fixed::new(SessionKey([0u8; 32]));
+//! let copy = original.clone();   // Opt-in cloning: each copy is independently zeroized.
+//! drop(original);  // zeroized on drop
+//! drop(copy);      // independently zeroized on drop
 //! ```
 //!
 //! # Security Notes

@@ -34,32 +34,24 @@
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "serde-serialize")]
 //! use secure_gate::{SerializableSecret, Fixed};
-//! # #[cfg(feature = "serde-serialize")]
 //! use serde::{Serialize, Deserialize};
-//! # #[cfg(feature = "serde-serialize")]
 //! use zeroize::Zeroize;
 //!
-//! # #[cfg(feature = "serde-serialize")]
-//! {
 //! #[derive(Serialize, Deserialize)]
 //! struct BackupKey(Vec<u8>);
 //!
 //! impl Zeroize for BackupKey {
-//!     fn zeroize(&mut self) {
-//!         self.0.zeroize();
-//!     }
+//!     fn zeroize(&mut self) { self.0.zeroize(); }
 //! }
 //!
+//! // Every impl is a deliberate security decision — audit all usages.
 //! impl SerializableSecret for BackupKey {}
 //!
-//! let original = Fixed::new(BackupKey(vec![0u8; 32]));
-//!
-//! // Now serializable (e.g., with bincode, serde_json, etc.)
-//! // let serialized = bincode::serialize(&original).unwrap();
-//! // Note: serialization exposes the secret — encrypt/transmit securely!
-//! # }
+//! let key = Fixed::new(BackupKey(vec![0u8; 32]));
+//! // Serialization exposes the secret — encrypt/authenticate output before storage.
+//! // let bytes = bincode::serialize(&key).unwrap();
+//! let _ = key;
 //! ```
 //!
 //! # Warnings
