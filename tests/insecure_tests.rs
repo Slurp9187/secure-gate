@@ -1,4 +1,4 @@
-#![cfg(feature = "insecure")]
+#![cfg(feature = "no-alloc")]
 
 extern crate alloc;
 

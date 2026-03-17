@@ -1,12 +1,12 @@
 # Security Considerations for secure-gate
 
-Last updated: 2026-01 (for v0.7.0-rc.15 / upcoming v0.7.0)
+Last updated: 2026-03 (for v0.8.0-alpha.1)
 
 ## TL;DR
 - **No independent audit** — review the source code yourself before production use.
 - **No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally.
 - **Explicit exposure only** — all secret access requires `.expose_secret()` / `.with_secret()` or mutable equivalents; no `Deref`, `AsRef`, or implicit borrowing.
-- **Zeroization on drop** — full buffer (including spare capacity) wiped when `zeroize` feature is enabled.
+- **Zeroization on drop** — full buffer (including spare capacity) always wiped on drop (inner type must implement `Zeroize`).
 - **Timing-safe equality** — use `ConstantTimeEq` (`ct-eq`) or `ConstantTimeEqExt` / `ct_eq_auto` (`ct-eq-hash`); `==` is deliberately not implemented.
 - **Opt-in risk** — cloning and serialization require explicit marker traits (`CloneableSecret`, `SerializableSecret`).
 - **Vulnerability reporting** — preferred: GitHub private vulnerability reporting (Security tab); public issues acceptable.
@@ -42,7 +42,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | Scoped exposure (preferred)       | Closures limit borrow lifetime; prevents long-lived references                             |
 | Direct exposure (escape hatch)    | `expose_secret()` / `expose_secret_mut()` — grep-able, auditable                           |
 | No implicit leaks                 | No `Deref`, `AsRef`, `Copy`, `Clone` (unless `cloneable` + marker)                         |
-| Zeroization                       | Full allocation wiped on drop (`zeroize` feature); includes `Vec`/`String` spare capacity |
+| Zeroization                       | Full allocation always wiped on drop; includes `Vec`/`String` spare capacity (inner type must implement `Zeroize`) |
 | Timing safety                     | `ConstantTimeEq` for direct comparison; `ConstantTimeEqExt` / `ct_eq_auto` for large/variable data   |
 | Probabilistic equality (`ct-eq-hash`) | keyed BLAKE3 (when `rand` enabled) or unkeyed; collision risk ~2⁻²⁵⁶ either way (negligible for practical purposes) |
 | Opt-in risky features             | Cloning/serialization gated by marker traits (`CloneableSecret`, `SerializableSecret`)         |
@@ -53,8 +53,8 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 | Feature              | Security Impact                                                                 | Recommendation                              |
 |----------------------|----------------------------------------------------------------------------------|---------------------------------------------|
-| `secure` (default)   | Enables `zeroize` + `alloc` — secure-by-default baseline with heap support      | Always enable unless extreme constraints    |
-| `zeroize`            | Wipes memory on drop; enables safe opt-in cloning/serialization                  | Strongly recommended                        |
+| `alloc` *(default)*  | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Enabling both `alloc` and `no-alloc` lets `alloc` take precedence — prefer enabling only one. | Enable unless on embedded/pure-stack target |
+| `no-alloc`           | Disables heap-dependent code (`Dynamic<T>`, heap zeroizing, encodings); reduces attack surface by excluding heap vulnerabilities. | Use for embedded / pure `no_std` builds     |
 | `ct-eq`              | Timing-safe direct byte comparison                                               | Strongly recommended; avoid `==`            |
 | `ct-eq-hash`         | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `ct_eq_auto` for most cases           |
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
@@ -63,9 +63,6 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `encoding-bech32`    | Bech32/BIP-173 encoding/decoding: `ToBech32`, `FromBech32Str`                    | Validate inputs upstream; test empty/invalid HRP |
 | `encoding-bech32m`   | Bech32m/BIP-350 encoding/decoding: `ToBech32m`, `FromBech32mStr`                 | Validate inputs upstream; test empty/invalid HRP |
 | `cloneable`          | Opt-in cloning via marker trait; increases exposure surface                      | Use minimally; prefer move semantics        |
-| `alloc`              | Enables heap-dependent code (`Dynamic<T>`, `Vec<String>` support); required for most features. Enabling both `alloc` and `no-alloc` allows `alloc` to take precedence (e.g., with `--all-features`) — prefer enabling only one. | Required for heap usage; opt-out for no-alloc |
-| `std`                | Enables std-specific enhancements; depends on `alloc`                           | Optional; future-proofs std integration      |
-| `no-alloc`           | Disables heap-dependent code (`Dynamic<T>`, heap zeroizing, encodings); reduces attack surface by excluding heap vulnerabilities. Enabling both `alloc` and `no-alloc` allows `alloc` to take precedence (e.g., with `--all-features`) — prefer enabling only one. | Optional (embedded only) |
 | `full`               | All features enabled — convenient but increases attack surface                   | Development only; audit for production      |
 
 ## Module-by-Module Security Notes
@@ -112,7 +109,7 @@ Zero-cost claim: performance indistinguishable from raw arrays; for detailed ben
 
 ## Best Practices
 
-- Enable the `secure` feature unless you have extreme constraints
+- The `alloc` feature is enabled by default and provides `Dynamic<T>` with full zeroization; use `no-alloc` only for embedded / pure-stack builds
 - Prefer scoped `with_secret()` over long-lived `expose_secret()`
 - Use `ct_eq_auto(…, None)` for general-purpose equality checks; customize the threshold (e.g., `Some(64)`, `Some(1024)`) based on your benchmarks if the default 32 bytes isn't optimal. For detailed justification, see [CT_EQ_AUTO.md](CT_EQ_AUTO.md)
 - Audit every `CloneableSecret` / `SerializableSecret` impl

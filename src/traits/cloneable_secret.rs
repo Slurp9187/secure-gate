@@ -4,8 +4,7 @@
 //! implementation on secret wrapper types (`Fixed<T>`, `Dynamic<T>`, aliases)
 //! while preserving core security invariants:
 //!
-//! - **Zeroization preserved**: All clones zeroize their contents on drop (when
-//!   the `zeroize` feature is enabled).
+//! - **Zeroization preserved**: All clones zeroize their contents on drop.
 //! - **No accidental cloning**: Cloning is impossible unless the inner type
 //!   explicitly implements `CloneableSecret`.
 //! - **Auditable risk**: Cloning increases the exposure surface (more copies
@@ -49,7 +48,7 @@
 //! - Use `CloneableSecret` sparingly; each clone increases the number of in-memory
 //!   copies of the secret, expanding the window for extraction attacks.
 //! - Audit all `CloneableSecret` impls to ensure the inner type correctly implements
-//!   `Clone` and `Zeroize` (if `zeroize` is enabled).
+//!   `Clone` and `Zeroize`.
 //!
 //! This trait is a **marker only** — it has no methods and adds no runtime behavior.
 //! It exists solely to gate the `Clone` impl on wrapper types.

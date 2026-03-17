@@ -13,8 +13,8 @@
 //! - **Explicit risk acceptance** — Cloning/serialization increases the chance of
 //!   secret leakage (e.g., via logs, network, disk). This marker forces developers
 //!   to acknowledge and accept that risk.
-//! - **Zeroization preserved** — Serialization does **not** bypass `ZeroizeOnDrop`
-//!   (when `zeroize` feature is enabled); all copies zeroize on drop.
+//! - **Zeroization preserved** — Serialization does **not** bypass `ZeroizeOnDrop`;
+//!   all copies zeroize on drop.
 //! - **No deserialization by default** — `Deserialize` is **not** automatically
 //!   enabled; use `serde-deserialize` feature + manual impl if needed.
 //!

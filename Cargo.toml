@@ -1,9 +1,9 @@
 [package]
 name = "secure-gate"
-version = "0.7.0-rc.15"
+version = "0.8.0-alpha.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "Zero-cost secure wrappers for secrets — heap for dynamic, stack for fixed"
+description = "Secure wrappers for secrets with explicit access and automatic zeroization (requires inner type: Zeroize)"
 repository = "https://github.com/Slurp9187/secure-gate/tree/main"
 documentation = "https://docs.rs/secure-gate"
 keywords = ["crypto", "no-std", "security", "zeroize"]
@@ -16,14 +16,10 @@ blake3 = { version = "1.8", optional = true, default-features = false }
 hex = { version = "0.4", optional = true }
 once_cell = { version = "1.19", optional = true }
 rand = { version = "0.9", optional = true }
-serde = { version = "1.0", optional = true, default-features = false, features = [
-  "derive",
-] }
+serde = { version = "1.0", optional = true, default-features = false, features = ["derive"] }
 subtle = { version = "2.5", optional = true }
 thiserror = "2.0"
-zeroize = { version = "1.7", default-features = false, optional = true, features = [
-  "zeroize_derive",
-] }
+zeroize = { version = "1.7", default-features = false, features = ["zeroize_derive"] }
 
 [dev-dependencies]
 bincode = "1.0"
@@ -32,72 +28,52 @@ proptest = "1.0"
 serde_json = "1.0"
 trybuild = "1.0"
 
-# ──────────────────────────────────────────────────────────────
-# Docs.rs metadata (enable features for online docs)
-# ──────────────────────────────────────────────────────────────
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
-# ──────────────────────────────────────────────────────────────
-# Features
-# ──────────────────────────────────────────────────────────────
 [features]
-alloc = []
-std = ["alloc"]
-no-alloc = [
-] # Explicit opt-out: disables heap (conflicts with alloc — document it)
+# Enables heap allocation (Dynamic<T>, Box, Vec, String) + full zeroization of spare capacity
+alloc = ["zeroize/alloc"]
 
-# Default feature: Enforces secure handling with zeroization and constant-time operations
-default = ["secure"]
+# Explicit opt-out: disables heap-dependent code (Dynamic<T>, Box, etc.)
+# Use for true no-heap / embedded / pure no_std builds (only Fixed<T> remains available)
+no-alloc = []
 
-# Secure: Essential for secure secret handling (includes zeroize and alloc)
-secure = ["zeroize", "alloc"]
+# Default: give users the most useful experience out of the box
+default = ["alloc"]
 
-# Zeroize: Secure zeroing of secrets on drop or explicit calls (uses 'zeroize' crate with alloc and derives)
-zeroize = ["dep:zeroize", "blake3/zeroize", "zeroize/alloc"]
-
-# Rand: Random number generation for securely creating secrets (uses rand with getrandom for seeding; rand_core is transitive)
+# Rand: secure random generation
 rand = ["dep:rand", "dep:once_cell", "rand/alloc", "once_cell/alloc"]
 
-# ct-eq: Constant-time equality checks (prevents timing attacks in comparisons; uses 'subtle' crate)
+# ct-eq: constant-time equality (subtle)
 ct-eq = ["dep:subtle"]
 
-# Hash-based equality (uses blake3 for fast, secure hashing without caching overhead)
+# ct-eq-hash: BLAKE3-based fast probabilistic equality
 ct-eq-hash = ["ct-eq", "dep:blake3"]
 
-# Insecure: Opt-out feature for no-default-features builds (disables zeroize, ct-eq; use only for testing/low-resource scenarios—strongly discouraged for production)
-insecure = []
-
-# Encoding: Secure conversions (hex/base64) for displaying or serializing secrets without leaks
+# Encoding features (unchanged)
 encoding = [
   "encoding-hex",
   "encoding-base64",
   "encoding-bech32",
   "encoding-bech32m",
 ]
-# Hex encoding support (uses the 'hex' crate)
 encoding-hex = ["dep:hex", "hex/alloc", "alloc"]
-# Base64 encoding support (uses the 'base64' crate)
 encoding-base64 = ["dep:base64", "base64/alloc", "alloc"]
-# Bech32/BIP-173 encoding support (uses the 'bech32' crate)
 encoding-bech32 = ["dep:bech32", "bech32/alloc", "alloc"]
-# Bech32m/BIP-350 encoding support (uses the 'bech32' crate)
 encoding-bech32m = ["dep:bech32", "bech32/alloc", "alloc"]
 
-# Cloneable: Opt-in safe cloning for secrets
+# Cloneable: opt-in cloning
 cloneable = []
 
-# Serde: Meta-feature enabling both deserialize and serialize
+# Serde: meta-feature for both directions
 serde = ["serde-deserialize", "serde-serialize"]
-# Serde deserialize: Enables serde Deserialize only (safe loading)
 serde-deserialize = ["dep:serde", "serde/alloc", "alloc"]
-# Serde serialize: Enables serde Serialize only (requires SerializableSecret marker)
 serde-serialize = ["dep:serde", "serde/alloc", "alloc"]
 
-# Full: batteries-included for most real-world usage (no redundancies)
-# Includes secure defaults + all encodings + fast equality + cloning + serde round-trip + secure RNG
-full = ["secure", "rand", "encoding", "ct-eq-hash", "cloneable", "serde"]
+# Full batteries-included combo (most common real-world usage)
+full = ["alloc", "rand", "encoding", "ct-eq-hash", "cloneable", "serde"]
 
 [[bench]]
 name = "ct_eq_auto"

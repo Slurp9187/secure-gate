@@ -51,15 +51,15 @@ pub struct SerializableVec(Vec<u8>);
 impl SerializableSecret for SerializableVec {}
 
 // Custom type for testing
-#[cfg(all(feature = "zeroize", feature = "serde-serialize"))]
+#[cfg(feature = "serde-serialize")]
 #[derive(serde::Serialize)]
 #[allow(dead_code)]
 struct MyKey([u8; 16]);
 
-#[cfg(all(feature = "zeroize", feature = "serde-serialize"))]
+#[cfg(feature = "serde-serialize")]
 impl SerializableSecret for MyKey {}
 
-#[cfg(all(feature = "zeroize", feature = "serde-serialize"))]
+#[cfg(feature = "serde-serialize")]
 impl zeroize::Zeroize for MyKey {
     fn zeroize(&mut self) {
         zeroize::Zeroize::zeroize(&mut self.0);
@@ -67,7 +67,6 @@ impl zeroize::Zeroize for MyKey {
 }
 
 #[cfg(all(
-    feature = "zeroize",
     feature = "serde-deserialize",
     feature = "serde-serialize"
 ))]
@@ -79,7 +78,6 @@ fn custom_type_serializable_secret_enables_serialization() {
 }
 
 #[cfg(all(
-    feature = "zeroize",
     feature = "serde-deserialize",
     feature = "serde-serialize"
 ))]
@@ -91,7 +89,6 @@ fn fixed_arrays_can_be_serialized() {
 }
 
 #[cfg(all(
-    feature = "zeroize",
     feature = "serde-deserialize",
     feature = "serde-serialize"
 ))]
@@ -104,7 +101,6 @@ fn primitives_via_dynamic_serializable() {
 }
 
 #[cfg(all(
-    feature = "zeroize",
     feature = "serde-deserialize",
     feature = "serde-serialize"
 ))]
@@ -117,7 +113,6 @@ fn serialized_fixed_are_consistent() {
 }
 
 #[cfg(all(
-    feature = "zeroize",
     feature = "serde-deserialize",
     feature = "serde-serialize"
 ))]
@@ -130,7 +125,6 @@ fn serializable_array_serialization() {
 }
 
 #[cfg(all(
-    feature = "zeroize",
     feature = "serde-deserialize",
     feature = "serde-serialize"
 ))]
@@ -144,7 +138,6 @@ fn serializable_array_mutation_before_serialization() {
 }
 
 #[cfg(all(
-    feature = "zeroize",
     feature = "serde-deserialize",
     feature = "serde-serialize"
 ))]
@@ -157,7 +150,6 @@ fn serializable_string_serialization() {
 }
 
 #[cfg(all(
-    feature = "zeroize",
     feature = "serde-deserialize",
     feature = "serde-serialize"
 ))]
@@ -171,7 +163,6 @@ fn serializable_string_mutability_before_serialization() {
 }
 
 #[cfg(all(
-    feature = "zeroize",
     feature = "serde-deserialize",
     feature = "serde-serialize"
 ))]
@@ -184,7 +175,6 @@ fn serializable_vec_serialization() {
 }
 
 #[cfg(all(
-    feature = "zeroize",
     feature = "serde-deserialize",
     feature = "serde-serialize"
 ))]
@@ -198,7 +188,6 @@ fn serializable_vec_mutability_before_serialization() {
 }
 
 #[cfg(all(
-    feature = "zeroize",
     feature = "alloc",
     not(feature = "serde-serialize")
 ))]
@@ -210,7 +199,7 @@ fn raw_dynamic_not_serializable() {
     // No Serialize impl on raw Dynamic
 }
 
-#[cfg(all(feature = "zeroize", not(feature = "serde-serialize")))]
+#[cfg(not(feature = "serde-serialize"))]
 #[test]
 #[allow(unused)]
 fn raw_fixed_not_serializable_by_default() {
@@ -220,7 +209,6 @@ fn raw_fixed_not_serializable_by_default() {
 }
 
 #[cfg(all(
-    feature = "zeroize",
     feature = "serde-deserialize",
     feature = "serde-serialize"
 ))]
