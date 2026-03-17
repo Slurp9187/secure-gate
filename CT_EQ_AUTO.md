@@ -32,7 +32,7 @@ Multi-run benchmarks (3x on 2019 Intel i7-10510U/16GB/Windows 11) show high vari
 
 ## Security Justification
 - **Timing safety**: Both paths constant-time; `ct_eq_hash` hides length/cache differences.
-- **Probabilistic but safe**: 2^-128 collision risk (negligible for equality); use `ct_eq` for zero-risk if <32B dominates.
+- **Probabilistic but safe**: 2⁻²⁵⁶ per-pair forgery probability (not the birthday bound); negligible for equality; use `ct_eq` for deterministic needs if <32B dominates.
 - **Key mode (active)**: Per-process random key resists rainbow tables/multi-target attacks across comparisons — stronger than deterministic BLAKE3.
 - **DoS resistance**: Hashing large inputs has fixed overhead; bound sizes upstream.
 - **No leaks**: Indirect channels (errors, timing) mitigated; zero-copy when possible.

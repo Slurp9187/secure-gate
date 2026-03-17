@@ -179,156 +179,84 @@
 
   ## Advanced Usage
 
-  ### Using Fixed<T> and Dynamic<T> Directly
+  ### Using `Fixed<T>` and `Dynamic<T>` Directly
 
-  For macro-averse users, use the types directly:
+  For macro-averse users, construct and expose types directly:
 
   ```rust
   use secure_gate::{Fixed, ExposeSecret};
-
   let key: Fixed<[u8; 32]> = Fixed::new([42u8; 32]);
   key.with_secret(|bytes| assert_eq!(bytes.len(), 32));
-
-  #[cfg(feature = "alloc")]
-  {
-      use secure_gate::{Dynamic, ExposeSecret};
-      extern crate alloc;
-
-      let pw: Dynamic<String> = "password".into();
-      pw.with_secret(|s| println!("secret: {}", s));
-  }
   ```
+
+  See [`Fixed`] and [`Dynamic`] in the [API docs](https://docs.rs/secure-gate) for full examples.
 
   ### Polymorphic / Generic Code
 
-  Write functions that work with any secure wrapper (`Fixed<T>` or `Dynamic<T>`) via the `ExposeSecret` trait:
+  Write functions that accept any secure wrapper via the `ExposeSecret` trait:
 
   ```rust
   use secure_gate::ExposeSecret;
-
-  fn log_length<S: ExposeSecret>(secret: &S) {
-      println!("length = {}", secret.len());
-  }
+  fn log_length<S: ExposeSecret>(secret: &S) { println!("length = {}", secret.len()); }
   ```
-  
+
   ### Macros for Aliases
-  
-  #### Dynamic Alias
-  
-  ```rust
-  #[cfg(feature = "alloc")]
-  {
-    use secure_gate::dynamic_alias;
 
-    dynamic_alias!(pub Password, String, "variable-length password");
-    let key: Password = "Super Secret Password".into();
-  }
-  ```
-  
-  #### Dynamic **Generic** Alias
-
-  ```rust
-  #[cfg(feature = "alloc")]
-  {
-    use secure_gate::dynamic_generic_alias;
-
-    dynamic_generic_alias!(Secret);
-    let text: Secret<String> = "hidden".into();
-  }
-  ```
-
-  #### Fixed Alias
+  `fixed_alias!`, `dynamic_alias!`, `fixed_generic_alias!`, and `dynamic_generic_alias!` create typed newtype wrappers with full visibility control and optional doc strings:
 
   ```rust
   use secure_gate::fixed_alias;
+  fixed_alias!(pub Aes256Key, 32, "32-byte AES-256 key");
 
-  fixed_alias!(pub ApiKey, 32, "32-byte API key");
+  #[cfg(feature = "alloc")]
+  {
+  use secure_gate::dynamic_alias;
+  dynamic_alias!(pub Password, String, "variable-length password");
+  }
   ```
 
-  #### Fixed **Generic** Alias
-
-  ```rust
-  use secure_gate::fixed_generic_alias;
-
-  fixed_generic_alias!(SecureBuffer, "Secure fixed-size buffer");
-  let buf: SecureBuffer<64> = [0u8; 64].into();
-  ```
+  See [`fixed_alias!`], [`dynamic_alias!`], [`fixed_generic_alias!`], and [`dynamic_generic_alias!`] in the [API docs](https://docs.rs/secure-gate) for all visibility forms and compile-time zero-size guards.
 
   ### Random Generation
-  
+
+  Cryptographically secure randomness via `OsRng` (requires `rand` feature):
+
   ```rust
   #[cfg(feature = "rand")]
   {
-      use secure_gate::{Dynamic, Fixed};
-
-      let token: Dynamic<Vec<u8>> = Dynamic::from_random(64);
-      let key: Fixed<[u8; 32]> = Fixed::from_random();
-
-      // For extreme cases, e.g., 128-byte keys
-      let large_key: Fixed<[u8; 128]> = Fixed::from_random();
+  use secure_gate::Fixed;
+  let key: Fixed<[u8; 32]> = Fixed::from_random();
   }
   ```
-  
+
+  See [`Fixed::from_random`] and [`Dynamic::from_random`] in the [API docs](https://docs.rs/secure-gate).
+
   ### Encoding (symmetric per-format traits)
-  
-  secure-gate provides **orthogonal, symmetric encoding/decoding traits** for extensibility:
 
-  - `ToHex` / `FromHexStr`: Hex encoding/decoding
-  - `ToBase64Url` / `FromBase64UrlStr`: Base64url encoding/decoding
-  - `ToBech32` / `FromBech32Str`: BIP-173 Bech32 encoding/decoding
-  - `ToBech32m` / `FromBech32mStr`: BIP-350 Bech32m encoding/decoding
+  secure-gate provides **orthogonal, symmetric encoding/decoding traits**. All methods are blanket-implemented over `AsRef<[u8]>` / `AsRef<str>` — call them directly on wrapper types without `.expose_secret()`:
 
-  Umbrellas (`SecureEncoding` / `SecureDecoding`) aggregate all enabled traits for convenience. Each format is independent—adding base58 later requires only one new pair.
+  - `ToHex` / `FromHexStr` — hex (requires `encoding-hex`)
+  - `ToBase64Url` / `FromBase64UrlStr` — base64url (requires `encoding-base64`)
+  - `ToBech32` / `FromBech32Str` — BIP-173 Bech32 (requires `encoding-bech32`)
+  - `ToBech32m` / `FromBech32mStr` — BIP-350 Bech32m (requires `encoding-bech32m`)
 
-
-
-  All methods are blanket-implemented over `AsRef<[u8]>` (encoding) or `AsRef<str>` (decoding) for zero-overhead ergonomics.
-  
   ```rust
-  #[cfg(all(feature = "encoding-bech32", feature = "encoding-bech32m", feature = "encoding-hex"))]
+  #[cfg(feature = "encoding-hex")]
   {
-      use secure_gate::{fixed_alias, Fixed, ExposeSecret, ToBech32, ToBech32m, ToHex, FromHexStr, FromBech32Str};
-  
-      fixed_alias!(TestKey, 20);  // 160 bits = exactly 32×5 for clean Bech32 conversion
-      let key = TestKey::new([
-          0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-          0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-          0x10, 0x11, 0x12, 0x13,
-      ]);  // Fixed data that always encodes successfully
-  
-      let hex    = key.expose_secret().to_hex();          // "2a2a2a..."
-      let bech32 = key.expose_secret().try_to_bech32("key", None).unwrap();  // "key1q..." (BIP-173)
-      let bech32m = key.expose_secret().try_to_bech32m("key", None).unwrap(); // "key1p..." (BIP-350)
-  
-      // Symmetric decoding
-      let decoded_hex: Vec<u8> = "000102030405060708090a0b0c0d0e0f10111213".try_from_hex().unwrap();
-      let decoded_bech32 = bech32.try_from_bech32().unwrap();  // Decode back
-  
-      assert_eq!(decoded_hex.len(), 20);
+  use secure_gate::{Fixed, ToHex};
+
+  let key = Fixed::new([0u8; 32]);
+  let hex = key.to_hex();  // direct on wrapper — no .expose_secret() needed
   }
   ```
 
+  See [`ToHex`], [`ToBech32`], [`FromHexStr`], and sibling traits in the [API docs](https://docs.rs/secure-gate) for round-trip examples.
 
-  ### Serde (direct deserialization to inner types; serialization requires `SerializableSecret`)
+  ### Serde
 
-  ```rust
-  #[cfg(all(feature = "serde-deserialize", feature = "encoding-hex", feature = "rand"))]
-  {
-      use secure_gate::{fixed_alias, ExposeSecret, ToHex, FromHexStr};
-      use serde_json;
+  `serde-deserialize` decodes directly to the inner type from a binary sequence — no temporary string buffers or format confusion attacks. Serialization requires implementing the `SerializableSecret` marker trait on your inner type.
 
-      fixed_alias!(Aes256Key, 32);
-
-      // Generate a key and encode to hex
-      let original: Aes256Key = Aes256Key::from_random();
-      let hex = original.with_secret(|s: &[u8; 32]| s.to_hex());
-      // Deserialize: manual decode + direct binary deserialization
-      let bytes = hex.try_from_hex().unwrap();
-      let decoded: Aes256Key = serde_json::from_str(&format!("[{}]", bytes.iter().map(|b| b.to_string()).collect::<Vec<_>>().join(","))).unwrap();
-  }
-  ```
-
-  See [docs](https://docs.rs/secure-gate) for full API.
+  See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for the full example.
   
   ## License
   

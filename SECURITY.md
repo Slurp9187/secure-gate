@@ -70,19 +70,14 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 ## Module-by-Module Security Notes
 
-### Wrappers (`dynamic.rs`, `fixed.rs`)
+> Security invariants (no `Deref`/`AsRef`, `Debug` prints `[REDACTED]`, zeroize on drop, opt-in clone/serialize) are documented in full on the [`Fixed`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html) and [`Dynamic`](https://docs.rs/secure-gate/latest/secure_gate/struct.Dynamic.html) rustdoc. This section focuses on weaknesses and mitigations not visible from the API surface.
 
-**Strengths**
-- Private `inner` field prevents direct access
-- Dual exposure model: scoped closures (leak-resistant) + direct refs (auditable)
-- Full-capacity zeroization (`zeroize`)
-- Redacted `Debug` output
-- Zero-cost: Performance indistinguishable from raw arrays; for detailed benchmarks, see [ZERO_COST_WRAPPERS.md](ZERO_COST_WRAPPERS.md)
+### Wrappers (`dynamic.rs`, `fixed.rs`)
 
 **Potential weaknesses**
 - Long-lived `expose_secret()` references can defeat scoping
 - Macro-generated aliases lack runtime size checks
-- Certain error variants may indirectly leak length information (e.g. wrong decoded length)
+- Certain error variants may indirectly leak length information (e.g. wrong decoded length).
   In most real-world usage (logging, API responses), length is already public metadata anyway (e.g. key length in JWT headers, signature length). Still, contextualize or redact errors when possible.
 
 **Mitigations**
@@ -90,38 +85,30 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Audit all `expose_secret()` calls
 - Contextualize errors to avoid side-channel information
 
-### Traits (`traits/`)
+Zero-cost claim: performance indistinguishable from raw arrays; for detailed benchmarks, see [ZERO_COST_WRAPPERS.md](ZERO_COST_WRAPPERS.md).
 
-**Strengths**
-- Marker traits (`CloneableSecret`, `SerializableSecret`) force deliberate opt-in
-- `ConstantTimeEq` and `ConstantTimeEqExt` provide safe equality alternatives
+### Traits (`traits/`)
 
 **Potential weaknesses**
 - Generic impls assume caller trustworthiness
 
 **Mitigations**
-- Audit custom marker impls
+- Audit every `CloneableSecret` / `SerializableSecret` impl — each is a deliberate security decision
 - Validate inputs before trait usage
 
 ### Encoding/Decoding (Traits & Errors)
 
-**Strengths**
-- Symmetric per-format traits: encoding (e.g., `ToHex`, `ToBech32`) and decoding (e.g., `FromHexStr`, `FromBech32Str`)
-- Explicit, fallible methods; typed errors prevent silent failures
-- Bech32/BIP-173 & Bech32m/BIP-350 HRP validation prevents injection attacks
-- Strict format adherence: invalid strings rejected; only valid decodings accepted
-
 **Potential weaknesses**
 - Decoding is inherently fallible; untrusted input may cause errors or temporary allocations
 - Length/format hints in errors (e.g., invalid HRP)
-- Bech32 edge cases: Strict validation covers most, but test empty/invalid HRP/data to confirm no panics/leaks
+- Bech32 edge cases: strict validation covers most, but test empty/invalid HRP/data to confirm no panics/leaks
 
 **Mitigations**
 - Treat all decoding input as untrusted; validate upstream
 - Use specific traits (e.g., `FromBech32Str`) for strict format enforcement
 - Fuzz parsers; sanitize inputs before decoding
 - Decoding errors may include format hints — treat as potential metadata leaks in sensitive contexts; redact logs or use custom error display in production
-- Opt-in markers (`Cloneable`/`Serializable`): Rely on correct user implementations; audit custom impls to preserve zeroization
+- Audit custom `Cloneable`/`Serializable` impls to preserve zeroization
 
 ## Best Practices
 
