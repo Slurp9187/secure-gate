@@ -6,24 +6,30 @@
 //! Requires the `encoding-bech32m` feature.
 //!
 //! # Security Notes
-//! - **BIP-350 variant**: Enhanced checksum for better error detection.
-//! - **Full secret exposure**: Use only after explicit `.expose_secret()`.
-//! - **HRP validation**: `try_to_bech32m` allows optional expected-HRP check.
-//! - **Scoped access enforced**: No implicit exposure paths.
+//!
+//! - **BIP-350 variant**: Enhanced checksum vs. BIP-173 Bech32 — use Bech32m
+//!   for Taproot, SegWit v1+, and modern address formats.
+//! - **Full secret exposure**: The resulting string contains the **entire** secret.
+//!   Always treat output as sensitive.
+//! - **HRP validation prevents injection attacks**: use `try_to_bech32m` with an
+//!   expected HRP to enforce protocol separation; test empty and invalid HRP inputs.
+//! - **Payload size capped at 90 bytes**: standard Bech32m checksum `CODE_LENGTH`
+//!   limit. For larger secrets use [`ToBech32`](crate::ToBech32) with `Bech32Large`.
+//! - **Treat all input as untrusted**: validate data upstream before wrapping.
 //!
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "encoding-bech32m")]
 //! use secure_gate::{Fixed, ToBech32m, ExposeSecret};
 //!
-//! # #[cfg(feature = "encoding-bech32m")]
-//! {
-//! let secret = Fixed::new([0u8]);
-//! let bech32m = secret.with_secret(|s| s.to_bech32m("A"));
-//! assert!(bech32m.starts_with("a1"));
-//! // bech32m is a BIP-350 encoded string starting with "a1" (prefix "A" + separator)
-//! # }
+//! let secret = Fixed::new([0x00u8, 0x01]);
+//!
+//! // Blanket impl on the inner byte array (via with_secret):
+//! let encoded = secret.with_secret(|s| s.to_bech32m("key"));
+//! assert!(encoded.starts_with("key1"));
+//!
+//! // Wrapper method (Direct Fixed<[u8; N]> API — same result):
+//! assert!(secret.to_bech32m("key").starts_with("key1"));
 //! ```
 #[cfg(feature = "encoding-bech32m")]
 use bech32::{encode_lower, Bech32m, Hrp};
@@ -31,17 +37,54 @@ use bech32::{encode_lower, Bech32m, Hrp};
 #[cfg(feature = "encoding-bech32m")]
 use crate::error::Bech32Error;
 
-/// Extension trait for encoding byte data to Bech32m strings with a specified HRP.
+/// Extension trait for encoding byte data as Bech32m (BIP-350) strings.
 ///
-/// Requires `encoding-bech32m` feature.
+/// *Requires feature `encoding-bech32m`.*
 ///
-/// All methods require explicit `.expose_secret()` access first.
+/// Blanket-implemented for all `AsRef<[u8]>` types. Prefer [`try_to_bech32m`](Self::try_to_bech32m)
+/// over the infallible [`to_bech32m`](Self::to_bech32m) — it validates the HRP and
+/// prevents cross-protocol confusion attacks. HRP validation prevents injection attacks;
+/// test empty and invalid HRP inputs in security-critical code.
 #[cfg(feature = "encoding-bech32m")]
 pub trait ToBech32m {
-    /// Encode bytes as Bech32m with the specified HRP (infallible version).
+    /// Encodes bytes as a Bech32m (BIP-350) string with the given HRP.
+    ///
+    /// Panics if `hrp` is invalid or the data exceeds the standard ~90-byte limit.
+    /// Prefer [`try_to_bech32m`](Self::try_to_bech32m) for any untrusted HRP.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::ToBech32m;
+    ///
+    /// let encoded = b"hello".to_bech32m("key");
+    /// assert!(encoded.starts_with("key1"));
+    /// ```
     fn to_bech32m(&self, hrp: &str) -> alloc::string::String;
 
-    /// Fallibly encode bytes as Bech32m with the specified HRP and optional expected-HRP validation.
+    /// Fallibly encodes bytes as a Bech32m (BIP-350) string with optional HRP validation.
+    ///
+    /// Pass `expected_hrp: Some("hrp")` to enforce that the encoded HRP matches;
+    /// useful for round-trip validation and preventing cross-protocol confusion.
+    ///
+    /// # Errors
+    ///
+    /// - [`Bech32Error::InvalidHrp`] — `hrp` contains invalid characters.
+    /// - [`Bech32Error::UnexpectedHrp`] — `expected_hrp` is `Some` and does not match `hrp`.
+    /// - [`Bech32Error::OperationFailed`] — encoding failure (e.g., data too large).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::ToBech32m;
+    ///
+    /// let encoded = b"hello".try_to_bech32m("key", None)?;
+    /// assert!(encoded.starts_with("key1"));
+    ///
+    /// // HRP validation
+    /// assert!(b"hello".try_to_bech32m("key", Some("key")).is_ok());
+    /// # Ok::<(), secure_gate::Bech32Error>(())
+    /// ```
     fn try_to_bech32m(
         &self,
         hrp: &str,

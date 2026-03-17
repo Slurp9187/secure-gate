@@ -1,4 +1,13 @@
-// secure-gate/src/traits/encoding/mod.rs
+//! Re-exports for all encoding traits.
+//!
+//! Each encoding trait has its own feature gate:
+//!
+//! | Trait            | Feature             |
+//! |------------------|---------------------|
+//! | [`ToHex`]        | `encoding-hex`      |
+//! | [`ToBase64Url`]  | `encoding-base64`   |
+//! | [`ToBech32`]     | `encoding-bech32`   |
+//! | [`ToBech32m`]    | `encoding-bech32m`  |
 pub mod base64_url;
 pub mod bech32;
 #[cfg(feature = "encoding-bech32m")]

@@ -7,39 +7,48 @@
 //! Requires the `encoding-hex` feature.
 //!
 //! # Security Notes
-//! - **Full secret exposure**: The resulting string contains the **entire** secret.
-//!   Use only after explicit `.expose_secret()`.
-//! - **Redacted helper**: `to_hex_left` is provided for safe partial display in logs.
-//! - **Scoped access enforced**: No implicit exposure paths exist.
 //!
-/// # Example
-///
-/// ```rust
-/// # #[cfg(feature = "encoding-hex")]
-/// use secure_gate::{Fixed, ToHex, ExposeSecret};
-///
-/// # #[cfg(feature = "encoding-hex")]
-/// {
-/// let secret = Fixed::new([0x0au8, 0x0bu8, 0x0cu8, 0x0du8]);
-/// let hex = secret.with_secret(|s| s.to_hex());
-/// assert_eq!(hex, "0a0b0c0d");
-///
-/// let hex_upper = secret.with_secret(|s| s.to_hex_upper());
-/// assert_eq!(hex_upper, "0A0B0C0D");
-///
-/// // Redacted for logs
-/// let redacted = secret.with_secret(|s| s.to_hex_left(2));
-/// assert_eq!(redacted, "0a0b…");
-/// # }
-/// ```
+//! - **Full secret exposure**: The resulting string contains the **entire** secret.
+//!   Always treat output as sensitive; do not log or persist without protection.
+//! - **Redacted helper**: `to_hex_left` truncates to the first `n` bytes with `…` —
+//!   use this for safe partial display in logs and audit trails.
+//! - **Treat all input as untrusted**: validate hex strings upstream before wrapping
+//!   in secrets.
+//!
+//! # Example
+//!
+//! ```rust
+//! # #[cfg(feature = "encoding-hex")]
+//! use secure_gate::{Fixed, ToHex, ExposeSecret};
+//! # #[cfg(feature = "encoding-hex")]
+//! {
+//! let secret = Fixed::new([0x0au8, 0x0bu8, 0x0cu8, 0x0du8]);
+//!
+//! // Blanket impl on the inner byte array (via with_secret):
+//! let hex = secret.with_secret(|s| s.to_hex());
+//! assert_eq!(hex, "0a0b0c0d");
+//!
+//! let hex_upper = secret.with_secret(|s| s.to_hex_upper());
+//! assert_eq!(hex_upper, "0A0B0C0D");
+//!
+//! // Redacted for logs — exposes only first 2 bytes
+//! let redacted = secret.with_secret(|s| s.to_hex_left(2));
+//! assert_eq!(redacted, "0a0b…");
+//!
+//! // Wrapper method (Direct Fixed<[u8; N]> API — same result):
+//! assert_eq!(secret.to_hex(), "0a0b0c0d");
+//! }
+//! ```
 #[cfg(feature = "encoding-hex")]
 use ::hex as hex_crate;
 
-/// Extension trait for encoding byte data to hexadecimal strings.
+/// Extension trait for encoding byte data as hexadecimal strings.
 ///
-/// Requires `encoding-hex` feature.
+/// *Requires feature `encoding-hex`.*
 ///
-/// All methods require explicit `.expose_secret()` access first.
+/// Blanket-implemented for all `AsRef<[u8]>` types (byte slices, arrays, `Vec<u8>`).
+/// To encode a secret wrapper, access the inner bytes via `with_secret` first, or
+/// call the wrapper's inherent `to_hex()` method if available.
 #[cfg(feature = "encoding-hex")]
 pub trait ToHex {
     /// Encode bytes as lowercase hexadecimal.
