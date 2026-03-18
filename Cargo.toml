@@ -9,22 +9,11 @@ documentation = "https://docs.rs/secure-gate"
 keywords = ["crypto", "no-std", "security", "zeroize"]
 categories = ["cryptography", "no-std", "data-structures"]
 include = [
-    ## Source files
-    "src/**",
-
-    ## Test files
-    "benches/*.rs",
-    "tests/**",
-
-    ## Core docs
+    "src/**/*.rs",
     "CHANGELOG.md",
     "LICENSE*",
     "README.md",
     "SECURITY.md",
-
-    ## Supplemental docs
-    "CT_EQ_AUTO.md",
-    "ZERO_COST_WRAPPERS.md",
 ]
 
 [dependencies]
