@@ -9,8 +9,12 @@
 //! Upstream `alloc.rs` checks a specific size unconditionally because their test binary is
 //! minimal. Here we additionally gate on an `AtomicBool` + `AtomicUsize` pair to avoid false
 //! positives from the test harness, which may allocate objects of the same size for internal
-//! bookkeeping. A `Mutex` serializes tests so that `TARGET_SIZE` is stable for the duration
-//! of each test (cargo test runs tests in parallel by default).
+//! bookkeeping.
+//!
+//! IMPORTANT: this file intentionally uses one aggregate `#[test]` (`all_heap_zeroed`) that runs
+//! all size checks sequentially. Avoid splitting this into multiple `#[test]` functions:
+//! `ProxyAllocator` is global process state and parallel tests can interleave allocator activity,
+//! causing false positives in CI.
 
 #![cfg(all(feature = "alloc", not(miri)))]
 #![allow(clippy::undocumented_unsafe_blocks)]
@@ -18,25 +22,17 @@
 use secure_gate::{Dynamic, ExposeSecretMut};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Mutex;
 
 // ---------------------------------------------------------------------------
-// Assertion gate — active only while a test holds the lock
+// Assertion gate — active only while one check is running
 // ---------------------------------------------------------------------------
 
 /// Set to `true` only while the active test's closure is executing.
 static CHECKING: AtomicBool = AtomicBool::new(false);
 
 /// The exact byte count of the heap allocation currently under scrutiny.
-/// Protected by `LOCK` — only written while the mutex is held, before `CHECKING` is set.
+/// Written before `CHECKING` is enabled.
 static TARGET_SIZE: AtomicUsize = AtomicUsize::new(0);
-
-/// Serializes tests so that `TARGET_SIZE` + `CHECKING` form a coherent pair.
-///
-/// `cargo test` runs tests in the same binary in parallel across multiple threads.
-/// Without this lock, two tests could race on `TARGET_SIZE`, causing the ProxyAllocator
-/// to check the wrong size (false positive) or silently skip the check (false negative).
-static LOCK: Mutex<()> = Mutex::new(());
 
 // ---------------------------------------------------------------------------
 // ProxyAllocator — adapted from upstream zeroize/tests/alloc.rs
@@ -71,11 +67,8 @@ static PROXY: ProxyAllocator = ProxyAllocator;
 
 /// Runs `f` under the ProxyAllocator gate for allocations of exactly `size` bytes.
 ///
-/// Acquires `LOCK` to prevent concurrent tests from racing on `TARGET_SIZE`.
-/// Sets `TARGET_SIZE = size` and `CHECKING = true` before invoking `f`, then
-/// clears `CHECKING` after `f` returns (i.e. after the secret has dropped).
+/// This helper assumes checks are executed sequentially by a single aggregate test function.
 fn with_proxy_check<F: FnOnce()>(size: usize, f: F) {
-    let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     TARGET_SIZE.store(size, Ordering::SeqCst);
     CHECKING.store(true, Ordering::SeqCst);
     f();
@@ -91,24 +84,12 @@ fn with_proxy_check<F: FnOnce()>(size: usize, f: F) {
 // bytes are 0 before forwarding the deallocation to the system allocator.
 // ---------------------------------------------------------------------------
 
-/// Generates a test that verifies `Dynamic<[u8; N]>` zeroes its `N`-byte heap
-/// allocation before the backing memory is freed.
-macro_rules! heap_array_zeroed_test {
-    ($name:ident, $n:expr) => {
-        #[test]
-        fn $name() {
-            with_proxy_check($n, || {
-                let secret: Dynamic<[u8; $n]> = Dynamic::new([0xAAu8; $n]);
-                core::hint::black_box(&secret);
-            }); // secret drops here → Dynamic::drop → zeroize → ProxyAllocator checks N bytes ✓
-        }
-    };
+fn check_array_zeroed<const N: usize>() {
+    with_proxy_check(N, || {
+        let secret: Dynamic<[u8; N]> = Dynamic::new([0xAAu8; N]);
+        core::hint::black_box(&secret);
+    }); // secret drops here → Dynamic::drop → zeroize → ProxyAllocator checks N bytes ✓
 }
-
-heap_array_zeroed_test!(dynamic_heap_zeroed_before_dealloc_16, 16);
-heap_array_zeroed_test!(dynamic_heap_zeroed_before_dealloc_32, 32);
-heap_array_zeroed_test!(dynamic_heap_zeroed_before_dealloc_64, 64);
-heap_array_zeroed_test!(dynamic_heap_zeroed_before_dealloc_128, 128);
 
 // ---------------------------------------------------------------------------
 // Dynamic<Vec<u8>> — backing-buffer zeroization tests
@@ -127,27 +108,35 @@ heap_array_zeroed_test!(dynamic_heap_zeroed_before_dealloc_128, 128);
 // is freed but its fields are not expected to be zeroed).
 // ---------------------------------------------------------------------------
 
-/// Generates a test that verifies the `N`-byte backing buffer of a `Dynamic<Vec<u8>>`
-/// is fully zeroed before it is freed by the allocator.
-macro_rules! heap_vec_zeroed_test {
-    ($name:ident, $n:expr) => {
-        #[test]
-        fn $name() {
-            with_proxy_check($n, || {
-                let mut secret: Dynamic<Vec<u8>> = Dynamic::new(Vec::with_capacity($n));
-                secret.with_secret_mut(|v| {
-                    // Fill exactly N bytes so len == cap == N after shrink_to_fit.
-                    v.extend(core::iter::repeat(0xBBu8).take($n));
-                    // shrink_to_fit ensures the allocator sees exactly N bytes on dealloc.
-                    v.shrink_to_fit();
-                });
-                core::hint::black_box(&secret);
-            }); // drop → Vec::zeroize (backing buf zeroed) → backing buf dealloc ← ProxyAllocator checks ✓
-        }
-    };
+fn check_vec_zeroed(size: usize) {
+    with_proxy_check(size, || {
+        let mut secret: Dynamic<Vec<u8>> = Dynamic::new(Vec::with_capacity(size));
+        secret.with_secret_mut(|v| {
+            // Fill exactly N bytes so len == cap == N after shrink_to_fit.
+            v.extend(std::iter::repeat_n(0xBBu8, size));
+            // shrink_to_fit ensures the allocator sees exactly N bytes on dealloc.
+            v.shrink_to_fit();
+        });
+        core::hint::black_box(&secret);
+    }); // drop → Vec::zeroize (backing buf zeroed) → backing buf dealloc ← ProxyAllocator checks ✓
 }
 
-heap_vec_zeroed_test!(dynamic_vec_heap_zeroed_16, 16);
-heap_vec_zeroed_test!(dynamic_vec_heap_zeroed_32, 32);
-heap_vec_zeroed_test!(dynamic_vec_heap_zeroed_64, 64);
-heap_vec_zeroed_test!(dynamic_vec_heap_zeroed_128, 128);
+/// Verifies both `Dynamic<[u8; N]>` and `Dynamic<Vec<u8>>` zeroize heap memory
+/// before deallocation across all supported sizes.
+///
+/// This stays as one aggregate test by design to avoid parallel test interleaving
+/// with the global ProxyAllocator state.
+#[test]
+fn all_heap_zeroed() {
+    // Dynamic<[u8; N]> — boxed arrays
+    check_array_zeroed::<16>();
+    check_array_zeroed::<32>();
+    check_array_zeroed::<64>();
+    check_array_zeroed::<128>();
+
+    // Dynamic<Vec<u8>> — backing buffers
+    check_vec_zeroed(16);
+    check_vec_zeroed(32);
+    check_vec_zeroed(64);
+    check_vec_zeroed(128);
+}
