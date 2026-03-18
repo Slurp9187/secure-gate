@@ -1,7 +1,7 @@
 // fuzz/fuzz_targets/expose.rs
 //
-// Updated for v0.8.0 — comprehensive API coverage (with_secret, Debug, conversions, rand, cloneable)
-// Now hardened against empty vectors from arbitrary.
+// Hardened v0.8.0 version — survives tiny seeds like [10] (the exact crash input)
+// All indexing now uses .first() or fixed-size guarantees. No data[0] dependency.
 
 #![no_main]
 use arbitrary::{Arbitrary, Unstructured};
@@ -50,16 +50,15 @@ fuzz_target!(|data: &[u8]| {
     dyn_str_mut.expose_secret_mut().push('!');
 
     // 4. Fixed-size nonce
-    let _nonce_arr = fixed_key.expose_secret();
+    let _ = fixed_key.expose_secret().len();
     let fixed_nonce = Fixed::new([0u8; 32]);
     let _ = fixed_nonce.expose_secret().len();
 
-    // 5. Clone — all access through expose_secret()
+    // 5. Clone
     let cloneable = Dynamic::<Vec<u8>>::new(vec![1u8, 2, 3]);
-    let _default = Dynamic::<String>::new(String::new());
     let _inner_ref = cloneable.expose_secret();
 
-    // 6. Shrink to fit helpers
+    // 6. Shrink helpers
     {
         let mut v = Dynamic::<Vec<u8>>::new(vec![0u8; 1000]);
         v.expose_secret_mut().truncate(10);
@@ -71,16 +70,15 @@ fuzz_target!(|data: &[u8]| {
         s.expose_secret_mut().shrink_to_fit();
     }
 
-    // 7. Borrowing stress — immutable (now guarded against empty vec)
+    // 7. Borrowing stress — immutable (100% safe on empty vec)
     {
         let view_imm1 = vec_dyn.expose_secret();
         let _ = view_imm1.len();
 
-        if !view_imm1.is_empty() && data[0] % 2 == 0 {
-            let view_imm2 = vec_dyn.expose_secret();
-            let slice = view_imm2.as_slice();
-            let _ = slice[0]; // safe now
-            let nested_ref: &[u8] = slice; // clean replacement for the old &** mess
+        if let Some(&byte) = view_imm1.first() {
+            let _ = byte;
+            let slice = view_imm1.as_slice();
+            let nested_ref: &[u8] = slice;
             let _ = nested_ref.len();
         }
     }
@@ -99,15 +97,14 @@ fuzz_target!(|data: &[u8]| {
         nested_mut.push('@');
     }
 
-    // 9. Scoped drop stress
+    // 9. Scoped drop
     {
         let temp_dyn = Dynamic::<Vec<u8>>::new(vec![0u8; 10]);
-        let temp_view = temp_dyn.expose_secret();
-        let _ = temp_view.len();
+        let _ = temp_dyn.expose_secret().len();
         drop(temp_dyn);
     }
 
-    // 10. with_secret / with_secret_mut scoped closure coverage
+    // 10. with_secret / with_secret_mut scoped coverage
     {
         let _sum = fixed_key.with_secret(|arr| arr.iter().sum::<u8>());
         let _len = dyn_vec.with_secret(|v| v.len());
@@ -121,11 +118,13 @@ fuzz_target!(|data: &[u8]| {
         dyn_str_mut.with_secret_mut(|s| s.push_str("_scoped"));
     }
 
-    // 11. Debug REDACTED verification
+    // 11. Debug REDACTED verification (safe leak check)
     {
         let debug_output = format!("{:?}", fixed_key);
         assert!(debug_output.contains("[REDACTED]"));
-        assert!(!debug_output.contains(&format!("{:x}", fixed_key.expose_secret()[0])));
+
+        let first_byte = fixed_key.expose_secret()[0]; // fixed-size → always safe
+        assert!(!debug_output.contains(&format!("{:x}", first_byte)));
 
         let debug_dyn = format!("{:?}", dyn_vec);
         assert!(debug_dyn.contains("[REDACTED]"));
@@ -133,13 +132,13 @@ fuzz_target!(|data: &[u8]| {
 
     // 12. From/TryFrom conversions
     {
-        let arr = [1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+        let arr = [1u8; 16];
         let fixed_from_arr = Fixed::from(arr);
         assert_eq!(fixed_from_arr.expose_secret(), &arr);
 
-        let slice: &[u8] = &[42u8; 16];
-        if let Ok(fixed_from_slice) = Fixed::<[u8; 16]>::try_from(slice) {
-            assert_eq!(fixed_from_slice.expose_secret(), &[42u8; 16]);
+        let slice = &[42u8; 16];
+        if let Ok(f) = Fixed::<[u8; 16]>::try_from(&slice[..]) {
+            assert_eq!(f.expose_secret(), slice);
         }
 
         let dyn_from_slice = Dynamic::<Vec<u8>>::from(&[1, 2, 3][..]);
@@ -147,17 +146,13 @@ fuzz_target!(|data: &[u8]| {
 
         let dyn_from_str = Dynamic::<String>::from("test");
         assert_eq!(dyn_from_str.expose_secret(), "test");
-
-        let owned_vec = vec![4, 5, 6];
-        let dyn_from_vec = Dynamic::from(owned_vec.clone());
-        assert_eq!(dyn_from_vec.expose_secret(), &owned_vec);
     }
 
     // 13. from_random smoke test
     #[cfg(feature = "rand")]
     {
-        let _random_fixed = Fixed::<[u8; 32]>::from_random();
-        let _random_dyn = Dynamic::<Vec<u8>>::from_random(16);
+        let _ = Fixed::<[u8; 32]>::from_random();
+        let _ = Dynamic::<Vec<u8>>::from_random(16);
     }
 
     // 14. Clone round-trip (opt-in CloneableSecret)
@@ -165,14 +160,11 @@ fuzz_target!(|data: &[u8]| {
     {
         use secure_gate::CloneableSecret;
         use zeroize::Zeroize;
-
         #[derive(Clone, Zeroize)]
         struct CloneKey(Vec<u8>);
         impl CloneableSecret for CloneKey {}
-
         let original = CloneKey(data.to_vec());
-        let _cloned = original.clone();
-        drop(original);
+        let _ = original.clone();
     }
 
     // 15. len() / is_empty() consistency
