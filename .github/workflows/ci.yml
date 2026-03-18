@@ -31,21 +31,25 @@ jobs:
             features: "--no-default-features --features=no-alloc"
 
           # ── Rand ──────────────────────────────────────────────────────────────
-          - name: rand (Fixed only)
+          # rand depends on rand/alloc + once_cell/alloc, so alloc is always
+          # enabled when rand is enabled.
+          - name: rand (includes alloc)
             features: "--no-default-features --features=rand"
 
           - name: alloc + rand
             features: "--no-default-features --features=alloc,rand"
 
           # ── Constant-time equality ────────────────────────────────────────────
-          - name: ct-eq only
-            features: "--no-default-features --features=ct-eq"
+          # alloc is required so Dynamic-backed tests in ct_eq_suite and
+          # proptest_suite/ct_eq.rs (gated on ct-eq + alloc) are exercised.
+          - name: ct-eq + alloc
+            features: "--no-default-features --features=ct-eq,alloc"
 
-          - name: ct-eq-hash (BLAKE3 unkeyed)
-            features: "--no-default-features --features=ct-eq-hash"
+          - name: ct-eq-hash + alloc (BLAKE3 unkeyed)
+            features: "--no-default-features --features=ct-eq-hash,alloc"
 
-          - name: ct-eq-hash + rand (BLAKE3 keyed)
-            features: "--no-default-features --features=ct-eq-hash,rand"
+          - name: ct-eq-hash + alloc + rand (BLAKE3 keyed)
+            features: "--no-default-features --features=ct-eq-hash,alloc,rand"
 
           # ── Encoding ──────────────────────────────────────────────────────────
           - name: encoding (all formats)
@@ -53,6 +57,18 @@ jobs:
 
           - name: encoding-hex only
             features: "--no-default-features --features=encoding-hex"
+
+          - name: encoding-base64 only
+            features: "--no-default-features --features=encoding-base64"
+
+          - name: encoding-bech32 only
+            features: "--no-default-features --features=encoding-bech32"
+
+          - name: encoding-bech32m only
+            features: "--no-default-features --features=encoding-bech32m"
+
+          - name: encoding-bech32 + bech32m
+            features: "--no-default-features --features=encoding-bech32,encoding-bech32m"
 
           # ── Serde ─────────────────────────────────────────────────────────────
           - name: serde (serialize + deserialize)
