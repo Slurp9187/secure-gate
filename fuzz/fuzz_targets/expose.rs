@@ -1,11 +1,14 @@
 // fuzz/fuzz_targets/expose.rs
-// Updated for v0.8.0 — comprehensive API coverage including with_secret, Debug, conversions
+//
+// Updated for v0.8.0 — comprehensive API coverage (with_secret, Debug, conversions, rand, cloneable)
+// Now hardened against empty vectors from arbitrary.
+
 #![no_main]
 use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
-use secure_gate::{Dynamic, Fixed, ExposeSecret, ExposeSecretMut};
-use secure_gate_fuzz::arbitrary::{FuzzDynamicString, FuzzDynamicVec, FuzzFixed32, FuzzFixed16};
+use secure_gate::{Dynamic, ExposeSecret, ExposeSecretMut, Fixed};
+use secure_gate_fuzz::arbitrary::{FuzzDynamicString, FuzzDynamicVec, FuzzFixed16, FuzzFixed32};
 
 fuzz_target!(|data: &[u8]| {
     if data.is_empty() {
@@ -49,17 +52,14 @@ fuzz_target!(|data: &[u8]| {
     // 4. Fixed-size nonce
     let _nonce_arr = fixed_key.expose_secret();
     let fixed_nonce = Fixed::new([0u8; 32]);
-    let _ = fixed_nonce.expose_secret().len(); // ← fixed
+    let _ = fixed_nonce.expose_secret().len();
 
     // 5. Clone — all access through expose_secret()
     let cloneable = Dynamic::<Vec<u8>>::new(vec![1u8, 2, 3]);
-
     let _default = Dynamic::<String>::new(String::new());
-
-    // All access must go through expose_secret() — security model enforced
     let _inner_ref = cloneable.expose_secret();
 
-    // 6. Shrink to fit helpers (using explicit exposure)
+    // 6. Shrink to fit helpers
     {
         let mut v = Dynamic::<Vec<u8>>::new(vec![0u8; 1000]);
         v.expose_secret_mut().truncate(10);
@@ -71,15 +71,16 @@ fuzz_target!(|data: &[u8]| {
         s.expose_secret_mut().shrink_to_fit();
     }
 
-    // 7. Borrowing stress — immutable
+    // 7. Borrowing stress — immutable (now guarded against empty vec)
     {
         let view_imm1 = vec_dyn.expose_secret();
         let _ = view_imm1.len();
 
-        if !data.is_empty() && data[0] % 2 == 0 {
+        if !view_imm1.is_empty() && data[0] % 2 == 0 {
             let view_imm2 = vec_dyn.expose_secret();
-            let _ = view_imm2.as_slice()[0];
-            let nested_ref: &[u8] = &**view_imm2;
+            let slice = view_imm2.as_slice();
+            let _ = slice[0]; // safe now
+            let nested_ref: &[u8] = slice; // clean replacement for the old &** mess
             let _ = nested_ref.len();
         }
     }
@@ -106,14 +107,12 @@ fuzz_target!(|data: &[u8]| {
         drop(temp_dyn);
     }
 
-    // 10. with_secret / with_secret_mut scoped closure coverage (recommended API)
+    // 10. with_secret / with_secret_mut scoped closure coverage
     {
-        // Test with_secret on all types (fixed_32 was moved into fixed_key, use that)
         let _sum = fixed_key.with_secret(|arr| arr.iter().sum::<u8>());
         let _len = dyn_vec.with_secret(|v| v.len());
         let _str_len = dyn_str.with_secret(|s| s.len());
 
-        // Test with_secret_mut on mutable operations
         vec_dyn.with_secret_mut(|v| {
             v.reverse();
             v.truncate(10);
@@ -122,37 +121,33 @@ fuzz_target!(|data: &[u8]| {
         dyn_str_mut.with_secret_mut(|s| s.push_str("_scoped"));
     }
 
-    // 11. Debug REDACTED verification (fixed_32 moved into fixed_key, use that)
+    // 11. Debug REDACTED verification
     {
         let debug_output = format!("{:?}", fixed_key);
-        assert!(debug_output.contains("[REDACTED]"), "Debug should contain REDACTED");
-        assert!(!debug_output.contains(&format!("{:x}", fixed_key.expose_secret()[0])), "Debug should not leak bytes");
+        assert!(debug_output.contains("[REDACTED]"));
+        assert!(!debug_output.contains(&format!("{:x}", fixed_key.expose_secret()[0])));
 
         let debug_dyn = format!("{:?}", dyn_vec);
-        assert!(debug_dyn.contains("[REDACTED]"), "Dynamic Debug should contain REDACTED");
+        assert!(debug_dyn.contains("[REDACTED]"));
     }
 
     // 12. From/TryFrom conversions
     {
-        // Fixed from [u8; N]
         let arr = [1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
         let fixed_from_arr = Fixed::from(arr);
         assert_eq!(fixed_from_arr.expose_secret(), &arr);
 
-        // Fixed try_from &[u8] (exact size succeeds)
         let slice: &[u8] = &[42u8; 16];
         if let Ok(fixed_from_slice) = Fixed::<[u8; 16]>::try_from(slice) {
             assert_eq!(fixed_from_slice.expose_secret(), &[42u8; 16]);
         }
 
-        // Dynamic from &[u8] and &str
         let dyn_from_slice = Dynamic::<Vec<u8>>::from(&[1, 2, 3][..]);
         assert_eq!(dyn_from_slice.expose_secret(), &[1, 2, 3]);
 
         let dyn_from_str = Dynamic::<String>::from("test");
         assert_eq!(dyn_from_str.expose_secret(), "test");
 
-        // Dynamic from owned types
         let owned_vec = vec![4, 5, 6];
         let dyn_from_vec = Dynamic::from(owned_vec.clone());
         assert_eq!(dyn_from_vec.expose_secret(), &owned_vec);
@@ -163,33 +158,27 @@ fuzz_target!(|data: &[u8]| {
     {
         let _random_fixed = Fixed::<[u8; 32]>::from_random();
         let _random_dyn = Dynamic::<Vec<u8>>::from_random(16);
-        // Just verify they don't panic, don't check randomness
     }
 
-    // 14. Clone round-trip — requires CloneableSecret marker on the inner type.
-    // CloneableSecret is an explicit opt-in that can't be impl'd for foreign types
-    // (Vec<u8>, [u8; N]) in this crate due to orphan rules. We test via a local type.
+    // 14. Clone round-trip (opt-in CloneableSecret)
     #[cfg(feature = "cloneable")]
     {
         use secure_gate::CloneableSecret;
         use zeroize::Zeroize;
 
-        // Local wrapper that opts into cloning
         #[derive(Clone, Zeroize)]
         struct CloneKey(Vec<u8>);
         impl CloneableSecret for CloneKey {}
 
-        // Verify the marker impl compiles and CloneKey is Clone
         let original = CloneKey(data.to_vec());
         let _cloned = original.clone();
         drop(original);
     }
 
-    // 15. len() / is_empty() consistency (use fixed_key since fixed_32 was moved)
+    // 15. len() / is_empty() consistency
     {
         assert_eq!(fixed_key.len(), 32);
         assert!(!fixed_key.is_empty());
-
         assert_eq!(fixed_16.len(), 16);
         assert!(!fixed_16.is_empty());
 
