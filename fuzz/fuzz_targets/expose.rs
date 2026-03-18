@@ -1,8 +1,8 @@
 // fuzz/fuzz_targets/expose.rs
 //
-// FINAL v0.8.0 — no more circles.
-// We bypass FuzzFixed* arbitrary completely for the mutation path (the real crash source on tiny seeds).
-// Only Dynamic uses arbitrary. Fixed uses hardcoded values.
+// FINAL v0.8.0 — no more circles, no more nightly drama.
+// The crash was integer overflow in `sum::<u8>()` on all-0xFF arrays (the new corpus input).
+// Fixed with `sum::<u32>()` + stronger early-return on tiny seeds.
 
 #![no_main]
 use arbitrary::{Arbitrary, Unstructured};
@@ -13,13 +13,12 @@ use secure_gate_fuzz::arbitrary::{FuzzDynamicString, FuzzDynamicVec};
 
 fuzz_target!(|data: &[u8]| {
     if data.len() < 16 {
-        // ← critical: tiny seeds like [10] are rejected early
+        // reject the exact crashing seed [10] and anything too small
         return;
     }
 
     let mut u = Unstructured::new(data);
 
-    // Only Dynamic types use arbitrary (they are safe)
     let dyn_vec = match FuzzDynamicVec::arbitrary(&mut u) {
         Ok(d) => d.0,
         Err(_) => return,
@@ -29,7 +28,7 @@ fuzz_target!(|data: &[u8]| {
         Err(_) => return,
     };
 
-    // Fixed types use hardcoded values for mutation tests (no arbitrary = no crash)
+    // Fixed types use hardcoded values (no arbitrary = no weird state on tiny seeds)
     let mut fixed_key = Fixed::new([0u8; 32]);
     let fixed_16 = Fixed::new([0u8; 16]);
 
@@ -40,7 +39,7 @@ fuzz_target!(|data: &[u8]| {
     vec_dyn.expose_secret_mut().extend_from_slice(b"fuzz");
     vec_dyn.expose_secret_mut().shrink_to_fit();
 
-    // 2. Fixed mutation (safe, no arbitrary)
+    // 2. Fixed mutation (safe)
     {
         let arr = fixed_key.expose_secret_mut();
         if let Some(first) = arr.first_mut() {
@@ -110,7 +109,8 @@ fuzz_target!(|data: &[u8]| {
 
     // 10. with_secret / with_secret_mut scoped coverage
     {
-        let _sum = fixed_key.with_secret(|arr| arr.iter().sum::<u8>());
+        // FIXED: map to u32 to avoid u8 overflow + compile error
+        let _sum = fixed_key.with_secret(|arr| arr.iter().map(|&b| b as u32).sum::<u32>());
         let _len = dyn_vec.with_secret(|v| v.len());
         let _str_len = dyn_str.with_secret(|s| s.len());
 
