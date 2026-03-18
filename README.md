@@ -5,7 +5,7 @@
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
-**0.8.0 — reboot release after critical zeroize bug fix. All prior versions yanked.**
+**0.8.0 — reboot release after critical zeroize bug fix. All prior versions yanked from crates.io.**
 
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
@@ -59,7 +59,7 @@ pw.expose_secret_mut().clear();
 // Encoding — operate on the exposed inner bytes
 #[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
 {
-    use secure_gate::{ToHex, ToBech32};
+    use secure_gate::{ToHex, ToBech32, FromHexStr};
     let hex    = key.with_secret(|b| b.to_hex());
     let bech32 = key.with_secret(|b| b.try_to_bech32("key", None).unwrap());  // BIP-173
     let _      = hex.try_from_hex().unwrap();  // decode back
@@ -92,23 +92,23 @@ secure-gate = { version = "0.8.0-rc.1", features = ["full"] }
 
 ## Features
 
-| Feature              | Description                                                                              |
-| -------------------- | ---------------------------------------------------------------------------------------- |
-| `alloc` _(default)_  | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity         |
-| `no-alloc`           | Disables heap (`Dynamic<T>` unavailable). Use for embedded / pure `no_std` builds       |
-| `rand`               | `from_random()` via `OsRng`; always enables `alloc` (transitively via `rand/alloc`)     |
-| `ct-eq`              | `ConstantTimeEq` — timing-safe direct byte comparison                                   |
-| `ct-eq-hash`         | `ConstantTimeEqExt` — BLAKE3-based probabilistic equality; fast for large secrets; enables `ct-eq` |
-| `encoding`           | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`     |
-| `encoding-hex`       | `ToHex` / `FromHexStr`                                                                   |
-| `encoding-base64`    | `ToBase64Url` / `FromBase64UrlStr`                                                       |
-| `encoding-bech32`    | `ToBech32` / `FromBech32Str` — BIP-173                                                   |
-| `encoding-bech32m`   | `ToBech32m` / `FromBech32mStr` — BIP-350                                                 |
-| `serde`              | Meta: `serde-deserialize` + `serde-serialize`                                            |
-| `serde-deserialize`  | Direct deserialization to inner types (binary-safe)                                      |
-| `serde-serialize`    | Serialize secrets (requires `SerializableSecret` marker on inner type)                   |
-| `cloneable`          | `CloneableSecret` opt-in cloning                                                         |
-| `full`               | All features combined                                                                    |
+| Feature             | Description                                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------------------- |
+| `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                    |
+| `no-alloc`          | Disables heap (`Dynamic<T>` unavailable). Use for embedded / pure `no_std` builds                  |
+| `rand`              | `from_random()` via `OsRng`; always enables `alloc` (transitively via `rand/alloc`)                |
+| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison                                              |
+| `ct-eq-hash`        | `ConstantTimeEqExt` — BLAKE3-based probabilistic equality; fast for large secrets; enables `ct-eq` |
+| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                |
+| `encoding-hex`      | `ToHex` / `FromHexStr`                                                                             |
+| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr`                                                                 |
+| `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                             |
+| `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                           |
+| `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                      |
+| `serde-deserialize` | Direct deserialization to inner types (binary-safe)                                                |
+| `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                             |
+| `cloneable`         | `CloneableSecret` opt-in cloning                                                                   |
+| `full`              | All features combined                                                                              |
 
 `no_std` + `alloc` compatible. Disabled features have zero overhead.
 
