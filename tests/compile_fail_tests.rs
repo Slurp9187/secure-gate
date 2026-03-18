@@ -5,6 +5,7 @@
 // are properly rejected at compile time for security reasons.
 
 #[test]
+#[cfg(not(miri))]
 fn fixed_alias_zero_size_compile_fail() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/fixed_alias_zero_size.rs");
