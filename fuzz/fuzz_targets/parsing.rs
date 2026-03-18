@@ -3,11 +3,12 @@
 // Fuzz target for all parsing/conversion paths — Dynamic<String>, Dynamic<Vec<u8>>,
 // Fixed<[u8;N]>, From/TryFrom conversions, UTF-8 boundary stress, len consistency.
 // Updated for v0.8.0: explicit exposure everywhere, no Deref.
+
 #![no_main]
 use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
-use secure_gate::{Dynamic, Fixed, ExposeSecret, ExposeSecretMut};
+use secure_gate::{Dynamic, ExposeSecret, ExposeSecretMut, Fixed};
 use secure_gate_fuzz::arbitrary::{FuzzDynamicString, FuzzDynamicVec};
 
 // 256 KB cap — large enough for allocation stress, small enough for CI
@@ -33,7 +34,7 @@ fuzz_target!(|data: &[u8]| {
         return;
     }
 
-    // 1. Dynamic<Vec<u8>> — raw arbitrary bytes (no UTF-8 required)
+    // 1. Dynamic<Vec<u8>> — raw arbitrary bytes
     {
         let dyn_bytes: Dynamic<Vec<u8>> = Dynamic::new(dyn_vec.expose_secret().clone());
         let _ = dyn_bytes.expose_secret().len();
@@ -59,7 +60,7 @@ fuzz_target!(|data: &[u8]| {
         assert_eq!(dyn_str.is_empty(), str_len == 0);
     }
 
-    // 3. UTF-8 path — clone the string, wrap, mutate
+    // 3. UTF-8 path — clone the string, wrap, mutate + repeated-string stress
     {
         let s = dyn_str.expose_secret().clone();
         let dyn_str_new = Dynamic::<String>::new(s.clone());
@@ -69,7 +70,6 @@ fuzz_target!(|data: &[u8]| {
         let _ = cloned.expose_secret().to_string();
         drop(cloned);
 
-        // Allocation stress on long strings (cap iterations to stay fast)
         for factor in 1..=5_usize {
             if s.len().saturating_mul(factor) > MAX_LEN {
                 break;
@@ -79,32 +79,27 @@ fuzz_target!(|data: &[u8]| {
         }
     }
 
-    // 4. UTF-8 boundary stress — try to interpret raw fuzz bytes as UTF-8
+    // 4. UTF-8 boundary stress (raw fuzz bytes)
     {
         if let Ok(s) = core::str::from_utf8(data) {
-            let dyn_from_str = Dynamic::<String>::new(s.to_string());
-            let _ = dyn_from_str.expose_secret().len();
+            let _ = Dynamic::<String>::new(s.to_string());
         }
-
-        // Attempt lossy UTF-8 by feeding bytes through String::from_utf8_lossy
         let lossy_str = String::from_utf8_lossy(data).into_owned();
-        let dyn_lossy = Dynamic::<String>::new(lossy_str);
-        let _ = dyn_lossy.len();
+        let _ = Dynamic::<String>::new(lossy_str);
     }
 
     // 5. From/TryFrom conversions for Fixed
     {
-        // Fixed<[u8; N]> from array
         let arr4 = [data[0], data[0].wrapping_add(1), 0x00, 0xFF];
         let fixed4 = Fixed::from(arr4);
         assert_eq!(fixed4.expose_secret(), &arr4);
 
-        // TryFrom<&[u8]> — exact size succeeds, wrong size fails
+        // TryFrom exact size
         if let Ok(fixed_from_slice) = Fixed::<[u8; 1]>::try_from(&data[..1]) {
             assert_eq!(fixed_from_slice.expose_secret(), &[data[0]]);
         }
 
-        // TryFrom with wrong size must return Err, not panic
+        // TryFrom wrong size MUST return Err (this was the crashing path)
         let too_short: &[u8] = &[];
         assert!(Fixed::<[u8; 4]>::try_from(too_short).is_err());
 
@@ -119,16 +114,13 @@ fuzz_target!(|data: &[u8]| {
 
     // 6. From/TryFrom conversions for Dynamic
     {
-        // Dynamic from &[u8]
         let dyn_from_slice = Dynamic::<Vec<u8>>::from(data);
         assert_eq!(dyn_from_slice.expose_secret(), data);
 
-        // Dynamic from &str
         let sample = "hello fuzzer";
         let dyn_from_str = Dynamic::<String>::from(sample);
         assert_eq!(dyn_from_str.expose_secret(), sample);
 
-        // Dynamic from owned Vec<u8>
         let owned = data.to_vec();
         let dyn_from_owned: Dynamic<Vec<u8>> = Dynamic::from(owned.clone());
         assert_eq!(dyn_from_owned.expose_secret(), &owned);
@@ -145,7 +137,7 @@ fuzz_target!(|data: &[u8]| {
         drop(dyn_str_mut);
     }
 
-    // 8. Allocation stress — repeated data (capped to MAX_LEN)
+    // 8. Allocation stress — repeated data
     {
         let repeated_data = dyn_vec.expose_secret().clone();
         if !repeated_data.is_empty() {
@@ -154,13 +146,12 @@ fuzz_target!(|data: &[u8]| {
                     break;
                 }
                 let repeated = repeated_data.repeat(factor);
-                let dyn_rep = Dynamic::<Vec<u8>>::new(repeated);
-                let _ = dyn_rep.expose_secret().len();
+                let _ = Dynamic::<Vec<u8>>::new(repeated);
             }
         }
     }
 
-    // 9. Edge cases: empty, single-byte, max-byte
+    // 9. Edge cases
     {
         let _ = Dynamic::<Vec<u8>>::new(vec![]);
         let _ = Dynamic::<Vec<u8>>::new(vec![0x00]);

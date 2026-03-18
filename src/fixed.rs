@@ -69,14 +69,12 @@ impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
     fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
         if slice.len() != N {
             #[cfg(debug_assertions)]
-            panic!(
-                "Fixed<{}> from_slice: expected exactly {} bytes, got {}",
-                N,
-                N,
-                slice.len()
-            );
+            return Err(crate::error::FromSliceError::InvalidLength {
+                actual: slice.len(),
+                expected: N,
+            });
             #[cfg(not(debug_assertions))]
-            return Err(crate::error::FromSliceError::LengthMismatch);
+            return Err(crate::error::FromSliceError::InvalidLength);
         }
         let mut arr = [0u8; N];
         arr.copy_from_slice(slice);
@@ -103,7 +101,6 @@ impl<const N: usize> Fixed<[u8; N]> {
     pub fn to_base64url(&self) -> alloc::string::String {
         self.with_secret(|s: &[u8; N]| s.to_base64url())
     }
-
 }
 
 /// Explicit access to immutable [`Fixed<[T; N]>`] contents.
@@ -288,8 +285,8 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
     where
         D: serde::Deserializer<'de>,
     {
-        use serde::de::Visitor;
         use core::fmt;
+        use serde::de::Visitor;
         struct FixedVisitor<const M: usize>;
         impl<'de, const M: usize> Visitor<'de> for FixedVisitor<M> {
             type Value = Fixed<[u8; M]>;

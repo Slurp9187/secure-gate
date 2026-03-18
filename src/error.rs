@@ -12,14 +12,18 @@ use thiserror::Error;
 
 /// Error returned when a byte slice cannot be converted to a fixed-size array.
 ///
-/// Always available. In **debug builds** the conversion panics with full context
-/// instead of returning this error (for development ergonomics). In **release
-/// builds** this variant is returned to prevent leaking expected-length metadata.
+/// In **debug builds** includes expected and actual lengths for development debugging.
+/// In **release builds** uses generic messages to prevent leaking expected-length metadata.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
 pub enum FromSliceError {
-    /// The slice length does not match the expected fixed size.
+    #[cfg(debug_assertions)]
+    /// Length mismatch in debug builds (detailed).
+    #[error("slice length mismatch: expected {expected}, got {actual}")]
+    InvalidLength { actual: usize, expected: usize },
+    #[cfg(not(debug_assertions))]
+    /// Length mismatch in release builds (generic).
     #[error("slice length mismatch")]
-    LengthMismatch,
+    InvalidLength,
 }
 
 /// Errors produced when decoding Bech32 (BIP-173) or Bech32m (BIP-350) strings.
