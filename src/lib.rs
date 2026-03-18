@@ -1,7 +1,7 @@
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
 
-//! secure-gate 0.8.0-alpha.1 — Secure secret wrappers with explicit access & automatic zeroization
+//! secure-gate — Secure secret wrappers with explicit access & automatic zeroization
 //!
 //! **Alpha release after yanking all prior versions due to a critical zeroize-on-drop bug.**
 //!

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0-rc.1] - 2026-03-17
+
+**Release candidate for 0.8.0**
+
+### Fixed
+
+- Updated trybuild snapshots to resolve CI mismatches for all feature configurations.
+
+### Changed
+
+- Version bump from 0.8.0-alpha.1 to 0.8.0-rc.1.
+
 ## [0.8.0-alpha.1] - 2026-03-16
 
 **Major breaking alpha release + critical security fix**

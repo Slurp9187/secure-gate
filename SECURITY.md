@@ -1,6 +1,6 @@
 # Security Considerations for secure-gate
 
-Last updated: 2026-03 (for v0.8.0-alpha.1)
+Last updated: 2026-03 (for v0.8.0-rc.1)
 
 ## TL;DR
 - **No independent audit** — review the source code yourself before production use.

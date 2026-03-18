@@ -5,7 +5,7 @@
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
-**0.8.0-alpha.1 — reboot release after critical zeroize bug fix. All prior versions yanked.**
+**0.8.0 — reboot release after critical zeroize bug fix. All prior versions yanked.**
 
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
@@ -72,19 +72,19 @@ pw.expose_secret_mut().clear();
 
 ```toml
 [dependencies]
-secure-gate = "0.8.0-alpha.1"
+secure-gate = "0.8.0-rc.1"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.8.0-alpha.1", default-features = false, features = ["no-alloc"] }
+secure-gate = { version = "0.8.0-rc.1", default-features = false, features = ["no-alloc"] }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.8.0-alpha.1", features = ["full"] }
+secure-gate = { version = "0.8.0-rc.1", features = ["full"] }
 ```
 
 > Enabling both `alloc` and `no-alloc` is a **compile error**. They are mutually exclusive.
