@@ -16,55 +16,70 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # ── Baseline ──────────────────────────────────────────────────────────
           - name: Default features
             features: ""
-          - name: Test secure with heap
-            features: "--no-default-features --features=secure"
-          - name: Test no-alloc
-            features: "--no-default-features --features=no-alloc"
-          - name: All features
-            features: "--features full"
-          - name: All features (--all-features)
-            features: "--all-features"
-          - name: No default features only
-            features: "--no-default-features"
-          - name: Secure + encoding
-            features: "--features encoding"
-          - name: Alloc only
-            features: "--no-default-features --features=alloc"
-          - name: Encoding only
-            features: "--no-default-features --features=encoding"
-          - name: ct-eq only
-            features: "--no-default-features --features ct-eq"
-          - name: ct-eq-hash deterministic
-            features: "--no-default-features --features ct-eq-hash"
-          - name: ct-eq-hash + rand
-            features: "--no-default-features --features ct-eq-hash,rand"
-          - name: Insecure only
-            features: "--no-default-features --features insecure"
-          - name: Insecure + cloneable
-            features: "--no-default-features --features insecure,cloneable"
-          - name: Insecure + encoding
-            features: "--no-default-features --features insecure,encoding"
-          - name: Insecure + serde
-            features: "--no-default-features --features insecure,serde"
-          - name: Insecure + rand
-            features: "--no-default-features --features insecure,rand"
-          - name: Insecure + ct-eq
-            features: "--no-default-features --features insecure,ct-eq"
-          - name: Insecure + ct-eq-hash
-            features: "--no-default-features --features insecure,ct-eq-hash"
-          - name: Insecure + ct-eq-hash + rand
-            features: "--no-default-features --features insecure,ct-eq-hash,rand"
+
           - name: No features
             features: "--no-default-features"
+
+          # ── Alloc / no-alloc ──────────────────────────────────────────────────
+          - name: alloc explicit
+            features: "--no-default-features --features=alloc"
+
+          - name: no-alloc explicit
+            features: "--no-default-features --features=no-alloc"
+
+          # ── Rand ──────────────────────────────────────────────────────────────
+          - name: rand (Fixed only)
+            features: "--no-default-features --features=rand"
+
+          - name: alloc + rand
+            features: "--no-default-features --features=alloc,rand"
+
+          # ── Constant-time equality ────────────────────────────────────────────
+          - name: ct-eq only
+            features: "--no-default-features --features=ct-eq"
+
+          - name: ct-eq-hash (BLAKE3 unkeyed)
+            features: "--no-default-features --features=ct-eq-hash"
+
+          - name: ct-eq-hash + rand (BLAKE3 keyed)
+            features: "--no-default-features --features=ct-eq-hash,rand"
+
+          # ── Encoding ──────────────────────────────────────────────────────────
+          - name: encoding (all formats)
+            features: "--no-default-features --features=encoding"
+
+          - name: encoding-hex only
+            features: "--no-default-features --features=encoding-hex"
+
+          # ── Serde ─────────────────────────────────────────────────────────────
+          - name: serde (serialize + deserialize)
+            features: "--no-default-features --features=serde"
+
+          - name: serde-serialize only
+            features: "--no-default-features --features=serde-serialize"
+
+          - name: serde-deserialize only
+            features: "--no-default-features --features=serde-deserialize"
+
+          # ── Cloneable ─────────────────────────────────────────────────────────
+          - name: alloc + cloneable
+            features: "--no-default-features --features=alloc,cloneable"
+
+          # ── Full ──────────────────────────────────────────────────────────────
+          - name: full
+            features: "--features=full"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
