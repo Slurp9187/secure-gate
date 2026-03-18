@@ -1,11 +1,11 @@
-// ==========================================================================
 // tests/core_tests.rs
-// ==========================================================================
-// Core integration tests — pure v0.6.0 API
+// Core API tests for Fixed<T> and Dynamic<T> — v0.8.0 style
 
 #[cfg(feature = "alloc")]
 use secure_gate::Dynamic;
 use secure_gate::{ExposeSecret, ExposeSecretMut, Fixed};
+#[cfg(feature = "cloneable")]
+use secure_gate::CloneableSecret;
 
 // === Basic Functionality ===
 
@@ -125,4 +125,43 @@ fn fixed_try_from_slice() {
     let _fail: Result<Fixed<[u8; 4]>, _> = short_slice.try_into();
     #[cfg(not(debug_assertions))]
     assert!(_fail.is_err());
+}
+
+// === CloneableSecret ===
+
+#[cfg(feature = "cloneable")]
+#[test]
+fn cloneable_secret_works() {
+    use zeroize::Zeroize;
+
+    #[derive(Clone, Zeroize, Debug)]
+    struct CloneKey(Vec<u8>);
+
+    impl CloneableSecret for CloneKey {}
+
+    let original = CloneKey(vec![1, 2, 3, 4]);
+    let cloned = original.clone();
+
+    assert_eq!(original.0, cloned.0);
+    // Verify zeroization on drop works
+    drop(original);
+}
+
+// === Random Generation (Fixed) ===
+
+#[cfg(feature = "rand")]
+#[test]
+fn fixed_from_random() {
+    let key1: Fixed<[u8; 32]> = Fixed::from_random();
+    let key2: Fixed<[u8; 32]> = Fixed::from_random();
+
+    key1.with_secret(|k1| {
+        key2.with_secret(|k2| {
+            // They should be different (statistically)
+            assert_ne!(k1, k2, "two random keys should differ");
+            // But both should be non-zero
+            assert!(!k1.iter().all(|&b| b == 0));
+            assert!(!k2.iter().all(|&b| b == 0));
+        });
+    });
 }

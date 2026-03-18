@@ -1,12 +1,11 @@
-//! Integration tests for `Fixed<T>` and `Dynamic<T>` zeroize behavior.
+//! tests/zeroize_tests.rs
+//! Zeroization behavior tests for Fixed<T> and Dynamic<T>.
 //!
-//! Adapted from upstream RustCrypto zeroize patterns:
-//! - `zeroize/tests/zeroize.rs` — `ZeroizedOnDrop`, `PanicOnNonZeroDrop`, `needs_drop`,
-//!   spare-capacity pattern
-//! - `zeroize/tests/zeroize_derive.rs` — `needs_drop` assertions
+//! This is the canonical test for v0.8.0's mandatory zeroize-on-drop guarantee.
+//! Adapted from upstream RustCrypto zeroize patterns. Uses spare-capacity and
+//! drop-order assertions to verify correctness.
 //!
-//! Run with `cargo test --release` so LLVM optimizations are applied; the zeroize crate
-//! uses `volatile_write` + `optimization_barrier` to resist dead-store elimination.
+//! Run with `cargo test --release` so LLVM optimizations are applied.
 
 #![allow(clippy::undocumented_unsafe_blocks)]
 
