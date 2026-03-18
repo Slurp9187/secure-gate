@@ -11,10 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Release candidate for 0.8.0**
 
-### Fixed
-
-- Updated trybuild snapshots to resolve CI mismatches for all feature configurations.
-
 ### Changed
 
 - Version bump from 0.8.0-alpha.1 to 0.8.0-rc.1.
@@ -82,6 +78,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   equality. Expanded `expose.rs`, `mut.rs`, `parsing.rs`, and `fuzz/src/arbitrary.rs`.
 
 ### Fixed
+
+- Updated trybuild snapshots to resolve CI mismatches for all feature configurations.
 
 - **`benches/ct_eq_auto.rs`**: Wrapped all inputs outside `iter` in `std::hint::black_box()` to prevent constant-folding (matches fix already applied in `fixed_vs_raw.rs`). Corrected four inverted benchmark names where `_force_ct_eq`/`_force_hash` labels contradicted the actual threshold path taken (`ct_eq_auto` selects `ct_eq` when `len ≤ threshold`, `ct_eq_hash` when `len > threshold`). Collapsed duplicate `criterion_main!` pair into a single `#[cfg(feature = "ct-eq-hash")]` call.
 
