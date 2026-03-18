@@ -79,7 +79,7 @@ secure-gate = "0.8.0-rc.1"
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.8.0-rc.1", default-features = false, features = ["no-alloc"] }
+secure-gate = { version = "0.8.0-rc.1", default-features = false }
 ```
 
 **Batteries-included**:
@@ -88,15 +88,12 @@ secure-gate = { version = "0.8.0-rc.1", default-features = false, features = ["n
 secure-gate = { version = "0.8.0-rc.1", features = ["full"] }
 ```
 
-> Enabling both `alloc` and `no-alloc` is a **compile error**. They are mutually exclusive.
-> `--all-features` (e.g. for docs or CI) also enables `full`, which bypasses the guard.
-
 ## Features
 
 | Feature             | Description                                                                                        |
 | ------------------- | -------------------------------------------------------------------------------------------------- |
 | `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                    |
-| `no-alloc`          | Disables heap (`Dynamic<T>` unavailable). Use for embedded / pure `no_std` builds                  |
+| `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.           |
 | `rand`              | `from_random()` via `OsRng`; always enables `alloc` (transitively via `rand/alloc`)                |
 | `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison                                              |
 | `ct-eq-hash`        | `ConstantTimeEqExt` — BLAKE3-based probabilistic equality; fast for large secrets; enables `ct-eq` |

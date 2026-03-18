@@ -33,15 +33,14 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
+# Default: give users the most useful experience out of the box
+default = ["alloc"]
+
 # Enables heap allocation (Dynamic<T>, Box, Vec, String) + full zeroization of spare capacity
 alloc = ["zeroize/alloc"]
 
-# Explicit opt-out: disables heap-dependent code (Dynamic<T>, Box, etc.)
-# Use for true no-heap / embedded / pure no_std builds (only Fixed<T> remains available)
-no-alloc = []
-
-# Default: give users the most useful experience out of the box
-default = ["alloc"]
+# Full std support (implies alloc)
+std = ["alloc"]
 
 # Rand: secure random generation
 rand = ["dep:rand", "dep:once_cell", "rand/alloc", "once_cell/alloc"]

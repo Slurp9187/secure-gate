@@ -11,9 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Release candidate for 0.8.0**
 
+### Added
+
+- `std` feature: opt-in full `std` support that implies `alloc`. Use `features = ["std"]` if you need `std`-specific integrations; `alloc` (the default) remains sufficient for all current functionality.
+
 ### Changed
 
 - Version bump from 0.8.0-alpha.1 to 0.8.0-rc.1.
+- **Breaking**: The `no-alloc` feature has been removed. To build without heap allocation (`Fixed<T>` only, embedded / pure `no_std`), use `default-features = false`. This matches the idiomatic Rust pattern used by `zeroize`, `serde`, `rand`, and others.
+- The `compile_error!` guard that prevented `alloc` and `no-alloc` from being enabled simultaneously has been removed along with `no-alloc`.
+
+### Migration
+
+```toml
+# Before (0.8.0-alpha.1)
+secure-gate = { version = "0.8", default-features = false, features = ["no-alloc"] }
+
+# After
+secure-gate = { version = "0.8", default-features = false }
+```
 
 ## [0.8.0-alpha.1] - 2026-03-16
 
@@ -122,15 +138,15 @@ The following changes were developed during the 0.7.0-rc period (preserved for h
 ### Added
 
 - **Polymorphic access traits**  
-`ExposeSecret` and `ExposeSecretMut` traits provide generic, zero-cost access with metadata (`len()`, `is_empty()`) without exposing contents. Implemented for both `Dynamic<T>` and `Fixed<T>`.
+  `ExposeSecret` and `ExposeSecretMut` traits provide generic, zero-cost access with metadata (`len()`, `is_empty()`) without exposing contents. Implemented for both `Dynamic<T>` and `Fixed<T>`.
 - **Timing-safe equality**  
-`ConstantTimeEq` trait (`ct-eq` feature) with `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
+  `ConstantTimeEq` trait (`ct-eq` feature) with `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
 - **Fast probabilistic equality for large secrets**  
-`ConstantTimeEqExt` trait (requires `ct-eq-hash` feature) extends `ConstantTimeEq` with methods for fast probabilistic equality using BLAKE3 hashing. Includes `ct_eq_hash()` for direct hash comparison and `ct_eq_auto()` for smart hybrid selection. Centralized threshold logic with default 32-byte crossover point.
+  `ConstantTimeEqExt` trait (requires `ct-eq-hash` feature) extends `ConstantTimeEq` with methods for fast probabilistic equality using BLAKE3 hashing. Includes `ct_eq_hash()` for direct hash comparison and `ct_eq_auto()` for smart hybrid selection. Centralized threshold logic with default 32-byte crossover point.
 - **Configurable decode priority in `try_decode_any`**  
-Added optional `priority: Option<&[Format]>` parameter for customizable decode order. Backward compatible with default (Bech32 → Hex → Base64url).
+  Added optional `priority: Option<&[Format]>` parameter for customizable decode order. Backward compatible with default (Bech32 → Hex → Base64url).
 - **Enhanced decoding errors with hints**  
-`DecodingError` variants include hints (e.g., attempted formats) in debug builds only.
+  `DecodingError` variants include hints (e.g., attempted formats) in debug builds only.
 - `alloc` and `no-alloc` features for explicit heap control.
 - `secure` includes `alloc` by default.
 - `std` feature depends on `alloc`.

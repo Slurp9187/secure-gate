@@ -50,8 +50,8 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 | Feature              | Security Impact                                                                 | Recommendation                              |
 |----------------------|----------------------------------------------------------------------------------|---------------------------------------------|
-| `alloc` *(default)*  | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Enabling both `alloc` and `no-alloc` is a **compile error**; they are mutually exclusive. | Enable unless on embedded/pure-stack target |
-| `no-alloc`           | Disables heap-dependent code (`Dynamic<T>`, heap zeroizing, encodings); reduces attack surface by excluding heap vulnerabilities. | Use for embedded / pure `no_std` builds     |
+| `alloc` *(default)*  | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Use `default-features = false` for no-heap builds. | Enable unless on embedded/pure-stack target |
+| `std`                | Full `std` support (implies `alloc`). Adds no additional security surface beyond `alloc`. | Optional; `alloc` is sufficient for most targets |
 | `ct-eq`              | Timing-safe direct byte comparison                                               | Strongly recommended; avoid `==`            |
 | `ct-eq-hash`         | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `ct_eq_auto` for most cases           |
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
@@ -109,7 +109,7 @@ Zero-cost claim: performance indistinguishable from raw arrays; for detailed ben
 
 ## Best Practices
 
-- The `alloc` feature is enabled by default and provides `Dynamic<T>` with full zeroization; use `no-alloc` only for embedded / pure-stack builds
+- The `alloc` feature is enabled by default and provides `Dynamic<T>` with full zeroization; use `default-features = false` for embedded / pure-stack builds (`Fixed<T>` only)
 - Prefer scoped `with_secret()` over long-lived `expose_secret()`
 - Use `ct_eq_auto(…, None)` for general-purpose equality checks; customize the threshold (e.g., `Some(64)`, `Some(1024)`) based on your benchmarks if the default 32 bytes isn't optimal. For detailed justification, see [CT_EQ_AUTO.md](CT_EQ_AUTO.md)
 - Audit every `CloneableSecret` / `SerializableSecret` impl
