@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [expose, mut, parsing]
+        target: [expose, mut, parsing, encoding, serde, ct_eq]
         mode: [normal, asan]
 
     env:
@@ -62,14 +62,14 @@ jobs:
       - name: Populate per-target corpus directories
         run: |
           mkdir -p fuzz/corpus
-          for t in expose mut parsing serde; do
+          for t in expose mut parsing encoding serde ct_eq; do
             mkdir -p "fuzz/corpus/$t"
             find fuzz/corpus-downloaded -type f -name "*$t*" -exec cp {} "fuzz/corpus/$t/" \; 2>/dev/null || true
           done
 
       - name: Seed minimal corpus (first-run safety net)
         run: |
-          for t in expose mut parsing serde; do
+          for t in expose mut parsing encoding serde ct_eq; do
             dir="fuzz/corpus/$t"
             if [ ! -d "$dir" ] || [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
               mkdir -p "$dir"
@@ -80,17 +80,26 @@ jobs:
             fi
           done
 
-          # Add JSON-specific seeds for serde target
+          # JSON-specific seeds for serde target
           dir="fuzz/corpus/serde"
           if [ -d "$dir" ]; then
-            printf '"deadbeef"' > "$dir/seed_json_hex"
-            printf '{}' > "$dir/seed_json_empty_object"
-            printf '[]' > "$dir/seed_json_empty_array"
-            printf '{"key":"value"}' > "$dir/seed_json_simple_object"
-            printf '[1,2,3]' > "$dir/seed_json_array"
-            printf 'null' > "$dir/seed_json_null"
-            printf 'invalid json' > "$dir/seed_json_invalid"
-            printf '{"huge_array":[' > "$dir/seed_json_huge_prefix"
+            printf '[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]' > "$dir/seed_fixed32"
+            printf '"hello world"' > "$dir/seed_string"
+            printf '[72,101,108,108,111]' > "$dir/seed_vec"
+            printf '{}' > "$dir/seed_empty_object"
+            printf '[]' > "$dir/seed_empty_array"
+            printf 'null' > "$dir/seed_null"
+            printf 'invalid json' > "$dir/seed_invalid"
+          fi
+
+          # Encoding-specific seeds
+          dir="fuzz/corpus/encoding"
+          if [ -d "$dir" ]; then
+            printf 'deadbeef' > "$dir/seed_hex"
+            printf 'DEADBEEF' > "$dir/seed_hex_upper"
+            printf 'QkJCQg' > "$dir/seed_base64"
+            printf 'test1abcdef' > "$dir/seed_bech32"
+            printf 'fuzz1vehk7cnpwgry9h76' > "$dir/seed_bech32_payload"
           fi
 
       - name: Fuzz – ${{ matrix.target }} (${{ matrix.mode }})
@@ -162,7 +171,7 @@ jobs:
       - name: Reconstruct corpus directories
         run: |
           mkdir -p fuzz/corpus
-          for t in expose mut parsing serde; do
+          for t in expose mut parsing encoding serde ct_eq; do
             mkdir -p "fuzz/corpus/$t"
             find fuzz/corpus-downloaded -type f -name "*$t*" -exec cp {} "fuzz/corpus/$t/" \; 2>/dev/null || true
           done
@@ -171,7 +180,7 @@ jobs:
         run: |
           mkdir -p coverage/html coverage/lcov
 
-          for target in expose mut parsing serde; do
+          for target in expose mut parsing encoding serde ct_eq; do
             echo "=== Generating coverage for $target ==="
             corpus="fuzz/corpus/$target"
             [ ! -d "$corpus" ] || [ -z "$(ls -A "$corpus")" ] && continue
