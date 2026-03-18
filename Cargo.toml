@@ -8,6 +8,24 @@ repository = "https://github.com/Slurp9187/secure-gate/tree/main"
 documentation = "https://docs.rs/secure-gate"
 keywords = ["crypto", "no-std", "security", "zeroize"]
 categories = ["cryptography", "no-std", "data-structures"]
+include = [
+    ## Source files
+    "src/**",
+
+    ## Test files
+    "benches/*.rs",
+    "tests/**",
+
+    ## Core docs
+    "CHANGELOG.md",
+    "LICENSE*",
+    "README.md",
+    "SECURITY.md",
+
+    ## Supplemental info docs
+    "CT_EQ_AUTO.md",
+    "ZERO_COST_WRAPPERS.md",
+]
 
 [dependencies]
 base64 = { version = "0.22", optional = true }
