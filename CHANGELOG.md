@@ -49,6 +49,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `AtomicBool` guard to confine the assertion to the test's lifetime, preventing false
   positives from unrelated test-harness allocations of the same size.
 
+- **Test suite reorganized** into domain-based directory suites (`ct_eq_suite/`,
+  `encoding_suite/`, `serde_suite/`, `macros_suite/`, `proptest_suite/`) compiled into a
+  single `integration` binary. Standalone binaries (`core_tests`, `error_tests`,
+  `no_alloc_tests`, `zeroize_tests`, `heap_zeroize`, `compile_fail_tests`) are each
+  auto-discovered by `cargo test --tests`. Replaced all old monolithic test files (`tests/codec/`,
+  `tests/ct_eq_auto.rs`, `tests/ct_eq_tests.rs`, `tests/proptest_tests.rs`, `tests/serde/`,
+  `tests/macros/`, `tests/insecure_tests.rs`).
+
+- **`tests/common.rs`**: shared helper module with `assert_redacted_debug` and
+  `ExposeSecret`/`ExposeSecretMut` re-exports available to all suite sub-modules.
+
+- **Bech32/Bech32m error-path test coverage** (`tests/encoding_suite/bech32.rs`): six new
+  tests trigger actual `Bech32Error` variants through encode/decode calls — invalid HRP
+  encoding, malformed string decoding, and decode-side HRP validation (happy path and
+  mismatch) for both `bech32` and `bech32m`.
+
+- **Fuzz targets**: new `fuzz/fuzz_targets/encoding.rs`, `serde.rs`, and `ct_eq.rs` covering
+  encoding round-trips for all four formats, serde serialize/deserialize, and constant-time
+  equality. Expanded `expose.rs`, `mut.rs`, `parsing.rs`, and `fuzz/src/arbitrary.rs`.
+
 ### Fixed
 
 - **`benches/ct_eq_auto.rs`**: Wrapped all inputs outside `iter` in `std::hint::black_box()` to prevent constant-folding (matches fix already applied in `fixed_vs_raw.rs`). Corrected four inverted benchmark names where `_force_ct_eq`/`_force_hash` labels contradicted the actual threshold path taken (`ct_eq_auto` selects `ct_eq` when `len ≤ threshold`, `ct_eq_hash` when `len > threshold`). Collapsed duplicate `criterion_main!` pair into a single `#[cfg(feature = "ct-eq-hash")]` call.
@@ -68,6 +88,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update code to satisfy `T: Zeroize` (most real secrets already do).
 - Replace any remaining optional-zeroize assumptions with mandatory behavior.
+
+### CI / Dev
+
+- CI matrix (`ci.yml`, `test_all.sh`) expanded: per-format encoding isolation configs added
+  (`encoding-base64`, `encoding-bech32`, `encoding-bech32m`, `encoding-bech32 + bech32m`);
+  `alloc` added to all `ct-eq`/`ct-eq-hash` entries so `Dynamic`-backed tests run; `rand`
+  label corrected to reflect it always enables `alloc` via its feature graph.
+- `fuzz-miri.yml`: `--skip` updated from stale `serde_core_without_marker_compile_fail` to
+  `serializable_secret_misuse` (test renamed in refactor); the old name was a silent no-op
+  that left the trybuild subprocess test unguarded under Miri.
+- `tests/compile_fail_tests.rs`: `serializable_secret_misuse` now gated on
+  `#[cfg(all(feature = "alloc", feature = "serde-serialize"))]`; previously triggered
+  irrelevant missing-feature diagnostics under `--no-default-features`.
 
 ## [0.7.0-rc.1 through 0.7.0-rc.15] - YANKED (2026-03-16)
 
