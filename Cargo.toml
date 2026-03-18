@@ -22,7 +22,7 @@ include = [
     "README.md",
     "SECURITY.md",
 
-    ## Supplemental info docs
+    ## Supplemental docs
     "CT_EQ_AUTO.md",
     "ZERO_COST_WRAPPERS.md",
 ]
