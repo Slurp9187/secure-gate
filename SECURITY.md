@@ -13,9 +13,6 @@ Last updated: 2026-03 (for v0.8.0-alpha.1)
 
 This document outlines the security model, design choices, strengths, known limitations, and review guidance for `secure-gate`.
 
-### No-Alloc Builds
-No-alloc builds (via `no-alloc` feature) reduce attack surface by excluding heap code (`Dynamic<T>`) and heap-related vulnerabilities.
-
 ## Audit Status
 
 `secure-gate` has **not** undergone an independent security audit.
@@ -31,7 +28,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 **Before production use**, review:
 
 - Source code
-- Tests (especially `hash_eq_tests.rs` and `proptest_tests.rs`)
+- Tests (especially `tests/ct_eq_suite/` and `tests/proptest_suite/`)
 - Dependency versions and their security history
 
 ## Core Security Model
@@ -53,13 +50,16 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 | Feature              | Security Impact                                                                 | Recommendation                              |
 |----------------------|----------------------------------------------------------------------------------|---------------------------------------------|
-| `alloc` *(default)*  | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Enabling both `alloc` and `no-alloc` lets `alloc` take precedence — prefer enabling only one. | Enable unless on embedded/pure-stack target |
+| `alloc` *(default)*  | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Enabling both `alloc` and `no-alloc` is a **compile error**; they are mutually exclusive. | Enable unless on embedded/pure-stack target |
 | `no-alloc`           | Disables heap-dependent code (`Dynamic<T>`, heap zeroizing, encodings); reduces attack surface by excluding heap vulnerabilities. | Use for embedded / pure `no_std` builds     |
 | `ct-eq`              | Timing-safe direct byte comparison                                               | Strongly recommended; avoid `==`            |
 | `ct-eq-hash`         | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `ct_eq_auto` for most cases           |
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
-| `serde-deserialize`  | Direct binary deserialization (arrays/seqs only); no string auto-parsing. Binary-safe, no temporary buffers or ambiguous parsing. Eliminates format confusion attacks and auto-decoding vulnerabilities; forces explicit pre-deserialization decoding via format-specific traits. | Enable for trusted JSON sources             |
+| `serde-deserialize`  | Direct binary deserialization (arrays/seqs only); no string auto-parsing. Binary-safe, no temporary buffers or ambiguous parsing. Eliminates format confusion attacks and auto-decoding vulnerabilities; forces explicit pre-deserialization decoding via format-specific traits. | Enable for trusted deserialization sources  |
 | `serde-serialize`    | Opt-in export via marker trait; audit all implementations                        | Enable sparingly; monitor exfiltration risk |
+| `encoding`           | Meta: enables all encoding sub-features (hex, base64url, bech32, bech32m); always requires `alloc` | Enable per-format instead for minimal surface |
+| `encoding-hex`       | Hex encoding/decoding: `ToHex`, `FromHexStr`; requires `alloc`                   | Validate inputs upstream; prefer `try_from_hex` |
+| `encoding-base64`    | Base64url encoding/decoding: `ToBase64Url`, `FromBase64UrlStr`; requires `alloc` | Validate inputs upstream; prefer `try_from_base64url` |
 | `encoding-bech32`    | Bech32/BIP-173 encoding/decoding: `ToBech32`, `FromBech32Str`                    | Validate inputs upstream; test empty/invalid HRP |
 | `encoding-bech32m`   | Bech32m/BIP-350 encoding/decoding: `ToBech32m`, `FromBech32mStr`                 | Validate inputs upstream; test empty/invalid HRP |
 | `cloneable`          | Opt-in cloning via marker trait; increases exposure surface                      | Use minimally; prefer move semantics        |

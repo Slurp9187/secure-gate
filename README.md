@@ -2,46 +2,73 @@
 
 [![Crates.io](https://img.shields.io/crates/v/secure-gate.svg)](https://crates.io/crates/secure-gate)
 [![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate)
+[![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
 **0.8.0-alpha.1 — reboot release after critical zeroize bug fix. All prior versions yanked.**
 
-`no_std`-compatible wrappers for sensitive data with explicit, auditable exposure and **automatic zeroization on drop**.
+`no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
 > **Security Notice**: This crate has **not undergone independent audit**.
 > Review the code and [SECURITY.md](SECURITY.md) before production use.
-> Memory safety is guaranteed — **no unsafe code** (`#![forbid(unsafe_code)]`).
-
-`secure-gate` provides `Dynamic<T>` (heap-allocated) and `Fixed<T>` (stack-allocated) wrappers that **force explicit access** to secrets via `.expose_secret()` or scoped `.with_secret()` — preventing accidental leaks while remaining zero-cost and `no_std` + `alloc` compatible.
+> No unsafe code — enforced with `#![forbid(unsafe_code)]`.
 
 ## What changed in 0.8.0
 
-- **Zeroize is now mandatory** — automatic memory wiping on drop is **always enabled** (no feature gate).
+- **Zeroize is now mandatory** — memory wiping on drop is always enabled, no feature gate.
 - `Fixed<T>` requires `T: Zeroize`; `Dynamic<T>` requires `T: ?Sized + Zeroize`.
 - Removed `zeroize`, `insecure`, `secure`, and `std` feature toggles.
 - Real `impl Drop` now calls `zeroize()` — the original security promise is finally true.
 
 **All versions 0.1.0–0.7.0-rc.15 were yanked** due to a critical flaw: automatic zeroize-on-drop was documented but never implemented (only manual `.zeroize()` worked).
 
-For zero-cost performance justification, see [ZERO_COST_WRAPPERS.md](ZERO_COST_WRAPPERS.md).
+## What You Get
 
-## Why secure-gate?
+- **Explicit access only** — `.with_secret()` (preferred) or `.expose_secret()` required; no silent `Deref`/`AsRef` leaks
+- **Mandatory zeroize on drop** — always active, no feature gate (inner type must implement `Zeroize`)
+- **Timing-safe equality** — `ct-eq` feature for direct byte comparison; `ct-eq-hash` for BLAKE3-accelerated comparison on large secrets
+- **Secure random generation** — `from_random()` via `OsRng` (`rand` feature)
+- **Orthogonal encoding** — symmetric per-format traits (hex, base64url, bech32/BIP-173, bech32m/BIP-350); each format is opt-in and zero-overhead when unused
+- **Serde** — direct deserialization to inner types (binary-safe); opt-in serialization requires `SerializableSecret` marker
+- **Ergonomic aliases** — `dynamic_alias!`, `fixed_alias!`, `fixed_generic_alias!`, `dynamic_generic_alias!` for typed newtypes
+- **Auditable** — every exposure, encoding, and equality call is grep-able; `no_std` + `alloc` compatible
 
-- **Orthogonal encoding/decoding** — per-format traits (e.g., `ToHex`/`FromHexStr`) with symmetric APIs and umbrella traits for aggregation
-- **Extensible** — adding new formats (e.g., base58) requires only one new trait pair + impls
+For zero-cost performance justification see [ZERO_COST_WRAPPERS.md](ZERO_COST_WRAPPERS.md).
 
-- **Explicit exposure** — no silent `Deref`/`AsRef` leaks
-- **Zeroize on drop** (always active — no feature gate)
-- **Timing-safe equality** (`ct-eq` feature)
-- **Fast probabilistic equality for large secrets** (`ct-eq-hash` → BLAKE3 + fixed digest compare)
-- **Secure random generation** (`rand` feature)
-- **Encoding** (symmetric per-format traits: hex, base64url, bech32/BIP-173, bech32m/BIP-350) + **serde** direct deserialization (binary-safe)
-- **Macros** for ergonomic aliases (`dynamic_alias!`, `fixed_alias!`)
-- **Auditable** — every exposure and encoding call is grep-able
+## Quick Start
+
+```rust
+use secure_gate::{dynamic_alias, fixed_alias, ExposeSecret, ExposeSecretMut};
+
+dynamic_alias!(pub Password, String);    // Dynamic<String>
+fixed_alias!(pub Aes256Key, 32);         // Fixed<[u8; 32]>
+
+let mut pw: Password = "hunter2".into();
+let key: Aes256Key = Aes256Key::new([42u8; 32]);
+
+// Scoped access — preferred; the borrow cannot outlive the closure
+pw.with_secret(|s| println!("length: {}", s.len()));
+
+// Mutable scoped access
+pw.with_secret_mut(|s: &mut String| s.push('!'));
+
+// Direct reference — auditable escape hatch (e.g. FFI, third-party APIs)
+assert_eq!(pw.expose_secret(), "hunter2!");
+pw.expose_secret_mut().clear();
+
+// Encoding — operate on the exposed inner bytes
+#[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
+{
+    use secure_gate::{ToHex, ToBech32};
+    let hex    = key.with_secret(|b| b.to_hex());
+    let bech32 = key.with_secret(|b| b.try_to_bech32("key", None).unwrap());  // BIP-173
+    let _      = hex.try_from_hex().unwrap();  // decode back
+}
+```
 
 ## Installation
 
-**Default** (`alloc` already on — `Dynamic<T>` + full zeroization):
+**Default** (`alloc` enabled — `Fixed<T>` + `Dynamic<T>` + full zeroization):
 
 ```toml
 [dependencies]
@@ -54,217 +81,170 @@ secure-gate = "0.8.0-alpha.1"
 secure-gate = { version = "0.8.0-alpha.1", default-features = false, features = ["no-alloc"] }
 ```
 
-**Batteries-included** (most features):
+**Batteries-included**:
 
 ```toml
 secure-gate = { version = "0.8.0-alpha.1", features = ["full"] }
 ```
 
+> Enabling both `alloc` and `no-alloc` is a **compile error**. They are mutually exclusive.
+> `--all-features` (e.g. for docs or CI) also enables `full`, which bypasses the guard.
+
 ## Features
 
-| Feature             | Description                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------------- |
-| `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity          |
-| `no-alloc`          | Disables heap (`Dynamic<T>` unavailable). Use for embedded / pure `no_std` builds        |
-| `ct-eq`             | `ConstantTimeEq` trait — timing-safe direct byte comparison                              |
-| `ct-eq-hash`        | `ConstantTimeEqExt` trait — BLAKE3-based probabilistic equality (fast for large secrets) |
-| `rand`              | Secure random generation via `OsRng` (`from_random()`)                                   |
-| `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                            |
-| `serde-deserialize` | Direct deserialization to inner types (binary-safe)                                      |
-| `serde-serialize`   | Export secrets (requires `SerializableSecret` marker on inner type)                      |
-| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m)                        |
-| `encoding-hex`      | `ToHex` / `FromHexStr` — hex encoding/decoding                                           |
-| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr` — base64url encoding/decoding                         |
-| `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173 Bech32 encoding/decoding                          |
-| `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350 Bech32m encoding/decoding                       |
-| `cloneable`         | `CloneableSecret` opt-in cloning marker                                                  |
-| `full`              | All features (convenient for development)                                                |
+| Feature              | Description                                                                              |
+| -------------------- | ---------------------------------------------------------------------------------------- |
+| `alloc` _(default)_  | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity         |
+| `no-alloc`           | Disables heap (`Dynamic<T>` unavailable). Use for embedded / pure `no_std` builds       |
+| `rand`               | `from_random()` via `OsRng`; always enables `alloc` (transitively via `rand/alloc`)     |
+| `ct-eq`              | `ConstantTimeEq` — timing-safe direct byte comparison                                   |
+| `ct-eq-hash`         | `ConstantTimeEqExt` — BLAKE3-based probabilistic equality; fast for large secrets; enables `ct-eq` |
+| `encoding`           | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`     |
+| `encoding-hex`       | `ToHex` / `FromHexStr`                                                                   |
+| `encoding-base64`    | `ToBase64Url` / `FromBase64UrlStr`                                                       |
+| `encoding-bech32`    | `ToBech32` / `FromBech32Str` — BIP-173                                                   |
+| `encoding-bech32m`   | `ToBech32m` / `FromBech32mStr` — BIP-350                                                 |
+| `serde`              | Meta: `serde-deserialize` + `serde-serialize`                                            |
+| `serde-deserialize`  | Direct deserialization to inner types (binary-safe)                                      |
+| `serde-serialize`    | Serialize secrets (requires `SerializableSecret` marker on inner type)                   |
+| `cloneable`          | `CloneableSecret` opt-in cloning                                                         |
+| `full`               | All features combined                                                                    |
 
-`no_std` + `alloc` compatible. Disabled features have **zero overhead**.
+`no_std` + `alloc` compatible. Disabled features have zero overhead.
 
-> **Heap support** — `alloc` (enabled by default) adds `Dynamic<T>` + full zeroization of spare capacity in `Vec`/`String`. Use `no-alloc` to disable heap entirely (only `Fixed<T>` remains available — pure stack / `no_std` friendly).
+## Core API
 
-### Quick Feature Guide
+`Fixed<T>` (stack-allocated) and `Dynamic<T>` (heap-allocated, requires `alloc`) share the same `ExposeSecret` / `ExposeSecretMut` interface. Both types:
 
-| Goal                   | Configuration                                       | Result                                  |
-| ---------------------- | --------------------------------------------------- | --------------------------------------- |
-| Default (heap + stack) | _(default)_                                         | `Fixed<T>` + `Dynamic<T>`, full zeroize |
-| No-heap / embedded     | `default-features = false, features = ["no-alloc"]` | `Fixed<T>` only, zeroize still active   |
-| Full featured          | `features = ["full"]`                               | All features enabled                    |
+- Redact `Debug` output to `[REDACTED]`
+- Implement `len()` and `is_empty()` without exposing secret contents
+- Zeroize contents on drop (mandatory)
 
-### Heap vs No-Heap Builds
-
-secure-gate **defaults to heap-enabled** (`alloc` is the default feature):
-
-```toml
-secure-gate = "0.8.0-alpha.1"  # Fixed<T> + Dynamic<T> + zeroize/alloc
-```
-
-For **no-heap / embedded** (only `Fixed<T>`):
-
-```toml
-secure-gate = { version = "0.8.0-alpha.1", default-features = false, features = ["no-alloc"] }
-```
-
-`Fixed<T>` always has zero-cost explicit exposure and mandatory zeroize on drop. `Dynamic<T>` requires heap and is unavailable in `no-alloc` mode.
-
-**Note**: Enabling both `alloc` and `no-alloc` lets `alloc` take precedence (e.g., `--all-features` for docs/CI). Prefer enabling only one for predictable builds.
-
-## Quick Start
+### Preferred: scoped access
 
 ```rust
+use secure_gate::{Fixed, ExposeSecret, ExposeSecretMut};
+
+let mut key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
+
+// Read — closure borrow cannot outlive the call
+let sum: u32 = key.with_secret(|bytes| bytes.iter().map(|&b| b as u32).sum());
+
+// Mutate
+key.with_secret_mut(|bytes: &mut [u8; 32]| bytes[0] = 0);
+```
+
+### Direct reference — auditable escape hatch
+
+```rust
+// Use only when a long-lived reference is unavoidable (FFI, third-party APIs)
+let raw: &[u8; 32] = key.expose_secret();
+```
+
+### Macros for typed aliases
+
+`fixed_alias!`, `dynamic_alias!`, `fixed_generic_alias!`, and `dynamic_generic_alias!` create typed newtype wrappers with full visibility control, optional doc strings, and compile-time zero-size guards:
+
+```rust
+use secure_gate::{fixed_alias, dynamic_alias};
+
+fixed_alias!(pub Aes256Key, 32, "32-byte AES-256 key");
+
 #[cfg(feature = "alloc")]
-{
-    use secure_gate::{dynamic_alias, fixed_alias, ExposeSecret, ExposeSecretMut};
+dynamic_alias!(pub Password, String, "variable-length password");
+```
 
-    dynamic_alias!(pub Password, String);      // Dynamic<String>
-    fixed_alias!(pub Aes256Key, 32);           // Fixed<[u8; 32]>
+See [`fixed_alias!`], [`dynamic_alias!`], [`fixed_generic_alias!`], and [`dynamic_generic_alias!`] in the [API docs](https://docs.rs/secure-gate).
 
-    let mut pw: Password = "hunter2".into();
-    let key: Aes256Key = Aes256Key::new([42u8; 32]);  // or [42u8; 32].into() / try_from
+### Polymorphic / generic code
 
-    // Scoped (recommended)
-    pw.with_secret(|s| println!("length: {}", s.len()));
+```rust
+use secure_gate::ExposeSecret;
 
-    // Direct (auditable)
-    assert_eq!(pw.expose_secret(), "hunter2");
-
-    // Mutable
-    pw.with_secret_mut(|s: &mut String| s.push('!'));
-    pw.expose_secret_mut().clear();
-
-    // Symmetric encoding/decoding example (new per-format traits)
-    #[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
-    {
-        use secure_gate::{FromHexStr, ToBech32, ToHex};
-        let hex    = key.expose_secret().to_hex();          // "2a2a2a..."
-        let bech32 = key.expose_secret().try_to_bech32("key", None).unwrap();  // "key1q..." (BIP-173)
-        let roundtrip = hex.try_from_hex().unwrap();        // Decode back
-    }
+fn log_length<S: ExposeSecret>(secret: &S) {
+    println!("length = {}", secret.len());
 }
 ```
 
-> **Note**: Encoding API updated in 0.7.0 — old `SecureEncoding` removed in favor of per-format traits (e.g., `ToHex`, `FromHexStr`). Existing code like `data.to_hex()` still works via blanket impls. For new symmetric encoding/decoding, use individual traits or umbrellas (`SecureEncoding`/`SecureDecoding`). Prefer fallible `try_` variants for encoding to avoid panics.
+## Encoding
 
-## Security Model
+secure-gate provides orthogonal, symmetric per-format traits blanket-implemented on `AsRef<[u8]>` / `AsRef<str>`. Use them inside `with_secret` closures to keep the inner bytes scoped:
 
-- **Explicit access only** — `.with_secret()` / `.expose_secret()` required
-- **No implicit leaks** — no `Deref`/`AsRef`/`Copy` by default
-- **Zeroize** on drop (always active — inner type must implement `Zeroize`)
-- **Timing-safe** equality (optional `ct-eq` feature)
-- **Probabilistic fast equality** for big data (`hash-eq`)
-- **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
+- `ToHex` / `FromHexStr` — hex (`encoding-hex`)
+- `ToBase64Url` / `FromBase64UrlStr` — base64url (`encoding-base64`)
+- `ToBech32` / `FromBech32Str` — BIP-173 Bech32 (`encoding-bech32`)
+- `ToBech32m` / `FromBech32mStr` — BIP-350 Bech32m (`encoding-bech32m`)
 
-Read [SECURITY.md](SECURITY.md) for threat model and mitigations.
+```rust
+#[cfg(feature = "encoding-hex")]
+{
+    use secure_gate::{Fixed, ToHex, FromHexStr};
 
-## Recommended Equality
+    let key = Fixed::new([0u8; 32]);
 
-Use **`ct_eq_auto`** — it automatically chooses the best method:
+    // Encode — operate on exposed bytes inside the closure
+    let hex: String = key.with_secret(|b| b.to_hex());
 
-- Small inputs (≤32 bytes default): fast deterministic `ct_eq`
-- Large/variable inputs: fast BLAKE3 hashing + digest compare
+    // Decode — fallible (use try_ variants to avoid panics)
+    let decoded: Vec<u8> = hex.try_from_hex().unwrap();
+}
+```
 
-**Performance Tuning**: If benchmarks show a different optimal crossover point on your hardware (e.g., `ct_eq` remains faster up to 64 or 1024 bytes), customize with `ct_eq_auto(&sig_b, Some(n))`.
+See [`ToHex`], [`ToBech32`], [`FromHexStr`], and sibling traits in the [API docs](https://docs.rs/secure-gate) for round-trip examples.
+
+## Equality
+
+Use **`ct_eq_auto`** — it automatically picks the optimal method based on input size:
+
+- Small inputs (≤ 32 bytes default): deterministic `ct_eq` (timing-safe direct comparison)
+- Large / variable inputs: BLAKE3 digest comparison via `ct_eq_hash`
 
 ```rust
 #[cfg(feature = "ct-eq-hash")]
 {
     use secure_gate::{Dynamic, ConstantTimeEqExt};
 
-    let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();  // e.g. ML-DSA signature
+    let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
     let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
 
-    // Recommended: smart path selection
     if sig_a.ct_eq_auto(&sig_b, None) {
-        // equal
+        // equal — crossover chosen automatically
     }
+
+    // Custom crossover (e.g. if benchmarks show ct_eq is faster up to 64 B on your hardware)
+    sig_a.ct_eq_auto(&sig_b, Some(64));
 }
 ```
 
-Plain `ct_eq_hash` is still available for uniform probabilistic behavior.
+Plain `ct_eq_hash` is still available for uniform probabilistic behavior. For benchmarks and crossover tuning guidance see [CT_EQ_AUTO.md](CT_EQ_AUTO.md).
 
-For detailed justification, benchmarks, and tuning guidance, see [CT_EQ_AUTO.md](CT_EQ_AUTO.md).
+## Serde
 
-## Advanced Usage
+`serde-deserialize` decodes directly to the inner type from a binary sequence — no temporary string buffers or format-confusion attacks. Serialization requires the `SerializableSecret` marker trait on the inner type.
 
-### Using `Fixed<T>` and `Dynamic<T>` Directly
+See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for the full example.
 
-For macro-averse users, construct and expose types directly:
-
-```rust
-use secure_gate::{Fixed, ExposeSecret};
-let key: Fixed<[u8; 32]> = Fixed::new([42u8; 32]);
-key.with_secret(|bytes| assert_eq!(bytes.len(), 32));
-```
-
-See [`Fixed`] and [`Dynamic`] in the [API docs](https://docs.rs/secure-gate) for full examples.
-
-### Polymorphic / Generic Code
-
-Write functions that accept any secure wrapper via the `ExposeSecret` trait:
-
-```rust
-use secure_gate::ExposeSecret;
-fn log_length<S: ExposeSecret>(secret: &S) { println!("length = {}", secret.len()); }
-```
-
-### Macros for Aliases
-
-`fixed_alias!`, `dynamic_alias!`, `fixed_generic_alias!`, and `dynamic_generic_alias!` create typed newtype wrappers with full visibility control and optional doc strings:
-
-```rust
-use secure_gate::fixed_alias;
-fixed_alias!(pub Aes256Key, 32, "32-byte AES-256 key");
-
-#[cfg(feature = "alloc")]
-{
-use secure_gate::dynamic_alias;
-dynamic_alias!(pub Password, String, "variable-length password");
-}
-```
-
-See [`fixed_alias!`], [`dynamic_alias!`], [`fixed_generic_alias!`], and [`dynamic_generic_alias!`] in the [API docs](https://docs.rs/secure-gate) for all visibility forms and compile-time zero-size guards.
-
-### Random Generation
-
-Cryptographically secure randomness via `OsRng` (requires `rand` feature):
+## Random Generation
 
 ```rust
 #[cfg(feature = "rand")]
 {
-use secure_gate::Fixed;
-let key: Fixed<[u8; 32]> = Fixed::from_random();
+    use secure_gate::Fixed;
+    let key: Fixed<[u8; 32]> = Fixed::from_random();
 }
 ```
 
-See [`Fixed::from_random`] and [`Dynamic::from_random`] in the [API docs](https://docs.rs/secure-gate).
+Cryptographically secure via `OsRng`. The `rand` feature always enables `alloc` transitively. See [`Fixed::from_random`] and [`Dynamic::from_random`] in the [API docs](https://docs.rs/secure-gate).
 
-### Encoding (symmetric per-format traits)
+## Security Model
 
-secure-gate provides **orthogonal, symmetric encoding/decoding traits**. All methods are blanket-implemented over `AsRef<[u8]>` / `AsRef<str>` — call them directly on wrapper types without `.expose_secret()`:
+- **Explicit access only** — `.with_secret()` / `.expose_secret()` required; no silent leaks
+- **Zeroize on drop** — always active; inner type must implement `Zeroize`
+- **Timing-safe equality** — `ct-eq` feature
+- **Probabilistic fast equality** for large data — `ct-eq-hash` (BLAKE3)
+- **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
 
-- `ToHex` / `FromHexStr` — hex (requires `encoding-hex`)
-- `ToBase64Url` / `FromBase64UrlStr` — base64url (requires `encoding-base64`)
-- `ToBech32` / `FromBech32Str` — BIP-173 Bech32 (requires `encoding-bech32`)
-- `ToBech32m` / `FromBech32mStr` — BIP-350 Bech32m (requires `encoding-bech32m`)
-
-```rust
-#[cfg(feature = "encoding-hex")]
-{
-use secure_gate::{Fixed, ToHex};
-
-let key = Fixed::new([0u8; 32]);
-let hex = key.to_hex();  // direct on wrapper — no .expose_secret() needed
-}
-```
-
-See [`ToHex`], [`ToBech32`], [`FromHexStr`], and sibling traits in the [API docs](https://docs.rs/secure-gate) for round-trip examples.
-
-### Serde
-
-`serde-deserialize` decodes directly to the inner type from a binary sequence — no temporary string buffers or format confusion attacks. Serialization requires implementing the `SerializableSecret` marker trait on your inner type.
-
-See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for the full example.
+Read [SECURITY.md](SECURITY.md) for the full threat model and mitigations.
 
 ## License
 
