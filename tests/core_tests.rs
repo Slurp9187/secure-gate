@@ -45,6 +45,13 @@ fn fixed_is_truly_zero_cost() {
     assert_eq!(core::mem::size_of_val(&key), 32);
 }
 
+#[test]
+fn fixed_mutation() {
+    let mut key = Fixed::new([0u8; 4]);
+    key.with_secret_mut(|s| s[0] = 42);
+    key.with_secret(|s| assert_eq!(s, &[42, 0, 0, 0]));
+}
+
 // === Security Features ===
 
 #[cfg(feature = "alloc")]
