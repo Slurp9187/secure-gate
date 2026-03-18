@@ -14,6 +14,10 @@ pub use secure_gate::{ExposeSecret, ExposeSecretMut};
 /// Asserts that the `Debug` output is exactly `[REDACTED]` in both normal and
 /// alternate (`{:#?}`) format — the canonical security invariant for all secret
 /// wrapper types.
+// Called only by serde_suite (gated on serde-serialize + serde-deserialize).
+// Under minimal feature sets those call sites are compiled out, so suppress
+// the dead_code lint that would otherwise appear.
+#[allow(dead_code)]
 pub fn assert_redacted_debug(value: &impl core::fmt::Debug) {
     assert_eq!(format!("{value:?}"), "[REDACTED]");
     assert_eq!(format!("{value:#?}"), "[REDACTED]");

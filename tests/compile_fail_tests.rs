@@ -10,6 +10,9 @@ fn fixed_alias_zero_size_compile_fail() {
     t.compile_fail("tests/compile-fail/fixed_alias_zero_size.rs");
 }
 
+// This case asserts serde-bound misuse diagnostics for wrapper serialization.
+// It requires both alloc-backed Dynamic<T> and serde Serialize impls to exist.
+#[cfg(all(feature = "alloc", feature = "serde-serialize"))]
 #[test]
 fn serializable_secret_misuse() {
     let t = trybuild::TestCases::new();

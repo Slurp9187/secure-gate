@@ -4,6 +4,8 @@
 use secure_gate::{FromBech32Str, ToBech32};
 #[cfg(feature = "encoding-bech32m")]
 use secure_gate::{FromBech32mStr, ToBech32m};
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+use secure_gate::Bech32Error;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use secure_gate::Dynamic;
 #[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
@@ -30,6 +32,40 @@ fn bech32_expected_hrp_mismatch_fails() {
     assert!(err.is_err());
 }
 
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bech32_invalid_hrp_encode_fails() {
+    let err = b"data".try_to_bech32("", None);
+    assert_eq!(err, Err(Bech32Error::InvalidHrp));
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bech32_decode_malformed_fails() {
+    let err = "notabech32string".try_from_bech32();
+    assert!(err.is_err());
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bech32_decode_expect_hrp_validates() {
+    let data = b"hello world";
+    let encoded = data.try_to_bech32("fuzz", None).expect("valid bech32");
+    let decoded = encoded
+        .try_from_bech32_expect_hrp("fuzz")
+        .expect("expected hrp should match");
+    assert_eq!(decoded, data);
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bech32_decode_expect_hrp_mismatch_fails() {
+    let data = b"hello world";
+    let encoded = data.try_to_bech32("fuzz", None).expect("valid bech32");
+    let err = encoded.try_from_bech32_expect_hrp("other");
+    assert!(err.is_err());
+}
+
 #[cfg(feature = "encoding-bech32m")]
 #[test]
 fn bech32m_roundtrip() {
@@ -38,6 +74,20 @@ fn bech32m_roundtrip() {
     let (hrp, decoded) = encoded.try_from_bech32m().expect("valid bech32m");
     assert_eq!(hrp, "fuzzm");
     assert_eq!(decoded, data);
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn bech32m_invalid_hrp_encode_fails() {
+    let err = b"data".try_to_bech32m("", None);
+    assert_eq!(err, Err(Bech32Error::InvalidHrp));
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn bech32m_decode_malformed_fails() {
+    let err = "notabech32mstring".try_from_bech32m();
+    assert!(err.is_err());
 }
 
 #[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
