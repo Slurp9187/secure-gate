@@ -14,12 +14,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `std` feature: opt-in full `std` support that implies `alloc`. Use `features = ["std"]` if you need `std`-specific integrations; `alloc` (the default) remains sufficient for all current functionality.
+- **Expanded zeroization integration test coverage** (closes #94):
+  - `Fixed<[u8; N]>` tested for N = 8, 16, 32, 64, 128 via a parameterized macro; all cases use `core::hint::black_box` to prevent LLVM from eliding the zeroization write.
+  - Pre-drop mutation tests for `Fixed<T>`: covers `with_secret_mut`, `expose_secret_mut`, custom `Zeroize` types, and scoped-access-then-drop patterns.
+  - `Dynamic<[u8; N]>` heap zeroization verified at the allocator level for N = 16, 32, 64, 128 via `ProxyAllocator`.
+  - `Dynamic<Vec<u8>>` backing-buffer zeroization verified for the same sizes with fill → `shrink_to_fit` → drop sequences.
+  - Mutation sequence tests for `Dynamic<Vec<u8>>` and `Dynamic<String>` covering `push`, `truncate`, `extend_from_slice`, `shrink_to_fit`, and `with_secret_mut` before drop.
+  - Spare-capacity zeroization tests for both `Dynamic<Vec<u8>>` and `Dynamic<String>`.
+  - Scoped `with_secret_mut` + drop tests for `Dynamic<Vec<u8>>`.
+  - `heap_zeroize.rs` refactored to a single aggregate `#[test]` (`all_heap_zeroed`) eliminating race conditions with the global `ProxyAllocator` state under parallel test execution.
+  - All new tests run cleanly under `cargo test --no-default-features`, `cargo test --release --features alloc`, and `cargo +nightly miri test --features alloc`.
+- Added ASan CI job (`asan-heap`) for heap zeroization verification using `cargo +nightly test --features alloc --test heap_zeroize -Z build-std`.
 
 ### Changed
 
 - Version bump from 0.8.0-alpha.1 to 0.8.0-rc.1.
 - **Breaking**: The `no-alloc` feature has been removed. To build without heap allocation (`Fixed<T>` only, embedded / pure `no_std`), use `default-features = false`. This matches the idiomatic Rust pattern used by `zeroize`, `serde`, `rand`, and others.
 - The `compile_error!` guard that prevented `alloc` and `no-alloc` from being enabled simultaneously has been removed along with `no-alloc`.
+- `heap_zeroize.rs` tests are skipped under Miri (`#![cfg(not(miri))]`) due to fundamental incompatibility between `#[global_allocator]` and Miri's Stacked Borrows model; heap zeroization is still verified in normal CI and under ASan.
+- `compile_fail_tests.rs` trybuild test is skipped under Miri (`#[cfg(not(miri))]`) since compile-fail diagnostics are not relevant to runtime UB detection.
 
 ### Migration
 
