@@ -1,5 +1,5 @@
-// uncomment for doctest runs
-#![doc = include_str!("../README.md")]
+// #![doc = include_str!("../README.md")] //uncomment for doctest runs
+
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
 

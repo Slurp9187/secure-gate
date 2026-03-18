@@ -59,7 +59,8 @@ pw.expose_secret_mut().clear();
 // Encoding — operate on the exposed inner bytes
 #[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
 {
-    use secure_gate::{ToHex, ToBech32, FromHexStr};
+    use secure_gate::{Fixed, ToHex, ToBech32, FromHexStr, ExposeSecret};
+    let key: Fixed<[u8; 32]> = Fixed::new([42u8; 32]);
     let hex    = key.with_secret(|b| b.to_hex());
     let bech32 = key.with_secret(|b| b.try_to_bech32("key", None).unwrap());  // BIP-173
     let _      = hex.try_from_hex().unwrap();  // decode back
@@ -138,6 +139,8 @@ key.with_secret_mut(|bytes: &mut [u8; 32]| bytes[0] = 0);
 
 ```rust
 // Use only when a long-lived reference is unavoidable (FFI, third-party APIs)
+use secure_gate::{Fixed, ExposeSecret};
+let key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
 let raw: &[u8; 32] = key.expose_secret();
 ```
 
@@ -178,7 +181,7 @@ secure-gate provides orthogonal, symmetric per-format traits blanket-implemented
 ```rust
 #[cfg(feature = "encoding-hex")]
 {
-    use secure_gate::{Fixed, ToHex, FromHexStr};
+    use secure_gate::{Fixed, ToHex, FromHexStr, ExposeSecret};
 
     let key = Fixed::new([0u8; 32]);
 
