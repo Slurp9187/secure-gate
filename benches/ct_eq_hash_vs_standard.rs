@@ -16,13 +16,18 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use std::hint::black_box;
 
 #[cfg(feature = "ct-eq-hash")]
+use secure_gate::{ConstantTimeEq, ConstantTimeEqExt, Fixed};
+
+#[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
+use secure_gate::Dynamic;
+
+#[cfg(feature = "ct-eq-hash")]
 // 32b secret (expect ct-eq to be faster)
 #[allow(non_snake_case)]
 fn bench_32B_secret_comparison(c: &mut Criterion) {
-    use secure_gate::{ConstantTimeEqExt, Fixed};
 
-    let a: Fixed<[u8; 32]> = Fixed::from([1u8; 32]);
-    let b: Fixed<[u8; 32]> = Fixed::from([1u8; 32]);
+    let a: Fixed<[u8; 32]> = Fixed::from(black_box([1u8; 32]));
+    let b: Fixed<[u8; 32]> = Fixed::from(black_box([1u8; 32]));
 
     // ct-eq-hash comparison (ConstantTimeEqExt::ct_eq_hash uses BLAKE3 hash equality)
     c.bench_function("fixed_ct_eq_hash_32b", |bencher| {
@@ -38,10 +43,9 @@ fn bench_32B_secret_comparison(c: &mut Criterion) {
 #[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
 #[allow(non_snake_case)]
 fn bench_1KiB_secret_comparison(c: &mut Criterion) {
-    use secure_gate::{ConstantTimeEqExt, Dynamic};
 
-    let a: Dynamic<Vec<u8>> = vec![1u8; 1024].into();
-    let b: Dynamic<Vec<u8>> = vec![1u8; 1024].into();
+    let a: Dynamic<Vec<u8>> = black_box(vec![1u8; 1024]).into();
+    let b: Dynamic<Vec<u8>> = black_box(vec![1u8; 1024]).into();
 
     // ct-eq-hash comparison (ConstantTimeEqExt::ct_eq_hash uses BLAKE3 hash equality)
     c.bench_function("dynamic_ct_eq_hash_1kb", |bencher| {
@@ -106,7 +110,6 @@ fn bench_1MiB_secret_comparison(c: &mut Criterion) {
 #[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
 fn bench_worst_case_unequal_32B(c: &mut Criterion) {
-    use secure_gate::{ConstantTimeEqExt, Fixed};
 
     let mut group = c.benchmark_group("fixed_unequal_end_32b");
 
@@ -145,7 +148,6 @@ fn bench_worst_case_unequal_32B(c: &mut Criterion) {
 #[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
 #[allow(non_snake_case)]
 fn bench_worst_case_unequal_1KiB(c: &mut Criterion) {
-    use secure_gate::{ConstantTimeEqExt, Dynamic};
 
     let mut group = c.benchmark_group("dynamic_unequal_end_1kb");
 
@@ -248,7 +250,6 @@ fn bench_keyed_vs_deterministic_hashing(c: &mut Criterion) {
 #[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
 #[allow(non_snake_case)]
 fn bench_ct_eq_hash_caching_effects(c: &mut Criterion) {
-    use secure_gate::{ConstantTimeEqExt, Dynamic, Fixed};
 
     // Fixed data (hash may be cached internally if same)
     c.bench_function("ct_eq_hash_fixed_data_32b", |bencher| {
@@ -285,7 +286,6 @@ fn bench_ct_eq_hash_caching_effects(c: &mut Criterion) {
     });
 }
 
-#[cfg(feature = "ct-eq-hash")]
 #[cfg(all(feature = "ct-eq-hash", not(feature = "alloc")))]
 criterion_group!(
     name = ct_eq_hash_vs_standard;
@@ -299,10 +299,7 @@ criterion_group!(
     config = Criterion::default();
     targets = bench_32B_secret_comparison, bench_1KiB_secret_comparison, bench_100KiB_secret_comparison, bench_1MiB_secret_comparison, bench_worst_case_unequal_1KiB, bench_ct_eq_hash_caching_effects, bench_hash_computation, bench_keyed_vs_deterministic_hashing, bench_worst_case_unequal_32B
 );
-#[cfg(all(feature = "ct-eq-hash", not(feature = "alloc")))]
-criterion_main!(ct_eq_hash_vs_standard);
-
-#[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
+#[cfg(feature = "ct-eq-hash")]
 criterion_main!(ct_eq_hash_vs_standard);
 
 // No benches when required features are not enabled

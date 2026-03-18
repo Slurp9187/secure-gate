@@ -12,23 +12,23 @@ This report justifies `ct_eq_auto` as the best choice for most equality checks, 
 Benchmarks confirm `ct_eq_auto`'s default selection is near-optimal, outperforming manual choices unless heavily skewed workloads. All results from Criterion benches in `--all-features` (keyed BLAKE3 enabled), averaged across multiple runs for reliability.
 
 ### Key Benchmarks: ct_eq_hash_vs_standard.rs (ct_eq_hash vs ct_eq)
-- **Small secrets (≤32B)**: `ct_eq` dominates (e.g., 32B: ~154ns vs `ct_eq_hash` ~303ns, 5x faster).
-- **Large secrets**: `ct_eq_hash` scales better (e.g., 1KB: ~5µs vs `ct_eq_hash` ~2µs, 2.5x faster; 100KB: ~408µs vs 55µs, 7x faster).
+- **Small secrets (≤32B)**: `ct_eq` dominates (e.g., 32B: ~152ns vs `ct_eq_hash` ~254ns, ~1.7x faster).
+- **Large secrets**: `ct_eq_hash` scales better (e.g., 1KB: ~4µs vs `ct_eq_hash` ~1.7µs, ~2.3x faster; 100KB: ~406µs vs 62µs, ~6.5x faster).
 - **Worst-case unequal (timing safety)**: Both constant-time, but `ct_eq_hash` avoids length-based side-channels.
 - **Hash overhead**: Fixed ~30-60ns (compute + keying), paid only for >32B.
 - **Caching effects**: Varying data hits ~10% slower, but still better than full `ct_eq` on large inputs.
 
 ### Threshold Tuning Benchmarks: ct_eq_auto.rs (custom thresholds)
-- **Default 32B optimal**: For 16B: ~65ns (ct_eq path); for 64B: ~278ns (hash path) — balanced.
-- **Forcing hash on small data**: +300% overhead (16B: 65ns → 259ns) — default avoids this.
-- **Forcing ct_eq on large data**: Potential 10-15% savings if hardware/cache favors it (64B: 278ns → 248ns), but rare and use-case specific.
+- **Default 32B optimal**: For 16B: ~74ns (ct_eq path); for 64B: ~285ns (hash path) — balanced.
+- **Forcing hash on small data**: +350% overhead (16B: 74ns → 338ns) — default avoids this.
+- **Forcing ct_eq on large data**: Potential 5-10% savings if hardware/cache favors it (64B: 285ns → 255ns), but rare and use-case specific.
 - **Dynamic vs Fixed**: Similar trends, with Dynamic adding ~20% alloc overhead.
-- **Outliers**: ≤17% across runs, confirming reliable trends.
+- **Outliers**: ≤8% across runs, confirming reliable trends (improved by `black_box` fixes).
 
 Crossover validated at ~32B: Default minimizes total latency for mixed sizes without manual tuning.
 
 ### Benchmark Variance & Hardware Sensitivity
-Multi-run benchmarks (3x on 2019 Intel i7-10510U/16GB/Windows 11) show high variance: regressions up to 25% (e.g., small ct_eq_hash +23%, 1MB ct_eq +15%) due to system noise/cache effects. Changes between runs: 5-25%—averages reliable, but absolute numbers vary. Outliers ≤17%. Key insight: Core trends (crossover ~32B, hash wins large data) hold; profile per-system for tuning if variance affects critical paths.
+Multi-run benchmarks (3x on 2019 Intel i7-10510U/16GB/Windows 11) show stable variance: changes between runs: 5-10% due to system noise/cache effects. Outliers ≤8%. Key insight: Core trends (crossover ~32B, hash wins large data) hold consistently; `black_box` fixes eliminated previous artifacts. Profile per-system for tuning if variance affects critical paths.
 
 ## Security Justification
 - **Timing safety**: Both paths constant-time; `ct_eq_hash` hides length/cache differences.

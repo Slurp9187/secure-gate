@@ -21,8 +21,8 @@ use secure_gate::Dynamic;
 #[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
 fn bench_ct_eq_auto_16B_thresholds(c: &mut Criterion) {
-    let a: Fixed<[u8; 16]> = Fixed::from([42u8; 16]);
-    let b: Fixed<[u8; 16]> = Fixed::from([42u8; 16]);
+    let a: Fixed<[u8; 16]> = Fixed::from(black_box([42u8; 16]));
+    let b: Fixed<[u8; 16]> = Fixed::from(black_box([42u8; 16]));
 
     let mut group = c.benchmark_group("fixed_ct_eq_auto_16b");
 
@@ -46,8 +46,8 @@ fn bench_ct_eq_auto_16B_thresholds(c: &mut Criterion) {
 #[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
 fn bench_ct_eq_auto_32B_thresholds(c: &mut Criterion) {
-    let a: Fixed<[u8; 32]> = Fixed::from([42u8; 32]);
-    let b: Fixed<[u8; 32]> = Fixed::from([42u8; 32]);
+    let a: Fixed<[u8; 32]> = Fixed::from(black_box([42u8; 32]));
+    let b: Fixed<[u8; 32]> = Fixed::from(black_box([42u8; 32]));
 
     let mut group = c.benchmark_group("fixed_ct_eq_auto_32b");
 
@@ -57,10 +57,10 @@ fn bench_ct_eq_auto_32B_thresholds(c: &mut Criterion) {
     group.bench_function("thresh_0_force_hash", |bencher| {
         bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(0))));
     });
-    group.bench_function("thresh_16_force_ct_eq", |bencher| {
+    group.bench_function("thresh_16_force_hash", |bencher| {
         bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(16))));
     });
-    group.bench_function("thresh_64_force_hash", |bencher| {
+    group.bench_function("thresh_64_force_ct_eq", |bencher| {
         bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(64))));
     });
 
@@ -71,8 +71,8 @@ fn bench_ct_eq_auto_32B_thresholds(c: &mut Criterion) {
 #[cfg(feature = "ct-eq-hash")]
 #[allow(non_snake_case)]
 fn bench_ct_eq_auto_64B_thresholds(c: &mut Criterion) {
-    let a: Fixed<[u8; 64]> = Fixed::from([42u8; 64]);
-    let b: Fixed<[u8; 64]> = Fixed::from([42u8; 64]);
+    let a: Fixed<[u8; 64]> = Fixed::from(black_box([42u8; 64]));
+    let b: Fixed<[u8; 64]> = Fixed::from(black_box([42u8; 64]));
 
     let mut group = c.benchmark_group("fixed_ct_eq_auto_64b");
 
@@ -96,15 +96,15 @@ fn bench_ct_eq_auto_64B_thresholds(c: &mut Criterion) {
 #[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
 #[allow(non_snake_case)]
 fn bench_ct_eq_auto_128B_dynamic_thresholds(c: &mut Criterion) {
-    let a: Dynamic<Vec<u8>> = vec![42u8; 128].into();
-    let b: Dynamic<Vec<u8>> = vec![42u8; 128].into();
+    let a: Dynamic<Vec<u8>> = black_box(vec![42u8; 128]).into();
+    let b: Dynamic<Vec<u8>> = black_box(vec![42u8; 128]).into();
 
     let mut group = c.benchmark_group("dynamic_ct_eq_auto_128b");
 
     group.bench_function("default_32b", |bencher| {
         bencher.iter(|| black_box(a.ct_eq_auto(&b, None)));
     });
-    group.bench_function("thresh_64_force_ct_eq", |bencher| {
+    group.bench_function("thresh_64_force_hash", |bencher| {
         bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(64))));
     });
     group.bench_function("thresh_256_force_ct_eq", |bencher| {
@@ -118,15 +118,15 @@ fn bench_ct_eq_auto_128B_dynamic_thresholds(c: &mut Criterion) {
 #[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
 #[allow(non_snake_case)]
 fn bench_ct_eq_auto_1KiB_dynamic_thresholds(c: &mut Criterion) {
-    let a: Dynamic<Vec<u8>> = vec![42u8; 1024].into();
-    let b: Dynamic<Vec<u8>> = vec![42u8; 1024].into();
+    let a: Dynamic<Vec<u8>> = black_box(vec![42u8; 1024]).into();
+    let b: Dynamic<Vec<u8>> = black_box(vec![42u8; 1024]).into();
 
     let mut group = c.benchmark_group("dynamic_ct_eq_auto_1kb");
 
     group.bench_function("default_32b", |bencher| {
         bencher.iter(|| black_box(a.ct_eq_auto(&b, None)));
     });
-    group.bench_function("thresh_512_force_ct_eq", |bencher| {
+    group.bench_function("thresh_512_force_hash", |bencher| {
         bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(512))));
     });
     group.bench_function("thresh_2048_force_ct_eq", |bencher| {
@@ -150,10 +150,7 @@ criterion_group!(
     targets = bench_ct_eq_auto_16B_thresholds, bench_ct_eq_auto_32B_thresholds, bench_ct_eq_auto_64B_thresholds,
              bench_ct_eq_auto_128B_dynamic_thresholds, bench_ct_eq_auto_1KiB_dynamic_thresholds
 );
-#[cfg(all(feature = "ct-eq-hash", not(feature = "alloc")))]
-criterion_main!(ct_eq_auto_benches);
-
-#[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
+#[cfg(feature = "ct-eq-hash")]
 criterion_main!(ct_eq_auto_benches);
 
 // No benches when required features are not enabled
