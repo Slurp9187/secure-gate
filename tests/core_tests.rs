@@ -1,11 +1,11 @@
 // tests/core_tests.rs
 // Core API tests for Fixed<T> and Dynamic<T> — v0.8.0 style
 
+#[cfg(feature = "cloneable")]
+use secure_gate::CloneableSecret;
 #[cfg(feature = "alloc")]
 use secure_gate::Dynamic;
 use secure_gate::{ExposeSecret, ExposeSecretMut, Fixed};
-#[cfg(feature = "cloneable")]
-use secure_gate::CloneableSecret;
 
 // === Basic Functionality ===
 
@@ -109,10 +109,6 @@ fn dynamic_vec_from_slice() {
 }
 
 // === TryFrom for Fixed ===
-#[cfg_attr(
-    debug_assertions,
-    should_panic(expected = "Fixed<4> from_slice: expected exactly 4 bytes, got 2")
-)]
 #[test]
 fn fixed_try_from_slice() {
     let slice: &[u8] = &[1u8, 2, 3, 4];
@@ -123,7 +119,6 @@ fn fixed_try_from_slice() {
 
     let short_slice: &[u8] = &[1u8, 2];
     let _fail: Result<Fixed<[u8; 4]>, _> = short_slice.try_into();
-    #[cfg(not(debug_assertions))]
     assert!(_fail.is_err());
 }
 
