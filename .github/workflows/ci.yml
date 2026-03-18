@@ -23,12 +23,12 @@ jobs:
           - name: No features
             features: "--no-default-features"
 
-          # ── Alloc / no-alloc ──────────────────────────────────────────────────
+          # ── Alloc / std ──────────────────────────────────────────────────
           - name: alloc explicit
             features: "--no-default-features --features=alloc"
 
-          - name: no-alloc explicit
-            features: "--no-default-features --features=no-alloc"
+          - name: std explicit
+            features: "--no-default-features --features=std"
 
           # ── Rand ──────────────────────────────────────────────────────────────
           # rand depends on rand/alloc + once_cell/alloc, so alloc is always
