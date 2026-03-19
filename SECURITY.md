@@ -53,7 +53,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `alloc` *(default)*  | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Use `default-features = false` for no-heap builds. | Enable unless on embedded/pure-stack target |
 | `std`                | Full `std` support (implies `alloc`). Adds no additional security surface beyond `alloc`. | Optional; `alloc` is sufficient for most targets |
 | `ct-eq`              | Timing-safe direct byte comparison                                               | Strongly recommended; avoid `==`            |
-| `ct-eq-hash`         | Fast BLAKE3-based equality for large secrets; probabilistic but cryptographically safe | Prefer `ct_eq_auto` for most cases           |
+| `ct-eq-hash`         | Enables `ct_eq_hash` (uniform BLAKE3 digest comparison) and `ct_eq_auto` (hybrid: `ct_eq` ≤ threshold, `ct_eq_hash` > threshold). Probabilistic but cryptographically safe. | Use `ct_eq_hash` for uniform behaviour regardless of size; use `ct_eq_auto` for mixed/variable sizes. |
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
 | `serde-deserialize`  | Direct binary deserialization (arrays/seqs only); no string auto-parsing. Binary-safe, no temporary buffers or ambiguous parsing. Eliminates format confusion attacks and auto-decoding vulnerabilities; forces explicit pre-deserialization decoding via format-specific traits. | Enable for trusted deserialization sources  |
 | `serde-serialize`    | Opt-in export via marker trait; audit all implementations                        | Enable sparingly; monitor exfiltration risk |
@@ -111,11 +111,10 @@ Zero-cost claim: performance indistinguishable from raw arrays; for detailed ben
 
 - The `alloc` feature is enabled by default and provides `Dynamic<T>` with full zeroization; use `default-features = false` for embedded / pure-stack builds (`Fixed<T>` only)
 - Prefer scoped `with_secret()` over long-lived `expose_secret()`
-- For typical fixed-size secrets (keys, nonces, ≤ 64 bytes) prefer `.ct_eq()` for deterministic constant-time comparison; use `ct_eq_auto(…, None)` when sizes are variable or large. See [CT_EQ_AUTO.md](CT_EQ_AUTO.md) for crossover tuning guidance.
+- For equality, prefer `.ct_eq()` for small/fixed-size secrets (keys, nonces, ≤ 64 bytes); use `ct_eq_auto(…, None)` for mixed/variable sizes; use `ct_eq_hash` when uniform behaviour regardless of size is required. All three are constant-time; `ct_eq_hash` / `ct_eq_auto` have negligible collision risk (~2⁻²⁵⁶). Bound input sizes to prevent DoS. See [CT_EQ_AUTO.md](CT_EQ_AUTO.md) for crossover tuning.
 - Audit every `CloneableSecret` / `SerializableSecret` impl
 - Validate and sanitize all inputs before encoding/decoding
 - Use specific format traits (`FromBech32Str`, `FromHexStr`, …) when the expected format is known
-- Probabilistic equality (`ct-eq-hash`): Negligible collision risk (~2⁻²⁵⁶), but use `ct_eq` for deterministic needs; bound input sizes to prevent DoS
 - Monitor dependency CVEs and update regularly
 - Treat secrets as radioactive — minimize exposure surface
 
