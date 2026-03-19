@@ -181,29 +181,105 @@ fn log_length<S: ExposeSecret>(secret: &S) {
 
 ## Encoding
 
-secure-gate provides orthogonal, symmetric per-format traits blanket-implemented on `AsRef<[u8]>` / `AsRef<str>`. Use them inside `with_secret` closures to keep the inner bytes scoped:
+`secure-gate` provides orthogonal, zero-overhead encoding traits for the most common formats. Encoding is **not** a bypass of the exposure rules — it is deliberate, auditable secret exposure with three access patterns:
 
-- `ToHex` / `FromHexStr` — hex (`encoding-hex`)
-- `ToBase64Url` / `FromBase64UrlStr` — base64url (`encoding-base64`)
-- `ToBech32` / `FromBech32Str` — BIP-173 Bech32 (`encoding-bech32`)
-- `ToBech32m` / `FromBech32mStr` — BIP-350 Bech32m (`encoding-bech32m`)
+- **Direct method (`key.to_hex()`)** — ergonomically safest for single operations. No reference in the caller's hands; exposure is entirely internal. Does not appear in `grep expose_secret` / `grep with_secret` sweeps.
+- **`with_secret` closure** — best for multi-step operations and audit-first teams. Borrow checker enforces the reference cannot escape the closure. Appears in `grep with_secret` sweeps.
+- **`expose_secret` + encode** — escape hatch for FFI or third-party APIs requiring `&[u8]`. Chaining immediately is safe; binding to a named variable that outlives the call is the danger.
+
+**Never treat encoded output as non-sensitive** — it contains the entire secret.
+
+Available methods (`E` = encode on bytes/wrapper, `D` = decode from string):
+
+- **Hex** (`encoding-hex`) — E: `to_hex()`, `to_hex_upper()` · D: `"…".try_from_hex()` → `Vec<u8>`
+- **Base64URL** (`encoding-base64`) — E: `to_base64url()` · D: `"…".try_from_base64url()` → `Vec<u8>`
+- **Bech32 BIP-173** (`encoding-bech32`) — E: `try_to_bech32(hrp, limit)` · D (raw): `"…".try_from_bech32_expect_hrp(hrp)` → `Vec<u8>` · D (wrapped): `Fixed::try_from_bech32_expect_hrp(s, hrp)`, `Dynamic::try_from_bech32_expect_hrp(s, hrp)` — prefer `_expect_hrp` over the HRP-discarding `try_from_bech32`
+- **Bech32m BIP-350** (`encoding-bech32m`) — E: `try_to_bech32m(hrp, limit)` · D (raw): `"…".try_from_bech32m_expect_hrp(hrp)` → `Vec<u8>` · D (wrapped): `Fixed::try_from_bech32m_expect_hrp(s, hrp)`, `Dynamic::try_from_bech32m_expect_hrp(s, hrp)` — prefer `_expect_hrp` over `try_from_bech32m`
+
+### Patterns
+
+**Direct convenience method — ergonomically safest for single operations**
+
+No reference in the caller's hands; the exposure is entirely internal and cannot be misused. Recommended for the common single-encode case.
 
 ```rust
 #[cfg(feature = "encoding-hex")]
 {
-    use secure_gate::{Fixed, ToHex, FromHexStr, ExposeSecret};
-
+    use secure_gate::{Fixed, ToHex};
     let key = Fixed::new([0u8; 32]);
-
-    // Encode — operate on exposed bytes inside the closure
-    let hex: String = key.with_secret(|b| b.to_hex());
-
-    // Decode — fallible (use try_ variants to avoid panics)
-    let decoded: Vec<u8> = hex.try_from_hex().unwrap();
+    let hex: String = key.to_hex();
 }
 ```
 
-See [`ToHex`], [`ToBech32`], [`FromHexStr`], and sibling traits in the [API docs](https://docs.rs/secure-gate) for round-trip examples.
+> **Audit note**: Direct calls do not appear in `grep expose_secret` or `grep with_secret` sweeps — see the consolidated grep command at the end of this section.
+
+**`with_secret` closure — best for multi-step operations and audit-first teams**
+
+The borrow checker enforces that the inner reference cannot escape the closure. Preferred when the inner bytes are needed for more than one operation; shows up in `grep with_secret` sweeps.
+
+```rust
+#[cfg(feature = "encoding-bech32")]
+{
+    use secure_gate::{Fixed, ToBech32, ExposeSecret};
+    let key = Fixed::new([0u8; 32]);
+    // Encode and decode in the same scoped access
+    let encoded = key.with_secret(|b| b.try_to_bech32("key", None)).unwrap();
+}
+```
+
+**Manual `expose_secret` + encode — escape hatch only**
+
+Chaining immediately (`key.expose_secret().to_hex()`) is safe — the reference is dropped at the semicolon. The danger is binding to a named variable:
+
+```rust
+// Dangerous: reference outlives the encoding call
+let bytes = key.expose_secret();
+// ... bytes can now be passed to other fns, stored in structs, etc. ...
+let hex = bytes.to_hex();
+```
+
+Use only when inner bytes must be passed to code that does not know about `secure-gate` (FFI, third-party APIs taking `&[u8]` directly). Keep the binding as short-lived as possible.
+
+### Bech32 decoding — prefer `_expect_hrp` variants
+
+When decoding Bech32/Bech32m into a secret wrapper, use the HRP-validating inherent methods on `Fixed` and `Dynamic` rather than the HRP-discarding variants:
+
+```rust
+#[cfg(feature = "encoding-bech32")]
+{
+    use secure_gate::Fixed;
+
+    let encoded_str = "myapp-key1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw"; // example
+
+    // Preferred: validates HRP, returns Bech32Error::UnexpectedHrp on mismatch
+    let key = Fixed::<[u8; 32]>::try_from_bech32_expect_hrp(encoded_str, "myapp-key")
+        .expect("valid bech32 with correct HRP");
+
+    // Avoid in security-critical code: accepts any HRP silently
+    // let key = Fixed::<[u8; 32]>::try_from_bech32(encoded_str).expect("valid bech32");
+}
+```
+
+`try_from_bech32_expect_hrp` / `try_from_bech32m_expect_hrp` compare HRP case-insensitively and prevent cross-protocol confusion attacks.
+
+### Available traits
+
+| Format | Encode | Decode | Infallible? | Feature |
+|---|---|---|---|---|
+| Hex | `ToHex` | `FromHexStr` | Encode yes, decode no | `encoding-hex` |
+| Base64URL | `ToBase64Url` | `FromBase64UrlStr` | Encode yes, decode no | `encoding-base64` |
+| Bech32 (BIP-173) | `ToBech32` | `FromBech32Str` / `Fixed::try_from_bech32_expect_hrp` | No | `encoding-bech32` |
+| Bech32m (BIP-350) | `ToBech32m` | `FromBech32mStr` / `Fixed::try_from_bech32m_expect_hrp` | No | `encoding-bech32m` |
+
+**Decode-side note**: Decoded bytes are plaintext from the moment of decoding until they are wrapped. Wrap the result immediately — avoid binding the intermediate `Vec<u8>` to a long-lived variable.
+
+**Auditing encoding exposure**: Direct wrapper calls (`to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`) do not appear in a standard `expose_secret` / `with_secret` grep. Use this single command to surface all encoding exposure points regardless of pattern:
+
+```sh
+grep -rn 'expose_secret\|with_secret\|\.to_hex\|\.to_base64url\|try_to_bech32\|try_to_bech32m'
+```
+
+See [`ToHex`], [`ToBech32`], [`FromHexStr`], and sibling traits in the [API docs](https://docs.rs/secure-gate) for full method listings and error types.
 
 ## Equality
 

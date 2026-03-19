@@ -10,6 +10,10 @@
 //!
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
+//! - **Audit visibility**: Direct wrapper calls (`key.to_hex()`) do **not** appear in
+//!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
+//!   multi-step operations, prefer `with_secret(|b| b.to_hex())` — the borrow checker
+//!   enforces the reference cannot escape the closure.
 //! - **Treat all input as untrusted**: validate hex strings upstream before wrapping
 //!   in secrets.
 //!
@@ -41,8 +45,9 @@ use ::hex as hex_crate;
 /// *Requires feature `encoding-hex`.*
 ///
 /// Blanket-implemented for all `AsRef<[u8]>` types (byte slices, arrays, `Vec<u8>`).
-/// To encode a secret wrapper, access the inner bytes via `with_secret` first, or
-/// call the wrapper's inherent `to_hex()` method if available.
+/// To encode a secret wrapper, call the inherent `to_hex()` method directly (ergonomically
+/// safest for single operations — no reference in the caller's hands), or use
+/// `with_secret(|b| b.to_hex())` for multi-step operations or when audit-greppability matters.
 #[cfg(feature = "encoding-hex")]
 pub trait ToHex {
     /// Encode bytes as lowercase hexadecimal.

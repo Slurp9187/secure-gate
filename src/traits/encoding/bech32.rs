@@ -10,6 +10,10 @@
 //!
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive.
+//! - **Audit visibility**: Direct wrapper calls (`key.try_to_bech32(...)`) do **not** appear in
+//!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
+//!   multi-step operations, prefer `with_secret(|b| b.try_to_bech32(...))` — the borrow
+//!   checker enforces the reference cannot escape the closure.
 //! - **HRP validation prevents injection attacks**: use `try_to_bech32` with an
 //!   expected HRP to enforce protocol separation; test empty and invalid HRP inputs.
 //! - **Extended limit**: Uses [`Bech32Large`] (8191 Fe32 values, ~5 KB (5,115 bytes maximum payload)) instead

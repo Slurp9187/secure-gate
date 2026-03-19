@@ -8,10 +8,12 @@
 //!
 //! # Security Notes
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
-//!   Use only after explicit `.expose_secret()` and only when the exposure is
-//!   deliberate and protected (encryption, short-lived, etc.).
-//! - **No implicit paths**: You **must** call `.expose_secret()` (or equivalent)
-//!   first — no `Deref` or automatic conversion exists.
+//!   Always treat output as sensitive; do not log or persist without protection.
+//! - **Explicit exposure**: Calling `to_base64url()` on a wrapper is deliberate exposure —
+//!   the same security contract as `with_secret` or `expose_secret`. Direct calls do not
+//!   appear in `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams
+//!   or multi-step operations, prefer `with_secret(|b| b.to_base64url())` — the borrow
+//!   checker enforces the reference cannot escape the closure.
 //! - **URL-safe**: No padding (`=`), safe for URLs/JSON/filenames.
 //!
 //! # Example
@@ -45,8 +47,10 @@ use base64_crate::Engine;
 /// *Requires feature `encoding-base64`.*
 ///
 /// Blanket-implemented for all `AsRef<[u8]>` types. Uses the RFC 4648 URL-safe
-/// alphabet without `=` padding. To encode a secret wrapper, access inner bytes
-/// via `with_secret` first, or call the wrapper's inherent `to_base64url()` method.
+/// alphabet without `=` padding. To encode a secret wrapper, call the inherent
+/// `to_base64url()` method directly (ergonomically safest for single operations), or
+/// use `with_secret(|b| b.to_base64url())` for multi-step operations or when
+/// audit-greppability matters.
 #[cfg(feature = "encoding-base64")]
 pub trait ToBase64Url {
     /// Encode bytes as URL-safe base64 (no padding).

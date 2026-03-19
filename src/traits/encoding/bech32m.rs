@@ -11,6 +11,10 @@
 //!   for Taproot, SegWit v1+, and modern address formats.
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive.
+//! - **Audit visibility**: Direct wrapper calls (`key.try_to_bech32m(...)`) do **not** appear in
+//!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
+//!   multi-step operations, prefer `with_secret(|b| b.try_to_bech32m(...))` — the borrow
+//!   checker enforces the reference cannot escape the closure.
 //! - **HRP validation prevents injection attacks**: use `try_to_bech32m` with an
 //!   expected HRP to enforce protocol separation; test empty and invalid HRP inputs.
 //! - **Standard BIP-350 payload limit (~90 bytes)**: intentionally kept at spec
