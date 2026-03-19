@@ -40,7 +40,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | Direct exposure (escape hatch)    | `expose_secret()` / `expose_secret_mut()` — grep-able, auditable                           |
 | No implicit leaks                 | No `Deref`, `AsRef`, `Copy`, `Clone` (unless `cloneable` + marker)                         |
 | Zeroization                       | Full allocation always wiped on drop; includes `Vec`/`String` spare capacity (inner type must implement `Zeroize`) |
-| Timing safety                     | `ConstantTimeEq` (`.ct_eq()`) for typical small/fixed keys; `ConstantTimeEqExt` / `ct_eq_auto` for large or variable data. Avoid `==`. |
+| Timing safety                     | `ConstantTimeEq` (`.ct_eq()`) for typical small/fixed keys; `ConstantTimeEqExt` / `ct_eq_auto` for large or variable data; `ct_eq_hash` for uniform probabilistic checks. Avoid `==`. |
 | Probabilistic equality (`ct-eq-hash`) | keyed BLAKE3 (when `rand` enabled) or unkeyed; collision risk ~2⁻²⁵⁶ either way (negligible for practical purposes) |
 | Opt-in risky features             | Cloning/serialization gated by marker traits (`CloneableSecret`, `SerializableSecret`)         |
 | Redacted debug                    | `Debug` impl always prints `[REDACTED]`                                                    |

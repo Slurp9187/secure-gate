@@ -207,7 +207,20 @@ See [`ToHex`], [`ToBech32`], [`FromHexStr`], and sibling traits in the [API docs
 
 ## Equality
 
-**For typical fixed-size secrets** (keys, nonces, HMACs — most real-world cases), use plain **`.ct_eq()`**:
+`secure-gate` provides three constant-time equality methods, each with different trade-offs:
+
+- **`ct_eq`** — deterministic, direct byte-by-byte comparison (from `subtle`).
+  Fastest for small/fixed-size secrets (typical crypto keys/nonces ≤ 64 bytes). Zero extra overhead.
+- **`ct_eq_hash`** — probabilistic BLAKE3 digest comparison.
+  Uniform behaviour regardless of size; scales well for large/variable data.
+- **`ct_eq_auto`** — hybrid: chooses `ct_eq` (≤ threshold, default 32 bytes) or `ct_eq_hash` (> threshold).
+  Best default for mixed or unknown sizes.
+
+**Never use plain `==`** on secrets.
+
+### Recommended choices
+
+- **Fixed-size keys/nonces (≤ 64 bytes, most real-world cases)** — use **`ct_eq`**:
 
 ```rust
 #[cfg(feature = "ct-eq")]
@@ -218,12 +231,12 @@ See [`ToHex`], [`ToBech32`], [`FromHexStr`], and sibling traits in the [API docs
     let key_b = Fixed::new([0xAAu8; 32]);
 
     if key_a.ct_eq(&key_b) {
-        // equal — deterministic, constant-time, zero overhead
+        // equal — deterministic, constant-time, fastest for small secrets
     }
 }
 ```
 
-For **variable-size or large secrets**, use **`ct_eq_auto`** — it automatically selects between `ct_eq` (≤ threshold) and BLAKE3 digest comparison (`ct_eq_hash`, > threshold):
+- **Variable-size or large secrets** — use **`ct_eq_auto`** (default threshold 32 bytes):
 
 ```rust
 #[cfg(feature = "ct-eq-hash")]
@@ -234,15 +247,31 @@ For **variable-size or large secrets**, use **`ct_eq_auto`** — it automaticall
     let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
 
     if sig_a.ct_eq_auto(&sig_b, None) {
-        // equal — crossover chosen automatically (default: 32 bytes)
+        // equal — automatically uses ct_eq for small, ct_eq_hash for large
     }
 
-    // Custom crossover (e.g. if benchmarks show ct_eq is faster up to 64 B on your hardware)
+    // Override threshold (e.g. if benchmarks show ct_eq is faster up to 64 bytes)
     sig_a.ct_eq_auto(&sig_b, Some(64));
 }
 ```
 
-Plain `ct_eq_hash` is available for uniform probabilistic behaviour regardless of size. For benchmarks and crossover tuning guidance see [CT_EQ_AUTO.md](CT_EQ_AUTO.md).
+- **Uniform probabilistic behaviour** (regardless of size) — use **`ct_eq_hash`**:
+
+```rust
+#[cfg(feature = "ct-eq-hash")]
+{
+    use secure_gate::{Dynamic, ConstantTimeEqExt};
+
+    let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
+    let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
+
+    if sig_a.ct_eq_hash(&sig_b) {
+        // equal — BLAKE3 digest comparison, constant-time, scales well
+    }
+}
+```
+
+For benchmarks, crossover tuning guidance, and security justification see [CT_EQ_AUTO.md](CT_EQ_AUTO.md).
 
 ## Serde
 

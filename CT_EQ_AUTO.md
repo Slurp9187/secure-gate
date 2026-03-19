@@ -1,5 +1,7 @@
 # Justification for Using `ct_eq_auto` in secure-gate
 
+> See the [Equality section in README.md](README.md#equality) for a quick overview of when to choose `ct_eq`, `ct_eq_hash`, or `ct_eq_auto`.
+
 ## Benchmark Environment
 Benchmarks run on a 2019-era consumer laptop (Intel Core i7-10510U @ 1.80GHz, 8 logical cores, 16GB RAM, Windows 11 Pro) – typical for developers and many production scenarios. Results generalize to similar mid-tier hardware; high-end servers may see even better ct_eq_hash scaling.
 
