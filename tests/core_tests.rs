@@ -147,6 +147,15 @@ fn cloneable_secret_works() {
     assert_eq!(original.0, cloned.0);
     // Verify zeroization on drop works
     drop(original);
+
+    // Wrapper-level clone: Fixed<CloneKey> exposes Clone when CloneableSecret is
+    // implemented, and the clone owns independent heap memory (deep clone semantics).
+    // If the clone were shallow (shared Vec backing), one of the two sequential drops
+    // below would corrupt the other, causing UB or a panic in CloneKey::zeroize.
+    let w: Fixed<CloneKey> = Fixed::new(CloneKey(vec![0xBBu8; 4]));
+    let w2 = w.clone();
+    drop(w);  // zeroizes w's Vec<u8> backing via CloneKey::zeroize
+    drop(w2); // independently zeroizes w2's backing — no UB/panic = independent
 }
 
 // === Random Generation (Fixed) ===

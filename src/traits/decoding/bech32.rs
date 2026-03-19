@@ -52,7 +52,7 @@ use crate::error::Bech32Error;
 /// HRP validation prevents injection attacks and cross-protocol confusion.
 ///
 /// **Extended payload capacity**: Uses the custom `Bech32Large` variant (8191 Fe32
-/// values, ~3.2 KB raw data) — significantly larger than Bech32m's standard 90-byte
+/// values, ~5 KB (5,115 bytes maximum payload)) — significantly larger than Bech32m's standard 90-byte
 /// limit. Strings encoded via [`ToBech32`](crate::ToBech32) round-trip correctly here
 /// but will fail with [`FromBech32mStr`](crate::FromBech32mStr) when they exceed ~90 bytes.
 #[cfg(feature = "encoding-bech32")]

@@ -13,7 +13,6 @@
 //! - **No implicit paths**: You **must** call `.expose_secret()` (or equivalent)
 //!   first — no `Deref` or automatic conversion exists.
 //! - **URL-safe**: No padding (`=`), safe for URLs/JSON/filenames.
-//! - **Redacted alternatives**: For logging/debugging use `to_hex_left` (from `ToHex`).
 //!
 //! # Example
 //!

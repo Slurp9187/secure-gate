@@ -40,6 +40,12 @@ pub enum Bech32Error {
     #[error("invalid Human-Readable Part (HRP)")]
     InvalidHrp,
     /// Bit conversion during encoding/decoding failed.
+    ///
+    /// **Currently unreachable.** After `CheckedHrpstring::new()` succeeds, the
+    /// `.byte_iter()` iterator is infallible — all bit-conversion happens during
+    /// the `new()` call and any failure surfaces as `OperationFailed` instead.
+    /// This variant is preserved as public API for forward compatibility should a
+    /// fallible conversion path be introduced in a future release of the `bech32` crate.
     #[error("bit conversion failed")]
     ConversionFailed,
     /// General bech32 operation failure.

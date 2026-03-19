@@ -121,6 +121,27 @@ fn check_vec_zeroed(size: usize) {
     }); // drop → Vec::zeroize (backing buf zeroed) → backing buf dealloc ← ProxyAllocator checks ✓
 }
 
+// ---------------------------------------------------------------------------
+// Dynamic<String> — backing-buffer zeroization test
+//
+// `Dynamic<String>` wraps a `Box<String>`. The String's backing buffer is
+// heap-allocated separately. `String::zeroize()` zeroes all bytes in the
+// allocated buffer. After `shrink_to_fit` ensures len == capacity == N,
+// the ProxyAllocator confirms all N bytes are zeroed before deallocation.
+// ---------------------------------------------------------------------------
+
+fn check_string_zeroed(size: usize) {
+    with_proxy_check(size, || {
+        let mut secret: Dynamic<String> = Dynamic::new(String::with_capacity(size));
+        secret.with_secret_mut(|s| {
+            // Fill exactly `size` ASCII bytes so len == cap == size after shrink_to_fit.
+            s.extend(std::iter::repeat_n('A', size));
+            s.shrink_to_fit();
+        });
+        core::hint::black_box(&secret);
+    }); // drop → String::zeroize (backing buf zeroed) → backing buf dealloc ← ProxyAllocator checks ✓
+}
+
 /// Verifies both `Dynamic<[u8; N]>` and `Dynamic<Vec<u8>>` zeroize heap memory
 /// before deallocation across all supported sizes.
 ///
@@ -139,4 +160,8 @@ fn all_heap_zeroed() {
     check_vec_zeroed(32);
     check_vec_zeroed(64);
     check_vec_zeroed(128);
+
+    // Dynamic<String> — backing buffers
+    check_string_zeroed(16);
+    check_string_zeroed(32);
 }

@@ -10,8 +10,6 @@
 //!
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
-//! - **Redacted helper**: `to_hex_left` truncates to the first `n` bytes with `…` —
-//!   use this for safe partial display in logs and audit trails.
 //! - **Treat all input as untrusted**: validate hex strings upstream before wrapping
 //!   in secrets.
 //!
@@ -30,10 +28,6 @@
 //!
 //! let hex_upper = secret.with_secret(|s| s.to_hex_upper());
 //! assert_eq!(hex_upper, "0A0B0C0D");
-//!
-//! // Redacted for logs — exposes only first 2 bytes
-//! let redacted = secret.with_secret(|s| s.to_hex_left(2));
-//! assert_eq!(redacted, "0a0b…");
 //!
 //! // Wrapper method (Direct Fixed<[u8; N]> API — same result):
 //! assert_eq!(secret.to_hex(), "0a0b0c0d");
@@ -57,17 +51,6 @@ pub trait ToHex {
     /// Encode bytes as uppercase hexadecimal.
     fn to_hex_upper(&self) -> alloc::string::String;
 
-    /// Encode bytes as lowercase hexadecimal, truncated to the first `bytes` with '…' if longer.
-    ///
-    /// Useful for redacted logging/debugging without exposing the full secret.
-    fn to_hex_left(&self, bytes: usize) -> alloc::string::String {
-        let full = self.to_hex();
-        if full.len() <= bytes * 2 {
-            full
-        } else {
-            format!("{}…", &full[..bytes * 2])
-        }
-    }
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)

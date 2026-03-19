@@ -40,7 +40,11 @@ fn wrapper_ct_eq_dynamic_and_fixed() {
 
 #[cfg(all(not(feature = "ct-eq"), feature = "alloc"))]
 #[test]
-fn partial_eq_fallback() {
+fn manual_comparison_without_ct_eq_feature() {
+    // This demonstrates how secrets can be compared when the `ct-eq` feature is
+    // disabled, but the comparison is NON-constant-time — `assert_eq!` on exposed
+    // slices uses a short-circuit equality check that leaks timing information.
+    // For security-sensitive equality always enable `ct-eq` and use `ConstantTimeEq`.
     use secure_gate::ExposeSecret;
     let dyn1: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
     let dyn2: Dynamic<Vec<u8>> = vec![1, 2, 3].into();

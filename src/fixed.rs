@@ -194,8 +194,37 @@ impl<const N: usize> Fixed<[u8; N]> {
 
 #[cfg(feature = "encoding-bech32")]
 impl<const N: usize> Fixed<[u8; N]> {
+    /// Decodes a Bech32 (BIP-173) string into `Fixed<[u8; N]>`.
+    ///
+    /// # Warning
+    ///
+    /// The HRP is **not validated** — any HRP will be accepted as long as the checksum
+    /// is valid and the payload length equals `N`. For security-critical code where
+    /// cross-protocol confusion must be prevented, use [`try_from_bech32_expect_hrp`](Self::try_from_bech32_expect_hrp).
     pub fn try_from_bech32(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes_raw) = s.try_from_bech32()?;
+        let bytes = zeroize::Zeroizing::new(bytes_raw);
+        if bytes.len() != N {
+            #[cfg(debug_assertions)]
+            return Err(crate::error::Bech32Error::InvalidLength {
+                expected: N,
+                got: bytes.len(),
+            });
+            #[cfg(not(debug_assertions))]
+            return Err(crate::error::Bech32Error::InvalidLength);
+        }
+        let mut arr = [0u8; N];
+        arr.copy_from_slice(&bytes);
+        Ok(Self::new(arr))
+    }
+
+    /// Decodes a Bech32 (BIP-173) string into `Fixed<[u8; N]>`, validating that the HRP
+    /// matches `expected_hrp` (case-insensitive).
+    ///
+    /// Prefer this over [`try_from_bech32`](Self::try_from_bech32) in security-critical code
+    /// to prevent cross-protocol confusion attacks.
+    pub fn try_from_bech32_expect_hrp(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+        let bytes_raw = s.try_from_bech32_expect_hrp(expected_hrp)?;
         let bytes = zeroize::Zeroizing::new(bytes_raw);
         if bytes.len() != N {
             #[cfg(debug_assertions)]
@@ -214,8 +243,37 @@ impl<const N: usize> Fixed<[u8; N]> {
 
 #[cfg(feature = "encoding-bech32m")]
 impl<const N: usize> Fixed<[u8; N]> {
+    /// Decodes a Bech32m (BIP-350) string into `Fixed<[u8; N]>`.
+    ///
+    /// # Warning
+    ///
+    /// The HRP is **not validated** — any HRP will be accepted as long as the checksum
+    /// is valid and the payload length equals `N`. For security-critical code where
+    /// cross-protocol confusion must be prevented, use [`try_from_bech32m_expect_hrp`](Self::try_from_bech32m_expect_hrp).
     pub fn try_from_bech32m(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes_raw) = s.try_from_bech32m()?;
+        let bytes = zeroize::Zeroizing::new(bytes_raw);
+        if bytes.len() != N {
+            #[cfg(debug_assertions)]
+            return Err(crate::error::Bech32Error::InvalidLength {
+                expected: N,
+                got: bytes.len(),
+            });
+            #[cfg(not(debug_assertions))]
+            return Err(crate::error::Bech32Error::InvalidLength);
+        }
+        let mut arr = [0u8; N];
+        arr.copy_from_slice(&bytes);
+        Ok(Self::new(arr))
+    }
+
+    /// Decodes a Bech32m (BIP-350) string into `Fixed<[u8; N]>`, validating that the HRP
+    /// matches `expected_hrp` (case-insensitive).
+    ///
+    /// Prefer this over [`try_from_bech32m`](Self::try_from_bech32m) in security-critical code
+    /// to prevent cross-protocol confusion attacks.
+    pub fn try_from_bech32m_expect_hrp(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+        let bytes_raw = s.try_from_bech32m_expect_hrp(expected_hrp)?;
         let bytes = zeroize::Zeroizing::new(bytes_raw);
         if bytes.len() != N {
             #[cfg(debug_assertions)]
@@ -303,10 +361,13 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
                     vec.push(value);
                 }
                 if vec.len() != M {
+                    #[cfg(debug_assertions)]
                     return Err(serde::de::Error::invalid_length(
                         vec.len(),
                         &M.to_string().as_str(),
                     ));
+                    #[cfg(not(debug_assertions))]
+                    return Err(serde::de::Error::custom("decoded length mismatch"));
                 }
                 let mut arr = [0u8; M];
                 arr.copy_from_slice(&vec);

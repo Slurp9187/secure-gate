@@ -21,6 +21,6 @@ Cargo.lock
 architecture.md
 GROK.md
 state.md
-AUDIT.md
+AUDIT*.md
 prompt.md
 # test_all.sh

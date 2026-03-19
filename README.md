@@ -220,7 +220,7 @@ Plain `ct_eq_hash` is still available for uniform probabilistic behavior. For be
 
 ## Serde
 
-`serde-deserialize` decodes directly to the inner type from a binary sequence — no temporary string buffers or format-confusion attacks. Serialization requires the `SerializableSecret` marker trait on the inner type.
+`serde-deserialize` decodes directly to the inner type from a binary sequence — no temporary string buffers for `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>`; `Dynamic<String>` deserialization delegates to serde internals which may allocate non-zeroized intermediate buffers. No format-confusion attacks. Serialization requires the `SerializableSecret` marker trait on the inner type.
 
 See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for the full example.
 

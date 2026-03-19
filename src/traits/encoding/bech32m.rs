@@ -17,7 +17,7 @@
 //!   compliance for interoperability with Bitcoin Taproot/SegWit v1+ tooling.
 //!   For non-address use cases with large payloads (age-style encryption recipients,
 //!   ciphertexts), use [`ToBech32`](crate::ToBech32) / [`FromBech32Str`](crate::FromBech32Str)
-//!   which use the extended `Bech32Large` variant (~3.2 KB).
+//!   which use the extended `Bech32Large` variant (~5 KB (5,115 bytes maximum payload)).
 //! - **Treat all input as untrusted**: validate data upstream before wrapping.
 //!
 //! # Example

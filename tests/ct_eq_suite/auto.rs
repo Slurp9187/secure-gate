@@ -42,4 +42,23 @@ mod ct_eq_auto_tests {
             a_large.ct_eq_hash(&b_large)
         );
     }
+
+    #[test]
+    fn ct_eq_auto_unequal_below_threshold() {
+        // 16 bytes < default threshold of 32 → dispatches to ct_eq (direct path)
+        let a = Fixed::new([0xAAu8; 16]);
+        let b = Fixed::new([0xBBu8; 16]);
+        assert!(!a.ct_eq_auto(&b, None));         // default threshold
+        assert!(!a.ct_eq_auto(&b, Some(32)));     // explicit threshold above len
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn ct_eq_auto_unequal_above_threshold() {
+        // 64 bytes > default threshold of 32 → dispatches to ct_eq_hash (hash path)
+        let a: Dynamic<Vec<u8>> = vec![0xAAu8; 64].into();
+        let b: Dynamic<Vec<u8>> = vec![0xBBu8; 64].into();
+        assert!(!a.ct_eq_auto(&b, None));         // default threshold
+        assert!(!a.ct_eq_auto(&b, Some(0)));      // force hash path for any length
+    }
 }

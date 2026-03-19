@@ -24,7 +24,7 @@ fn dynamic_deserialize_from_string() {
     assert_eq!(result.expose_secret(), "hello");
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]
+#[cfg(feature = "serde-deserialize")]
 #[test]
 fn fixed_deserialize_wrong_length() {
     use secure_gate::Fixed;

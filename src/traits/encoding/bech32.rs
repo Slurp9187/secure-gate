@@ -12,7 +12,7 @@
 //!   Always treat output as sensitive.
 //! - **HRP validation prevents injection attacks**: use `try_to_bech32` with an
 //!   expected HRP to enforce protocol separation; test empty and invalid HRP inputs.
-//! - **Extended limit**: Uses [`Bech32Large`] (8191 Fe32 values, ~3.2 KB) instead
+//! - **Extended limit**: Uses [`Bech32Large`] (8191 Fe32 values, ~5 KB (5,115 bytes maximum payload)) instead
 //!   of the 90-character standard limit — suitable for large secrets such as
 //!   age-style encryption recipients, ciphertexts, and arbitrary binary payloads.
 //!   For Bitcoin address formats, use [`ToBech32m`](crate::ToBech32m) (BIP-350).
@@ -41,7 +41,7 @@ use bech32::primitives::checksum::Checksum;
 /// Custom Bech32 (BIP-173) checksum variant with an extended payload capacity.
 ///
 /// Matches classic Bech32 checksum behavior but raises the `CODE_LENGTH` limit to
-/// 8191 Fe32 values (~3.2 KB raw data), well above the standard 90-character limit.
+/// 8191 Fe32 values (~5 KB (5,115 bytes maximum payload)), well above the standard 90-character limit.
 /// Used by the [`ToBech32`] trait to support large secrets while preserving full
 /// checksum validation.
 ///

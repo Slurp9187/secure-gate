@@ -7,12 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.0-rc.1] - 2026-03-17
+### Breaking Changes
 
-**Release candidate for 0.8.0**
+- **Removed `ToHex::to_hex_left`** — the redacted-logging helper has been removed from the `ToHex` trait. The function allocated a full hex-encoded `String` of the entire secret and dropped it without zeroization on the truncation path, contradicting its intended "safe for logs" purpose. Callers should construct any redacted output according to their own threat model (e.g. `format!("{}…", &hex[..n])` wrapped in `zeroize::Zeroizing`).
+
+### Security
+
+- **Serde visitor length error now redacted in release builds** (`src/fixed.rs`) — `serde::de::Error::invalid_length(vec.len(), ...)` embedded the actual received byte count unconditionally, inconsistent with every other length-revealing error in the codebase. In release builds the error is now `serde::de::Error::custom("decoded length mismatch")`; debug builds retain the detailed form for diagnostics.
 
 ### Added
 
+- **HRP-validating wrapper constructors** — `Fixed::try_from_bech32_expect_hrp(s, hrp)`, `Fixed::try_from_bech32m_expect_hrp(s, hrp)`, `Dynamic::try_from_bech32_expect_hrp(s, hrp)`, and `Dynamic::try_from_bech32m_expect_hrp(s, hrp)`. These enforce case-insensitive HRP matching at the wrapper level, returning `Bech32Error::UnexpectedHrp` on mismatch. The existing HRP-discarding constructors are retained but now carry a `# Warning` doc note directing security-critical callers to the `_expect_hrp` variants.
+- **`Dynamic<String>` allocator-level zeroization oracle** (`tests/heap_zeroize.rs`) — `check_string_zeroed` helper mirrors `check_vec_zeroed` and verifies via `ProxyAllocator` that the `String` backing buffer is fully zeroed before deallocation. Called at sizes 16 and 32 from the aggregate `all_heap_zeroed` test.
+- **Generic macro test coverage** (`tests/macros_suite/fixed_generic.rs`, `tests/macros_suite/dynamic_generic.rs`) — exercises `fixed_generic_alias!` (basic instantiation at N=16/32, `size_of` check, and an explicit N=0 documentation test showing the absence of a compile-time guard) and `dynamic_generic_alias!` (Vec<u8> and String instantiation). `tests/macros_suite/mod.rs` updated accordingly.
+- **`ct_eq_auto` unequal-data tests** (`tests/ct_eq_suite/auto.rs`) — `ct_eq_auto_unequal_below_threshold` (16-byte `Fixed`, dispatches to direct `ct_eq` path) and `ct_eq_auto_unequal_above_threshold` (64-byte `Dynamic`, dispatches to `ct_eq_hash` path), both asserting `false`. The `ct_eq_auto_threshold_switch` proptest (`tests/proptest_suite/ct_eq.rs`) updated to generate two independently-random vectors so the false-returning path is exercised under both dispatch branches.
 - `std` feature: opt-in full `std` support that implies `alloc`. Use `features = ["std"]` if you need `std`-specific integrations; `alloc` (the default) remains sufficient for all current functionality.
 - **Expanded zeroization integration test coverage** (closes #94):
   - `Fixed<[u8; N]>` tested for N = 8, 16, 32, 64, 128 via a parameterized macro; all cases use `core::hint::black_box` to prevent LLVM from eliding the zeroization write.
@@ -26,8 +34,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All new tests run cleanly under `cargo test --no-default-features`, `cargo test --release --features alloc`, and `cargo +nightly miri test --features alloc`.
 - Added ASan CI job (`asan-heap`) for heap zeroization verification using `cargo +nightly test --features alloc --test heap_zeroize -Z build-std`.
 
+### Fixed
+
+- **Wrong feature gate on `fixed_deserialize_wrong_length` test** (`tests/serde_suite/deserialize.rs`) — the test was gated `#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]`; hex encoding has no relationship to serde deserialization length checking. Corrected to `#[cfg(feature = "serde-deserialize")]` so the error path (including `Zeroizing<Vec<u8>>` drop on length mismatch) is exercised in minimal serde-only feature configurations.
+
 ### Changed
 
+- **`fixed_generic_alias!` implementation notes rewritten** (`src/macros/fixed_generic_alias.rs`) — the previous note inaccurately referred to "a compile-time zero-size guard inherited from `Fixed<[u8; N]>`" that does not exist for generic aliases. The note now explains that `N=0` cannot be rejected at macro-invocation time (unlike `fixed_alias!`), that `SecretBuffer::<0>` compiles to a zero-byte type with no cryptographic utility, and directs callers to validate `N > 0` in their own tests.
+- **`partial_eq_fallback` test renamed** (`tests/ct_eq_suite/basic.rs`) — renamed to `manual_comparison_without_ct_eq_feature` and given an explicit comment warning that the comparison is non-constant-time and that `ct-eq` + `ConstantTimeEq` should be used for security-sensitive equality.
+- **`Bech32Error::ConversionFailed` documented as currently unreachable** (`src/error.rs`) — the variant is never produced: `.byte_iter()` on a successfully-validated `CheckedHrpstring` is infallible in the `bech32` crate; any bit-conversion failure surfaces as `OperationFailed` during the `CheckedHrpstring::new()` call. The variant is retained as public API for forward compatibility.
+- **`Bech32Large` capacity documentation corrected** — all inline docs stated "~3.2 KB raw data"; the correct figure is ~5 KB (5,115 bytes maximum payload). Updated in `src/traits/encoding/bech32.rs`, `src/traits/encoding/bech32m.rs`, and `src/traits/decoding/bech32.rs`.
+- **README serde section scoped** — the "no temporary string buffers" claim now explicitly excludes `Dynamic<String>`, which delegates deserialization to serde internals that may allocate non-zeroized intermediate buffers. `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` retain the guarantee.
+- **`cloneable_secret_works` extended** (`tests/core_tests.rs`) — wrapper-level `Fixed<CloneKey>` clone independence test added: creates a `Fixed<CloneKey>`, clones it, drops the original (triggering zeroization of its `Vec<u8>` backing), and drops the clone. Both sequential drops succeeding without panic proves the clone owns independent heap memory.
+- **`try_from_bech32` / `try_from_bech32m` constructors now document HRP discard** — existing `Fixed` and `Dynamic` wrapper constructors carry a `# Warning` doc note directing security-critical callers to the new `_expect_hrp` variants.
 - Version bump from 0.8.0-alpha.1 to 0.8.0-rc.1.
 - **Breaking**: The `no-alloc` feature has been removed. To build without heap allocation (`Fixed<T>` only, embedded / pure `no_std`), use `default-features = false`. This matches the idiomatic Rust pattern used by `zeroize`, `serde`, `rand`, and others.
 - The `compile_error!` guard that prevented `alloc` and `no-alloc` from being enabled simultaneously has been removed along with `no-alloc`.
@@ -56,7 +75,6 @@ secure-gate = { version = "0.8", default-features = false }
   **Root cause**: Rust's E0367 rule prevents `Drop` impls with bounds stricter than struct bounds. The optional `zeroize` feature created conflicting bounds.  
   **Fix**: Made `zeroize` mandatory (no feature gate), added `T: Zeroize` bounds to struct definitions, and implemented real `Drop` handlers that call `zeroize()`. Zeroization is now guaranteed.  
   **Migration**: Users wrapping non-zeroizable types must implement `Zeroize` on them. Most crypto types already implement `Zeroize` out of the box.
-
 - **All previous versions yanked**: 0.1.0 through 0.7.0-rc.15 were permanently yanked from crates.io on 2026-03-16 due to the above flaw.
 
 ### Breaking Changes
@@ -78,14 +96,12 @@ secure-gate = { version = "0.8", default-features = false }
   - `dynamic_direct_zeroize_vec` / `dynamic_direct_zeroize_string` — `.zeroize()` empties the heap contents of `Dynamic<Vec<u8>>` and `Dynamic<String>`
   - `dynamic_spare_capacity_vec_zeroized` — `PanicOnNonZeroDrop` + `set_len` restore pattern verifies `Vec::zeroize()` byte-zeroes spare capacity (memory beyond `len` but within `cap`) via `with_secret_mut`
   - `dynamic_needs_drop` / `dynamic_needs_drop_string` — confirms real destructors exist for both heap variants
-
 - **Heap-level zeroize verification** (`tests/heap_zeroize.rs`, issue #93)  
   Dedicated integration test binary with a `ProxyAllocator` (adapted from upstream
   `zeroize/tests/alloc.rs`) that intercepts OS deallocations and asserts all bytes of a
   `Dynamic<[u8; 64]>` backing allocation are zero before the memory is freed. Uses an
   `AtomicBool` guard to confine the assertion to the test's lifetime, preventing false
   positives from unrelated test-harness allocations of the same size.
-
 - **Test suite reorganized** into domain-based directory suites (`ct_eq_suite/`,
   `encoding_suite/`, `serde_suite/`, `macros_suite/`, `proptest_suite/`) compiled into a
   single `integration` binary. Standalone binaries (`core_tests`, `error_tests`,
@@ -93,15 +109,12 @@ secure-gate = { version = "0.8", default-features = false }
   auto-discovered by `cargo test --tests`. Replaced all old monolithic test files (`tests/codec/`,
   `tests/ct_eq_auto.rs`, `tests/ct_eq_tests.rs`, `tests/proptest_tests.rs`, `tests/serde/`,
   `tests/macros/`, `tests/insecure_tests.rs`).
-
-- **`tests/common.rs`**: shared helper module with `assert_redacted_debug` and
+- `**tests/common.rs`\*\*: shared helper module with `assert_redacted_debug` and
   `ExposeSecret`/`ExposeSecretMut` re-exports available to all suite sub-modules.
-
 - **Bech32/Bech32m error-path test coverage** (`tests/encoding_suite/bech32.rs`): six new
   tests trigger actual `Bech32Error` variants through encode/decode calls — invalid HRP
   encoding, malformed string decoding, and decode-side HRP validation (happy path and
   mismatch) for both `bech32` and `bech32m`.
-
 - **Fuzz targets**: new `fuzz/fuzz_targets/encoding.rs`, `serde.rs`, and `ct_eq.rs` covering
   encoding round-trips for all four formats, serde serialize/deserialize, and constant-time
   equality. Expanded `expose.rs`, `mut.rs`, `parsing.rs`, and `fuzz/src/arbitrary.rs`.
@@ -109,19 +122,16 @@ secure-gate = { version = "0.8", default-features = false }
 ### Fixed
 
 - Updated trybuild snapshots to resolve CI mismatches for all feature configurations.
-
-- **`benches/ct_eq_auto.rs`**: Wrapped all inputs outside `iter` in `std::hint::black_box()` to prevent constant-folding (matches fix already applied in `fixed_vs_raw.rs`). Corrected four inverted benchmark names where `_force_ct_eq`/`_force_hash` labels contradicted the actual threshold path taken (`ct_eq_auto` selects `ct_eq` when `len ≤ threshold`, `ct_eq_hash` when `len > threshold`). Collapsed duplicate `criterion_main!` pair into a single `#[cfg(feature = "ct-eq-hash")]` call.
-
-- **`benches/ct_eq_hash_vs_standard.rs`**: Same `black_box()` fix on inputs. Added missing top-level imports (`ConstantTimeEq`, `ConstantTimeEqExt`, `Fixed`, `Dynamic`) — the bench previously failed to compile under `--features ct-eq-hash,alloc,rand`. Removed a redundant outer `#[cfg(feature = "ct-eq-hash")]` wrapping an already-specific inner `#[cfg(all(...))]`; collapsed duplicate `criterion_main!`.
-
-- **`benches/serde.rs`**: Removed unused `extern crate alloc;` and corrected run command to `--features serde`. Added `#[derive(zeroize::Zeroize)]` to the local helper types (`SerializableArray32`, `SerializableVec`, `SerializableString`) — without it they could not be wrapped in `Fixed<T>`/`Dynamic<T>` (both require `T: Zeroize`), so the bench never exercised wrapper serialization at all. Added `Fixed<SerializableArray32>`, `Dynamic<SerializableVec>`, and `Dynamic<SerializableString>` serialize benchmarks alongside the existing newtype/raw comparisons, confirming zero-overhead delegation. Consolidated scattered local `use` statements into a single top-level import; fixed `.clone()` calls on non-`Clone` types. Moved 1 MB fixture allocation outside `iter()` so large benchmarks measure serialization rather than alloc + 2 × 1 MB `zeroize-on-drop` per sample.
+- `**benches/ct_eq_auto.rs`\*\*: Wrapped all inputs outside `iter` in `std::hint::black_box()` to prevent constant-folding (matches fix already applied in `fixed_vs_raw.rs`). Corrected four inverted benchmark names where `_force_ct_eq`/`_force_hash` labels contradicted the actual threshold path taken (`ct_eq_auto` selects `ct_eq` when `len ≤ threshold`, `ct_eq_hash` when `len > threshold`). Collapsed duplicate `criterion_main!` pair into a single `#[cfg(feature = "ct-eq-hash")]` call.
+- `**benches/ct_eq_hash_vs_standard.rs**`: Same `black_box()` fix on inputs. Added missing top-level imports (`ConstantTimeEq`, `ConstantTimeEqExt`, `Fixed`, `Dynamic`) — the bench previously failed to compile under `--features ct-eq-hash,alloc,rand`. Removed a redundant outer `#[cfg(feature = "ct-eq-hash")]` wrapping an already-specific inner `#[cfg(all(...))]`; collapsed duplicate `criterion_main!`.
+- `**benches/serde.rs**`: Removed unused `extern crate alloc;` and corrected run command to `--features serde`. Added `#[derive(zeroize::Zeroize)]` to the local helper types (`SerializableArray32`, `SerializableVec`, `SerializableString`) — without it they could not be wrapped in `Fixed<T>`/`Dynamic<T>` (both require `T: Zeroize`), so the bench never exercised wrapper serialization at all. Added `Fixed<SerializableArray32>`, `Dynamic<SerializableVec>`, and `Dynamic<SerializableString>` serialize benchmarks alongside the existing newtype/raw comparisons, confirming zero-overhead delegation. Consolidated scattered local `use` statements into a single top-level import; fixed `.clone()` calls on non-`Clone` types. Moved 1 MB fixture allocation outside `iter()` so large benchmarks measure serialization rather than alloc + 2 × 1 MB `zeroize-on-drop` per sample.
 
 ### Changed
 
 - Zeroization is no longer optional — always enabled and enforced.
 - Documentation updated throughout to reflect mandatory zeroize requirement.
 - `alloc` feature now enables `zeroize/alloc` for full spare-capacity wiping in `Dynamic<Vec<T>>`/`Dynamic<String>`.
-- **`CT_EQ_AUTO.md`**: Refreshed all performance figures from a clean-machine run after the `black_box` fixes. Key corrections: 32 B ratio 1.7× → 2.3× (`ct_eq` ~127 ns, `ct_eq_hash` ~288 ns); 100 KB figures reflect the permanent increase from `zeroize-on-drop` overhead (~169 µs vs ~565 µs, ~3.3×, not the pre-zeroize 6.5×); raw hash overhead corrected to ~59–75 ns; caching note now distinguishes 32 B cache miss (~6%) from 1 KB alloc+zeroize cost (~70%); threshold crossover confirmed closer to 64 B; outlier ceiling ≤8% → ≤20%.
+- `**CT_EQ_AUTO.md**`: Refreshed all performance figures from a clean-machine run after the `black_box` fixes. Key corrections: 32 B ratio 1.7× → 2.3× (`ct_eq` ~~127 ns, `ct_eq_hash` ~288 ns); 100 KB figures reflect the permanent increase from `zeroize-on-drop` overhead (~~169 µs vs ~~565 µs, ~3.3×, not the pre-zeroize 6.5×); raw hash overhead corrected to ~59–75 ns; caching note now distinguishes 32 B cache miss (~~6%) from 1 KB alloc+zeroize cost (~70%); threshold crossover confirmed closer to 64 B; outlier ceiling ≤8% → ≤20%.
 
 ### Migration
 
