@@ -11,11 +11,12 @@ fn fixed_alias_zero_size_compile_fail() {
     t.compile_fail("tests/compile-fail/fixed_alias_zero_size.rs");
 }
 
-// // This case asserts serde-bound misuse diagnostics for wrapper serialization.
-// // It requires both alloc-backed Dynamic<T> and serde Serialize impls to exist.
-// #[cfg(all(feature = "alloc", feature = "serde-serialize"))]
-// #[test]
-// fn serializable_secret_misuse() {
-//     let t = trybuild::TestCases::new();
-//     t.compile_fail("tests/compile-fail/serializable_secret_misuse.rs");
-// }
+// Compile-fail test for SerializableSecret opt-in requirement.
+// Skipped under Miri because trybuild spawns cargo subprocesses (forbidden syscalls).
+#[cfg(all(feature = "alloc", feature = "serde-serialize"))]
+#[cfg(not(miri))]
+#[test]
+fn serializable_secret_misuse() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/serializable_secret_misuse.rs");
+}
