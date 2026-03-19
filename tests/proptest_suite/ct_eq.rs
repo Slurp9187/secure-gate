@@ -8,10 +8,23 @@ mod tests {
     dynamic_alias!(TestDynamic, Vec<u8>);
 
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(50))]
+        #![proptest_config(ProptestConfig::with_cases(256))]
 
         #[test]
-        fn ct_eq_symmetric(a in prop::collection::vec(any::<u8>(), 0usize..256), b in prop::collection::vec(any::<u8>(), 0usize..256)) {
+        fn ct_eq_symmetric(
+            a in prop_oneof![
+                Just(vec![]),
+                prop::collection::vec(any::<u8>(), 1..=1),
+                Just(vec![0xFFu8; 255]),
+                prop::collection::vec(any::<u8>(), 0usize..256),
+            ],
+            b in prop_oneof![
+                Just(vec![]),
+                prop::collection::vec(any::<u8>(), 1..=1),
+                Just(vec![0x00u8; 255]),
+                prop::collection::vec(any::<u8>(), 0usize..256),
+            ]
+        ) {
             let da: TestDynamic = a.clone().into();
             let db: TestDynamic = b.clone().into();
             prop_assert_eq!(da.ct_eq(&db), db.ct_eq(&da));
@@ -27,7 +40,7 @@ mod auto_threshold_tests {
     dynamic_alias!(TestDynamic2, Vec<u8>);
 
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(50))]
+        #![proptest_config(ProptestConfig::with_cases(256))]
 
         #[test]
         fn ct_eq_auto_threshold_switch(

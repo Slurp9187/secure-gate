@@ -16,10 +16,15 @@ mod tests {
     impl SerializableSecret for SerializableKey {}
 
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(30))]
+        #![proptest_config(ProptestConfig::with_cases(256))]
 
         #[test]
-        fn serializable_vec_roundtrip(data in prop::collection::vec(any::<u8>(), 0usize..128)) {
+        fn serializable_vec_roundtrip(data in prop_oneof![
+            Just(vec![]),
+            prop::collection::vec(any::<u8>(), 1..=1),
+            Just(vec![0xAAu8; 127]),
+            prop::collection::vec(any::<u8>(), 0usize..128),
+        ]) {
             let value = SerializableVec(data.clone());
             let json = serde_json::to_string(&value).expect("serialize");
             let decoded: SerializableVec = serde_json::from_str(&json).expect("deserialize");
