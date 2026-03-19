@@ -6,7 +6,7 @@ Benchmarks run on a 2019-era consumer laptop (Intel Core i7-10510U @ 1.80GHz, 8 
 ## Overview
 `ct_eq_auto` is the recommended hybrid constant-time equality method in secure-gate, automatically selecting between direct byte comparison (`ct_eq`, using `subtle`) and probabilistic BLAKE3 hashing (`ct_eq_hash`) based on input size. The default 32-byte threshold optimizes for mixed workloads: ≤32 bytes use fast deterministic `ct_eq`; >32 bytes use secure hashing. In `--all-features` mode, BLAKE3 uses keyed mode (enabled via `rand` feature) for enhanced resistance to multi-target precomputation attacks.
 
-This report justifies `ct_eq_auto` as the best choice for most equality checks, backed by benchmarks, security analysis, and practical benefits.
+This report benchmarks and justifies `ct_eq_auto` as the recommended choice for variable-size or large secrets, and explains when plain `ct_eq` is preferable.
 
 ## Performance Data
 Benchmarks confirm `ct_eq_auto`'s default selection is near-optimal, outperforming manual choices unless heavily skewed workloads. All results from Criterion benches in `--all-features` (keyed BLAKE3 enabled), averaged across multiple runs for reliability.
@@ -41,7 +41,35 @@ Multi-run benchmarks (3x on 2019 Intel i7-10510U/16GB/Windows 11) show stable va
 - **Easy tuning**: Pass `Some(n)` to `ct_eq_auto` for custom thresholds (e.g., `ct_eq_auto(&a, &b, Some(64))` for larger small-input cutoff). Benchmark for gains.
 - **Auto-selection pros**: Zero overhead for small data; security for large. Justifies "auto" name.
 - **Cons**: Probabilistic for >32B; tune threshold if benchmarks show >10% gains.
-- **When to use**: 99% of cases — ideal for unknown/variable secret sizes. Fall back to `ct_eq` (deterministic) or `ct_eq_hash` (uniform probabilistic) only if needed.
+- **When to use**: Variable or large secrets, or when a single consistent equality API is preferred. For small/fixed-size keys and nonces (the most common case), plain `ct_eq` is faster and fully sufficient.
 
 ## Recommendation
-Use `ct_eq_auto` with default `None` for optimal balance. Data shows it delivers best average performance/security. If workloads are uniform (all small/large), tune for marginal gains — but default is fine for most. Bench your hardware for final validation.
+
+For **most typical use cases** (fixed-size cryptographic keys, nonces, HMAC keys, signatures ≤ 64 bytes), use plain `.ct_eq()` — it is fastest, fully deterministic, constant-time, and has zero extra overhead:
+
+```rust
+#[cfg(feature = "ct-eq")]
+if a.ct_eq(&b) { /* equal */ }
+```
+
+Use **`ct_eq_auto(None)`** (default 32-byte threshold) when:
+
+- Secret sizes are **variable** or **unknown** at compile time
+- You want to **hide length-based side channels** for large inputs
+- You have **mixed sizes** and prefer a single consistent API
+
+```rust
+// Variable or mixed sizes
+if a.ct_eq_auto(&b, None) { /* equal */ }
+
+// Tune the crossover based on your own benchmarks
+if a.ct_eq_auto(&b, Some(64)) { /* equal */ }
+```
+
+`ct_eq_hash` (uniform probabilistic) is available when you want consistent behaviour regardless of size.
+
+**Bottom line:**
+- Small/fixed secrets (typical crypto keys/nonces, ≤ 64 bytes) → prefer `.ct_eq()`
+- Variable/large/mixed data → prefer `ct_eq_auto(None)`
+
+Bench your specific workload and hardware if the default threshold feels suboptimal — most users never need to tune it.

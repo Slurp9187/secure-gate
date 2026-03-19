@@ -40,7 +40,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | Direct exposure (escape hatch)    | `expose_secret()` / `expose_secret_mut()` — grep-able, auditable                           |
 | No implicit leaks                 | No `Deref`, `AsRef`, `Copy`, `Clone` (unless `cloneable` + marker)                         |
 | Zeroization                       | Full allocation always wiped on drop; includes `Vec`/`String` spare capacity (inner type must implement `Zeroize`) |
-| Timing safety                     | `ConstantTimeEq` for direct comparison; `ConstantTimeEqExt` / `ct_eq_auto` for large/variable data   |
+| Timing safety                     | `ConstantTimeEq` (`.ct_eq()`) for typical small/fixed keys; `ConstantTimeEqExt` / `ct_eq_auto` for large or variable data. Avoid `==`. |
 | Probabilistic equality (`ct-eq-hash`) | keyed BLAKE3 (when `rand` enabled) or unkeyed; collision risk ~2⁻²⁵⁶ either way (negligible for practical purposes) |
 | Opt-in risky features             | Cloning/serialization gated by marker traits (`CloneableSecret`, `SerializableSecret`)         |
 | Redacted debug                    | `Debug` impl always prints `[REDACTED]`                                                    |
@@ -111,7 +111,7 @@ Zero-cost claim: performance indistinguishable from raw arrays; for detailed ben
 
 - The `alloc` feature is enabled by default and provides `Dynamic<T>` with full zeroization; use `default-features = false` for embedded / pure-stack builds (`Fixed<T>` only)
 - Prefer scoped `with_secret()` over long-lived `expose_secret()`
-- Use `ct_eq_auto(…, None)` for general-purpose equality checks; customize the threshold (e.g., `Some(64)`, `Some(1024)`) based on your benchmarks if the default 32 bytes isn't optimal. For detailed justification, see [CT_EQ_AUTO.md](CT_EQ_AUTO.md)
+- For typical fixed-size secrets (keys, nonces, ≤ 64 bytes) prefer `.ct_eq()` for deterministic constant-time comparison; use `ct_eq_auto(…, None)` when sizes are variable or large. See [CT_EQ_AUTO.md](CT_EQ_AUTO.md) for crossover tuning guidance.
 - Audit every `CloneableSecret` / `SerializableSecret` impl
 - Validate and sanitize all inputs before encoding/decoding
 - Use specific format traits (`FromBech32Str`, `FromHexStr`, …) when the expected format is known

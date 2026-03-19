@@ -20,7 +20,9 @@
 - Removed `zeroize`, `insecure`, `secure`, and `std` feature toggles.
 - Real `impl Drop` now calls `zeroize()` — the original security promise is finally true.
 
-**All versions 0.1.0–0.7.0-rc.15 were yanked** due to a critical flaw: automatic zeroize-on-drop was documented but never implemented (only manual `.zeroize()` worked).
+- **All versions 0.1.0–0.7.0-rc.15 were yanked** from crates.io due to a critical zeroize-on-drop flaw that has now been fixed.
+
+- **Zeroization test suite greatly expanded** — multi-size coverage, spare-capacity checks for both Vec and String, runtime heap-byte verification via ProxyAllocator, and AddressSanitizer integration.
 
 ## What You Get
 
@@ -56,14 +58,25 @@ pw.with_secret_mut(|s: &mut String| s.push('!'));
 assert_eq!(pw.expose_secret(), "hunter2!");
 pw.expose_secret_mut().clear();
 
-// Encoding — operate on the exposed inner bytes
 #[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
 {
-    use secure_gate::{Fixed, ToHex, ToBech32, FromHexStr, ExposeSecret};
+    use secure_gate::{Fixed, ExposeSecret, ToHex, ToBech32, FromHexStr};
+
     let key: Fixed<[u8; 32]> = Fixed::new([42u8; 32]);
-    let hex    = key.with_secret(|b| b.to_hex());
-    let bech32 = key.with_secret(|b| b.try_to_bech32("key", None).unwrap());  // BIP-173
-    let _      = hex.try_from_hex().unwrap();  // decode back
+
+    // Encode to hex (scoped borrow — no long-lived reference)
+    let hex: String = key.with_secret(|bytes| bytes.to_hex());
+
+    // Encode to Bech32 (BIP-173) with human-readable prefix "key"
+    let bech32: String = key.with_secret(|bytes| {
+        bytes.try_to_bech32("key", None).expect("valid bech32")
+    });
+
+    // Round-trip demonstration (decode hex back to bytes)
+    let decoded: Vec<u8> = hex.try_from_hex().expect("valid hex");
+
+    // Optional: assert round-trip (useful in real code / tests)
+    key.with_secret(|original| assert_eq!(decoded, original));
 }
 ```
 
@@ -194,10 +207,23 @@ See [`ToHex`], [`ToBech32`], [`FromHexStr`], and sibling traits in the [API docs
 
 ## Equality
 
-Use **`ct_eq_auto`** — it automatically picks the optimal method based on input size:
+**For typical fixed-size secrets** (keys, nonces, HMACs — most real-world cases), use plain **`.ct_eq()`**:
 
-- Small inputs (≤ 32 bytes default): deterministic `ct_eq` (timing-safe direct comparison)
-- Large / variable inputs: BLAKE3 digest comparison via `ct_eq_hash`
+```rust
+#[cfg(feature = "ct-eq")]
+{
+    use secure_gate::{Fixed, ConstantTimeEq};
+
+    let key_a = Fixed::new([0xAAu8; 32]);
+    let key_b = Fixed::new([0xAAu8; 32]);
+
+    if key_a.ct_eq(&key_b) {
+        // equal — deterministic, constant-time, zero overhead
+    }
+}
+```
+
+For **variable-size or large secrets**, use **`ct_eq_auto`** — it automatically selects between `ct_eq` (≤ threshold) and BLAKE3 digest comparison (`ct_eq_hash`, > threshold):
 
 ```rust
 #[cfg(feature = "ct-eq-hash")]
@@ -208,7 +234,7 @@ Use **`ct_eq_auto`** — it automatically picks the optimal method based on inpu
     let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
 
     if sig_a.ct_eq_auto(&sig_b, None) {
-        // equal — crossover chosen automatically
+        // equal — crossover chosen automatically (default: 32 bytes)
     }
 
     // Custom crossover (e.g. if benchmarks show ct_eq is faster up to 64 B on your hardware)
@@ -216,11 +242,11 @@ Use **`ct_eq_auto`** — it automatically picks the optimal method based on inpu
 }
 ```
 
-Plain `ct_eq_hash` is still available for uniform probabilistic behavior. For benchmarks and crossover tuning guidance see [CT_EQ_AUTO.md](CT_EQ_AUTO.md).
+Plain `ct_eq_hash` is available for uniform probabilistic behaviour regardless of size. For benchmarks and crossover tuning guidance see [CT_EQ_AUTO.md](CT_EQ_AUTO.md).
 
 ## Serde
 
-`serde-deserialize` decodes directly to the inner type from a binary sequence — no temporary string buffers for `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>`; `Dynamic<String>` deserialization delegates to serde internals which may allocate non-zeroized intermediate buffers. No format-confusion attacks. Serialization requires the `SerializableSecret` marker trait on the inner type.
+`serde-deserialize` decodes directly to the inner type from a binary sequence — no temporary string buffers for `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>`. `Dynamic<String>` uses serde’s built-in deserializer (minimal allocation). Serialization requires the `SerializableSecret` marker trait on the inner type.
 
 See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for the full example.
 
