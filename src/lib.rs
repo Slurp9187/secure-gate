@@ -5,8 +5,6 @@
 
 //! secure-gate — Secure secret wrappers with explicit access & automatic zeroization
 //!
-//! **Alpha release after yanking all prior versions due to a critical zeroize-on-drop bug.**
-//!
 //! Secrets are **automatically zeroized on drop** (inner type must implement [`Zeroize`](zeroize::Zeroize)).
 //! Explicit access only via [`ExposeSecret`]/[`ExposeSecretMut`] — no `Deref`, no accidental leaks.
 //! `Debug` always prints `[REDACTED]`.
@@ -31,7 +29,7 @@
 //! `no_std` compatible. [`Fixed<T>`] works without `alloc`. Enable `alloc` (default) for
 //! [`Dynamic<T>`]. For pure stack / embedded builds, use `default-features = false`.
 //!
-//! See [README](https://github.com/Slurp9187/secure-gate) and
+//! See [README](https://github.com/Slurp9187/secure-gate/blob/main/README.md) and
 //! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for full details.
 
 #[cfg(feature = "alloc")]
