@@ -231,10 +231,15 @@ The borrow checker enforces that the inner reference cannot escape the closure. 
 Chaining immediately (`key.expose_secret().to_hex()`) is safe — the reference is dropped at the semicolon. The danger is binding to a named variable:
 
 ```rust
-// Dangerous: reference outlives the encoding call
-let bytes = key.expose_secret();
-// ... bytes can now be passed to other fns, stored in structs, etc. ...
-let hex = bytes.to_hex();
+#[cfg(feature = "encoding-hex")]
+{
+    use secure_gate::{Fixed, ExposeSecret, ToHex};
+    let key = Fixed::new([0u8; 32]);
+    // Dangerous: reference outlives the encoding call
+    let bytes = key.expose_secret();
+    // ... bytes can now be passed to other fns, stored in structs, etc. ...
+    let hex = bytes.to_hex();
+}
 ```
 
 Use only when inner bytes must be passed to code that does not know about `secure-gate` (FFI, third-party APIs taking `&[u8]` directly). Keep the binding as short-lived as possible.
@@ -248,14 +253,16 @@ When decoding Bech32/Bech32m into a secret wrapper, use the HRP-validating inher
 {
     use secure_gate::Fixed;
 
-    let encoded_str = "myapp-key1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw"; // example
+    // BIP-173 test vector — valid checksum, HRP = "abcdef", payload = 20 bytes
+    let encoded_str = "abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw";
 
     // Preferred: validates HRP, returns Bech32Error::UnexpectedHrp on mismatch
-    let key = Fixed::<[u8; 32]>::try_from_bech32_with_hrp(encoded_str, "myapp-key")
+    let key = Fixed::<[u8; 20]>::try_from_bech32_with_hrp(encoded_str, "abcdef")
         .expect("valid bech32 with correct HRP");
 
     // Avoid in security-critical code: accepts any HRP silently
-    // let key = Fixed::<[u8; 32]>::try_from_bech32(encoded_str).expect("valid bech32");
+    // let key = Fixed::<[u8; 20]>::try_from_bech32(encoded_str).expect("valid bech32");
+    let _ = key;
 }
 ```
 
