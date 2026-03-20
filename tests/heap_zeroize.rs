@@ -130,6 +130,27 @@ fn check_vec_zeroed(size: usize) {
 // the ProxyAllocator confirms all N bytes are zeroed before deallocation.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Dynamic<Vec<u8>> — decode-path backing-buffer zeroization test
+//
+// Verifies that decoding into a `Dynamic<Vec<u8>>` via `try_from_hex` and then
+// dropping the result correctly zeroizes the backing buffer. This exercises the
+// `protect_decode_result` path added in issue #96.
+//
+// Note: on the error path (invalid input) no `Vec` is returned by the decoder,
+// so there is no intermediate buffer for `Zeroizing` to clean up — the `?`
+// propagates before our code ever holds bytes. The protection provided by the
+// `Zeroizing` wrapper is for panics between a *successful* decode and `Self::new`.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "encoding-hex")]
+fn check_decode_temp_zeroed(hex: &str, expected_len: usize) {
+    with_proxy_check(expected_len, || {
+        let secret = Dynamic::<Vec<u8>>::try_from_hex(hex).expect("valid hex");
+        core::hint::black_box(&secret);
+    }); // drop → Vec::zeroize (backing buf zeroed) → backing buf dealloc ← ProxyAllocator checks ✓
+}
+
 fn check_string_zeroed(size: usize) {
     with_proxy_check(size, || {
         let mut secret: Dynamic<String> = Dynamic::new(String::with_capacity(size));
@@ -164,4 +185,12 @@ fn all_heap_zeroed() {
     // Dynamic<String> — backing buffers
     check_string_zeroed(16);
     check_string_zeroed(32);
+
+    // Dynamic<Vec<u8>> decode path — verify backing buffer is zeroized after
+    // decoding via try_from_hex and dropping the result (#96)
+    #[cfg(feature = "encoding-hex")]
+    {
+        check_decode_temp_zeroed("deadbeef", 4);
+        check_decode_temp_zeroed("0102030405060708090a0b0c0d0e0f10", 16);
+    }
 }

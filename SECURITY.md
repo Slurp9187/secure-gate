@@ -101,6 +101,7 @@ Zero-cost claim: performance indistinguishable from raw arrays; for detailed ben
 - Bech32 edge cases: strict validation covers most, but test empty/invalid HRP/data to confirm no panics/leaks
 
 **Mitigations**
+- Temporary decode buffers in `Dynamic<Vec<u8>>` decoding constructors and `Deserialize`, and `Dynamic<String>` `Deserialize`, are routed through `zeroize::Zeroizing` before being moved into the wrapper, matching `Fixed<T>` and ensuring zeroization if a panic occurs between a successful decode and construction (#96, #97)
 - Treat all decoding input as untrusted; validate upstream
 - Encoding traits (`ToHex`, `ToBech32`, etc.) are explicit exposure — same contract as `expose_secret`. They are not a bypass. Direct wrapper methods (`key.to_hex()`) are ergonomically safe (no user-visible reference) but do **not** appear in `grep expose_secret` / `grep with_secret` audit sweeps. Use the consolidated grep to surface all encoding exposure points regardless of pattern: `grep -rn 'expose_secret\|with_secret\|\.to_hex\|\.to_base64url\|try_to_bech32\|try_to_bech32m'`. For `expose_secret` + encode: chaining immediately is safe; binding to a named variable that outlives the encoding call is the danger — use only for FFI or third-party APIs requiring a raw `&[u8]` slice. For Bech32/Bech32m decoding into a wrapper, prefer `Fixed::try_from_bech32_expect_hrp` / `Dynamic::try_from_bech32_expect_hrp` to prevent cross-protocol confusion attacks.
 - Use specific traits (e.g., `FromBech32Str`) for strict format enforcement

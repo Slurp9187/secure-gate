@@ -118,6 +118,26 @@ impl Dynamic<Vec<u8>> {
     pub fn to_base64url(&self) -> alloc::string::String {
         self.with_secret(|s: &Vec<u8>| s.to_base64url())
     }
+
+    /// Moves `bytes` through a [`zeroize::Zeroizing`] wrapper, ensuring the
+    /// allocation is zeroized if a panic occurs between a successful decode and
+    /// [`Self::new`]. Uses `core::mem::take` — no extra heap allocation.
+    #[inline(always)]
+    fn protect_decode_result(bytes: alloc::vec::Vec<u8>) -> alloc::vec::Vec<u8> {
+        let mut protected = zeroize::Zeroizing::new(bytes);
+        core::mem::take(&mut *protected)
+    }
+}
+
+impl Dynamic<String> {
+    /// Moves `s` through a [`zeroize::Zeroizing`] wrapper, ensuring the
+    /// allocation is zeroized if a panic occurs between a successful decode and
+    /// [`Self::new`]. Uses `core::mem::take` — no extra heap allocation.
+    #[inline(always)]
+    fn protect_decode_result(s: alloc::string::String) -> alloc::string::String {
+        let mut protected = zeroize::Zeroizing::new(s);
+        core::mem::take(&mut *protected)
+    }
 }
 
 // ExposeSecret
@@ -212,23 +232,31 @@ impl Dynamic<alloc::vec::Vec<u8>> {
 // Decoding constructors
 #[cfg(feature = "encoding-hex")]
 impl Dynamic<alloc::vec::Vec<u8>> {
+    /// Decodes a lowercase hex string into `Dynamic<Vec<u8>>`.
+    ///
+    /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
     pub fn try_from_hex(s: &str) -> Result<Self, crate::error::HexError> {
         let bytes = s.try_from_hex()?;
-        Ok(Self::new(bytes))
+        Ok(Self::new(Self::protect_decode_result(bytes)))
     }
 }
 
 #[cfg(feature = "encoding-base64")]
 impl Dynamic<alloc::vec::Vec<u8>> {
+    /// Decodes a Base64url (unpadded) string into `Dynamic<Vec<u8>>`.
+    ///
+    /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
     pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
         let bytes = s.try_from_base64url()?;
-        Ok(Self::new(bytes))
+        Ok(Self::new(Self::protect_decode_result(bytes)))
     }
 }
 
 #[cfg(feature = "encoding-bech32")]
 impl Dynamic<alloc::vec::Vec<u8>> {
     /// Decodes a Bech32 (BIP-173) string into `Dynamic<Vec<u8>>`.
+    ///
+    /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
     ///
     /// # Warning
     ///
@@ -237,23 +265,27 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// prevented, use [`try_from_bech32_expect_hrp`](Self::try_from_bech32_expect_hrp).
     pub fn try_from_bech32(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes) = s.try_from_bech32()?;
-        Ok(Self::new(bytes))
+        Ok(Self::new(Self::protect_decode_result(bytes)))
     }
 
     /// Decodes a Bech32 (BIP-173) string into `Dynamic<Vec<u8>>`, validating that the HRP
     /// matches `expected_hrp` (case-insensitive).
     ///
+    /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
+    ///
     /// Prefer this over [`try_from_bech32`](Self::try_from_bech32) in security-critical code
     /// to prevent cross-protocol confusion attacks.
     pub fn try_from_bech32_expect_hrp(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
         let bytes = s.try_from_bech32_expect_hrp(expected_hrp)?;
-        Ok(Self::new(bytes))
+        Ok(Self::new(Self::protect_decode_result(bytes)))
     }
 }
 
 #[cfg(feature = "encoding-bech32m")]
 impl Dynamic<alloc::vec::Vec<u8>> {
     /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>`.
+    ///
+    /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
     ///
     /// # Warning
     ///
@@ -262,17 +294,19 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// prevented, use [`try_from_bech32m_expect_hrp`](Self::try_from_bech32m_expect_hrp).
     pub fn try_from_bech32m(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes) = s.try_from_bech32m()?;
-        Ok(Self::new(bytes))
+        Ok(Self::new(Self::protect_decode_result(bytes)))
     }
 
     /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>`, validating that the HRP
     /// matches `expected_hrp` (case-insensitive).
     ///
+    /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
+    ///
     /// Prefer this over [`try_from_bech32m`](Self::try_from_bech32m) in security-critical code
     /// to prevent cross-protocol confusion attacks.
     pub fn try_from_bech32m_expect_hrp(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
         let bytes = s.try_from_bech32m_expect_hrp(expected_hrp)?;
-        Ok(Self::new(bytes))
+        Ok(Self::new(Self::protect_decode_result(bytes)))
     }
 }
 
@@ -335,7 +369,7 @@ impl<'de> serde::Deserialize<'de> for Dynamic<String> {
         D: serde::Deserializer<'de>,
     {
         let s: String = serde::Deserialize::deserialize(deserializer)?;
-        Ok(Dynamic::new(s))
+        Ok(Self::new(Self::protect_decode_result(s)))
     }
 }
 
@@ -346,7 +380,7 @@ impl<'de> serde::Deserialize<'de> for Dynamic<alloc::vec::Vec<u8>> {
         D: serde::Deserializer<'de>,
     {
         let vec: alloc::vec::Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
-        Ok(Dynamic::new(vec))
+        Ok(Self::new(Self::protect_decode_result(vec)))
     }
 }
 

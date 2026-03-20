@@ -31,3 +31,27 @@ fn fixed_deserialize_wrong_length() {
     let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str("[1,2,3]");
     assert!(result.is_err());
 }
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_vec_deserialize_malformed_input_returns_err() {
+    use secure_gate::Dynamic;
+    let result: Result<Dynamic<Vec<u8>>, _> = serde_json::from_str("\"not-an-array\"");
+    assert!(result.is_err());
+}
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_string_deserialize_roundtrip() {
+    use secure_gate::{Dynamic, ExposeSecret};
+    let result: Dynamic<String> = serde_json::from_str("\"hello world\"").expect("deserialize");
+    assert_eq!(result.expose_secret(), "hello world");
+}
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_string_deserialize_malformed_input_returns_err() {
+    use secure_gate::Dynamic;
+    let result: Result<Dynamic<String>, _> = serde_json::from_str("[1,2,3]");
+    assert!(result.is_err());
+}

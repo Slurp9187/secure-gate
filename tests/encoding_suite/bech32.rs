@@ -98,3 +98,15 @@ fn dynamic_try_from_bech32m_roundtrip() {
     let dynv = Dynamic::<Vec<u8>>::try_from_bech32m(&encoded).expect("decode");
     dynv.with_secret(|d| assert_eq!(d, b"abcd"));
 }
+
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+#[test]
+fn dynamic_try_from_bech32_invalid_input_returns_err() {
+    assert!(secure_gate::Dynamic::<Vec<u8>>::try_from_bech32("notabech32string").is_err());
+}
+
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[test]
+fn dynamic_try_from_bech32m_invalid_input_returns_err() {
+    assert!(Dynamic::<Vec<u8>>::try_from_bech32m("notabech32mstring").is_err());
+}

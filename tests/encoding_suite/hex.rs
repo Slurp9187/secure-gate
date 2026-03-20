@@ -30,6 +30,13 @@ fn dynamic_try_from_hex_roundtrip() {
     decoded.with_secret(|d| assert_eq!(d, &[1, 2, 3, 4]));
 }
 
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
+#[test]
+fn dynamic_try_from_hex_invalid_input_returns_err() {
+    assert!(Dynamic::<Vec<u8>>::try_from_hex("not-hex!").is_err());
+    assert!(Dynamic::<Vec<u8>>::try_from_hex("xyz").is_err());
+}
+
 #[cfg(feature = "encoding-hex")]
 #[test]
 fn secure_decoding_marker_trait_is_available() {

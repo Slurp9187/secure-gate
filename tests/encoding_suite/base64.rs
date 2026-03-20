@@ -31,3 +31,9 @@ fn dynamic_try_from_base64url_roundtrip() {
     let decoded = Dynamic::<Vec<u8>>::try_from_base64url(&encoded).expect("valid");
     decoded.with_secret(|d| assert_eq!(d, &[10, 20, 30]));
 }
+
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
+#[test]
+fn dynamic_try_from_base64url_invalid_input_returns_err() {
+    assert!(Dynamic::<Vec<u8>>::try_from_base64url("not valid base64url!!!").is_err());
+}
