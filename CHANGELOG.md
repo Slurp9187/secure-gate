@@ -7,11 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Security / Hygiene
-
-- `Dynamic<Vec<u8>>` decoding constructors (`try_from_hex`, `try_from_base64url`, `try_from_bech32`, `try_from_bech32_expect_hrp`, `try_from_bech32m`, `try_from_bech32m_expect_hrp`) and `Deserialize` now route decoded bytes through a `Zeroizing` wrapper before passing them to `Self::new`, matching the existing pattern in `Fixed<T>`. Uses `core::mem::take` — zero extra heap allocation. (#96)
-- `Dynamic<String>` `Deserialize` now wraps the intermediate `String` in `Zeroizing` before construction, matching `Dynamic<Vec<u8>>` and `Fixed<T>`. (#97)
-- `Dynamic<Vec<u8>>` and `Dynamic<String>` deserialization now reject inputs exceeding `MAX_DESERIALIZE_BYTES` (1 MiB by default). Oversized buffers are zeroized before rejection. `deserialize_with_limit` is available for custom ceilings. (#99)
 
 ## [0.8.0-rc.1] - 2026-03-18
 
@@ -22,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - **Serde visitor length error now redacted in release builds** (`src/fixed.rs`) — `serde::de::Error::invalid_length(vec.len(), ...)` embedded the actual received byte count unconditionally, inconsistent with every other length-revealing error in the codebase. In release builds the error is now `serde::de::Error::custom("decoded length mismatch")`; debug builds retain the detailed form for diagnostics.
+- `Dynamic<Vec<u8>>` decoding constructors (`try_from_hex`, `try_from_base64url`, `try_from_bech32`, `try_from_bech32_expect_hrp`, `try_from_bech32m`, `try_from_bech32m_expect_hrp`) and `Deserialize` now route decoded bytes through a `Zeroizing` wrapper before passing them to `Self::new`, matching the existing pattern in `Fixed<T>`. Uses `core::mem::take` — zero extra heap allocation. (#96)
+- `Dynamic<String>` `Deserialize` now wraps the intermediate `String` in `Zeroizing` before construction, matching `Dynamic<Vec<u8>>` and `Fixed<T>`. (#97)
+- `Dynamic<Vec<u8>>` and `Dynamic<String>` deserialization now reject inputs exceeding `MAX_DESERIALIZE_BYTES` (1 MiB by default). Oversized buffers are zeroized before rejection. `deserialize_with_limit` is available for custom ceilings. (#99)
 
 ### Added
 
@@ -56,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`partial_eq_fallback` test renamed** (`tests/ct_eq_suite/basic.rs`) — renamed to `manual_comparison_without_ct_eq_feature` and given an explicit comment warning that the comparison is non-constant-time and that `ct-eq` + `ConstantTimeEq` should be used for security-sensitive equality.
 - **`Bech32Error::ConversionFailed` documented as currently unreachable** (`src/error.rs`) — the variant is never produced: `.byte_iter()` on a successfully-validated `CheckedHrpstring` is infallible in the `bech32` crate; any bit-conversion failure surfaces as `OperationFailed` during the `CheckedHrpstring::new()` call. The variant is retained as public API for forward compatibility.
 - **`Bech32Large` capacity documentation corrected** — all inline docs stated "~3.2 KB raw data"; the correct figure is ~5 KB (5,115 bytes maximum payload). Updated in `src/traits/encoding/bech32.rs`, `src/traits/encoding/bech32m.rs`, and `src/traits/decoding/bech32.rs`.
-- **README serde section scoped** — the "no temporary string buffers" claim now explicitly excludes `Dynamic<String>`, which delegates deserialization to serde internals that may allocate non-zeroized intermediate buffers. `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` retain the guarantee.
+- **README serde section scoped** — the "no temporary string buffers" claim now explicitly excludes `Dynamic<String>`, which delegates deserialization to serde internals that may allocate non-zeroized intermediate buffers. `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` retain the guarantee. This scoping was subsequently resolved: `Dynamic<String>` deserialization now wraps its buffer in `Zeroizing` (#97), so the limitation no longer applies.
 - **`cloneable_secret_works` extended** (`tests/core_tests.rs`) — wrapper-level `Fixed<CloneKey>` clone independence test added: creates a `Fixed<CloneKey>`, clones it, drops the original (triggering zeroization of its `Vec<u8>` backing), and drops the clone. Both sequential drops succeeding without panic proves the clone owns independent heap memory.
 - **`try_from_bech32` / `try_from_bech32m` constructors now document HRP discard** — existing `Fixed` and `Dynamic` wrapper constructors carry a `# Warning` doc note directing security-critical callers to the new `_expect_hrp` variants.
 - Version bump from 0.8.0-alpha.1 to 0.8.0-rc.1.
