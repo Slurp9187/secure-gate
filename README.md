@@ -365,7 +365,7 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 }
 ```
 
-Cryptographically secure via `OsRng`. The `rand` feature always enables `alloc` transitively. See [`Fixed::from_random`] and [`Dynamic::from_random`] in the [API docs](https://docs.rs/secure-gate).
+Cryptographically secure via `OsRng`. `Fixed::from_random()` is heap-free and works in `no_std`/`no_alloc` builds. `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself already requires it). See [`Fixed::from_random`] and [`Dynamic::from_random`] in the [API docs](https://docs.rs/secure-gate).
 
 ## Security Model
 
