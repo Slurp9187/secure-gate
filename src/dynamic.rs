@@ -122,7 +122,12 @@ impl Dynamic<Vec<u8>> {
     /// Moves `bytes` through a [`zeroize::Zeroizing`] wrapper, ensuring the
     /// allocation is zeroized if a panic occurs between a successful decode and
     /// [`Self::new`]. Uses `core::mem::take` — no extra heap allocation.
-    #[cfg(feature = "encoding")]
+    #[cfg(any(
+        feature = "encoding-hex",
+        feature = "encoding-base64",
+        feature = "encoding-bech32",
+        feature = "encoding-bech32m",
+    ))]
     #[inline(always)]
     fn protect_decode_result(bytes: alloc::vec::Vec<u8>) -> alloc::vec::Vec<u8> {
         let mut protected = zeroize::Zeroizing::new(bytes);

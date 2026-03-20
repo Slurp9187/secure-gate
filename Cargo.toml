@@ -58,7 +58,7 @@ ct-eq = ["dep:subtle"]
 # ct-eq-hash: BLAKE3-based fast probabilistic equality
 ct-eq-hash = ["ct-eq", "dep:blake3", "blake3/zeroize"]
 
-# Encoding features (unchanged)
+# Encoding features
 encoding = [
   "encoding-hex",
   "encoding-base64",
