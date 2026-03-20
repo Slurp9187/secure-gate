@@ -82,11 +82,25 @@ The crate is intentionally small and relies on well-vetted dependencies:
   environments (core dumps, memory forensics) secret bytes may persist briefly on the
   stack. In release mode the compiler often eliminates the slot entirely. `Dynamic<T>`
   avoids this via `protect_decode_result` + `mem::take` (heap-only path).
+- **`static` secrets are never zeroized.** `Fixed::new` is `const fn`, so
+  `static SECRET: Fixed<[u8; 32]> = Fixed::new([...]);` compiles without warning.
+  Rust does not invoke `Drop` on program-scope statics during the lifetime of the
+  process. The `ZeroizeOnDrop` guarantee only applies to values that are dropped in
+  the normal sense (stack unwinding, scope exit). Do not store secrets in statics.
+- **`panic = "abort"` builds disable zeroization on panic.** When `panic = "abort"`
+  is set in a profile, Rust aborts the process immediately on panic without running
+  any `Drop` implementations. Secrets held in `Fixed<T>` or `Dynamic<T>` at the
+  moment of a panic will not be zeroized before the process exits. This is an
+  inherent limitation of the `zeroize` ecosystem — `zeroize`, `secrecy`, and other
+  crates share the same constraint. Prefer `panic = "unwind"` (the default) in
+  security-sensitive builds.
 
 **Mitigations**
 - Prefer `with_secret()` / `with_secret_mut()`
 - Audit all `expose_secret()` calls
 - Contextualize errors to avoid side-channel information
+- Never store a wrapper in a `static` — use local variables or heap-allocated structs instead
+- Keep the default `panic = "unwind"` profile in security-sensitive builds; if `panic = "abort"` is required, document and accept the constraint that secrets may not be cleared on panic
 
 Zero-cost claim: performance indistinguishable from raw arrays; for detailed benchmarks, see [ZERO_COST_WRAPPERS.md](ZERO_COST_WRAPPERS.md).
 
