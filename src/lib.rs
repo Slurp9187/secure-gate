@@ -54,6 +54,13 @@ pub mod traits;
 /// Requires `alloc` feature. Inner type must implement `Zeroize`.
 pub use dynamic::Dynamic;
 
+#[cfg(all(feature = "alloc", feature = "serde-deserialize"))]
+/// Default maximum byte length for `Dynamic<Vec<u8>>` / `Dynamic<String>` deserialization (1 MiB).
+///
+/// The standard `serde::Deserialize` impl for both types rejects payloads exceeding this value.
+/// Pass a custom ceiling to [`Dynamic::deserialize_with_limit`] when a different limit is needed.
+pub use dynamic::MAX_DESERIALIZE_BYTES;
+
 /// Stack-allocated secret wrapper with explicit access and automatic zeroization on drop.
 ///
 /// Always available. Inner type must implement `Zeroize`.

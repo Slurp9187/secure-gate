@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Dynamic<Vec<u8>>` decoding constructors (`try_from_hex`, `try_from_base64url`, `try_from_bech32`, `try_from_bech32_expect_hrp`, `try_from_bech32m`, `try_from_bech32m_expect_hrp`) and `Deserialize` now route decoded bytes through a `Zeroizing` wrapper before passing them to `Self::new`, matching the existing pattern in `Fixed<T>`. Uses `core::mem::take` — zero extra heap allocation. (#96)
 - `Dynamic<String>` `Deserialize` now wraps the intermediate `String` in `Zeroizing` before construction, matching `Dynamic<Vec<u8>>` and `Fixed<T>`. (#97)
+- `Dynamic<Vec<u8>>` and `Dynamic<String>` deserialization now reject inputs exceeding `MAX_DESERIALIZE_BYTES` (1 MiB by default). Oversized buffers are zeroized before rejection. `deserialize_with_limit` is available for custom ceilings. (#99)
 
 ## [0.8.0-rc.1] - 2026-03-18
 

@@ -55,3 +55,43 @@ fn dynamic_string_deserialize_malformed_input_returns_err() {
     let result: Result<Dynamic<String>, _> = serde_json::from_str("[1,2,3]");
     assert!(result.is_err());
 }
+
+// ---------------------------------------------------------------------------
+// deserialize_with_limit — custom ceiling tests
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_vec_deserialize_with_limit_accepts_within_limit() {
+    use secure_gate::{Dynamic, ExposeSecret};
+    let mut de = serde_json::Deserializer::from_str("[1,2,3,4]");
+    let result = Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, 4).expect("within limit");
+    assert_eq!(result.expose_secret(), &[1, 2, 3, 4]);
+}
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_vec_deserialize_with_limit_rejects_over_limit() {
+    use secure_gate::Dynamic;
+    let mut de = serde_json::Deserializer::from_str("[1,2,3,4]");
+    let result = Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, 3);
+    assert!(result.is_err());
+}
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_string_deserialize_with_limit_accepts_within_limit() {
+    use secure_gate::{Dynamic, ExposeSecret};
+    let mut de = serde_json::Deserializer::from_str("\"hello\"");
+    let result = Dynamic::<String>::deserialize_with_limit(&mut de, 5).expect("within limit");
+    assert_eq!(result.expose_secret(), "hello");
+}
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_string_deserialize_with_limit_rejects_over_limit() {
+    use secure_gate::Dynamic;
+    let mut de = serde_json::Deserializer::from_str("\"hello\"");
+    let result = Dynamic::<String>::deserialize_with_limit(&mut de, 4);
+    assert!(result.is_err());
+}

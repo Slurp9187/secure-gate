@@ -129,17 +129,6 @@ impl Dynamic<Vec<u8>> {
     }
 }
 
-impl Dynamic<String> {
-    /// Moves `s` through a [`zeroize::Zeroizing`] wrapper, ensuring the
-    /// allocation is zeroized if a panic occurs between a successful decode and
-    /// [`Self::new`]. Uses `core::mem::take` — no extra heap allocation.
-    #[inline(always)]
-    fn protect_decode_result(s: alloc::string::String) -> alloc::string::String {
-        let mut protected = zeroize::Zeroizing::new(s);
-        core::mem::take(&mut *protected)
-    }
-}
-
 // ExposeSecret
 impl crate::ExposeSecret for Dynamic<String> {
     type Inner = String;
@@ -362,14 +351,58 @@ impl<T: zeroize::Zeroize + crate::SerializableSecret> serde::Serialize for Dynam
 }
 
 // Deserialize
+
+/// Default maximum byte length accepted when deserializing `Dynamic<Vec<u8>>` or
+/// `Dynamic<String>` via the standard `serde::Deserialize` impl (1 MiB).
+///
+/// Pass a custom value to [`Dynamic::deserialize_with_limit`] when a different
+/// ceiling is required.
 #[cfg(feature = "serde-deserialize")]
-impl<'de> serde::Deserialize<'de> for Dynamic<String> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+pub const MAX_DESERIALIZE_BYTES: usize = 1_048_576;
+
+#[cfg(feature = "serde-deserialize")]
+impl Dynamic<alloc::vec::Vec<u8>> {
+    /// Deserializes into `Dynamic<Vec<u8>>`, rejecting payloads larger than `limit` bytes.
+    ///
+    /// The standard [`serde::Deserialize`] impl calls this with [`MAX_DESERIALIZE_BYTES`].
+    /// Use this method directly when you need a tighter or looser ceiling.
+    ///
+    /// Oversized buffers are wrapped in `Zeroizing` and zeroed before the error is returned,
+    /// providing the same defense-in-depth as the success path.
+    pub fn deserialize_with_limit<'de, D>(deserializer: D, limit: usize) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let s: String = serde::Deserialize::deserialize(deserializer)?;
-        Ok(Self::new(Self::protect_decode_result(s)))
+        let mut buf: zeroize::Zeroizing<alloc::vec::Vec<u8>> =
+            zeroize::Zeroizing::new(serde::Deserialize::deserialize(deserializer)?);
+        if buf.len() > limit {
+            // buf drops here → Zeroizing zeros the oversized buffer before deallocation
+            return Err(serde::de::Error::custom("deserialized secret exceeds maximum size"));
+        }
+        Ok(Self::new(core::mem::take(&mut *buf)))
+    }
+}
+
+#[cfg(feature = "serde-deserialize")]
+impl Dynamic<String> {
+    /// Deserializes into `Dynamic<String>`, rejecting payloads larger than `limit` bytes.
+    ///
+    /// The standard [`serde::Deserialize`] impl calls this with [`MAX_DESERIALIZE_BYTES`].
+    /// Use this method directly when you need a tighter or looser ceiling.
+    ///
+    /// Oversized buffers are wrapped in `Zeroizing` and zeroed before the error is returned,
+    /// providing the same defense-in-depth as the success path.
+    pub fn deserialize_with_limit<'de, D>(deserializer: D, limit: usize) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut buf: zeroize::Zeroizing<alloc::string::String> =
+            zeroize::Zeroizing::new(serde::Deserialize::deserialize(deserializer)?);
+        if buf.len() > limit {
+            // buf drops here → Zeroizing zeros the oversized buffer before deallocation
+            return Err(serde::de::Error::custom("deserialized secret exceeds maximum size"));
+        }
+        Ok(Self::new(core::mem::take(&mut *buf)))
     }
 }
 
@@ -379,8 +412,17 @@ impl<'de> serde::Deserialize<'de> for Dynamic<alloc::vec::Vec<u8>> {
     where
         D: serde::Deserializer<'de>,
     {
-        let vec: alloc::vec::Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
-        Ok(Self::new(Self::protect_decode_result(vec)))
+        Self::deserialize_with_limit(deserializer, MAX_DESERIALIZE_BYTES)
+    }
+}
+
+#[cfg(feature = "serde-deserialize")]
+impl<'de> serde::Deserialize<'de> for Dynamic<String> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Self::deserialize_with_limit(deserializer, MAX_DESERIALIZE_BYTES)
     }
 }
 
