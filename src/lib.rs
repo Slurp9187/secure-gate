@@ -58,6 +58,11 @@ pub use dynamic::Dynamic;
 ///
 /// The standard `serde::Deserialize` impl for both types rejects payloads exceeding this value.
 /// Pass a custom ceiling to [`Dynamic::deserialize_with_limit`] when a different limit is needed.
+///
+/// **Important:** this limit is enforced *after* the upstream deserializer has fully
+/// materialized the payload. It is a **result-length acceptance bound**, not a
+/// pre-allocation DoS guard. For untrusted input, enforce size limits at the
+/// transport or parser layer upstream.
 pub use dynamic::MAX_DESERIALIZE_BYTES;
 
 /// Stack-allocated secret wrapper with explicit access and automatic zeroization on drop.

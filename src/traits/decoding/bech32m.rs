@@ -10,7 +10,7 @@
 //!
 //! - **Treat all input as untrusted**: validate Bech32m strings upstream before wrapping
 //!   in secrets. HRP validation prevents cross-protocol confusion attacks.
-//! - **HRP validation**: use `try_from_bech32m_expect_hrp` to enforce expected HRPs;
+//! - **HRP validation**: use `try_from_bech32m_with_hrp` to enforce expected HRPs;
 //!   test empty and invalid HRP inputs in security-critical code.
 //! - **Heap allocation**: Returns `Vec<u8>` — wrap in [`Fixed`](crate::Fixed) or
 //!   [`Dynamic`](crate::Dynamic) to store as a secret.
@@ -35,7 +35,7 @@
 //! assert!(data.is_empty());
 //!
 //! // HRP validation — prevents cross-protocol confusion
-//! let data = bech32m.try_from_bech32m_expect_hrp("A").expect("HRP matches");
+//! let data = bech32m.try_from_bech32m_with_hrp("A").expect("HRP matches");
 //! assert!(data.is_empty());
 //!
 //! // Error on invalid input
@@ -98,14 +98,14 @@ pub trait FromBech32mStr {
     /// use secure_gate::FromBech32mStr;
     ///
     /// // BIP-350 minimal valid test vector
-    /// let data = "A1LQFN3A".try_from_bech32m_expect_hrp("A")?;
+    /// let data = "A1LQFN3A".try_from_bech32m_with_hrp("A")?;
     /// assert!(data.is_empty());
     ///
     /// // HRP mismatch returns an error
-    /// assert!("A1LQFN3A".try_from_bech32m_expect_hrp("bc").is_err());
+    /// assert!("A1LQFN3A".try_from_bech32m_with_hrp("bc").is_err());
     /// # Ok::<(), secure_gate::Bech32Error>(())
     /// ```
-    fn try_from_bech32m_expect_hrp(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error>;
+    fn try_from_bech32m_with_hrp(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error>;
 }
 
 // Blanket impl to cover any AsRef<str> (e.g., &str, String, etc.)
@@ -126,7 +126,7 @@ impl<T: AsRef<str> + ?Sized> FromBech32mStr for T {
         Ok((hrp, data))
     }
 
-    fn try_from_bech32m_expect_hrp(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error> {
+    fn try_from_bech32m_with_hrp(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error> {
         let (got_hrp, data) = self.try_from_bech32m()?;
         if !got_hrp.eq_ignore_ascii_case(expected_hrp) {
             #[cfg(debug_assertions)]

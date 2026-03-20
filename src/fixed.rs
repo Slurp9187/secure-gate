@@ -200,7 +200,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// The HRP is **not validated** — any HRP will be accepted as long as the checksum
     /// is valid and the payload length equals `N`. For security-critical code where
-    /// cross-protocol confusion must be prevented, use [`try_from_bech32_expect_hrp`](Self::try_from_bech32_expect_hrp).
+    /// cross-protocol confusion must be prevented, use [`try_from_bech32_with_hrp`](Self::try_from_bech32_with_hrp).
     pub fn try_from_bech32(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes_raw) = s.try_from_bech32()?;
         let bytes = zeroize::Zeroizing::new(bytes_raw);
@@ -223,8 +223,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// Prefer this over [`try_from_bech32`](Self::try_from_bech32) in security-critical code
     /// to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32_expect_hrp(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
-        let bytes_raw = s.try_from_bech32_expect_hrp(expected_hrp)?;
+    pub fn try_from_bech32_with_hrp(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+        let bytes_raw = s.try_from_bech32_with_hrp(expected_hrp)?;
         let bytes = zeroize::Zeroizing::new(bytes_raw);
         if bytes.len() != N {
             #[cfg(debug_assertions)]
@@ -249,7 +249,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// The HRP is **not validated** — any HRP will be accepted as long as the checksum
     /// is valid and the payload length equals `N`. For security-critical code where
-    /// cross-protocol confusion must be prevented, use [`try_from_bech32m_expect_hrp`](Self::try_from_bech32m_expect_hrp).
+    /// cross-protocol confusion must be prevented, use [`try_from_bech32m_with_hrp`](Self::try_from_bech32m_with_hrp).
     pub fn try_from_bech32m(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes_raw) = s.try_from_bech32m()?;
         let bytes = zeroize::Zeroizing::new(bytes_raw);
@@ -272,8 +272,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// Prefer this over [`try_from_bech32m`](Self::try_from_bech32m) in security-critical code
     /// to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32m_expect_hrp(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
-        let bytes_raw = s.try_from_bech32m_expect_hrp(expected_hrp)?;
+    pub fn try_from_bech32m_with_hrp(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+        let bytes_raw = s.try_from_bech32m_with_hrp(expected_hrp)?;
         let bytes = zeroize::Zeroizing::new(bytes_raw);
         if bytes.len() != N {
             #[cfg(debug_assertions)]

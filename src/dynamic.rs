@@ -257,7 +257,7 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// The HRP is **not validated** — any HRP will be accepted as long as the checksum
     /// is valid. For security-critical code where cross-protocol confusion must be
-    /// prevented, use [`try_from_bech32_expect_hrp`](Self::try_from_bech32_expect_hrp).
+    /// prevented, use [`try_from_bech32_with_hrp`](Self::try_from_bech32_with_hrp).
     pub fn try_from_bech32(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes) = s.try_from_bech32()?;
         Ok(Self::new(Self::protect_decode_result(bytes)))
@@ -270,11 +270,11 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// Prefer this over [`try_from_bech32`](Self::try_from_bech32) in security-critical code
     /// to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32_expect_hrp(
+    pub fn try_from_bech32_with_hrp(
         s: &str,
         expected_hrp: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
-        let bytes = s.try_from_bech32_expect_hrp(expected_hrp)?;
+        let bytes = s.try_from_bech32_with_hrp(expected_hrp)?;
         Ok(Self::new(Self::protect_decode_result(bytes)))
     }
 }
@@ -289,7 +289,7 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// The HRP is **not validated** — any HRP will be accepted as long as the checksum
     /// is valid. For security-critical code where cross-protocol confusion must be
-    /// prevented, use [`try_from_bech32m_expect_hrp`](Self::try_from_bech32m_expect_hrp).
+    /// prevented, use [`try_from_bech32m_with_hrp`](Self::try_from_bech32m_with_hrp).
     pub fn try_from_bech32m(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes) = s.try_from_bech32m()?;
         Ok(Self::new(Self::protect_decode_result(bytes)))
@@ -302,11 +302,11 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// Prefer this over [`try_from_bech32m`](Self::try_from_bech32m) in security-critical code
     /// to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32m_expect_hrp(
+    pub fn try_from_bech32m_with_hrp(
         s: &str,
         expected_hrp: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
-        let bytes = s.try_from_bech32m_expect_hrp(expected_hrp)?;
+        let bytes = s.try_from_bech32m_with_hrp(expected_hrp)?;
         Ok(Self::new(Self::protect_decode_result(bytes)))
     }
 }
@@ -355,6 +355,11 @@ impl<T: zeroize::Zeroize + crate::SerializableSecret> serde::Serialize for Dynam
 ///
 /// Pass a custom value to [`Dynamic::deserialize_with_limit`] when a different
 /// ceiling is required.
+///
+/// **Important:** this limit is enforced *after* the upstream deserializer has fully
+/// materialized the payload. It is a **result-length acceptance bound**, not a
+/// pre-allocation DoS guard. For untrusted input, enforce size limits at the
+/// transport or parser layer upstream.
 #[cfg(feature = "serde-deserialize")]
 pub const MAX_DESERIALIZE_BYTES: usize = 1_048_576;
 
@@ -367,6 +372,11 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// Oversized buffers are wrapped in `Zeroizing` and zeroed before the error is returned,
     /// providing the same defense-in-depth as the success path.
+    ///
+    /// **Important:** this limit is enforced *after* the upstream deserializer has fully
+    /// materialized the payload. It is a **result-length acceptance bound**, not a
+    /// pre-allocation DoS guard. For untrusted input, enforce size limits at the
+    /// transport or parser layer upstream.
     pub fn deserialize_with_limit<'de, D>(deserializer: D, limit: usize) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -392,6 +402,11 @@ impl Dynamic<String> {
     ///
     /// Oversized buffers are wrapped in `Zeroizing` and zeroed before the error is returned,
     /// providing the same defense-in-depth as the success path.
+    ///
+    /// **Important:** this limit is enforced *after* the upstream deserializer has fully
+    /// materialized the payload. It is a **result-length acceptance bound**, not a
+    /// pre-allocation DoS guard. For untrusted input, enforce size limits at the
+    /// transport or parser layer upstream.
     pub fn deserialize_with_limit<'de, D>(deserializer: D, limit: usize) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,

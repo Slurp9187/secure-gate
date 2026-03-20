@@ -13,6 +13,18 @@ Last updated: 2026-03 (for v0.8.0-rc.1)
 
 This document outlines the security model, design choices, strengths, known limitations, and review guidance for `secure-gate`.
 
+## What secure-gate does NOT protect against
+
+- **Process compromise / arbitrary memory read** — wrappers offer no defense if an attacker can read process memory
+- **OS swap, page files, core dumps** — secrets may be paged to disk; use `mlock` or encrypted swap at the OS level
+- **`panic = "abort"` / SIGKILL / hard crash** — `Drop` impls do not run; secrets are not cleared
+- **`static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized
+- **Copies made by caller code** — after `expose_secret()`, encoding, or serialization, the caller holds ordinary non-zeroized memory
+- **Encoded/serialized output** — `to_hex()`, `to_base64url()`, serde `Serialize` output are full secret exposure into ordinary, non-zeroizing `String`s
+- **All side channels beyond equality timing** — cache, power, EM, and branch-predictor side channels are outside scope
+- **Allocation-based DoS from deserialization** — `MAX_DESERIALIZE_BYTES` is a post-materialization result-length bound; the upstream deserializer may have already allocated the full payload
+- **Stack/register residue outside wrapper control** — temporaries in caller code, FFI boundaries, and compiler-generated spills are not managed by this crate
+
 ## Audit Status
 
 `secure-gate` has **not** undergone an independent security audit.
@@ -55,7 +67,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `std`                | Full `std` support (implies `alloc`). Adds no additional security surface beyond `alloc`. | Optional; `alloc` is sufficient for most targets |
 | `ct-eq`              | Timing-safe direct byte comparison (`.ct_eq()`)                                  | Strongly recommended; avoid `==`            |
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
-| `serde-deserialize`  | Direct binary deserialization (arrays/seqs only); no string auto-parsing. Binary-safe; temporary buffers are `Zeroizing`-wrapped. Default 1 MiB limit (`MAX_DESERIALIZE_BYTES`) rejects oversized payloads and zeroizes them before deallocation. Use `Dynamic::deserialize_with_limit` for custom ceilings. | Enable for trusted deserialization sources; set a tight limit for untrusted input |
+| `serde-deserialize`  | Direct binary deserialization (arrays/seqs only); no string auto-parsing. Binary-safe; temporary buffers are `Zeroizing`-wrapped. Default 1 MiB limit (`MAX_DESERIALIZE_BYTES`) rejects oversized payloads and zeroizes them before deallocation. Use `Dynamic::deserialize_with_limit` for custom ceilings. **Note:** the limit is a post-materialization result-length bound — the upstream deserializer may have already allocated the full payload. For untrusted input, enforce size limits at the transport or parser layer upstream. | Enable for trusted deserialization sources; set a tight limit for untrusted input and enforce transport-level size caps upstream |
 | `serde-serialize`    | Opt-in export via marker trait; audit all implementations                        | Enable sparingly; monitor exfiltration risk |
 | `encoding`           | Meta: enables all encoding sub-features (hex, base64url, bech32, bech32m); always requires `alloc` | Enable per-format instead for minimal surface |
 | `encoding-hex`       | Hex encoding/decoding: `ToHex`, `FromHexStr`; requires `alloc`                   | Validate inputs upstream; prefer `try_from_hex` |
@@ -124,7 +136,7 @@ Zero-cost claim: performance indistinguishable from raw arrays; for detailed ben
 - Temporary decode buffers in `Dynamic<Vec<u8>>` decoding constructors and `Deserialize`, and `Dynamic<String>` `Deserialize`, are routed through `zeroize::Zeroizing` before being moved into the wrapper, matching `Fixed<T>` and ensuring zeroization if a panic occurs between a successful decode and construction (#96, #97)
 - `Dynamic<Vec<u8>>` and `Dynamic<String>` deserialization rejects payloads exceeding `MAX_DESERIALIZE_BYTES` (1 MiB); oversized buffers are zeroized before deallocation. Use `deserialize_with_limit` for custom ceilings. (#99)
 - Treat all decoding input as untrusted; validate upstream
-- Encoding traits (`ToHex`, `ToBech32`, etc.) are explicit exposure — same contract as `expose_secret`. They are not a bypass. Direct wrapper methods (`key.to_hex()`) are ergonomically safe (no user-visible reference) but do **not** appear in `grep expose_secret` / `grep with_secret` audit sweeps. Use the consolidated grep to surface all encoding exposure points regardless of pattern: `grep -rn 'expose_secret\|with_secret\|\.to_hex\|\.to_base64url\|try_to_bech32\|try_to_bech32m'`. For `expose_secret` + encode: chaining immediately is safe; binding to a named variable that outlives the encoding call is the danger — use only for FFI or third-party APIs requiring a raw `&[u8]` slice. For Bech32/Bech32m decoding into a wrapper, prefer `Fixed::try_from_bech32_expect_hrp` / `Dynamic::try_from_bech32_expect_hrp` to prevent cross-protocol confusion attacks.
+- Encoding traits (`ToHex`, `ToBech32`, etc.) are explicit exposure — same contract as `expose_secret`. They are not a bypass. Direct wrapper methods (`key.to_hex()`) are ergonomically safe (no user-visible reference) but do **not** appear in `grep expose_secret` / `grep with_secret` audit sweeps. Use the consolidated grep to surface all encoding exposure points regardless of pattern: `grep -rn 'expose_secret\|with_secret\|\.to_hex\|\.to_base64url\|try_to_bech32\|try_to_bech32m'`. For `expose_secret` + encode: chaining immediately is safe; binding to a named variable that outlives the encoding call is the danger — use only for FFI or third-party APIs requiring a raw `&[u8]` slice. For Bech32/Bech32m decoding into a wrapper, prefer `Fixed::try_from_bech32_with_hrp` / `Dynamic::try_from_bech32_with_hrp` to prevent cross-protocol confusion attacks.
 - Use specific traits (e.g., `FromBech32Str`) for strict format enforcement
 - Fuzz parsers; sanitize inputs before decoding
 - Decoding errors may include format hints — treat as potential metadata leaks in sensitive contexts; redact logs or use custom error display in production

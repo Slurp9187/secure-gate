@@ -48,21 +48,21 @@ fn bech32_decode_malformed_fails() {
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
-fn bech32_decode_expect_hrp_validates() {
+fn bech32_decode_with_hrp_validates() {
     let data = b"hello world";
     let encoded = data.try_to_bech32("fuzz", None).expect("valid bech32");
     let decoded = encoded
-        .try_from_bech32_expect_hrp("fuzz")
+        .try_from_bech32_with_hrp("fuzz")
         .expect("expected hrp should match");
     assert_eq!(decoded, data);
 }
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
-fn bech32_decode_expect_hrp_mismatch_fails() {
+fn bech32_decode_with_hrp_mismatch_fails() {
     let data = b"hello world";
     let encoded = data.try_to_bech32("fuzz", None).expect("valid bech32");
-    let err = encoded.try_from_bech32_expect_hrp("other");
+    let err = encoded.try_from_bech32_with_hrp("other");
     assert!(err.is_err());
 }
 

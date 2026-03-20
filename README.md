@@ -192,8 +192,8 @@ Available methods (`E` = encode on bytes/wrapper, `D` = decode from string):
 
 - **Hex** (`encoding-hex`) — E: `to_hex()`, `to_hex_upper()` · D: `"…".try_from_hex()` → `Vec<u8>`
 - **Base64URL** (`encoding-base64`) — E: `to_base64url()` · D: `"…".try_from_base64url()` → `Vec<u8>`
-- **Bech32 BIP-173** (`encoding-bech32`) — E: `try_to_bech32(hrp, limit)` · D (raw): `"…".try_from_bech32_expect_hrp(hrp)` → `Vec<u8>` · D (wrapped): `Fixed::try_from_bech32_expect_hrp(s, hrp)`, `Dynamic::try_from_bech32_expect_hrp(s, hrp)` — prefer `_expect_hrp` over the HRP-discarding `try_from_bech32`
-- **Bech32m BIP-350** (`encoding-bech32m`) — E: `try_to_bech32m(hrp, limit)` · D (raw): `"…".try_from_bech32m_expect_hrp(hrp)` → `Vec<u8>` · D (wrapped): `Fixed::try_from_bech32m_expect_hrp(s, hrp)`, `Dynamic::try_from_bech32m_expect_hrp(s, hrp)` — prefer `_expect_hrp` over `try_from_bech32m`
+- **Bech32 BIP-173** (`encoding-bech32`) — E: `try_to_bech32(hrp, limit)` · D (raw): `"…".try_from_bech32_with_hrp(hrp)` → `Vec<u8>` · D (wrapped): `Fixed::try_from_bech32_with_hrp(s, hrp)`, `Dynamic::try_from_bech32_with_hrp(s, hrp)` — prefer `_with_hrp` over the HRP-discarding `try_from_bech32`
+- **Bech32m BIP-350** (`encoding-bech32m`) — E: `try_to_bech32m(hrp, limit)` · D (raw): `"…".try_from_bech32m_with_hrp(hrp)` → `Vec<u8>` · D (wrapped): `Fixed::try_from_bech32m_with_hrp(s, hrp)`, `Dynamic::try_from_bech32m_with_hrp(s, hrp)` — prefer `_with_hrp` over `try_from_bech32m`
 
 ### Patterns
 
@@ -239,7 +239,7 @@ let hex = bytes.to_hex();
 
 Use only when inner bytes must be passed to code that does not know about `secure-gate` (FFI, third-party APIs taking `&[u8]` directly). Keep the binding as short-lived as possible.
 
-### Bech32 decoding — prefer `_expect_hrp` variants
+### Bech32 decoding — prefer `_with_hrp` variants
 
 When decoding Bech32/Bech32m into a secret wrapper, use the HRP-validating inherent methods on `Fixed` and `Dynamic` rather than the HRP-discarding variants:
 
@@ -251,7 +251,7 @@ When decoding Bech32/Bech32m into a secret wrapper, use the HRP-validating inher
     let encoded_str = "myapp-key1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw"; // example
 
     // Preferred: validates HRP, returns Bech32Error::UnexpectedHrp on mismatch
-    let key = Fixed::<[u8; 32]>::try_from_bech32_expect_hrp(encoded_str, "myapp-key")
+    let key = Fixed::<[u8; 32]>::try_from_bech32_with_hrp(encoded_str, "myapp-key")
         .expect("valid bech32 with correct HRP");
 
     // Avoid in security-critical code: accepts any HRP silently
@@ -259,7 +259,7 @@ When decoding Bech32/Bech32m into a secret wrapper, use the HRP-validating inher
 }
 ```
 
-`try_from_bech32_expect_hrp` / `try_from_bech32m_expect_hrp` compare HRP case-insensitively and prevent cross-protocol confusion attacks.
+`try_from_bech32_with_hrp` / `try_from_bech32m_with_hrp` compare HRP case-insensitively and prevent cross-protocol confusion attacks.
 
 ### Available traits
 
@@ -267,8 +267,8 @@ When decoding Bech32/Bech32m into a secret wrapper, use the HRP-validating inher
 | ----------------- | ------------- | ------------------------------------------------------- | --------------------- | ------------------ |
 | Hex               | `ToHex`       | `FromHexStr`                                            | Encode yes, decode no | `encoding-hex`     |
 | Base64URL         | `ToBase64Url` | `FromBase64UrlStr`                                      | Encode yes, decode no | `encoding-base64`  |
-| Bech32 (BIP-173)  | `ToBech32`    | `FromBech32Str` / `Fixed::try_from_bech32_expect_hrp`   | No                    | `encoding-bech32`  |
-| Bech32m (BIP-350) | `ToBech32m`   | `FromBech32mStr` / `Fixed::try_from_bech32m_expect_hrp` | No                    | `encoding-bech32m` |
+| Bech32 (BIP-173)  | `ToBech32`    | `FromBech32Str` / `Fixed::try_from_bech32_with_hrp`   | No                    | `encoding-bech32`  |
+| Bech32m (BIP-350) | `ToBech32m`   | `FromBech32mStr` / `Fixed::try_from_bech32m_with_hrp` | No                    | `encoding-bech32m` |
 
 **Decode-side note**: Decoded bytes are plaintext from the moment of decoding until they are wrapped. Wrap the result immediately — avoid binding the intermediate `Vec<u8>` to a long-lived variable.
 
@@ -304,6 +304,8 @@ Enable the **`ct-eq`** feature and use **`.ct_eq()`** for all secret comparisons
 ## Serde
 
 `serde-deserialize` decodes directly to the inner type. After deserialization completes, temporary buffers for `Dynamic<Vec<u8>>` and `Dynamic<String>` are `Zeroizing`-wrapped — oversized buffers are zeroized even on rejection. The default limit is `MAX_DESERIALIZE_BYTES` (1 MiB); call `Dynamic::deserialize_with_limit` to set a custom ceiling. Serialization requires the `SerializableSecret` marker trait.
+
+> **Note:** `MAX_DESERIALIZE_BYTES` (and `deserialize_with_limit`) is enforced *after* the upstream deserializer has fully materialized the payload. It is a result-length acceptance bound, not a pre-allocation DoS guard. For untrusted input, enforce size limits at the transport or parser layer upstream.
 
 See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for the full example.
 
