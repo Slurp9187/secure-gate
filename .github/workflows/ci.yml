@@ -40,7 +40,7 @@ jobs:
             features: "--no-default-features --features=alloc,rand"
 
           # ── Constant-time equality ────────────────────────────────────────────
-          # alloc is required so Dynamic-backed tests in ct_eq_suite and
+          # alloc is required so Dynamic-backed tests in ct_eq_tests and
           # proptest_suite/ct_eq.rs (gated on ct-eq + alloc) are exercised.
           - name: ct-eq + alloc
             features: "--no-default-features --features=ct-eq,alloc"

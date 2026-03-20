@@ -1,7 +1,7 @@
 //! Suite integration runner for secure-gate v0.8.0.
 //!
 //! Compiles the directory-based test suites into a single binary.
-//! Flat test files (core_tests, zeroize_tests, error_tests, no_alloc_tests)
+//! Flat test files (`core_tests`, `ct_eq_tests`, `zeroize_tests`, `error_tests`, …)
 //! each run as their own binary — that is intentional, not a gap.
 //!
 //! Separate binaries are also kept for:
@@ -10,8 +10,6 @@
 
 mod common;
 
-#[cfg(feature = "ct-eq")]
-mod ct_eq_suite;
 mod encoding_suite;
 mod serde_suite;
 mod macros_suite;

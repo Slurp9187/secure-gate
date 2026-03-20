@@ -1,11 +1,10 @@
-//! ct_eq_suite/basic.rs — Basic constant-time equality tests
+//! Constant-time equality tests (`ct-eq` feature).
 
 #[cfg(feature = "ct-eq")]
 use secure_gate::ConstantTimeEq;
 #[cfg(all(feature = "ct-eq", feature = "alloc"))]
 use secure_gate::Fixed;
-
-#[cfg(all(feature = "ct-eq", feature = "alloc"))]
+#[cfg(feature = "alloc")]
 use secure_gate::Dynamic;
 
 #[cfg(feature = "ct-eq")]

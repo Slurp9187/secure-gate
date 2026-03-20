@@ -30,7 +30,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Tests:
   - `tests/zeroize_tests.rs` — semantic layer: verifies drop order, API-visible state, and spare-capacity targeting via `PanicOnNonZeroDrop`
   - `tests/heap_zeroize.rs` — physical layer: verifies heap bytes are zeroed before deallocation via `ProxyAllocator` interception
-  - `tests/ct_eq_suite/` and `tests/proptest_suite/` — timing-safe equality coverage
+  - `tests/ct_eq_tests.rs` and `tests/proptest_suite/` — timing-safe equality coverage
 - Dependency versions and their security history
 
 ## Core Security Model
