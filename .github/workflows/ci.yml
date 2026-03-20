@@ -31,9 +31,9 @@ jobs:
             features: "--no-default-features --features=std"
 
           # ── Rand ──────────────────────────────────────────────────────────────
-          # rand depends on rand/alloc + once_cell/alloc, so alloc is always
-          # enabled when rand is enabled.
-          - name: rand (includes alloc)
+          # rand no longer forces alloc: Fixed::from_random() works without heap.
+          # Dynamic::from_random() is covered by the alloc + rand entry below.
+          - name: rand (no_std, Fixed only)
             features: "--no-default-features --features=rand"
 
           - name: alloc + rand

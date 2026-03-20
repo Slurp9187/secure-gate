@@ -51,7 +51,7 @@ alloc = ["zeroize/alloc"]
 std = ["alloc"]
 
 # Rand: secure random generation
-rand = ["dep:rand", "dep:once_cell", "rand?/alloc", "once_cell?/alloc"]
+rand = ["dep:rand"]
 
 # ct-eq: constant-time equality (subtle)
 ct-eq = ["dep:subtle"]
@@ -59,7 +59,8 @@ ct-eq = ["dep:subtle"]
 # ct-eq-hash: BLAKE3-based fast probabilistic equality
 # NOTE: blake3 transitively requires constant_time_eq v0.4.2 (edition2024),
 #       which needs Rust 1.85+. This feature is excluded from the MSRV check job.
-ct-eq-hash = ["ct-eq", "dep:blake3", "blake3?/zeroize"]
+# NOTE: keyed mode (rand + ct-eq-hash) uses once_cell::sync::Lazy which requires std.
+ct-eq-hash = ["ct-eq", "dep:blake3", "blake3?/zeroize", "dep:once_cell"]
 
 # Encoding features
 encoding = [

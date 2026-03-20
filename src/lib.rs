@@ -18,7 +18,7 @@
 //! - `std`: Full `std` support (implies `alloc`)
 //! - `ct-eq`: [`ConstantTimeEq`] constant-time equality
 //! - `ct-eq-hash`: [`ConstantTimeEqExt`] BLAKE3-based probabilistic equality
-//! - `rand`: Secure random generation via `OsRng`
+//! - `rand`: Secure random generation via `OsRng`; `no_std` compatible for `Fixed<T>` (no heap required)
 //! - `cloneable`: [`CloneableSecret`] opt-in cloning
 //! - `serde-serialize` / `serde-deserialize`: Serde support
 //! - `encoding-hex` / `encoding-base64` / `encoding-bech32` / `encoding-bech32m`: Per-format encoding

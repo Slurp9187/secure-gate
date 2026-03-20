@@ -107,9 +107,9 @@ secure-gate = { version = "0.8.0-rc.1", features = ["full"] }
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                      |
 | `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                             |
-| `rand`              | `from_random()` via `OsRng`; always enables `alloc` (transitively via `rand/alloc`)                                                                  |
+| `rand`              | `from_random()` via `OsRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself requires it).    |
 | `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison                                                                                                |
-| `ct-eq-hash`        | `ConstantTimeEqExt` — BLAKE3-based probabilistic equality; fast for large secrets; enables `ct-eq`                                                   |
+| `ct-eq-hash`        | `ConstantTimeEqExt` — BLAKE3-based probabilistic equality; fast for large secrets; enables `ct-eq`. Keyed mode (with `rand`) uses `once_cell::sync::Lazy` and requires `std`; omit `rand` for unkeyed BLAKE3 in `no_std + alloc` builds. |
 | `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                  |
 | `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                               |
 | `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr`                                                                                                                   |
@@ -121,7 +121,7 @@ secure-gate = { version = "0.8.0-rc.1", features = ["full"] }
 | `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                     |
 | `full`              | All features combined                                                                                                                                |
 
-`no_std` + `alloc` compatible. Disabled features have zero overhead.
+`no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding, and serde require `alloc`. `ct-eq-hash + rand` (keyed mode) requires `std`. Disabled features have zero overhead.
 
 ## Core API
 
