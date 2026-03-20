@@ -51,7 +51,7 @@ alloc = ["zeroize/alloc"]
 std = ["alloc"]
 
 # Rand: secure random generation
-rand = ["dep:rand", "dep:once_cell", "rand/alloc", "once_cell/alloc"]
+rand = ["dep:rand", "dep:once_cell", "rand?/alloc", "once_cell?/alloc"]
 
 # ct-eq: constant-time equality (subtle)
 ct-eq = ["dep:subtle"]
@@ -66,18 +66,18 @@ encoding = [
   "encoding-bech32",
   "encoding-bech32m",
 ]
-encoding-hex = ["dep:hex", "hex/alloc", "alloc"]
-encoding-base64 = ["dep:base64", "base64/alloc", "alloc"]
-encoding-bech32 = ["dep:bech32", "bech32/alloc", "alloc"]
-encoding-bech32m = ["dep:bech32", "bech32/alloc", "alloc"]
+encoding-hex = ["dep:hex", "hex?/alloc", "alloc"]
+encoding-base64 = ["dep:base64", "base64?/alloc", "alloc"]
+encoding-bech32 = ["dep:bech32", "bech32?/alloc", "alloc"]
+encoding-bech32m = ["dep:bech32", "bech32?/alloc", "alloc"]
 
 # Cloneable: opt-in cloning
 cloneable = []
 
 # Serde: meta-feature for both directions
 serde = ["serde-deserialize", "serde-serialize"]
-serde-deserialize = ["dep:serde", "serde/alloc", "alloc"]
-serde-serialize = ["dep:serde", "serde/alloc", "alloc"]
+serde-deserialize = ["dep:serde", "serde?/alloc", "alloc"]
+serde-serialize = ["dep:serde", "serde?/alloc", "alloc"]
 
 # Full batteries-included combo (most common real-world usage)
 full = ["alloc", "rand", "encoding", "ct-eq-hash", "cloneable", "serde"]
