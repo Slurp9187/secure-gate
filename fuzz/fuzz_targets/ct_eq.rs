@@ -90,25 +90,25 @@ fuzz_target!(|data: &[u8]| {
     // === Fixed<[u8; 32]> — ct_eq_auto ===
 
     // Auto with default threshold (32 bytes) → uses ct_eq path for Fixed<[u8;32]>
-    let auto_default = a32.ct_eq_auto(&b32, None);
+    let auto_default = a32.ct_eq_auto(&b32);
     let direct = a32.ct_eq(&b32);
     assert_eq!(
         auto_default, direct,
-        "ct_eq_auto(None) disagrees with ct_eq for 32-byte Fixed"
+        "ct_eq_auto() disagrees with ct_eq for 32-byte Fixed"
     );
 
     // Auto with threshold=0 → always uses ct_eq_hash path
-    let auto_hash = a32.ct_eq_auto(&b32, Some(0));
+    let auto_hash = a32.ct_eq_auto_with_threshold(&b32, 0);
     // ct_eq_hash is probabilistic; for equal inputs it must be true
     if a32.ct_eq(&b32) {
-        assert!(auto_hash, "ct_eq_auto(0) false for equal Fixed — hash path broken");
+        assert!(auto_hash, "ct_eq_auto_with_threshold(0) false for equal Fixed — hash path broken");
     }
 
     // Auto with threshold=4096 → always uses ct_eq path (32 <= 4096)
-    let auto_ct = a32.ct_eq_auto(&b32, Some(4096));
+    let auto_ct = a32.ct_eq_auto_with_threshold(&b32, 4096);
     assert_eq!(
         auto_ct, direct,
-        "ct_eq_auto(4096) disagrees with ct_eq for 32-byte Fixed"
+        "ct_eq_auto_with_threshold(4096) disagrees with ct_eq for 32-byte Fixed"
     );
 
     // === Dynamic<Vec<u8>> — ct_eq ===
@@ -156,7 +156,7 @@ fuzz_target!(|data: &[u8]| {
 
     // === Dynamic<Vec<u8>> — ct_eq_auto ===
 
-    let vec_auto_default = a_vec.ct_eq_auto(&b_vec, None);
+    let vec_auto_default = a_vec.ct_eq_auto(&b_vec);
     if a_vec.expose_secret().len() == b_vec.expose_secret().len() {
         let expected = if a_vec.expose_secret().len() <= 32 {
             a_vec.ct_eq(&b_vec)
@@ -165,7 +165,7 @@ fuzz_target!(|data: &[u8]| {
         };
         assert_eq!(
             vec_auto_default, expected,
-            "ct_eq_auto(None) inconsistent with manual strategy selection"
+            "ct_eq_auto() inconsistent with manual strategy selection"
         );
     } else {
         assert!(!vec_auto_default, "ct_eq_auto must be false for different-length Vecs");
@@ -178,7 +178,7 @@ fuzz_target!(|data: &[u8]| {
     let empty_b = Dynamic::<Vec<u8>>::new(vec![]);
     assert!(empty_a.ct_eq(&empty_b), "empty ct_eq should be true");
     assert!(empty_a.ct_eq_hash(&empty_b), "empty ct_eq_hash should be true");
-    assert!(empty_a.ct_eq_auto(&empty_b, None), "empty ct_eq_auto should be true");
+    assert!(empty_a.ct_eq_auto(&empty_b), "empty ct_eq_auto should be true");
 
     // Single byte: equal vs. different
     let one_a = Dynamic::<Vec<u8>>::new(vec![data[0]]);

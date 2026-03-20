@@ -1,4 +1,4 @@
-﻿# secure-gate
+# secure-gate
 
 [![Crates.io](https://img.shields.io/crates/v/secure-gate.svg)](https://crates.io/crates/secure-gate)
 [![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate)
@@ -322,12 +322,12 @@ See [`ToHex`], [`ToBech32`], [`FromHexStr`], and sibling traits in the [API docs
     let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
     let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
 
-    if sig_a.ct_eq_auto(&sig_b, None) {
+    if sig_a.ct_eq_auto(&sig_b) {
         // equal — automatically uses ct_eq for small, ct_eq_hash for large
     }
 
-    // Override threshold (e.g. if benchmarks show ct_eq is faster up to 64 bytes)
-    sig_a.ct_eq_auto(&sig_b, Some(64));
+    // Power users: override threshold if benchmarks show a better crossover
+    sig_a.ct_eq_auto_with_threshold(&sig_b, 64);
 }
 ```
 

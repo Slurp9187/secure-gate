@@ -84,6 +84,15 @@ pub use traits::ConstantTimeEq;
 /// Provides `ct_eq_hash()` method. Requires `ct-eq-hash` feature.
 pub use traits::ConstantTimeEqExt;
 
+#[cfg(feature = "ct-eq-hash")]
+/// Default crossover threshold for [`ConstantTimeEqExt::ct_eq_auto`] (32 bytes).
+///
+/// Inputs ≤ this value use `ct_eq`; larger inputs use `ct_eq_hash`.
+/// Used internally by `ct_eq_auto`. Call `ct_eq_auto_with_threshold` directly
+/// only when you need a custom crossover; values above 4096 are capped at 4096.
+/// See [CT_EQ_AUTO.md](https://github.com/Slurp9187/secure-gate/blob/main/CT_EQ_AUTO.md).
+pub use traits::constant_time_eq_ext::CT_EQ_AUTO_THRESHOLD;
+
 /// Explicit immutable access to secret contents.
 ///
 /// Provides `expose_secret()` and `with_secret()` methods.

@@ -55,15 +55,30 @@
 //! let large_c = Fixed::<[u8; 2048]>::new([99u8; 2048]);
 //!
 //! // Recommended: automatic strategy selection (hash path uses OsRng when `rand` enabled)
-//! assert!(large_a.ct_eq_auto(&large_b, None));       // default 32-byte crossover
-//! assert!(!large_a.ct_eq_auto(&large_c, None));
-//! assert!(large_a.ct_eq_auto(&large_b, Some(0)));    // force hash path for all sizes
-//! assert!(large_a.ct_eq_auto(&large_b, Some(4096))); // hardware-tuned threshold
+//! assert!(large_a.ct_eq_auto(&large_b));
+//! assert!(!large_a.ct_eq_auto(&large_c));
+//!
+//! // Power users: explicit threshold (uses ct_eq for all ≤ 64B inputs)
+//! assert!(large_a.ct_eq_auto_with_threshold(&large_b, 64));
+//! // Force hash path for all sizes (threshold 0)
+//! assert!(large_a.ct_eq_auto_with_threshold(&large_b, 0));
 //!
 //! // Direct hash path (uniform probabilistic behavior):
 //! assert!(large_a.ct_eq_hash(&large_b));
 //! assert!(!large_a.ct_eq_hash(&large_c));
 //! ```
+#[cfg(feature = "ct-eq-hash")]
+/// Default crossover threshold for [`ConstantTimeEqExt::ct_eq_auto`].
+///
+/// Inputs ≤ this many bytes use `ct_eq` (deterministic); larger inputs use
+/// `ct_eq_hash` (BLAKE3, probabilistic). Validated at ~32 bytes on typical
+/// hardware — see [CT_EQ_AUTO.md](../CT_EQ_AUTO.md).
+///
+/// `ct_eq_auto` uses this value internally. Call `ct_eq_auto_with_threshold`
+/// directly only when your benchmarks show a different optimal crossover point.
+/// Values above 4096 are capped at 4096.
+pub const CT_EQ_AUTO_THRESHOLD: usize = 32;
+
 #[cfg(feature = "ct-eq-hash")]
 #[allow(clippy::len_without_is_empty)]
 pub trait ConstantTimeEqExt: crate::ConstantTimeEq {
@@ -90,7 +105,26 @@ pub trait ConstantTimeEqExt: crate::ConstantTimeEq {
     /// DoS warning: hashing very large untrusted inputs is costly — bound sizes.
     fn ct_eq_hash(&self, other: &Self) -> bool;
 
-    /// Recommended hybrid constant-time equality check.
+    /// Recommended constant-time equality check using the automatic hybrid strategy.
+    ///
+    /// Uses [`CT_EQ_AUTO_THRESHOLD`] (32 bytes) as the crossover:
+    ///
+    /// - Length mismatch → `false` (public metadata, non-constant-time compare)
+    /// - Size ≤ threshold → `self.ct_eq(other)` (strict deterministic)
+    /// - Size > threshold → `self.ct_eq_hash(other)` (probabilistic, fast)
+    ///
+    /// This is the idiomatic call for most users. If you need a custom crossover
+    /// point based on your own benchmarks, use [`ct_eq_auto_with_threshold`](Self::ct_eq_auto_with_threshold) directly.
+    ///
+    /// Prefer this method over `ct_eq_hash` for variable/mixed-size secrets unless
+    /// you specifically need uniform probabilistic behavior.
+    ///
+    /// See [CT_EQ_AUTO.md](../CT_EQ_AUTO.md) for benchmarks and threshold tuning guidance.
+    fn ct_eq_auto(&self, other: &Self) -> bool {
+        self.ct_eq_auto_with_threshold(other, CT_EQ_AUTO_THRESHOLD)
+    }
+
+    /// Power-user variant of [`ct_eq_auto`](Self::ct_eq_auto) with an explicit threshold.
     ///
     /// Automatically chooses the best strategy:
     ///
@@ -98,21 +132,18 @@ pub trait ConstantTimeEqExt: crate::ConstantTimeEq {
     /// - Size ≤ threshold → `self.ct_eq(other)` (strict deterministic)
     /// - Size > threshold → `self.ct_eq_hash(other)` (probabilistic, fast)
     ///
-    /// Default threshold: **32 bytes** — optimal on most hardware for small secrets.
-    /// Customize with `threshold_bytes: Some(n)` if your benchmarks show a different
-    /// optimal crossover point (e.g., `64`, `1024`, or `0` to always use `ct_eq`).
+    /// `threshold_bytes` is capped at 4096 — values above it behave identically to `Some(4096)`.
+    /// Pass `0` to force `ct_eq_hash` for all input sizes.
     ///
-    /// Prefer this method in almost all cases unless you need:
-    /// - Guaranteed zero-collision → use `ct_eq`
-    /// - Uniform probabilistic behavior → use `ct_eq_hash`
+    /// Prefer [`ct_eq_auto`](Self::ct_eq_auto) in almost all cases. Use this method only when
+    /// your benchmarks show a different optimal crossover point for your specific hardware.
     ///
     /// See [CT_EQ_AUTO.md](../CT_EQ_AUTO.md) for benchmarks and threshold tuning guidance.
-    fn ct_eq_auto(&self, other: &Self, threshold_bytes: Option<usize>) -> bool {
-        // Default implementation (can be overridden if desired)
+    fn ct_eq_auto_with_threshold(&self, other: &Self, threshold_bytes: usize) -> bool {
         if self.len() != other.len() {
             return false;
         }
-        let thresh = threshold_bytes.unwrap_or(32);
+        let thresh = threshold_bytes.min(4096);
         if self.len() <= thresh {
             self.ct_eq(other)
         } else {

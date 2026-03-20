@@ -40,7 +40,7 @@ Multi-run benchmarks (3x on 2019 Intel i7-10510U/16GB/Windows 11) show stable va
 - **No leaks**: Indirect channels (errors, timing) mitigated; zero-copy when possible.
 
 ## Customization & Practical Benefits
-- **Easy tuning**: Pass `Some(n)` to `ct_eq_auto` for custom thresholds (e.g., `ct_eq_auto(&a, &b, Some(64))` for larger small-input cutoff). Benchmark for gains.
+- **Easy tuning**: Call `ct_eq_auto()` for the default (`CT_EQ_AUTO_THRESHOLD`, 32 bytes) — the idiomatic choice for most callers, no argument needed. For a custom crossover point, call `ct_eq_auto_with_threshold(n)` directly (values above 4096 are capped at 4096). The constant is also useful as a base for custom multiples (e.g., `ct_eq_auto_with_threshold(CT_EQ_AUTO_THRESHOLD * 2)`) or in tests that assert boundary behavior. Benchmark for gains.
 - **Auto-selection pros**: Zero overhead for small data; security for large. Justifies "auto" name.
 - **Cons**: Probabilistic for >32B; tune threshold if benchmarks show >10% gains.
 - **When to use**: Variable or large secrets, or when a single consistent equality API is preferred. For small/fixed-size keys and nonces (the most common case), plain `ct_eq` is faster and fully sufficient.
@@ -54,24 +54,24 @@ For **most typical use cases** (fixed-size cryptographic keys, nonces, HMAC keys
 if a.ct_eq(&b) { /* equal */ }
 ```
 
-Use **`ct_eq_auto(None)`** (default 32-byte threshold) when:
+Use **`ct_eq_auto()`** (default 32-byte threshold) when:
 
 - Secret sizes are **variable** or **unknown** at compile time
 - You want to **hide length-based side channels** for large inputs
 - You have **mixed sizes** and prefer a single consistent API
 
 ```rust
-// Variable or mixed sizes
-if a.ct_eq_auto(&b, None) { /* equal */ }
+// Variable or mixed sizes — no argument needed
+if a.ct_eq_auto(&b) { /* equal */ }
 
-// Tune the crossover based on your own benchmarks
-if a.ct_eq_auto(&b, Some(64)) { /* equal */ }
+// Power users: tune the crossover based on your own benchmarks
+if a.ct_eq_auto_with_threshold(&b, 64) { /* equal */ }
 ```
 
 `ct_eq_hash` (uniform probabilistic) is available when you want consistent behaviour regardless of size.
 
 **Bottom line:**
 - Small/fixed secrets (typical crypto keys/nonces, ≤ 64 bytes) → prefer `.ct_eq()`
-- Variable/large/mixed data → prefer `ct_eq_auto(None)`
+- Variable/large/mixed data → prefer `ct_eq_auto()`
 
 Bench your specific workload and hardware if the default threshold feels suboptimal — most users never need to tune it.

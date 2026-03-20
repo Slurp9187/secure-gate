@@ -2,6 +2,7 @@
 name = "secure-gate"
 version = "0.8.0-rc.1"
 edition = "2021"
+rust-version = "1.70"
 license = "MIT OR Apache-2.0"
 description = "Secure wrappers for secrets with explicit access and automatic zeroization (requires inner type: Zeroize)"
 repository = "https://github.com/Slurp9187/secure-gate/tree/main"

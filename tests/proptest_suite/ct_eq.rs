@@ -35,7 +35,7 @@ mod tests {
 #[cfg(all(feature = "ct-eq-hash", feature = "alloc"))]
 mod auto_threshold_tests {
     use proptest::prelude::*;
-    use secure_gate::{dynamic_alias, ConstantTimeEq, ConstantTimeEqExt};
+    use secure_gate::{dynamic_alias, ConstantTimeEq, ConstantTimeEqExt, CT_EQ_AUTO_THRESHOLD};
 
     dynamic_alias!(TestDynamic2, Vec<u8>);
 
@@ -46,7 +46,13 @@ mod auto_threshold_tests {
         fn ct_eq_auto_threshold_switch(
             data_a in prop::collection::vec(any::<u8>(), 20..45),
             data_b in prop::collection::vec(any::<u8>(), 20..45),
-            threshold in 10usize..60
+            threshold in prop_oneof![
+                10usize..60,                        // normal range
+                Just(0usize),                       // force hash path always
+                Just(CT_EQ_AUTO_THRESHOLD),         // the exported constant itself
+                4090usize..4100,                    // boundary around the .min(4096) cap
+                Just(usize::MAX),                   // pathological: must not panic
+            ]
         ) {
             let a: TestDynamic2 = data_a.clone().into();
             let b: TestDynamic2 = data_b.clone().into();
@@ -54,8 +60,9 @@ mod auto_threshold_tests {
             if data_a.len() == data_b.len() {
                 let direct_ct = a.ct_eq(&b);
                 let len = data_a.len();
-                let expected = if len <= threshold { direct_ct } else { a.ct_eq_hash(&b) };
-                prop_assert_eq!(a.ct_eq_auto(&b, Some(threshold)), expected);
+                let effective_thresh = threshold.min(4096);
+                let expected = if len <= effective_thresh { direct_ct } else { a.ct_eq_hash(&b) };
+                prop_assert_eq!(a.ct_eq_auto_with_threshold(&b, threshold), expected);
             }
         }
     }

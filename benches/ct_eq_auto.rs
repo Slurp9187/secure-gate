@@ -27,16 +27,16 @@ fn bench_ct_eq_auto_16B_thresholds(c: &mut Criterion) {
     let mut group = c.benchmark_group("fixed_ct_eq_auto_16b");
 
     group.bench_function("default_32b", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, None)));
+        bencher.iter(|| black_box(a.ct_eq_auto(&b)));
     });
     group.bench_function("thresh_0_force_hash", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(0))));
+        bencher.iter(|| black_box(a.ct_eq_auto_with_threshold(&b, 0)));
     });
     group.bench_function("thresh_16_force_ct_eq", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(16))));
+        bencher.iter(|| black_box(a.ct_eq_auto_with_threshold(&b, 16)));
     });
     group.bench_function("thresh_64_force_ct_eq", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(64))));
+        bencher.iter(|| black_box(a.ct_eq_auto_with_threshold(&b, 64)));
     });
 
     group.finish();
@@ -52,16 +52,16 @@ fn bench_ct_eq_auto_32B_thresholds(c: &mut Criterion) {
     let mut group = c.benchmark_group("fixed_ct_eq_auto_32b");
 
     group.bench_function("default_32b", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, None)));
+        bencher.iter(|| black_box(a.ct_eq_auto(&b)));
     });
     group.bench_function("thresh_0_force_hash", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(0))));
+        bencher.iter(|| black_box(a.ct_eq_auto_with_threshold(&b, 0)));
     });
     group.bench_function("thresh_16_force_hash", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(16))));
+        bencher.iter(|| black_box(a.ct_eq_auto_with_threshold(&b, 16)));
     });
     group.bench_function("thresh_64_force_ct_eq", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(64))));
+        bencher.iter(|| black_box(a.ct_eq_auto_with_threshold(&b, 64)));
     });
 
     group.finish();
@@ -77,16 +77,16 @@ fn bench_ct_eq_auto_64B_thresholds(c: &mut Criterion) {
     let mut group = c.benchmark_group("fixed_ct_eq_auto_64b");
 
     group.bench_function("default_32b", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, None)));
+        bencher.iter(|| black_box(a.ct_eq_auto(&b)));
     });
     group.bench_function("thresh_0_force_hash", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(0))));
+        bencher.iter(|| black_box(a.ct_eq_auto_with_threshold(&b, 0)));
     });
     group.bench_function("thresh_64_force_ct_eq", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(64))));
+        bencher.iter(|| black_box(a.ct_eq_auto_with_threshold(&b, 64)));
     });
     group.bench_function("thresh_128_force_ct_eq", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(128))));
+        bencher.iter(|| black_box(a.ct_eq_auto_with_threshold(&b, 128)));
     });
 
     group.finish();
@@ -102,13 +102,13 @@ fn bench_ct_eq_auto_128B_dynamic_thresholds(c: &mut Criterion) {
     let mut group = c.benchmark_group("dynamic_ct_eq_auto_128b");
 
     group.bench_function("default_32b", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, None)));
+        bencher.iter(|| black_box(a.ct_eq_auto(&b)));
     });
     group.bench_function("thresh_64_force_hash", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(64))));
+        bencher.iter(|| black_box(a.ct_eq_auto_with_threshold(&b, 64)));
     });
     group.bench_function("thresh_256_force_ct_eq", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(256))));
+        bencher.iter(|| black_box(a.ct_eq_auto_with_threshold(&b, 256)));
     });
 
     group.finish();
@@ -124,13 +124,13 @@ fn bench_ct_eq_auto_1KiB_dynamic_thresholds(c: &mut Criterion) {
     let mut group = c.benchmark_group("dynamic_ct_eq_auto_1kb");
 
     group.bench_function("default_32b", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, None)));
+        bencher.iter(|| black_box(a.ct_eq_auto(&b)));
     });
     group.bench_function("thresh_512_force_hash", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(512))));
+        bencher.iter(|| black_box(a.ct_eq_auto_with_threshold(&b, 512)));
     });
     group.bench_function("thresh_2048_force_ct_eq", |bencher| {
-        bencher.iter(|| black_box(a.ct_eq_auto(&b, Some(2048))));
+        bencher.iter(|| black_box(a.ct_eq_auto_with_threshold(&b, 2048)));
     });
 
     group.finish();

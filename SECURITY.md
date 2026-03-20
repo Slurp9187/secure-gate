@@ -76,6 +76,12 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Macro-generated aliases lack runtime size checks
 - Certain error variants may indirectly leak length information (e.g. wrong decoded length).
   In most real-world usage (logging, API responses), length is already public metadata anyway (e.g. key length in JWT headers, signature length). Still, contextualize or redact errors when possible.
+- `Fixed<T>` decoding constructors (`try_from_hex`, `try_from_base64url`, etc.) use
+  `copy_from_slice` into a stack-allocated `[0u8; N]` before moving into the wrapper.
+  The intermediate stack slot is not explicitly zeroed before the move; in adversarial
+  environments (core dumps, memory forensics) secret bytes may persist briefly on the
+  stack. In release mode the compiler often eliminates the slot entirely. `Dynamic<T>`
+  avoids this via `protect_decode_result` + `mem::take` (heap-only path).
 
 **Mitigations**
 - Prefer `with_secret()` / `with_secret_mut()`
@@ -114,7 +120,7 @@ Zero-cost claim: performance indistinguishable from raw arrays; for detailed ben
 
 - The `alloc` feature is enabled by default and provides `Dynamic<T>` with full zeroization; use `default-features = false` for embedded / pure-stack builds (`Fixed<T>` only)
 - Prefer scoped `with_secret()` over long-lived `expose_secret()`
-- For equality, prefer `.ct_eq()` for small/fixed-size secrets (keys, nonces, ≤ 64 bytes); use `ct_eq_auto(…, None)` for mixed/variable sizes; use `ct_eq_hash` when uniform behaviour regardless of size is required. All three are constant-time; `ct_eq_hash` / `ct_eq_auto` have negligible collision risk (~2⁻²⁵⁶). Bound input sizes to prevent DoS. See [CT_EQ_AUTO.md](CT_EQ_AUTO.md) for crossover tuning.
+- For equality, prefer `.ct_eq()` for small/fixed-size secrets (keys, nonces, ≤ 64 bytes); use `ct_eq_auto()` for mixed/variable sizes; use `ct_eq_hash` when uniform behaviour regardless of size is required. All three are constant-time; `ct_eq_hash` / `ct_eq_auto` have negligible collision risk (~2⁻²⁵⁶). Bound input sizes to prevent DoS. See [CT_EQ_AUTO.md](CT_EQ_AUTO.md) for crossover tuning.
 - Audit every `CloneableSecret` / `SerializableSecret` impl
 - Validate and sanitize all inputs before encoding/decoding
 - Use specific format traits (`FromBech32Str`, `FromHexStr`, …) when the expected format is known
