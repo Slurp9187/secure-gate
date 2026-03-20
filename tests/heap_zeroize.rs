@@ -113,7 +113,7 @@ fn check_vec_zeroed(size: usize) {
         let mut secret: Dynamic<Vec<u8>> = Dynamic::new(Vec::with_capacity(size));
         secret.with_secret_mut(|v| {
             // Fill exactly N bytes so len == cap == N after shrink_to_fit.
-            v.extend(std::iter::repeat_n(0xBBu8, size));
+            v.extend(std::iter::repeat(0xBBu8).take(size));
             // shrink_to_fit ensures the allocator sees exactly N bytes on dealloc.
             v.shrink_to_fit();
         });
@@ -156,7 +156,7 @@ fn check_string_zeroed(size: usize) {
         let mut secret: Dynamic<String> = Dynamic::new(String::with_capacity(size));
         secret.with_secret_mut(|s| {
             // Fill exactly `size` ASCII bytes so len == cap == size after shrink_to_fit.
-            s.extend(std::iter::repeat_n('A', size));
+            s.extend(std::iter::repeat('A').take(size));
             s.shrink_to_fit();
         });
         core::hint::black_box(&secret);
