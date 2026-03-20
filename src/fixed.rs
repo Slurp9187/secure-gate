@@ -300,20 +300,6 @@ where
     }
 }
 
-#[cfg(feature = "ct-eq-hash")]
-impl<T: zeroize::Zeroize> crate::ConstantTimeEqExt for Fixed<T>
-where
-    T: AsRef<[u8]> + crate::ConstantTimeEq,
-{
-    fn len(&self) -> usize {
-        self.inner.as_ref().len()
-    }
-
-    fn ct_eq_hash(&self, other: &Self) -> bool {
-        crate::traits::ct_eq_hash_bytes(self.inner.as_ref(), other.inner.as_ref())
-    }
-}
-
 impl<T: zeroize::Zeroize> core::fmt::Debug for Fixed<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")

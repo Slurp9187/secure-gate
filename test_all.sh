@@ -84,8 +84,6 @@ run_tests "alloc + rand"                   "--no-default-features --features=all
 # ── Constant-time equality ──────────────────────────────────────────────────
 # (alloc needed for Dynamic<T> ct-eq tests)
 run_tests "ct-eq + alloc"                  "--no-default-features --features=ct-eq,alloc"
-run_tests "ct-eq-hash + alloc (unkeyed)"   "--no-default-features --features=ct-eq-hash,alloc"
-run_tests "ct-eq-hash + alloc + rand (keyed)" "--no-default-features --features=ct-eq-hash,alloc,rand"
 
 # ── Encoding ────────────────────────────────────────────────────────────────
 run_tests "encoding (all formats)"         "--no-default-features --features=encoding"

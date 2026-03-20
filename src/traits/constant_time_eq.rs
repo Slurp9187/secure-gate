@@ -12,14 +12,14 @@
 //! # Security Warning
 //!
 //! **Never** use `==` to compare cryptographic secrets, authentication tokens,
-//! MACs, signatures, or other sensitive data. Always use `.ct_eq()` or the
-//! recommended `ct_eq_auto()` (from `ConstantTimeEqExt`) instead.
+//! MACs, signatures, or other sensitive data. Always use `.ct_eq()`.
 //!
 //! # When to Use
 //!
-//! - Small, fixed-size secrets (< 256–512 bytes): `ConstantTimeEq` is fast and deterministic.
-//! - Large or variable-length secrets: Prefer `ConstantTimeEqExt::ct_eq_auto()` or `.ct_eq_hash()`
-//!   (requires `ct-eq-hash`) for better performance with negligible collision risk.
+//! Use `ConstantTimeEq::ct_eq()` for all secret comparisons: keys, nonces, MACs,
+//! tags, signatures, and variable-length secrets. It is deterministic and
+//! constant-time; for very large buffers, compare in chunks or use a protocol-level
+//! digest if you need a fixed-size equality check.
 //!
 //! `==` is deliberately not implemented on secret wrappers — always use `ct_eq`.
 //!
@@ -51,9 +51,6 @@
 //! - `Vec<u8>` / `String` (when `alloc` feature is enabled)
 //!
 //! These cover the most common secret types in cryptographic applications.
-//!
-//! See [`ConstantTimeEqExt`](../constant_time_eq_ext/index.html) for probabilistic
-//! fast equality on large secrets (recommended default).
 #[cfg(feature = "ct-eq")]
 pub trait ConstantTimeEq {
     /// Performs equality comparison in constant time.

@@ -28,7 +28,7 @@
 
 - **Explicit access only** — `.with_secret()` (preferred) or `.expose_secret()` required; no silent `Deref`/`AsRef` leaks
 - **Mandatory zeroize on drop** — always active, no feature gate (inner type must implement `Zeroize`)
-- **Timing-safe equality** — `ct-eq` feature for direct byte comparison; `ct-eq-hash` for BLAKE3-accelerated comparison on large secrets
+- **Timing-safe equality** — `ct-eq` feature for deterministic constant-time byte comparison (`subtle`)
 - **Secure random generation** — `from_random()` via `OsRng` (`rand` feature)
 - **Orthogonal encoding** — symmetric per-format traits (hex, base64url, bech32/BIP-173, bech32m/BIP-350); each format is opt-in and zero-overhead when unused
 - **Serde** — direct deserialization to inner types (binary-safe); opt-in serialization requires `SerializableSecret` marker
@@ -108,8 +108,7 @@ secure-gate = { version = "0.8.0-rc.1", features = ["full"] }
 | `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                      |
 | `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                             |
 | `rand`              | `from_random()` via `OsRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself requires it).    |
-| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison                                                                                                |
-| `ct-eq-hash`        | `ConstantTimeEqExt` — BLAKE3-based probabilistic equality; fast for large secrets; enables `ct-eq`. Keyed mode (with `rand`) uses `once_cell::sync::Lazy` and requires `std`; omit `rand` for unkeyed BLAKE3 in `no_std + alloc` builds. |
+| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                     |
 | `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                  |
 | `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                               |
 | `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr`                                                                                                                   |
@@ -121,7 +120,7 @@ secure-gate = { version = "0.8.0-rc.1", features = ["full"] }
 | `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                     |
 | `full`              | All features combined                                                                                                                                |
 
-`no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding, and serde require `alloc`. `ct-eq-hash + rand` (keyed mode) requires `std`. Disabled features have zero overhead.
+`no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding, and serde require `alloc`. Disabled features have zero overhead.
 
 ## Core API
 
@@ -283,71 +282,24 @@ See [`ToHex`], [`ToBech32`], [`FromHexStr`], and sibling traits in the [API docs
 
 ## Equality
 
-`secure-gate` provides three constant-time equality methods, each with different trade-offs:
+Enable the **`ct-eq`** feature and use **`.ct_eq()`** for all secret comparisons. It is deterministic, constant-time (via `subtle`), and exact — suitable for keys, nonces, MACs, tags, signatures, and variable-length secrets.
 
-- **`ct_eq`** — deterministic, direct byte-by-byte comparison (from `subtle`).
-  Fastest for small/fixed-size secrets (typical crypto keys/nonces ≤ 64 bytes). Zero extra overhead.
-- **`ct_eq_hash`** — probabilistic BLAKE3 digest comparison.
-  Uniform behaviour regardless of size; scales well for large/variable data.
-- **`ct_eq_auto`** — hybrid: chooses `ct_eq` (≤ threshold, default 32 bytes) or `ct_eq_hash` (> threshold).
-  Best default for mixed or unknown sizes.
-
-**Never use plain `==`** on secrets.
-
-### Recommended choices
-
-- **Fixed-size keys/nonces (≤ 64 bytes, most real-world cases)** — use **`ct_eq`**:
+**Never use plain `==`** on secrets (`==` is not implemented on the wrappers).
 
 ```rust
 #[cfg(feature = "ct-eq")]
 {
-    use secure_gate::{Fixed, ConstantTimeEq};
+    use secure_gate::{Dynamic, Fixed, ConstantTimeEq};
 
     let key_a = Fixed::new([0xAAu8; 32]);
     let key_b = Fixed::new([0xAAu8; 32]);
+    assert!(key_a.ct_eq(&key_b));
 
-    if key_a.ct_eq(&key_b) {
-        // equal — deterministic, constant-time, fastest for small secrets
-    }
+    let blob_a: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
+    let blob_b: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
+    assert!(blob_a.ct_eq(&blob_b));
 }
 ```
-
-- **Variable-size or large secrets** — use **`ct_eq_auto`** (default threshold 32 bytes):
-
-```rust
-#[cfg(feature = "ct-eq-hash")]
-{
-    use secure_gate::{Dynamic, ConstantTimeEqExt};
-
-    let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
-    let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
-
-    if sig_a.ct_eq_auto(&sig_b) {
-        // equal — automatically uses ct_eq for small, ct_eq_hash for large
-    }
-
-    // Power users: override threshold if benchmarks show a better crossover
-    sig_a.ct_eq_auto_with_threshold(&sig_b, 64);
-}
-```
-
-- **Uniform probabilistic behaviour** (regardless of size) — use **`ct_eq_hash`**:
-
-```rust
-#[cfg(feature = "ct-eq-hash")]
-{
-    use secure_gate::{Dynamic, ConstantTimeEqExt};
-
-    let sig_a: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
-    let sig_b: Dynamic<Vec<u8>> = vec![0xAA; 2048].into();
-
-    if sig_a.ct_eq_hash(&sig_b) {
-        // equal — BLAKE3 digest comparison, constant-time, scales well
-    }
-}
-```
-
-For benchmarks, crossover tuning guidance, and security justification see [CT_EQ_AUTO.md](CT_EQ_AUTO.md).
 
 ## Serde
 
@@ -371,8 +323,7 @@ Cryptographically secure via `OsRng`. `Fixed::from_random()` is heap-free and wo
 
 - **Explicit access only** — `.with_secret()` / `.expose_secret()` required; no silent leaks
 - **Zeroize on drop** — always active; inner type must implement `Zeroize`
-- **Timing-safe equality** — `ct-eq` feature
-- **Probabilistic fast equality** for large data — `ct-eq-hash` (BLAKE3)
+- **Timing-safe equality** — `ct-eq` feature (`.ct_eq()`)
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
 
 Read [SECURITY.md](SECURITY.md) for the full threat model and mitigations.

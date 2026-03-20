@@ -45,12 +45,6 @@ jobs:
           - name: ct-eq + alloc
             features: "--no-default-features --features=ct-eq,alloc"
 
-          - name: ct-eq-hash + alloc (BLAKE3 unkeyed)
-            features: "--no-default-features --features=ct-eq-hash,alloc"
-
-          - name: ct-eq-hash + alloc + rand (BLAKE3 keyed)
-            features: "--no-default-features --features=ct-eq-hash,alloc,rand"
-
           # ── Encoding ──────────────────────────────────────────────────────────
           - name: encoding (all formats)
             features: "--no-default-features --features=encoding"
@@ -136,10 +130,8 @@ jobs:
       - name: cargo check – default features
         run: cargo +1.75 check
 
-      # --features=full is intentionally excluded: the ct-eq-hash feature pulls in
-      # blake3 → constant_time_eq v0.4.2, which uses edition = "2024" (requires
-      # Rust 1.85+). The full feature matrix is already tested on stable in the
-      # `test` job above.
+      - name: cargo check – full features
+        run: cargo +1.75 check --features=full
 
   # ---------------------------------------------------------------------------
   # AddressSanitizer job — heap zeroization oracle

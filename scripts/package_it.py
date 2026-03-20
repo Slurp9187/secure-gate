@@ -54,7 +54,6 @@ PACKAGES = [
         "root_files": [
             "Cargo.toml",
             "CHANGELOG.md",
-            "CT_EQ_AUTO.md",
             "README.md",
             "ROADMAP.md",
             "SECURITY.md",

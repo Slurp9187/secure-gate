@@ -7,7 +7,7 @@ Last updated: 2026-03 (for v0.8.0-rc.1)
 - **No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally.
 - **Explicit exposure only** — all secret access requires `.expose_secret()` / `.with_secret()` or mutable equivalents; no `Deref`, `AsRef`, or implicit borrowing.
 - **Zeroization on drop** — full buffer (including spare capacity) always wiped on drop (inner type must implement `Zeroize`).
-- **Timing-safe equality** — use `ConstantTimeEq` (`ct-eq`) or `ConstantTimeEqExt` / `ct_eq_auto` (`ct-eq-hash`); `==` is deliberately not implemented.
+- **Timing-safe equality** — use `ConstantTimeEq` / `.ct_eq()` (`ct-eq`); `==` is deliberately not implemented.
 - **Opt-in risk** — cloning and serialization require explicit marker traits (`CloneableSecret`, `SerializableSecret`).
 - **Vulnerability reporting** — preferred: GitHub private vulnerability reporting (Security tab); public issues acceptable.
 
@@ -21,8 +21,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 - `zeroize` — memory wiping
 - `subtle` — constant-time comparison primitives
-- `blake3` — cryptographic hashing
-- `rand_core` + `getrandom` — secure randomness
+- `rand_core` + `getrandom` — secure randomness (via `rand` feature)
 - Encoding crates (`hex`, `base64`, `bech32`) — battle-tested (supports bech32 / bech32m)
 
 **Before production use**, review:
@@ -43,8 +42,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | Direct exposure (escape hatch)    | `expose_secret()` / `expose_secret_mut()` — grep-able, auditable                           |
 | No implicit leaks                 | No `Deref`, `AsRef`, `Copy`, `Clone` (unless `cloneable` + marker)                         |
 | Zeroization                       | Full allocation always wiped on drop; includes `Vec`/`String` spare capacity (inner type must implement `Zeroize`) |
-| Timing safety                     | `ConstantTimeEq` (`.ct_eq()`) for typical small/fixed keys; `ConstantTimeEqExt` / `ct_eq_auto` for large or variable data; `ct_eq_hash` for uniform probabilistic checks. Avoid `==`. |
-| Probabilistic equality (`ct-eq-hash`) | keyed BLAKE3 (when `rand` enabled) or unkeyed; collision risk ~2⁻²⁵⁶ either way (negligible for practical purposes) |
+| Timing safety                     | `ConstantTimeEq` (`.ct_eq()`) — deterministic constant-time comparison. Avoid `==`. |
 | Opt-in risky features             | Cloning/serialization gated by marker traits (`CloneableSecret`, `SerializableSecret`)         |
 | Redacted debug                    | `Debug` impl always prints `[REDACTED]`                                                    |
 | No unsafe code                    | `#![forbid(unsafe_code)]` enforced at crate level                                          |
@@ -55,8 +53,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 |----------------------|----------------------------------------------------------------------------------|---------------------------------------------|
 | `alloc` *(default)*  | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Use `default-features = false` for no-heap builds. | Enable unless on embedded/pure-stack target |
 | `std`                | Full `std` support (implies `alloc`). Adds no additional security surface beyond `alloc`. | Optional; `alloc` is sufficient for most targets |
-| `ct-eq`              | Timing-safe direct byte comparison                                               | Strongly recommended; avoid `==`            |
-| `ct-eq-hash`         | Enables `ct_eq_hash` (uniform BLAKE3 digest comparison) and `ct_eq_auto` (hybrid: `ct_eq` ≤ threshold, `ct_eq_hash` > threshold). Probabilistic but cryptographically safe. | Use `ct_eq_hash` for uniform behaviour regardless of size; use `ct_eq_auto` for mixed/variable sizes. |
+| `ct-eq`              | Timing-safe direct byte comparison (`.ct_eq()`)                                  | Strongly recommended; avoid `==`            |
 | `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
 | `serde-deserialize`  | Direct binary deserialization (arrays/seqs only); no string auto-parsing. Binary-safe; temporary buffers are `Zeroizing`-wrapped. Default 1 MiB limit (`MAX_DESERIALIZE_BYTES`) rejects oversized payloads and zeroizes them before deallocation. Use `Dynamic::deserialize_with_limit` for custom ceilings. | Enable for trusted deserialization sources; set a tight limit for untrusted input |
 | `serde-serialize`    | Opt-in export via marker trait; audit all implementations                        | Enable sparingly; monitor exfiltration risk |
@@ -137,7 +134,7 @@ Zero-cost claim: performance indistinguishable from raw arrays; for detailed ben
 
 - The `alloc` feature is enabled by default and provides `Dynamic<T>` with full zeroization; use `default-features = false` for embedded / pure-stack builds (`Fixed<T>` only)
 - Prefer scoped `with_secret()` over long-lived `expose_secret()`
-- For equality, prefer `.ct_eq()` for small/fixed-size secrets (keys, nonces, ≤ 64 bytes); use `ct_eq_auto()` for mixed/variable sizes; use `ct_eq_hash` when uniform behaviour regardless of size is required. All three are constant-time; `ct_eq_hash` / `ct_eq_auto` have negligible collision risk (~2⁻²⁵⁶). Bound input sizes to prevent DoS. See [CT_EQ_AUTO.md](CT_EQ_AUTO.md) for crossover tuning.
+- For equality, use `.ct_eq()` (`ct-eq` feature) for all secret comparisons — deterministic and constant-time. Bound input sizes at the transport/parser layer for untrusted data.
 - Audit every `CloneableSecret` / `SerializableSecret` impl
 - Validate and sanitize all inputs before encoding/decoding
 - Use specific format traits (`FromBech32Str`, `FromHexStr`, …) when the expected format is known

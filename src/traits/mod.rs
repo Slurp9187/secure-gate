@@ -12,7 +12,6 @@
 //! | [`ExposeSecret`]       | Read-only scoped / direct access + metadata  | Always available         | Preferred: `with_secret` (scoped); escape hatch: `expose_secret`      |
 //! | [`ExposeSecretMut`]    | Mutable scoped / direct access               | Always available         | Same preference: `with_secret_mut` over `expose_secret_mut`           |
 //! | [`ConstantTimeEq`]     | Deterministic constant-time equality         | `ct-eq`                  | Timing-attack resistant byte comparison                               |
-//! | [`ConstantTimeEqExt`]  | Probabilistic fast equality (BLAKE3 hash)    | `ct-eq-hash`             | Recommended for large/variable secrets; see `ct_eq_auto`              |
 //! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved. See [SECURITY.md](../SECURITY.md) for opt-in risk details. |
 //! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution. See [SECURITY.md](../SECURITY.md) for opt-in risk details. |
 //! | [`SecureEncoding`]     | Marker + blanket impl for encoding traits    | Any `encoding-*`         | Enables `ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`               |
@@ -23,7 +22,7 @@
 //! - **No implicit access** — All secret data access requires explicit trait methods
 //! - **Scoped preference** — `with_secret` / `with_secret_mut` limit borrow lifetime
 //! - **Zero-cost** — All methods use `#[inline(always)]` where possible
-//! - **Timing safety** — `ConstantTimeEq` / `ConstantTimeEqExt` prevent side-channels
+//! - **Timing safety** — `ConstantTimeEq` provides constant-time equality
 //! - **Opt-in risk** — Cloning and serialization require deliberate marker impls
 //! - **Read-only enforcement** — Encoding wrappers and random types only expose immutable access
 //!
@@ -32,7 +31,6 @@
 //! Some traits are only available when their corresponding Cargo features are enabled:
 //!
 //! - `ct-eq`          → [`ConstantTimeEq`]
-//! - `ct-eq-hash`     → [`ConstantTimeEqExt`] (recommended for large secrets)
 //! - `cloneable`      → [`CloneableSecret`]
 //! - `serde-serialize`→ [`SerializableSecret`]
 //! - `encoding-*`     → [`SecureEncoding`], [`SecureDecoding`], and per-format traits
@@ -52,16 +50,8 @@ pub mod constant_time_eq;
 #[cfg(feature = "ct-eq")]
 pub use constant_time_eq::ConstantTimeEq;
 
-#[cfg(feature = "ct-eq-hash")]
-pub mod constant_time_eq_ext;
-#[cfg(feature = "ct-eq-hash")]
-pub use constant_time_eq_ext::ConstantTimeEqExt;
-
 pub mod decoding;
 pub mod encoding;
-
-#[cfg(feature = "ct-eq-hash")]
-pub(crate) use constant_time_eq_ext::ct_eq_hash_bytes;
 
 // Re-export per-format decoding traits (feature-gated)
 #[cfg(feature = "encoding-base64")]

@@ -20,9 +20,7 @@ include = [
 [dependencies]
 base64 = { version = "0.22", optional = true }
 bech32 = { version = "0.11", default-features = false, optional = true }
-blake3 = { version = "1.8", optional = true, default-features = false }
 hex = { version = "0.4", optional = true }
-once_cell = { version = "1.19", optional = true }
 rand = { version = "0.9", optional = true }
 serde = { version = "1.0", optional = true, default-features = false, features = ["derive"] }
 subtle = { version = "2.5", optional = true }
@@ -56,12 +54,6 @@ rand = ["dep:rand"]
 # ct-eq: constant-time equality (subtle)
 ct-eq = ["dep:subtle"]
 
-# ct-eq-hash: BLAKE3-based fast probabilistic equality
-# NOTE: blake3 transitively requires constant_time_eq v0.4.2 (edition2024),
-#       which needs Rust 1.85+. This feature is excluded from the MSRV check job.
-# NOTE: keyed mode (rand + ct-eq-hash) uses once_cell::sync::Lazy which requires std.
-ct-eq-hash = ["ct-eq", "dep:blake3", "blake3?/zeroize", "dep:once_cell"]
-
 # Encoding features
 encoding = [
   "encoding-hex",
@@ -83,15 +75,7 @@ serde-deserialize = ["dep:serde", "serde?/alloc", "alloc"]
 serde-serialize = ["dep:serde", "serde?/alloc", "alloc"]
 
 # Full batteries-included combo (most common real-world usage)
-full = ["alloc", "rand", "encoding", "ct-eq-hash", "cloneable", "serde"]
-
-[[bench]]
-name = "ct_eq_auto"
-harness = false
-
-[[bench]]
-name = "ct_eq_hash_vs_standard"
-harness = false
+full = ["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]
 
 [[bench]]
 name = "fixed_vs_raw"

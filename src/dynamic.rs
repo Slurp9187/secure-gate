@@ -322,20 +322,6 @@ where
     }
 }
 
-#[cfg(feature = "ct-eq-hash")]
-impl<T: ?Sized + zeroize::Zeroize> crate::ConstantTimeEqExt for Dynamic<T>
-where
-    T: AsRef<[u8]> + crate::ConstantTimeEq,
-{
-    fn len(&self) -> usize {
-        (*self.inner).as_ref().len()
-    }
-
-    fn ct_eq_hash(&self, other: &Self) -> bool {
-        crate::traits::ct_eq_hash_bytes((*self.inner).as_ref(), (*other.inner).as_ref())
-    }
-}
-
 // Debug
 impl<T: ?Sized + zeroize::Zeroize> core::fmt::Debug for Dynamic<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
