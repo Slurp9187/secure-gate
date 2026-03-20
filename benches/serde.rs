@@ -3,13 +3,15 @@
 // Run with: cargo bench --features serde --bench serde
 // → measures serialization/deserialization overhead
 
-#[cfg(any(feature = "serde-serialize", feature = "serde-deserialize"))]
+#[cfg(feature = "serde-serialize")]
 use criterion::{criterion_group, criterion_main, Criterion};
-#[cfg(any(feature = "serde-serialize", feature = "serde-deserialize"))]
+#[cfg(feature = "serde-serialize")]
 use std::hint::black_box;
 
-#[cfg(any(feature = "serde-serialize", feature = "serde-deserialize"))]
-use serde_json::{from_str, to_string};
+#[cfg(feature = "serde-serialize")]
+use serde_json::to_string;
+#[cfg(all(feature = "serde-serialize", feature = "serde-deserialize"))]
+use serde_json::from_str;
 
 #[cfg(feature = "serde-serialize")]
 use secure_gate::{Dynamic, Fixed, SerializableSecret};
