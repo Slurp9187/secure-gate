@@ -6,6 +6,17 @@
 //! drop-order assertions to verify correctness.
 //!
 //! Run with `cargo test --release` so LLVM optimizations are applied.
+//!
+//! ## Testing strategy
+//!
+//! This file verifies *semantic* correctness: drop order, API-visible state
+//! after zeroization, spare-capacity targeting, and the existence of real Drop
+//! glue. It does not directly observe raw memory bytes.
+//!
+//! For allocator-level proof that heap bytes are physically zeroed before
+//! deallocation (and that LLVM dead-store elimination has not defeated the
+//! volatile writes), see `tests/heap_zeroize.rs`. The two files are
+//! complementary — neither fully substitutes for the other.
 
 #![allow(clippy::undocumented_unsafe_blocks)]
 
@@ -86,8 +97,8 @@ fn fixed_direct_zeroize() {
 /// No `unsafe`, no `drop_in_place`, no read-after-drop UB — fully sound and Miri-clean.
 #[test]
 fn fixed_zeroize_on_drop() {
-    let _secret = Fixed::new(PanicOnNonZeroDrop(0xAA));
-    // drop order: Fixed::drop → zeroize() → PanicOnNonZeroDrop::drop → assert .0==0 ✓
+    let secret = Fixed::new(PanicOnNonZeroDrop(0xAA));
+    drop(secret); // explicit: Fixed::drop → zeroize() → PanicOnNonZeroDrop::drop → assert .0==0
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +114,14 @@ fn fixed_needs_drop_array() {
     assert!(core::mem::needs_drop::<Fixed<[u8; 32]>>());
 }
 
-/// `Fixed<ZeroizedOnDrop>` has a real `Drop` glue destructor.
+/// `Fixed<ZeroizedOnDrop>` propagates the drop requirement of its inner type through the wrapper.
+///
+/// Note: this test does *not* prove that `Fixed<T>` itself has a custom `Drop` impl.
+/// Because `ZeroizedOnDrop` already requires drop, any container holding it reports
+/// `needs_drop == true` — with or without a custom `Drop` on the outer type.
+/// The definitive proof is `fixed_needs_drop_array`: `[u8; 32]` does not need drop on its
+/// own, so `Fixed<[u8; 32]>::needs_drop == true` can only be explained by `Fixed` having
+/// a manual `impl Drop`.
 #[test]
 fn fixed_needs_drop_custom_type() {
     assert!(core::mem::needs_drop::<Fixed<ZeroizedOnDrop>>());
@@ -205,17 +223,21 @@ fn fixed_mutate_custom_type_then_zeroize() {
 // Fixed<T> tests — scoped access + drop
 // ---------------------------------------------------------------------------
 
-/// `with_secret` scoped access followed by implicit drop correctly zeroes the secret.
+/// `with_secret` scoped access followed by implicit drop correctly exercises the zeroize-on-drop path.
 ///
 /// Accesses the secret once (summing all bytes, result passed through `black_box`),
-/// then lets it drop. This verifies the end-to-end flow: access → implicit zeroize-on-drop,
+/// then drops it explicitly. This verifies the end-to-end flow: access → zeroize-on-drop,
 /// without requiring an explicit `.zeroize()` call.
+///
+/// Note: this test exercises the code path but does not directly observe that bytes were
+/// cleared. Allocator-level verification that the bytes are physically zeroed belongs in
+/// `tests/heap_zeroize.rs`.
 #[test]
 fn fixed_scoped_access_then_drop() {
     let secret = Fixed::new([0xCCu8; 32]);
     let sum = secret.with_secret(|arr| arr.iter().map(|b| *b as u64).sum::<u64>());
     core::hint::black_box(sum);
-    // drop here → Fixed::drop → zeroize() → all bytes cleared ✓
+    drop(secret); // explicit: Fixed::drop → zeroize() runs here
 }
 
 // ---------------------------------------------------------------------------
@@ -261,8 +283,9 @@ fn dynamic_spare_capacity_vec_zeroized() {
 
     let mut secret: Dynamic<Vec<PanicOnNonZeroDrop>> = Dynamic::new(v);
     secret.zeroize();
-    // SAFETY: memory at index 1 was byte-zeroed by spare_capacity_mut().zeroize() above,
-    // so PanicOnNonZeroDrop(0) is a valid representation for reading back via drop.
+    // SAFETY: `PanicOnNonZeroDrop` wraps a `u64`; all-zero bytes are a valid `u64`
+    // representation (zero), so byte-zeroing the spare capacity produces a valid
+    // `PanicOnNonZeroDrop(0)`. When Drop runs for element[1], it finds `.0 == 0`. ✓
     secret.with_secret_mut(|v| unsafe { v.set_len(2) });
     // drop: Dynamic::drop → zeroize → clear → PanicOnNonZeroDrop::drop for element[1]
     // element[1].0 == 0 (zeroed in the spare_capacity_mut pass above) ✓
@@ -291,8 +314,9 @@ fn dynamic_needs_drop_string() {
 /// `Dynamic<Vec<u8>>` mutation sequence (push → truncate → extend → shrink_to_fit →
 /// with_secret_mut) followed by `.zeroize()` leaves an empty Vec.
 ///
-/// Tests that zeroization is correct regardless of the Vec's growth/shrink history,
-/// including that spare capacity from `shrink_to_fit` is also zeroed.
+/// Tests that zeroization is correct regardless of the Vec's growth/shrink history.
+/// This test verifies the API-visible outcome (`v.is_empty()`); for physical verification
+/// that the backing memory bytes are zeroed, see `tests/heap_zeroize.rs`.
 #[test]
 #[cfg(feature = "alloc")]
 fn dynamic_mutate_vec_sequence_then_zeroize() {
@@ -353,17 +377,16 @@ fn dynamic_mutate_string_sequence_then_zeroize() {
 // Dynamic<T> tests — spare-capacity String
 // ---------------------------------------------------------------------------
 
-/// `String::zeroize()` byte-zeroes spare capacity in `Dynamic<String>`.
+/// `String::zeroize()` zeroes the former-content bytes in `Dynamic<String>`.
 ///
 /// Mirrors `dynamic_spare_capacity_vec_zeroized` but for `String`. The mechanism
 /// is identical: String is a `Vec<u8>` under the hood, so `String::zeroize()` also
 /// calls `spare_capacity_mut().zeroize()` on the backing buffer.
 ///
-/// Steps:
-/// 1. Reserve extra capacity so `cap > len`.
-/// 2. Explicitly call `.zeroize()` — clears content and spare capacity.
-/// 3. Re-extend the String via its byte representation to verify the spare capacity
-///    slots are now all zero (uses the same PanicOnNonZeroDrop pattern at byte level).
+/// This test specifically verifies that the 6 bytes that previously held `"secret"`
+/// are zeroed after calling `.zeroize()`. It restores `len` to 6 via `set_len` and
+/// reads back the bytes. It does not enumerate the full spare-capacity tail (the
+/// remaining 26 bytes); that physical-level check belongs in `tests/heap_zeroize.rs`.
 #[test]
 #[cfg(feature = "alloc")]
 fn dynamic_spare_capacity_string_zeroized() {
@@ -401,10 +424,11 @@ fn dynamic_spare_capacity_string_zeroized() {
 // Dynamic<T> tests — scoped access + drop
 // ---------------------------------------------------------------------------
 
-/// Scoped `with_secret_mut` access followed by implicit drop correctly zeroes the secret.
+/// Scoped `with_secret_mut` access followed by explicit drop correctly exercises the zeroize-on-drop path.
 ///
-/// Verifies the end-to-end guarantee: mutate, read back (via `black_box`), let drop
-/// handle zeroization — no explicit `.zeroize()` call needed.
+/// Verifies the end-to-end guarantee: mutate, read back (via `black_box`), drop explicitly —
+/// no explicit `.zeroize()` call needed. This test exercises the code path but does not
+/// directly observe that bytes were cleared; see `tests/heap_zeroize.rs` for physical verification.
 #[test]
 #[cfg(feature = "alloc")]
 fn dynamic_scoped_with_secret_mut_drop() {
@@ -415,5 +439,5 @@ fn dynamic_scoped_with_secret_mut_drop() {
         v.iter().map(|b| *b as u64).sum::<u64>()
     });
     core::hint::black_box(checksum);
-    // drop here → Dynamic::drop → zeroize() → Vec content zeroed ✓
+    drop(secret); // explicit: Dynamic::drop → zeroize() runs here
 }

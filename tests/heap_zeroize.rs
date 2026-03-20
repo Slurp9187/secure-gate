@@ -15,6 +15,11 @@
 //! all size checks sequentially. Avoid splitting this into multiple `#[test]` functions:
 //! `ProxyAllocator` is global process state and parallel tests can interleave allocator activity,
 //! causing false positives in CI.
+//!
+//! Known gap: this suite verifies "no false positive on correct code" but does not include a
+//! positive-control test that verifies the proxy *catches* non-zeroed memory. A safe positive
+//! control would need `AtomicBool CAUGHT` + `std::panic::catch_unwind` to avoid panicking
+//! inside `GlobalAlloc::dealloc`. Deferred to a future improvement.
 
 #![cfg(all(feature = "alloc", not(miri)))]
 #![allow(clippy::undocumented_unsafe_blocks)]
@@ -62,17 +67,39 @@ unsafe impl GlobalAlloc for ProxyAllocator {
 static PROXY: ProxyAllocator = ProxyAllocator;
 
 // ---------------------------------------------------------------------------
+// CheckGuard — RAII gate reset
+// ---------------------------------------------------------------------------
+
+/// RAII guard that clears the allocator check gate on drop (both normal return and unwind).
+///
+/// Without this, a panic inside the closure (e.g. from the capacity assertion) would leave
+/// `CHECKING = true` during stack unwinding. Every subsequent deallocation of `TARGET_SIZE`
+/// bytes during unwind — including panic-formatting allocations from `assert_eq!` / `format_args!`
+/// — would be inspected, producing cascading assertion failures and confusing output.
+///
+/// Residual: panic-formatting allocations that occur *inside* the closure while the guard is
+/// active are still inspected. In practice they are unlikely to match `TARGET_SIZE` exactly.
+struct CheckGuard;
+
+impl Drop for CheckGuard {
+    fn drop(&mut self) {
+        CHECKING.store(false, Ordering::SeqCst);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Test helper
 // ---------------------------------------------------------------------------
 
 /// Runs `f` under the ProxyAllocator gate for allocations of exactly `size` bytes.
 ///
+/// The `CheckGuard` ensures the gate is cleared even if `f` panics.
 /// This helper assumes checks are executed sequentially by a single aggregate test function.
 fn with_proxy_check<F: FnOnce()>(size: usize, f: F) {
     TARGET_SIZE.store(size, Ordering::SeqCst);
     CHECKING.store(true, Ordering::SeqCst);
+    let _guard = CheckGuard; // cleared on return OR on unwind
     f();
-    CHECKING.store(false, Ordering::SeqCst);
 }
 
 // ---------------------------------------------------------------------------
@@ -87,8 +114,11 @@ fn with_proxy_check<F: FnOnce()>(size: usize, f: F) {
 fn check_array_zeroed<const N: usize>() {
     with_proxy_check(N, || {
         let secret: Dynamic<[u8; N]> = Dynamic::new([0xAAu8; N]);
+        // Prevent the compiler from eliding construction or the fill pattern
+        // before zeroization runs on drop.
         core::hint::black_box(&secret);
-    }); // secret drops here → Dynamic::drop → zeroize → ProxyAllocator checks N bytes ✓
+        drop(secret); // explicit: must occur while CHECKING is true
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -106,19 +136,33 @@ fn check_array_zeroed<const N: usize>() {
 // deallocation and asserts all N bytes are zero. The 24-byte Box struct
 // deallocation is intentionally not checked (correct behavior: Vec header
 // is freed but its fields are not expected to be zeroed).
+//
+// All test sizes are powers of two (16/32/64/128) to align with common
+// allocator size classes and avoid rounding after shrink_to_fit.
 // ---------------------------------------------------------------------------
 
 fn check_vec_zeroed(size: usize) {
     with_proxy_check(size, || {
         let mut secret: Dynamic<Vec<u8>> = Dynamic::new(Vec::with_capacity(size));
         secret.with_secret_mut(|v| {
-            // Fill exactly N bytes so len == cap == N after shrink_to_fit.
+            // Fill exactly N bytes so len == N before shrink_to_fit.
             v.extend(std::iter::repeat(0xBBu8).take(size));
-            // shrink_to_fit ensures the allocator sees exactly N bytes on dealloc.
             v.shrink_to_fit();
+            // Test realism guard: shrink_to_fit is best-effort; the allocator may
+            // leave capacity larger than len. Assert exact capacity so TARGET_SIZE
+            // matches layout.size() on dealloc — without this, the proxy check is
+            // silently skipped (false negative).
+            assert_eq!(
+                v.capacity(),
+                size,
+                "allocator rounded up capacity after shrink_to_fit — proxy check would be skipped"
+            );
         });
+        // Prevent the compiler from eliding construction or the fill pattern
+        // before zeroization runs on drop.
         core::hint::black_box(&secret);
-    }); // drop → Vec::zeroize (backing buf zeroed) → backing buf dealloc ← ProxyAllocator checks ✓
+        drop(secret); // explicit: must occur while CHECKING is true
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -126,9 +170,34 @@ fn check_vec_zeroed(size: usize) {
 //
 // `Dynamic<String>` wraps a `Box<String>`. The String's backing buffer is
 // heap-allocated separately. `String::zeroize()` zeroes all bytes in the
-// allocated buffer. After `shrink_to_fit` ensures len == capacity == N,
-// the ProxyAllocator confirms all N bytes are zeroed before deallocation.
+// allocated buffer (bytes, not characters — encoding is irrelevant here).
+// After shrink_to_fit ensures len == capacity == N, the ProxyAllocator
+// confirms all N bytes are zeroed before deallocation.
+//
+// All test sizes are powers of two (16/32/64/128) to align with common
+// allocator size classes and avoid rounding after shrink_to_fit.
 // ---------------------------------------------------------------------------
+
+fn check_string_zeroed(size: usize) {
+    with_proxy_check(size, || {
+        let mut secret: Dynamic<String> = Dynamic::new(String::with_capacity(size));
+        secret.with_secret_mut(|s| {
+            // Fill exactly `size` ASCII bytes so len == size before shrink_to_fit.
+            s.extend(std::iter::repeat('A').take(size));
+            s.shrink_to_fit();
+            // Test realism guard: same rationale as check_vec_zeroed above.
+            assert_eq!(
+                s.capacity(),
+                size,
+                "allocator rounded up capacity after shrink_to_fit — proxy check would be skipped"
+            );
+        });
+        // Prevent the compiler from eliding construction or the fill pattern
+        // before zeroization runs on drop.
+        core::hint::black_box(&secret);
+        drop(secret); // explicit: must occur while CHECKING is true
+    });
+}
 
 // ---------------------------------------------------------------------------
 // Dynamic<Vec<u8>> — decode-path backing-buffer zeroization test
@@ -147,24 +216,14 @@ fn check_vec_zeroed(size: usize) {
 fn check_decode_temp_zeroed(hex: &str, expected_len: usize) {
     with_proxy_check(expected_len, || {
         let secret = Dynamic::<Vec<u8>>::try_from_hex(hex).expect("valid hex");
+        // Prevent the compiler from eliding construction before zeroization runs on drop.
         core::hint::black_box(&secret);
-    }); // drop → Vec::zeroize (backing buf zeroed) → backing buf dealloc ← ProxyAllocator checks ✓
+        drop(secret); // explicit: must occur while CHECKING is true
+    });
 }
 
-fn check_string_zeroed(size: usize) {
-    with_proxy_check(size, || {
-        let mut secret: Dynamic<String> = Dynamic::new(String::with_capacity(size));
-        secret.with_secret_mut(|s| {
-            // Fill exactly `size` ASCII bytes so len == cap == size after shrink_to_fit.
-            s.extend(std::iter::repeat('A').take(size));
-            s.shrink_to_fit();
-        });
-        core::hint::black_box(&secret);
-    }); // drop → String::zeroize (backing buf zeroed) → backing buf dealloc ← ProxyAllocator checks ✓
-}
-
-/// Verifies both `Dynamic<[u8; N]>` and `Dynamic<Vec<u8>>` zeroize heap memory
-/// before deallocation across all supported sizes.
+/// Verifies `Dynamic<[u8; N]>`, `Dynamic<Vec<u8>>`, `Dynamic<String>`, and the
+/// `try_from_hex` decode path all zeroize heap memory before deallocation.
 ///
 /// This stays as one aggregate test by design to avoid parallel test interleaving
 /// with the global ProxyAllocator state.
@@ -176,15 +235,11 @@ fn all_heap_zeroed() {
     check_array_zeroed::<64>();
     check_array_zeroed::<128>();
 
-    // Dynamic<Vec<u8>> — backing buffers
-    check_vec_zeroed(16);
-    check_vec_zeroed(32);
-    check_vec_zeroed(64);
-    check_vec_zeroed(128);
-
-    // Dynamic<String> — backing buffers
-    check_string_zeroed(16);
-    check_string_zeroed(32);
+    // Dynamic<Vec<u8>> and Dynamic<String> — interleaved for structural size parity
+    for size in [16usize, 32, 64, 128] {
+        check_vec_zeroed(size);
+        check_string_zeroed(size);
+    }
 
     // Dynamic<Vec<u8>> decode path — verify backing buffer is zeroized after
     // decoding via try_from_hex and dropping the result (#96)
