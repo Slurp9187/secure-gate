@@ -99,20 +99,10 @@ pub use encoding::ToHex;
 /// bounds and extension methods to be available where appropriate.
 ///
 /// Requires at least one `encoding-*` feature to be enabled.
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32",
-    feature = "encoding-bech32m"
-))]
+#[cfg(feature = "encoding")]
 pub trait SecureEncoding {}
 
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32",
-    feature = "encoding-bech32m"
-))]
+#[cfg(feature = "encoding")]
 impl<T: AsRef<[u8]> + ?Sized> SecureEncoding for T {}
 
 /// Marker trait for types that support secure decoding operations.
@@ -125,20 +115,10 @@ impl<T: AsRef<[u8]> + ?Sized> SecureEncoding for T {}
 /// to allow trait bounds and extension methods where relevant.
 ///
 /// Requires at least one `encoding-*` feature to be enabled.
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32",
-    feature = "encoding-bech32m"
-))]
+#[cfg(feature = "encoding")]
 pub trait SecureDecoding {}
 
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32",
-    feature = "encoding-bech32m"
-))]
+#[cfg(feature = "encoding")]
 impl<T: AsRef<str> + ?Sized> SecureDecoding for T {}
 
 #[cfg(feature = "cloneable")]

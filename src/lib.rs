@@ -127,20 +127,10 @@ pub use traits::ToBech32m;
 #[cfg(feature = "encoding-hex")]
 pub use traits::ToHex;
 
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32",
-    feature = "encoding-bech32m"
-))]
+#[cfg(feature = "encoding")]
 pub use traits::SecureDecoding;
 
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base64",
-    feature = "encoding-bech32",
-    feature = "encoding-bech32m"
-))]
+#[cfg(feature = "encoding")]
 pub use traits::SecureEncoding;
 
 #[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]

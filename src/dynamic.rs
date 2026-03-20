@@ -122,6 +122,7 @@ impl Dynamic<Vec<u8>> {
     /// Moves `bytes` through a [`zeroize::Zeroizing`] wrapper, ensuring the
     /// allocation is zeroized if a panic occurs between a successful decode and
     /// [`Self::new`]. Uses `core::mem::take` — no extra heap allocation.
+    #[cfg(feature = "encoding")]
     #[inline(always)]
     fn protect_decode_result(bytes: alloc::vec::Vec<u8>) -> alloc::vec::Vec<u8> {
         let mut protected = zeroize::Zeroizing::new(bytes);
@@ -264,7 +265,10 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// Prefer this over [`try_from_bech32`](Self::try_from_bech32) in security-critical code
     /// to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32_expect_hrp(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+    pub fn try_from_bech32_expect_hrp(
+        s: &str,
+        expected_hrp: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
         let bytes = s.try_from_bech32_expect_hrp(expected_hrp)?;
         Ok(Self::new(Self::protect_decode_result(bytes)))
     }
@@ -293,7 +297,10 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// Prefer this over [`try_from_bech32m`](Self::try_from_bech32m) in security-critical code
     /// to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32m_expect_hrp(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+    pub fn try_from_bech32m_expect_hrp(
+        s: &str,
+        expected_hrp: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
         let bytes = s.try_from_bech32m_expect_hrp(expected_hrp)?;
         Ok(Self::new(Self::protect_decode_result(bytes)))
     }
@@ -377,7 +384,9 @@ impl Dynamic<alloc::vec::Vec<u8>> {
             zeroize::Zeroizing::new(serde::Deserialize::deserialize(deserializer)?);
         if buf.len() > limit {
             // buf drops here → Zeroizing zeros the oversized buffer before deallocation
-            return Err(serde::de::Error::custom("deserialized secret exceeds maximum size"));
+            return Err(serde::de::Error::custom(
+                "deserialized secret exceeds maximum size",
+            ));
         }
         Ok(Self::new(core::mem::take(&mut *buf)))
     }
@@ -400,7 +409,9 @@ impl Dynamic<String> {
             zeroize::Zeroizing::new(serde::Deserialize::deserialize(deserializer)?);
         if buf.len() > limit {
             // buf drops here → Zeroizing zeros the oversized buffer before deallocation
-            return Err(serde::de::Error::custom("deserialized secret exceeds maximum size"));
+            return Err(serde::de::Error::custom(
+                "deserialized secret exceeds maximum size",
+            ));
         }
         Ok(Self::new(core::mem::take(&mut *buf)))
     }
