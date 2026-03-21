@@ -44,7 +44,8 @@
 //!
 //! # Security Notes
 //!
-//! - Cloning **does not** bypass zeroization — every copy is independently zeroized.
+//! - Cloning **does not** bypass zeroization — **every** copy is independently zeroized on drop.
+//!   However, each clone **increases the number of simultaneous in-memory copies**, expanding the window for memory-extraction attacks (cold-boot, scraping, etc.).
 //! - Use `CloneableSecret` sparingly; each clone increases the number of in-memory
 //!   copies of the secret, expanding the window for extraction attacks.
 //! - Audit all `CloneableSecret` impls to ensure the inner type correctly implements
