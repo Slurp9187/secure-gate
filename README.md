@@ -353,6 +353,26 @@ Cryptographically secure via `OsRng`. `Fixed::from_random()` is heap-free and wo
 
 Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for the full threat model and mitigations.
 
+## Contributing
+
+### MSRV & Lockfile
+
+This crate enforces MSRV 1.75 (`rust-version = "1.75"` in `Cargo.toml`).
+
+**Important:** Always use the MSRV toolchain to update `Cargo.lock`:
+
+```bash
+cargo +1.75 update
+git add Cargo.lock
+git commit -m "chore: regenerate Cargo.lock with MSRV 1.75"
+```
+
+Do **not** use a newer toolchain (1.80+, nightly) to update the lockfile — it generates version 4 format, which Cargo 1.75 cannot read, breaking the MSRV CI job with:
+
+```
+lock file version `4` was found, but this version of Cargo does not understand this lock file
+```
+
 ## License
 
 MIT OR Apache-2.0
