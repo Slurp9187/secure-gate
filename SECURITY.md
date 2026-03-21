@@ -113,7 +113,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
   The intermediate stack slot is not explicitly zeroed before the move; in adversarial
   environments (core dumps, memory forensics) secret bytes may persist briefly on the
   stack. In release mode the compiler often eliminates the slot entirely. `Dynamic<T>`
-  avoids this via `protect_decode_result` + `mem::take` (heap-only path).
+  avoids this via `from_protected_bytes` + `mem::swap` (heap-only path).
 - **`static` secrets are never zeroized.** `Fixed::new` is `const fn`, so
   `static SECRET: Fixed<[u8; 32]> = Fixed::new([...]);` compiles without warning.
   Rust does not invoke `Drop` on program-scope statics during the lifetime of the

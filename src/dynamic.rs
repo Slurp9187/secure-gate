@@ -119,9 +119,20 @@ impl Dynamic<Vec<u8>> {
         self.with_secret(|s: &Vec<u8>| s.to_base64url())
     }
 
-    /// Moves `bytes` through a [`zeroize::Zeroizing`] wrapper, ensuring the
-    /// allocation is zeroized if a panic occurs between a successful decode and
-    /// [`Self::new`]. Uses `core::mem::take` — no extra heap allocation.
+    /// Transfers `protected` bytes into a freshly boxed `Vec`, keeping
+    /// [`zeroize::Zeroizing`] alive across the only allocation that can panic.
+    ///
+    /// # Panic safety
+    ///
+    /// `Box::new(Vec::new())` is the sole allocation point — just the 24-byte
+    /// `Vec` header, no data buffer. If it panics (OOM), `protected` is still
+    /// in scope and `Zeroizing::drop` zeroes the secret bytes during unwind.
+    /// After the swap, `protected` holds an empty `Vec` (no-op to zeroize) and
+    /// `Dynamic::from(boxed)` is an infallible struct-field assignment.
+    ///
+    /// Note: `Box::new(*protected)` would be cleaner but does not compile —
+    /// `Zeroizing` implements `Deref` (returning `&T`), not a move-out, so
+    /// `*protected` yields a reference rather than an owned value (E0507).
     #[cfg(any(
         feature = "encoding-hex",
         feature = "encoding-base64",
@@ -129,9 +140,11 @@ impl Dynamic<Vec<u8>> {
         feature = "encoding-bech32m",
     ))]
     #[inline(always)]
-    fn protect_decode_result(bytes: alloc::vec::Vec<u8>) -> alloc::vec::Vec<u8> {
-        let mut protected = zeroize::Zeroizing::new(bytes);
-        core::mem::take(&mut *protected)
+    fn from_protected_bytes(mut protected: zeroize::Zeroizing<alloc::vec::Vec<u8>>) -> Self {
+        // Only fallible allocation; protected stays live across it for panic-safety
+        let mut boxed = Box::new(alloc::vec::Vec::new());
+        core::mem::swap(&mut *boxed, &mut *protected);
+        Self::from(boxed)
     }
 }
 
@@ -229,10 +242,12 @@ impl Dynamic<alloc::vec::Vec<u8>> {
 impl Dynamic<alloc::vec::Vec<u8>> {
     /// Decodes a lowercase hex string into `Dynamic<Vec<u8>>`.
     ///
-    /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
+    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
+    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
     pub fn try_from_hex(s: &str) -> Result<Self, crate::error::HexError> {
-        let bytes = s.try_from_hex()?;
-        Ok(Self::new(Self::protect_decode_result(bytes)))
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
+            s.try_from_hex()?,
+        )))
     }
 }
 
@@ -240,10 +255,12 @@ impl Dynamic<alloc::vec::Vec<u8>> {
 impl Dynamic<alloc::vec::Vec<u8>> {
     /// Decodes a Base64url (unpadded) string into `Dynamic<Vec<u8>>`.
     ///
-    /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
+    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
+    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
     pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
-        let bytes = s.try_from_base64url()?;
-        Ok(Self::new(Self::protect_decode_result(bytes)))
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
+            s.try_from_base64url()?,
+        )))
     }
 }
 
@@ -251,7 +268,8 @@ impl Dynamic<alloc::vec::Vec<u8>> {
 impl Dynamic<alloc::vec::Vec<u8>> {
     /// Decodes a Bech32 (BIP-173) string into `Dynamic<Vec<u8>>`.
     ///
-    /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
+    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
+    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
     ///
     /// # Warning
     ///
@@ -260,19 +278,21 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// prevented, use [`try_from_bech32`](Self::try_from_bech32).
     pub fn try_from_bech32_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes) = s.try_from_bech32_unchecked()?;
-        Ok(Self::new(Self::protect_decode_result(bytes)))
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(bytes)))
     }
 
     /// Decodes a Bech32 (BIP-173) string into `Dynamic<Vec<u8>>`, validating that the HRP
     /// matches `expected_hrp` (case-insensitive).
     ///
-    /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
+    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
+    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
     ///
     /// Prefer this over [`try_from_bech32_unchecked`](Self::try_from_bech32_unchecked) in
     /// security-critical code to prevent cross-protocol confusion attacks.
     pub fn try_from_bech32(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
-        let bytes = s.try_from_bech32(expected_hrp)?;
-        Ok(Self::new(Self::protect_decode_result(bytes)))
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
+            s.try_from_bech32(expected_hrp)?,
+        )))
     }
 }
 
@@ -280,7 +300,8 @@ impl Dynamic<alloc::vec::Vec<u8>> {
 impl Dynamic<alloc::vec::Vec<u8>> {
     /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>`.
     ///
-    /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
+    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
+    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
     ///
     /// # Warning
     ///
@@ -289,19 +310,24 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// prevented, use [`try_from_bech32m`](Self::try_from_bech32m).
     pub fn try_from_bech32m_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
         let (_hrp, bytes) = s.try_from_bech32m_unchecked()?;
-        Ok(Self::new(Self::protect_decode_result(bytes)))
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(bytes)))
     }
 
     /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>`, validating that the HRP
     /// matches `expected_hrp` (case-insensitive).
     ///
-    /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
+    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
+    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
     ///
     /// Prefer this over [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked) in
     /// security-critical code to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32m(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
-        let bytes = s.try_from_bech32m(expected_hrp)?;
-        Ok(Self::new(Self::protect_decode_result(bytes)))
+    pub fn try_from_bech32m(
+        s: &str,
+        expected_hrp: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
+            s.try_from_bech32m(expected_hrp)?,
+        )))
     }
 }
 
@@ -364,8 +390,9 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// The standard [`serde::Deserialize`] impl calls this with [`MAX_DESERIALIZE_BYTES`].
     /// Use this method directly when you need a tighter or looser ceiling.
     ///
-    /// Oversized buffers are wrapped in `Zeroizing` and zeroed before the error is returned,
-    /// providing the same defense-in-depth as the success path.
+    /// The intermediate buffer is kept inside a `Zeroizing` wrapper until after the `Box`
+    /// allocation completes, guaranteeing zeroization even on OOM panic. Oversized buffers
+    /// are also zeroized before the error is returned.
     ///
     /// **Important:** this limit is enforced *after* the upstream deserializer has fully
     /// materialized the payload. It is a **result-length acceptance bound**, not a
@@ -383,7 +410,10 @@ impl Dynamic<alloc::vec::Vec<u8>> {
                 "deserialized secret exceeds maximum size",
             ));
         }
-        Ok(Self::new(core::mem::take(&mut *buf)))
+        // Only fallible allocation; protected stays live across it for panic-safety
+        let mut boxed = Box::new(alloc::vec::Vec::new());
+        core::mem::swap(&mut *boxed, &mut *buf);
+        Ok(Self::from(boxed))
     }
 }
 
@@ -394,8 +424,9 @@ impl Dynamic<String> {
     /// The standard [`serde::Deserialize`] impl calls this with [`MAX_DESERIALIZE_BYTES`].
     /// Use this method directly when you need a tighter or looser ceiling.
     ///
-    /// Oversized buffers are wrapped in `Zeroizing` and zeroed before the error is returned,
-    /// providing the same defense-in-depth as the success path.
+    /// The intermediate buffer is kept inside a `Zeroizing` wrapper until after the `Box`
+    /// allocation completes, guaranteeing zeroization even on OOM panic. Oversized buffers
+    /// are also zeroized before the error is returned.
     ///
     /// **Important:** this limit is enforced *after* the upstream deserializer has fully
     /// materialized the payload. It is a **result-length acceptance bound**, not a
@@ -413,7 +444,10 @@ impl Dynamic<String> {
                 "deserialized secret exceeds maximum size",
             ));
         }
-        Ok(Self::new(core::mem::take(&mut *buf)))
+        // Only fallible allocation; protected stays live across it for panic-safety
+        let mut boxed = Box::new(alloc::string::String::new());
+        core::mem::swap(&mut *boxed, &mut *buf);
+        Ok(Self::from(boxed))
     }
 }
 

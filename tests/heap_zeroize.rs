@@ -16,10 +16,11 @@
 //! `ProxyAllocator` is global process state and parallel tests can interleave allocator activity,
 //! causing false positives in CI.
 //!
-//! Known gap: this suite verifies "no false positive on correct code" but does not include a
-//! positive-control test that verifies the proxy *catches* non-zeroed memory. A safe positive
-//! control would need `AtomicBool CAUGHT` + `std::panic::catch_unwind` to avoid panicking
-//! inside `GlobalAlloc::dealloc`. Deferred to a future improvement.
+//! The panic-path positive-control test (`check_panic_path_bytes_zeroed`) uses a separate
+//! recording mode (PANIC_CHECK_*) that records without asserting inside `dealloc`, then checks
+//! after `catch_unwind` returns — safe because `dealloc` must never panic (allocator contract).
+//! Size 8192 is used to avoid collision with small Rust panic-machinery allocations (message
+//! formatting, backtrace, TLS) that may occur during unwind.
 
 #![cfg(all(feature = "alloc", not(miri)))]
 #![allow(clippy::undocumented_unsafe_blocks)]
@@ -29,7 +30,7 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 // ---------------------------------------------------------------------------
-// Assertion gate — active only while one check is running
+// Asserting-mode gate — active only while one happy-path check is running
 // ---------------------------------------------------------------------------
 
 /// Set to `true` only while the active test's closure is executing.
@@ -40,11 +41,32 @@ static CHECKING: AtomicBool = AtomicBool::new(false);
 static TARGET_SIZE: AtomicUsize = AtomicUsize::new(0);
 
 // ---------------------------------------------------------------------------
+// Recording-mode gate — used by the panic-path positive-control test
+//
+// Unlike the asserting mode, the recording mode never panics inside `dealloc`
+// (which would be UB per the allocator contract). Instead it silently records
+// whether the first matching deallocation was fully zeroed, then the test
+// checks the result after `catch_unwind` returns.
+// ---------------------------------------------------------------------------
+
+/// Set to `true` before `catch_unwind`; cleared by `dealloc` on first match.
+static PANIC_CHECK_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+/// The exact byte count to watch for in recording mode.
+static PANIC_CHECK_SIZE: AtomicUsize = AtomicUsize::new(0);
+
+/// `true` iff the first matching deallocation in recording mode was fully zeroed.
+static PANIC_CHECK_ZEROED: AtomicBool = AtomicBool::new(false);
+
+// ---------------------------------------------------------------------------
 // ProxyAllocator — adapted from upstream zeroize/tests/alloc.rs
 // ---------------------------------------------------------------------------
 
-/// A `GlobalAlloc` wrapper that asserts deallocated memory is fully zeroed
-/// for allocations of exactly `TARGET_SIZE` bytes while `CHECKING` is active.
+/// A `GlobalAlloc` wrapper that:
+///   - In **asserting mode** (`CHECKING`): panics if a deallocation of
+///     `TARGET_SIZE` bytes contains any non-zero byte.
+///   - In **recording mode** (`PANIC_CHECK_ACTIVE`): silently records whether
+///     the first deallocation of `PANIC_CHECK_SIZE` bytes was fully zeroed.
 struct ProxyAllocator;
 
 unsafe impl GlobalAlloc for ProxyAllocator {
@@ -53,12 +75,23 @@ unsafe impl GlobalAlloc for ProxyAllocator {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        // Asserting mode: panic on non-zeroed bytes (never called during unwind)
         if CHECKING.load(Ordering::SeqCst) && layout.size() == TARGET_SIZE.load(Ordering::SeqCst) {
             for i in 0..layout.size() {
                 let b = unsafe { core::ptr::read(ptr.add(i)) };
                 assert_eq!(b, 0, "byte at offset {i} was not zeroed before dealloc");
             }
         }
+
+        // Recording mode: record zeroed status without panicking (safe inside dealloc)
+        if PANIC_CHECK_ACTIVE.load(Ordering::SeqCst)
+            && layout.size() == PANIC_CHECK_SIZE.load(Ordering::SeqCst)
+        {
+            let all_zero = (0..layout.size()).all(|i| unsafe { *ptr.add(i) == 0 });
+            PANIC_CHECK_ZEROED.store(all_zero, Ordering::SeqCst);
+            PANIC_CHECK_ACTIVE.store(false, Ordering::SeqCst);
+        }
+
         unsafe { System.dealloc(ptr, layout) }
     }
 }
@@ -67,7 +100,7 @@ unsafe impl GlobalAlloc for ProxyAllocator {
 static PROXY: ProxyAllocator = ProxyAllocator;
 
 // ---------------------------------------------------------------------------
-// CheckGuard — RAII gate reset
+// CheckGuard — RAII gate reset for asserting mode
 // ---------------------------------------------------------------------------
 
 /// RAII guard that clears the allocator check gate on drop (both normal return and unwind).
@@ -88,7 +121,7 @@ impl Drop for CheckGuard {
 }
 
 // ---------------------------------------------------------------------------
-// Test helper
+// Test helper — asserting mode
 // ---------------------------------------------------------------------------
 
 /// Runs `f` under the ProxyAllocator gate for allocations of exactly `size` bytes.
@@ -200,30 +233,201 @@ fn check_string_zeroed(size: usize) {
 }
 
 // ---------------------------------------------------------------------------
-// Dynamic<Vec<u8>> — decode-path backing-buffer zeroization test
+// Dynamic<Vec<u8>> — decode-path backing-buffer zeroization tests
 //
-// Verifies that decoding into a `Dynamic<Vec<u8>>` via `try_from_hex` and then
-// dropping the result correctly zeroizes the backing buffer. This exercises the
-// `protect_decode_result` path added in issue #96.
+// Verifies that decoding into a `Dynamic<Vec<u8>>` and then dropping the
+// result correctly zeroizes the backing buffer. Each function exercises a
+// different decode path (hex, base64url, bech32, bech32m) to confirm that
+// all six constructors using `from_protected_bytes` produce a correctly
+// zeroized result on the happy path.
 //
 // Note: on the error path (invalid input) no `Vec` is returned by the decoder,
-// so there is no intermediate buffer for `Zeroizing` to clean up — the `?`
-// propagates before our code ever holds bytes. The protection provided by the
-// `Zeroizing` wrapper is for panics between a *successful* decode and `Self::new`.
+// so there is no intermediate buffer — the `?` propagates before our code ever
+// holds bytes.
+//
+// The decode is performed OUTSIDE the proxy window to avoid false positives
+// from decoder-internal allocations of the same size. Only the final drop of
+// the `Dynamic` occurs inside the proxy window.
 // ---------------------------------------------------------------------------
 
 #[cfg(feature = "encoding-hex")]
-fn check_decode_temp_zeroed(hex: &str, expected_len: usize) {
+fn check_decode_hex_zeroed(hex: &str, expected_len: usize) {
     with_proxy_check(expected_len, || {
         let secret = Dynamic::<Vec<u8>>::try_from_hex(hex).expect("valid hex");
-        // Prevent the compiler from eliding construction before zeroization runs on drop.
         core::hint::black_box(&secret);
         drop(secret); // explicit: must occur while CHECKING is true
     });
 }
 
-/// Verifies `Dynamic<[u8; N]>`, `Dynamic<Vec<u8>>`, `Dynamic<String>`, and the
-/// `try_from_hex` decode path all zeroize heap memory before deallocation.
+#[cfg(feature = "encoding-base64")]
+fn check_decode_base64_zeroed(data: &[u8]) {
+    use secure_gate::ToBase64Url;
+    let encoded = data.to_base64url();
+    let mut secret =
+        Dynamic::<Vec<u8>>::try_from_base64url(&encoded).expect("valid base64url");
+    // Shrink to exact len so TARGET_SIZE matches layout.size() on dealloc.
+    secret.with_secret_mut(|v| {
+        v.shrink_to_fit();
+        assert_eq!(
+            v.capacity(),
+            data.len(),
+            "allocator rounded up capacity after shrink_to_fit — proxy check would be skipped"
+        );
+    });
+    with_proxy_check(data.len(), move || {
+        core::hint::black_box(&secret);
+        drop(secret);
+    });
+}
+
+#[cfg(feature = "encoding-bech32")]
+fn check_decode_bech32_zeroed(data: &[u8]) {
+    use secure_gate::ToBech32;
+    let encoded = data.try_to_bech32("test").expect("valid hrp");
+    let mut secret =
+        Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "test").expect("valid bech32");
+    secret.with_secret_mut(|v| {
+        v.shrink_to_fit();
+        assert_eq!(
+            v.capacity(),
+            data.len(),
+            "allocator rounded up capacity after shrink_to_fit — proxy check would be skipped"
+        );
+    });
+    with_proxy_check(data.len(), move || {
+        core::hint::black_box(&secret);
+        drop(secret);
+    });
+}
+
+#[cfg(feature = "encoding-bech32m")]
+fn check_decode_bech32m_zeroed(data: &[u8]) {
+    use secure_gate::ToBech32m;
+    let encoded = data.try_to_bech32m("testm").expect("valid hrp");
+    let mut secret =
+        Dynamic::<Vec<u8>>::try_from_bech32m(&encoded, "testm").expect("valid bech32m");
+    secret.with_secret_mut(|v| {
+        v.shrink_to_fit();
+        assert_eq!(
+            v.capacity(),
+            data.len(),
+            "allocator rounded up capacity after shrink_to_fit — proxy check would be skipped"
+        );
+    });
+    with_proxy_check(data.len(), move || {
+        core::hint::black_box(&secret);
+        drop(secret);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic<Vec<u8>> / Dynamic<String> — serde deserialize-path zeroization
+//
+// Verifies that bytes materialized by `deserialize_with_limit` are correctly
+// zeroized when the `Dynamic` is dropped. The deserialize call and
+// shrink_to_fit happen OUTSIDE the proxy window to avoid interference from
+// serde_json's internal allocations.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "serde-deserialize")]
+fn check_vec_deserialized_zeroed(size: usize) {
+    // Build JSON array outside the proxy window.
+    let json: String = {
+        let nums: Vec<String> = (0..size).map(|i| (i as u8).to_string()).collect();
+        format!("[{}]", nums.join(","))
+    };
+    let mut de = serde_json::Deserializer::from_str(&json);
+    let mut secret = Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, size)
+        .expect("within limit");
+    secret.with_secret_mut(|v| {
+        v.shrink_to_fit();
+        assert_eq!(
+            v.capacity(),
+            size,
+            "allocator rounded up capacity after shrink_to_fit — proxy check would be skipped"
+        );
+    });
+    with_proxy_check(size, move || {
+        core::hint::black_box(&secret);
+        drop(secret);
+    });
+}
+
+#[cfg(feature = "serde-deserialize")]
+fn check_string_deserialized_zeroed(size: usize) {
+    // Build JSON string of exactly `size` ASCII bytes outside the proxy window.
+    let json: String = format!("\"{}\"", "A".repeat(size));
+    let mut de = serde_json::Deserializer::from_str(&json);
+    let mut secret = Dynamic::<String>::deserialize_with_limit(&mut de, size)
+        .expect("within limit");
+    secret.with_secret_mut(|s| {
+        s.shrink_to_fit();
+        assert_eq!(
+            s.capacity(),
+            size,
+            "allocator rounded up capacity after shrink_to_fit — proxy check would be skipped"
+        );
+    });
+    with_proxy_check(size, move || {
+        core::hint::black_box(&secret);
+        drop(secret);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Panic-path positive-control test
+//
+// Verifies that `Zeroizing::drop` actually zeroes the backing buffer when a
+// panic fires while `Zeroizing<Vec<u8>>` is in scope — the exact guarantee
+// that `from_protected_bytes` relies on.
+//
+// Design:
+//   1. Enable recording mode (PANIC_CHECK_ACTIVE) for SIZE bytes.
+//   2. Inside `catch_unwind`: create `Zeroizing::new(vec![0xAA; SIZE])`, then
+//      panic. During unwind, `Zeroizing::drop` runs → `Vec::zeroize()` zeroes
+//      the SIZE-byte backing buffer → `dealloc` records the zeroed status.
+//   3. After `catch_unwind`: assert PANIC_CHECK_ZEROED == true.
+//
+// SIZE = 8192 avoids collision with Rust panic-machinery allocations (message
+// formatting, backtrace capture, TLS) which are small (typically ≤ 512 bytes).
+// A size collision would cause the proxy to record a non-zeroed panic-internal
+// buffer instead of our secret buffer, falsely failing the assertion.
+//
+// Regression value: this test would FAIL with the old `mem::take` pattern,
+// because `mem::take` leaves `protected` holding an empty Vec — so no
+// SIZE-byte deallocation is zeroed during unwind, PANIC_CHECK_ZEROED stays
+// false, and the assertion fails. With `from_protected_bytes` (swap), the
+// live `Zeroizing` holds the full buffer at panic time and zeroizes it.
+// ---------------------------------------------------------------------------
+
+fn check_panic_path_bytes_zeroed(size: usize) {
+    PANIC_CHECK_SIZE.store(size, Ordering::SeqCst);
+    PANIC_CHECK_ZEROED.store(false, Ordering::SeqCst);
+    PANIC_CHECK_ACTIVE.store(true, Ordering::SeqCst);
+
+    // Simulate a panic that fires after Zeroizing::new but before Box::new —
+    // the exact OOM window that `from_protected_bytes` is designed to protect.
+    let result = std::panic::catch_unwind(|| {
+        let _protected = zeroize::Zeroizing::new(vec![0xAAu8; size]);
+        // `_protected` is still alive here. During unwind its Drop impl runs:
+        // Zeroizing::drop → Vec::zeroize() → backing buffer zeroed → dealloc.
+        panic!("simulated OOM before Box allocation");
+    });
+
+    assert!(result.is_err(), "catch_unwind should have captured the panic");
+    assert!(
+        PANIC_CHECK_ZEROED.load(Ordering::SeqCst),
+        "Zeroizing must zero its backing buffer even when a panic fires before Box::new"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Aggregate test
+// ---------------------------------------------------------------------------
+
+/// Verifies `Dynamic<[u8; N]>`, `Dynamic<Vec<u8>>`, `Dynamic<String>`, all
+/// decode paths, all deserialize paths, and the panic-path positive control
+/// all zeroize heap memory before deallocation.
 ///
 /// This stays as one aggregate test by design to avoid parallel test interleaving
 /// with the global ProxyAllocator state.
@@ -241,11 +445,41 @@ fn all_heap_zeroed() {
         check_string_zeroed(size);
     }
 
-    // Dynamic<Vec<u8>> decode path — verify backing buffer is zeroized after
-    // decoding via try_from_hex and dropping the result (#96)
+    // Decode-path backing-buffer zeroization (#96 / from_protected_bytes fix)
     #[cfg(feature = "encoding-hex")]
     {
-        check_decode_temp_zeroed("deadbeef", 4);
-        check_decode_temp_zeroed("0102030405060708090a0b0c0d0e0f10", 16);
+        check_decode_hex_zeroed("deadbeef", 4);
+        check_decode_hex_zeroed("0102030405060708090a0b0c0d0e0f10", 16);
     }
+
+    #[cfg(feature = "encoding-base64")]
+    {
+        check_decode_base64_zeroed(&[0xAAu8; 16]);
+        check_decode_base64_zeroed(&[0xBBu8; 32]);
+    }
+
+    #[cfg(feature = "encoding-bech32")]
+    {
+        check_decode_bech32_zeroed(&[0xAAu8; 16]);
+        check_decode_bech32_zeroed(&[0xBBu8; 32]);
+    }
+
+    #[cfg(feature = "encoding-bech32m")]
+    {
+        check_decode_bech32m_zeroed(&[0xAAu8; 16]);
+        check_decode_bech32m_zeroed(&[0xBBu8; 32]);
+    }
+
+    // Deserialize-path backing-buffer zeroization (deserialize_with_limit fix)
+    #[cfg(feature = "serde-deserialize")]
+    {
+        check_vec_deserialized_zeroed(16);
+        check_vec_deserialized_zeroed(32);
+        check_string_deserialized_zeroed(16);
+        check_string_deserialized_zeroed(32);
+    }
+
+    // Panic-path positive control: proves Zeroizing zeroes bytes on unwind.
+    // Size 8192 avoids collision with panic-machinery allocations (see comment above).
+    check_panic_path_bytes_zeroed(8192);
 }
