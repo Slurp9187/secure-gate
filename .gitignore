@@ -7,7 +7,7 @@
 *conflict*
 *# Name clash*
 
-Cargo.lock
+# Cargo.lock
 
 *.bak
 *.del
