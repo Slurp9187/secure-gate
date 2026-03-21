@@ -9,7 +9,7 @@
 //! # Security Notes
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
-//! - **Explicit exposure**: Calling `to_base64url()` on a wrapper is deliberate exposure —
+//! - **Explicit exposure**: `to_base64url()` (and the other encoding methods) perform deliberate full-secret exposure —
 //!   the same security contract as `with_secret` or `expose_secret`. Direct calls do not
 //!   appear in `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams
 //!   or multi-step operations, prefer `with_secret(|b| b.to_base64url())` — the borrow

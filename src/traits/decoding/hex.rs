@@ -8,7 +8,7 @@
 //!
 //! # Security Notes
 //!
-//! - **Treat all input as untrusted**: validate hex strings upstream before wrapping
+//! - Treat all input as untrusted**: validate hex strings upstream before wrapping in secrets. Invalid input fails immediately.
 //!   in secrets. Invalid hex may indicate tampering or injection attempts.
 //! - **Heap allocation**: Returns `Vec<u8>` — wrap in [`Fixed`](crate::Fixed) or
 //!   [`Dynamic`](crate::Dynamic) to store as a secret.

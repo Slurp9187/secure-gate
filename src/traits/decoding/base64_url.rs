@@ -12,7 +12,7 @@
 //!   wrapping in secrets. Invalid input may indicate tampering or injection attempts.
 //! - **Heap allocation**: Returns `Vec<u8>` — wrap in [`Fixed`](crate::Fixed) or
 //!   [`Dynamic`](crate::Dynamic) to store as a secret.
-//! - **No padding**: Strict base64url (no `=` padding) per RFC 4648 §5.
+//! - **Strict validation**: URL-safe alphabet, no padding, per RFC 4648 §5. Invalid input fails immediately.
 //! - **URL-safe alphabet**: Uses `-` and `_` instead of `+` and `/`.
 //!
 //! # Example

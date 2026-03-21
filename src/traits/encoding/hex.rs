@@ -10,7 +10,7 @@
 //!
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
-//! - **Audit visibility**: Direct wrapper calls (`key.to_hex()`) do **not** appear in
+//! - **Audit visibility**: Direct calls (`key.to_hex()` / `key.to_hex_upper()`) do **not** appear in
 //!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
 //!   multi-step operations, prefer `with_secret(|b| b.to_hex())` — the borrow checker
 //!   enforces the reference cannot escape the closure.
@@ -55,7 +55,6 @@ pub trait ToHex {
 
     /// Encode bytes as uppercase hexadecimal.
     fn to_hex_upper(&self) -> alloc::string::String;
-
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
