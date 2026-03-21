@@ -5,24 +5,20 @@
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
-**0.8.0 — reboot release after critical zeroize bug fix. All prior versions yanked from crates.io.**
-
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
 > **Security Notice**: This crate has **not undergone independent audit**.
-> Review the code and [SECURITY.md](SECURITY.md) before production use.
+> Review the code and [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) before production use.
 > No unsafe code — enforced with `#![forbid(unsafe_code)]`.
 
 ## What changed in 0.8.0
 
-- **Zeroize is now mandatory** — memory wiping on drop is always enabled, no feature gate.
+- **Zeroize is now mandatory** — memory wiping on drop is always enabled with no feature gate.
 - `Fixed<T>` requires `T: Zeroize`; `Dynamic<T>` requires `T: ?Sized + Zeroize`.
-- Removed `zeroize`, `insecure`, `secure`, and `std` feature toggles.
-- Real `impl Drop` now calls `zeroize()` — the original security promise is finally true.
-
-- **All versions 0.1.0–0.7.0-rc.15 were yanked** from crates.io due to a critical zeroize-on-drop flaw that has now been fixed.
-
-- **Zeroization test suite greatly expanded** — multi-size coverage, spare-capacity checks for both Vec and String, runtime heap-byte verification via ProxyAllocator, and AddressSanitizer integration.
+- Removed the old optional `zeroize` feature and related toggles (`insecure`, `secure`, and `std`).
+- Real `impl Drop` now calls `zeroize()` on the inner value — the documented zeroization guarantee is fully enforced.
+- All previous versions (0.1.0–0.7.0-rc.15) were yanked from crates.io.
+- Greatly expanded zeroization test suite with multi-size coverage, spare-capacity checks for both `Vec` and `String`, runtime heap verification via `ProxyAllocator`, and AddressSanitizer integration.
 
 ## What You Get
 
@@ -33,9 +29,9 @@
 - **Orthogonal encoding** — symmetric per-format traits (hex, base64url, bech32/BIP-173, bech32m/BIP-350); each format is opt-in and zero-overhead when unused
 - **Serde** — direct deserialization to inner types (binary-safe); opt-in serialization requires `SerializableSecret` marker
 - **Ergonomic aliases** — `dynamic_alias!`, `fixed_alias!`, `fixed_generic_alias!`, `dynamic_generic_alias!` for typed newtypes
-- **Auditable** — every exposure, encoding, and equality call is grep-able; `no_std` + `alloc` compatible
+- **Auditable** — every secret exposure point (including encoding methods) is grep-able using the consolidated pattern shown in the [Encoding](#encoding) section; `no_std` + `alloc` compatible
 
-For zero-cost performance justification see [ZERO_COST_WRAPPERS.md](ZERO_COST_WRAPPERS.md).
+For zero-cost performance justification see [ZERO_COST_WRAPPERS.md](https://github.com/Slurp9187/secure-gate/blob/main/ZERO_COST_WRAPPERS.md).
 
 ## Quick Start
 
@@ -103,22 +99,22 @@ secure-gate = { version = "0.8.0-rc.1", features = ["full"] }
 
 ## Features
 
-| Feature             | Description                                                                                                                                          |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                      |
-| `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                             |
-| `rand`              | `from_random()` via `OsRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself requires it).    |
-| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                     |
-| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                  |
-| `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                               |
-| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr`                                                                                                                   |
-| `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                                                                               |
-| `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                                                                             |
-| `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                                                                        |
-| `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings |
-| `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                               |
-| `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                     |
-| `full`              | All features combined                                                                                                                                |
+| Feature             | Description                                                                                                                                                                 |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                             |
+| `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                    |
+| `rand`              | `from_random()` via `OsRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself requires it). |
+| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                            |
+| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                                         |
+| `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                                                      |
+| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr`                                                                                                                                          |
+| `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                                                                                                      |
+| `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                                                                                                    |
+| `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                                                                                               |
+| `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                        |
+| `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                      |
+| `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                            |
+| `full`              | All features combined                                                                                                                                                       |
 
 `no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding, and serde require `alloc`. Disabled features have zero overhead.
 
@@ -172,6 +168,8 @@ See [`fixed_alias!`], [`dynamic_alias!`], [`fixed_generic_alias!`], and [`dynami
 `fixed_alias!(Name, N)` rejects `N = 0` at compile time (via a const-eval index-out-of-bounds guard).  
 However, `fixed_generic_alias!`, `dynamic_alias!`, and `dynamic_generic_alias!` **allow** zero-sized types (`SecretBuffer<0>`, `Dynamic<[u8; 0]>`, `Dynamic<()>` etc.). These compile successfully but have no cryptographic value and should never be used in production. Always validate that the effective size is > 0 in your unit tests when using the generic or dynamic alias macros.
 
+See also the Best Practices section in [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for the equivalent guidance.
+
 ### Polymorphic / generic code
 
 ```rust
@@ -182,22 +180,31 @@ fn log_length<S: ExposeSecret>(secret: &S) {
 }
 ```
 
-## Encoding
+### Encoding
 
-`secure-gate` provides orthogonal, zero-overhead encoding traits for the most common formats. Encoding is **not** a bypass of the exposure rules — it is deliberate, auditable secret exposure with three access patterns:
+Convert secrets into human-readable strings.
 
-- **Direct method (`key.to_hex()`)** — ergonomically safest for single operations. No reference in the caller's hands; exposure is entirely internal. Does not appear in `grep expose_secret` / `grep with_secret` sweeps.
-- **`with_secret` closure** — best for multi-step operations and audit-first teams. Borrow checker enforces the reference cannot escape the closure. Appears in `grep with_secret` sweeps.
-- **`expose_secret` + encode** — escape hatch for FFI or third-party APIs requiring `&[u8]`. Chaining immediately is safe; binding to a named variable that outlives the call is the danger.
+| Format                | Method                          | Output   | Notes                                         |
+| --------------------- | ------------------------------- | -------- | --------------------------------------------- |
+| **Hex**               | `.to_hex()` / `.to_hex_upper()` | `String` | Direct on both `Fixed` and `Dynamic<Vec<u8>>` |
+| **Base64URL**         | `.to_base64url()`               | `String` | Unpadded, URL-safe                            |
+| **Bech32 (BIP-173)**  | `.try_to_bech32(hrp)`           | `String` | Supports large payloads (~5 KB)               |
+| **Bech32m (BIP-350)** | `.try_to_bech32m(hrp)`          | `String` | Best for Bitcoin/Taproot compatibility        |
 
-**Never treat encoded output as non-sensitive** — it contains the entire secret.
+### Decoding
 
-Available methods (`E` = encode on bytes/wrapper, `D` = decode from string):
+Convert strings back into secure wrappers. **Always wrap the result immediately** into `Fixed` or `Dynamic`.
 
-- **Hex** (`encoding-hex`) — E: `to_hex()`, `to_hex_upper()` · D: `"…".try_from_hex()` → `Vec<u8>`
-- **Base64URL** (`encoding-base64`) — E: `to_base64url()` · D: `"…".try_from_base64url()` → `Vec<u8>`
-- **Bech32 BIP-173** (`encoding-bech32`) — E: `try_to_bech32(hrp)` · D (validated): `"…".try_from_bech32(hrp)` → `Vec<u8>` · D (unchecked): `"…".try_from_bech32_unchecked()` → `(String, Vec<u8>)` · D (wrapped): `Fixed::try_from_bech32(s, hrp)`, `Dynamic::try_from_bech32(s, hrp)` — prefer these over `try_from_bech32_unchecked`
-- **Bech32m BIP-350** (`encoding-bech32m`) — E: `try_to_bech32m(hrp)` · D (validated): `"…".try_from_bech32m(hrp)` · D (unchecked): `"…".try_from_bech32m_unchecked()` · D (wrapped): `Fixed::try_from_bech32m(s, hrp)`, `Dynamic::try_from_bech32m(s, hrp)` — prefer validated over `try_from_bech32m_unchecked`
+| Format                | Type      | Method                                                                   | Returns                       | Recommendation                                           |
+| --------------------- | --------- | ------------------------------------------------------------------------ | ----------------------------- | -------------------------------------------------------- |
+| **Hex**               | Validated | `"…".try_from_hex()`                                                     | `Vec<u8>`                     | Use this                                                 |
+| **Base64URL**         | Validated | `"…".try_from_base64url()`                                               | `Vec<u8>`                     | Use this                                                 |
+| **Bech32 (BIP-173)**  | Validated | `Fixed::try_from_bech32(s, hrp)`<br>`Dynamic::try_from_bech32(s, hrp)`   | `Fixed` or `Dynamic<Vec<u8>>` | **Strongly preferred** (prevents cross-protocol attacks) |
+| **Bech32 (BIP-173)**  | Unchecked | `.try_from_bech32_unchecked()`                                           | `Vec<u8>`                     | Only when HRP validation is intentionally skipped        |
+| **Bech32m (BIP-350)** | Validated | `Fixed::try_from_bech32m(s, hrp)`<br>`Dynamic::try_from_bech32m(s, hrp)` | `Fixed` or `Dynamic<Vec<u8>>` | **Strongly preferred** (prevents cross-protocol attacks) |
+| **Bech32m (BIP-350)** | Unchecked | `.try_from_bech32m_unchecked()`                                          | `Vec<u8>`                     | Only when HRP validation is intentionally skipped        |
+
+> **Tip**: For large secrets or arbitrary binary data, prefer **Bech32 (BIP-173)** — it supports much larger payloads than Bech32m.
 
 ### Patterns
 
@@ -274,19 +281,20 @@ Validated `try_from_bech32` / `try_from_bech32m` on `Fixed` and `Dynamic` compar
 
 ### Available traits
 
-| Format            | Encode        | Decode                                                  | Infallible?           | Feature            |
-| ----------------- | ------------- | ------------------------------------------------------- | --------------------- | ------------------ |
-| Hex               | `ToHex`       | `FromHexStr`                                            | Encode yes, decode no | `encoding-hex`     |
-| Base64URL         | `ToBase64Url` | `FromBase64UrlStr`                                      | Encode yes, decode no | `encoding-base64`  |
-| Bech32 (BIP-173)  | `ToBech32`    | `FromBech32Str` / `Fixed::try_from_bech32`   | No                    | `encoding-bech32`  |
-| Bech32m (BIP-350) | `ToBech32m`   | `FromBech32mStr` / `Fixed::try_from_bech32m` | No                    | `encoding-bech32m` |
+| Format            | Encode        | Decode                                                                     | Infallible?           | Feature            |
+| ----------------- | ------------- | -------------------------------------------------------------------------- | --------------------- | ------------------ |
+| Hex               | `ToHex`       | `FromHexStr`                                                               | Encode yes, decode no | `encoding-hex`     |
+| Base64URL         | `ToBase64Url` | `FromBase64UrlStr`                                                         | Encode yes, decode no | `encoding-base64`  |
+| Bech32 (BIP-173)  | `ToBech32`    | `FromBech32Str` / `Fixed::try_from_bech32` / `Dynamic::try_from_bech32`    | No                    | `encoding-bech32`  |
+| Bech32m (BIP-350) | `ToBech32m`   | `FromBech32mStr` / `Fixed::try_from_bech32m` / `Dynamic::try_from_bech32m` | No                    | `encoding-bech32m` |
 
 **Decode-side note**: Decoded bytes are plaintext from the moment of decoding until they are wrapped. Wrap the result immediately — avoid binding the intermediate `Vec<u8>` to a long-lived variable.
 
-**Auditing encoding exposure**: Direct wrapper calls (`to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`) do not appear in a standard `expose_secret` / `with_secret` grep. Use this single command to surface all encoding exposure points regardless of pattern:
+**Auditing encoding exposure**: Direct wrapper calls (`to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`) do not appear in a standard `expose_secret` / `with_secret` grep. Use `rg`, `grep -rn`, or your editor's project-wide search for these method names:
 
-```sh
-grep -rn 'expose_secret\|with_secret\|\.to_hex\|\.to_base64url\|try_to_bech32\|try_to_bech32m'
+```
+expose_secret  expose_secret_mut  with_secret  with_secret_mut
+to_hex  to_base64url  try_to_bech32  try_to_bech32m
 ```
 
 See [`ToHex`], [`ToBech32`], [`FromHexStr`], and sibling traits in the [API docs](https://docs.rs/secure-gate) for full method listings and error types.
@@ -316,7 +324,7 @@ Enable the **`ct-eq`** feature and use **`.ct_eq()`** for all secret comparisons
 
 `serde-deserialize` decodes directly to the inner type. After deserialization completes, temporary buffers for `Dynamic<Vec<u8>>` and `Dynamic<String>` are `Zeroizing`-wrapped — oversized buffers are zeroized even on rejection. The default limit is `MAX_DESERIALIZE_BYTES` (1 MiB); call `Dynamic::deserialize_with_limit` to set a custom ceiling. Serialization requires the `SerializableSecret` marker trait.
 
-> **Note:** `MAX_DESERIALIZE_BYTES` (and `deserialize_with_limit`) is enforced *after* the upstream deserializer has fully materialized the payload. It is a result-length acceptance bound, not a pre-allocation DoS guard. For untrusted input, enforce size limits at the transport or parser layer upstream.
+> **Note:** `MAX_DESERIALIZE_BYTES` (and `deserialize_with_limit`) is enforced _after_ the upstream deserializer has fully materialized the payload. It is a result-length acceptance bound, not a pre-allocation DoS guard. For untrusted input, enforce size limits at the transport or parser layer upstream.
 
 See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for the full example.
 
@@ -339,7 +347,7 @@ Cryptographically secure via `OsRng`. `Fixed::from_random()` is heap-free and wo
 - **Timing-safe equality** — `ct-eq` feature (`.ct_eq()`)
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
 
-Read [SECURITY.md](SECURITY.md) for the full threat model and mitigations.
+Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for the full threat model and mitigations.
 
 ## License
 

@@ -1,8 +1,9 @@
 # Security Considerations for secure-gate
 
-Last updated: 2026-03 (for v0.8.0-rc.1)
+Last updated: March 2026 (for v0.8.0-rc.1)
 
 ## TL;DR
+
 - **No independent audit** — review the source code yourself before production use.
 - **No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally.
 - **Explicit exposure only** — all secret access requires `.expose_secret()` / `.with_secret()` or mutable equivalents; no `Deref`, `AsRef`, or implicit borrowing.
@@ -47,35 +48,53 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 ## Core Security Model
 
-| Property                          | Guarantee / Design Choice                                                                 |
-|-----------------------------------|--------------------------------------------------------------------------------------------|
-| Explicit exposure                 | Private inner fields; access only via audited methods (`expose_secret`, `with_secret`)   |
-| Scoped exposure (preferred)       | Closures limit borrow lifetime; prevents long-lived references                             |
-| Direct exposure (escape hatch)    | `expose_secret()` / `expose_secret_mut()` — grep-able, auditable                           |
-| No implicit leaks                 | No `Deref`, `AsRef`, `Copy`, `Clone` (unless `cloneable` + marker)                         |
-| Zeroization                       | Full allocation always wiped on drop; includes `Vec`/`String` spare capacity (inner type must implement `Zeroize`) |
-| Timing safety                     | `ConstantTimeEq` (`.ct_eq()`) — deterministic constant-time comparison. Avoid `==`. |
-| Opt-in risky features             | Cloning/serialization gated by marker traits (`CloneableSecret`, `SerializableSecret`)         |
-| Redacted debug                    | `Debug` impl always prints `[REDACTED]`                                                    |
-| No unsafe code                    | `#![forbid(unsafe_code)]` enforced at crate level                                          |
+| Property                       | Guarantee / Design Choice                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Explicit exposure              | Private inner fields; access only via audited methods (`expose_secret`, `with_secret`)                             |
+| Scoped exposure (preferred)    | Closures limit borrow lifetime; prevents long-lived references                                                     |
+| Direct exposure (escape hatch) | `expose_secret()` / `expose_secret_mut()` — grep-able, auditable                                                   |
+| No implicit leaks              | No `Deref`, `AsRef`, `Copy`, `Clone` (unless `cloneable` + marker)                                                 |
+| Zeroization                    | Full allocation always wiped on drop; includes `Vec`/`String` spare capacity (inner type must implement `Zeroize`) |
+| Timing safety                  | `ConstantTimeEq` (`.ct_eq()`) — deterministic constant-time comparison. Avoid `==`.                                |
+| Opt-in risky features          | Cloning/serialization gated by marker traits (`CloneableSecret`, `SerializableSecret`)                             |
+| Redacted debug                 | `Debug` impl always prints `[REDACTED]`                                                                            |
+| No unsafe code                 | `#![forbid(unsafe_code)]` enforced at crate level                                                                  |
 
 ## Feature Security Implications
 
-| Feature              | Security Impact                                                                 | Recommendation                              |
-|----------------------|----------------------------------------------------------------------------------|---------------------------------------------|
-| `alloc` *(default)*  | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Use `default-features = false` for no-heap builds. | Enable unless on embedded/pure-stack target |
-| `std`                | Full `std` support (implies `alloc`). Adds no additional security surface beyond `alloc`. | Optional; `alloc` is sufficient for most targets |
-| `ct-eq`              | Timing-safe direct byte comparison (`.ct_eq()`)                                  | Strongly recommended; avoid `==`            |
-| `rand`               | Secure random via `OsRng`; panics on failure                                     | Use only in trusted entropy environments    |
-| `serde-deserialize`  | Direct binary deserialization (arrays/seqs only); no string auto-parsing. Binary-safe; temporary buffers are `Zeroizing`-wrapped. Default 1 MiB limit (`MAX_DESERIALIZE_BYTES`) rejects oversized payloads and zeroizes them before deallocation. Use `Dynamic::deserialize_with_limit` for custom ceilings. **Note:** the limit is a post-materialization result-length bound — the upstream deserializer may have already allocated the full payload. For untrusted input, enforce size limits at the transport or parser layer upstream. | Enable for trusted deserialization sources; set a tight limit for untrusted input and enforce transport-level size caps upstream |
-| `serde-serialize`    | Opt-in export via marker trait; audit all implementations                        | Enable sparingly; monitor exfiltration risk |
-| `encoding`           | Meta: enables all encoding sub-features (hex, base64url, bech32, bech32m); always requires `alloc` | Enable per-format instead for minimal surface |
-| `encoding-hex`       | Hex encoding/decoding: `ToHex`, `FromHexStr`; requires `alloc`                   | Validate inputs upstream; prefer `try_from_hex` |
-| `encoding-base64`    | Base64url encoding/decoding: `ToBase64Url`, `FromBase64UrlStr`; requires `alloc` | Validate inputs upstream; prefer `try_from_base64url` |
-| `encoding-bech32`    | Bech32/BIP-173 encoding/decoding: `ToBech32`, `FromBech32Str`                    | Validate inputs upstream; test empty/invalid HRP |
-| `encoding-bech32m`   | Bech32m/BIP-350 encoding/decoding: `ToBech32m`, `FromBech32mStr`                 | Validate inputs upstream; test empty/invalid HRP |
-| `cloneable`          | Opt-in cloning via marker trait; increases exposure surface                      | Use minimally; prefer move semantics        |
-| `full`               | All features enabled — convenient but increases attack surface                   | Development only; audit for production      |
+| Feature             | Security Impact                                                                                                                                                           | Recommendation                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `alloc` _(default)_ | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Use `default-features = false` for no-heap builds.                                              | Enable unless on embedded/pure-stack target                                                                                      |
+| `std`               | Full `std` support (implies `alloc`). Adds no additional security surface beyond `alloc`.                                                                                 | Optional; `alloc` is sufficient for most targets                                                                                 |
+| `ct-eq`             | Timing-safe direct byte comparison (`.ct_eq()`)                                                                                                                           | Strongly recommended; avoid `==`                                                                                                 |
+| `rand`              | Secure random via `OsRng`; panics on failure                                                                                                                              | Use only in trusted entropy environments                                                                                         |
+| `serde-deserialize` | Decodes to inner type; temporary buffers use `zeroize::Zeroizing` (zeroized on rejection too). 1 MiB default limit (`MAX_DESERIALIZE_BYTES`). See allocation notes below. | Enable for trusted deserialization sources; set a tight limit for untrusted input and enforce transport-level size caps upstream |
+| `serde-serialize`   | Opt-in export via marker trait; audit all implementations                                                                                                                 | Enable sparingly; monitor exfiltration risk                                                                                      |
+| `encoding`          | Meta: enables all encoding sub-features (hex, base64url, bech32, bech32m); always requires `alloc`                                                                        | Enable per-format instead for minimal surface                                                                                    |
+| `encoding-hex`      | Hex encoding/decoding: `ToHex`, `FromHexStr`; requires `alloc`                                                                                                            | Validate inputs upstream; prefer `try_from_hex`                                                                                  |
+| `encoding-base64`   | Base64url encoding/decoding: `ToBase64Url`, `FromBase64UrlStr`; requires `alloc`                                                                                          | Validate inputs upstream; prefer `try_from_base64url`                                                                            |
+| `encoding-bech32`   | Bech32/BIP-173 encoding/decoding: `ToBech32`, `FromBech32Str`                                                                                                             | Validate inputs upstream; test empty/invalid HRP                                                                                 |
+| `encoding-bech32m`  | Bech32m/BIP-350 encoding/decoding: `ToBech32m`, `FromBech32mStr`                                                                                                          | Validate inputs upstream; test empty/invalid HRP                                                                                 |
+| `cloneable`         | Opt-in cloning via marker trait; increases exposure surface                                                                                                               | Use minimally; prefer move semantics                                                                                             |
+| `full`              | All features enabled — convenient but increases attack surface                                                                                                            | Development only; audit for production                                                                                           |
+
+#### `serde-deserialize` — Allocation & Limit Notes
+
+`MAX_DESERIALIZE_BYTES` (default 1 MiB) and `deserialize_with_limit` are enforced **after** the upstream deserializer has fully materialized the payload — they are result-length acceptance bounds, not pre-allocation guards. For untrusted input, enforce size limits at the transport or parser layer upstream to prevent allocation-based DoS.
+
+## Best Practices
+
+> See the [TL;DR](#tldr) for the shortest version of the most important points.
+
+- The `alloc` feature is enabled by default and provides `Dynamic<T>` with full zeroization; use `default-features = false` for embedded / pure-stack builds (`Fixed<T>` only)
+- Prefer scoped `with_secret()` over long-lived `expose_secret()`
+- For equality, use `.ct_eq()` (`ct-eq` feature) for all secret comparisons — deterministic and constant-time. Bound input sizes at the transport/parser layer for untrusted data.
+- Audit every `CloneableSecret` / `SerializableSecret` impl
+- Validate and sanitize all inputs before encoding/decoding
+- Use specific format traits (`FromBech32Str`, `FromHexStr`, …) when the expected format is known
+- When using `fixed_generic_alias!`, `dynamic_alias!`, or `dynamic_generic_alias!`, validate that the effective inner size is > 0 in unit tests — these macros accept zero-sized types without compile-time rejection (unlike `fixed_alias!`).
+- Monitor dependency CVEs and update regularly
+- Treat secrets as radioactive — minimize exposure surface
 
 ## Module-by-Module Security Notes
 
@@ -84,6 +103,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 ### Wrappers (`dynamic.rs`, `fixed.rs`)
 
 **Potential weaknesses**
+
 - Long-lived `expose_secret()` references can defeat scoping
 - Macro-generated aliases lack runtime size checks
 - Certain error variants may indirectly leak length information (e.g. wrong decoded length).
@@ -108,6 +128,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
   security-sensitive builds.
 
 **Mitigations**
+
 - Prefer `with_secret()` / `with_secret_mut()`
 - Audit all `expose_secret()` calls
 - Contextualize errors to avoid side-channel information
@@ -119,41 +140,44 @@ Zero-cost claim: performance indistinguishable from raw arrays; for detailed ben
 ### Traits (`traits/`)
 
 **Potential weaknesses**
+
 - Generic impls assume caller trustworthiness
 
 **Mitigations**
+
 - Audit every `CloneableSecret` / `SerializableSecret` impl — each is a deliberate security decision
 - Validate inputs before trait usage
 
 ### Encoding/Decoding (Traits & Errors)
 
-**Potential weaknesses**
-- Decoding is inherently fallible; untrusted input may cause errors or temporary allocations
-- Length/format hints in errors (e.g., invalid HRP)
-- Bech32 edge cases: strict validation covers most, but test empty/invalid HRP/data to confirm no panics/leaks
+#### Untrusted Input & Format Enforcement
 
-**Mitigations**
-- Temporary decode buffers in `Dynamic<Vec<u8>>` decoding constructors and `Deserialize`, and `Dynamic<String>` `Deserialize`, are routed through `zeroize::Zeroizing` before being moved into the wrapper, matching `Fixed<T>` and ensuring zeroization if a panic occurs between a successful decode and construction (#96, #97)
+- Validate and sanitize all inputs before any decoding operation
+- Use specific traits (`FromBech32Str`, `FromHexStr`, `FromBase64UrlStr`) when the expected format is known — they enforce strict parsing rules
+- Fuzz parsers and boundary cases in CI; treat all decoding input as untrusted
+- Temporary decode buffers for `Dynamic<Vec<u8>>` and `Dynamic<String>` constructors and `Deserialize` impls are wrapped in `zeroize::Zeroizing` — buffers are zeroized even if a panic occurs between a successful decode and wrapper construction (#96, #97)
 - `Dynamic<Vec<u8>>` and `Dynamic<String>` deserialization rejects payloads exceeding `MAX_DESERIALIZE_BYTES` (1 MiB); oversized buffers are zeroized before deallocation. Use `deserialize_with_limit` for custom ceilings. (#99)
-- Treat all decoding input as untrusted; validate upstream
-- Encoding traits (`ToHex`, `ToBech32`, etc.) are explicit exposure — same contract as `expose_secret`. They are not a bypass. Direct wrapper methods (`key.to_hex()`) are ergonomically safe (no user-visible reference) but do **not** appear in `grep expose_secret` / `grep with_secret` audit sweeps. Use the consolidated grep to surface all encoding exposure points regardless of pattern: `grep -rn 'expose_secret\|with_secret\|\.to_hex\|\.to_base64url\|try_to_bech32\|try_to_bech32m'`. For `expose_secret` + encode: chaining immediately is safe; binding to a named variable that outlives the encoding call is the danger — use only for FFI or third-party APIs requiring a raw `&[u8]` slice. For Bech32/Bech32m decoding into a wrapper, prefer `Fixed::try_from_bech32` / `Dynamic::try_from_bech32` (and `try_from_bech32m`) over the `_unchecked` variants to prevent cross-protocol confusion attacks.
-- Use specific traits (e.g., `FromBech32Str`) for strict format enforcement
-- Fuzz parsers; sanitize inputs before decoding
-- In release builds, all length and HRP information is redacted. Only the broad error category (e.g. "invalid bech32") is visible. This is intentional to prevent length/HRP oracles.
-- Decoding errors may include format hints — treat as potential metadata leaks in sensitive contexts; redact logs or use custom error display in production
-- Audit custom `Cloneable`/`Serializable` impls to preserve zeroization
 
-## Best Practices
+#### Audit Surfaces
 
-- The `alloc` feature is enabled by default and provides `Dynamic<T>` with full zeroization; use `default-features = false` for embedded / pure-stack builds (`Fixed<T>` only)
-- Prefer scoped `with_secret()` over long-lived `expose_secret()`
-- For equality, use `.ct_eq()` (`ct-eq` feature) for all secret comparisons — deterministic and constant-time. Bound input sizes at the transport/parser layer for untrusted data.
-- Audit every `CloneableSecret` / `SerializableSecret` impl
-- Validate and sanitize all inputs before encoding/decoding
-- Use specific format traits (`FromBech32Str`, `FromHexStr`, …) when the expected format is known
-- When using `fixed_generic_alias!`, `dynamic_alias!`, or `dynamic_generic_alias!`, validate that the effective inner size is > 0 in unit tests — these macros accept zero-sized types without compile-time rejection (unlike `fixed_alias!`).
-- Monitor dependency CVEs and update regularly
-- Treat secrets as radioactive — minimize exposure surface
+All secret materialization requires an explicit call. Use `rg`, `grep -rn`, or your editor's project-wide search for these method names:
+
+```
+expose_secret  expose_secret_mut  with_secret  with_secret_mut
+to_hex  to_base64url  try_to_bech32  try_to_bech32m
+```
+
+Encoding traits (`ToHex`, `ToBech32`, etc.) are **explicit secret exposure** — they will not appear in an `expose_secret`-only sweep, so audit them separately.
+
+For `expose_secret` + encode: chaining immediately is safe; binding to a named variable that outlives the encoding call is the risk — use only for FFI or APIs requiring a raw `&[u8]` slice. Prefer `Fixed::try_from_bech32` / `Dynamic::try_from_bech32` (and `*_bech32m`) over `_unchecked` variants to prevent cross-protocol confusion attacks (BIP-173 vs BIP-350).
+
+#### Error Metadata (debug vs release)
+
+In **debug builds** (`cfg(debug_assertions)`), decoding errors include detailed hints — expected vs actual lengths, received HRP values, and encoding hint strings — to aid development and testing. In **release builds** these details are stripped; only broad error categories remain (e.g. `"invalid bech32 string"`, `"decoded length mismatch"`). This is intentional to prevent length/HRP oracles.
+
+Prefer `Display` (`{}`) over `Debug` (`{:?}`) when logging errors in production — derived `Debug` exposes struct fields in debug builds and may be more verbose than intended.
+
+Coarse error categories are still present in release and can aid attacker fingerprinting in niche threat models. Redact or suppress error details in logs for high-sensitivity contexts.
 
 ## Vulnerability Reporting
 
