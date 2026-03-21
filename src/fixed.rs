@@ -8,15 +8,15 @@
 //! # Examples
 //!
 //! ```rust
-//! use secure_gate::{Fixed, ExposeSecret};
+//! use secure_gate::{Fixed, RevealSecret};
 //!
 //! let secret = Fixed::new([1u8, 2, 3, 4]);
 //! let sum = secret.with_secret(|arr| arr.iter().sum::<u8>());
 //! assert_eq!(sum, 10);
 //! ```
 
-use crate::ExposeSecret;
-use crate::ExposeSecretMut;
+use crate::RevealSecret;
+use crate::RevealSecretMut;
 
 #[cfg(feature = "encoding-base64")]
 use crate::traits::encoding::base64_url::ToBase64Url;
@@ -41,8 +41,8 @@ use crate::traits::decoding::hex::FromHexStr;
 /// Always available. Inner type **must implement `Zeroize`** for automatic zeroization on drop.
 ///
 /// No `Deref`, `AsRef`, or `Copy` by default — all access requires
-/// [`expose_secret()`](ExposeSecret::expose_secret) or
-/// [`with_secret()`](ExposeSecret::with_secret) (scoped, recommended).
+/// [`expose_secret()`](RevealSecret::expose_secret) or
+/// [`with_secret()`](RevealSecret::with_secret) (scoped, recommended).
 /// `Debug` always prints `[REDACTED]`. Performance indistinguishable from raw arrays.
 pub struct Fixed<T: zeroize::Zeroize> {
     inner: T,
@@ -104,7 +104,7 @@ impl<const N: usize> Fixed<[u8; N]> {
 }
 
 /// Explicit access to immutable [`Fixed<[T; N]>`] contents.
-impl<const N: usize, T: zeroize::Zeroize> ExposeSecret for Fixed<[T; N]> {
+impl<const N: usize, T: zeroize::Zeroize> RevealSecret for Fixed<[T; N]> {
     type Inner = [T; N];
 
     #[inline(always)]
@@ -127,7 +127,7 @@ impl<const N: usize, T: zeroize::Zeroize> ExposeSecret for Fixed<[T; N]> {
 }
 
 /// Explicit access to mutable [`Fixed<[T; N]>`] contents.
-impl<const N: usize, T: zeroize::Zeroize> ExposeSecretMut for Fixed<[T; N]> {
+impl<const N: usize, T: zeroize::Zeroize> RevealSecretMut for Fixed<[T; N]> {
     #[inline(always)]
     fn with_secret_mut<F, R>(&mut self, f: F) -> R
     where

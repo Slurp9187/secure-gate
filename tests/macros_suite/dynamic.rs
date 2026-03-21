@@ -1,7 +1,7 @@
 //! macros_suite/dynamic.rs — dynamic_alias macro tests
 
 #[cfg(feature = "alloc")]
-use secure_gate::{dynamic_alias, ExposeSecret};
+use secure_gate::{dynamic_alias, RevealSecret};
 
 #[cfg(feature = "alloc")]
 dynamic_alias!(LocalDynVec, Vec<u8>);

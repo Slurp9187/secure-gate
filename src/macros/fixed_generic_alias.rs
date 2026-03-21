@@ -12,7 +12,7 @@
 /// # Examples
 ///
 /// ```rust
-/// use secure_gate::{fixed_generic_alias, ExposeSecret};
+/// use secure_gate::{fixed_generic_alias, RevealSecret};
 ///
 /// fixed_generic_alias!(pub SecretBuffer, "Generic fixed-size secret buffer.");
 ///

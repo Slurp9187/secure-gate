@@ -19,7 +19,7 @@
 use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
-use secure_gate::{ConstantTimeEq, Dynamic, ExposeSecret};
+use secure_gate::{ConstantTimeEq, Dynamic, RevealSecret};
 use secure_gate_fuzz::arbitrary::{FuzzDynamicVec, FuzzFixed32};
 
 fuzz_target!(|data: &[u8]| {

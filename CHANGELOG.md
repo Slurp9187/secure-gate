@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
+- **Renamed `ExposeSecret` → `RevealSecret` and `ExposeSecretMut` → `RevealSecretMut` (#101)** — The two core access traits have been renamed. `RevealSecret` more accurately describes the capability ("this type supports controlled revelation of its secret contents") while keeping `expose_secret` / `expose_secret_mut` as method names preserves their warning tone for the escape-hatch paths. All method names (`with_secret`, `with_secret_mut`, `expose_secret`, `expose_secret_mut`) and all struct/macro/encoding API surfaces are **unchanged**. Only code that names the trait explicitly is affected: `use secure_gate::ExposeSecret` → `use secure_gate::RevealSecret`; `T: ExposeSecret` bounds → `T: RevealSecret`; same for the `Mut` variant. Users who only call methods via method resolution are unaffected.
+
 - **HRP-primary Bech32/Bech32m APIs (#100)** — `FromBech32Str` / `FromBech32mStr`: primary decode is now `try_from_bech32(expected_hrp)` / `try_from_bech32m(expected_hrp)` (payload only); raw `(HRP, bytes)` is `try_from_bech32_unchecked` / `try_from_bech32m_unchecked`. `ToBech32` / `ToBech32m`: `try_to_bech32(hrp)` / `try_to_bech32m(hrp)` only (removed optional second HRP). `Fixed` / `Dynamic`: `try_from_bech32(s, hrp)` / `try_from_bech32m(s, hrp)` for validated decode; `try_from_bech32_unchecked` / `try_from_bech32m_unchecked` replace the old single-arg `try_from_bech32` / `try_from_bech32m`. Migrate: `"s".try_from_bech32()` → `try_from_bech32_unchecked()`; `try_from_bech32_with_hrp(hrp)` → `try_from_bech32(hrp)`; `try_to_bech32(hrp, None)` → `try_to_bech32(hrp)`; wrappers: `try_from_bech32_with_hrp(s, hrp)` → `try_from_bech32(s, hrp)`, `try_from_bech32(s)` → `try_from_bech32_unchecked(s)` (and Bech32m analogs).
 - **Removed `ToHex::to_hex_left`** — the redacted-logging helper has been removed from the `ToHex` trait. The function allocated a full hex-encoded `String` of the entire secret and dropped it without zeroization on the truncation path, contradicting its intended "safe for logs" purpose. Callers should construct any redacted output according to their own threat model (e.g. `format!("{}…", &hex[..n])` wrapped in `zeroize::Zeroizing`).
 - **Removed `ct-eq-hash` feature** — `ConstantTimeEqExt`, `ct_eq_hash`, `ct_eq_auto`, optional `blake3` and `once_cell` dependencies, `CT_EQ_AUTO.md`, and related benches/tests/fuzz targets are gone. Timing-safe equality is only [`ConstantTimeEq::ct_eq`](https://docs.rs/secure-gate/latest/secure_gate/trait.ConstantTimeEq.html) (`ct-eq`). Migrate: enable `ct-eq` and replace any `ct_eq_hash` / `ct_eq_auto` usage with `.ct_eq()`.
@@ -133,7 +135,7 @@ secret_a.ct_eq(&secret_b);
   `tests/ct_eq_auto.rs`, `tests/ct_eq_tests.rs`, `tests/proptest_tests.rs`, `tests/serde/`,
   `tests/macros/`, `tests/insecure_tests.rs`).
 - `**tests/common.rs`\*\*: shared helper module with `assert_redacted_debug` and
-  `ExposeSecret`/`ExposeSecretMut` re-exports available to all suite sub-modules.
+  `RevealSecret`/`RevealSecretMut` re-exports available to all suite sub-modules.
 - **Bech32/Bech32m error-path test coverage** (`tests/encoding_suite/bech32.rs`): six new
   tests trigger actual `Bech32Error` variants through encode/decode calls — invalid HRP
   encoding, malformed string decoding, and decode-side HRP validation (happy path and
@@ -184,7 +186,7 @@ The following changes were developed during the 0.7.0-rc period (preserved for h
 ### Added
 
 - **Polymorphic access traits**  
-  `ExposeSecret` and `ExposeSecretMut` traits provide generic, zero-cost access with metadata (`len()`, `is_empty()`) without exposing contents. Implemented for both `Dynamic<T>` and `Fixed<T>`.
+  `RevealSecret` and `RevealSecretMut` traits provide generic, zero-cost access with metadata (`len()`, `is_empty()`) without exposing contents. Implemented for both `Dynamic<T>` and `Fixed<T>`.
 - **Timing-safe equality**  
   `ConstantTimeEq` trait (`ct-eq` feature) with `.ct_eq()` methods on `Fixed<[u8; N]>` and `Dynamic<T: AsRef<[u8]>>`.
 - **Fast probabilistic equality for large secrets**  

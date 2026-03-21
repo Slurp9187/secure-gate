@@ -18,7 +18,7 @@ use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
 use secure_gate::{
-    Dynamic, ExposeSecret, Fixed,
+    Dynamic, RevealSecret, Fixed,
     FromBech32Str,
     ToBech32, ToBech32m, ToBase64Url, ToHex,
 };

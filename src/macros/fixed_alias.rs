@@ -18,7 +18,7 @@
 /// All three visibility forms:
 ///
 /// ```rust
-/// use secure_gate::{fixed_alias, ExposeSecret};
+/// use secure_gate::{fixed_alias, RevealSecret};
 ///
 /// fixed_alias!(pub Aes256Key, 32);           // public
 /// fixed_alias!(pub(crate) HmacKey, 32);      // crate-visible
@@ -31,7 +31,7 @@
 /// With a custom doc string:
 ///
 /// ```rust
-/// use secure_gate::{fixed_alias, ExposeSecret};
+/// use secure_gate::{fixed_alias, RevealSecret};
 ///
 /// fixed_alias!(pub ApiKey, 32, "32-byte API authentication key.");
 /// let key: ApiKey = [0u8; 32].into();
@@ -53,7 +53,7 @@
 /// runtime checks for other size constraints. Validate expected sizes in unit tests:
 ///
 /// ```rust
-/// use secure_gate::{fixed_alias, ExposeSecret};
+/// use secure_gate::{fixed_alias, RevealSecret};
 ///
 /// fixed_alias!(pub ChaChaKey, 32);
 /// // In your tests:

@@ -3,7 +3,7 @@
 #[cfg(feature = "serde-deserialize")]
 #[test]
 fn fixed_deserialize_from_array() {
-    use secure_gate::{ExposeSecret, Fixed};
+    use secure_gate::{RevealSecret, Fixed};
     let result: Fixed<[u8; 4]> = serde_json::from_str("[1,2,3,4]").expect("deserialize");
     assert_eq!(result.expose_secret(), &[1, 2, 3, 4]);
 }
@@ -11,7 +11,7 @@ fn fixed_deserialize_from_array() {
 #[cfg(feature = "serde-deserialize")]
 #[test]
 fn dynamic_deserialize_from_array() {
-    use secure_gate::{Dynamic, ExposeSecret};
+    use secure_gate::{Dynamic, RevealSecret};
     let result: Dynamic<Vec<u8>> = serde_json::from_str("[1,2,3,4]").expect("deserialize");
     assert_eq!(result.expose_secret(), &[1, 2, 3, 4]);
 }
@@ -19,7 +19,7 @@ fn dynamic_deserialize_from_array() {
 #[cfg(feature = "serde-deserialize")]
 #[test]
 fn dynamic_deserialize_from_string() {
-    use secure_gate::{Dynamic, ExposeSecret};
+    use secure_gate::{Dynamic, RevealSecret};
     let result: Dynamic<String> = serde_json::from_str("\"hello\"").expect("deserialize");
     assert_eq!(result.expose_secret(), "hello");
 }
@@ -43,7 +43,7 @@ fn dynamic_vec_deserialize_malformed_input_returns_err() {
 #[cfg(feature = "serde-deserialize")]
 #[test]
 fn dynamic_string_deserialize_roundtrip() {
-    use secure_gate::{Dynamic, ExposeSecret};
+    use secure_gate::{Dynamic, RevealSecret};
     let result: Dynamic<String> = serde_json::from_str("\"hello world\"").expect("deserialize");
     assert_eq!(result.expose_secret(), "hello world");
 }
@@ -63,7 +63,7 @@ fn dynamic_string_deserialize_malformed_input_returns_err() {
 #[cfg(feature = "serde-deserialize")]
 #[test]
 fn dynamic_vec_deserialize_with_limit_accepts_within_limit() {
-    use secure_gate::{Dynamic, ExposeSecret};
+    use secure_gate::{Dynamic, RevealSecret};
     let mut de = serde_json::Deserializer::from_str("[1,2,3,4]");
     let result = Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, 4).expect("within limit");
     assert_eq!(result.expose_secret(), &[1, 2, 3, 4]);
@@ -81,7 +81,7 @@ fn dynamic_vec_deserialize_with_limit_rejects_over_limit() {
 #[cfg(feature = "serde-deserialize")]
 #[test]
 fn dynamic_string_deserialize_with_limit_accepts_within_limit() {
-    use secure_gate::{Dynamic, ExposeSecret};
+    use secure_gate::{Dynamic, RevealSecret};
     let mut de = serde_json::Deserializer::from_str("\"hello\"");
     let result = Dynamic::<String>::deserialize_with_limit(&mut de, 5).expect("within limit");
     assert_eq!(result.expose_secret(), "hello");

@@ -1,7 +1,7 @@
 //! macros_suite/dynamic_generic.rs — dynamic_generic_alias macro tests
 
 #[cfg(feature = "alloc")]
-use secure_gate::{dynamic_generic_alias, ExposeSecret};
+use secure_gate::{dynamic_generic_alias, RevealSecret};
 
 #[cfg(feature = "alloc")]
 dynamic_generic_alias!(GenericBox);

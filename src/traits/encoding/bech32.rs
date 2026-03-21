@@ -26,7 +26,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "encoding-bech32")]
-//! use secure_gate::{Fixed, ToBech32, ExposeSecret};
+//! use secure_gate::{Fixed, ToBech32, RevealSecret};
 //! # #[cfg(feature = "encoding-bech32")]
 //! {
 //! let secret = Fixed::new([0x42u8; 4]);

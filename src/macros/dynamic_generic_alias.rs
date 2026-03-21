@@ -14,7 +14,7 @@
 /// # Examples
 ///
 /// ```rust
-/// use secure_gate::{dynamic_generic_alias, ExposeSecret};
+/// use secure_gate::{dynamic_generic_alias, RevealSecret};
 ///
 /// dynamic_generic_alias!(pub SecureBox, "Generic heap-allocated secret wrapper.");
 ///

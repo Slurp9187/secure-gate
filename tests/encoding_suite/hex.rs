@@ -1,7 +1,7 @@
 //! encoding_suite/hex.rs — hex encoding/decoding tests
 
 #[cfg(feature = "encoding-hex")]
-use secure_gate::{ExposeSecret, Fixed, FromHexStr, SecureDecoding, ToHex};
+use secure_gate::{RevealSecret, Fixed, FromHexStr, SecureDecoding, ToHex};
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 use secure_gate::Dynamic;
 

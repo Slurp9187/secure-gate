@@ -27,7 +27,7 @@
 //! # Example
 //!
 //! ```rust
-//! use secure_gate::{Fixed, ToBech32m, ExposeSecret};
+//! use secure_gate::{Fixed, ToBech32m, RevealSecret};
 //!
 //! let secret = Fixed::new([0x00u8, 0x01]);
 //!

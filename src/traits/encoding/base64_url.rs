@@ -20,7 +20,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "encoding-base64")]
-//! use secure_gate::{Fixed, ToBase64Url, ExposeSecret};
+//! use secure_gate::{Fixed, ToBase64Url, RevealSecret};
 //! # #[cfg(feature = "encoding-base64")]
 //! {
 //! let secret = Fixed::new([0x42u8; 4]);

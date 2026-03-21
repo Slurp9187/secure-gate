@@ -20,7 +20,7 @@
 use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
-use secure_gate::{Dynamic, Fixed, ExposeSecret, SerializableSecret};
+use secure_gate::{Dynamic, Fixed, RevealSecret, SerializableSecret};
 use secure_gate_fuzz::arbitrary::FuzzJsonPayload;
 
 use serde::{Deserialize, Serialize};

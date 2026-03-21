@@ -24,7 +24,7 @@
 #![cfg(all(feature = "alloc", not(miri)))]
 #![allow(clippy::undocumented_unsafe_blocks)]
 
-use secure_gate::{Dynamic, ExposeSecretMut};
+use secure_gate::{Dynamic, RevealSecretMut};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 

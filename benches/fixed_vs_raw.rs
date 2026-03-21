@@ -4,7 +4,7 @@
 // → opens HTML report showing negligible overhead (< 0.1 cycles typical)
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use secure_gate::{fixed_alias, ExposeSecret, ExposeSecretMut, Fixed};
+use secure_gate::{fixed_alias, RevealSecret, RevealSecretMut, Fixed};
 use std::hint::black_box;
 
 fixed_alias!(pub RawKey, 32); // Alias for semantic testing

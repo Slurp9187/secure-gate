@@ -3,7 +3,7 @@
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 mod hex_roundtrip {
     use proptest::prelude::*;
-    use secure_gate::{Dynamic, ExposeSecret};
+    use secure_gate::{Dynamic, RevealSecret};
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(256))]
@@ -26,7 +26,7 @@ mod hex_roundtrip {
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 mod b64_roundtrip {
     use proptest::prelude::*;
-    use secure_gate::{Dynamic, ExposeSecret};
+    use secure_gate::{Dynamic, RevealSecret};
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(256))]

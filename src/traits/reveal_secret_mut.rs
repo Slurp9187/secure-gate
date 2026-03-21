@@ -1,7 +1,7 @@
-//! Traits for mutable secret exposure.
+//! Traits for mutable secret revelation.
 //!
-//! This module defines the [`ExposeSecretMut`] trait, which extends
-//! [`ExposeSecret`] to provide controlled mutable access to secrets.
+//! This module defines the [`RevealSecretMut`] trait, which extends
+//! [`RevealSecret`] to provide controlled mutable access to secrets.
 //!
 //! Only the core secret wrappers (`Fixed<T>` and `Dynamic<T>`) implement this
 //! trait. Read-only wrappers (e.g., encoding types, random generators) deliberately
@@ -15,10 +15,14 @@
 //!   for legitimate needs (e.g., FFI, third-party APIs that require `&mut T`).
 //! - **Zero-cost**: All methods use `#[inline(always)]` where appropriate.
 //! - **Inheritance**: You automatically get `.len()`, `.is_empty()`, `with_secret`,
-//!   and `expose_secret` from [`ExposeSecret`].
+//!   and `expose_secret` from [`RevealSecret`].
 //! - **No implicit leaks**: No `DerefMut`, `AsMut`, or accidental borrowing.
 //!
 //! # Usage Guidelines
+//!
+//! The preferred and recommended way to access secrets is the scoped `with_secret` /
+//! `with_secret_mut` methods. `expose_secret` / `expose_secret_mut` are escape hatches
+//! for rare cases and should be audited closely.
 //!
 //! - Prefer scoped methods (`with_secret_mut`) in application code.
 //! - Use `expose_secret_mut` **only** when you need a long-lived mutable reference
@@ -30,7 +34,7 @@
 //! Scoped mutable access (recommended):
 //!
 //! ```rust
-//! use secure_gate::{Fixed, ExposeSecretMut, ExposeSecret};
+//! use secure_gate::{Fixed, RevealSecretMut, RevealSecret};
 //!
 //! let mut secret = Fixed::new([0u8; 4]);
 //! secret.with_secret_mut(|bytes| bytes[0] = 42);
@@ -41,9 +45,9 @@
 //! Polymorphic generic code (works for any mutable secret wrapper):
 //!
 //! ```rust
-//! use secure_gate::ExposeSecretMut;
+//! use secure_gate::RevealSecretMut;
 //!
-//! fn mutate_first_byte<S: ExposeSecretMut>(secret: &mut S)
+//! fn mutate_first_byte<S: RevealSecretMut>(secret: &mut S)
 //! where
 //!     S::Inner: AsMut<[u8]>,
 //! {
@@ -55,16 +59,16 @@
 //! }
 //! ```
 //!
-//! This trait (together with [`ExposeSecret`]) enforces the core security principle of secure-gate:
+//! This trait (together with [`RevealSecret`]) enforces the core security principle of secure-gate:
 //! **all secret access (read or write) must be explicit and auditable**.
 //! Scoped methods are preferred in nearly all cases.
-use crate::ExposeSecret;
+use crate::RevealSecret;
 
 /// Trait for mutable access to secrets.
 ///
-/// Extends [`ExposeSecret`] (so you get read-only access, `len()`, `is_empty()`, etc.).
+/// Extends [`RevealSecret`] (so you get read-only access, `len()`, `is_empty()`, etc.).
 /// Only core wrappers (`Fixed<T>`, `Dynamic<T>`) implement this trait.
-pub trait ExposeSecretMut: ExposeSecret {
+pub trait RevealSecretMut: RevealSecret {
     /// Provides scoped (recommended) mutable access to the secret.
     ///
     /// The closure receives a `&mut` reference that cannot escape — the borrow ends
@@ -74,7 +78,7 @@ pub trait ExposeSecretMut: ExposeSecret {
     /// # Examples
     ///
     /// ```rust
-    /// use secure_gate::{Fixed, ExposeSecretMut, ExposeSecret};
+    /// use secure_gate::{Fixed, RevealSecretMut, RevealSecret};
     ///
     /// let mut secret = Fixed::new([0u8; 4]);
     /// secret.with_secret_mut(|bytes| bytes[0] = 42);

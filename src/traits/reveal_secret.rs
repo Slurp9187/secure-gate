@@ -1,4 +1,4 @@
-//! Traits for controlled, polymorphic secret exposure.
+//! Traits for controlled, polymorphic secret revelation.
 //!
 //! This module defines the core traits that enforce explicit, auditable access to
 //! secret data across all wrapper types (`Fixed<T>`, `Dynamic<T>`, aliases, etc.).
@@ -13,18 +13,22 @@
 //!
 //! | Trait                  | Access     | Preferred Method          | Escape Hatch             | Metadata          | Feature     |
 //! |------------------------|------------|---------------------------|--------------------------|-------------------|-------------|
-//! | [`ExposeSecret`]                | Read-only  | `with_secret` (scoped)    | `expose_secret`     | `len`, `is_empty` | Always |
-//! | [`crate::ExposeSecretMut`]      | Mutable    | `with_secret_mut` (scoped)| `expose_secret_mut` | Inherits above    | Always |
+//! | [`RevealSecret`]                | Read-only  | `with_secret` (scoped)    | `expose_secret`     | `len`, `is_empty` | Always |
+//! | [`crate::RevealSecretMut`]      | Mutable    | `with_secret_mut` (scoped)| `expose_secret_mut` | Inherits above    | Always |
 //!
 //! # Security Model
 //!
 //! - **Core wrappers** (`Fixed<T>`, `Dynamic<T>`) implement both traits → full access.
-//! - **Read-only wrappers** (encoding wrappers, random types) implement only `ExposeSecret` → mutation prevented.
+//! - **Read-only wrappers** (encoding wrappers, random types) implement only `RevealSecret` → mutation prevented.
 //! - **Zero-cost** — all methods are `#[inline(always)]` where possible.
 //! - **Scoped access preferred** — `with_secret` / `with_secret_mut` limit borrow lifetime, reducing leak risk.
 //! - **Direct exposure** (`expose_secret` / `expose_secret_mut`) is provided for legitimate needs (FFI, third-party APIs), but marked as an escape hatch.
 //!
 //! # Usage Guidelines
+//!
+//! The preferred and recommended way to access secrets is the scoped `with_secret` /
+//! `with_secret_mut` methods. `expose_secret` / `expose_secret_mut` are escape hatches
+//! for rare cases and should be audited closely.
 //!
 //! - **Always prefer scoped methods** (`with_secret`, `with_secret_mut`) in application code.
 //! - Use direct exposure only when necessary (e.g., passing raw pointer + length to C FFI).
@@ -35,7 +39,7 @@
 //! Scoped (recommended):
 //!
 //! ```rust
-//! use secure_gate::{Fixed, ExposeSecret};
+//! use secure_gate::{Fixed, RevealSecret};
 //!
 //! let secret = Fixed::new([42u8; 4]);
 //! let sum: u32 = secret.with_secret(|bytes| bytes.iter().map(|&b| b as u32).sum());
@@ -45,7 +49,7 @@
 //! Direct (escape hatch – use with caution):
 //!
 //! ```rust
-//! use secure_gate::{Fixed, ExposeSecret};
+//! use secure_gate::{Fixed, RevealSecret};
 //!
 //! let secret = Fixed::new([42u8; 4]);
 //!
@@ -58,7 +62,7 @@
 //! Mutable scoped:
 //!
 //! ```rust
-//! use secure_gate::{Fixed, ExposeSecret, ExposeSecretMut};
+//! use secure_gate::{Fixed, RevealSecret, RevealSecretMut};
 //!
 //! let mut secret = Fixed::new([0u8; 4]);
 //! secret.with_secret_mut(|bytes| bytes[0] = 99);
@@ -68,9 +72,9 @@
 //! Polymorphic generic code:
 //!
 //! ```rust
-//! use secure_gate::ExposeSecret;
+//! use secure_gate::RevealSecret;
 //!
-//! fn print_length<S: ExposeSecret>(secret: &S) {
+//! fn print_length<S: RevealSecret>(secret: &S) {
 //!     println!("Length: {} bytes", secret.len());
 //! }
 //! ```
@@ -83,8 +87,8 @@
 //! Long-lived `expose_secret()` references can defeat scoping — the borrow outlives the
 //! call site and the compiler cannot enforce that the secret is not retained. This is an
 //! intentional escape hatch for FFI and legacy APIs; audit every call site.
-pub trait ExposeSecret {
-    /// The inner secret type being exposed.
+pub trait RevealSecret {
+    /// The inner secret type being revealed.
     ///
     /// This can be a sized type (e.g. `[u8; N]`, `u32`) or unsized (e.g. `str`, `[u8]`).
     type Inner: ?Sized;
@@ -98,7 +102,7 @@ pub trait ExposeSecret {
     /// # Examples
     ///
     /// ```rust
-    /// use secure_gate::{Fixed, ExposeSecret};
+    /// use secure_gate::{Fixed, RevealSecret};
     ///
     /// let secret = Fixed::new([42u8; 4]);
     /// let sum: u32 = secret.with_secret(|bytes| bytes.iter().map(|&b| b as u32).sum());
@@ -117,7 +121,7 @@ pub trait ExposeSecret {
     /// # Examples
     ///
     /// ```rust
-    /// use secure_gate::{Fixed, ExposeSecret};
+    /// use secure_gate::{Fixed, RevealSecret};
     ///
     /// let secret = Fixed::new([42u8; 4]);
     ///

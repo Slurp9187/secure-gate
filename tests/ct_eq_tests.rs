@@ -46,7 +46,7 @@ fn manual_comparison_without_ct_eq_feature() {
     // disabled, but the comparison is NON-constant-time — `assert_eq!` on exposed
     // slices uses a short-circuit equality check that leaks timing information.
     // For security-sensitive equality always enable `ct-eq` and use `ConstantTimeEq`.
-    use secure_gate::ExposeSecret;
+    use secure_gate::RevealSecret;
     let dyn1: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
     let dyn2: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
     dyn1.with_secret(|a| dyn2.with_secret(|b| assert_eq!(a, b)));
