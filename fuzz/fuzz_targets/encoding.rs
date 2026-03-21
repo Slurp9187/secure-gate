@@ -112,11 +112,11 @@ fuzz_target!(|data: &[u8]| {
 
     // === BECH32 (Bech32Large — extended capacity) ===
 
-    // 3a. Arbitrary strings to try_from_bech32 — no panic
+    // 3a. Arbitrary strings to try_from_bech32_unchecked — no panic
     {
         let arbitrary_str: String = Arbitrary::arbitrary(&mut u).unwrap_or_default();
-        let _ = Dynamic::<Vec<u8>>::try_from_bech32(&arbitrary_str);
-        let _ = Fixed::<[u8; 4]>::try_from_bech32(&arbitrary_str);
+        let _ = Dynamic::<Vec<u8>>::try_from_bech32_unchecked(&arbitrary_str);
+        let _ = Fixed::<[u8; 4]>::try_from_bech32_unchecked(&arbitrary_str);
     }
 
     // 3b. Valid bech32 round-trip via ToBech32 blanket impl on &[u8]
@@ -129,9 +129,9 @@ fuzz_target!(|data: &[u8]| {
         // Cap to avoid enormous strings
         let capped = if raw.len() > 90 { &raw[..90] } else { &raw[..] };
 
-        if let Ok(encoded) = capped.try_to_bech32("fuzz", None) {
-            let decoded =
-                Dynamic::<Vec<u8>>::try_from_bech32(&encoded).expect("bech32 from valid encode");
+        if let Ok(encoded) = capped.try_to_bech32("fuzz") {
+            let decoded = Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "fuzz")
+                .expect("bech32 from valid encode");
             assert_eq!(decoded.expose_secret(), capped, "Bech32 round-trip failed");
         }
     }
@@ -142,13 +142,16 @@ fuzz_target!(|data: &[u8]| {
             Ok(b) => b.0,
             Err(_) => return,
         };
-        let _ = Dynamic::<Vec<u8>>::try_from_bech32(&bech32_str);
+        let _ = Dynamic::<Vec<u8>>::try_from_bech32_unchecked(&bech32_str);
     }
 
     // 3d. HRP round-trip: encode with hrp, decode, verify hrp preserved
     {
-        if let Ok(encoded) = b"hello".try_to_bech32("mykey", None) {
-            let (hrp, payload) = encoded.as_str().try_from_bech32().expect("valid bech32");
+        if let Ok(encoded) = b"hello".try_to_bech32("mykey") {
+            let (hrp, payload) = encoded
+                .as_str()
+                .try_from_bech32_unchecked()
+                .expect("valid bech32");
             assert_eq!(hrp.to_ascii_lowercase(), "mykey");
             assert_eq!(payload, b"hello");
         }
@@ -156,9 +159,9 @@ fuzz_target!(|data: &[u8]| {
 
     // 3e. Bech32 edge cases
     {
-        let _ = Dynamic::<Vec<u8>>::try_from_bech32("not-bech32");
-        let _ = Dynamic::<Vec<u8>>::try_from_bech32("1");       // no HRP
-        let _ = Dynamic::<Vec<u8>>::try_from_bech32("");
+        let _ = Dynamic::<Vec<u8>>::try_from_bech32_unchecked("not-bech32");
+        let _ = Dynamic::<Vec<u8>>::try_from_bech32_unchecked("1"); // no HRP
+        let _ = Dynamic::<Vec<u8>>::try_from_bech32_unchecked("");
     }
 
     // === BECH32M (BIP-350, 90-byte payload limit) ===
@@ -166,7 +169,7 @@ fuzz_target!(|data: &[u8]| {
     // 4a. Arbitrary strings to try_from_bech32m — no panic
     {
         let arbitrary_str: String = Arbitrary::arbitrary(&mut u).unwrap_or_default();
-        let _ = Dynamic::<Vec<u8>>::try_from_bech32m(&arbitrary_str);
+        let _ = Dynamic::<Vec<u8>>::try_from_bech32m_unchecked(&arbitrary_str);
     }
 
     // 4b. Valid bech32m round-trip (cap to 32 bytes for BIP-350 compliance)
@@ -178,8 +181,8 @@ fuzz_target!(|data: &[u8]| {
         let raw2 = dyn_vec2.expose_secret();
         let capped2 = if raw2.len() > 32 { &raw2[..32] } else { &raw2[..] };
 
-        if let Ok(encoded) = capped2.try_to_bech32m("fuzz", None) {
-            let decoded = Dynamic::<Vec<u8>>::try_from_bech32m(&encoded)
+        if let Ok(encoded) = capped2.try_to_bech32m("fuzz") {
+            let decoded = Dynamic::<Vec<u8>>::try_from_bech32m(&encoded, "fuzz")
                 .expect("bech32m from valid encode");
             assert_eq!(decoded.expose_secret(), capped2, "Bech32m round-trip failed");
         }
@@ -187,8 +190,8 @@ fuzz_target!(|data: &[u8]| {
 
     // 4c. Bech32m edge cases
     {
-        let _ = Dynamic::<Vec<u8>>::try_from_bech32m("not-bech32m");
-        let _ = Dynamic::<Vec<u8>>::try_from_bech32m("");
-        let _ = Dynamic::<Vec<u8>>::try_from_bech32m("1");
+        let _ = Dynamic::<Vec<u8>>::try_from_bech32m_unchecked("not-bech32m");
+        let _ = Dynamic::<Vec<u8>>::try_from_bech32m_unchecked("");
+        let _ = Dynamic::<Vec<u8>>::try_from_bech32m_unchecked("1");
     }
 });

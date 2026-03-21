@@ -69,7 +69,7 @@ pw.expose_secret_mut().clear();
 
     // Encode to Bech32 (BIP-173) with human-readable prefix "key"
     let bech32: String = key.with_secret(|bytes| {
-        bytes.try_to_bech32("key", None).expect("valid bech32")
+        bytes.try_to_bech32("key").expect("valid bech32")
     });
 
     // Round-trip demonstration (decode hex back to bytes)
@@ -192,8 +192,8 @@ Available methods (`E` = encode on bytes/wrapper, `D` = decode from string):
 
 - **Hex** (`encoding-hex`) — E: `to_hex()`, `to_hex_upper()` · D: `"…".try_from_hex()` → `Vec<u8>`
 - **Base64URL** (`encoding-base64`) — E: `to_base64url()` · D: `"…".try_from_base64url()` → `Vec<u8>`
-- **Bech32 BIP-173** (`encoding-bech32`) — E: `try_to_bech32(hrp, limit)` · D (raw): `"…".try_from_bech32_with_hrp(hrp)` → `Vec<u8>` · D (wrapped): `Fixed::try_from_bech32_with_hrp(s, hrp)`, `Dynamic::try_from_bech32_with_hrp(s, hrp)` — prefer `_with_hrp` over the HRP-discarding `try_from_bech32`
-- **Bech32m BIP-350** (`encoding-bech32m`) — E: `try_to_bech32m(hrp, limit)` · D (raw): `"…".try_from_bech32m_with_hrp(hrp)` → `Vec<u8>` · D (wrapped): `Fixed::try_from_bech32m_with_hrp(s, hrp)`, `Dynamic::try_from_bech32m_with_hrp(s, hrp)` — prefer `_with_hrp` over `try_from_bech32m`
+- **Bech32 BIP-173** (`encoding-bech32`) — E: `try_to_bech32(hrp)` · D (validated): `"…".try_from_bech32(hrp)` → `Vec<u8>` · D (unchecked): `"…".try_from_bech32_unchecked()` → `(String, Vec<u8>)` · D (wrapped): `Fixed::try_from_bech32(s, hrp)`, `Dynamic::try_from_bech32(s, hrp)` — prefer these over `try_from_bech32_unchecked`
+- **Bech32m BIP-350** (`encoding-bech32m`) — E: `try_to_bech32m(hrp)` · D (validated): `"…".try_from_bech32m(hrp)` · D (unchecked): `"…".try_from_bech32m_unchecked()` · D (wrapped): `Fixed::try_from_bech32m(s, hrp)`, `Dynamic::try_from_bech32m(s, hrp)` — prefer validated over `try_from_bech32m_unchecked`
 
 ### Patterns
 
@@ -222,7 +222,7 @@ The borrow checker enforces that the inner reference cannot escape the closure. 
     use secure_gate::{Fixed, ToBech32, ExposeSecret};
     let key = Fixed::new([0u8; 32]);
     // Encode and decode in the same scoped access
-    let encoded = key.with_secret(|b| b.try_to_bech32("key", None)).unwrap();
+    let encoded = key.with_secret(|b| b.try_to_bech32("key")).unwrap();
 }
 ```
 
@@ -244,9 +244,9 @@ Chaining immediately (`key.expose_secret().to_hex()`) is safe — the reference 
 
 Use only when inner bytes must be passed to code that does not know about `secure-gate` (FFI, third-party APIs taking `&[u8]` directly). Keep the binding as short-lived as possible.
 
-### Bech32 decoding — prefer `_with_hrp` variants
+### Bech32 decoding — prefer HRP-validated constructors
 
-When decoding Bech32/Bech32m into a secret wrapper, use the HRP-validating inherent methods on `Fixed` and `Dynamic` rather than the HRP-discarding variants:
+When decoding Bech32/Bech32m into a secret wrapper, use the HRP-validating inherent methods on `Fixed` and `Dynamic` rather than the `_unchecked` variants:
 
 ```rust
 #[cfg(feature = "encoding-bech32")]
@@ -257,16 +257,16 @@ When decoding Bech32/Bech32m into a secret wrapper, use the HRP-validating inher
     let encoded_str = "abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw";
 
     // Preferred: validates HRP, returns Bech32Error::UnexpectedHrp on mismatch
-    let key = Fixed::<[u8; 20]>::try_from_bech32_with_hrp(encoded_str, "abcdef")
+    let key = Fixed::<[u8; 20]>::try_from_bech32(encoded_str, "abcdef")
         .expect("valid bech32 with correct HRP");
 
     // Avoid in security-critical code: accepts any HRP silently
-    // let key = Fixed::<[u8; 20]>::try_from_bech32(encoded_str).expect("valid bech32");
+    // let key = Fixed::<[u8; 20]>::try_from_bech32_unchecked(encoded_str).expect("valid bech32");
     let _ = key;
 }
 ```
 
-`try_from_bech32_with_hrp` / `try_from_bech32m_with_hrp` compare HRP case-insensitively and prevent cross-protocol confusion attacks.
+Validated `try_from_bech32` / `try_from_bech32m` on `Fixed` and `Dynamic` compare HRP case-insensitively and prevent cross-protocol confusion attacks.
 
 ### Available traits
 
@@ -274,8 +274,8 @@ When decoding Bech32/Bech32m into a secret wrapper, use the HRP-validating inher
 | ----------------- | ------------- | ------------------------------------------------------- | --------------------- | ------------------ |
 | Hex               | `ToHex`       | `FromHexStr`                                            | Encode yes, decode no | `encoding-hex`     |
 | Base64URL         | `ToBase64Url` | `FromBase64UrlStr`                                      | Encode yes, decode no | `encoding-base64`  |
-| Bech32 (BIP-173)  | `ToBech32`    | `FromBech32Str` / `Fixed::try_from_bech32_with_hrp`   | No                    | `encoding-bech32`  |
-| Bech32m (BIP-350) | `ToBech32m`   | `FromBech32mStr` / `Fixed::try_from_bech32m_with_hrp` | No                    | `encoding-bech32m` |
+| Bech32 (BIP-173)  | `ToBech32`    | `FromBech32Str` / `Fixed::try_from_bech32`   | No                    | `encoding-bech32`  |
+| Bech32m (BIP-350) | `ToBech32m`   | `FromBech32mStr` / `Fixed::try_from_bech32m` | No                    | `encoding-bech32m` |
 
 **Decode-side note**: Decoded bytes are plaintext from the moment of decoding until they are wrapped. Wrap the result immediately — avoid binding the intermediate `Vec<u8>` to a long-lived variable.
 

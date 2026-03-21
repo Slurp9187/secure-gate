@@ -15,8 +15,8 @@
 //!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
 //!   multi-step operations, prefer `with_secret(|b| b.try_to_bech32m(...))` — the borrow
 //!   checker enforces the reference cannot escape the closure.
-//! - **HRP validation prevents injection attacks**: use `try_to_bech32m` with an
-//!   expected HRP to enforce protocol separation; test empty and invalid HRP inputs.
+//! - **HRP**: pass the intended human-readable part to `try_to_bech32m`; test empty and
+//!   invalid HRP inputs in security-critical code.
 //! - **Standard BIP-350 payload limit (~90 bytes)**: intentionally kept at spec
 //!   compliance for interoperability with Bitcoin Taproot/SegWit v1+ tooling.
 //!   For non-address use cases with large payloads (age-style encryption recipients,
@@ -32,7 +32,7 @@
 //! let secret = Fixed::new([0x00u8, 0x01]);
 //!
 //! // Use try_to_bech32m — the sole encoding API:
-//! let encoded = secret.with_secret(|s| s.try_to_bech32m("key", None)).unwrap();
+//! let encoded = secret.with_secret(|s| s.try_to_bech32m("key")).unwrap();
 //! assert!(encoded.starts_with("key1"));
 //! ```
 #[cfg(feature = "encoding-bech32m")]
@@ -46,8 +46,7 @@ use crate::error::Bech32Error;
 /// *Requires feature `encoding-bech32m`.*
 ///
 /// Blanket-implemented for all `AsRef<[u8]>` types. Use [`try_to_bech32m`](Self::try_to_bech32m)
-/// to validate the HRP and prevent cross-protocol confusion attacks.
-/// Test empty and invalid HRP inputs in security-critical code.
+/// with the protocol's HRP. Test empty and invalid HRP inputs in security-critical code.
 ///
 /// **Design note — intentional size asymmetry**: `ToBech32m` targets BIP-350
 /// (Bitcoin Taproot/SegWit v1+ addresses, typically 20–40 bytes). The 90-byte spec
@@ -56,15 +55,11 @@ use crate::error::Bech32Error;
 /// arbitrary keys ≥ ~50 bytes), use [`ToBech32`](crate::ToBech32) / `Bech32Large`.
 #[cfg(feature = "encoding-bech32m")]
 pub trait ToBech32m {
-    /// Fallibly encodes bytes as a Bech32m (BIP-350) string with optional HRP validation.
-    ///
-    /// Pass `expected_hrp: Some("hrp")` to enforce that the encoded HRP matches;
-    /// useful for round-trip validation and preventing cross-protocol confusion.
+    /// Fallibly encodes bytes as a Bech32m (BIP-350) string with the given HRP.
     ///
     /// # Errors
     ///
     /// - [`Bech32Error::InvalidHrp`] — `hrp` contains invalid characters.
-    /// - [`Bech32Error::UnexpectedHrp`] — `expected_hrp` is `Some` and does not match `hrp`.
     /// - [`Bech32Error::OperationFailed`] — encoding failure (e.g., data too large).
     ///
     /// # Examples
@@ -72,41 +67,19 @@ pub trait ToBech32m {
     /// ```rust
     /// use secure_gate::ToBech32m;
     ///
-    /// let encoded = b"hello".try_to_bech32m("key", None)?;
+    /// let encoded = b"hello".try_to_bech32m("key")?;
     /// assert!(encoded.starts_with("key1"));
-    ///
-    /// // HRP validation
-    /// assert!(b"hello".try_to_bech32m("key", Some("key")).is_ok());
     /// # Ok::<(), secure_gate::Bech32Error>(())
     /// ```
-    fn try_to_bech32m(
-        &self,
-        hrp: &str,
-        expected_hrp: Option<&str>,
-    ) -> Result<alloc::string::String, Bech32Error>;
+    fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error>;
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
 #[cfg(feature = "encoding-bech32m")]
 impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
     #[inline(always)]
-    fn try_to_bech32m(
-        &self,
-        hrp: &str,
-        expected_hrp: Option<&str>,
-    ) -> Result<alloc::string::String, Bech32Error> {
+    fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error> {
         let hrp_parsed = Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
-        if let Some(exp) = expected_hrp {
-            if hrp != exp {
-                #[cfg(debug_assertions)]
-                return Err(Bech32Error::UnexpectedHrp {
-                    expected: exp.to_string(),
-                    got: hrp.to_string(),
-                });
-                #[cfg(not(debug_assertions))]
-                return Err(Bech32Error::UnexpectedHrp);
-            }
-        }
         encode_lower::<Bech32m>(hrp_parsed, self.as_ref()).map_err(|_| Bech32Error::OperationFailed)
     }
 }

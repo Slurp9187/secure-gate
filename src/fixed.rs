@@ -200,9 +200,9 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// The HRP is **not validated** — any HRP will be accepted as long as the checksum
     /// is valid and the payload length equals `N`. For security-critical code where
-    /// cross-protocol confusion must be prevented, use [`try_from_bech32_with_hrp`](Self::try_from_bech32_with_hrp).
-    pub fn try_from_bech32(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes_raw) = s.try_from_bech32()?;
+    /// cross-protocol confusion must be prevented, use [`try_from_bech32`](Self::try_from_bech32).
+    pub fn try_from_bech32_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes_raw) = s.try_from_bech32_unchecked()?;
         let bytes = zeroize::Zeroizing::new(bytes_raw);
         if bytes.len() != N {
             #[cfg(debug_assertions)]
@@ -221,10 +221,10 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// Decodes a Bech32 (BIP-173) string into `Fixed<[u8; N]>`, validating that the HRP
     /// matches `expected_hrp` (case-insensitive).
     ///
-    /// Prefer this over [`try_from_bech32`](Self::try_from_bech32) in security-critical code
-    /// to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32_with_hrp(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
-        let bytes_raw = s.try_from_bech32_with_hrp(expected_hrp)?;
+    /// Prefer this over [`try_from_bech32_unchecked`](Self::try_from_bech32_unchecked) in
+    /// security-critical code to prevent cross-protocol confusion attacks.
+    pub fn try_from_bech32(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+        let bytes_raw = s.try_from_bech32(expected_hrp)?;
         let bytes = zeroize::Zeroizing::new(bytes_raw);
         if bytes.len() != N {
             #[cfg(debug_assertions)]
@@ -249,9 +249,9 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// The HRP is **not validated** — any HRP will be accepted as long as the checksum
     /// is valid and the payload length equals `N`. For security-critical code where
-    /// cross-protocol confusion must be prevented, use [`try_from_bech32m_with_hrp`](Self::try_from_bech32m_with_hrp).
-    pub fn try_from_bech32m(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes_raw) = s.try_from_bech32m()?;
+    /// cross-protocol confusion must be prevented, use [`try_from_bech32m`](Self::try_from_bech32m).
+    pub fn try_from_bech32m_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes_raw) = s.try_from_bech32m_unchecked()?;
         let bytes = zeroize::Zeroizing::new(bytes_raw);
         if bytes.len() != N {
             #[cfg(debug_assertions)]
@@ -270,10 +270,10 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// Decodes a Bech32m (BIP-350) string into `Fixed<[u8; N]>`, validating that the HRP
     /// matches `expected_hrp` (case-insensitive).
     ///
-    /// Prefer this over [`try_from_bech32m`](Self::try_from_bech32m) in security-critical code
-    /// to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32m_with_hrp(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
-        let bytes_raw = s.try_from_bech32m_with_hrp(expected_hrp)?;
+    /// Prefer this over [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked) in
+    /// security-critical code to prevent cross-protocol confusion attacks.
+    pub fn try_from_bech32m(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+        let bytes_raw = s.try_from_bech32m(expected_hrp)?;
         let bytes = zeroize::Zeroizing::new(bytes_raw);
         if bytes.len() != N {
             #[cfg(debug_assertions)]

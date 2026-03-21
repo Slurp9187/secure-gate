@@ -23,7 +23,7 @@ pub struct FuzzHexString(pub String);
 pub struct FuzzBase64String(pub String);
 
 /// Generates bech32-encoded strings using secure-gate's ToBech32 trait
-/// so they round-trip correctly with try_from_bech32.
+/// so they round-trip with `try_from_bech32(_, &hrp)` or `try_from_bech32_unchecked`.
 #[derive(Debug)]
 pub struct FuzzBech32String(pub String);
 
@@ -110,8 +110,8 @@ impl<'a> Arbitrary<'a> for FuzzBech32String {
         // Cap data to avoid enormous bech32 strings
         let capped = if data.len() > 256 { &data[..256] } else { &data[..] };
 
-        // Encode with secure-gate's ToBech32 so round-trips via try_from_bech32 work
-        match capped.try_to_bech32(&hrp, None) {
+        // Encode with secure-gate's ToBech32 so fuzz decoding can validate HRP
+        match capped.try_to_bech32(&hrp) {
             Ok(encoded) => Ok(FuzzBech32String(encoded)),
             Err(_) => Ok(FuzzBech32String("fuzz1vehk7cnpwgry9h76".to_string())),
         }

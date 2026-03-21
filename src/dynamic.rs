@@ -257,9 +257,9 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// The HRP is **not validated** — any HRP will be accepted as long as the checksum
     /// is valid. For security-critical code where cross-protocol confusion must be
-    /// prevented, use [`try_from_bech32_with_hrp`](Self::try_from_bech32_with_hrp).
-    pub fn try_from_bech32(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes) = s.try_from_bech32()?;
+    /// prevented, use [`try_from_bech32`](Self::try_from_bech32).
+    pub fn try_from_bech32_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes) = s.try_from_bech32_unchecked()?;
         Ok(Self::new(Self::protect_decode_result(bytes)))
     }
 
@@ -268,13 +268,10 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
     ///
-    /// Prefer this over [`try_from_bech32`](Self::try_from_bech32) in security-critical code
-    /// to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32_with_hrp(
-        s: &str,
-        expected_hrp: &str,
-    ) -> Result<Self, crate::error::Bech32Error> {
-        let bytes = s.try_from_bech32_with_hrp(expected_hrp)?;
+    /// Prefer this over [`try_from_bech32_unchecked`](Self::try_from_bech32_unchecked) in
+    /// security-critical code to prevent cross-protocol confusion attacks.
+    pub fn try_from_bech32(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+        let bytes = s.try_from_bech32(expected_hrp)?;
         Ok(Self::new(Self::protect_decode_result(bytes)))
     }
 }
@@ -289,9 +286,9 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// The HRP is **not validated** — any HRP will be accepted as long as the checksum
     /// is valid. For security-critical code where cross-protocol confusion must be
-    /// prevented, use [`try_from_bech32m_with_hrp`](Self::try_from_bech32m_with_hrp).
-    pub fn try_from_bech32m(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes) = s.try_from_bech32m()?;
+    /// prevented, use [`try_from_bech32m`](Self::try_from_bech32m).
+    pub fn try_from_bech32m_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes) = s.try_from_bech32m_unchecked()?;
         Ok(Self::new(Self::protect_decode_result(bytes)))
     }
 
@@ -300,13 +297,10 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// The temporary decode buffer is wrapped with `Zeroizing` (consistent with `Fixed<T>`).
     ///
-    /// Prefer this over [`try_from_bech32m`](Self::try_from_bech32m) in security-critical code
-    /// to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32m_with_hrp(
-        s: &str,
-        expected_hrp: &str,
-    ) -> Result<Self, crate::error::Bech32Error> {
-        let bytes = s.try_from_bech32m_with_hrp(expected_hrp)?;
+    /// Prefer this over [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked) in
+    /// security-critical code to prevent cross-protocol confusion attacks.
+    pub fn try_from_bech32m(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+        let bytes = s.try_from_bech32m(expected_hrp)?;
         Ok(Self::new(Self::protect_decode_result(bytes)))
     }
 }
