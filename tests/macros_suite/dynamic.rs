@@ -12,3 +12,12 @@ fn dynamic_alias_basics() {
     let val: LocalDynVec = vec![1u8, 2, 3].into();
     val.with_secret(|s| assert_eq!(s, &[1, 2, 3]));
 }
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_alias_zero_size_accepted() {
+    // dynamic_alias! accepts zero-sized inner types with no compile-time rejection (unlike fixed_alias!).
+    // A Dynamic<Vec<u8>> wrapping an empty vec has no cryptographic utility; this test documents the behavior.
+    let val: LocalDynVec = vec![].into();
+    val.with_secret(|s: &Vec<u8>| assert_eq!(s.len(), 0));
+}

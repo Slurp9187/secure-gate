@@ -150,6 +150,7 @@ Zero-cost claim: performance indistinguishable from raw arrays; for detailed ben
 - Audit every `CloneableSecret` / `SerializableSecret` impl
 - Validate and sanitize all inputs before encoding/decoding
 - Use specific format traits (`FromBech32Str`, `FromHexStr`, …) when the expected format is known
+- When using `fixed_generic_alias!`, `dynamic_alias!`, or `dynamic_generic_alias!`, validate that the effective inner size is > 0 in unit tests — these macros accept zero-sized types without compile-time rejection (unlike `fixed_alias!`).
 - Monitor dependency CVEs and update regularly
 - Treat secrets as radioactive — minimize exposure surface
 

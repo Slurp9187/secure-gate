@@ -43,6 +43,7 @@
 ///
 /// `dynamic_alias!` has **no zero-size or type-level guard** — any `T` is accepted.
 /// Macro-generated aliases lack runtime size checks beyond what `Dynamic<T>` itself provides.
+/// Note that unlike `fixed_alias!`, this macro (and the generic dynamic variant) allows zero-sized or empty inner types with no compile-time rejection.
 /// Validate expected inner types and sizes in unit tests:
 ///
 /// ```rust

@@ -26,6 +26,8 @@
 ///
 /// Macro-generated generic aliases lack runtime size checks. Validate expected
 /// inner types and sizes in unit tests.
+/// As with `dynamic_alias!`, zero-sized or empty inner types are permitted
+/// (no compile-time size check is possible); validate non-zero size in tests.
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! dynamic_generic_alias {
