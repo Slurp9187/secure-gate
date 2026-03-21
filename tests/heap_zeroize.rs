@@ -52,10 +52,12 @@ static TARGET_SIZE: AtomicUsize = AtomicUsize::new(0);
 /// Set to `true` before `catch_unwind`; cleared by `dealloc` on first match.
 static PANIC_CHECK_ACTIVE: AtomicBool = AtomicBool::new(false);
 
-/// The exact byte count to watch for in recording mode.
-static PANIC_CHECK_SIZE: AtomicUsize = AtomicUsize::new(0);
+/// The exact backing-buffer pointer of the allocation being tracked in recording mode.
+/// Matching by pointer rather than by size makes the test immune to same-size
+/// allocations from panic machinery (backtrace, symbol resolution, TLS).
+static PANIC_CHECK_PTR: AtomicUsize = AtomicUsize::new(0);
 
-/// `true` iff the first matching deallocation in recording mode was fully zeroed.
+/// `true` iff the tracked allocation was fully zeroed when its dealloc was observed.
 static PANIC_CHECK_ZEROED: AtomicBool = AtomicBool::new(false);
 
 // ---------------------------------------------------------------------------
@@ -66,7 +68,9 @@ static PANIC_CHECK_ZEROED: AtomicBool = AtomicBool::new(false);
 ///   - In **asserting mode** (`CHECKING`): panics if a deallocation of
 ///     `TARGET_SIZE` bytes contains any non-zero byte.
 ///   - In **recording mode** (`PANIC_CHECK_ACTIVE`): silently records whether
-///     the first deallocation of `PANIC_CHECK_SIZE` bytes was fully zeroed.
+///     the deallocation of the specific pointer in `PANIC_CHECK_PTR` was fully
+///     zeroed. Pointer-based matching avoids false results from same-size
+///     allocations made by panic infrastructure (backtrace, symbol resolution).
 struct ProxyAllocator;
 
 unsafe impl GlobalAlloc for ProxyAllocator {
@@ -83,9 +87,12 @@ unsafe impl GlobalAlloc for ProxyAllocator {
             }
         }
 
-        // Recording mode: record zeroed status without panicking (safe inside dealloc)
+        // Recording mode: match by exact pointer, not size, to avoid false results
+        // from panic-infrastructure allocations of the same size (backtrace buffers,
+        // symbol tables). Never panics — safe to call inside dealloc.
         if PANIC_CHECK_ACTIVE.load(Ordering::SeqCst)
-            && layout.size() == PANIC_CHECK_SIZE.load(Ordering::SeqCst)
+            && PANIC_CHECK_PTR.load(Ordering::SeqCst) != 0
+            && ptr as usize == PANIC_CHECK_PTR.load(Ordering::SeqCst)
         {
             let all_zero = (0..layout.size()).all(|i| unsafe { *ptr.add(i) == 0 });
             PANIC_CHECK_ZEROED.store(all_zero, Ordering::SeqCst);
@@ -382,38 +389,45 @@ fn check_string_deserialized_zeroed(size: usize) {
 // that `from_protected_bytes` relies on.
 //
 // Design:
-//   1. Enable recording mode (PANIC_CHECK_ACTIVE) for SIZE bytes.
-//   2. Inside `catch_unwind`: create `Zeroizing::new(vec![0xAA; SIZE])`, then
-//      panic. During unwind, `Zeroizing::drop` runs → `Vec::zeroize()` zeroes
-//      the SIZE-byte backing buffer → `dealloc` records the zeroed status.
+//   1. Enable recording mode (PANIC_CHECK_ACTIVE).
+//   2. Inside `catch_unwind`: allocate a Vec, pin its backing-buffer pointer
+//      in PANIC_CHECK_PTR, wrap in Zeroizing, then panic. During unwind,
+//      Zeroizing::drop → Vec::zeroize() → dealloc → pointer match → record.
 //   3. After `catch_unwind`: assert PANIC_CHECK_ZEROED == true.
 //
-// SIZE = 8192 avoids collision with Rust panic-machinery allocations (message
-// formatting, backtrace capture, TLS) which are small (typically ≤ 512 bytes).
-// A size collision would cause the proxy to record a non-zeroed panic-internal
-// buffer instead of our secret buffer, falsely failing the assertion.
+// Matching by pointer (not size) makes the test immune to same-size
+// allocations from panic machinery. Under ASan with `build-std`, Rust's
+// backtrace infrastructure allocates buffers during panic processing (observed:
+// 8192 bytes). A size-based match would intercept a non-zeroed backtrace
+// buffer instead of the Zeroizing-protected Vec, falsely failing the test.
 //
 // Regression value: this test would FAIL with the old `mem::take` pattern,
-// because `mem::take` leaves `protected` holding an empty Vec — so no
-// SIZE-byte deallocation is zeroed during unwind, PANIC_CHECK_ZEROED stays
-// false, and the assertion fails. With `from_protected_bytes` (swap), the
-// live `Zeroizing` holds the full buffer at panic time and zeroizes it.
+// because `mem::take` leaves `protected` holding an empty Vec at panic time.
+// No SIZE-byte deallocation would be zeroed during unwind → PANIC_CHECK_ZEROED
+// stays false → assertion fails. With `from_protected_bytes` (swap), the live
+// `Zeroizing` holds the full buffer at panic time and zeroizes it on unwind.
 // ---------------------------------------------------------------------------
 
 fn check_panic_path_bytes_zeroed(size: usize) {
-    PANIC_CHECK_SIZE.store(size, Ordering::SeqCst);
+    PANIC_CHECK_PTR.store(0, Ordering::SeqCst);
     PANIC_CHECK_ZEROED.store(false, Ordering::SeqCst);
     PANIC_CHECK_ACTIVE.store(true, Ordering::SeqCst);
 
     // Simulate a panic that fires after Zeroizing::new but before Box::new —
     // the exact OOM window that `from_protected_bytes` is designed to protect.
     let result = std::panic::catch_unwind(|| {
-        let _protected = zeroize::Zeroizing::new(vec![0xAAu8; size]);
-        // `_protected` is still alive here. During unwind its Drop impl runs:
+        let v = vec![0xAAu8; size];
+        // Pin the exact backing-buffer pointer before wrapping in Zeroizing.
+        // dealloc matches this pointer, not the size, so concurrent panic-
+        // infrastructure allocations of the same size don't interfere.
+        PANIC_CHECK_PTR.store(v.as_ptr() as usize, Ordering::SeqCst);
+        let _protected = zeroize::Zeroizing::new(v);
+        // `_protected` is still alive. During unwind its Drop impl runs:
         // Zeroizing::drop → Vec::zeroize() → backing buffer zeroed → dealloc.
         panic!("simulated OOM before Box allocation");
     });
 
+    PANIC_CHECK_ACTIVE.store(false, Ordering::SeqCst); // defensive cleanup
     assert!(result.is_err(), "catch_unwind should have captured the panic");
     assert!(
         PANIC_CHECK_ZEROED.load(Ordering::SeqCst),
