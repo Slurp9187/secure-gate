@@ -36,7 +36,7 @@
 //! assert!(!a.ct_eq(c));   // not equal — same time as equal case
 //!
 //! // Works on fixed-size arrays and secret wrappers
-//! use secure_gate::{Fixed, ConstantTimeEq as _};
+//! use secure_gate::Fixed;
 //! let key1: Fixed<[u8; 32]> = Fixed::new([0u8; 32]);
 //! let key2: Fixed<[u8; 32]> = Fixed::new([0u8; 32]);
 //! assert!(key1.ct_eq(&key2));
