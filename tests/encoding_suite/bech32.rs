@@ -1,19 +1,19 @@
 //! encoding_suite/bech32.rs — bech32/bech32m encoding/decoding tests
 
-#[cfg(feature = "encoding-bech32")]
-use secure_gate::{FromBech32Str, ToBech32};
-#[cfg(feature = "encoding-bech32m")]
-use secure_gate::{FromBech32mStr, ToBech32m};
 #[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 use secure_gate::Bech32Error;
 #[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 use secure_gate::Dynamic;
 #[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 use secure_gate::ExposeSecret;
+#[cfg(feature = "encoding-bech32")]
+use secure_gate::{FromBech32Str, ToBech32};
+#[cfg(feature = "encoding-bech32m")]
+use secure_gate::{FromBech32mStr, ToBech32m};
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
-fn bech32_roundtrip_with_expected_hrp() {
+fn bech32_unchecked_roundtrip_preserves_hrp() {
     let data = b"hello world";
     let encoded = data.try_to_bech32("fuzz").expect("valid bech32");
 
@@ -38,7 +38,7 @@ fn bech32_decode_malformed_fails() {
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
-fn bech32_decode_with_hrp_validates() {
+fn bech32_try_from_bech32_accepts_matching_hrp() {
     let data = b"hello world";
     let encoded = data.try_to_bech32("fuzz").expect("valid bech32");
     let decoded = encoded
@@ -49,7 +49,7 @@ fn bech32_decode_with_hrp_validates() {
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
-fn bech32_decode_with_hrp_mismatch_fails() {
+fn bech32_try_from_bech32_rejects_mismatched_hrp() {
     let data = b"hello world";
     let encoded = data.try_to_bech32("fuzz").expect("valid bech32");
     let err = encoded.try_from_bech32("other");
@@ -82,7 +82,7 @@ fn bech32m_decode_malformed_fails() {
 
 #[cfg(feature = "encoding-bech32m")]
 #[test]
-fn bech32m_decode_with_hrp_validates() {
+fn bech32m_try_from_bech32m_accepts_matching_hrp() {
     let data = b"hello world";
     let encoded = data.try_to_bech32m("fuzz").expect("valid bech32m");
     let decoded = encoded
@@ -93,7 +93,7 @@ fn bech32m_decode_with_hrp_validates() {
 
 #[cfg(feature = "encoding-bech32m")]
 #[test]
-fn bech32m_decode_with_hrp_mismatch_fails() {
+fn bech32m_try_from_bech32m_rejects_mismatched_hrp() {
     let data = b"hello world";
     let encoded = data.try_to_bech32m("fuzz").expect("valid bech32m");
     let err = encoded.try_from_bech32m("other");
