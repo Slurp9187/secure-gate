@@ -23,7 +23,7 @@
 //! # Example
 //!
 //! ```rust
-//! use secure_gate::{CloneableSecret, Fixed, ExposeSecret};
+//! use secure_gate::{CloneableSecret, Fixed, RevealSecret};
 //! use zeroize::Zeroize;
 //!
 //! #[derive(Clone)]

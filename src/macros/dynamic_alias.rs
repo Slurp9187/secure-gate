@@ -19,7 +19,7 @@
 /// All three visibility forms:
 ///
 /// ```rust
-/// use secure_gate::{dynamic_alias, ExposeSecret};
+/// use secure_gate::{dynamic_alias, RevealSecret};
 ///
 /// dynamic_alias!(pub Password, String);            // public
 /// dynamic_alias!(pub(crate) SessionToken, Vec<u8>); // crate-visible
@@ -32,7 +32,7 @@
 /// With a custom doc string:
 ///
 /// ```rust
-/// use secure_gate::{dynamic_alias, ExposeSecret};
+/// use secure_gate::{dynamic_alias, RevealSecret};
 ///
 /// dynamic_alias!(pub Token, Vec<u8>, "OAuth 2.0 bearer token.");
 /// let token: Token = vec![1u8, 2, 3].into();

@@ -6,7 +6,7 @@
 //! secure-gate — Secure secret wrappers with explicit access & automatic zeroization
 //!
 //! Secrets are **automatically zeroized on drop** (the inner type must implement [`Zeroize`](zeroize::Zeroize)).
-//! Explicit access only via [`ExposeSecret`]/[`ExposeSecretMut`] — no `Deref`, no accidental leaks.
+//! Explicit access only via [`RevealSecret`]/[`RevealSecretMut`] — no `Deref`, no accidental leaks.
 //! `Debug` always prints `[REDACTED]`.
 //!
 //! - [`Fixed<T>`] — stack-allocated, compile-time-sized secrets (keys, nonces, tokens)
@@ -85,12 +85,12 @@ pub use traits::ConstantTimeEq;
 /// Explicit immutable access to secret contents.
 ///
 /// Provides `expose_secret()` and `with_secret()` methods.
-pub use traits::ExposeSecret;
+pub use traits::RevealSecret;
 
 /// Explicit mutable access to secret contents.
 ///
 /// Provides `expose_secret_mut()` and `with_secret_mut()` methods.
-pub use traits::ExposeSecretMut;
+pub use traits::RevealSecretMut;
 
 #[cfg(feature = "serde-serialize")]
 /// Marker trait for secrets that can be serialized with Serde.

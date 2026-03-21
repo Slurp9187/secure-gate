@@ -21,7 +21,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "encoding-hex")]
-//! use secure_gate::{Fixed, ToHex, ExposeSecret};
+//! use secure_gate::{Fixed, ToHex, RevealSecret};
 //! # #[cfg(feature = "encoding-hex")]
 //! {
 //! let secret = Fixed::new([0x0au8, 0x0bu8, 0x0cu8, 0x0du8]);

@@ -5,7 +5,7 @@
 use secure_gate::CloneableSecret;
 #[cfg(feature = "alloc")]
 use secure_gate::Dynamic;
-use secure_gate::{ExposeSecret, ExposeSecretMut, Fixed};
+use secure_gate::{RevealSecret, RevealSecretMut, Fixed};
 
 // === Basic Functionality ===
 

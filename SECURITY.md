@@ -87,7 +87,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 > See the [TL;DR](#tldr) for the shortest version of the most important points.
 
 - The `alloc` feature is enabled by default and provides `Dynamic<T>` with full zeroization; use `default-features = false` for embedded / pure-stack builds (`Fixed<T>` only)
-- Prefer scoped `with_secret()` over long-lived `expose_secret()`
+- Prefer scoped `with_secret` / `with_secret_mut` over `expose_secret` / `expose_secret_mut` in application code
 - For equality, use `.ct_eq()` (`ct-eq` feature) for all secret comparisons — deterministic and constant-time. Bound input sizes at the transport/parser layer for untrusted data.
 - Audit every `CloneableSecret` / `SerializableSecret` impl
 - Validate and sanitize all inputs before encoding/decoding

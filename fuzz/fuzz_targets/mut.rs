@@ -7,7 +7,7 @@
 use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
-use secure_gate::{Dynamic, Fixed, ExposeSecret, ExposeSecretMut};
+use secure_gate::{Dynamic, Fixed, RevealSecret, RevealSecretMut};
 use secure_gate_fuzz::arbitrary::{FuzzAction, FuzzDynamicString, FuzzDynamicVec, FuzzFixed32};
 use zeroize::Zeroize;
 
@@ -153,7 +153,7 @@ fuzz_target!(|data: &[u8]| {
     }
 
     // 6. Nested Dynamic<Dynamic<Vec<u8>>> — creation, zeroize, drop ordering
-    // ExposeSecret/ExposeSecretMut is not blanket-impl'd for arbitrary T;
+    // RevealSecret/RevealSecretMut is not blanket-impl'd for arbitrary T;
     // only Dynamic<String> and Dynamic<Vec<T>> have impls. We test
     // construction and drop-order zeroize here.
     {

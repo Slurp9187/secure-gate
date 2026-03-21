@@ -10,7 +10,7 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "alloc")]
-//! use secure_gate::{Dynamic, ExposeSecret};
+//! use secure_gate::{Dynamic, RevealSecret};
 //!
 //! # #[cfg(feature = "alloc")]
 //! {
@@ -26,7 +26,7 @@ use alloc::boxed::Box;
 use zeroize::Zeroize;
 
 #[cfg(any(feature = "encoding-hex", feature = "encoding-base64"))]
-use crate::ExposeSecret;
+use crate::RevealSecret;
 
 // Encoding traits
 #[cfg(feature = "encoding-base64")]
@@ -135,8 +135,8 @@ impl Dynamic<Vec<u8>> {
     }
 }
 
-// ExposeSecret
-impl crate::ExposeSecret for Dynamic<String> {
+// RevealSecret
+impl crate::RevealSecret for Dynamic<String> {
     type Inner = String;
 
     #[inline(always)]
@@ -158,7 +158,7 @@ impl crate::ExposeSecret for Dynamic<String> {
     }
 }
 
-impl<T: zeroize::Zeroize> crate::ExposeSecret for Dynamic<Vec<T>> {
+impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
     type Inner = Vec<T>;
 
     #[inline(always)]
@@ -180,8 +180,8 @@ impl<T: zeroize::Zeroize> crate::ExposeSecret for Dynamic<Vec<T>> {
     }
 }
 
-// ExposeSecretMut
-impl crate::ExposeSecretMut for Dynamic<String> {
+// RevealSecretMut
+impl crate::RevealSecretMut for Dynamic<String> {
     #[inline(always)]
     fn with_secret_mut<F, R>(&mut self, f: F) -> R
     where
@@ -196,7 +196,7 @@ impl crate::ExposeSecretMut for Dynamic<String> {
     }
 }
 
-impl<T: zeroize::Zeroize> crate::ExposeSecretMut for Dynamic<Vec<T>> {
+impl<T: zeroize::Zeroize> crate::RevealSecretMut for Dynamic<Vec<T>> {
     #[inline(always)]
     fn with_secret_mut<F, R>(&mut self, f: F) -> R
     where

@@ -1,7 +1,7 @@
 //! encoding_suite/base64.rs — base64url encoding/decoding tests
 
 #[cfg(feature = "encoding-base64")]
-use secure_gate::{ExposeSecret, Fixed, FromBase64UrlStr, ToBase64Url};
+use secure_gate::{RevealSecret, Fixed, FromBase64UrlStr, ToBase64Url};
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 use secure_gate::Dynamic;
 

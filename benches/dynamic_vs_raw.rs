@@ -7,7 +7,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
 #[cfg(feature = "alloc")]
-use secure_gate::{Dynamic, ExposeSecret};
+use secure_gate::{Dynamic, RevealSecret};
 
 #[cfg(feature = "alloc")]
 use std::hint::black_box;

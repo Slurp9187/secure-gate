@@ -20,7 +20,7 @@
 
 #![allow(clippy::undocumented_unsafe_blocks)]
 
-use secure_gate::{ExposeSecret, ExposeSecretMut, Fixed};
+use secure_gate::{RevealSecret, RevealSecretMut, Fixed};
 use zeroize::Zeroize;
 
 #[cfg(feature = "alloc")]
@@ -204,7 +204,7 @@ fn fixed_mutate_expose_secret_mut_then_zeroize() {
 
 /// `expose_secret_mut` on a `Fixed<[ZeroizedOnDrop; 1]>` followed by `zeroize()` clears the inner `u64`.
 ///
-/// `ExposeSecret` / `ExposeSecretMut` are implemented for `Fixed<[T; N]>` (arrays), so we wrap
+/// `RevealSecret` / `RevealSecretMut` are implemented for `Fixed<[T; N]>` (arrays), so we wrap
 /// the custom type in a single-element array. This covers the custom-type path — with its own
 /// `Drop` impl — that the bare `[u8; N]` macro cannot exercise.
 #[test]

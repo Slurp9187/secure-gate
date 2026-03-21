@@ -1,6 +1,6 @@
 //! macros_suite/fixed.rs — fixed_alias macro tests
 
-use secure_gate::{fixed_alias, ExposeSecret};
+use secure_gate::{fixed_alias, RevealSecret};
 
 fixed_alias!(LocalFixed32, 32);
 

@@ -5,6 +5,8 @@
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
+Current crates.io version: 0.8.0-rc.1 (see `Cargo.toml` for exact version).
+
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
 > **Security Notice**: This crate has **not undergone independent audit**.
@@ -36,7 +38,7 @@ For zero-cost performance justification see [ZERO_COST_WRAPPERS.md](https://gith
 ## Quick Start
 
 ```rust
-use secure_gate::{dynamic_alias, fixed_alias, ExposeSecret, ExposeSecretMut};
+use secure_gate::{dynamic_alias, fixed_alias, RevealSecret, RevealSecretMut};
 
 dynamic_alias!(pub Password, String);    // Dynamic<String>
 fixed_alias!(pub Aes256Key, 32);         // Fixed<[u8; 32]>
@@ -56,7 +58,7 @@ pw.expose_secret_mut().clear();
 
 #[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
 {
-    use secure_gate::{Fixed, ExposeSecret, ToHex, ToBech32, FromHexStr};
+    use secure_gate::{Fixed, RevealSecret, ToHex, ToBech32, FromHexStr};
 
     let key: Fixed<[u8; 32]> = Fixed::new([42u8; 32]);
 
@@ -120,16 +122,18 @@ secure-gate = { version = "0.8.0-rc.1", features = ["full"] }
 
 ## Core API
 
-`Fixed<T>` (stack-allocated) and `Dynamic<T>` (heap-allocated, requires `alloc`) share the same `ExposeSecret` / `ExposeSecretMut` interface. Both types:
+`Fixed<T>` (stack-allocated) and `Dynamic<T>` (heap-allocated, requires `alloc`) share the same `RevealSecret` / `RevealSecretMut` interface. Both types:
 
 - Redact `Debug` output to `[REDACTED]`
 - Implement `len()` and `is_empty()` without exposing secret contents
 - Zeroize contents on drop (mandatory)
 
+The preferred and recommended way to access secrets is the scoped `with_secret` / `with_secret_mut` methods. `expose_secret` / `expose_secret_mut` are escape hatches for rare cases and should be audited closely.
+
 ### Preferred: scoped access
 
 ```rust
-use secure_gate::{Fixed, ExposeSecret, ExposeSecretMut};
+use secure_gate::{Fixed, RevealSecret, RevealSecretMut};
 
 let mut key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
 
@@ -144,7 +148,7 @@ key.with_secret_mut(|bytes: &mut [u8; 32]| bytes[0] = 0);
 
 ```rust
 // Use only when a long-lived reference is unavoidable (FFI, third-party APIs)
-use secure_gate::{Fixed, ExposeSecret};
+use secure_gate::{Fixed, RevealSecret};
 let key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
 let raw: &[u8; 32] = key.expose_secret();
 ```
@@ -173,9 +177,9 @@ See also the Best Practices section in [SECURITY.md](https://github.com/Slurp918
 ### Polymorphic / generic code
 
 ```rust
-use secure_gate::ExposeSecret;
+use secure_gate::RevealSecret;
 
-fn log_length<S: ExposeSecret>(secret: &S) {
+fn log_length<S: RevealSecret>(secret: &S) {
     println!("length = {}", secret.len());
 }
 ```
@@ -230,7 +234,7 @@ The borrow checker enforces that the inner reference cannot escape the closure. 
 ```rust
 #[cfg(feature = "encoding-bech32")]
 {
-    use secure_gate::{Fixed, ToBech32, ExposeSecret};
+    use secure_gate::{Fixed, ToBech32, RevealSecret};
     let key = Fixed::new([0u8; 32]);
     // Encode and decode in the same scoped access
     let encoded = key.with_secret(|b| b.try_to_bech32("key")).unwrap();
@@ -244,7 +248,7 @@ Chaining immediately (`key.expose_secret().to_hex()`) is safe — the reference 
 ```rust
 #[cfg(feature = "encoding-hex")]
 {
-    use secure_gate::{Fixed, ExposeSecret, ToHex};
+    use secure_gate::{Fixed, RevealSecret, ToHex};
     let key = Fixed::new([0u8; 32]);
     // Dangerous: reference outlives the encoding call
     let bytes = key.expose_secret();

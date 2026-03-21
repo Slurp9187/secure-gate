@@ -9,7 +9,7 @@
 // Suite modules currently import traits directly from secure_gate, so these are
 // available but not yet consumed — suppress the false-positive lint.
 #[allow(unused_imports)]
-pub use secure_gate::{ExposeSecret, ExposeSecretMut};
+pub use secure_gate::{RevealSecret, RevealSecretMut};
 
 /// Asserts that the `Debug` output is exactly `[REDACTED]` in both normal and
 /// alternate (`{:#?}`) format — the canonical security invariant for all secret
