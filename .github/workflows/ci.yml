@@ -127,6 +127,9 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
+      - name: Update Cargo.lock with MSRV toolchain
+        run: cargo +1.75 update
+
       - name: cargo check – default features
         run: cargo +1.75 check
 
