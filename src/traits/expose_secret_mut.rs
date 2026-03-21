@@ -43,7 +43,10 @@
 //! ```rust
 //! use secure_gate::ExposeSecretMut;
 //!
-//! fn mutate_first_byte<S: ExposeSecretMut>(secret: &mut S) where S::Inner: AsMut<[u8]> {
+//! fn mutate_first_byte<S: ExposeSecretMut>(secret: &mut S)
+//! where
+//!     S::Inner: AsMut<[u8]>,
+//! {
 //!     secret.with_secret_mut(|bytes| {
 //!         if let Some(first) = bytes.as_mut().first_mut() {
 //!             *first = 99;
@@ -52,7 +55,7 @@
 //! }
 //! ```
 //!
-//! These traits enforce the core security principle of secure-gate:
+//! This trait (together with [`ExposeSecret`]) enforces the core security principle of secure-gate:
 //! **all secret access (read or write) must be explicit and auditable**.
 //! Scoped methods are preferred in nearly all cases.
 use crate::ExposeSecret;
