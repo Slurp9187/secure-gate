@@ -32,6 +32,10 @@ Current crates.io version: 0.8.0-rc.2 (see `Cargo.toml` for exact version).
 - Real `impl Drop` now calls `zeroize()` on the inner value — the documented zeroization guarantee is fully enforced.
 - All previous versions (0.1.0–0.7.0-rc.15) were yanked from crates.io.
 - Greatly expanded zeroization test suite with multi-size coverage, spare-capacity checks for both `Vec` and `String`, runtime heap verification via `ProxyAllocator`, and AddressSanitizer integration.
+- **`ExposeSecret` → `RevealSecret` trait rename** — `ExposeSecret` / `ExposeSecretMut` are now `RevealSecret` / `RevealSecretMut`. Method names (`expose_secret`, `with_secret`, etc.) are unchanged; only code that names the trait explicitly needs updating.
+- **`ct-eq-hash` feature removed** — `ConstantTimeEqExt`, `ct_eq_hash`, and `ct_eq_auto` are gone. Use the `ct-eq` feature and `.ct_eq()` instead.
+- **Bech32 / Bech32m constructor API changed** — Primary decode is now `try_from_bech32(s, hrp)` (HRP-validated); unchecked single-arg form is `try_from_bech32_unchecked(s)`. `_expect_hrp` variants renamed to `_with_hrp`.
+- **`ToHex::to_hex_left` removed** — The partial-reveal logging helper was removed; construct redacted output manually if needed.
 
 ## What You Get
 
