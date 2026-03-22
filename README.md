@@ -5,7 +5,7 @@
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
-Current crates.io version: 0.8.0-rc.1 (see `Cargo.toml` for exact version).
+Current crates.io version: 0.8.0-rc.2 (see `Cargo.toml` for exact version).
 
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
@@ -84,19 +84,19 @@ pw.expose_secret_mut().clear();
 
 ```toml
 [dependencies]
-secure-gate = "0.8.0-rc.1"
+secure-gate = "0.8.0-rc.2"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.8.0-rc.1", default-features = false }
+secure-gate = { version = "0.8.0-rc.2", default-features = false }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.8.0-rc.1", features = ["full"] }
+secure-gate = { version = "0.8.0-rc.2", features = ["full"] }
 ```
 
 ## Features
