@@ -5,6 +5,17 @@
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
+> **Note:** This is the **active development branch** for secure-gate v0.9.x (`main`).
+> It targets **Rust Edition 2024** and **MSRV 1.85+**, bringing modern Rust language features.
+> For stable, production-ready editions on older Rust versions, see the `release/0.8` branch (v0.8.x).
+
+| Aspect  | **0.9.x** (this branch) | **0.8.x** (`release/0.8`) |
+|---------|:----------------------:|:------------------------:|
+| Edition | 2024                   | 2021                      |
+| MSRV    | 1.85                   | 1.75                      |
+| Status  | Active development     | LTS / stable patches      |
+| Branch  | `main`                 | `release/0.8`             |
+
 Current crates.io version: 0.9.0-rc.1 (see `Cargo.toml` for exact version).
 
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
@@ -13,21 +24,20 @@ Current crates.io version: 0.9.0-rc.1 (see `Cargo.toml` for exact version).
 > Review the code and [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) before production use.
 > No unsafe code — enforced with `#![forbid(unsafe_code)]`.
 
-## What changed in 0.8.0
+## What changed in 0.9.0
 
-- **Zeroize is now mandatory** — memory wiping on drop is always enabled with no feature gate.
-- `Fixed<T>` requires `T: Zeroize`; `Dynamic<T>` requires `T: ?Sized + Zeroize`.
-- Removed the old optional `zeroize` feature and related toggles (`insecure`, `secure`, and `std`).
-- Real `impl Drop` now calls `zeroize()` on the inner value — the documented zeroization guarantee is fully enforced.
-- All previous versions (0.1.0–0.7.0-rc.15) were yanked from crates.io.
-- Greatly expanded zeroization test suite with multi-size coverage, spare-capacity checks for both `Vec` and `String`, runtime heap verification via `ProxyAllocator`, and AddressSanitizer integration.
+- **Rust Edition 2024** — requires Rust ≥ 1.85. Pin `secure-gate = "0.8"` and use the `release/0.8` branch if your toolchain cannot upgrade.
+- **MSRV raised to 1.85** — drops support for toolchains older than Rust 1.85.0 (February 2025).
+- **`rand` 0.9 → 0.10** — internal migration (`OsRng` → `SysRng`, `TryRngCore` → `TryRng`). No public API change; see the [rand 0.10 update guide](https://rust-random.github.io/book/update-0.10.html) if you use `rand` types directly.
+- **`bincode` dev-dependency 1 → 2** — test suite only; no public API change.
+- **Dependencies bumped**: `subtle` 2.5 → 2.6, `zeroize` 1.7 → 1.8, `proptest` 1.0 → 1.10.
 
 ## What You Get
 
 - **Explicit access only** — `.with_secret()` (preferred) or `.expose_secret()` required; no silent `Deref`/`AsRef` leaks
 - **Mandatory zeroize on drop** — always active, no feature gate (inner type must implement `Zeroize`)
 - **Timing-safe equality** — `ct-eq` feature for deterministic constant-time byte comparison (`subtle`)
-- **Secure random generation** — `from_random()` via `OsRng` (`rand` feature)
+- **Secure random generation** — `from_random()` via `SysRng` (`rand` feature)
 - **Orthogonal encoding** — symmetric per-format traits + direct `try_from_*` constructors on `Fixed` and `Dynamic<Vec<u8>>` (hex, base64url, bech32/BIP-173, bech32m/BIP-350); each format is opt-in and zero-overhead when unused
 - **Serde** — direct deserialization to inner types (binary-safe); opt-in serialization requires `SerializableSecret` marker
 - **Ergonomic aliases** — `dynamic_alias!`, `fixed_alias!`, `fixed_generic_alias!`, `dynamic_generic_alias!` for typed newtypes
@@ -84,19 +94,19 @@ pw.expose_secret_mut().clear();
 
 ```toml
 [dependencies]
-secure-gate = "0.8.0-rc.1"
+secure-gate = "0.9.0-rc.1"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.8.0-rc.1", default-features = false }
+secure-gate = { version = "0.9.0-rc.1", default-features = false }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.8.0-rc.1", features = ["full"] }
+secure-gate = { version = "0.9.0-rc.1", features = ["full"] }
 ```
 
 ## Features
@@ -105,7 +115,7 @@ secure-gate = { version = "0.8.0-rc.1", features = ["full"] }
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                             |
 | `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                    |
-| `rand`              | `from_random()` via `OsRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself requires it). |
+| `rand`              | `from_random()` via `SysRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself requires it). |
 | `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                            |
 | `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                                         |
 | `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                                                      |
@@ -255,7 +265,7 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 }
 ```
 
-Cryptographically secure via `OsRng`. `Fixed::from_random()` is heap-free and works in `no_std`/`no_alloc` builds. `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself already requires it). See [`Fixed::from_random`] and [`Dynamic::from_random`] in the [API docs](https://docs.rs/secure-gate).
+Cryptographically secure via `SysRng`. `Fixed::from_random()` is heap-free and works in `no_std`/`no_alloc` builds. `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself already requires it). See [`Fixed::from_random`] and [`Dynamic::from_random`] in the [API docs](https://docs.rs/secure-gate).
 
 ## Security Model
 
