@@ -8,4 +8,4 @@ Benchmarks show:
 
 This makes every access explicit and auditable while preserving performance. Raw arrays are faster to type but far easier to misuse.
 
-See [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for the full model.
+See [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) for the full model.

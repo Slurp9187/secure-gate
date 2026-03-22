@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/secure-gate.svg)](https://crates.io/crates/secure-gate)
 [![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate)
-[![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
+[![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg?branch=release%2F0.8)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml?query=branch%3Arelease%2F0.8)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
 > **Note:** This is the **LTS (Long-Term Support) branch** for secure-gate 0.8.x (`release/0.8`).
@@ -21,7 +21,7 @@ Current crates.io version: 0.8.0-rc.2 (see `Cargo.toml` for exact version).
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
 > **Security Notice**: This crate has **not undergone independent audit**.
-> Review the code and [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) before production use.
+> Review the code and [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) before production use.
 > No unsafe code — enforced with `#![forbid(unsafe_code)]`.
 
 ## What changed in 0.8.0
@@ -48,7 +48,7 @@ Current crates.io version: 0.8.0-rc.2 (see `Cargo.toml` for exact version).
 - **Ergonomic aliases** — `dynamic_alias!`, `fixed_alias!`, `fixed_generic_alias!`, `dynamic_generic_alias!` for typed newtypes
 - **Auditable** — every secret exposure point (including encoding methods) is grep-able using the consolidated pattern shown in the [Encoding](#encoding) section; `no_std` + `alloc` compatible
 
-For zero-cost performance justification see [ZERO_COST_WRAPPERS.md](https://github.com/Slurp9187/secure-gate/blob/main/ZERO_COST_WRAPPERS.md).
+For zero-cost performance justification see [ZERO_COST_WRAPPERS.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/ZERO_COST_WRAPPERS.md).
 
 ## Quick Start
 
@@ -187,7 +187,7 @@ See [`fixed_alias!`], [`dynamic_alias!`], [`fixed_generic_alias!`], and [`dynami
 `fixed_alias!(Name, N)` rejects `N = 0` at compile time (via a const-eval index-out-of-bounds guard).  
 However, `fixed_generic_alias!`, `dynamic_alias!`, and `dynamic_generic_alias!` **allow** zero-sized types (`SecretBuffer<0>`, `Dynamic<[u8; 0]>`, `Dynamic<()>` etc.). These compile successfully but have no cryptographic value and should never be used in production. Always validate that the effective size is > 0 in your unit tests when using the generic or dynamic alias macros.
 
-See also the Best Practices section in [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for the equivalent guidance.
+See also the Best Practices section in [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) for the equivalent guidance.
 
 ### Polymorphic / generic code
 
@@ -279,7 +279,7 @@ Cryptographically secure via `OsRng`. `Fixed::from_random()` is heap-free and wo
 - **Timing-safe equality** — `ct-eq` feature (`.ct_eq()`)
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
 
-Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for the full threat model and mitigations.
+Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) for the full threat model and mitigations.
 
 ## Contributing
 
