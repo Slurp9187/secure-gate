@@ -47,8 +47,10 @@ fn fixed_binary_roundtrip_bincode() {
     impl SerializableSecret for SerializableArray32 {}
 
     let original = SerializableArray32([0xab; 32]);
-    let bytes = bincode::serialize(&original).expect("serialize");
-    let round: SerializableArray32 = bincode::deserialize(&bytes).expect("deserialize");
+    let config = bincode::config::standard();
+    let bytes = bincode::serde::encode_to_vec(&original, config).expect("serialize");
+    let (round, _): (SerializableArray32, _) =
+        bincode::serde::decode_from_slice(&bytes, config).expect("deserialize");
     assert_eq!(original.0, round.0);
 }
 

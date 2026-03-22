@@ -5,7 +5,7 @@
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
-Current crates.io version: 0.8.0-rc.1 (see `Cargo.toml` for exact version).
+Current crates.io version: 0.9.0-rc.1 (see `Cargo.toml` for exact version).
 
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
@@ -270,21 +270,24 @@ Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.m
 
 ### MSRV & Lockfile
 
-This crate enforces MSRV 1.75 (`rust-version = "1.75"` in `Cargo.toml`).
+This crate (`main`, 0.9.x) enforces MSRV 1.85 (`rust-version = "1.85"` in `Cargo.toml`). Rust 1.85 is the minimum that supports **Rust edition 2024**.
 
-**Important:** Always use the MSRV toolchain to update `Cargo.lock`:
+Always use the MSRV toolchain to update `Cargo.lock`:
 
 ```bash
-cargo +1.75 update
+cargo +1.85 update
 git add Cargo.lock
-git commit -m "chore: regenerate Cargo.lock with MSRV 1.75"
+git commit -m "chore: regenerate Cargo.lock with MSRV 1.85"
 ```
 
-Do **not** use a newer toolchain (1.80+, nightly) to update the lockfile — it generates version 4 format, which Cargo 1.75 cannot read, breaking the MSRV CI job with:
+### Dual-track support
 
-```
-lock file version `4` was found, but this version of Cargo does not understand this lock file
-```
+| Branch | Crate version | Rust edition | MSRV | Status |
+|---|---|---|---|---|
+| `main` | 0.9.x | 2024 | 1.85 | Active development |
+| `release/0.8` | 0.8.x | 2021 | 1.75 | LTS — security patches only |
+
+**Users on Rust < 1.85:** pin `secure-gate = "0.8"` in `Cargo.toml`. The `release/0.8` branch is maintained for security patches and important bug fixes backported from `main`.
 
 ## License
 

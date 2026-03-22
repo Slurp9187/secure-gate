@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.1] - 2026-03-22
+
+### Breaking Changes
+
+- **Rust edition 2021 → 2024** — requires Rust ≥ 1.85 to build. Users who cannot upgrade to Rust 1.85 should pin `secure-gate = "0.8"` and track the `release/0.8` LTS branch (edition 2021, MSRV 1.75, security patches backported).
+
+- **`rust-version` raised 1.75 → 1.85** — drops support for toolchains older than Rust 1.85.0 (released February 2025). The 0.8.x line on `release/0.8` continues to support Rust 1.75 and older for users who cannot upgrade.
+
+- **`rand` 0.9 → 0.10** (`src/fixed.rs`) — `rand_core::OsRng` has been replaced by `rand::rngs::SysRng`; the trait `TryRngCore` has been renamed to `TryRng`. If you depend on the `rand` feature and call `Fixed::from_random()`, no API change is visible — the migration is internal. If you use `rand` types directly alongside this crate, consult the [rand 0.10 update guide](https://rust-random.github.io/book/update-0.10.html).
+
+### Changed
+
+- **`bincode` dev-dependency 1 → 2** — the binary serde round-trip test (`tests/serde_suite/roundtrip.rs`) has been updated to the bincode 2 serde-compat API (`bincode::serde::encode_to_vec` / `bincode::serde::decode_from_slice`). This only affects running the test suite; there is no public API change.
+
+### Dependencies
+
+- `rand` (optional): 0.9 → **0.10** (MSRV 1.85)
+- `subtle` (optional): 2.5 → **2.6**
+- `zeroize`: 1.7 → **1.8** (aligns with fuzz workspace)
+- `bincode` (dev): 1 → **2** (MSRV 1.85)
+- `proptest` (dev): 1.0 → **1.10** (MSRV 1.84)
+- `arbitrary` (fuzz): 1.3 → **1.4**
+
 ## [0.8.0-rc.1] - 2026-03-21
 
 ### Breaking Changes

@@ -107,34 +107,35 @@ jobs:
   # MSRV job — verify declared rust-version is actually buildable
   #
   # Runs `cargo check` (not full tests) on the MSRV toolchain to catch any
-  # accidental use of post-1.75 APIs before they reach a release. Clippy's
+  # accidental use of post-1.85 APIs before they reach a release. This crate
+  # uses Rust edition 2024, which requires rustc ≥ 1.85.0. Clippy's
   # --version-lint flag catches MSRV violations in the main `test` job, but
   # a real toolchain check is the authoritative guard.
   # ---------------------------------------------------------------------------
   msrv:
-    name: MSRV – cargo check (1.75)
+    name: MSRV – cargo check (1.85)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust 1.75
+      - name: Install Rust 1.85
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: "1.75"
+          toolchain: "1.85"
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
       - name: Update Cargo.lock with MSRV toolchain
-        run: cargo +1.75 update
+        run: cargo +1.85 update
 
       - name: cargo check – default features
-        run: cargo +1.75 check
+        run: cargo +1.85 check
 
       - name: cargo check – full features
-        run: cargo +1.75 check --features=full
+        run: cargo +1.85 check --features=full
 
   # ---------------------------------------------------------------------------
   # AddressSanitizer job — heap zeroization oracle

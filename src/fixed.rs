@@ -24,7 +24,7 @@ use crate::traits::encoding::base64_url::ToBase64Url;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{rngs::OsRng, TryRngCore};
+use rand::{rngs::SysRng, TryRng};
 use zeroize::Zeroize;
 
 #[cfg(feature = "encoding-base64")]
@@ -147,9 +147,9 @@ impl<const N: usize> Fixed<[u8; N]> {
     #[inline]
     pub fn from_random() -> Self {
         let mut bytes = [0u8; N];
-        OsRng
+        SysRng
             .try_fill_bytes(&mut bytes)
-            .expect("OsRng failure is a program error");
+            .expect("SysRng failure is a program error");
         Self::from(bytes)
     }
 }

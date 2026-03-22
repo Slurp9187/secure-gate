@@ -35,7 +35,7 @@ use crate::traits::encoding::base64_url::ToBase64Url;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{rngs::OsRng, TryRngCore};
+use rand::{rngs::SysRng, TryRng};
 
 #[cfg(feature = "encoding-base64")]
 use crate::traits::decoding::base64_url::FromBase64UrlStr;
@@ -230,9 +230,9 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     #[inline]
     pub fn from_random(len: usize) -> Self {
         let mut bytes = vec![0u8; len];
-        OsRng
+        SysRng
             .try_fill_bytes(&mut bytes)
-            .expect("OsRng failure is a program error");
+            .expect("SysRng failure is a program error");
         Self::from(bytes)
     }
 }
