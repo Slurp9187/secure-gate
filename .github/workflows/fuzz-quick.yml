@@ -6,13 +6,14 @@ permissions:
 
 on:
   push:
-    branches: [main]
+    branches: [release/0.8]
     tags: ["v*.*.*"]
     paths:
       - "fuzz/**"
       - "src/**"
       - "Cargo.toml"
   pull_request:
+    branches: [release/0.8]
     paths:
       - "fuzz/**"
       - "src/**"

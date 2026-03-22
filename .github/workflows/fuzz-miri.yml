@@ -8,7 +8,7 @@ on:
     - cron: "0 0 * * 0" # Every Sunday at 00:00 UTC
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [release/0.8]
     paths:
       - "src/**"
       - "fuzz/**"
