@@ -28,7 +28,7 @@ Current crates.io version: 0.8.0-rc.1 (see `Cargo.toml` for exact version).
 - **Mandatory zeroize on drop** — always active, no feature gate (inner type must implement `Zeroize`)
 - **Timing-safe equality** — `ct-eq` feature for deterministic constant-time byte comparison (`subtle`)
 - **Secure random generation** — `from_random()` via `OsRng` (`rand` feature)
-- **Orthogonal encoding** — symmetric per-format traits (hex, base64url, bech32/BIP-173, bech32m/BIP-350); each format is opt-in and zero-overhead when unused
+- **Orthogonal encoding** — symmetric per-format traits + direct `try_from_*` constructors on `Fixed` and `Dynamic<Vec<u8>>` (hex, base64url, bech32/BIP-173, bech32m/BIP-350); each format is opt-in and zero-overhead when unused
 - **Serde** — direct deserialization to inner types (binary-safe); opt-in serialization requires `SerializableSecret` marker
 - **Ergonomic aliases** — `dynamic_alias!`, `fixed_alias!`, `fixed_generic_alias!`, `dynamic_generic_alias!` for typed newtypes
 - **Auditable** — every secret exposure point (including encoding methods) is grep-able using the consolidated pattern shown in the [Encoding](#encoding) section; `no_std` + `alloc` compatible
@@ -184,145 +184,58 @@ fn log_length<S: RevealSecret>(secret: &S) {
 }
 ```
 
-### Encoding
+## Encoding & Decoding
 
-Convert secrets into human-readable strings.
-
-| Format                | Method                          | Output   | Notes                                         |
-| --------------------- | ------------------------------- | -------- | --------------------------------------------- |
-| **Hex**               | `.to_hex()` / `.to_hex_upper()` | `String` | Direct on both `Fixed` and `Dynamic<Vec<u8>>` |
-| **Base64URL**         | `.to_base64url()`               | `String` | Unpadded, URL-safe                            |
-| **Bech32 (BIP-173)**  | `.try_to_bech32(hrp)`           | `String` | Supports large payloads (~5 KB)               |
-| **Bech32m (BIP-350)** | `.try_to_bech32m(hrp)`          | `String` | Best for Bitcoin/Taproot compatibility        |
-
-### Decoding
-
-Convert strings back into secure wrappers. **Always wrap the result immediately** into `Fixed` or `Dynamic`.
-
-| Format                | Type      | Method                                                                   | Returns                       | Recommendation                                           |
-| --------------------- | --------- | ------------------------------------------------------------------------ | ----------------------------- | -------------------------------------------------------- |
-| **Hex**               | Validated | `"…".try_from_hex()`                                                     | `Vec<u8>`                     | Use this                                                 |
-| **Base64URL**         | Validated | `"…".try_from_base64url()`                                               | `Vec<u8>`                     | Use this                                                 |
-| **Bech32 (BIP-173)**  | Validated | `Fixed::try_from_bech32(s, hrp)`<br>`Dynamic::try_from_bech32(s, hrp)`   | `Fixed` or `Dynamic<Vec<u8>>` | **Strongly preferred** (prevents cross-protocol attacks) |
-| **Bech32 (BIP-173)**  | Unchecked | `.try_from_bech32_unchecked()`                                           | `Vec<u8>`                     | Only when HRP validation is intentionally skipped        |
-| **Bech32m (BIP-350)** | Validated | `Fixed::try_from_bech32m(s, hrp)`<br>`Dynamic::try_from_bech32m(s, hrp)` | `Fixed` or `Dynamic<Vec<u8>>` | **Strongly preferred** (prevents cross-protocol attacks) |
-| **Bech32m (BIP-350)** | Unchecked | `.try_from_bech32m_unchecked()`                                          | `Vec<u8>`                     | Only when HRP validation is intentionally skipped        |
-
-> **Tip**: For large secrets or arbitrary binary data, prefer **Bech32 (BIP-173)** — it supports much larger payloads than Bech32m.
-
-### Patterns
-
-**Direct convenience method — ergonomically safest for single operations**
-
-No reference in the caller's hands; the exposure is entirely internal and cannot be misused. Recommended for the common single-encode case.
-
-```rust
-#[cfg(feature = "encoding-hex")]
-{
-    use secure_gate::{Fixed, ToHex};
-    let key = Fixed::new([0u8; 32]);
-    let hex: String = key.to_hex();
-}
-```
-
-> **Audit note**: Direct calls do not appear in `grep expose_secret` or `grep with_secret` sweeps — see the consolidated grep command at the end of this section.
-
-**`with_secret` closure — best for multi-step operations and audit-first teams**
-
-The borrow checker enforces that the inner reference cannot escape the closure. Preferred when the inner bytes are needed for more than one operation; shows up in `grep with_secret` sweeps.
-
-```rust
-#[cfg(feature = "encoding-bech32")]
-{
-    use secure_gate::{Fixed, ToBech32, RevealSecret};
-    let key = Fixed::new([0u8; 32]);
-    // Encode and decode in the same scoped access
-    let encoded = key.with_secret(|b| b.try_to_bech32("key")).unwrap();
-}
-```
-
-**Manual `expose_secret` + encode — escape hatch only**
-
-Chaining immediately (`key.expose_secret().to_hex()`) is safe — the reference is dropped at the semicolon. The danger is binding to a named variable:
-
-```rust
-#[cfg(feature = "encoding-hex")]
-{
-    use secure_gate::{Fixed, RevealSecret, ToHex};
-    let key = Fixed::new([0u8; 32]);
-    // Dangerous: reference outlives the encoding call
-    let bytes = key.expose_secret();
-    // ... bytes can now be passed to other fns, stored in structs, etc. ...
-    let hex = bytes.to_hex();
-}
-```
-
-Use only when inner bytes must be passed to code that does not know about `secure-gate` (FFI, third-party APIs taking `&[u8]` directly). Keep the binding as short-lived as possible.
-
-### Bech32 decoding — prefer HRP-validated constructors
-
-When decoding Bech32/Bech32m into a secret wrapper, use the HRP-validating inherent methods on `Fixed` and `Dynamic` rather than the `_unchecked` variants:
-
-```rust
-#[cfg(feature = "encoding-bech32")]
-{
-    use secure_gate::Fixed;
-
-    // BIP-173 test vector — valid checksum, HRP = "abcdef", payload = 20 bytes
-    let encoded_str = "abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw";
-
-    // Preferred: validates HRP, returns Bech32Error::UnexpectedHrp on mismatch
-    let key = Fixed::<[u8; 20]>::try_from_bech32(encoded_str, "abcdef")
-        .expect("valid bech32 with correct HRP");
-
-    // Avoid in security-critical code: accepts any HRP silently
-    // let key = Fixed::<[u8; 20]>::try_from_bech32_unchecked(encoded_str).expect("valid bech32");
-    let _ = key;
-}
-```
-
-Validated `try_from_bech32` / `try_from_bech32m` on `Fixed` and `Dynamic` compare HRP case-insensitively and prevent cross-protocol confusion attacks.
+`secure-gate` provides symmetric, zero-overhead encoding and decoding for four formats: hex, base64url, bech32 (BIP-173), and bech32m (BIP-350). All operations are explicit and return `Result` on failure.
 
 ### Available traits
 
-| Format            | Encode        | Decode                                                                     | Infallible?           | Feature            |
-| ----------------- | ------------- | -------------------------------------------------------------------------- | --------------------- | ------------------ |
-| Hex               | `ToHex`       | `FromHexStr`                                                               | Encode yes, decode no | `encoding-hex`     |
-| Base64URL         | `ToBase64Url` | `FromBase64UrlStr`                                                         | Encode yes, decode no | `encoding-base64`  |
-| Bech32 (BIP-173)  | `ToBech32`    | `FromBech32Str` / `Fixed::try_from_bech32` / `Dynamic::try_from_bech32`    | No                    | `encoding-bech32`  |
-| Bech32m (BIP-350) | `ToBech32m`   | `FromBech32mStr` / `Fixed::try_from_bech32m` / `Dynamic::try_from_bech32m` | No                    | `encoding-bech32m` |
+| Format            | Encode        | Decode             | Feature            |
+| ----------------- | ------------- | ------------------ | ------------------ |
+| Hex               | `ToHex`       | `FromHexStr`       | `encoding-hex`     |
+| Base64URL         | `ToBase64Url` | `FromBase64UrlStr` | `encoding-base64`  |
+| Bech32 (BIP-173)  | `ToBech32`    | `FromBech32Str`    | `encoding-bech32`  |
+| Bech32m (BIP-350) | `ToBech32m`   | `FromBech32mStr`   | `encoding-bech32m` |
 
-**Decode-side note**: Decoded bytes are plaintext from the moment of decoding until they are wrapped. Wrap the result immediately — avoid binding the intermediate `Vec<u8>` to a long-lived variable.
+### Encoding (to string)
 
-**Auditing encoding exposure**: Direct wrapper calls (`to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`) do not appear in a standard `expose_secret` / `with_secret` grep. Use `rg`, `grep -rn`, or your editor's project-wide search for these method names:
-
-```
-expose_secret  expose_secret_mut  with_secret  with_secret_mut
-to_hex  to_base64url  try_to_bech32  try_to_bech32m
-```
-
-See [`ToHex`], [`ToBech32`], [`FromHexStr`], and sibling traits in the [API docs](https://docs.rs/secure-gate) for full method listings and error types.
-
-## Equality
-
-Enable the **`ct-eq`** feature and use **`.ct_eq()`** for all secret comparisons. It is deterministic, constant-time (via `subtle`), and exact — suitable for keys, nonces, MACs, tags, signatures, and variable-length secrets.
-
-**Never use plain `==`** on secrets (`==` is not implemented on the wrappers).
+Use trait methods on the wrapper:
 
 ```rust
-#[cfg(feature = "ct-eq")]
-{
-    use secure_gate::{Dynamic, Fixed, ConstantTimeEq};
+let key: Fixed<[u8; 32]> = ...;
 
-    let key_a = Fixed::new([0xAAu8; 32]);
-    let key_b = Fixed::new([0xAAu8; 32]);
-    assert!(key_a.ct_eq(&key_b));
-
-    let blob_a: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
-    let blob_b: Dynamic<Vec<u8>> = vec![1, 2, 3].into();
-    assert!(blob_a.ct_eq(&blob_b));
-}
+let hex    = key.to_hex();             // String
+let b64    = key.to_base64url();       // String
+let bech32 = key.try_to_bech32("bc")?; // String with HRP
+let bech32m = key.try_to_bech32m("bc")?; // String with HRP
 ```
+
+### Direct Constructors (Recommended)
+
+Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from strings. These use panic-safe `Zeroizing` + pre-alloc swap internally.
+
+| Format              | `Fixed<[u8; N]>`                       | `Dynamic<Vec<u8>>`                       | Notes                                       |
+| ------------------- | -------------------------------------- | ---------------------------------------- | ------------------------------------------- |
+| Hex                 | `Fixed::try_from_hex(s)`               | `Dynamic::try_from_hex(s)`               | `HexError`                                  |
+| Base64URL           | `Fixed::try_from_base64url(s)`         | `Dynamic::try_from_base64url(s)`         | `Base64Error` (unpadded, URL-safe)          |
+| Bech32 (BIP-173)    | `Fixed::try_from_bech32(s, hrp)`       | `Dynamic::try_from_bech32(s, hrp)`       | HRP validated; `Bech32Error::UnexpectedHrp` |
+| Bech32 (unchecked)  | `Fixed::try_from_bech32_unchecked(s)`  | `Dynamic::try_from_bech32_unchecked(s)`  | No HRP; `Bech32Error`                       |
+| Bech32m (BIP-350)   | `Fixed::try_from_bech32m(s, hrp)`      | `Dynamic::try_from_bech32m(s, hrp)`      | HRP validated; `Bech32Error::UnexpectedHrp` |
+| Bech32m (unchecked) | `Fixed::try_from_bech32m_unchecked(s)` | `Dynamic::try_from_bech32m_unchecked(s)` | No HRP; `Bech32Error`                       |
+
+**Security notes**:
+
+- Prefer HRP-validated constructors to prevent cross-protocol confusion attacks.
+- Use `_unchecked` only when HRP is validated upstream.
+- All constructors guarantee zeroization even on OOM panic via `Zeroizing`.
+
+### Audit Surface (All Secret Materialization)
+
+All encoding and direct decoding bypass `expose_secret` / `with_secret`. Audit with project-wide search (`rg`, IDE “find in files”) for **every** name below:
+
+- **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
+- **Encode:** `to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`
+- **Decode:** `try_from_hex`, `try_from_base64url`, `try_from_bech32`, `try_from_bech32m`
 
 ## Serde
 
