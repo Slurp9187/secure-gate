@@ -239,15 +239,19 @@ Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from st
 - Use `_unchecked` only when HRP is validated upstream.
 - All constructors guarantee zeroization even on OOM panic via `Zeroizing`.
 
-### Audit Surface (All Secret Materialization)
+## Audit Surface (Secret Materialization)
 
-All encoding and direct decoding methods internally use scoped `with_secret` access — they do **not** bypass the security model, but they still materialize the full secret contents.
+Encoding and decoding methods are **convenience wrappers** that internally use scoped `with_secret` access — they do **not** bypass the security model, but return the fully materialized encoded value.
 
-Audit them as exposure points by searching for:
+They exist because users who call them have already decided to reveal the secret — the wrapper reduces boilerplate and avoids long-lived raw references.
+
+**Audit every exposure point** by searching your codebase for:
 
 - **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
 - **Encode:** `to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`
-- **Decode:** `try_from_hex`, `try_from_base64url`, `try_from_bech32`, `try_from_bech32m` (and `_unchecked` variants)
+- **Decode:** `try_from_hex`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
+
+**Best practice**: Prefer scoped methods (`with_secret` / `with_secret_mut`) when possible — they keep exposure minimal.
 
 ## Serde
 
