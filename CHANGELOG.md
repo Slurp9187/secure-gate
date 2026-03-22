@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`bincode` dev-dependency 1 → 2** — the binary serde round-trip test (`tests/serde_suite/roundtrip.rs`) has been updated to the bincode 2 serde-compat API (`bincode::serde::encode_to_vec` / `bincode::serde::decode_from_slice`). This only affects running the test suite; there is no public API change.
 
+- **Proptest coverage** — added comprehensive property-based round-trip tests for `encoding-bech32` and `encoding-bech32m` in `tests/proptest_suite/encoding.rs`. This brings bech32/bech32m to the same level of randomized testing as hex and base64url, exercising arbitrary payloads and HRP values.
+
 ### Dependencies
 
 - `rand` (optional): 0.9 → **0.10** (MSRV 1.85)
