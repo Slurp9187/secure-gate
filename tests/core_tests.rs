@@ -1,4 +1,3 @@
-// tests/core_tests.rs
 // Core API tests for Fixed<T> and Dynamic<T> — v0.8.0 style
 
 #[cfg(feature = "cloneable")]

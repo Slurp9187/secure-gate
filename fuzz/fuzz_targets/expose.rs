@@ -1,5 +1,3 @@
-// fuzz/fuzz_targets/expose.rs
-//
 // FINAL v0.8.0 — no more circles, no more nightly drama.
 // The crash was integer overflow in `sum::<u8>()` on all-0xFF arrays (the new corpus input).
 // Fixed with `sum::<u32>()` + stronger early-return on tiny seeds.

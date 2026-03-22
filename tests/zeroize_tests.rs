@@ -1,4 +1,3 @@
-//! tests/zeroize_tests.rs
 //! Zeroization behavior tests for Fixed<T> and Dynamic<T>.
 //!
 //! This is the canonical test for v0.8.0's mandatory zeroize-on-drop guarantee.

@@ -1,5 +1,3 @@
-// fuzz/fuzz_targets/encoding.rs
-//
 // Encoding/decoding round-trip fuzz target for secure-gate v0.8.0.
 // Tests hex, base64url, bech32, and bech32m formats with both valid and arbitrary inputs.
 //

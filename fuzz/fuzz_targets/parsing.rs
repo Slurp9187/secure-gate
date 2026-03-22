@@ -1,5 +1,3 @@
-// fuzz/fuzz_targets/parsing.rs
-//
 // Fuzz target for all parsing/conversion paths — Dynamic<String>, Dynamic<Vec<u8>>,
 // Fixed<[u8;N]>, From/TryFrom conversions, UTF-8 boundary stress, len consistency.
 // Updated for v0.8.0: explicit exposure everywhere, no Deref.

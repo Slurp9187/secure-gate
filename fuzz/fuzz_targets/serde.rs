@@ -1,5 +1,3 @@
-// fuzz/fuzz_targets/serde.rs
-//
 // Serde serialize/deserialize round-trip fuzz target for secure-gate v0.8.0.
 //
 // Tests the serde paths flagged in AUDIT.md (F-02: intermediate Vec in Fixed
