@@ -5,6 +5,17 @@
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
+> **Note:** This is the **LTS (Long-Term Support) branch** for secure-gate 0.8.x (`release/0.8`).
+> It targets **Rust Edition 2021** and **MSRV 1.75**, making it the right choice for projects
+> that cannot yet move to Rust 1.85+. For the latest features see the `main` branch (v0.9.x).
+
+| Aspect  | **0.8.x** (this branch) | **0.9.x** (`main`) |
+|---------|:-----------------------:|:------------------:|
+| Edition | 2021                    | 2024               |
+| MSRV    | 1.75                    | 1.85               |
+| Status  | LTS / stable patches    | Active development |
+| Branch  | `release/0.8`           | `main`             |
+
 Current crates.io version: 0.8.0-rc.2 (see `Cargo.toml` for exact version).
 
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
