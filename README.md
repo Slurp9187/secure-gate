@@ -9,7 +9,7 @@
 > It targets **Rust Edition 2024** and **MSRV 1.85+**, bringing modern Rust language features.
 > For stable, production-ready editions on older Rust versions, see the `release/0.8` branch (v0.8.x).
 
-| Aspect  | **0.9.x** (this branch) | **0.8.x** (`release/0.8`) |
+| Aspect  | **0.9.x**| **0.8.x** |
 |---------|:----------------------:|:------------------------:|
 | Edition | 2024                   | 2021                      |
 | MSRV    | 1.85                   | 1.75                      |
@@ -241,11 +241,13 @@ Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from st
 
 ### Audit Surface (All Secret Materialization)
 
-All encoding and direct decoding bypass `expose_secret` / `with_secret`. Audit with project-wide search (`rg`, IDE “find in files”) for **every** name below:
+All encoding and direct decoding methods internally use scoped `with_secret` access — they do **not** bypass the security model, but they still materialize the full secret contents.
+
+Audit them as exposure points by searching for:
 
 - **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
 - **Encode:** `to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`
-- **Decode:** `try_from_hex`, `try_from_base64url`, `try_from_bech32`, `try_from_bech32m`
+- **Decode:** `try_from_hex`, `try_from_base64url`, `try_from_bech32`, `try_from_bech32m` (and `_unchecked` variants)
 
 ## Serde
 
