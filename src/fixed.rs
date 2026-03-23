@@ -144,6 +144,28 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecretMut for Fixed<[T; N]> {
 
 #[cfg(feature = "rand")]
 impl<const N: usize> Fixed<[u8; N]> {
+    /// Fills a new `[u8; N]` with cryptographically secure random bytes and wraps it.
+    ///
+    /// Uses the system RNG ([`SysRng`](rand::rngs::SysRng)). Requires the `rand` feature.
+    /// Heap-free and works in `no_std` / `no_alloc` builds.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS RNG fails to provide bytes ([`TryRng::try_fill_bytes`](rand::TryRng::try_fill_bytes)
+    /// returns `Err`). This is treated as a fatal environment error.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "rand")]
+    /// use secure_gate::{Fixed, RevealSecret};
+    ///
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// let key: Fixed<[u8; 32]> = Fixed::from_random();
+    /// assert_eq!(key.len(), 32);
+    /// # }
+    /// ```
     #[inline]
     pub fn from_random() -> Self {
         let mut bytes = [0u8; N];

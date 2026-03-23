@@ -35,7 +35,7 @@ use crate::traits::encoding::base64_url::ToBase64Url;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{rngs::SysRng, TryRng};
+use rand::{TryRng, rngs::SysRng};
 
 #[cfg(feature = "encoding-base64")]
 use crate::traits::decoding::base64_url::FromBase64UrlStr;
@@ -227,6 +227,28 @@ impl<T: zeroize::Zeroize> crate::RevealSecretMut for Dynamic<Vec<T>> {
 // Random generation
 #[cfg(feature = "rand")]
 impl Dynamic<alloc::vec::Vec<u8>> {
+    /// Fills a new `Vec<u8>` with `len` cryptographically secure random bytes and wraps it.
+    ///
+    /// Uses the system RNG ([`SysRng`](rand::rngs::SysRng)). Requires the `rand` feature (and
+    /// `alloc`, which `Dynamic<Vec<u8>>` always needs).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS RNG fails to provide bytes ([`TryRng::try_fill_bytes`](rand::TryRng::try_fill_bytes)
+    /// returns `Err`). This is treated as a fatal environment error.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "alloc", feature = "rand"))]
+    /// use secure_gate::{Dynamic, RevealSecret};
+    ///
+    /// # #[cfg(all(feature = "alloc", feature = "rand"))]
+    /// # {
+    /// let nonce: Dynamic<Vec<u8>> = Dynamic::from_random(24);
+    /// assert_eq!(nonce.len(), 24);
+    /// # }
+    /// ```
     #[inline]
     pub fn from_random(len: usize) -> Self {
         let mut bytes = vec![0u8; len];
