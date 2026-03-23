@@ -64,5 +64,11 @@
 //!
 //! This trait is a **marker only** — it has no methods and adds no runtime behavior.
 //! It exists solely to gate `Serialize` (and optionally `Deserialize`) on wrapper types.
+
+/// Marker trait that opts a secret type into serialization.
+///
+/// No methods — its only purpose is to gate the `Serialize` impl on
+/// [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic).
+/// Requires the `serde-serialize` feature.
 #[cfg(feature = "serde-serialize")]
 pub trait SerializableSecret: serde::Serialize {}

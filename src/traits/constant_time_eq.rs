@@ -51,6 +51,10 @@
 //! - `Vec<u8>` / `String` (when `alloc` feature is enabled)
 //!
 //! These cover the most common secret types in cryptographic applications.
+
+/// Constant-time equality comparison, preventing timing side-channel attacks.
+///
+/// Requires the `ct-eq` feature. Backed by the [`subtle`] crate internally.
 #[cfg(feature = "ct-eq")]
 pub trait ConstantTimeEq {
     /// Performs equality comparison in constant time.

@@ -84,18 +84,30 @@ impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
 
 /// Ergonomic encoding helpers for `Fixed<[u8; N]>`.
 impl<const N: usize> Fixed<[u8; N]> {
+    /// Encodes the secret bytes as a lowercase hex string.
+    ///
+    /// Delegates to [`ToHex::to_hex`](crate::ToHex::to_hex) on the inner `[u8; N]`.
+    /// Requires the `encoding-hex` feature.
     #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex(&self) -> alloc::string::String {
         self.with_secret(|s: &[u8; N]| s.to_hex())
     }
 
+    /// Encodes the secret bytes as an uppercase hex string.
+    ///
+    /// Delegates to [`ToHex::to_hex_upper`](crate::ToHex::to_hex_upper) on the inner `[u8; N]`.
+    /// Requires the `encoding-hex` feature.
     #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex_upper(&self) -> alloc::string::String {
         self.with_secret(|s: &[u8; N]| s.to_hex_upper())
     }
 
+    /// Encodes the secret bytes as an unpadded Base64url string.
+    ///
+    /// Delegates to [`ToBase64Url::to_base64url`](crate::ToBase64Url::to_base64url) on the inner `[u8; N]`.
+    /// Requires the `encoding-base64` feature.
     #[cfg(feature = "encoding-base64")]
     #[inline]
     pub fn to_base64url(&self) -> alloc::string::String {
@@ -178,6 +190,22 @@ impl<const N: usize> Fixed<[u8; N]> {
 
 #[cfg(feature = "encoding-hex")]
 impl<const N: usize> Fixed<[u8; N]> {
+    /// Decodes a lowercase hex string into `Fixed<[u8; N]>`.
+    ///
+    /// The decoded bytes are held in a `Zeroizing<Vec<u8>>` until copied onto
+    /// the stack array, so the temporary heap buffer is zeroed even if a panic
+    /// occurs mid-flight.
+    ///
+    /// # Errors
+    ///
+    /// Returns `HexError::InvalidLength` if the decoded length does not equal `N`,
+    /// or a parse error if the input is not valid hex.
+    ///
+    /// # Note
+    ///
+    /// Unlike [`Dynamic::try_from_hex`](crate::Dynamic::try_from_hex), the secret
+    /// lives on the stack inside a `[u8; N]`. Stack residue behaviour after the
+    /// `Fixed` is dropped and zeroized is discussed in `SECURITY.md`.
     pub fn try_from_hex(hex: &str) -> Result<Self, crate::error::HexError> {
         let bytes = zeroize::Zeroizing::new(hex.try_from_hex()?);
         if bytes.len() != N {
@@ -197,6 +225,22 @@ impl<const N: usize> Fixed<[u8; N]> {
 
 #[cfg(feature = "encoding-base64")]
 impl<const N: usize> Fixed<[u8; N]> {
+    /// Decodes an unpadded Base64url string into `Fixed<[u8; N]>`.
+    ///
+    /// The decoded bytes are held in a `Zeroizing<Vec<u8>>` until copied onto
+    /// the stack array, so the temporary heap buffer is zeroed even if a panic
+    /// occurs mid-flight.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Base64Error::InvalidLength` if the decoded length does not equal `N`,
+    /// or a parse error if the input is not valid Base64url.
+    ///
+    /// # Note
+    ///
+    /// Unlike [`Dynamic::try_from_base64url`](crate::Dynamic::try_from_base64url), the
+    /// secret lives on the stack inside a `[u8; N]`. Stack residue behaviour after the
+    /// `Fixed` is dropped and zeroized is discussed in `SECURITY.md`.
     pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
         let bytes = zeroize::Zeroizing::new(s.try_from_base64url()?);
         if bytes.len() != N {

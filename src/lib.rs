@@ -2,6 +2,7 @@
 
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
 //! secure-gate — Secure secret wrappers with explicit access & automatic zeroization
 //!

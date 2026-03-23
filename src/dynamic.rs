@@ -57,6 +57,15 @@ pub struct Dynamic<T: ?Sized + zeroize::Zeroize> {
 }
 
 impl<T: ?Sized + zeroize::Zeroize> Dynamic<T> {
+    /// Wraps `value` in a `Box<T>` and returns a `Dynamic<T>`.
+    ///
+    /// Accepts any type that implements `Into<Box<T>>` — including owned values,
+    /// `Box<T>`, `String`, `Vec<u8>`, `&str` (via the blanket `From<&str>` impl), etc.
+    ///
+    /// Equivalent to `Dynamic::from(value)` — `#[doc(alias = "from")]` is set so both
+    /// names appear in docs.rs search.
+    ///
+    /// Requires the `alloc` feature (which `Dynamic<T>` itself always requires).
     #[doc(alias = "from")]
     #[inline(always)]
     pub fn new<U>(value: U) -> Self
@@ -101,18 +110,30 @@ impl<T: 'static + zeroize::Zeroize> From<T> for Dynamic<T> {
 
 // Encoding helpers for Dynamic<Vec<u8>>
 impl Dynamic<Vec<u8>> {
+    /// Encodes the secret bytes as a lowercase hex string.
+    ///
+    /// Delegates to [`ToHex::to_hex`](crate::ToHex::to_hex) on the inner `Vec<u8>`.
+    /// Requires the `encoding-hex` feature.
     #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex(&self) -> alloc::string::String {
         self.with_secret(|s: &Vec<u8>| s.to_hex())
     }
 
+    /// Encodes the secret bytes as an uppercase hex string.
+    ///
+    /// Delegates to [`ToHex::to_hex_upper`](crate::ToHex::to_hex_upper) on the inner `Vec<u8>`.
+    /// Requires the `encoding-hex` feature.
     #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex_upper(&self) -> alloc::string::String {
         self.with_secret(|s: &Vec<u8>| s.to_hex_upper())
     }
 
+    /// Encodes the secret bytes as an unpadded Base64url string.
+    ///
+    /// Delegates to [`ToBase64Url::to_base64url`](crate::ToBase64Url::to_base64url) on the inner `Vec<u8>`.
+    /// Requires the `encoding-base64` feature.
     #[cfg(feature = "encoding-base64")]
     #[inline]
     pub fn to_base64url(&self) -> alloc::string::String {

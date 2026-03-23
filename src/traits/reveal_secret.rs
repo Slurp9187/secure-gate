@@ -87,6 +87,14 @@
 //! Long-lived `expose_secret()` references can defeat scoping — the borrow outlives the
 //! call site and the compiler cannot enforce that the secret is not retained. This is an
 //! intentional escape hatch for FFI and legacy APIs; audit every call site.
+
+/// Read-only access to a wrapped secret.
+///
+/// Implemented by [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic).
+/// Prefer the scoped [`with_secret`](Self::with_secret) method; use
+/// [`expose_secret`](Self::expose_secret) only when a long-lived reference is
+/// unavoidable. See [`RevealSecretMut`](crate::RevealSecretMut) for the mutable
+/// counterpart.
 pub trait RevealSecret {
     /// The inner secret type being revealed.
     ///
