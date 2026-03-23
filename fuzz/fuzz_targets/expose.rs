@@ -1,8 +1,6 @@
-// fuzz/fuzz_targets/expose.rs
-//
-// FINAL v0.8.0 — no more circles, no more nightly drama.
-// The crash was integer overflow in `sum::<u8>()` on all-0xFF arrays (the new corpus input).
-// Fixed with `sum::<u32>()` + stronger early-return on tiny seeds.
+// Fuzz target for `RevealSecret` / `RevealSecretMut` on `Fixed` and `Dynamic` (Vec, String).
+// Stresses `expose_secret*`, `with_secret*`, mutation, borrowing, `Debug` redaction, and helpers.
+// Short inputs return early; aggregations over bytes use a wider integer type to avoid overflow.
 
 #![no_main]
 use arbitrary::{Arbitrary, Unstructured};
@@ -13,7 +11,7 @@ use secure_gate_fuzz::arbitrary::{FuzzDynamicString, FuzzDynamicVec};
 
 fuzz_target!(|data: &[u8]| {
     if data.len() < 16 {
-        // reject the exact crashing seed [10] and anything too small
+        // Too little entropy for structured `Arbitrary` construction.
         return;
     }
 
@@ -109,7 +107,7 @@ fuzz_target!(|data: &[u8]| {
 
     // 10. with_secret / with_secret_mut scoped coverage
     {
-        // FIXED: map to u32 to avoid u8 overflow + compile error
+        // Widen to u32 so summing arbitrary byte patterns cannot overflow.
         let _sum = fixed_key.with_secret(|arr| arr.iter().map(|&b| b as u32).sum::<u32>());
         let _len = dyn_vec.with_secret(|v| v.len());
         let _str_len = dyn_str.with_secret(|s| s.len());

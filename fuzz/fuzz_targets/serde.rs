@@ -1,13 +1,9 @@
-// fuzz/fuzz_targets/serde.rs
+// Serde serialize/deserialize round-trip fuzz target for `secure-gate`.
 //
-// Serde serialize/deserialize round-trip fuzz target for secure-gate v0.8.0.
-//
-// Tests the serde paths flagged in AUDIT.md (F-02: intermediate Vec in Fixed
-// deserialization; F-03: encoding constructors). Exercises:
-//   - Deserialize for Fixed<[u8; 32]>, Dynamic<String>, Dynamic<Vec<u8>>
-//   - Serialize for a locally-defined SerializableSecretVec wrapper
-//   - Malformed JSON → graceful error (no panic)
-//   - Corrupted-JSON round-trip → deserialize error (no panic)
+// Stresses high-value serde paths: `Deserialize` for `Fixed<[u8; 32]>`, `Dynamic<String>`,
+// and `Dynamic<Vec<u8>>` (including intermediate buffer handling); `Serialize` for a local
+// `SerializableSecret` wrapper; malformed JSON (must not panic); corrupted JSON round-trips
+// (must error without panic).
 //
 // Corpus seed hints (paste into fuzz/corpus/serde/):
 //   [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]

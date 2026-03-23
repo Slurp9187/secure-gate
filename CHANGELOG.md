@@ -77,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`rand` feature no longer forces `alloc`** (`Cargo.toml`) — `rand?/alloc` has been removed from the `rand` feature. `Fixed::from_random()` only uses `OsRng::try_fill_bytes` on a stack array and requires no heap allocation; `rand` now works in pure `no_std`/`no_alloc` builds for `Fixed<T>`. `Dynamic::from_random()` continues to work when `alloc` is also active, since `Dynamic<T>` already requires `alloc` independently.
+- **`rand` feature no longer forces `alloc`** (`Cargo.toml`) — `rand?/alloc` has been removed from the `rand` feature. `Fixed::from_random()` only fills a stack array via the OS RNG (`try_fill_bytes`) and requires no heap allocation; `rand` now works in pure `no_std`/`no_alloc` builds for `Fixed<T>`. `Dynamic::from_random()` continues to work when `alloc` is also active, since `Dynamic<T>` already requires `alloc` independently.
 - **`tests/heap_zeroize.rs` hardened against silent false negatives and gate leakage** — test-only improvements, no library behavior changes: (1) `check_vec_zeroed` and `check_string_zeroed` now `assert_eq!(capacity, size)` after `shrink_to_fit` — without this, an allocator that rounds up capacity silently bypasses the proxy check producing a false negative; (2) `with_proxy_check` now uses a `CheckGuard` RAII struct to ensure `CHECKING` is cleared even when the closure panics — previously a panic left the gate open during stack unwinding; (3) all four helper closures now call `drop(secret)` explicitly to make drop timing clear and refactor-safe; (4) `Dynamic<String>` size coverage expanded from 2 to 4 sizes (16/32/64/128) to match `Dynamic<Vec<u8>>`; (5) Vec and String checks now interleaved in a `for size in [16, 32, 64, 128]` loop that structurally enforces size parity.
 - **Wrong feature gate on `fixed_deserialize_wrong_length` test** (`tests/serde_suite/deserialize.rs`) — the test was gated `#[cfg(all(feature = "serde-deserialize", feature = "encoding-hex"))]`; hex encoding has no relationship to serde deserialization length checking. Corrected to `#[cfg(feature = "serde-deserialize")]` so the error path (including `Zeroizing<Vec<u8>>` drop on length mismatch) is exercised in minimal serde-only feature configurations.
 - **`static` secrets + `panic = "abort"` footguns documented** (`SECURITY.md`) — `Fixed::new` is `const fn`, so `static SECRET: Fixed<...> = Fixed::new([...])` compiles silently but is never zeroized (Rust does not invoke `Drop` on program-scope statics). Additionally, `panic = "abort"` builds skip all `Drop` impls on panic, meaning secrets in scope at the time of a panic are not cleared. Both limitations are shared by the broader `zeroize` / `secrecy` ecosystem; they are now documented under _Wrappers — Potential weaknesses_ with concrete mitigation notes.
@@ -232,7 +232,7 @@ The following changes were developed during the 0.7.0-rc period (preserved for h
 - `std` feature depends on `alloc`.
 - **Per-format encoding/decoding traits** (orthogonal `ToHex`/`FromHexStr`, etc.)
 - **Opt-in cloning & serialization** (`CloneableSecret`, `SerializableSecret` markers)
-- **Secure random generation** (`from_random()` using `OsRng`)
+- **Secure random generation** (`from_random()` via the OS RNG)
 - **Fallible fixed-size construction** (`TryFrom<&[u8]>` with `FromSliceError`)
 - **Centralized errors** via `thiserror`
 - Additional alias macros
@@ -274,13 +274,13 @@ The following changes were developed during the 0.7.0-rc period (preserved for h
 - Removed inherent conversion methods (now trait-based)
 - Replaced `RandomBytes<N>` with `FixedRng<N>`
 - Removed `serde` feature (now gated by marker)
-- Switched RNG to direct `OsRng`
+- Switched RNG to direct OS RNG access
 
 ### Added
 
 - `len()`/`is_empty()` on fixed arrays
 - Compile-time negative impl guard
-- Direct `OsRng` usage
+- Direct OS RNG usage
 
 ### Fixed
 
@@ -289,7 +289,7 @@ The following changes were developed during the 0.7.0-rc period (preserved for h
 
 ### Performance
 
-- Direct `OsRng` improved keygen throughput 8–10%
+- Direct OS RNG access improved keygen throughput 8–10%
 
 ## [0.5.10] - 2025-12-02 (yanked)
 

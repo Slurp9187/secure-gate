@@ -1,6 +1,6 @@
 # Security Considerations for secure-gate
 
-Last updated: March 2026 (for v0.8.0-rc.1)
+Last updated: March 2026 (for v0.9.0-rc.1)
 
 ## TL;DR
 
@@ -18,8 +18,8 @@ This document outlines the security model, design choices, strengths, known limi
 
 - **Process compromise / arbitrary memory read** — wrappers offer no defense if an attacker can read process memory
 - **OS swap, page files, core dumps** — secrets may be paged to disk; use `mlock` or encrypted swap at the OS level
-- **`panic = "abort"` / SIGKILL / hard crash** — `Drop` impls do not run; secrets are not cleared
-- **`static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized
+- `**panic = "abort"` / SIGKILL / hard crash** — `Drop` impls do not run; secrets are not cleared
+- `**static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized
 - **Copies made by caller code** — after `expose_secret()`, encoding, or serialization, the caller holds ordinary non-zeroized memory
 - **Encoded/serialized output** — `to_hex()`, `to_base64url()`, serde `Serialize` output are full secret exposure into ordinary, non-zeroizing `String`s
 - **All side channels beyond equality timing** — cache, power, EM, and branch-predictor side channels are outside scope
@@ -48,6 +48,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 ## Core Security Model
 
+
 | Property                       | Guarantee / Design Choice                                                                                          |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | Explicit exposure              | Private inner fields; access only via audited methods (`expose_secret`, `with_secret`)                             |
@@ -60,14 +61,16 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | Redacted debug                 | `Debug` impl always prints `[REDACTED]`                                                                            |
 | No unsafe code                 | `#![forbid(unsafe_code)]` enforced at crate level                                                                  |
 
+
 ## Feature Security Implications
+
 
 | Feature             | Security Impact                                                                                                                                                           | Recommendation                                                                                                                   |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `alloc` _(default)_ | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Use `default-features = false` for no-heap builds.                                              | Enable unless on embedded/pure-stack target                                                                                      |
+| `alloc` *(default)* | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Use `default-features = false` for no-heap builds.                                              | Enable unless on embedded/pure-stack target                                                                                      |
 | `std`               | Full `std` support (implies `alloc`). Adds no additional security surface beyond `alloc`.                                                                                 | Optional; `alloc` is sufficient for most targets                                                                                 |
 | `ct-eq`             | Timing-safe direct byte comparison (`.ct_eq()`)                                                                                                                           | Strongly recommended; avoid `==`                                                                                                 |
-| `rand`              | Secure random via `OsRng`; panics on failure                                                                                                                              | Use only in trusted entropy environments                                                                                         |
+| `rand`              | Secure random via `SysRng` (`rand` 0.10); panics on failure                                                                                                               | Use only in trusted entropy environments                                                                                         |
 | `serde-deserialize` | Decodes to inner type; temporary buffers use `zeroize::Zeroizing` (zeroized on rejection too). 1 MiB default limit (`MAX_DESERIALIZE_BYTES`). See allocation notes below. | Enable for trusted deserialization sources; set a tight limit for untrusted input and enforce transport-level size caps upstream |
 | `serde-serialize`   | Opt-in export via marker trait; audit all implementations                                                                                                                 | Enable sparingly; monitor exfiltration risk                                                                                      |
 | `encoding`          | Meta: enables all encoding sub-features (hex, base64url, bech32, bech32m); always requires `alloc`                                                                        | Enable per-format instead for minimal surface                                                                                    |
@@ -77,6 +80,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `encoding-bech32m`  | Bech32m/BIP-350 encoding/decoding: `ToBech32m`, `FromBech32mStr`                                                                                                          | Validate inputs upstream; test empty/invalid HRP                                                                                 |
 | `cloneable`         | Opt-in cloning via marker trait; increases exposure surface                                                                                                               | Use minimally; prefer move semantics                                                                                             |
 | `full`              | All features enabled — convenient but increases attack surface                                                                                                            | Development only; audit for production                                                                                           |
+
 
 #### `serde-deserialize` — Allocation & Limit Notes
 
@@ -98,7 +102,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 ## Module-by-Module Security Notes
 
-> Security invariants (no `Deref`/`AsRef`, `Debug` prints `[REDACTED]`, zeroize on drop, opt-in clone/serialize) are documented in full on the [`Fixed`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html) and [`Dynamic`](https://docs.rs/secure-gate/latest/secure_gate/struct.Dynamic.html) rustdoc. This section focuses on weaknesses and mitigations not visible from the API surface.
+> Security invariants (no `Deref`/`AsRef`, `Debug` prints `[REDACTED]`, zeroize on drop, opt-in clone/serialize) are documented in full on the `[Fixed](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html)` and `[Dynamic](https://docs.rs/secure-gate/latest/secure_gate/struct.Dynamic.html)` rustdoc. This section focuses on weaknesses and mitigations not visible from the API surface.
 
 ### Wrappers (`dynamic.rs`, `fixed.rs`)
 
@@ -107,25 +111,25 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Long-lived `expose_secret()` references can defeat scoping
 - Macro-generated aliases lack runtime size checks
 - Certain error variants may indirectly leak length information (e.g. wrong decoded length).
-  In most real-world usage (logging, API responses), length is already public metadata anyway (e.g. key length in JWT headers, signature length). Still, contextualize or redact errors when possible.
+In most real-world usage (logging, API responses), length is already public metadata anyway (e.g. key length in JWT headers, signature length). Still, contextualize or redact errors when possible.
 - `Fixed<T>` decoding constructors (`try_from_hex`, `try_from_base64url`, etc.) use
-  `copy_from_slice` into a stack-allocated `[0u8; N]` before moving into the wrapper.
-  The intermediate stack slot is not explicitly zeroed before the move; in adversarial
-  environments (core dumps, memory forensics) secret bytes may persist briefly on the
-  stack. In release mode the compiler often eliminates the slot entirely. `Dynamic<T>`
-  avoids this via `from_protected_bytes` + `mem::swap` (heap-only path).
-- **`static` secrets are never zeroized.** `Fixed::new` is `const fn`, so
-  `static SECRET: Fixed<[u8; 32]> = Fixed::new([...]);` compiles without warning.
-  Rust does not invoke `Drop` on program-scope statics during the lifetime of the
-  process. The `ZeroizeOnDrop` guarantee only applies to values that are dropped in
-  the normal sense (stack unwinding, scope exit). Do not store secrets in statics.
-- **`panic = "abort"` builds disable zeroization on panic.** When `panic = "abort"`
-  is set in a profile, Rust aborts the process immediately on panic without running
-  any `Drop` implementations. Secrets held in `Fixed<T>` or `Dynamic<T>` at the
-  moment of a panic will not be zeroized before the process exits. This is an
-  inherent limitation of the `zeroize` ecosystem — `zeroize`, `secrecy`, and other
-  crates share the same constraint. Prefer `panic = "unwind"` (the default) in
-  security-sensitive builds.
+`copy_from_slice` into a stack-allocated `[0u8; N]` before moving into the wrapper.
+The intermediate stack slot is not explicitly zeroed before the move; in adversarial
+environments (core dumps, memory forensics) secret bytes may persist briefly on the
+stack. In release mode the compiler often eliminates the slot entirely. `Dynamic<T>`
+avoids this via `from_protected_bytes` + `mem::swap` (heap-only path).
+- `**static` secrets are never zeroized.** `Fixed::new` is `const fn`, so
+`static SECRET: Fixed<[u8; 32]> = Fixed::new([...]);` compiles without warning.
+Rust does not invoke `Drop` on program-scope statics during the lifetime of the
+process. The `ZeroizeOnDrop` guarantee only applies to values that are dropped in
+the normal sense (stack unwinding, scope exit). Do not store secrets in statics.
+- `**panic = "abort"` builds disable zeroization on panic.** When `panic = "abort"`
+is set in a profile, Rust aborts the process immediately on panic without running
+any `Drop` implementations. Secrets held in `Fixed<T>` or `Dynamic<T>` at the
+moment of a panic will not be zeroized before the process exits. This is an
+inherent limitation of the `zeroize` ecosystem — `zeroize`, `secrecy`, and other
+crates share the same constraint. Prefer `panic = "unwind"` (the default) in
+security-sensitive builds.
 
 **Mitigations**
 

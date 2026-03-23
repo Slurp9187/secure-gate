@@ -1,5 +1,4 @@
-// tests/core_tests.rs
-// Core API tests for Fixed<T> and Dynamic<T> — v0.8.0 style
+// Core API tests for `Fixed<T>` and `Dynamic<T>` (`RevealSecret` / `RevealSecretMut`).
 
 #[cfg(feature = "cloneable")]
 use secure_gate::CloneableSecret;

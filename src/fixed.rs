@@ -163,7 +163,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// # Panics
     ///
-    /// Panics if the OS RNG fails to provide bytes ([`TryRng::try_fill_bytes`](rand::TryRng::try_fill_bytes)
+    /// Panics if the system RNG fails to provide bytes ([`TryRng::try_fill_bytes`](rand::TryRng::try_fill_bytes)
     /// returns `Err`). This is treated as a fatal environment error.
     ///
     /// # Examples

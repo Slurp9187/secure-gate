@@ -1,7 +1,6 @@
-//! tests/zeroize_tests.rs
 //! Zeroization behavior tests for Fixed<T> and Dynamic<T>.
 //!
-//! This is the canonical test for v0.8.0's mandatory zeroize-on-drop guarantee.
+//! This is the canonical test suite for mandatory zeroize-on-drop on the core wrappers.
 //! Adapted from upstream RustCrypto zeroize patterns. Uses spare-capacity and
 //! drop-order assertions to verify correctness.
 //!

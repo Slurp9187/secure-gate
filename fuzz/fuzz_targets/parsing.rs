@@ -1,8 +1,6 @@
-// fuzz/fuzz_targets/parsing.rs
-//
-// Fuzz target for all parsing/conversion paths — Dynamic<String>, Dynamic<Vec<u8>>,
-// Fixed<[u8;N]>, From/TryFrom conversions, UTF-8 boundary stress, len consistency.
-// Updated for v0.8.0: explicit exposure everywhere, no Deref.
+// Parsing and conversion fuzz target for `Dynamic<String>`, `Dynamic<Vec<u8>>`, and
+// `Fixed<[u8; N]>`: `From` / `TryFrom`, UTF-8 edge cases, and length consistency.
+// All access goes through `RevealSecret` / `RevealSecretMut` (no `Deref`).
 
 #![no_main]
 use arbitrary::{Arbitrary, Unstructured};

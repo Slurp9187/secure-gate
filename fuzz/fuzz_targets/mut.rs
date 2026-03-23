@@ -1,8 +1,6 @@
-// fuzz/fuzz_targets/mut.rs
-//
-// Mutation + zeroization stress target for secure-gate v0.8.0
-// Zeroize is always-on. Tests expose_secret_mut, with_secret_mut, command-driven
-// mutation, zeroize verification, spare-capacity stress, and nested types.
+// Mutation and zeroization stress fuzz target for `secure-gate`.
+// Zeroize-on-drop is always required. Exercises `expose_secret_mut`, `with_secret_mut`,
+// command-driven mutation, post-mutation state, spare capacity, and nested wrappers.
 #![no_main]
 use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;

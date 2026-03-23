@@ -1,6 +1,6 @@
-//! Suite integration runner for secure-gate v0.8.0.
+//! Integration test runner for `secure-gate` directory-based suites.
 //!
-//! Compiles the directory-based test suites into a single binary.
+//! Compiles those suites into a single binary.
 //! Flat test files (`core_tests`, `ct_eq_tests`, `zeroize_tests`, `error_tests`, …)
 //! each run as their own binary — that is intentional, not a gap.
 //!
@@ -9,7 +9,6 @@
 //! - `compile_fail_tests.rs` (uses trybuild)
 
 mod common;
-
 mod encoding_suite;
 mod serde_suite;
 mod macros_suite;
