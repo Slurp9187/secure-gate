@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Rust API reference (`#![warn(missing_docs)]`)** — Documented struct fields on debug-only error variants (`FromSliceError`, `Bech32Error`, `Base64Error`, `HexError`), `DecodingError` variants (including `hint`), and added item-level `///` docs for `RevealSecret`, `ConstantTimeEq`, `CloneableSecret`, and `SerializableSecret`. Expanded rustdoc on `Dynamic::new`, `Dynamic<Vec<u8>>` / `Fixed<[u8; N]>` hex and Base64url encoding helpers, `Fixed` decode constructors (`try_from_hex` / `try_from_base64url`), and `from_random` on both core wrappers.
+- **README** — Consolidated the “Direct constructors” encoding table into a single “Method (both wrappers)” column, since `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` expose the same inherent decode APIs.
+
 ## [0.9.0-rc.1] - 2026-03-22
 
 ### Breaking Changes
