@@ -3,47 +3,14 @@
 [![Crates.io](https://img.shields.io/crates/v/secure-gate.svg)](https://crates.io/crates/secure-gate)
 [![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate)
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
+[![MSRV: 1.85](https://img.shields.io/badge/msrv-1.85-blue)](https://github.com/Slurp9187/secure-gate/blob/main/Cargo.toml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
-> **Note:** This is the **active development branch** for secure-gate v0.9.x (`main`).
-> It targets **Rust Edition 2024** and **MSRV 1.85+**, bringing modern Rust language features.
-> For stable, production-ready editions on older Rust versions, see the `release/0.8` branch (v0.8.x).
-
-| Aspect  | **0.9.x**| **0.8.x** |
-|---------|:----------------------:|:------------------------:|
-| Edition | 2024                   | 2021                      |
-| MSRV    | 1.85                   | 1.75                      |
-| Status  | Active development     | LTS / stable patches      |
-| Branch  | `main`                 | `release/0.8`             |
-
-Current crates.io version: 0.9.0-rc.1 (see `Cargo.toml` for exact version).
-
-`no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
+A `no_std`-compatible, zero-overhead library for managing secrets with mandatory zeroization and audit-friendly access patterns.
 
 > **Security Notice**: This crate has **not undergone independent audit**.
 > Review the code and [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) before production use.
 > No unsafe code — enforced with `#![forbid(unsafe_code)]`.
-
-## What changed in 0.9.0
-
-- **Rust Edition 2024** — requires Rust ≥ 1.85. Pin `secure-gate = "0.8"` and use the `release/0.8` branch if your toolchain cannot upgrade.
-- **MSRV raised to 1.85** — drops support for toolchains older than Rust 1.85.0 (February 2025).
-- **`rand` 0.9 → 0.10** — internal migration (`OsRng` → `SysRng`, `TryRngCore` → `TryRng`). No public API change; see the [rand 0.10 update guide](https://rust-random.github.io/book/update-0.10.html) if you use `rand` types directly.
-- **`bincode` dev-dependency 1 → 2** — test suite only; no public API change.
-- **Dependencies bumped**: `subtle` 2.5 → 2.6, `zeroize` 1.7 → 1.8, `proptest` 1.0 → 1.10.
-
-## What You Get
-
-- **Explicit access only** — `.with_secret()` (preferred) or `.expose_secret()` required; no silent `Deref`/`AsRef` leaks
-- **Mandatory zeroize on drop** — always active, no feature gate (inner type must implement `Zeroize`)
-- **Timing-safe equality** — `ct-eq` feature for deterministic constant-time byte comparison (`subtle`)
-- **Secure random generation** — `from_random()` via `SysRng` (`rand` feature)
-- **Orthogonal encoding** — symmetric per-format traits + direct `try_from_*` constructors on `Fixed` and `Dynamic<Vec<u8>>` (hex, base64url, bech32/BIP-173, bech32m/BIP-350); each format is opt-in and zero-overhead when unused
-- **Serde** — direct deserialization to inner types (binary-safe); opt-in serialization requires `SerializableSecret` marker
-- **Ergonomic aliases** — `dynamic_alias!`, `fixed_alias!`, `fixed_generic_alias!`, `dynamic_generic_alias!` for typed newtypes
-- **Auditable** — every secret exposure point (including encoding methods) is grep-able using the consolidated pattern shown in the [Encoding](#encoding) section; `no_std` + `alloc` compatible
-
-For zero-cost performance justification see [ZERO_COST_WRAPPERS.md](https://github.com/Slurp9187/secure-gate/blob/main/ZERO_COST_WRAPPERS.md).
 
 ## Quick Start
 
@@ -88,57 +55,14 @@ pw.expose_secret_mut().clear();
 }
 ```
 
-## Installation
+## Core Concepts
 
-**Default** (`alloc` enabled — `Fixed<T>` + `Dynamic<T>` + full zeroization):
+`Fixed<T>` (stack-allocated) and `Dynamic<T>` (heap, requires `alloc`) share the same access interface:
 
-```toml
-[dependencies]
-secure-gate = "0.9.0-rc.1"
-```
-
-**No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
-
-```toml
-secure-gate = { version = "0.9.0-rc.1", default-features = false }
-```
-
-**Batteries-included**:
-
-```toml
-secure-gate = { version = "0.9.0-rc.1", features = ["full"] }
-```
-
-## Features
-
-| Feature             | Description                                                                                                                                                                 |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                             |
-| `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                    |
-| `rand`              | `from_random()` via `SysRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself requires it). |
-| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                            |
-| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                                         |
-| `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                                                      |
-| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr`                                                                                                                                          |
-| `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                                                                                                      |
-| `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                                                                                                    |
-| `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                                                                                               |
-| `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                        |
-| `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                      |
-| `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                            |
-| `full`              | All features combined                                                                                                                                                       |
-
-`no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding, and serde require `alloc`. Disabled features have zero overhead.
-
-## Core API
-
-`Fixed<T>` (stack-allocated) and `Dynamic<T>` (heap-allocated, requires `alloc`) share the same `RevealSecret` / `RevealSecretMut` interface. Both types:
-
-- Redact `Debug` output to `[REDACTED]`
-- Implement `len()` and `is_empty()` without exposing secret contents
-- Zeroize contents on drop (mandatory)
-
-The preferred and recommended way to access secrets is the scoped `with_secret` / `with_secret_mut` methods. `expose_secret` / `expose_secret_mut` are escape hatches for rare cases and should be audited closely.
+- `Debug` output → `[REDACTED]`
+- `.len()` / `.is_empty()` without exposure
+- Zeroize on drop (always)
+- Access via `.with_secret(|s| ...)` (preferred) or `.expose_secret()` (auditable escape hatch)
 
 ### Preferred: scoped access
 
@@ -194,6 +118,35 @@ fn log_length<S: RevealSecret>(secret: &S) {
 }
 ```
 
+## What You Get
+
+- **Zero-cost safety** — mandatory zeroization on drop; `no_std` / `no_alloc` support. See [ZERO_COST_WRAPPERS.md](https://github.com/Slurp9187/secure-gate/blob/main/ZERO_COST_WRAPPERS.md) for benchmarks.
+- **Audit-first API** — secrets cannot leak via `Deref`. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch.
+- **Type-safe wrappers** — macros create newtype aliases that redact `Debug` output automatically.
+- **Batteries included** — optional, zero-overhead support for serde, constant-time comparison (`subtle`), and secure encoding (hex, base64url, bech32/m).
+- **No unsafe code** — enforced with `#![forbid(unsafe_code)]`.
+
+## Installation
+
+**Default** (`alloc` enabled — `Fixed<T>` + `Dynamic<T>` + full zeroization):
+
+```toml
+[dependencies]
+secure-gate = "0.9.0-rc.1"
+```
+
+**No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
+
+```toml
+secure-gate = { version = "0.9.0-rc.1", default-features = false }
+```
+
+**Batteries-included**:
+
+```toml
+secure-gate = { version = "0.9.0-rc.1", features = ["full"] }
+```
+
 ## Encoding & Decoding
 
 `secure-gate` provides symmetric, zero-overhead encoding and decoding for four formats: hex, base64url, bech32 (BIP-173), and bech32m (BIP-350). All operations are explicit and return `Result` on failure.
@@ -214,10 +167,17 @@ Use trait methods on the wrapper:
 ```rust
 let key: Fixed<[u8; 32]> = ...;
 
-let hex    = key.to_hex();             // String
-let b64    = key.to_base64url();       // String
-let bech32 = key.try_to_bech32("bc")?; // String with HRP
-let bech32m = key.try_to_bech32m("bc")?; // String with HRP
+// Direct on the wrapper (convenient; omit `with_secret` from audit greps)
+let hex = key.to_hex();
+let b64 = key.to_base64url();
+let bech32 = key.try_to_bech32("bc")?;
+let bech32m = key.try_to_bech32m("bc")?;
+
+// Scoped on the inner bytes (preferred when you want `with_secret` in audit sweeps)
+let hex_scoped = key.with_secret(|s| s.to_hex());
+let b64_scoped = key.with_secret(|s| s.to_base64url());
+let bech32_scoped = key.with_secret(|s| s.try_to_bech32("bc"))?;
+let bech32m_scoped = key.with_secret(|s| s.try_to_bech32m("bc"))?;
 ```
 
 ### Direct Constructors (Recommended)
@@ -239,20 +199,6 @@ Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from st
 - Use `_unchecked` only when HRP is validated upstream.
 - All constructors guarantee zeroization even on OOM panic via `Zeroizing`.
 
-## Audit Surface (Secret Materialization)
-
-Encoding and decoding methods are **convenience wrappers** that internally use scoped `with_secret` access — they do **not** bypass the security model, but return the fully materialized encoded value.
-
-They exist because users who call them have already decided to reveal the secret — the wrapper reduces boilerplate and avoids long-lived raw references.
-
-**Audit every exposure point** by searching your codebase for:
-
-- **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
-- **Encode:** `to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`
-- **Decode:** `try_from_hex`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
-
-**Best practice**: Prefer scoped methods (`with_secret` / `with_secret_mut`) when possible — they keep exposure minimal.
-
 ## Serde
 
 `serde-deserialize` decodes directly to the inner type. After deserialization completes, temporary buffers for `Dynamic<Vec<u8>>` and `Dynamic<String>` are `Zeroizing`-wrapped — oversized buffers are zeroized even on rejection. The default limit is `MAX_DESERIALIZE_BYTES` (1 MiB); call `Dynamic::deserialize_with_limit` to set a custom ceiling. Serialization requires the `SerializableSecret` marker trait.
@@ -273,14 +219,56 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 
 Cryptographically secure via `SysRng`. `Fixed::from_random()` is heap-free and works in `no_std`/`no_alloc` builds. `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself already requires it). See [`Fixed::from_random`] and [`Dynamic::from_random`] in the [API docs](https://docs.rs/secure-gate).
 
-## Security Model
+## Audit Guide
 
-- **Explicit access only** — `.with_secret()` / `.expose_secret()` required; no silent leaks
-- **Zeroize on drop** — always active; inner type must implement `Zeroize`
-- **Timing-safe equality** — `ct-eq` feature (`.ct_eq()`)
-- **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
+Encoding and decoding methods are **convenience wrappers** that internally use scoped `with_secret` access — they do **not** bypass the security model, but return the fully materialized encoded value.
+
+They exist because users who call them have already decided to reveal the secret — the wrapper reduces boilerplate and avoids long-lived raw references.
+
+**Audit every exposure point** by searching your codebase for:
+
+- **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
+- **Encode:** `to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`
+- **Decode:** `try_from_hex`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
+
+**Best practice**: Prefer scoped methods (`with_secret` / `with_secret_mut`) when possible — they keep exposure minimal.
 
 Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for the full threat model and mitigations.
+
+## What changed in 0.9.0
+
+Edition 2024, MSRV 1.85, `rand` 0.10 (`OsRng` → `SysRng`), dep bumps.  
+Full details in [CHANGELOG.md](CHANGELOG.md). Users on Rust < 1.85: pin `secure-gate = "0.8"`.
+
+## Branch support
+
+Version **0.9.x** (`main`) targets Rust Edition 2024 and MSRV 1.85.  
+For Rust < 1.85, pin `secure-gate = "0.8"` — the `release/0.8` branch (Edition 2021, MSRV 1.75) receives security patches and important backports.
+
+Current crates.io version: 0.9.0-rc.1 (see [Cargo.toml](https://github.com/Slurp9187/secure-gate/blob/main/Cargo.toml) for exact version).
+
+## Features
+
+Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = false` for heap-free `Fixed` only.
+
+| Feature             | Description                                                                                                                                                                  |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                              |
+| `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                     |
+| `rand`              | `from_random()` via `SysRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself requires it). |
+| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                             |
+| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                                          |
+| `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                                                       |
+| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr`                                                                                                                                           |
+| `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                                                                                                       |
+| `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                                                                                                     |
+| `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                                                                                                |
+| `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                         |
+| `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                       |
+| `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                             |
+| `full`              | All features combined                                                                                                                                                        |
+
+`no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding, and serde require `alloc`. Disabled features have zero overhead.
 
 ## Contributing
 
@@ -295,15 +283,6 @@ cargo +1.85 update
 git add Cargo.lock
 git commit -m "chore: regenerate Cargo.lock with MSRV 1.85"
 ```
-
-### Dual-track support
-
-| Branch | Crate version | Rust edition | MSRV | Status |
-|---|---|---|---|---|
-| `main` | 0.9.x | 2024 | 1.85 | Active development |
-| `release/0.8` | 0.8.x | 2021 | 1.75 | LTS — security patches only |
-
-**Users on Rust < 1.85:** pin `secure-gate = "0.8"` in `Cargo.toml`. The `release/0.8` branch is maintained for security patches and important bug fixes backported from `main`.
 
 ## License
 
