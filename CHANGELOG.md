@@ -7,10 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.2] - 2026-03-23
+
 ### Documentation
 
 - **Rust API reference** — Rustdoc expanded so `#![warn(missing_docs)]` stays clean (errors, public traits, and main `Fixed` / `Dynamic` APIs).
 - **README** — Encoding “Direct constructors” table uses one shared method column for `Fixed` and `Dynamic`.
+- **SECURITY** — Version update.
 
 ## [0.9.0-rc.1] - 2026-03-22
 
