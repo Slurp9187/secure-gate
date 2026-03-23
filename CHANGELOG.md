@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- **Rust API reference (`#![warn(missing_docs)]`)** — Documented struct fields on debug-only error variants (`FromSliceError`, `Bech32Error`, `Base64Error`, `HexError`), `DecodingError` variants (including `hint`), and added item-level `///` docs for `RevealSecret`, `ConstantTimeEq`, `CloneableSecret`, and `SerializableSecret`. Expanded rustdoc on `Dynamic::new`, `Dynamic<Vec<u8>>` / `Fixed<[u8; N]>` hex and Base64url encoding helpers, `Fixed` decode constructors (`try_from_hex` / `try_from_base64url`), and `from_random` on both core wrappers.
-- **README** — Consolidated the “Direct constructors” encoding table into a single “Method (both wrappers)” column, since `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` expose the same inherent decode APIs.
+- **Rust API reference** — Rustdoc expanded so `#![warn(missing_docs)]` stays clean (errors, public traits, and main `Fixed` / `Dynamic` APIs).
+- **README** — Encoding “Direct constructors” table uses one shared method column for `Fixed` and `Dynamic`.
 
 ## [0.9.0-rc.1] - 2026-03-22
 
@@ -473,3 +473,7 @@ The following changes were developed during the 0.7.0-rc period (preserved for h
 ## [0.3.0] - 2025-11-13 (yanked)
 
 - Initial public release
+
+## [0.1.0 - 0.2.3] - 2025-11-15 / 2025-11-16 (yanked)
+
+Crates.io releases from closed development before this changelog existed (`0.1.0` through `0.2.3`). No per-version notes were kept. All yanked (see bulk yank notice for `0.1.0`–`0.7.0-rc.15` elsewhere in this file). **0.1.0** published 2025-11-15; **0.2.3** (last in span) published 2025-11-16.
