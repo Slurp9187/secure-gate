@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0-rc.2] - 2026-03-22
+
 ### Changed
 
 - **Proptest coverage** — added comprehensive property-based round-trip tests for `encoding-bech32` and `encoding-bech32m` in `tests/proptest_suite/encoding.rs`. This brings bech32/bech32m to the same level of randomized testing as hex and base64url, exercising arbitrary payloads and HRP values.
@@ -447,3 +449,7 @@ The following changes were developed during the 0.7.0-rc period (preserved for h
 ## [0.3.0] - 2025-11-13 (yanked)
 
 - Initial public release
+
+## [0.1.0 - 0.2.3] - 2025-11-15 / 2025-11-16 (yanked)
+
+Crates.io releases from closed development before this changelog existed (`0.1.0` through `0.2.3`). No per-version notes were kept. All yanked (see bulk yank notice for `0.1.0`–`0.7.0-rc.15` elsewhere in this file). **0.1.0** published 2025-11-15; **0.2.3** (last in span) published 2025-11-16.

@@ -16,7 +16,7 @@
 | Status  | LTS / stable patches    | Active development |
 | Branch  | `release/0.8`           | `main`             |
 
-Current crates.io version: 0.8.0-rc.2 (see `Cargo.toml` for exact version).
+Current crates.io version: 0.8.0-rc.3 (see `Cargo.toml` for exact version).
 
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
@@ -99,19 +99,19 @@ pw.expose_secret_mut().clear();
 
 ```toml
 [dependencies]
-secure-gate = "0.8.0-rc.2"
+secure-gate = "0.8.0-rc.3"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.8.0-rc.2", default-features = false }
+secure-gate = { version = "0.8.0-rc.3", default-features = false }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.8.0-rc.2", features = ["full"] }
+secure-gate = { version = "0.8.0-rc.3", features = ["full"] }
 ```
 
 ## Features
