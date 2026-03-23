@@ -132,19 +132,19 @@ fn log_length<S: RevealSecret>(secret: &S) {
 
 ```toml
 [dependencies]
-secure-gate = "0.9.0-rc.1"
+secure-gate = "0.9.0-rc.2"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.9.0-rc.1", default-features = false }
+secure-gate = { version = "0.9.0-rc.2", default-features = false }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.9.0-rc.1", features = ["full"] }
+secure-gate = { version = "0.9.0-rc.2", features = ["full"] }
 ```
 
 ## Encoding & Decoding
@@ -245,7 +245,7 @@ Full details in [CHANGELOG.md](CHANGELOG.md). Users on Rust < 1.85: pin `secure-
 Version **0.9.x** (`main`) targets Rust Edition 2024 and MSRV 1.85.  
 For Rust < 1.85, pin `secure-gate = "0.8"` — the `release/0.8` branch (Edition 2021, MSRV 1.75) receives security patches and important backports.
 
-Current crates.io version: 0.9.0-rc.1 (see [Cargo.toml](https://github.com/Slurp9187/secure-gate/blob/main/Cargo.toml) for exact version).
+Current crates.io version: 0.9.0-rc.2 (see [Cargo.toml](https://github.com/Slurp9187/secure-gate/blob/main/Cargo.toml) for exact version).
 
 ## Features
 
