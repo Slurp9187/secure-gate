@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0-rc.3] - 2026-03-24
+
+### Changed
+
+- **MSRV lowered to Rust 1.70** (`Cargo.toml`) to improve downstream compatibility for the `release/0.8` line.
+- **Dev-dependency compatibility pins for 1.70** (`Cargo.toml` / `Cargo.lock`) — pinned test/bench stack to Rust 1.70-compatible lines (`criterion = 0.4.0`, `proptest = 1.0.0`, `serde_json = 1.0.132`, `trybuild = 1.0.81`) and regenerated lockfile.
+- **LTS docs synced to MSRV 1.70** (`README.md`, `ROADMAP.md`) — updated MSRV badge/table text and lockfile regeneration guidance (`cargo +1.70 update`).
+
+### Fixed
+
+- **Rust 1.70 all-features build compatibility** — disambiguated trait re-export paths in `src/traits/decoding/mod.rs` and `src/traits/encoding/mod.rs` by qualifying module paths with `self::` (no API behavior change).
+- **Rust 1.70 test compatibility** (`src/traits/encoding/bech32.rs`) — replaced `.div_ceil()` in a Bech32 bit-conversion test with an equivalent stable arithmetic expression.
+
 ## [0.8.0-rc.2] - 2026-03-22
 
 ### Changed

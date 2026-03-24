@@ -143,7 +143,7 @@ mod tests {
     fn test_bit_conversion_large_uncapped() {
         let large_data = vec![0u8; 4096];
         let fes: Vec<Fe32> = large_data.iter().copied().bytes_to_fes().collect();
-        assert_eq!(fes.len(), (large_data.len() * 8).div_ceil(5));
+        assert_eq!(fes.len(), ((large_data.len() * 8) + 4) / 5);
 
         let bytes_back: Vec<u8> = fes.iter().copied().fes_to_bytes().collect();
         assert_eq!(bytes_back, large_data);

@@ -3,19 +3,19 @@
 [![Crates.io](https://img.shields.io/crates/v/secure-gate.svg)](https://crates.io/crates/secure-gate)
 [![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate)
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg?branch=release%2F0.8)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml?query=branch%3Arelease%2F0.8)
-[![MSRV: 1.75](https://img.shields.io/badge/msrv-1.75-blue)](https://github.com/Slurp9187/secure-gate/blob/main/Cargo.toml)
+[![MSRV: 1.70](https://img.shields.io/badge/msrv-1.70-blue)](https://github.com/Slurp9187/secure-gate/blob/release/0.8/Cargo.toml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
 > **Note:** This is the **LTS (Long-Term Support) branch** for secure-gate 0.8.x (`release/0.8`).
-> It targets **Rust Edition 2021** and **MSRV 1.75**, making it the right choice for projects
+> It targets **Rust Edition 2021** and **MSRV 1.70**, making it the right choice for projects
 > that cannot yet move to Rust 1.85+. For the latest features see the `main` branch (v0.9.x).
 
-| Aspect  | **0.8.x** (this branch) | **0.9.x** (`main`) |
-|---------|:-----------------------:|:------------------:|
-| Edition | 2021                    | 2024               |
-| MSRV    | 1.75                    | 1.85               |
-| Status  | LTS / stable patches    | Active development |
-| Branch  | `release/0.8`           | `main`             |
+| Aspect  |      **0.8.x**       |     **0.9.x**      |
+| ------- | :------------------: | :----------------: |
+| Edition |         2021         |        2024        |
+| MSRV    |         1.70         |        1.85        |
+| Status  | LTS / stable patches | Active development |
+| Branch  |    `release/0.8`     |       `main`       |
 
 Current crates.io version: 0.8.0-rc.3 (see `Cargo.toml` for exact version).
 
@@ -292,17 +292,17 @@ Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SEC
 
 ### MSRV & Lockfile
 
-This crate enforces MSRV 1.75 (`rust-version = "1.75"` in `Cargo.toml`).
+This crate enforces MSRV 1.70 (`rust-version = "1.70"` in `Cargo.toml`).
 
 **Important:** Always use the MSRV toolchain to update `Cargo.lock`:
 
 ```bash
-cargo +1.75 update
+cargo +1.70 update
 git add Cargo.lock
-git commit -m "chore: regenerate Cargo.lock with MSRV 1.75"
+git commit -m "chore: regenerate Cargo.lock with MSRV 1.70"
 ```
 
-Do **not** use a newer toolchain (1.80+, nightly) to update the lockfile — it generates version 4 format, which Cargo 1.75 cannot read, breaking the MSRV CI job with:
+Do **not** use a newer toolchain (1.80+, nightly) to update the lockfile — it generates version 4 format, which Cargo 1.70 cannot read, breaking the MSRV CI job with:
 
 ```
 lock file version `4` was found, but this version of Cargo does not understand this lock file

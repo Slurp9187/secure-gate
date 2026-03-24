@@ -11,13 +11,13 @@ secure-gate is a small, single-developer crate for in-memory secret protection.
 | Branch | Version | Rust edition | MSRV | Status |
 |---|---|---|---|---|
 | `main` | 0.9.x | 2024 | 1.85 | Active development |
-| `release/0.8` | 0.8.x | 2021 | 1.75 | LTS — security patches only |
+| `release/0.8` | 0.8.x | 2021 | 1.70 | LTS — security patches only |
 
 **Users on Rust < 1.85**: pin `secure-gate = "0.8"` in `Cargo.toml`.
 **Modern users (Rust ≥ 1.85)**: use `secure-gate = "0.9"`.
 
 Security fixes and important bug fixes may be backported from `main` to `release/0.8` as patch releases (0.8.x).
-The 0.8 line will receive patches as long as the dependencies it relies on remain compatible with Rust 1.75.
+The 0.8 line will receive patches as long as the dependencies it relies on remain compatible with Rust 1.70.
 
 ---
 

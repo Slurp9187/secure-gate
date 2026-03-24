@@ -15,10 +15,10 @@ pub mod bech32m;
 pub mod hex;
 
 #[cfg(feature = "encoding-base64")]
-pub use base64_url::ToBase64Url;
+pub use self::base64_url::ToBase64Url;
 #[cfg(feature = "encoding-bech32")]
-pub use bech32::ToBech32;
+pub use self::bech32::ToBech32;
 #[cfg(feature = "encoding-bech32m")]
-pub use bech32m::ToBech32m;
+pub use self::bech32m::ToBech32m;
 #[cfg(feature = "encoding-hex")]
-pub use hex::ToHex;
+pub use self::hex::ToHex;
