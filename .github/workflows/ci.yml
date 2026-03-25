@@ -127,17 +127,14 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Update Cargo.lock with MSRV toolchain
-        run: cargo +1.70 update
-
       - name: cargo check – default features
-        run: cargo +1.70 check
+        run: cargo +1.70 check --locked
 
       - name: cargo check – full features
-        run: cargo +1.70 check --features=full
+        run: cargo +1.70 check --locked --features=full
 
       - name: cargo test – all features (MSRV compatibility)
-        run: cargo +1.70 test --all-features
+        run: cargo +1.70 test --locked --all-features
 
   # ---------------------------------------------------------------------------
   # AddressSanitizer job — heap zeroization oracle
