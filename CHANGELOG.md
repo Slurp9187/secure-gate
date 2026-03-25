@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`from_rng` constructor** (`Fixed<[u8; N]>` and `Dynamic<Vec<u8>>`, `rand` feature) — fills with bytes from any caller-supplied `TryRngCore + TryCryptoRng`, returning `Result<Self, R::Error>`; useful for seeded/deterministic RNGs in tests ([#103](https://github.com/Slurp9187/secure-gate/issues/103)).
 
+### Fixed
+
+- **MSRV CI: removed nondeterministic `cargo +1.70 update` step** (`.github/workflows/ci.yml`) — MSRV job now uses `--locked` for all commands so it tests the committed lockfile instead of a freshly resolved graph. This prevented transitive dep upgrades (e.g. `half 2.6.0`, `ryu 1.0.23`) from silently breaking the 1.70 job.
+- **MSRV transitive dep caps added** (`Cargo.toml`) — explicit `ryu = ">=1.0, <1.0.23"` and `half = ">=2.0, <2.7.1"` version caps prevent future `cargo update` runs from pulling in versions that require rustc ≥ 1.71 / ≥ 1.81 respectively.
+- **Miri timeout fixed** (`.github/workflows/fuzz-miri.yml`, `tests/integration.rs`) — `proptest_suite` is now excluded under `#[cfg(not(miri))]`; proptest's 256–512 cases per test are prohibitively slow under Miri's interpreter. Miri still runs all deterministic suites (46 tests vs. 61 before). Removed `--include-ignored` from the Miri command.
+- **MSRV job no longer runs `trybuild` compile-fail tests** (`.github/workflows/ci.yml`) — `trybuild` snapshot format differs between Rust 1.70 and stable (diagnostic wording changed). Compile-fail tests validate error message wording, not MSRV compatibility; they continue to run in the stable `test` job. MSRV step now passes `-- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse`.
+- **`trybuild` snapshots updated** (`tests/compile-fail/fixed_alias_zero_size.stderr`, `tests/compile-fail/serializable_secret_misuse.stderr`) — blessed to current stable compiler diagnostic format (new unsatisfied-trait-bound help spans, updated `E0080` wording).
+
+> **Maintainer note — `trybuild` snapshots:** These files (`tests/compile-fail/*.stderr`) encode exact compiler diagnostic output and must be re-blessed whenever the stable toolchain changes the error format. Run `TRYBUILD=overwrite cargo test --test compile_fail_tests --features=full` to regenerate them. Do **not** bless on Rust 1.70; only bless on the same toolchain CI's `test` (stable) job uses.
+
 ## [0.8.0-rc.3] - 2026-03-24
 
 ### Changed
