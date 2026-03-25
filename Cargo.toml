@@ -1,6 +1,6 @@
 [package]
 name = "secure-gate"
-version = "0.8.0-rc.5-dev"
+version = "0.8.0-secrecy-compat.0.0.1"
 edition = "2021"
 rust-version = "1.70"
 license = "MIT OR Apache-2.0"
@@ -94,6 +94,13 @@ serde-serialize = ["dep:serde", "serde?/alloc", "alloc"]
 
 # Full batteries-included combo (most common real-world usage)
 full = ["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]
+
+# secrecy compatibility shims — drop-in replacements for secrecy v0.8.0 and v0.10.1.
+# Enables `secure_gate::compat::v10` (SecretBox/SecretString/SecretSlice) and
+# `secure_gate::compat::v08` (Secret/SecretString/SecretVec/DebugSecret).
+# Shared traits (ExposeSecret, CloneableSecret, zeroize re-export) live in compat root.
+# See `src/compat/` for the full migration guides.
+secrecy-compat = ["alloc"]
 
 [[bench]]
 name = "fixed_vs_raw"

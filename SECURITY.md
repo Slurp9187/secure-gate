@@ -1,6 +1,6 @@
 # Security Considerations for secure-gate
 
-Last updated: March 2026 (for v0.8.0-rc.5)
+Last updated: March 2026 (for v0.8.0, secrecy-compat backport)
 
 ## TL;DR
 
@@ -76,6 +76,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | `encoding-bech32`   | Bech32/BIP-173 encoding/decoding: `ToBech32`, `FromBech32Str`                                                                                                             | Validate inputs upstream; test empty/invalid HRP                                                                                 |
 | `encoding-bech32m`  | Bech32m/BIP-350 encoding/decoding: `ToBech32m`, `FromBech32mStr`                                                                                                          | Validate inputs upstream; test empty/invalid HRP                                                                                 |
 | `cloneable`         | Opt-in cloning via marker trait; increases exposure surface                                                                                                               | Use minimally; prefer move semantics                                                                                             |
+| `secrecy-compat`    | Drop-in secrecy 0.8/0.10 compatibility layer (requires `alloc`). Compat wrappers carry the same zeroize-on-drop + redacted-`Debug` invariants as native types. Bridge impls expose native `Dynamic`/`Fixed` via the compat `ExposeSecret` trait, adding a second auditable access surface. | Treat as transitional; migrate to native `RevealSecret` APIs and remove `secrecy-compat` once call sites are updated. Audit both `expose_secret` (compat) and `with_secret`/`expose_secret` (native) during transition. |
 | `full`              | All features enabled — convenient but increases attack surface                                                                                                            | Development only; audit for production                                                                                           |
 
 #### `serde-deserialize` — Allocation & Limit Notes
@@ -178,6 +179,23 @@ In **debug builds** (`cfg(debug_assertions)`), decoding errors include detailed 
 Prefer `Display` (`{}`) over `Debug` (`{:?}`) when logging errors in production — derived `Debug` exposes struct fields in debug builds and may be more verbose than intended.
 
 Coarse error categories are still present in release and can aid attacker fingerprinting in niche threat models. Redact or suppress error details in logs for high-sensitivity contexts.
+
+### Compatibility Layer (`compat/`)
+
+The `secrecy-compat` feature provides drop-in wrappers mirroring `secrecy` 0.8.0 and 0.10.1. These wrappers (`Secret<S>`, `SecretBox<S>`, etc.) carry the same zeroize-on-drop and redacted-`Debug` invariants as native `Fixed<T>` / `Dynamic<T>`.
+
+**Potential weaknesses**
+
+- During migration, two parallel access traits exist: compat `ExposeSecret` and native `RevealSecret`. Both are grep-able, but audit sweeps must cover both surfaces.
+- Bridge impls on `Dynamic<T>` and `Fixed<[T; N]>` implement compat `ExposeSecret` / `ExposeSecretMut` by delegating to the native trait. This is safe but widens the set of method names that grant secret access.
+- `v10::SecretBox<S> → Dynamic<S>` conversion requires `S: Clone` (the `Drop` impl on `SecretBox` prevents moving out of the `Box`); the stack copy is zeroized immediately, but the clone window is inherent.
+- `v08::Secret<S>` stores the secret inline (no heap). `Drop` zeroizes the value, but the same stack-residue caveats as `Fixed<T>` apply.
+
+**Mitigations**
+
+- Treat the compat layer as transitional — migrate to native `RevealSecret` / `RevealSecretMut` and remove `secrecy-compat` once all call sites are updated.
+- During transition, audit for **both** `expose_secret` (compat) and `with_secret` / `expose_secret` (native) access patterns.
+- Prefer `SecretBox::init_with_mut` over `SecretBox::init_with` to avoid the clone-then-zeroize path.
 
 ## Vulnerability Reporting
 
