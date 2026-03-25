@@ -77,6 +77,12 @@ serde-serialize = ["dep:serde", "serde?/alloc", "alloc"]
 # Full batteries-included combo (most common real-world usage)
 full = ["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]
 
+# secrecy compatibility shim — drop-in replacement for secrecy v0.10.1 API.
+# Enables `secure_gate::compat::*` with SecretBox, SecretString, SecretSlice,
+# ExposeSecret, ExposeSecretMut, CloneableSecret, and zeroize re-export.
+# See `src/compat.rs` for the full migration guide.
+secrecy-compat = ["alloc"]
+
 [[bench]]
 name = "fixed_vs_raw"
 harness = false

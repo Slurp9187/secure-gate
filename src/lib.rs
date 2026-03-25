@@ -154,3 +154,10 @@ pub use error::HexError;
 
 pub use error::DecodingError;
 pub use error::FromSliceError;
+
+/// secrecy v0.10.1 compatibility layer — drop-in replacement for the `secrecy` crate.
+///
+/// Enable with `features = ["secrecy-compat"]`. See the module docs for a full
+/// migration guide and per-item deprecation notices.
+#[cfg(feature = "secrecy-compat")]
+pub mod compat;
