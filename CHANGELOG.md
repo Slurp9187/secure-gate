@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **CI** (`.github/workflows/ci.yml`) — dedicated `lint` job runs `clippy` + doctests on three feature combos only (`--no-default-features`, `rand` no-heap, `full`); the 17-entry `test` matrix runs `cargo test --tests` only, reducing redundant work per push.
+
 ## [0.8.0-rc.4] - 2026-03-24
 
 ### Added

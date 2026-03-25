@@ -17,7 +17,7 @@
 | Status  | LTS / stable patches | Active development |
 | Branch  |    `release/0.8`     |       `main`       |
 
-Current crates.io version: 0.8.0-rc.4 (see `Cargo.toml` for exact version).
+Current crates.io version: 0.8.0-rc.5 (see `Cargo.toml` for exact version).
 
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
@@ -100,39 +100,39 @@ pw.expose_secret_mut().clear();
 
 ```toml
 [dependencies]
-secure-gate = "0.8.0-rc.4"
+secure-gate = "0.8.0-rc.5"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.8.0-rc.4", default-features = false }
+secure-gate = { version = "0.8.0-rc.5", default-features = false }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.8.0-rc.4", features = ["full"] }
+secure-gate = { version = "0.8.0-rc.5", features = ["full"] }
 ```
 
 ## Features
 
-| Feature             | Description                                                                                                                                                                 |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                             |
-| `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                    |
+| Feature             | Description                                                                                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                                                                                      |
+| `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                                                                             |
 | `rand`              | `from_random()` (system `OsRng`) and fallible `from_rng()` for custom RNGs; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random` / `from_rng` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
-| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                            |
-| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                                         |
-| `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                                                      |
-| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr`                                                                                                                                          |
-| `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                                                                                                      |
-| `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                                                                                                    |
-| `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                                                                                               |
-| `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                        |
-| `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                      |
-| `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                            |
-| `full`              | All features combined                                                                                                                                                       |
+| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                                                                                     |
+| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                                                                                                  |
+| `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                                                                                                               |
+| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr`                                                                                                                                                                                                   |
+| `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                                                                                                                                                               |
+| `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                                                                                                                                                             |
+| `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                                                                                                                                                        |
+| `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                                                                                 |
+| `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                                                                               |
+| `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                                                                                     |
+| `full`              | All features combined                                                                                                                                                                                                                |
 
 `no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding, and serde require `alloc`. Disabled features have zero overhead.
 
