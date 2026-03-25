@@ -1,6 +1,6 @@
 [package]
 name = "secure-gate"
-version = "0.9.0-rc.3"
+version = "0.9.0-secrecy-compat.0.0.1"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -13,6 +13,7 @@ include = [
     "src/**/*.rs",
     "CHANGELOG.md",
     "LICENSE*",
+    "MIGRATING_FROM_SECRECY.md",
     "README.md",
     "SECURITY.md",
 ]

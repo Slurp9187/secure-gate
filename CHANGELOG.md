@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`secrecy-compat` feature flag** (`Cargo.toml`) — opt-in compatibility shim for teams migrating from `secrecy` without rewriting call sites immediately. Enables `secure_gate::compat` and keeps native secure-gate APIs unchanged.
+- **Dual-version secrecy compatibility modules** (`src/compat/`) — added `compat::v10` (secrecy 0.10.1-style `SecretBox<S>`, `SecretString`, `SecretSlice`) and `compat::v08` (secrecy 0.8.0-style `Secret<S>`, `SecretString`, `SecretVec`, `SecretBox`, `DebugSecret`), including API-level docs and migration tables.
+- **Shared secrecy trait surface + bridges** (`src/compat/mod.rs`) — added `ExposeSecret`, `ExposeSecretMut`, `CloneableSecret`, optional `SerializableSecret`, and `zeroize` re-export to mirror secrecy imports; also added bridge impls so native `Dynamic<String>`, `Dynamic<Vec<T>>`, and `Fixed<[T; N]>` satisfy compat traits for incremental migration.
+- **Conversion paths between compat and native wrappers** (`src/compat/v10.rs`, `src/compat/v08.rs`) — added `From` conversions to move gradually from secrecy-shaped types to `Dynamic<T>` / `Fixed<[T; N]>` and back for common string/vector cases.
+- **Compatibility integration suites** (`tests/compat_v10_tests.rs`, `tests/compat_v08_tests.rs`) — added coverage for constructors, trait behavior (`ExposeSecret`/`ExposeSecretMut`), redacted `Debug` behavior, clone/serde gates, and compat-native conversion round-trips across both secrecy generations.
+
+### Documentation
+
+- **`MIGRATING_FROM_SECRECY.md`** — new standalone guide covering both secrecy 0.8.x and 0.10.x: import swap tables, type mapping, step-by-step native migration, all `From` conversions, bridge impl examples, and security notes for the transition period.
+- **README** — "Migrating from secrecy" section replaced with a short pointer to `MIGRATING_FROM_SECRECY.md`. Features table: added `secrecy-compat` row.
+- **SECURITY** — Feature Security Implications table: added `secrecy-compat` row with security impact and recommendation. Compat layer security note added under Module-by-Module.
+
 ## [0.9.0-rc.3] - 2026-03-24
 
 ### Added
