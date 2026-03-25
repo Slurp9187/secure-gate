@@ -13,4 +13,8 @@ mod common;
 mod encoding_suite;
 mod serde_suite;
 mod macros_suite;
+// Proptest is valuable on native runs, but prohibitively slow under Miri's
+// interpreter; deterministic suites and the dedicated fuzz/Miri workflow still
+// cover UB-oriented paths there.
+#[cfg(not(miri))]
 mod proptest_suite;
