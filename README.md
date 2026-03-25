@@ -17,7 +17,7 @@
 | Status  | LTS / stable patches | Active development |
 | Branch  |    `release/0.8`     |       `main`       |
 
-Current crates.io version: 0.8.0-rc.3 (see `Cargo.toml` for exact version).
+Current crates.io version: 0.8.0-rc.4 (see `Cargo.toml` for exact version).
 
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
@@ -43,7 +43,7 @@ Current crates.io version: 0.8.0-rc.3 (see `Cargo.toml` for exact version).
 - **Explicit access only** — `.with_secret()` (preferred) or `.expose_secret()` required; no silent `Deref`/`AsRef` leaks
 - **Mandatory zeroize on drop** — always active, no feature gate (inner type must implement `Zeroize`)
 - **Timing-safe equality** — `ct-eq` feature for deterministic constant-time byte comparison (`subtle`)
-- **Secure random generation** — `from_random()` via `OsRng` (`rand` feature)
+- **Secure random generation** — `from_random()` (system `OsRng`) and `from_rng()` for any caller-supplied `TryCryptoRng` + `TryRngCore` (`rand` feature)
 - **Orthogonal encoding** — symmetric per-format traits + direct `try_from_*` constructors on `Fixed` and `Dynamic<Vec<u8>>` (hex, base64url, bech32/BIP-173, bech32m/BIP-350); each format is opt-in and zero-overhead when unused
 - **Serde** — direct deserialization to inner types (binary-safe); opt-in serialization requires `SerializableSecret` marker
 - **Ergonomic aliases** — `dynamic_alias!`, `fixed_alias!`, `fixed_generic_alias!`, `dynamic_generic_alias!` for typed newtypes
@@ -100,19 +100,19 @@ pw.expose_secret_mut().clear();
 
 ```toml
 [dependencies]
-secure-gate = "0.8.0-rc.3"
+secure-gate = "0.8.0-rc.4"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.8.0-rc.3", default-features = false }
+secure-gate = { version = "0.8.0-rc.4", default-features = false }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.8.0-rc.3", features = ["full"] }
+secure-gate = { version = "0.8.0-rc.4", features = ["full"] }
 ```
 
 ## Features
@@ -121,7 +121,7 @@ secure-gate = { version = "0.8.0-rc.3", features = ["full"] }
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                             |
 | `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                    |
-| `rand`              | `from_random()` via `OsRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself requires it). |
+| `rand`              | `from_random()` (system `OsRng`) and fallible `from_rng()` for custom RNGs; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random` / `from_rng` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
 | `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                            |
 | `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                                         |
 | `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                                                      |
@@ -273,11 +273,23 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 #[cfg(feature = "rand")]
 {
     use secure_gate::Fixed;
+    // System RNG — panics if entropy is unavailable (fatal environment error).
     let key: Fixed<[u8; 32]> = Fixed::from_random();
+}
+
+#[cfg(all(feature = "rand", feature = "alloc"))]
+{
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    use secure_gate::{Dynamic, Fixed};
+
+    let mut rng = StdRng::from_seed([0u8; 32]);
+    let _fixed: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng).expect("rng fill");
+    let _buf: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).expect("rng fill");
 }
 ```
 
-Cryptographically secure via `OsRng`. `Fixed::from_random()` is heap-free and works in `no_std`/`no_alloc` builds. `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself already requires it). See [`Fixed::from_random`] and [`Dynamic::from_random`] in the [API docs](https://docs.rs/secure-gate).
+`from_random()` uses the system RNG ([`OsRng`](https://docs.rs/rand/latest/rand/rngs/struct.OsRng.html)), panics on failure, and is heap-free for `Fixed<T>` (`no_std` / `no_alloc`). `from_rng` fills from any [`TryCryptoRng`](https://docs.rs/rand/latest/rand/trait.TryCryptoRng.html) + [`TryRngCore`](https://docs.rs/rand/latest/rand/trait.TryRngCore.html) and returns `Result` (e.g. seeded `StdRng` in tests). `Dynamic::from_random` / `from_rng` require `alloc` (implicit — `Dynamic<T>` itself already requires it). See [`Fixed::from_random`], [`Fixed::from_rng`], [`Dynamic::from_random`], and [`Dynamic::from_rng`] in the [API docs](https://docs.rs/secure-gate).
 
 ## Security Model
 

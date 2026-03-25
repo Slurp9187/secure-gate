@@ -35,7 +35,7 @@ use crate::traits::encoding::base64_url::ToBase64Url;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{rngs::OsRng, TryRngCore};
+use rand::{rngs::OsRng, TryCryptoRng, TryRngCore};
 
 #[cfg(feature = "encoding-base64")]
 use crate::traits::decoding::base64_url::FromBase64UrlStr;
@@ -227,6 +227,16 @@ impl<T: zeroize::Zeroize> crate::RevealSecretMut for Dynamic<Vec<T>> {
 // Random generation
 #[cfg(feature = "rand")]
 impl Dynamic<alloc::vec::Vec<u8>> {
+    /// Allocates a `Vec<u8>` of length `len`, fills it with cryptographically secure random bytes,
+    /// and wraps it.
+    ///
+    /// Uses the system RNG ([`OsRng`](rand::rngs::OsRng)). Requires the `rand` feature and `alloc`
+    /// (implicit — [`Dynamic<T>`](crate::Dynamic) itself requires `alloc`).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RNG fails ([`TryRngCore::try_fill_bytes`](rand::TryRngCore::try_fill_bytes)
+    /// returns `Err`). This is treated as a fatal environment error.
     #[inline]
     pub fn from_random(len: usize) -> Self {
         let mut bytes = vec![0u8; len];
@@ -234,6 +244,24 @@ impl Dynamic<alloc::vec::Vec<u8>> {
             .try_fill_bytes(&mut bytes)
             .expect("OsRng failure is a program error");
         Self::from(bytes)
+    }
+
+    /// Allocates a `Vec<u8>` of length `len`, fills it from `rng`, and wraps it.
+    ///
+    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRngCore`](rand::TryRngCore) (e.g. a
+    /// seeded generator for deterministic tests). Requires the `rand` feature and `alloc`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRngCore::try_fill_bytes) fails.
+    #[inline]
+    pub fn from_rng<R: TryRngCore + TryCryptoRng>(
+        len: usize,
+        rng: &mut R,
+    ) -> Result<Self, R::Error> {
+        let mut bytes = vec![0u8; len];
+        rng.try_fill_bytes(&mut bytes)?;
+        Ok(Self::from(bytes))
     }
 }
 

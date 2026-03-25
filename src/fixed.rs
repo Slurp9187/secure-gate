@@ -24,7 +24,7 @@ use crate::traits::encoding::base64_url::ToBase64Url;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{rngs::OsRng, TryRngCore};
+use rand::{rngs::OsRng, TryCryptoRng, TryRngCore};
 use zeroize::Zeroize;
 
 #[cfg(feature = "encoding-base64")]
@@ -144,6 +144,15 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecretMut for Fixed<[T; N]> {
 
 #[cfg(feature = "rand")]
 impl<const N: usize> Fixed<[u8; N]> {
+    /// Fills a new `[u8; N]` with cryptographically secure random bytes and wraps it.
+    ///
+    /// Uses the system RNG ([`OsRng`](rand::rngs::OsRng)). Requires the `rand` feature.
+    /// Heap-free and works in `no_std` / `no_alloc` builds.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RNG fails ([`TryRngCore::try_fill_bytes`](rand::TryRngCore::try_fill_bytes)
+    /// returns `Err`). This is treated as a fatal environment error.
     #[inline]
     pub fn from_random() -> Self {
         let mut bytes = [0u8; N];
@@ -151,6 +160,21 @@ impl<const N: usize> Fixed<[u8; N]> {
             .try_fill_bytes(&mut bytes)
             .expect("OsRng failure is a program error");
         Self::from(bytes)
+    }
+
+    /// Fills a new `[u8; N]` from `rng` and wraps it.
+    ///
+    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRngCore`](rand::TryRngCore) (e.g. a
+    /// seeded generator for deterministic tests). Requires the `rand` feature. Heap-free.
+    ///
+    /// # Errors
+    ///
+    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRngCore::try_fill_bytes) fails.
+    #[inline]
+    pub fn from_rng<R: TryRngCore + TryCryptoRng>(rng: &mut R) -> Result<Self, R::Error> {
+        let mut bytes = [0u8; N];
+        rng.try_fill_bytes(&mut bytes)?;
+        Ok(Self::from(bytes))
     }
 }
 

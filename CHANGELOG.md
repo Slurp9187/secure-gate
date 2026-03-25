@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0-rc.4] - 2026-03-24
+
+### Added
+
+- **`from_rng` constructor** (`Fixed<[u8; N]>` and `Dynamic<Vec<u8>>`, `rand` feature) — fills with bytes from any caller-supplied `TryRngCore + TryCryptoRng`, returning `Result<Self, R::Error>`; useful for seeded/deterministic RNGs in tests ([#103](https://github.com/Slurp9187/secure-gate/issues/103)).
+
 ## [0.8.0-rc.3] - 2026-03-24
 
 ### Changed

@@ -105,6 +105,22 @@ fn dynamic_generate_random() {
     random.with_secret(|s| assert!(!s.iter().all(|&b| b == 0)));
 }
 
+#[cfg(feature = "rand")]
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_from_rng_seeded() {
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    use secure_gate::Dynamic;
+
+    let mut rng = StdRng::from_seed([9u8; 32]);
+    let a: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).unwrap();
+    let b: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).unwrap();
+    a.with_secret(|sa| {
+        b.with_secret(|sb| assert_ne!(sa, sb, "sequential draws should differ"));
+    });
+}
+
 // === Dynamic<Vec<u8>> from slice ===
 #[cfg(feature = "alloc")]
 #[test]
@@ -174,4 +190,17 @@ fn fixed_from_random() {
             assert!(!k2.iter().all(|&b| b == 0));
         });
     });
+}
+
+#[cfg(feature = "rand")]
+#[test]
+fn fixed_from_rng_seeded_deterministic() {
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let mut rng_a = StdRng::from_seed([1u8; 32]);
+    let mut rng_b = StdRng::from_seed([1u8; 32]);
+    let key_a: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_a).unwrap();
+    let key_b: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_b).unwrap();
+    key_a.with_secret(|a| key_b.with_secret(|b| assert_eq!(a, b)));
 }
