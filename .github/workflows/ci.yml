@@ -134,7 +134,10 @@ jobs:
         run: cargo +1.70 check --locked --features=full
 
       - name: cargo test – all features (MSRV compatibility)
-        run: cargo +1.70 test --locked --all-features
+        # Skip compile-fail tests: trybuild snapshot format differs between Rust 1.70
+        # and stable (diagnostic wording changed). Compile-fail tests verify error
+        # message wording, not MSRV compatibility — they run in the stable `test` job.
+        run: cargo +1.70 test --locked --all-features -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse
 
   # ---------------------------------------------------------------------------
   # AddressSanitizer job — heap zeroization oracle
