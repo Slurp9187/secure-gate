@@ -155,9 +155,12 @@ pub use error::HexError;
 pub use error::DecodingError;
 pub use error::FromSliceError;
 
-/// secrecy v0.10.1 compatibility layer — drop-in replacement for the `secrecy` crate.
+/// secrecy compatibility layers — drop-in replacements for the `secrecy` crate.
 ///
-/// Enable with `features = ["secrecy-compat"]`. See the module docs for a full
-/// migration guide and per-item deprecation notices.
+/// Enable with `features = ["secrecy-compat"]`. Two sub-modules are provided:
+/// [`compat::v10`] mirrors secrecy 0.10.1 (`SecretBox<S>`, heap-allocated), and
+/// [`compat::v08`] mirrors secrecy 0.8.0 (`Secret<S>`, stack-allocated). Shared
+/// traits ([`compat::ExposeSecret`], [`compat::CloneableSecret`], etc.) live in the
+/// module root. See each sub-module for a full migration guide.
 #[cfg(feature = "secrecy-compat")]
 pub mod compat;

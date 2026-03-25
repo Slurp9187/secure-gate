@@ -1,8 +1,7 @@
-//! secrecy v0.10.1 compatibility layer.
+//! secrecy **v0.10.1** compatibility layer.
 //!
 //! This module is a near-exact API mirror of [`secrecy`](https://crates.io/crates/secrecy)
-//! v0.10.1 (`edition = "2021"`, `rust-version = "1.60"`). Enable it with
-//! `features = ["secrecy-compat"]` in your `Cargo.toml`.
+//! v0.10.1 (`edition = "2021"`, `rust-version = "1.60"`).
 //!
 //! # Drop-in replacement
 //!
@@ -10,17 +9,16 @@
 //!
 //! ```text
 //! // Before
-//! use secrecy::{SecretBox, SecretString, ExposeSecret};
+//! use secrecy::{SecretBox, SecretString, SecretSlice, ExposeSecret, ExposeSecretMut};
 //!
 //! // After (one global find/replace)
-//! use secure_gate::compat::{SecretBox, SecretString, ExposeSecret};
+//! use secure_gate::compat::v10::{SecretBox, SecretString, SecretSlice};
+//! use secure_gate::compat::{ExposeSecret, ExposeSecretMut};
 //! ```
-//!
-//! All types, traits, method signatures, and `zeroize` re-exports match secrecy v0.10.1.
 //!
 //! # Migration table
 //!
-//! | secrecy | secure-gate native |
+//! | secrecy 0.10 | secure-gate native |
 //! |---|---|
 //! | `SecretBox<T>` | [`Dynamic<T>`](crate::Dynamic) |
 //! | `SecretString` | `Dynamic<String>` |
@@ -33,8 +31,8 @@
 //! # Step-by-step migration
 //!
 //! 1. Replace `secrecy` dependency with `secure-gate` + `features = ["secrecy-compat"]`
-//! 2. Find/replace `use secrecy::` → `use secure_gate::compat::` (mechanical, no logic changes)
-//! 3. Gradually replace `compat::SecretBox<T>` with [`Dynamic<T>`](crate::Dynamic) using the
+//! 2. Find/replace `use secrecy::` → `use secure_gate::compat::v10::` (or `compat::` for traits)
+//! 3. Gradually replace `v10::SecretBox<T>` with [`Dynamic<T>`](crate::Dynamic) using the
 //!    provided [`From`] conversions
 //! 4. Replace `compat::ExposeSecret` with [`RevealSecret`](crate::RevealSecret) — bridge impls
 //!    on `Dynamic` and `Fixed` mean that call-sites using `.expose_secret()` continue to compile
@@ -50,81 +48,17 @@ use core::str::FromStr;
 use core::{any, fmt};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-// ── zeroize re-export ────────────────────────────────────────────────────────
-
-/// Re-exported [`zeroize`] crate — mirrors `secrecy`'s own `pub use zeroize;`.
-///
-/// Allows code using `secrecy::zeroize::Zeroize` to migrate unchanged via
-/// `use secure_gate::compat::zeroize::Zeroize`.
-pub use zeroize;
-
-// ── ExposeSecret / ExposeSecretMut ───────────────────────────────────────────
-
-/// Read-only access to a wrapped secret — mirrors `secrecy::ExposeSecret`.
-///
-/// Implemented by [`SecretBox`] and, via bridge impls, by
-/// [`Dynamic<String>`](crate::Dynamic), [`Dynamic<Vec<T>>`](crate::Dynamic), and
-/// [`Fixed<[T; N]>`](crate::Fixed).
-///
-/// # Migration
-///
-/// For new code, prefer [`RevealSecret`](crate::RevealSecret), which additionally
-/// provides scoped `with_secret` access (limiting the borrow lifetime) and byte-length
-/// metadata (`len`, `is_empty`).
-pub trait ExposeSecret<S: ?Sized> {
-    /// Returns a shared reference to the inner secret.
-    fn expose_secret(&self) -> &S;
-}
-
-/// Mutable access to a wrapped secret — mirrors `secrecy::ExposeSecretMut`.
-///
-/// # Migration
-///
-/// For new code, prefer [`RevealSecretMut`](crate::RevealSecretMut).
-pub trait ExposeSecretMut<S: ?Sized> {
-    /// Returns a mutable reference to the inner secret.
-    fn expose_secret_mut(&mut self) -> &mut S;
-}
-
-// ── CloneableSecret ──────────────────────────────────────────────────────────
-
-/// Marker trait for secrets that may be cloned — mirrors `secrecy::CloneableSecret`.
-///
-/// Defined locally here so the `cloneable` feature flag is not required when using
-/// the compat layer. For native secure-gate code, enable the `cloneable` feature and
-/// use [`secure_gate::CloneableSecret`](crate::CloneableSecret) directly.
-pub trait CloneableSecret: Clone + Zeroize {}
-
-impl CloneableSecret for i8 {}
-impl CloneableSecret for i16 {}
-impl CloneableSecret for i32 {}
-impl CloneableSecret for i64 {}
-impl CloneableSecret for i128 {}
-impl CloneableSecret for isize {}
-impl CloneableSecret for u8 {}
-impl CloneableSecret for u16 {}
-impl CloneableSecret for u32 {}
-impl CloneableSecret for u64 {}
-impl CloneableSecret for u128 {}
-impl CloneableSecret for usize {}
-impl<Z: CloneableSecret, const N: usize> CloneableSecret for [Z; N] {}
-
-// ── SerializableSecret ───────────────────────────────────────────────────────
-
-/// Marker trait for secrets that may be serialized — mirrors `secrecy::SerializableSecret`.
-///
-/// Requires the `serde-serialize` feature. To prevent accidental exfiltration,
-/// [`SecretBox`] serialization is opt-in: the inner type must implement this trait.
+use super::{CloneableSecret, ExposeSecret, ExposeSecretMut};
 #[cfg(feature = "serde-serialize")]
-pub trait SerializableSecret: serde::Serialize {}
+use super::SerializableSecret;
 
 // ── SecretBox ────────────────────────────────────────────────────────────────
 
 /// Heap-allocated secret wrapper — mirrors `secrecy::SecretBox`.
 ///
 /// Stores the secret in a `Box<S>`, zeroizes on drop, and only exposes the inner
-/// value through [`ExposeSecret`] / [`ExposeSecretMut`]. `Debug` always prints
-/// `[REDACTED]`.
+/// value through [`ExposeSecret`](super::ExposeSecret) /
+/// [`ExposeSecretMut`](super::ExposeSecretMut). `Debug` always prints `[REDACTED]`.
 ///
 /// # Migration to native secure-gate
 ///
@@ -133,7 +67,7 @@ pub trait SerializableSecret: serde::Serialize {}
 ///
 /// ```rust
 /// # #[cfg(feature = "secrecy-compat")] {
-/// use secure_gate::compat::SecretBox;
+/// use secure_gate::compat::v10::SecretBox;
 /// use secure_gate::Dynamic;
 ///
 /// let compat: SecretBox<String> = SecretBox::init_with(|| String::from("hunter2"));
@@ -323,57 +257,6 @@ where
     }
 }
 
-// ── Bridge: secure-gate native types → ExposeSecret / ExposeSecretMut ────────
-//
-// These explicit impls allow code written against the secrecy `ExposeSecret` trait
-// to work with native `Dynamic<T>` and `Fixed<[T; N]>` values unchanged.
-//
-// Explicit impls (rather than a blanket) are used to prevent the blanket from also
-// applying to `SecretBox`, which already has its own direct impl and must not pick
-// up a conflicting one.
-
-impl ExposeSecret<String> for crate::Dynamic<String> {
-    #[inline]
-    fn expose_secret(&self) -> &String {
-        crate::RevealSecret::expose_secret(self)
-    }
-}
-
-impl ExposeSecretMut<String> for crate::Dynamic<String> {
-    #[inline]
-    fn expose_secret_mut(&mut self) -> &mut String {
-        crate::RevealSecretMut::expose_secret_mut(self)
-    }
-}
-
-impl<T: Zeroize> ExposeSecret<Vec<T>> for crate::Dynamic<Vec<T>> {
-    #[inline]
-    fn expose_secret(&self) -> &Vec<T> {
-        crate::RevealSecret::expose_secret(self)
-    }
-}
-
-impl<T: Zeroize> ExposeSecretMut<Vec<T>> for crate::Dynamic<Vec<T>> {
-    #[inline]
-    fn expose_secret_mut(&mut self) -> &mut Vec<T> {
-        crate::RevealSecretMut::expose_secret_mut(self)
-    }
-}
-
-impl<const N: usize, T: Zeroize> ExposeSecret<[T; N]> for crate::Fixed<[T; N]> {
-    #[inline]
-    fn expose_secret(&self) -> &[T; N] {
-        crate::RevealSecret::expose_secret(self)
-    }
-}
-
-impl<const N: usize, T: Zeroize> ExposeSecretMut<[T; N]> for crate::Fixed<[T; N]> {
-    #[inline]
-    fn expose_secret_mut(&mut self) -> &mut [T; N] {
-        crate::RevealSecretMut::expose_secret_mut(self)
-    }
-}
-
 // ── Conversions: SecretBox ↔ Dynamic ─────────────────────────────────────────
 
 /// Converts a `SecretBox<S>` into a [`Dynamic<S>`](crate::Dynamic) (primary migration path).
@@ -472,5 +355,8 @@ where
 /// Legacy type alias for [`SecretBox`] — mirrors `secrecy::Secret` from secrecy <0.9.
 ///
 /// secrecy 0.9 renamed `Secret<T>` to `SecretBox<T>`. Use [`SecretBox`] instead.
+///
+/// **Note:** secrecy 0.8 users should use [`v08::Secret`](super::v08::Secret) instead,
+/// which mirrors the original stack-allocated semantics.
 #[deprecated(since = "0.8.0", note = "Use `SecretBox` instead (mirrors secrecy >=0.9)")]
 pub type Secret<S> = SecretBox<S>;

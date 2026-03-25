@@ -77,10 +77,11 @@ serde-serialize = ["dep:serde", "serde?/alloc", "alloc"]
 # Full batteries-included combo (most common real-world usage)
 full = ["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]
 
-# secrecy compatibility shim — drop-in replacement for secrecy v0.10.1 API.
-# Enables `secure_gate::compat::*` with SecretBox, SecretString, SecretSlice,
-# ExposeSecret, ExposeSecretMut, CloneableSecret, and zeroize re-export.
-# See `src/compat.rs` for the full migration guide.
+# secrecy compatibility shims — drop-in replacements for secrecy v0.8.0 and v0.10.1.
+# Enables `secure_gate::compat::v10` (SecretBox/SecretString/SecretSlice) and
+# `secure_gate::compat::v08` (Secret/SecretString/SecretVec/DebugSecret).
+# Shared traits (ExposeSecret, CloneableSecret, zeroize re-export) live in compat root.
+# See `src/compat/` for the full migration guides.
 secrecy-compat = ["alloc"]
 
 [[bench]]

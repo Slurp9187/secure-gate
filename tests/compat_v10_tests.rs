@@ -1,4 +1,4 @@
-// Integration tests for the secrecy v0.10.1 compatibility layer.
+// Integration tests for the secrecy v0.10.1 compatibility layer (compat::v10).
 //
 // These tests verify:
 //   1. SecretBox construction and access — matches secrecy's API exactly
@@ -15,9 +15,8 @@
 #![cfg(feature = "secrecy-compat")]
 #![allow(deprecated)] // for the Secret<T> alias test
 
-use secure_gate::compat::{
-    CloneableSecret, ExposeSecret, ExposeSecretMut, SecretBox, SecretSlice, SecretString,
-};
+use secure_gate::compat::v10::{SecretBox, SecretSlice, SecretString};
+use secure_gate::compat::{CloneableSecret, ExposeSecret, ExposeSecretMut};
 use secure_gate::{Dynamic, Fixed};
 
 // ── 1. SecretBox construction ─────────────────────────────────────────────────
@@ -310,7 +309,7 @@ fn zeroize_reexport_accessible() {
 
 #[test]
 fn legacy_secret_alias_compiles() {
-    use secure_gate::compat::Secret;
+    use secure_gate::compat::v10::Secret;
     let _s: Secret<String> = Secret::new(Box::new(String::from("legacy")));
 }
 
@@ -319,7 +318,6 @@ fn legacy_secret_alias_compiles() {
 #[cfg(feature = "serde-deserialize")]
 #[test]
 fn secret_box_deserialize_string() {
-    use secure_gate::compat::SecretBox;
     let json = r#""my_secret_password""#;
     let sb: SecretBox<String> = serde_json::from_str(json).expect("deserialize failed");
     assert_eq!(sb.expose_secret(), "my_secret_password");
