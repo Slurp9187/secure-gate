@@ -175,3 +175,32 @@ fn fixed_from_random() {
         });
     });
 }
+
+#[cfg(feature = "rand")]
+#[test]
+fn fixed_from_rng_seeded_deterministic() {
+    use rand::SeedableRng;
+    use rand::rngs::StdRng;
+
+    let mut rng_a = StdRng::from_seed([1u8; 32]);
+    let mut rng_b = StdRng::from_seed([1u8; 32]);
+    let key_a: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_a).expect("rng fill");
+    let key_b: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_b).expect("rng fill");
+    key_a.with_secret(|a| key_b.with_secret(|b| assert_eq!(a, b, "same seed must yield same bytes")));
+}
+
+#[cfg(feature = "rand")]
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_from_rng_seeded() {
+    use rand::SeedableRng;
+    use rand::rngs::StdRng;
+    use secure_gate::Dynamic;
+
+    let mut rng = StdRng::from_seed([9u8; 32]);
+    let a: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).expect("rng fill");
+    let b: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).expect("rng fill");
+    a.with_secret(|sa| {
+        b.with_secret(|sb| assert_ne!(sa, sb, "sequential draws from same RNG should differ"));
+    });
+}

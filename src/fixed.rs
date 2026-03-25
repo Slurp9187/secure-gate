@@ -24,7 +24,7 @@ use crate::traits::encoding::base64_url::ToBase64Url;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{rngs::SysRng, TryRng};
+use rand::{TryCryptoRng, TryRng, rngs::SysRng};
 use zeroize::Zeroize;
 
 #[cfg(feature = "encoding-base64")]
@@ -185,6 +185,36 @@ impl<const N: usize> Fixed<[u8; N]> {
             .try_fill_bytes(&mut bytes)
             .expect("SysRng failure is a program error");
         Self::from(bytes)
+    }
+
+    /// Fills a new `[u8; N]` from `rng` and wraps it.
+    ///
+    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRng`](rand::TryRng) — for example,
+    /// a seeded [`StdRng`](rand::rngs::StdRng) for deterministic tests. Requires the `rand`
+    /// feature. Heap-free.
+    ///
+    /// # Errors
+    ///
+    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRng::try_fill_bytes) fails.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use rand::rngs::StdRng;
+    /// use rand::SeedableRng;
+    /// use secure_gate::Fixed;
+    ///
+    /// let mut rng = StdRng::from_seed([1u8; 32]);
+    /// let key: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng).expect("rng fill");
+    /// # }
+    /// ```
+    #[inline]
+    pub fn from_rng<R: TryRng + TryCryptoRng>(rng: &mut R) -> Result<Self, R::Error> {
+        let mut bytes = [0u8; N];
+        rng.try_fill_bytes(&mut bytes)?;
+        Ok(Self::from(bytes))
     }
 }
 

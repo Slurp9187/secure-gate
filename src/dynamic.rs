@@ -35,7 +35,7 @@ use crate::traits::encoding::base64_url::ToBase64Url;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{TryRng, rngs::SysRng};
+use rand::{TryCryptoRng, TryRng, rngs::SysRng};
 
 #[cfg(feature = "encoding-base64")]
 use crate::traits::decoding::base64_url::FromBase64UrlStr;
@@ -277,6 +277,36 @@ impl Dynamic<alloc::vec::Vec<u8>> {
             .try_fill_bytes(&mut bytes)
             .expect("SysRng failure is a program error");
         Self::from(bytes)
+    }
+
+    /// Allocates a `Vec<u8>` of length `len`, fills it from `rng`, and wraps it.
+    ///
+    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRng`](rand::TryRng) — for example,
+    /// a seeded [`StdRng`](rand::rngs::StdRng) for deterministic tests. Requires the `rand`
+    /// feature and `alloc` (implicit — [`Dynamic<T>`](crate::Dynamic) itself requires it).
+    ///
+    /// # Errors
+    ///
+    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRng::try_fill_bytes) fails.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "alloc", feature = "rand"))]
+    /// # {
+    /// use rand::rngs::StdRng;
+    /// use rand::SeedableRng;
+    /// use secure_gate::Dynamic;
+    ///
+    /// let mut rng = StdRng::from_seed([9u8; 32]);
+    /// let nonce: Dynamic<Vec<u8>> = Dynamic::from_rng(24, &mut rng).expect("rng fill");
+    /// # }
+    /// ```
+    #[inline]
+    pub fn from_rng<R: TryRng + TryCryptoRng>(len: usize, rng: &mut R) -> Result<Self, R::Error> {
+        let mut bytes = alloc::vec![0u8; len];
+        rng.try_fill_bytes(&mut bytes)?;
+        Ok(Self::from(bytes))
     }
 }
 

@@ -213,11 +213,23 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 #[cfg(feature = "rand")]
 {
     use secure_gate::Fixed;
+    // System RNG — panics if entropy is unavailable (fatal environment error).
     let key: Fixed<[u8; 32]> = Fixed::from_random();
+}
+
+#[cfg(all(feature = "rand", feature = "alloc"))]
+{
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    use secure_gate::{Dynamic, Fixed};
+
+    let mut rng = StdRng::from_seed([0u8; 32]);
+    let _fixed: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng).expect("rng fill");
+    let _buf: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).expect("rng fill");
 }
 ```
 
-Cryptographically secure via `SysRng`. `Fixed::from_random()` is heap-free and works in `no_std`/`no_alloc` builds. `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself already requires it). See [`Fixed::from_random`] and [`Dynamic::from_random`] in the [API docs](https://docs.rs/secure-gate).
+`from_random()` uses the system RNG ([`SysRng`](https://docs.rs/rand/latest/rand/rngs/struct.SysRng.html)), panics on failure, and is heap-free for `Fixed<T>` (`no_std` / `no_alloc`). `from_rng` fills from any [`TryCryptoRng`](https://docs.rs/rand/latest/rand/trait.TryCryptoRng.html) + [`TryRng`](https://docs.rs/rand/latest/rand/trait.TryRng.html) and returns `Result` (e.g. seeded `StdRng` in tests). `Dynamic::from_random` / `from_rng` require `alloc` (implicit — `Dynamic<T>` itself already requires it). See [`Fixed::from_random`], [`Fixed::from_rng`], [`Dynamic::from_random`], and [`Dynamic::from_rng`] in the [API docs](https://docs.rs/secure-gate).
 
 ## Audit Guide
 
@@ -255,7 +267,7 @@ Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = 
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                              |
 | `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                     |
-| `rand`              | `from_random()` via `SysRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` requires `alloc` (implicit — `Dynamic<T>` itself requires it). |
+| `rand`              | `from_random()` (system `SysRng`) and fallible `from_rng()` for any `TryRng + TryCryptoRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` / `from_rng()` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
 | `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                             |
 | `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                                          |
 | `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                                                       |
