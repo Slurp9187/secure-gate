@@ -27,6 +27,7 @@ fn bech32_error_variants() {
 /// Test Bech32Error Clone, Copy, Debug, PartialEq, Eq
 #[cfg(feature = "encoding-bech32")]
 #[test]
+#[allow(clippy::redundant_clone)]
 fn bech32_error_traits() {
     let error1 = Bech32Error::InvalidHrp;
     let error2 = error1.clone(); // Clone

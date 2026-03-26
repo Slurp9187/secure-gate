@@ -62,6 +62,8 @@ fn stage1_v08_compat() {
         session_key: Secret::new(vec![0xABu8; 32]),
     };
 
+    assert_eq!(creds.username.as_str(), "alice");
+
     // Verify access
     assert_eq!(creds.password.expose_secret(), "correct_horse_battery_staple");
     assert_eq!(creds.session_key.expose_secret().len(), 32);
@@ -73,6 +75,8 @@ fn stage1_v08_compat() {
     // Clone (String: CloneableSecret in v08)
     let pw_copy = creds.password.clone();
     assert_eq!(creds.password.expose_secret(), pw_copy.expose_secret());
+    fn consume<T>(_t: T) {}
+    consume(pw_copy);
 
     // SecretVec
     let raw_key: SecretVec<u8> = Secret::new(vec![0x01u8; 16]);
@@ -99,6 +103,8 @@ fn stage2_v10_compat() {
         api_key: "Bearer_tok_xyz_789".into(),
         tls_cert: vec![0xCEu8; 64].into(),
     };
+
+    assert_eq!(config.api_endpoint.as_str(), "https://api.example.com");
 
     // Read access
     assert_eq!(config.api_key.expose_secret(), "Bearer_tok_xyz_789");

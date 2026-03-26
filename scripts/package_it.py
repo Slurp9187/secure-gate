@@ -10,11 +10,12 @@ from pathlib import Path
 from typing import Optional
 
 # ========================== CONFIGURATION ==========================
+MSRV = "1.70"
 PROJECT_TITLE = "secure-gate"
-OUTPUT_DIR = "code_packages"
+OUTPUT_DIR = f"code_packages_{MSRV}"
 ENCODING = "utf-8"
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
-OUTPUT_TIMESTAMP_FORMAT = "%Y%m%d_%H%M%S"
+OUTPUT_TIMESTAMP_FORMAT = f"%Y%m%d_%H%M%S_{MSRV}"
 
 # ========================== SAFETY FIRST ==========================
 

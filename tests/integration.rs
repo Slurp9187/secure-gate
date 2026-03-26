@@ -7,6 +7,7 @@
 //! Separate binaries are also kept for:
 //! - `heap_zeroize.rs`       (uses #[global_allocator])
 //! - `compile_fail_tests.rs` (uses trybuild)
+#![allow(clippy::redundant_clone)]
 
 mod common;
 
@@ -15,9 +16,14 @@ mod serde_suite;
 mod macros_suite;
 // The compat_suite gate lives entirely inside compat_suite/mod.rs
 // (#![cfg(feature = "secrecy-compat")]). No cfg is needed here.
+#[cfg(feature = "secrecy-compat")]
 mod compat_suite;
 // Proptest is valuable on native runs, but prohibitively slow under Miri's
 // interpreter; deterministic suites and the dedicated fuzz/Miri workflow still
 // cover UB-oriented paths there.
 #[cfg(not(miri))]
 mod proptest_suite;
+// The dual-compat-test gate lives entirely inside compat_dual/mod.rs
+// (#![cfg(feature = "dual-compat-test")]). No cfg is needed here.
+#[cfg(feature = "dual-compat-test")]
+mod compat_dual;

@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Property-based compat tests** (`tests/proptest_suite/proptest_compat.rs`) — proptest suite for the compat layer: value identity, Debug invariant, clone independence, and (when `ct-eq` is active) ct_eq agreement across all round-trip combinations.
 - **Compile-fail enforcement for compat explicit-access semantics** (`tests/compile-fail/compat_*.rs`) — three new trybuild tests proving that `Secret<T>` has no `Deref` (E0614), no `AsRef<str>` (E0277), and that `Debug` requires `DebugSecret` opt-in (E0277); gated on `secrecy-compat` feature.
 - **Fuzz targets for compat layer** (`fuzz/fuzz_targets/compat_v08.rs`, `fuzz/fuzz_targets/compat_v10.rs`) — libfuzzer targets covering all round-trip paths, value identity, Debug invariants, and mutable access for both compat generations. Added to CI fuzz matrix.
+- **`dual-compat-test` feature + dual-parity test suite** (`tests/compat_dual/`) — new opt-in feature that runs identical test bodies against both the real `secrecy` crate (pinned `0.8.0` / `0.10.1`) and the `secure-gate` compat shim side-by-side. Provides machine-verified proof of drop-in compatibility. Adds `~50` tests across `parity_v08.rs` (~24 tests), `parity_v10.rs` (~25 tests), and `divergence.rs` (5 tests). All test names include a `::real_secrecy` / `::compat_shim` suffix so failures pinpoint which side diverges. API coverage verified directly against local source clones of both secrecy versions.
 
 ### Documentation
 
