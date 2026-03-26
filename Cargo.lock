@@ -686,7 +686,7 @@ dependencies = [
 
 [[package]]
 name = "secure-gate"
-version = "0.8.0-secrecy-compat.0.0.1"
+version = "0.8.0-rc.5"
 dependencies = [
  "base64",
  "bech32",

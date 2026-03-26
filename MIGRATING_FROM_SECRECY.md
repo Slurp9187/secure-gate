@@ -16,6 +16,7 @@ major secrecy generations so that migration can be done incrementally.
 > [`tests/migration_full.rs`](tests/migration_full.rs) (standalone harness),
 > and [`tests/compat_suite/examples.rs`](tests/compat_suite/examples.rs)
 > (canonical copy-paste examples). Run:
+>
 > ```
 > cargo test --features secrecy-compat
 > cargo test --test migration_full --features secrecy-compat
@@ -25,6 +26,7 @@ major secrecy generations so that migration can be done incrementally.
 > [`tests/compat_dual/`](tests/compat_dual/) **twice** — once against the real
 > `secrecy` crate (0.8.0 / 0.10.1) and once against the `secure-gate` compat shim.
 > Both must pass identically, giving you machine-verified proof of drop-in compatibility.
+>
 > ```
 > cargo test --features dual-compat-test
 > ```
@@ -52,7 +54,7 @@ version sub-module) and work with both generations.
 # secrecy = "0.10"   (or "0.8")
 
 # Add:
-secure-gate = { version = "0.8.0", features = ["secrecy-compat"] }
+secure-gate = { version = "0.8.{x}", features = ["secrecy-compat"] }
 ```
 
 Then do a global find/replace on imports (details below). Your code should
@@ -256,24 +258,24 @@ cargo test --all-features
 
 ### What each file tests
 
-| File | What it verifies |
-| --- | --- |
-| `tests/compat_dual/parity_v08.rs` | ~21 shared API tests against secrecy 0.8.0 baseline + 3 bridge tests |
+| File                              | What it verifies                                                              |
+| --------------------------------- | ----------------------------------------------------------------------------- |
+| `tests/compat_dual/parity_v08.rs` | ~21 shared API tests against secrecy 0.8.0 baseline + 3 bridge tests          |
 | `tests/compat_dual/parity_v10.rs` | ~20 shared API tests against secrecy 0.10.1 baseline + 5 shim-extension tests |
-| `tests/compat_dual/divergence.rs` | Zeroization parity checks; shim-only stricter behaviors documented |
+| `tests/compat_dual/divergence.rs` | Zeroization parity checks; shim-only stricter behaviors documented            |
 
 ### Shim extensions (not in real secrecy)
 
 The following are convenience additions our shim provides beyond what real
 secrecy implements. They are tested in Part B of the parity files:
 
-| API | Shim version | Real secrecy |
-| --- | --- | --- |
-| `SecretString::from("&str")` (v10) | `impl From<&'a str>` | Missing — use `From<String>` |
-| `"...".parse::<SecretString>()` (v10) | `impl FromStr` | Missing |
-| `SecretString::default()` (v10) | Concrete impl | Missing — `str: !Default` |
-| `SecretSlice::<T>::default()` (v10) | Concrete impl | Missing — `[T]: !Default` |
-| `with_secret` / `with_secret_mut` | On native `Dynamic` / `Fixed` after migration | Not in secrecy |
+| API                                   | Shim version                                  | Real secrecy                 |
+| ------------------------------------- | --------------------------------------------- | ---------------------------- |
+| `SecretString::from("&str")` (v10)    | `impl From<&'a str>`                          | Missing — use `From<String>` |
+| `"...".parse::<SecretString>()` (v10) | `impl FromStr`                                | Missing                      |
+| `SecretString::default()` (v10)       | Concrete impl                                 | Missing — `str: !Default`    |
+| `SecretSlice::<T>::default()` (v10)   | Concrete impl                                 | Missing — `[T]: !Default`    |
+| `with_secret` / `with_secret_mut`     | On native `Dynamic` / `Fixed` after migration | Not in secrecy               |
 
 ---
 

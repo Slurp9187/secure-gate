@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0-rc.5] - 2026-03-26
+
 ### Added
 
 - **`Fixed::new_with` constructor** (`src/fixed.rs`) — closure-based constructor that writes directly into the wrapper's storage via `FnOnce(&mut [u8; N])`, eliminating the intermediate stack copy present in `new(value)`. All library-internal construction paths updated to use it: `TryFrom<&[u8]>`, `try_from_hex`, `try_from_base64url`, `try_from_bech32*`, `from_random`, `from_rng`, and the serde `visit_seq` deserializer. `new(value)` is unchanged and remains the ergonomic default.

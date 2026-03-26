@@ -17,7 +17,7 @@
 | Status  | LTS / stable patches | Active development |
 | Branch  |    `release/0.8`     |       `main`       |
 
-Current crates.io version: 0.8.0 (see `Cargo.toml` for exact version).
+Current crates.io version: 0.8.0-rc.5 (see `Cargo.toml` for exact version).
 
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
@@ -100,19 +100,19 @@ pw.expose_secret_mut().clear();
 
 ```toml
 [dependencies]
-secure-gate = "0.8.0"
+secure-gate = "0.8.0-rc.{x}"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.8.0", default-features = false }
+secure-gate = { version = "0.8.0-rc.{x}", default-features = false }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.8.0", features = ["full"] }
+secure-gate = { version = "0.8.0-rc.{x}", features = ["full"] }
 ```
 
 ## Features
@@ -132,7 +132,7 @@ secure-gate = { version = "0.8.0", features = ["full"] }
 | `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                                                                                 |
 | `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                                                                               |
 | `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                                                                                     |
-| `secrecy-compat`    | Drop-in compatibility shim for `secrecy` 0.8.x and 0.10.x — `compat::v08` and `compat::v10` modules with matching types, traits, and `From` conversions to native wrappers                                                          |
+| `secrecy-compat`    | Drop-in compatibility shim for `secrecy` 0.8.x and 0.10.x — `compat::v08` and `compat::v10` modules with matching types, traits, and `From` conversions to native wrappers                                                           |
 | `full`              | All features combined                                                                                                                                                                                                                |
 
 `no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding, and serde require `alloc`. Disabled features have zero overhead.
@@ -306,7 +306,7 @@ Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SEC
 Enable `secrecy-compat` and swap imports — your code compiles unchanged. Then replace compat types with native `Dynamic<T>` / `Fixed<[T; N]>` at your own pace using the provided `From` conversions.
 
 ```toml
-secure-gate = { version = "0.8.0", features = ["secrecy-compat"] }
+secure-gate = { version = "0.8.0-rc.{x}", features = ["secrecy-compat"] }
 ```
 
 See **[MIGRATING_FROM_SECRECY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/MIGRATING_FROM_SECRECY.md)** for the full guide, including per-version import tables, type mappings, step-by-step instructions, and security notes for the transition period.
