@@ -99,8 +99,14 @@ full = ["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]
 # Enables `secure_gate::compat::v10` (SecretBox/SecretString/SecretSlice) and
 # `secure_gate::compat::v08` (Secret/SecretString/SecretVec/DebugSecret).
 # Shared traits (ExposeSecret, CloneableSecret, zeroize re-export) live in compat root.
-# See `src/compat/` for the full migration guides.
+# See `src/compat/` for the full migration guides and
+# `tests/compat_suite/` for the exhaustive migration test suite.
 secrecy-compat = ["alloc"]
+
+[[test]]
+name = "migration_full"
+path = "tests/migration_full.rs"
+harness = false
 
 [[bench]]
 name = "fixed_vs_raw"

@@ -11,6 +11,16 @@ major secrecy generations so that migration can be done incrementally.
 > **Goal**: get your code compiling against `secure-gate` immediately (Step 1),
 > then replace compat types with native wrappers at your own pace (Steps 2–5).
 
+> **Test suite**: Every pattern in this guide is proven by runnable tests in
+> [`tests/compat_suite/`](tests/compat_suite/) (integrated into `cargo test`),
+> [`tests/migration_full.rs`](tests/migration_full.rs) (standalone harness),
+> and [`tests/compat_suite/examples.rs`](tests/compat_suite/examples.rs)
+> (canonical copy-paste examples). Run:
+> ```
+> cargo test --features secrecy-compat
+> cargo test --test migration_full --features secrecy-compat
+> ```
+
 ---
 
 ## Which secrecy version are you on?

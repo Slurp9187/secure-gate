@@ -13,6 +13,9 @@ mod common;
 mod encoding_suite;
 mod serde_suite;
 mod macros_suite;
+// The compat_suite gate lives entirely inside compat_suite/mod.rs
+// (#![cfg(feature = "secrecy-compat")]). No cfg is needed here.
+mod compat_suite;
 // Proptest is valuable on native runs, but prohibitively slow under Miri's
 // interpreter; deterministic suites and the dedicated fuzz/Miri workflow still
 // cover UB-oriented paths there.
