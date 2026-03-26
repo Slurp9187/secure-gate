@@ -177,8 +177,8 @@ fn secret_vec_clone() {
 fn secret_box_byte_slice() {
     let data: Box<[u8]> = Box::from(&[1u8, 2, 3, 4][..]);
     let sb: SecretBox<[u8]> = Secret::new(data);
-    let inner: &Box<[u8]> = sb.expose_secret();
-    assert_eq!(inner.as_ref(), &[1u8, 2, 3, 4]);
+    let inner: &[u8] = sb.expose_secret().as_ref();
+    assert_eq!(inner, &[1u8, 2, 3, 4]);
 }
 
 // ── 9. CloneableSecret for String and Vec ────────────────────────────────────

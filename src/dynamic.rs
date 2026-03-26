@@ -169,7 +169,7 @@ impl Dynamic<Vec<u8>> {
     #[inline(always)]
     fn from_protected_bytes(mut protected: zeroize::Zeroizing<alloc::vec::Vec<u8>>) -> Self {
         // Only fallible allocation; protected stays live across it for panic-safety
-        let mut boxed = Box::new(alloc::vec::Vec::new());
+        let mut boxed = Box::<alloc::vec::Vec<u8>>::default();
         core::mem::swap(&mut *boxed, &mut *protected);
         Self::from(boxed)
     }
@@ -525,7 +525,7 @@ impl Dynamic<alloc::vec::Vec<u8>> {
             ));
         }
         // Only fallible allocation; protected stays live across it for panic-safety
-        let mut boxed = Box::new(alloc::vec::Vec::new());
+        let mut boxed = Box::<alloc::vec::Vec<u8>>::default();
         core::mem::swap(&mut *boxed, &mut *buf);
         Ok(Self::from(boxed))
     }
@@ -559,7 +559,7 @@ impl Dynamic<String> {
             ));
         }
         // Only fallible allocation; protected stays live across it for panic-safety
-        let mut boxed = Box::new(alloc::string::String::new());
+        let mut boxed = Box::<alloc::string::String>::default();
         core::mem::swap(&mut *boxed, &mut *buf);
         Ok(Self::from(boxed))
     }

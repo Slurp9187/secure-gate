@@ -34,6 +34,10 @@ criterion = { version = "0.7", features = ["html_reports"] }
 proptest = "1.10"
 serde_json = "1.0"
 trybuild = "1.0"
+# Dual-parity testing baselines — pinned exact versions matching local source clones.
+# These compile as dev-deps always; the dual-compat-test feature gates the test module.
+secrecy-v08 = { package = "secrecy", version = "=0.8.0" }
+secrecy-v10 = { package = "secrecy", version = "=0.10.1" }
 
 [package.metadata.docs.rs]
 all-features = true
@@ -85,6 +89,12 @@ full = ["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]
 # See `src/compat/` for the full migration guides and
 # `tests/compat_suite/` for the exhaustive migration test suite.
 secrecy-compat = ["alloc"]
+
+# Enables side-by-side parity tests in tests/compat_dual/ that run the exact same
+# test body against both the real `secrecy` crate and the compat shim, proving drop-in
+# identity. Implies secrecy-compat. Real secrecy dev-deps are always compiled (they are
+# ordinary dev-dependencies); this feature just activates the test module.
+dual-compat-test = ["secrecy-compat"]
 
 [[test]]
 name = "migration_full"

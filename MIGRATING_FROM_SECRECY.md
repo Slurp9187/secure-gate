@@ -20,6 +20,14 @@ major secrecy generations so that migration can be done incrementally.
 > cargo test --features secrecy-compat
 > cargo test --test migration_full --features secrecy-compat
 > ```
+>
+> **Parity suite**: The `dual-compat-test` feature runs every test in
+> [`tests/compat_dual/`](tests/compat_dual/) **twice** — once against the real
+> `secrecy` crate (0.8.0 / 0.10.1) and once against the `secure-gate` compat shim.
+> Both must pass identically, giving you machine-verified proof of drop-in compatibility.
+> ```
+> cargo test --features dual-compat-test
+> ```
 
 ---
 
@@ -252,6 +260,49 @@ process(&compat);
 let native: Dynamic<String> = Dynamic::new(String::from("hi"));
 process(&native);
 ```
+
+---
+
+## Parity test suite — machine-verified drop-in compatibility
+
+The `tests/compat_dual/` suite provides the strongest guarantee available: the
+**exact same test body** runs against the real `secrecy` crate and the
+`secure-gate` compat shim in a single `cargo test` run. If both pass, the shim
+is behaviorally identical for that test case.
+
+### Running the parity suite
+
+```bash
+# Primary parity run — recommended for CI and before releases
+cargo test --features dual-compat-test
+
+# Verify fast path is unchanged (no dual tests)
+cargo test --features secrecy-compat
+
+# Full suite including parity
+cargo test --all-features
+```
+
+### What each file tests
+
+| File | What it verifies |
+| --- | --- |
+| `tests/compat_dual/parity_v08.rs` | ~21 shared API tests against secrecy 0.8.0 baseline + 3 bridge tests |
+| `tests/compat_dual/parity_v10.rs` | ~20 shared API tests against secrecy 0.10.1 baseline + 5 shim-extension tests |
+| `tests/compat_dual/divergence.rs` | Zeroization parity checks; shim-only stricter behaviors documented |
+
+### Shim extensions (not in real secrecy)
+
+The following are convenience additions our shim provides beyond what real
+secrecy implements. They are tested in Part B of the parity files:
+
+| API | Shim version | Real secrecy |
+| --- | --- | --- |
+| `SecretString::from("&str")` (v10) | `impl From<&'a str>` | Missing — use `From<String>` |
+| `"...".parse::<SecretString>()` (v10) | `impl FromStr` | Missing |
+| `SecretString::default()` (v10) | Concrete impl | Missing — `str: !Default` |
+| `SecretSlice::<T>::default()` (v10) | Concrete impl | Missing — `[T]: !Default` |
+| `with_secret` / `with_secret_mut` | On native `Dynamic` / `Fixed` after migration | Not in secrecy |
 
 ---
 
