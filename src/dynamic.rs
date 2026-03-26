@@ -51,7 +51,13 @@ use crate::traits::decoding::hex::FromHexStr;
 /// Requires `alloc`. **Inner type must implement `Zeroize`** for automatic zeroization on drop
 /// (including spare capacity in `Vec`/`String`).
 ///
-/// No `Deref`, `AsRef`, or `Copy` by default. `Debug` always prints `[REDACTED]`.
+/// No `Deref`, `AsRef`, or `Copy` by default — all access requires
+/// [`expose_secret()`](crate::RevealSecret::expose_secret) or
+/// [`with_secret()`](crate::RevealSecret::with_secret) (scoped, preferred).
+/// For the common concrete types, [`Dynamic::<Vec<u8>>::new_with`](Dynamic::new_with) and
+/// [`Dynamic::<String>::new_with`](Dynamic::new_with) are the matching scoped constructors —
+/// closures that write directly into the wrapper. [`new(value)`](Dynamic::new) remains
+/// available as the ergonomic default. `Debug` always prints `[REDACTED]`.
 pub struct Dynamic<T: ?Sized + zeroize::Zeroize> {
     inner: Box<T>,
 }
@@ -167,6 +173,34 @@ impl Dynamic<Vec<u8>> {
         core::mem::swap(&mut *boxed, &mut *protected);
         Self::from(boxed)
     }
+
+    /// Closure-based constructor for consistent API with [`Fixed::new_with`](crate::Fixed::new_with).
+    /// The actual secret data is allocated on the heap; this method exists
+    /// for ergonomic uniformity across the crate.
+    #[inline(always)]
+    pub fn new_with<F>(f: F) -> Self
+    where
+        F: FnOnce(&mut alloc::vec::Vec<u8>),
+    {
+        let mut v = alloc::vec::Vec::new();
+        f(&mut v);
+        Self::new(v)
+    }
+}
+
+impl Dynamic<alloc::string::String> {
+    /// Closure-based constructor for consistent API with [`Fixed::new_with`](crate::Fixed::new_with).
+    /// The actual secret data is allocated on the heap; this method exists
+    /// for ergonomic uniformity across the crate.
+    #[inline(always)]
+    pub fn new_with<F>(f: F) -> Self
+    where
+        F: FnOnce(&mut alloc::string::String),
+    {
+        let mut s = alloc::string::String::new();
+        f(&mut s);
+        Self::new(s)
+    }
 }
 
 // RevealSecret
@@ -272,11 +306,12 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// ```
     #[inline]
     pub fn from_random(len: usize) -> Self {
-        let mut bytes = vec![0u8; len];
-        SysRng
-            .try_fill_bytes(&mut bytes)
-            .expect("SysRng failure is a program error");
-        Self::from(bytes)
+        Self::new_with(|v| {
+            v.resize(len, 0u8);
+            SysRng
+                .try_fill_bytes(v)
+                .expect("SysRng failure is a program error");
+        })
     }
 
     /// Allocates a `Vec<u8>` of length `len`, fills it from `rng`, and wraps it.
@@ -303,10 +338,16 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// # }
     /// ```
     #[inline]
-    pub fn from_rng<R: TryRng + TryCryptoRng>(len: usize, rng: &mut R) -> Result<Self, R::Error> {
-        let mut bytes = alloc::vec![0u8; len];
-        rng.try_fill_bytes(&mut bytes)?;
-        Ok(Self::from(bytes))
+    pub fn from_rng<R: TryRng + TryCryptoRng>(
+        len: usize,
+        rng: &mut R,
+    ) -> Result<Self, R::Error> {
+        let mut result = Ok(());
+        let this = Self::new_with(|v| {
+            v.resize(len, 0u8);
+            result = rng.try_fill_bytes(v);
+        });
+        result.map(|_| this)
     }
 }
 

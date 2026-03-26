@@ -112,29 +112,39 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Long-lived `expose_secret()` references can defeat scoping
 - Macro-generated aliases lack runtime size checks
 - Certain error variants may indirectly leak length information (e.g. wrong decoded length).
-In most real-world usage (logging, API responses), length is already public metadata anyway (e.g. key length in JWT headers, signature length). Still, contextualize or redact errors when possible.
-- `Fixed<T>` decoding constructors (`try_from_hex`, `try_from_base64url`, etc.) use
-`copy_from_slice` into a stack-allocated `[0u8; N]` before moving into the wrapper.
-The intermediate stack slot is not explicitly zeroed before the move; in adversarial
-environments (core dumps, memory forensics) secret bytes may persist briefly on the
-stack. In release mode the compiler often eliminates the slot entirely. `Dynamic<T>`
-avoids this via `from_protected_bytes` + `mem::swap` (heap-only path).
-- `**static` secrets are never zeroized.** `Fixed::new` is `const fn`, so
-`static SECRET: Fixed<[u8; 32]> = Fixed::new([...]);` compiles without warning.
-Rust does not invoke `Drop` on program-scope statics during the lifetime of the
-process. The `ZeroizeOnDrop` guarantee only applies to values that are dropped in
-the normal sense (stack unwinding, scope exit). Do not store secrets in statics.
-- `**panic = "abort"` builds disable zeroization on panic.** When `panic = "abort"`
-is set in a profile, Rust aborts the process immediately on panic without running
-any `Drop` implementations. Secrets held in `Fixed<T>` or `Dynamic<T>` at the
-moment of a panic will not be zeroized before the process exits. This is an
-inherent limitation of the `zeroize` ecosystem — `zeroize`, `secrecy`, and other
-crates share the same constraint. Prefer `panic = "unwind"` (the default) in
-security-sensitive builds.
+  In most real-world usage (logging, API responses), length is already public metadata anyway (e.g. key length in JWT headers, signature length). Still, contextualize or redact errors when possible.
+- `Fixed<T>` decode constructors previously used `copy_from_slice` into a separate
+  stack-allocated `[0u8; N]` before wrapping. **This has been mitigated**: all
+  library-internal decode paths (`try_from_hex`, `try_from_base64url`, `try_from_bech32*`,
+  `TryFrom<&[u8]>`) and the RNG constructors (`from_random`, `from_rng`) now use
+  `Fixed::new_with`, which writes directly into the wrapper's storage and avoids the
+  intermediate slot. The `new(value)` constructor still accepts a pre-constructed array
+  and may produce a brief stack temporary (compiler often eliminates it at opt-level ≥ 1
+  with `#[inline(always)]`). `Dynamic<T>` avoids all stack involvement via
+  `from_protected_bytes` + `mem::swap` (heap-only path).
+- **`static` secrets are never zeroized.** `Fixed::new` is `const fn`, so
+  `static SECRET: Fixed<[u8; 32]> = Fixed::new([...]);` compiles without warning.
+  Rust does not invoke `Drop` on program-scope statics during the lifetime of the
+  process. The `ZeroizeOnDrop` guarantee only applies to values that are dropped in
+  the normal sense (stack unwinding, scope exit). Do not store secrets in statics.
+- **`panic = "abort"` builds disable zeroization on panic.** When `panic = "abort"`
+  is set in a profile, Rust aborts the process immediately on panic without running
+  any `Drop` implementations. Secrets held in `Fixed<T>` or `Dynamic<T>` at the
+  moment of a panic will not be zeroized before the process exits. This is an
+  inherent limitation of the `zeroize` ecosystem — `zeroize`, `secrecy`, and other
+  crates share the same constraint. Prefer `panic = "unwind"` (the default) in
+  security-sensitive builds.
 
 **Mitigations**
 
-- Prefer `with_secret()` / `with_secret_mut()`
+- **For accessing secrets:** prefer the scoped `with_secret()` / `with_secret_mut()` closures
+  over `expose_secret()` / `expose_secret_mut()` — they keep the exposed reference tightly
+  bound and make accidental long-lived borrows visible at the call site.
+- **For constructing secrets:** prefer `Fixed::new_with(|arr| { ... })` or
+  `Dynamic::<Vec<u8>>::new_with(|v| { ... })` over `Fixed::new(value)` / `Dynamic::new(value)`
+  when constructing from computed data inline — these write directly into the wrapper's storage
+  and avoid any intermediate copy. `Dynamic<T>` remains the strictest option (heap-only; secret
+  bytes never on the stack).
 - Audit all `expose_secret()` calls
 - Contextualize errors to avoid side-channel information
 - Never store a wrapper in a `static` — use local variables or heap-allocated structs instead
