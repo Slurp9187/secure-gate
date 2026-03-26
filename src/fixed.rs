@@ -42,7 +42,11 @@ use crate::traits::decoding::hex::FromHexStr;
 ///
 /// No `Deref`, `AsRef`, or `Copy` by default — all access requires
 /// [`expose_secret()`](RevealSecret::expose_secret) or
-/// [`with_secret()`](RevealSecret::with_secret) (scoped, recommended).
+/// [`with_secret()`](RevealSecret::with_secret) (scoped, preferred).
+/// For construction of `Fixed<[u8; N]>`, [`new_with`](Fixed::new_with) is the
+/// matching scoped constructor — it writes directly into the wrapper's storage
+/// and avoids any intermediate stack copy. [`new(value)`](Fixed::new) remains
+/// available as the ergonomic default.
 /// `Debug` always prints `[REDACTED]`. Performance indistinguishable from raw arrays.
 pub struct Fixed<T: zeroize::Zeroize> {
     inner: T,
@@ -76,14 +80,36 @@ impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
             #[cfg(not(debug_assertions))]
             return Err(crate::error::FromSliceError::InvalidLength);
         }
-        let mut arr = [0u8; N];
-        arr.copy_from_slice(slice);
-        Ok(Self::new(arr))
+        Ok(Self::new_with(|arr| arr.copy_from_slice(slice)))
     }
 }
 
-/// Ergonomic encoding helpers for `Fixed<[u8; N]>`.
+/// Construction and ergonomic encoding helpers for `Fixed<[u8; N]>`.
 impl<const N: usize> Fixed<[u8; N]> {
+    /// Writes directly into the wrapper's storage via a user-supplied closure,
+    /// eliminating the intermediate stack copy that [`new`](Self::new) may produce.
+    ///
+    /// The array is zero-initialized before the closure runs. Prefer this over
+    /// [`new(value)`](Self::new) when minimizing stack residue matters
+    /// (long-lived keys, high-assurance environments).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::Fixed;
+    ///
+    /// let secret = Fixed::<[u8; 4]>::new_with(|arr| arr.fill(0xAB));
+    /// ```
+    #[inline(always)]
+    pub fn new_with<F>(f: F) -> Self
+    where
+        F: FnOnce(&mut [u8; N]),
+    {
+        let mut this = Self { inner: [0u8; N] };
+        f(&mut this.inner);
+        this
+    }
+
     #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex(&self) -> alloc::string::String {
@@ -155,11 +181,11 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// returns `Err`). This is treated as a fatal environment error.
     #[inline]
     pub fn from_random() -> Self {
-        let mut bytes = [0u8; N];
-        OsRng
-            .try_fill_bytes(&mut bytes)
-            .expect("OsRng failure is a program error");
-        Self::from(bytes)
+        Self::new_with(|arr| {
+            OsRng
+                .try_fill_bytes(arr)
+                .expect("OsRng failure is a program error");
+        })
     }
 
     /// Fills a new `[u8; N]` from `rng` and wraps it.
@@ -172,9 +198,11 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRngCore::try_fill_bytes) fails.
     #[inline]
     pub fn from_rng<R: TryRngCore + TryCryptoRng>(rng: &mut R) -> Result<Self, R::Error> {
-        let mut bytes = [0u8; N];
-        rng.try_fill_bytes(&mut bytes)?;
-        Ok(Self::from(bytes))
+        let mut result = Ok(());
+        let this = Self::new_with(|arr| {
+            result = rng.try_fill_bytes(arr);
+        });
+        result.map(|_| this) // on Err, `this` drops → zeroizes any partial fill
     }
 }
 
@@ -191,9 +219,7 @@ impl<const N: usize> Fixed<[u8; N]> {
             #[cfg(not(debug_assertions))]
             return Err(crate::error::HexError::InvalidLength);
         }
-        let mut arr = [0u8; N];
-        arr.copy_from_slice(&bytes);
-        Ok(Self::new(arr))
+        Ok(Self::new_with(|arr| arr.copy_from_slice(&bytes)))
     }
 }
 
@@ -210,9 +236,7 @@ impl<const N: usize> Fixed<[u8; N]> {
             #[cfg(not(debug_assertions))]
             return Err(crate::error::Base64Error::InvalidLength);
         }
-        let mut arr = [0u8; N];
-        arr.copy_from_slice(&bytes);
-        Ok(Self::new(arr))
+        Ok(Self::new_with(|arr| arr.copy_from_slice(&bytes)))
     }
 }
 
@@ -237,9 +261,7 @@ impl<const N: usize> Fixed<[u8; N]> {
             #[cfg(not(debug_assertions))]
             return Err(crate::error::Bech32Error::InvalidLength);
         }
-        let mut arr = [0u8; N];
-        arr.copy_from_slice(&bytes);
-        Ok(Self::new(arr))
+        Ok(Self::new_with(|arr| arr.copy_from_slice(&bytes)))
     }
 
     /// Decodes a Bech32 (BIP-173) string into `Fixed<[u8; N]>`, validating that the HRP
@@ -259,9 +281,7 @@ impl<const N: usize> Fixed<[u8; N]> {
             #[cfg(not(debug_assertions))]
             return Err(crate::error::Bech32Error::InvalidLength);
         }
-        let mut arr = [0u8; N];
-        arr.copy_from_slice(&bytes);
-        Ok(Self::new(arr))
+        Ok(Self::new_with(|arr| arr.copy_from_slice(&bytes)))
     }
 }
 
@@ -286,9 +306,7 @@ impl<const N: usize> Fixed<[u8; N]> {
             #[cfg(not(debug_assertions))]
             return Err(crate::error::Bech32Error::InvalidLength);
         }
-        let mut arr = [0u8; N];
-        arr.copy_from_slice(&bytes);
-        Ok(Self::new(arr))
+        Ok(Self::new_with(|arr| arr.copy_from_slice(&bytes)))
     }
 
     /// Decodes a Bech32m (BIP-350) string into `Fixed<[u8; N]>`, validating that the HRP
@@ -308,9 +326,7 @@ impl<const N: usize> Fixed<[u8; N]> {
             #[cfg(not(debug_assertions))]
             return Err(crate::error::Bech32Error::InvalidLength);
         }
-        let mut arr = [0u8; N];
-        arr.copy_from_slice(&bytes);
-        Ok(Self::new(arr))
+        Ok(Self::new_with(|arr| arr.copy_from_slice(&bytes)))
     }
 }
 
@@ -379,9 +395,7 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
                     #[cfg(not(debug_assertions))]
                     return Err(serde::de::Error::custom("decoded length mismatch"));
                 }
-                let mut arr = [0u8; M];
-                arr.copy_from_slice(&vec);
-                Ok(Fixed::new(arr))
+                Ok(Fixed::new_with(|arr| arr.copy_from_slice(&vec)))
             }
         }
         deserializer.deserialize_seq(FixedVisitor::<N>)

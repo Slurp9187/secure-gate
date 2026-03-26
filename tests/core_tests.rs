@@ -204,3 +204,96 @@ fn fixed_from_rng_seeded_deterministic() {
     let key_b: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_b).unwrap();
     key_a.with_secret(|a| key_b.with_secret(|b| assert_eq!(a, b)));
 }
+
+// === new_with Construction ===
+
+#[test]
+fn fixed_new_with_fills_correctly() {
+    let key = Fixed::<[u8; 4]>::new_with(|arr| arr.copy_from_slice(&[1, 2, 3, 4]));
+    key.with_secret(|s| assert_eq!(s, &[1u8, 2, 3, 4]));
+}
+
+#[test]
+fn fixed_new_with_zero_initialized_before_closure() {
+    // Closure does nothing — array must be zero, not garbage
+    let key = Fixed::<[u8; 8]>::new_with(|_arr| {});
+    key.with_secret(|s| assert_eq!(s, &[0u8; 8]));
+}
+
+#[test]
+fn fixed_new_with_partial_fill() {
+    let key = Fixed::<[u8; 4]>::new_with(|arr| arr[0] = 0xFF);
+    key.with_secret(|s| {
+        assert_eq!(s[0], 0xFF);
+        assert_eq!(&s[1..], &[0u8; 3]); // rest stays zero
+    });
+}
+
+#[test]
+fn fixed_new_with_is_zero_cost() {
+    let key = Fixed::<[u8; 32]>::new_with(|arr| arr.fill(0xAB));
+    assert_eq!(core::mem::size_of_val(&key), 32);
+}
+
+// Shared failing RNG for error-propagation tests.
+#[cfg(feature = "rand")]
+struct FailingRng;
+
+#[cfg(feature = "rand")]
+impl rand::TryRngCore for FailingRng {
+    type Error = &'static str;
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> { Err("fail") }
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> { Err("fail") }
+    fn try_fill_bytes(&mut self, _: &mut [u8]) -> Result<(), Self::Error> { Err("fail") }
+}
+
+#[cfg(feature = "rand")]
+impl rand::TryCryptoRng for FailingRng {}
+
+#[cfg(feature = "rand")]
+#[test]
+fn fixed_from_rng_error_returns_err() {
+    let result = Fixed::<[u8; 4]>::from_rng(&mut FailingRng);
+    assert!(result.is_err());
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_vec_new_with_fills_correctly() {
+    use secure_gate::Dynamic;
+    let secret = Dynamic::<Vec<u8>>::new_with(|v| v.extend_from_slice(&[10, 20, 30]));
+    secret.with_secret(|s| assert_eq!(s.as_slice(), &[10u8, 20, 30]));
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_vec_new_with_empty_closure() {
+    use secure_gate::Dynamic;
+    let secret = Dynamic::<Vec<u8>>::new_with(|_v| {});
+    secret.with_secret(|s| assert!(s.is_empty()));
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_string_new_with_fills_correctly() {
+    use secure_gate::Dynamic;
+    let secret = Dynamic::<String>::new_with(|s| s.push_str("hunter2"));
+    secret.with_secret(|s| assert_eq!(s.as_str(), "hunter2"));
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_string_new_with_empty_closure() {
+    use secure_gate::Dynamic;
+    let secret = Dynamic::<String>::new_with(|_s| {});
+    secret.with_secret(|s| assert!(s.is_empty()));
+}
+
+#[cfg(feature = "rand")]
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_from_rng_error_returns_err() {
+    use secure_gate::Dynamic;
+    let result = Dynamic::<Vec<u8>>::from_rng(32, &mut FailingRng);
+    assert!(result.is_err());
+}
