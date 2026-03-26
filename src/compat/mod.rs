@@ -120,10 +120,14 @@ impl<Z: CloneableSecret, const N: usize> CloneableSecret for [Z; N] {}
 
 /// Marker trait for secrets that may be serialized — mirrors `secrecy::SerializableSecret`.
 ///
+/// Re-exports [`crate::SerializableSecret`] so that code importing from the compat layer
+/// obtains the **same** trait as code importing from the crate root, preventing
+/// disambiguation issues in compiler error messages.
+///
 /// Requires the `serde-serialize` feature. Serialization of secret wrappers is
 /// deliberately opt-in to prevent accidental exfiltration.
 #[cfg(feature = "serde-serialize")]
-pub trait SerializableSecret: serde::Serialize {}
+pub use crate::SerializableSecret;
 
 // ── Bridge: secure-gate native types → ExposeSecret / ExposeSecretMut ────────
 //

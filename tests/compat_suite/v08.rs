@@ -17,9 +17,6 @@
 //  14.  Serde Deserialize/Serialize (feature-gated)
 //  15.  zeroize re-export accessible via compat::zeroize
 
-#![cfg(feature = "secrecy-compat")]
-#![allow(dead_code)] // some helper types are only used inside specific tests
-
 use secure_gate::compat::v08::{DebugSecret, Secret, SecretBox, SecretString, SecretVec};
 use secure_gate::compat::{CloneableSecret, ExposeSecret};
 use secure_gate::{Dynamic, Fixed};

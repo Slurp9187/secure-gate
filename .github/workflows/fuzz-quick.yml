@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [expose, mut, parsing, encoding, serde, ct_eq]
+        target: [expose, mut, parsing, encoding, serde, ct_eq, compat_v08, compat_v10]
 
     steps:
       - name: Checkout repository

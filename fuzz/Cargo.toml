@@ -8,7 +8,7 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-secure-gate = { path = "../", features = ["full"] }
+secure-gate = { path = "../", features = ["full", "secrecy-compat"] }
 arbitrary = { version = "1.4", features = ["derive"] }
 libfuzzer-sys = "0.4"
 
@@ -75,6 +75,20 @@ doc = false
 [[bin]]
 name = "ct_eq"
 path = "fuzz_targets/ct_eq.rs"
+test = false
+bench = false
+doc = false
+
+[[bin]]
+name = "compat_v08"
+path = "fuzz_targets/compat_v08.rs"
+test = false
+bench = false
+doc = false
+
+[[bin]]
+name = "compat_v10"
+path = "fuzz_targets/compat_v10.rs"
 test = false
 bench = false
 doc = false

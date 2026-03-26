@@ -12,7 +12,6 @@
 //   9. Serde Deserialize/Serialize (behind feature gates)
 //  10. Legacy Secret<T> alias compiles with deprecation
 
-#![cfg(feature = "secrecy-compat")]
 #![allow(deprecated)] // for the Secret<T> alias test
 
 use secure_gate::compat::v10::{SecretBox, SecretSlice, SecretString};
@@ -179,7 +178,6 @@ fn cloneable_secret_custom_type() {
 #[test]
 fn dynamic_string_satisfies_expose_secret() {
     let d: Dynamic<String> = Dynamic::new(String::from("bridge_test"));
-    // Call ExposeSecret::expose_secret via the bridge impl
     let val: &String = ExposeSecret::expose_secret(&d);
     assert_eq!(val, "bridge_test");
 }
@@ -245,7 +243,6 @@ fn generic_expose_secret_with_dynamic() {
 fn secret_box_string_to_dynamic() {
     let sb: SecretBox<String> = SecretBox::init_with(|| String::from("migrate_me"));
     let native: Dynamic<String> = sb.into();
-    // Use the compat bridge — ExposeSecret is in scope from the top-level import
     assert_eq!(ExposeSecret::expose_secret(&native), "migrate_me");
 }
 
