@@ -73,13 +73,16 @@ fuzz_target!(|data: &[u8]| {
         assert!(dbg.contains("[REDACTED"), "String: debug missing [REDACTED: {}", dbg);
 
         if !capped.is_empty() {
-            // A non-empty payload must not appear verbatim in the debug output.
-            // We sample the first 8 chars to avoid false positives from type names.
-            let sample: String = capped.chars().take(8).collect();
-            if sample.len() >= 4 && sample.is_ascii() {
-                assert!(!dbg.contains(&sample),
-                    "String: debug leaked payload sample '{}' in: {}", sample, dbg);
-            }
+            // Compare against Rust's quoted Debug form of the full secret value.
+            // This avoids false positives from type names (e.g. "String") while
+            // still catching real leaks where Debug prints the payload.
+            let quoted_secret = format!("{:?}", capped);
+            assert!(
+                !dbg.contains(&quoted_secret),
+                "String: debug leaked payload {:?} in: {}",
+                quoted_secret,
+                dbg
+            );
         }
     }
 
