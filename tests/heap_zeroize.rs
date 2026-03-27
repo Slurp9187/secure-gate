@@ -25,7 +25,7 @@
 #![cfg(all(feature = "alloc", not(miri)))]
 #![allow(clippy::undocumented_unsafe_blocks)]
 
-use secure_gate::{Dynamic, RevealSecretMut};
+use secure_gate::{Dynamic, RevealSecret, RevealSecretMut};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -382,6 +382,43 @@ fn check_string_deserialized_zeroed(size: usize) {
 }
 
 // ---------------------------------------------------------------------------
+// Dynamic<Vec<u8>> — into_inner path backing-buffer zeroization tests
+//
+// Verifies that calling `into_inner()` on a `Dynamic<Vec<u8>>` and then
+// dropping the returned `Zeroizing<Vec<u8>>` physically zeroes the backing
+// buffer before deallocation. This closes the physical verification gap for
+// the new `into_inner` code path: `zeroize_tests.rs` proves semantic
+// correctness (spare-capacity, drop order); this test proves LLVM has not
+// dead-store-eliminated the volatile writes through the
+// `Zeroizing` → `Vec::zeroize()` path.
+//
+// The test follows the same pattern as `check_vec_zeroed`: fill a Vec of
+// exactly `size` bytes, `shrink_to_fit`, then call `into_inner()` and drop
+// the result while the ProxyAllocator gate is active.
+// ---------------------------------------------------------------------------
+
+fn check_into_inner_vec_zeroed(size: usize) {
+    with_proxy_check(size, || {
+        let mut secret: Dynamic<Vec<u8>> = Dynamic::new(Vec::with_capacity(size));
+        secret.with_secret_mut(|v| {
+            v.extend(std::iter::repeat_n(0xCCu8, size));
+            v.shrink_to_fit();
+            assert_eq!(
+                v.capacity(),
+                size,
+                "allocator rounded up capacity after shrink_to_fit — proxy check would be skipped"
+            );
+        });
+        core::hint::black_box(&secret);
+        // Consume the wrapper; the returned Zeroizing<Vec<u8>> must zero the
+        // backing buffer when it drops.
+        let extracted = secret.into_inner();
+        core::hint::black_box(&extracted);
+        drop(extracted); // explicit: must occur while CHECKING is true
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Panic-path positive-control test
 //
 // Verifies that `Zeroizing::drop` actually zeroes the backing buffer when a
@@ -491,6 +528,13 @@ fn all_heap_zeroed() {
         check_vec_deserialized_zeroed(32);
         check_string_deserialized_zeroed(16);
         check_string_deserialized_zeroed(32);
+    }
+
+    // into_inner path: verify Vec<u8> backing buffer is physically zeroed when the
+    // returned Zeroizing<Vec<u8>> drops (closes the physical verification gap for
+    // the into_inner code path added in issue #105).
+    for size in [16usize, 32, 64, 128] {
+        check_into_inner_vec_zeroed(size);
     }
 
     // Panic-path positive control: proves Zeroizing zeroes bytes on unwind.

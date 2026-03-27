@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`into_inner` consuming method on `RevealSecret` trait** (`src/traits/reveal_secret.rs`, `src/fixed.rs`, `src/dynamic.rs`) — safe owned extraction returning `Zeroizing<Self::Inner>`, preserving automatic zeroization on drop. Implemented for `Fixed<[T; N]>`, `Dynamic<String>`, and `Dynamic<Vec<T>>`. Requires `Self::Inner: Sized + Default` (satisfied by all three concrete types: `[u8; N]`, `String`, `Vec<T>`). `Fixed::into_inner` is zero-cost (no allocation); `Dynamic::into_inner` allocates a small sentinel `Box` (24 bytes) that is OOM-panic-safe (secret is zeroized on unwind). **Debug warning:** the returned `Zeroizing<T>` does not redact on `Debug` — do not log or format the return value directly.
+
 ### Changed
 
 - **Trybuild snapshot baseline pinned to Rust 1.85 for local/dev runs** (`tests/compile-fail/*.stderr`) — restored `fixed_alias_zero_size.stderr` and `serializable_secret_misuse.stderr` to the 1.85 diagnostic format so `cargo +1.85 test --all-features` passes consistently on the declared toolchain.

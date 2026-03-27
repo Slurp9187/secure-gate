@@ -127,6 +127,16 @@ The crate is intentionally small and relies on well-vetted dependencies:
   Rust does not invoke `Drop` on program-scope statics during the lifetime of the
   process. The `ZeroizeOnDrop` guarantee only applies to values that are dropped in
   the normal sense (stack unwinding, scope exit). Do not store secrets in statics.
+- **`Dynamic::into_inner` allocates a small sentinel `Box` (24 bytes on 64-bit).**
+  This is a new availability surface: on pathologically memory-pressured systems the
+  sentinel allocation can OOM. Confidentiality is preserved — if `Box::new` panics
+  before the swap, `self.inner` still holds the real secret and `Dynamic::drop` zeroizes
+  it during unwind. `Fixed::into_inner` is zero-cost (no allocation).
+- **The `Zeroizing<T>` returned by `into_inner` does not redact on `Debug`.**
+  `{:?}` will print raw secret bytes for common inner types (`[u8; N]`, `Vec<u8>`,
+  `String`). This is a regression from the `[REDACTED]` invariant that `Fixed` and
+  `Dynamic` themselves enforce. Do not log, print, or format the return value of
+  `into_inner()`.
 - **`panic = "abort"` builds disable zeroization on panic.** When `panic = "abort"`
   is set in a profile, Rust aborts the process immediately on panic without running
   any `Drop` implementations. Secrets held in `Fixed<T>` or `Dynamic<T>` at the
@@ -203,8 +213,13 @@ All secret materialization requires an explicit call. Use `rg`, `grep -rn`, or y
 
 ```
 expose_secret  expose_secret_mut  with_secret  with_secret_mut
+into_inner
 to_hex  to_base64url  try_to_bech32  try_to_bech32m
 ```
+
+**Note:** `into_inner` does not appear in an `expose_secret*`-only sweep — audit it
+separately. It consumes the wrapper and transfers ownership to a `Zeroizing<T>`;
+the caller is responsible for letting it drop normally (no `mem::forget`).
 
 Encoding traits (`ToHex`, `ToBech32`, etc.) are **explicit secret exposure** — they will not appear in an `expose_secret`-only sweep, so audit them separately.
 

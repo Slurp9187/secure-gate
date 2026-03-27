@@ -224,6 +224,30 @@ impl crate::RevealSecret for Dynamic<String> {
     fn len(&self) -> usize {
         self.inner.len()
     }
+
+    /// Consumes `self` and returns the inner `String` wrapped in [`zeroize::Zeroizing`].
+    ///
+    /// **Allocation note:** allocates one small `Box<String>` sentinel (24 bytes on
+    /// 64-bit) before the swap. If that allocation panics (OOM), `self.inner` is
+    /// unchanged and `Dynamic::drop` zeroizes the real secret during unwind —
+    /// confidentiality is preserved. This is the same OOM-safety pattern used by
+    /// `from_protected_bytes` and `deserialize_with_limit`.
+    ///
+    /// See [`RevealSecret::into_inner`] for full documentation including the
+    /// `Debug` warning.
+    #[inline(always)]
+    fn into_inner(mut self) -> zeroize::Zeroizing<String>
+    where
+        Self: Sized,
+        Self::Inner: Sized + Default + zeroize::Zeroize,
+    {
+        // Swap in an empty-String sentinel. If Box::new panics (OOM) before the
+        // swap, self.inner still holds the real secret and Dynamic::drop zeroizes
+        // it on unwind. After the swap, self.inner is Box<String::new()> — zeroized
+        // on Dynamic::drop as a no-op. `*boxed` deref-moves the String out of the Box.
+        let boxed = core::mem::replace(&mut self.inner, Box::new(String::new()));
+        zeroize::Zeroizing::new(*boxed)
+    }
 }
 
 impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
@@ -245,6 +269,30 @@ impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
     #[inline(always)]
     fn len(&self) -> usize {
         self.inner.len() * core::mem::size_of::<T>()
+    }
+
+    /// Consumes `self` and returns the inner `Vec<T>` wrapped in [`zeroize::Zeroizing`].
+    ///
+    /// **Allocation note:** allocates one small `Box<Vec<T>>` sentinel (24 bytes on
+    /// 64-bit) before the swap. If that allocation panics (OOM), `self.inner` is
+    /// unchanged and `Dynamic::drop` zeroizes the real secret during unwind —
+    /// confidentiality is preserved. This is the same OOM-safety pattern used by
+    /// `from_protected_bytes` and `deserialize_with_limit`.
+    ///
+    /// See [`RevealSecret::into_inner`] for full documentation including the
+    /// `Debug` warning.
+    #[inline(always)]
+    fn into_inner(mut self) -> zeroize::Zeroizing<Vec<T>>
+    where
+        Self: Sized,
+        Self::Inner: Sized + Default + zeroize::Zeroize,
+    {
+        // Swap in an empty-Vec sentinel. If Box::new panics (OOM) before the swap,
+        // self.inner still holds the real secret and Dynamic::drop zeroizes it on
+        // unwind. After the swap, self.inner is Box<Vec::new()> — zeroized on
+        // Dynamic::drop as a no-op. `*boxed` deref-moves the Vec out of the Box.
+        let boxed = core::mem::replace(&mut self.inner, Box::new(Vec::new()));
+        zeroize::Zeroizing::new(*boxed)
     }
 }
 

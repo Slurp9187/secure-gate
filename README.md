@@ -63,6 +63,7 @@ pw.expose_secret_mut().clear();
 - `.len()` / `.is_empty()` without exposure
 - Zeroize on drop (always)
 - Access via `.with_secret(|s| ...)` (preferred) or `.expose_secret()` (auditable escape hatch)
+- Owned extraction via `.into_inner()` → `Zeroizing<T>` (transfers zeroization to caller)
 
 ### Preferred: scoped access
 
@@ -85,6 +86,17 @@ key.with_secret_mut(|bytes: &mut [u8; 32]| bytes[0] = 0);
 use secure_gate::{Fixed, RevealSecret};
 let key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
 let raw: &[u8; 32] = key.expose_secret();
+```
+
+### Owned consumption — transfer ownership
+
+```rust
+// When you need to move the secret value out (FFI hand-off, type migration)
+use secure_gate::{Fixed, RevealSecret};
+let key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
+let owned: zeroize::Zeroizing<[u8; 32]> = key.into_inner();
+// Zeroizes its 32 bytes when it drops — same guarantee as Fixed<[u8; 32]>.
+// ⚠ Do NOT log or format `owned` — Zeroizing<T> does not redact on Debug.
 ```
 
 ### Macros for typed aliases
