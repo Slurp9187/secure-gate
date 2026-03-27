@@ -76,12 +76,17 @@ fuzz_target!(|data: &[u8]| {
         let dbg = format!("{:?}", sb_back);
         assert!(dbg.contains("[REDACTED]"),
             "String: SecretBox Debug missing [REDACTED]: {}", dbg);
-        if capped.len() >= 4 {
-            let sample: String = capped.chars().take(4).collect();
-            if sample.is_ascii() && sample.chars().all(|c| c.is_alphanumeric()) {
-                assert!(!dbg.contains(&sample),
-                    "String: Debug leaked payload sample '{}' in: {}", sample, dbg);
-            }
+        if !capped.is_empty() {
+            // Compare against Rust's quoted Debug form of the full secret value.
+            // This avoids false positives from incidental substrings while still
+            // catching real leaks where Debug prints the payload.
+            let quoted_secret = format!("{:?}", expected);
+            assert!(
+                !dbg.contains(&quoted_secret),
+                "String: Debug leaked payload {:?} in: {}",
+                quoted_secret,
+                dbg
+            );
         }
     }
 
