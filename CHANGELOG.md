@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Trybuild snapshot baseline pinned to Rust 1.85 for local/dev runs** (`tests/compile-fail/*.stderr`) — restored `fixed_alias_zero_size.stderr` and `serializable_secret_misuse.stderr` to the 1.85 diagnostic format so `cargo +1.85 test --all-features` passes consistently on the declared toolchain.
+
+### CI
+
+- **Stable CI test matrix now skips two toolchain-sensitive trybuild cases** (`.github/workflows/ci.yml`) — `fixed_alias_zero_size_compile_fail` and `serializable_secret_misuse` are excluded from the stable `cargo test --tests ...` step to avoid false failures from rustc diagnostic drift across stable releases.
+
 ## [0.9.0-rc.3] - 2026-03-26
 
 ### Added
