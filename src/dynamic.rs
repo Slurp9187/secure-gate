@@ -176,7 +176,7 @@ impl Dynamic<Vec<u8>> {
 
     /// Closure-based constructor for consistent API with [`Fixed::new_with`](crate::Fixed::new_with).
     /// The actual secret data is allocated on the heap; this method exists
-    /// for ergonomic uniformity across the crate.
+    /// for consistent security-first construction idiom across the crate.
     #[inline(always)]
     pub fn new_with<F>(f: F) -> Self
     where
@@ -191,7 +191,7 @@ impl Dynamic<Vec<u8>> {
 impl Dynamic<alloc::string::String> {
     /// Closure-based constructor for consistent API with [`Fixed::new_with`](crate::Fixed::new_with).
     /// The actual secret data is allocated on the heap; this method exists
-    /// for ergonomic uniformity across the crate.
+    /// for consistent security-first construction idiom across the crate.
     #[inline(always)]
     pub fn new_with<F>(f: F) -> Self
     where
@@ -338,10 +338,7 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// # }
     /// ```
     #[inline]
-    pub fn from_rng<R: TryRng + TryCryptoRng>(
-        len: usize,
-        rng: &mut R,
-    ) -> Result<Self, R::Error> {
+    pub fn from_rng<R: TryRng + TryCryptoRng>(len: usize, rng: &mut R) -> Result<Self, R::Error> {
         let mut result = Ok(());
         let this = Self::new_with(|v| {
             v.resize(len, 0u8);

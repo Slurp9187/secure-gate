@@ -141,10 +141,34 @@ The crate is intentionally small and relies on well-vetted dependencies:
   over `expose_secret()` / `expose_secret_mut()` — they keep the exposed reference tightly
   bound and make accidental long-lived borrows visible at the call site.
 - **For constructing secrets:** prefer `Fixed::new_with(|arr| { ... })` or
-  `Dynamic::<Vec<u8>>::new_with(|v| { ... })` over `Fixed::new(value)` / `Dynamic::new(value)`
-  when constructing from computed data inline — these write directly into the wrapper's storage
-  and avoid any intermediate copy. `Dynamic<T>` remains the strictest option (heap-only; secret
-  bytes never on the stack).
+  `Dynamic::<Vec<u8>>::new_with(|v| { ... })` / `Dynamic::<String>::new_with(|s| { ... })`
+  over `Fixed::new(value)` / `Dynamic::new(value)` when constructing from computed data
+  inline — these write directly into the wrapper's storage and avoid any intermediate copy.
+  `Dynamic<T>` remains the strictest option (heap-only; secret bytes never on the stack).
+
+**Security-first construction and access patterns**
+
+Just as `with_secret` / `with_secret_mut` are the recommended scoped methods for *accessing*
+secrets — keeping the exposed reference tightly bound to the closure lifetime —
+`Fixed::new_with` is the recommended constructor for *building* `Fixed` secrets when
+minimizing stack residue matters. It writes secret material **directly** into the wrapper's
+own storage, eliminating the intermediate stack temporary that can exist with the ergonomic
+`new(value)` constructor.
+
+`Dynamic<T>` is already heap-only (`from_protected_bytes` + `mem::swap`), so its
+`new_with` variants (`Dynamic::<Vec<u8>>::new_with` / `Dynamic::<String>::new_with`)
+exist purely for API symmetry — not because `Dynamic` carries any stack-residue risk.
+If stack residue is a concern, `Dynamic<T>` remains the strictest overall choice.
+
+For high-assurance `Fixed` construction, prefer:
+
+- `Fixed::new_with(|arr| { … })` over `Fixed::new(value)`
+
+The regular `new(value)` constructors and `expose_secret` / `expose_secret_mut` remain
+available as convenient defaults and auditable escape hatches respectively. This mirrors a
+consistent "scoped / minimal lifetime" philosophy across both construction and access — the
+same defensive mindset applied throughout the crate.
+
 - Audit all `expose_secret()` calls
 - Contextualize errors to avoid side-channel information
 - Never store a wrapper in a `static` — use local variables or heap-allocated structs instead
