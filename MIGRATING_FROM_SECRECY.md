@@ -77,14 +77,16 @@ use secure_gate::compat::{ExposeSecret, ExposeSecretMut};
    use secure_gate::compat::v10::SecretBox;
    use secure_gate::Dynamic;
 
-   let compat: SecretBox<String> = SecretBox::init_with(|| String::from("hunter2"));
+   // Prefer init_with_mut — avoids the clone-then-zeroize window of init_with
+   let compat: SecretBox<String> = SecretBox::init_with_mut(|s| s.push_str("hunter2"));
    let native: Dynamic<String> = compat.into();   // From<SecretBox<S>> for Dynamic<S>
    ```
 
    > **Note**: The conversion clones the inner value (`SecretBox` has a `Drop`
    > impl so moving out without `unsafe` is not possible). The clone is
    > immediately wrapped in `Dynamic` and the original is zeroized on drop.
-   > For zero-copy construction, build `Dynamic<T>` directly.
+   > For zero-copy native construction, build `Dynamic<T>` directly using
+   > `new_with` (see step 4).
 
 3. Replace `compat::ExposeSecret` trait bounds with `RevealSecret`. Bridge impls
    on `Dynamic<T>` and `Fixed<[T; N]>` implement both traits, so call sites using
@@ -98,8 +100,24 @@ use secure_gate::compat::{ExposeSecret, ExposeSecretMut};
    fn show<S: secure_gate::RevealSecret>(s: &S) { … }
    ```
 
-4. Prefer `with_secret` / `with_secret_mut` scoped access over `expose_secret`
-   for new code — it limits borrow lifetime and is the recommended audit pattern.
+4. Prefer scoped construction and access for new code:
+   - **Access**: use `with_secret` / `with_secret_mut` closures over `expose_secret`
+     — limits borrow lifetime and is the recommended audit pattern.
+   - **Construction**: use `new_with` closures when building secrets from computed
+     data inline — writes directly into the wrapper's storage, no intermediate copy:
+
+   ```rust
+   // Dynamic<Vec<u8>>
+   let key = Dynamic::<Vec<u8>>::new_with(|v| v.extend_from_slice(&raw_bytes));
+
+   // Dynamic<String>
+   let token = Dynamic::<String>::new_with(|s| s.push_str(&decoded));
+
+   // Fixed<[u8; N]>
+   let key = Fixed::<[u8; 32]>::new_with(|arr| arr.copy_from_slice(&raw_bytes));
+   ```
+
+   `Dynamic::new(value)` and `Fixed::new(value)` remain available as the ergonomic default.
 
 5. Remove `secrecy-compat` from `Cargo.toml` once all call sites are updated.
 
@@ -172,8 +190,19 @@ use secure_gate::compat::{CloneableSecret, ExposeSecret};
    let native: Fixed<[u8; 32]> = old.into();   // From<Secret<[T; N]>> for Fixed<[T; N]>
    ```
 
-4. Replace `compat::ExposeSecret` bounds with `RevealSecret`, and `expose_secret()`
-   call sites with `with_secret(|s| …)` where possible.
+4. Prefer scoped construction and access for new code:
+   - **Access**: replace `expose_secret()` call sites with `with_secret(|s| …)` closures
+     and `compat::ExposeSecret` bounds with `RevealSecret`.
+   - **Construction**: use `new_with` closures when building secrets inline — writes
+     directly into the wrapper's storage:
+
+   ```rust
+   // Fixed<[u8; 32]> — avoids intermediate stack copy
+   let key = Fixed::<[u8; 32]>::new_with(|arr| arr.copy_from_slice(&raw_bytes));
+
+   // Dynamic<Vec<u8>>
+   let key = Dynamic::<Vec<u8>>::new_with(|v| v.extend_from_slice(&raw_bytes));
+   ```
 
 5. Remove `secrecy-compat` from `Cargo.toml` once all call sites are updated.
 
@@ -221,7 +250,11 @@ process(&native);
 - Two access trait families coexist during transition: compat `ExposeSecret` and
   native `RevealSecret`. Audit sweeps must cover **both** — search for
   `expose_secret` **and** `with_secret` / `expose_secret` (native).
-- Prefer `SecretBox::init_with_mut` over `SecretBox::init_with` where possible
-  to avoid the clone-then-zeroize window.
-- See [SECURITY.md](SECURITY.md#compatibility-layer-compat) for the full compat
-  security analysis.
+- **Compat construction**: prefer `SecretBox::init_with_mut` over `SecretBox::init_with`
+  to avoid the clone-then-zeroize window inherent in `init_with`.
+- **Native construction**: prefer `Fixed::new_with(|arr| …)` and
+  `Dynamic::<Vec<u8>>::new_with(|v| …)` over `new(value)` when constructing secrets
+  from computed data inline — these write directly into the wrapper's storage and
+  eliminate any intermediate copy.
+- See [SECURITY.md](SECURITY.md#wrappers-dynamicrs-fixedrs) for the full stack-residue
+  analysis and mitigations.
