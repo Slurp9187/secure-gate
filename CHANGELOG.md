@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.9.0-rc.4] - 2026-03-27
-
 ### Added
 
 - **`into_inner` consuming method on `RevealSecret` trait** (`src/traits/reveal_secret.rs`, `src/fixed.rs`, `src/dynamic.rs`) — safe owned extraction returning `Zeroizing<Self::Inner>`, preserving automatic zeroization on drop. Implemented for `Fixed<[T; N]>`, `Dynamic<String>`, and `Dynamic<Vec<T>>`. Requires `Self::Inner: Sized + Default` (satisfied by all three concrete types: `[u8; N]`, `String`, `Vec<T>`). `Fixed::into_inner` is zero-cost (no allocation); `Dynamic::into_inner` allocates a small sentinel `Box` (24 bytes) that is OOM-panic-safe (secret is zeroized on unwind). **Debug warning:** the returned `Zeroizing<T>` does not redact on `Debug` — do not log or format the return value directly.
