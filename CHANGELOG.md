@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.3] - 2026-03-26
+
 ### Added
 
 - **`Fixed::new_with` constructor** (`src/fixed.rs`) — closure-based constructor that writes directly into the wrapper's storage via `FnOnce(&mut [u8; N])`, eliminating the intermediate stack copy present in `new(value)`. All library-internal construction paths updated to use it: `TryFrom<&[u8]>`, `try_from_hex`, `try_from_base64url`, `try_from_bech32*`, `from_random`, `from_rng`, and the serde `visit_seq` deserializer. `new(value)` is unchanged and remains the ergonomic default.
@@ -16,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shared secrecy trait surface + bridges** (`src/compat/mod.rs`) — added `ExposeSecret`, `ExposeSecretMut`, `CloneableSecret`, optional `SerializableSecret`, and `zeroize` re-export to mirror secrecy imports; also added bridge impls so native `Dynamic<String>`, `Dynamic<Vec<T>>`, and `Fixed<[T; N]>` satisfy compat traits for incremental migration.
 - **Conversion paths between compat and native wrappers** (`src/compat/v10.rs`, `src/compat/v08.rs`) — added `From` conversions to move gradually from secrecy-shaped types to `Dynamic<T>` / `Fixed<[T; N]>` and back for common string/vector cases.
 - **Compatibility integration suites** (`tests/compat_v10_tests.rs`, `tests/compat_v08_tests.rs`) — added coverage for constructors, trait behavior (`ExposeSecret`/`ExposeSecretMut`), redacted `Debug` behavior, clone/serde gates, and compat-native conversion round-trips across both secrecy generations.
+- **`from_rng` constructor** (`Fixed<[u8; N]>` and `Dynamic<Vec<u8>>`, `rand` feature) — fills with bytes from any caller-supplied `TryRng + TryCryptoRng`, returning `Result<Self, R::Error>`; useful for seeded/deterministic RNGs in tests.
 
 ### Documentation
 
@@ -23,11 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **README** — "Migrating from secrecy" section replaced with a short pointer to `MIGRATING_FROM_SECRECY.md`. Features table: added `secrecy-compat` row.
 - **SECURITY** — Feature Security Implications table: added `secrecy-compat` row with security impact and recommendation. Compat layer security note added under Module-by-Module.
 
-## [0.9.0-rc.3] - 2026-03-24
-
 ### Added
-
-- **`from_rng` constructor** (`Fixed<[u8; N]>` and `Dynamic<Vec<u8>>`, `rand` feature) — fills with bytes from any caller-supplied `TryRng + TryCryptoRng`, returning `Result<Self, R::Error>`; useful for seeded/deterministic RNGs in tests.
 
 ## [0.9.0-rc.2] - 2026-03-23
 
