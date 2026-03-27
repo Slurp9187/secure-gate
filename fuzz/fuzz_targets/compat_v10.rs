@@ -83,9 +83,7 @@ fuzz_target!(|data: &[u8]| {
             let quoted_secret = format!("{:?}", expected);
             assert!(
                 !dbg.contains(&quoted_secret),
-                "String: Debug leaked payload {:?} in: {}",
-                quoted_secret,
-                dbg
+                "String: Debug leaked secret payload"
             );
         }
     }

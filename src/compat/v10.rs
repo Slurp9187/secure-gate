@@ -242,7 +242,7 @@ where
 {
     fn clone(&self) -> Self {
         SecretBox {
-            inner_secret: Vec::from(&*self.inner_secret).into_boxed_slice(),
+            inner_secret: self.inner_secret.as_ref().to_vec().into_boxed_slice(),
         }
     }
 }
