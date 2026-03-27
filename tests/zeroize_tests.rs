@@ -290,6 +290,38 @@ fn dynamic_spare_capacity_vec_zeroized() {
     // element[1].0 == 0 (zeroed in the spare_capacity_mut pass above) ✓
 }
 
+/// `into_inner()` transfers the full zeroization contract — including spare capacity —
+/// to the returned `Zeroizing<Vec<T>>`.
+///
+/// This is the critical regression guard for the `into_inner` code path. It mirrors
+/// `dynamic_spare_capacity_vec_zeroized` exactly, but calls `secret.into_inner()`
+/// instead of `secret.zeroize()`, proving that:
+///
+/// 1. `into_inner()` consumes the wrapper without running the secret through `zeroize()`.
+/// 2. The returned `Zeroizing<Vec<PanicOnNonZeroDrop>>` calls `Vec::zeroize()` on drop.
+/// 3. `Vec::zeroize()` byte-zeroes spare capacity via `spare_capacity_mut()`.
+/// 4. `PanicOnNonZeroDrop::drop` finds `.0 == 0` for the spare-capacity element → passes. ✓
+#[test]
+#[cfg(feature = "alloc")]
+fn dynamic_into_inner_spare_capacity_zeroized() {
+    let mut v = vec![PanicOnNonZeroDrop(42); 2];
+    // SAFETY: reducing len makes element[1] spare capacity; its memory remains initialized.
+    unsafe { v.set_len(1) };
+
+    let secret: Dynamic<Vec<PanicOnNonZeroDrop>> = Dynamic::new(v);
+
+    // Consume the wrapper via into_inner; zeroization contract transfers to `extracted`.
+    let mut extracted: zeroize::Zeroizing<Vec<PanicOnNonZeroDrop>> = secret.into_inner();
+
+    // Restore len=2 so element[1] is visible as a `PanicOnNonZeroDrop` when Drop runs.
+    // SAFETY: `PanicOnNonZeroDrop` wraps a `u64`; all-zero bytes are a valid `u64`
+    // representation (zero). Zeroizing::drop → Vec::zeroize() will byte-zero the spare
+    // slot before the element's Drop fires, so PanicOnNonZeroDrop::drop finds `.0 == 0`. ✓
+    unsafe { extracted.set_len(2) };
+    // drop: Zeroizing::drop → Vec::zeroize() → Vec::clear → PanicOnNonZeroDrop::drop
+    // element[1].0 == 0 (zeroed by Vec::zeroize() spare_capacity_mut pass) ✓
+}
+
 /// `Dynamic<Vec<u8>>` has a real `Drop` glue destructor.
 ///
 /// In the broken pre-0.8.0 versions, `needs_drop` would have returned `false`.

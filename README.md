@@ -144,6 +144,7 @@ secure-gate = { version = "0.8.0-rc.{x}", features = ["full"] }
 - Redact `Debug` output to `[REDACTED]`
 - Implement `len()` and `is_empty()` without exposing secret contents
 - Zeroize contents on drop (mandatory)
+- Owned extraction via `.into_inner()` → `Zeroizing<T>` (transfers zeroization to caller)
 
 The preferred and recommended way to access secrets is the scoped `with_secret` / `with_secret_mut` methods. `expose_secret` / `expose_secret_mut` are escape hatches for rare cases and should be audited closely.
 
@@ -168,6 +169,17 @@ key.with_secret_mut(|bytes: &mut [u8; 32]| bytes[0] = 0);
 use secure_gate::{Fixed, RevealSecret};
 let key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
 let raw: &[u8; 32] = key.expose_secret();
+```
+
+### Owned consumption — transfer ownership
+
+```rust
+// When you need to move the secret value out (FFI hand-off, type migration)
+use secure_gate::{Fixed, RevealSecret};
+let key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
+let owned: zeroize::Zeroizing<[u8; 32]> = key.into_inner();
+// Zeroizes its 32 bytes when it drops — same guarantee as Fixed<[u8; 32]>.
+// ⚠ Do NOT log or format `owned` — Zeroizing<T> does not redact on Debug.
 ```
 
 ### Macros for typed aliases
