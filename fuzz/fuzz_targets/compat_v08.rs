@@ -8,6 +8,8 @@
 //! Invariants asserted on every run:
 //!   1. Value identity: expose_secret() after round-trip == original
 //!   2. Debug never leaks: format!("{:?}") does not contain the exposed value
+//!      (only for types whose S implements DebugSecret — String, [T; N], Box<S>, Vec<S where S:DebugSecret>;
+//!       `Secret<Vec<u8>>` intentionally has no Debug because u8 does not implement DebugSecret)
 //!   3. Clone independence: modifying clone does not affect original
 //!   4. Zeroize on drop: types drop without panicking (memory safety via allocator)
 
@@ -47,12 +49,10 @@ fuzz_target!(|data: &[u8]| {
         assert_eq!(original.expose_secret(), clone.expose_secret(),
             "Vec<u8>: clone does not match original");
 
-        // Debug must not contain the actual bytes
-        let debug_str = format!("{:?}", v08_back);
-        assert!(!capped.iter().any(|b| debug_str.contains(&b.to_string()) && !debug_str.contains("REDACTED")),
-            "Vec<u8>: raw content in debug? dbg={:?}", debug_str);
-        assert!(debug_str.contains("[REDACTED") || debug_str.contains("REDACTED"),
-            "Vec<u8>: debug output missing REDACTED marker: {}", debug_str);
+        // Note: Secret<Vec<u8>> intentionally has no Debug impl in v0.8 compat because
+        // u8 does not implement DebugSecret (Vec<S> requires S: DebugSecret).
+        // Debug-redaction is verified below for SecretString, which does implement DebugSecret.
+        let _ = v08_back; // consumed, zeroized on drop
     }
 
     // ── String round-trip ─────────────────────────────────────────────────────
