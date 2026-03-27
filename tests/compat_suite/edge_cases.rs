@@ -178,9 +178,9 @@ fn secret_slice_u32_v10() {
 
 // ── Move semantics ────────────────────────────────────────────────────────────
 
-fn consume_and_expose<T: zeroize::Zeroize>(s: Secret<T>) -> T
+fn consume_and_expose<T>(s: Secret<T>) -> T
 where
-    T: Clone,
+    T: zeroize::Zeroize + Clone,
 {
     s.expose_secret().clone()
 }
