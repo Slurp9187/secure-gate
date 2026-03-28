@@ -8,7 +8,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-secure-gate = { path = "../secure-gate-core", features = ["secrecy-compat"] }
+secure-gate = { path = "../secure-gate-core" }
 
 [dev-dependencies]
 # Dual-parity testing baselines — pinned exact versions matching local source clones.

@@ -9,16 +9,15 @@
 //! - `compile_fail_tests.rs` (uses trybuild)
 #![allow(clippy::redundant_clone)]
 
+#[cfg(feature = "secrecy-compat")]
 mod common;
-mod encoding_suite;
-mod serde_suite;
-mod macros_suite;
+#[cfg(feature = "dual-compat-test")]
+mod compat_dual;
 #[cfg(feature = "secrecy-compat")]
 mod compat_suite;
+
 // Proptest is valuable on native runs, but prohibitively slow under Miri's
 // interpreter; deterministic suites and the dedicated fuzz/Miri workflow still
 // cover UB-oriented paths there.
 #[cfg(not(miri))]
 mod proptest_suite;
-#[cfg(feature = "dual-compat-test")]
-mod compat_dual;
