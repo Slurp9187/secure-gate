@@ -5,7 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] (v0.6.0-rc.6-dev)
+## [Unreleased]
+
+(v0.8.0-rc.7-dev)
+
+### Changed
+- Major refactor: split the project into a Cargo workspace. `secure-gate-core` is now the minimal, auditable foundation (published as `secure-gate`), while `secure-gate-compat` isolates all `secrecy` migration shims, tests, and related code.
+  - **Significantly reduces the security blast radius**: the core is no longer affected by compat-specific dependencies or vulnerabilities.
+  - Simplifies maintenance, CI matrices, and independent evolution of each crate.
+- Purged all compat-related features, modules, tests, and code from the core crate.
+- Root workspace `Cargo.toml` manages shared metadata; core now inherits `version`, `edition`, `rust-version`, etc., via `.workspace = true`.
+- Cleaned up dev-dependencies (removed `secrecy-v*` pins, as they belong in the compat crate).
+- Updated manifests, imports, documentation, and CI to match the new structure.
+
+## [0.8.0-rc.6] - 2026-03-27
 
 ### Added
 
