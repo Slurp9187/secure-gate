@@ -6,26 +6,25 @@ Last updated: March 2026 (for v0.9.0-rc.4)
 
 - **No independent audit** — review the source code yourself before production use.
 - **No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally.
-- **3-tier access model** — all secret access follows an explicit hierarchy (prefer Tier 1). Audit Tier 2 and Tier 3 calls separately.
-- **Explicit exposure only** — all secret access requires `.expose_secret()` / `.with_secret()` or mutable equivalents; no `Deref`, `AsRef`, or implicit borrowing.
-- **Zeroization on drop** — full buffer (including spare capacity) always wiped on drop (inner type must implement `Zeroize`).
-- **Timing-safe equality** — use `ConstantTimeEq` / `.ct_eq()` (`ct-eq`); `==` is deliberately not implemented.
-- **Opt-in risk** — cloning and serialization require explicit marker traits (`CloneableSecret`, `SerializableSecret`).
-- **Vulnerability reporting** — preferred: GitHub private vulnerability reporting (Security tab); public issues acceptable.
+- **3-tier access model** — explicit hierarchy (prefer Tier 1 scoped methods). Audit Tier 2/3 calls separately.
+- **Explicit exposure only** — requires `with_secret`/`expose_secret` (or mutable equivalents); no `Deref`/`AsRef`.
+- **Zeroization on drop** — full buffer (incl. spare capacity) is wiped (inner type must implement `Zeroize`).
+- **Timing-safe equality** — use `.ct_eq()` (`ct-eq` feature); `==` is deliberately not implemented.
+- **Opt-in risk** — cloning/serialization requires marker traits (`CloneableSecret`/`SerializableSecret`).
 
-This document outlines the security model, design choices, strengths, known limitations, and review guidance for `secure-gate`.
+This document outlines the security model, design choices, strengths, limitations, and review guidance.
 
 ## What secure-gate does NOT protect against
 
-- **Process compromise / arbitrary memory read** — wrappers offer no defense if an attacker can read process memory
-- **OS swap, page files, core dumps** — secrets may be paged to disk; use `mlock` or encrypted swap at the OS level
-- `**panic = "abort"` / SIGKILL / hard crash** — `Drop` impls do not run; secrets are not cleared
-- `**static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized
-- **Copies made by caller code** — after `expose_secret()`, encoding, or serialization, the caller holds ordinary non-zeroized memory
-- **Encoded/serialized output** — `to_hex()`, `to_base64url()`, serde `Serialize` output are full secret exposure into ordinary, non-zeroizing `String`s
-- **All side channels beyond equality timing** — cache, power, EM, and branch-predictor side channels are outside scope
-- **Allocation-based DoS from deserialization** — `MAX_DESERIALIZE_BYTES` is a post-materialization result-length bound; the upstream deserializer may have already allocated the full payload
-- **Stack/register residue outside wrapper control** — temporaries in caller code, FFI boundaries, and compiler-generated spills are not managed by this crate
+- **Process compromise / arbitrary memory read** — wrappers offer no defense if an attacker can read process memory.
+- **OS swap, page files, core dumps** — secrets may be paged to disk; use `mlock` or encrypted swap at the OS level.
+- **`panic = "abort"` / SIGKILL / hard crash** — `Drop` impls do not run; secrets are not cleared.
+- **`static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized.
+- **Copies made by caller code** — after `expose_secret()`, encoding, or serialization, the caller holds ordinary non-zeroized memory.
+- **Encoded/serialized output** — `to_hex()`, `to_base64url()`, and serde `Serialize` produce full secrets in ordinary, non-zeroizing `String`s.
+- **All side channels beyond equality timing** — cache, power, EM, and branch-predictor attacks are out of scope.
+- **Allocation-based DoS from deserialization** — `MAX_DESERIALIZE_BYTES` is a post-materialization bound only; the upstream deserializer may allocate arbitrarily first.
+- **Stack/register residue** — temporaries, FFI boundaries, and compiler spills are outside wrapper control.
 
 ## Audit Status
 
@@ -48,13 +47,13 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - Dependency versions and their security history
 
 ## 3-Tier Access Model
-All secret access follows this explicit hierarchy:
+All secret access follows this explicit hierarchy (the table below expands on these tiers):
 
 - **Tier 1 — Scoped borrow (preferred)**: `with_secret` / `with_secret_mut` — borrow ends when closure returns, minimizing exposure.
 - **Tier 2 — Direct reference (escape hatch)**: `expose_secret` / `expose_secret_mut` — long-lived references; use only for FFI or third-party APIs requiring `&T`/`&mut T`.
 - **Tier 3 — Owned consumption**: `into_inner` — returns `InnerSecret<T>` (wraps `Zeroizing<T>`); zeroization transfers to caller. Audit separately.
 
-**Audit note**: `into_inner` calls must be reviewed independently. Tier 2 and Tier 3 calls do not appear in simple `expose_secret` grep sweeps.
+**Audit note**: Tier 2 and Tier 3 calls do not appear in simple `expose_secret` grep sweeps and must be reviewed independently.
 
 ## Core Security Model
 
@@ -89,7 +88,6 @@ All secret access follows this explicit hierarchy:
 | `encoding-bech32`   | Bech32/BIP-173 encoding/decoding: `ToBech32`, `FromBech32Str`                                                                                                             | Validate inputs upstream; test empty/invalid HRP                                                                                 |
 | `encoding-bech32m`  | Bech32m/BIP-350 encoding/decoding: `ToBech32m`, `FromBech32mStr`                                                                                                          | Validate inputs upstream; test empty/invalid HRP                                                                                 |
 | `cloneable`         | Opt-in cloning via marker trait; increases exposure surface                                                                                                               | Use minimally; prefer move semantics                                                                                             |
-| `secrecy-compat`    | Drop-in secrecy 0.8/0.10 compatibility layer (requires `alloc`). Compat wrappers carry the same zeroize-on-drop + redacted-Debug invariants as native types. Bridge impls expose native `Dynamic`/`Fixed` via the compat `ExposeSecret` trait, adding a second auditable access surface. | Treat as transitional; migrate to native `RevealSecret` APIs and remove `secrecy-compat` once call sites are updated. Audit both `expose_secret` (compat) and `with_secret`/`expose_secret` (native) during transition. |
 | `full`              | All features enabled — convenient but increases attack surface                                                                                                            | Development only; audit for production                                                                                           |
 
 
@@ -101,16 +99,14 @@ All secret access follows this explicit hierarchy:
 
 > See the [TL;DR](#tldr) for the shortest version of the most important points.
 
-- Prefer **Tier 1 scoped methods** (`with_secret` / `with_secret_mut`) in all application code to limit secret lifetime.
+- Prefer **Tier 1 scoped methods** (`with_secret`/`with_secret_mut`) in application code to minimize lifetime.
 - Audit every Tier 2 (`expose_*`) and Tier 3 (`into_inner`) call site separately — they do not appear in simple `expose_secret` grep sweeps.
-- The `alloc` feature is enabled by default and provides `Dynamic<T>` with full zeroization; use `default-features = false` for embedded / pure-stack builds (`Fixed<T>` only)
-- For equality, use `.ct_eq()` (`ct-eq` feature) for all secret comparisons — deterministic and constant-time. Bound input sizes at the transport/parser layer for untrusted data.
-- Audit every `CloneableSecret` / `SerializableSecret` impl
-- Validate and sanitize all inputs before encoding/decoding
-- Use specific format traits (`FromBech32Str`, `FromHexStr`, …) when the expected format is known
-- When using `fixed_generic_alias!`, `dynamic_alias!`, or `dynamic_generic_alias!`, validate that the effective inner size is > 0 in unit tests — these macros accept zero-sized types without compile-time rejection (unlike `fixed_alias!`).
-- Monitor dependency CVEs and update regularly
-- Treat secrets as radioactive — minimize exposure surface
+- Use `alloc` (default) for `Dynamic<T>` zeroization; disable for pure-stack `Fixed<T>` builds.
+- Use `.ct_eq()` (`ct-eq` feature) for comparisons; avoid `==`. Bound untrusted input size at the transport/parser layer.
+- Audit all `CloneableSecret`/`SerializableSecret` implementations.
+- Validate inputs before encoding/decoding or using format-specific traits.
+- Monitor dependencies for CVEs.
+- Treat secrets as radioactive — minimize exposure surface.
 
 ## Module-by-Module Security Notes
 
@@ -243,23 +239,6 @@ In **debug builds** (`cfg(debug_assertions)`), decoding errors include detailed 
 Prefer `Display` (`{}`) over `Debug` (`{:?}`) when logging errors in production — derived `Debug` exposes struct fields in debug builds and may be more verbose than intended.
 
 Coarse error categories are still present in release and can aid attacker fingerprinting in niche threat models. Redact or suppress error details in logs for high-sensitivity contexts.
-
-### Compatibility Layer (`compat/`)
-
-The `secrecy-compat` feature provides drop-in wrappers mirroring `secrecy` 0.8.0 and 0.10.1. These wrappers (`Secret<S>`, `SecretBox<S>`, etc.) carry the same zeroize-on-drop and redacted-`Debug` invariants as native `Fixed<T>` / `Dynamic<T>`.
-
-**Potential weaknesses**
-
-- During migration, two parallel access traits exist: compat `ExposeSecret` and native `RevealSecret`. Both are grep-able, but audit sweeps must cover both surfaces.
-- Bridge impls on `Dynamic<T>` and `Fixed<[T; N]>` implement compat `ExposeSecret` / `ExposeSecretMut` by delegating to the native trait. This is safe but widens the set of method names that grant secret access.
-- `v10::SecretBox<S> → Dynamic<S>` conversion requires `S: Clone` (the `Drop` impl on `SecretBox` prevents moving out of the `Box`); the stack copy is zeroized immediately, but the clone window is inherent.
-- `v08::Secret<S>` stores the secret inline (no heap). `Drop` zeroizes the value, but the same stack-residue caveats as `Fixed<T>` apply.
-
-**Mitigations**
-
-- Treat the compat layer as transitional — migrate to native `RevealSecret` / `RevealSecretMut` and remove `secrecy-compat` once all call sites are updated.
-- During transition, audit for **both** `expose_secret` (compat) and `with_secret` / `expose_secret` (native) access patterns.
-- Prefer `SecretBox::init_with_mut` over `SecretBox::init_with` to avoid the clone-then-zeroize path.
 
 ## Vulnerability Reporting
 
