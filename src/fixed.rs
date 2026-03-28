@@ -110,18 +110,30 @@ impl<const N: usize> Fixed<[u8; N]> {
         this
     }
 
+    /// Encodes the secret bytes as a lowercase hex string.
+    ///
+    /// Delegates to [`ToHex::to_hex`](crate::ToHex::to_hex) on the inner `[u8; N]`.
+    /// Requires the `encoding-hex` feature.
     #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex(&self) -> alloc::string::String {
         self.with_secret(|s: &[u8; N]| s.to_hex())
     }
 
+    /// Encodes the secret bytes as an uppercase hex string.
+    ///
+    /// Delegates to [`ToHex::to_hex_upper`](crate::ToHex::to_hex_upper) on the inner `[u8; N]`.
+    /// Requires the `encoding-hex` feature.
     #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex_upper(&self) -> alloc::string::String {
         self.with_secret(|s: &[u8; N]| s.to_hex_upper())
     }
 
+    /// Encodes the secret bytes as an unpadded Base64url string.
+    ///
+    /// Delegates to [`ToBase64Url::to_base64url`](crate::ToBase64Url::to_base64url) on the inner `[u8; N]`.
+    /// Requires the `encoding-base64` feature.
     #[cfg(feature = "encoding-base64")]
     #[inline]
     pub fn to_base64url(&self) -> alloc::string::String {
@@ -151,16 +163,16 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecret for Fixed<[T; N]> {
         N * core::mem::size_of::<T>()
     }
 
-    /// Consumes `self` and returns the inner `[T; N]` wrapped in [`zeroize::Zeroizing`].
+    /// Consumes `self` and returns the inner `[T; N]` wrapped in [`crate::InnerSecret`].
     ///
     /// Zero cost — no allocation. The sentinel placed in `self.inner` is
     /// `[T::default(); N]` (already zeroed for `u8`), so `Fixed::drop` zeroizes
     /// an already-zero array — a harmless no-op.
     ///
     /// See [`RevealSecret::into_inner`] for full documentation including the
-    /// `Default` bound rationale and the `Debug` warning.
+    /// `Default` bound rationale and redacted `Debug` behavior.
     #[inline(always)]
-    fn into_inner(mut self) -> zeroize::Zeroizing<[T; N]>
+    fn into_inner(mut self) -> crate::InnerSecret<[T; N]>
     where
         Self: Sized,
         Self::Inner: Sized + Default + zeroize::Zeroize,
@@ -170,7 +182,7 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecret for Fixed<[T; N]> {
         // Default::default() is inferred as [T; N] from context; [T; N]: Default
         // is guaranteed by the where clause above.
         let inner = core::mem::replace(&mut self.inner, Default::default());
-        zeroize::Zeroizing::new(inner)
+        crate::InnerSecret::new(inner)
     }
 }
 
@@ -194,32 +206,60 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecretMut for Fixed<[T; N]> {
 impl<const N: usize> Fixed<[u8; N]> {
     /// Fills a new `[u8; N]` with cryptographically secure random bytes and wraps it.
     ///
-    /// Uses the system RNG ([`OsRng`](rand::rngs::OsRng)). Requires the `rand` feature.
+    /// Uses the system RNG ([`SysRng`](rand::rngs::SysRng)). Requires the `rand` feature.
     /// Heap-free and works in `no_std` / `no_alloc` builds.
     ///
     /// # Panics
     ///
-    /// Panics if the RNG fails ([`TryRngCore::try_fill_bytes`](rand::TryRngCore::try_fill_bytes)
+    /// Panics if the system RNG fails to provide bytes ([`TryRng::try_fill_bytes`](rand::TryRng::try_fill_bytes)
     /// returns `Err`). This is treated as a fatal environment error.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "rand")]
+    /// use secure_gate::{Fixed, RevealSecret};
+    ///
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// let key: Fixed<[u8; 32]> = Fixed::from_random();
+    /// assert_eq!(key.len(), 32);
+    /// # }
+    /// ```
     #[inline]
     pub fn from_random() -> Self {
         Self::new_with(|arr| {
-            OsRng
+            SysRng
                 .try_fill_bytes(arr)
-                .expect("OsRng failure is a program error");
+                .expect("SysRng failure is a program error");
         })
     }
 
     /// Fills a new `[u8; N]` from `rng` and wraps it.
     ///
-    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRngCore`](rand::TryRngCore) (e.g. a
-    /// seeded generator for deterministic tests). Requires the `rand` feature. Heap-free.
+    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRng`](rand::TryRng) — for example,
+    /// a seeded [`OsRng`](rand::rngs::OsRng) for deterministic tests. Requires the `rand`
+    /// feature. Heap-free.
     ///
     /// # Errors
     ///
-    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRngCore::try_fill_bytes) fails.
+    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRng::try_fill_bytes) fails.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use rand::rngs::OsRng;
+    /// use rand::SeedableRng;
+    /// use secure_gate::Fixed;
+    ///
+    /// let mut rng = OsRng::from_seed([1u8; 32]);
+    /// let key: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng).expect("rng fill");
+    /// # }
+    /// ```
     #[inline]
-    pub fn from_rng<R: TryRngCore + TryCryptoRng>(rng: &mut R) -> Result<Self, R::Error> {
+    pub fn from_rng<R: TryRng + TryCryptoRng>(rng: &mut R) -> Result<Self, R::Error> {
         let mut result = Ok(());
         let this = Self::new_with(|arr| {
             result = rng.try_fill_bytes(arr);
@@ -230,6 +270,22 @@ impl<const N: usize> Fixed<[u8; N]> {
 
 #[cfg(feature = "encoding-hex")]
 impl<const N: usize> Fixed<[u8; N]> {
+    /// Decodes a lowercase hex string into `Fixed<[u8; N]>`.
+    ///
+    /// The decoded bytes are held in a `Zeroizing<Vec<u8>>` until copied onto
+    /// the stack array, so the temporary heap buffer is zeroed even if a panic
+    /// occurs mid-flight.
+    ///
+    /// # Errors
+    ///
+    /// Returns `HexError::InvalidLength` if the decoded length does not equal `N`,
+    /// or a parse error if the input is not valid hex.
+    ///
+    /// # Note
+    ///
+    /// Unlike [`Dynamic::try_from_hex`](crate::Dynamic::try_from_hex), the secret
+    /// lives on the stack inside a `[u8; N]`. Stack residue behaviour after the
+    /// `Fixed` is dropped and zeroized is discussed in `SECURITY.md`.
     pub fn try_from_hex(hex: &str) -> Result<Self, crate::error::HexError> {
         let bytes = zeroize::Zeroizing::new(hex.try_from_hex()?);
         if bytes.len() != N {
@@ -247,6 +303,22 @@ impl<const N: usize> Fixed<[u8; N]> {
 
 #[cfg(feature = "encoding-base64")]
 impl<const N: usize> Fixed<[u8; N]> {
+    /// Decodes an unpadded Base64url string into `Fixed<[u8; N]>`.
+    ///
+    /// The decoded bytes are held in a `Zeroizing<Vec<u8>>` until copied onto
+    /// the stack array, so the temporary heap buffer is zeroed even if a panic
+    /// occurs mid-flight.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Base64Error::InvalidLength` if the decoded length does not equal `N`,
+    /// or a parse error if the input is not valid Base64url.
+    ///
+    /// # Note
+    ///
+    /// Unlike [`Dynamic::try_from_base64url`](crate::Dynamic::try_from_base64url), the
+    /// secret lives on the stack inside a `[u8; N]`. Stack residue behaviour after the
+    /// `Fixed` is dropped and zeroized is discussed in `SECURITY.md`.
     pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
         let bytes = zeroize::Zeroizing::new(s.try_from_base64url()?);
         if bytes.len() != N {
@@ -336,7 +408,10 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// Prefer this over [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked) in
     /// security-critical code to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32m(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+    pub fn try_from_bech32m(
+        s: &str,
+        expected_hrp: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
         let bytes_raw = s.try_from_bech32m(expected_hrp)?;
         let bytes = zeroize::Zeroizing::new(bytes_raw);
         if bytes.len() != N {

@@ -63,6 +63,15 @@ pub struct Dynamic<T: ?Sized + zeroize::Zeroize> {
 }
 
 impl<T: ?Sized + zeroize::Zeroize> Dynamic<T> {
+    /// Wraps `value` in a `Box<T>` and returns a `Dynamic<T>`.
+    ///
+    /// Accepts any type that implements `Into<Box<T>>` — including owned values,
+    /// `Box<T>`, `String`, `Vec<u8>`, `&str` (via the blanket `From<&str>` impl), etc.
+    ///
+    /// Equivalent to `Dynamic::from(value)` — `#[doc(alias = "from")]` is set so both
+    /// names appear in docs.rs search.
+    ///
+    /// Requires the `alloc` feature (which `Dynamic<T>` itself always requires).
     #[doc(alias = "from")]
     #[inline(always)]
     pub fn new<U>(value: U) -> Self
@@ -107,18 +116,30 @@ impl<T: 'static + zeroize::Zeroize> From<T> for Dynamic<T> {
 
 // Encoding helpers for Dynamic<Vec<u8>>
 impl Dynamic<Vec<u8>> {
+    /// Encodes the secret bytes as a lowercase hex string.
+    ///
+    /// Delegates to [`ToHex::to_hex`](crate::ToHex::to_hex) on the inner `Vec<u8>`.
+    /// Requires the `encoding-hex` feature.
     #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex(&self) -> alloc::string::String {
         self.with_secret(|s: &Vec<u8>| s.to_hex())
     }
 
+    /// Encodes the secret bytes as an uppercase hex string.
+    ///
+    /// Delegates to [`ToHex::to_hex_upper`](crate::ToHex::to_hex_upper) on the inner `Vec<u8>`.
+    /// Requires the `encoding-hex` feature.
     #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex_upper(&self) -> alloc::string::String {
         self.with_secret(|s: &Vec<u8>| s.to_hex_upper())
     }
 
+    /// Encodes the secret bytes as an unpadded Base64url string.
+    ///
+    /// Delegates to [`ToBase64Url::to_base64url`](crate::ToBase64Url::to_base64url) on the inner `Vec<u8>`.
+    /// Requires the `encoding-base64` feature.
     #[cfg(feature = "encoding-base64")]
     #[inline]
     pub fn to_base64url(&self) -> alloc::string::String {
@@ -155,7 +176,7 @@ impl Dynamic<Vec<u8>> {
 
     /// Closure-based constructor for consistent API with [`Fixed::new_with`](crate::Fixed::new_with).
     /// The actual secret data is allocated on the heap; this method exists
-    /// for ergonomic uniformity across the crate.
+    /// for consistent security-first construction idiom across the crate.
     #[inline(always)]
     pub fn new_with<F>(f: F) -> Self
     where
@@ -170,7 +191,7 @@ impl Dynamic<Vec<u8>> {
 impl Dynamic<alloc::string::String> {
     /// Closure-based constructor for consistent API with [`Fixed::new_with`](crate::Fixed::new_with).
     /// The actual secret data is allocated on the heap; this method exists
-    /// for ergonomic uniformity across the crate.
+    /// for consistent security-first construction idiom across the crate.
     #[inline(always)]
     pub fn new_with<F>(f: F) -> Self
     where
@@ -204,7 +225,7 @@ impl crate::RevealSecret for Dynamic<String> {
         self.inner.len()
     }
 
-    /// Consumes `self` and returns the inner `String` wrapped in [`zeroize::Zeroizing`].
+    /// Consumes `self` and returns the inner `String` wrapped in [`crate::InnerSecret`].
     ///
     /// **Allocation note:** allocates one small `Box<String>` sentinel (24 bytes on
     /// 64-bit) before the swap. If that allocation panics (OOM), `self.inner` is
@@ -213,9 +234,9 @@ impl crate::RevealSecret for Dynamic<String> {
     /// `from_protected_bytes` and `deserialize_with_limit`.
     ///
     /// See [`RevealSecret::into_inner`] for full documentation including the
-    /// `Debug` warning.
+    /// redacted `Debug` behavior.
     #[inline(always)]
-    fn into_inner(mut self) -> zeroize::Zeroizing<String>
+    fn into_inner(mut self) -> crate::InnerSecret<String>
     where
         Self: Sized,
         Self::Inner: Sized + Default + zeroize::Zeroize,
@@ -225,7 +246,7 @@ impl crate::RevealSecret for Dynamic<String> {
         // it on unwind. After the swap, self.inner is Box<String::new()> — zeroized
         // on Dynamic::drop as a no-op. `*boxed` deref-moves the String out of the Box.
         let boxed = core::mem::replace(&mut self.inner, Box::new(String::new()));
-        zeroize::Zeroizing::new(*boxed)
+        crate::InnerSecret::new(*boxed)
     }
 }
 
@@ -250,7 +271,7 @@ impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
         self.inner.len() * core::mem::size_of::<T>()
     }
 
-    /// Consumes `self` and returns the inner `Vec<T>` wrapped in [`zeroize::Zeroizing`].
+    /// Consumes `self` and returns the inner `Vec<T>` wrapped in [`crate::InnerSecret`].
     ///
     /// **Allocation note:** allocates one small `Box<Vec<T>>` sentinel (24 bytes on
     /// 64-bit) before the swap. If that allocation panics (OOM), `self.inner` is
@@ -259,9 +280,9 @@ impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
     /// `from_protected_bytes` and `deserialize_with_limit`.
     ///
     /// See [`RevealSecret::into_inner`] for full documentation including the
-    /// `Debug` warning.
+    /// redacted `Debug` behavior.
     #[inline(always)]
-    fn into_inner(mut self) -> zeroize::Zeroizing<Vec<T>>
+    fn into_inner(mut self) -> crate::InnerSecret<Vec<T>>
     where
         Self: Sized,
         Self::Inner: Sized + Default + zeroize::Zeroize,
@@ -271,7 +292,7 @@ impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
         // unwind. After the swap, self.inner is Box<Vec::new()> — zeroized on
         // Dynamic::drop as a no-op. `*boxed` deref-moves the Vec out of the Box.
         let boxed = core::mem::replace(&mut self.inner, Box::new(Vec::new()));
-        zeroize::Zeroizing::new(*boxed)
+        crate::InnerSecret::new(*boxed)
     }
 }
 
@@ -309,39 +330,63 @@ impl<T: zeroize::Zeroize> crate::RevealSecretMut for Dynamic<Vec<T>> {
 // Random generation
 #[cfg(feature = "rand")]
 impl Dynamic<alloc::vec::Vec<u8>> {
-    /// Allocates a `Vec<u8>` of length `len`, fills it with cryptographically secure random bytes,
-    /// and wraps it.
+    /// Fills a new `Vec<u8>` with `len` cryptographically secure random bytes and wraps it.
     ///
-    /// Uses the system RNG ([`OsRng`](rand::rngs::OsRng)). Requires the `rand` feature and `alloc`
-    /// (implicit — [`Dynamic<T>`](crate::Dynamic) itself requires `alloc`).
+    /// Uses the system RNG ([`SysRng`](rand::rngs::SysRng)). Requires the `rand` feature (and
+    /// `alloc`, which `Dynamic<Vec<u8>>` always needs).
     ///
     /// # Panics
     ///
-    /// Panics if the RNG fails ([`TryRngCore::try_fill_bytes`](rand::TryRngCore::try_fill_bytes)
+    /// Panics if the system RNG fails to provide bytes ([`TryRng::try_fill_bytes`](rand::TryRng::try_fill_bytes)
     /// returns `Err`). This is treated as a fatal environment error.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "alloc", feature = "rand"))]
+    /// use secure_gate::{Dynamic, RevealSecret};
+    ///
+    /// # #[cfg(all(feature = "alloc", feature = "rand"))]
+    /// # {
+    /// let nonce: Dynamic<Vec<u8>> = Dynamic::from_random(24);
+    /// assert_eq!(nonce.len(), 24);
+    /// # }
+    /// ```
     #[inline]
     pub fn from_random(len: usize) -> Self {
         Self::new_with(|v| {
             v.resize(len, 0u8);
-            OsRng
+            SysRng
                 .try_fill_bytes(v)
-                .expect("OsRng failure is a program error");
+                .expect("SysRng failure is a program error");
         })
     }
 
     /// Allocates a `Vec<u8>` of length `len`, fills it from `rng`, and wraps it.
     ///
-    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRngCore`](rand::TryRngCore) (e.g. a
-    /// seeded generator for deterministic tests). Requires the `rand` feature and `alloc`.
+    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRng`](rand::TryRng) — for example,
+    /// a seeded [`OsRng`](rand::rngs::OsRng) for deterministic tests. Requires the `rand`
+    /// feature and `alloc` (implicit — [`Dynamic<T>`](crate::Dynamic) itself requires it).
     ///
     /// # Errors
     ///
-    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRngCore::try_fill_bytes) fails.
+    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRng::try_fill_bytes) fails.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "alloc", feature = "rand"))]
+    /// # {
+    /// use rand::rngs::OsRng;
+    /// use rand::SeedableRng;
+    /// use secure_gate::Dynamic;
+    ///
+    /// let mut rng = OsRng::from_seed([9u8; 32]);
+    /// let nonce: Dynamic<Vec<u8>> = Dynamic::from_rng(24, &mut rng).expect("rng fill");
+    /// # }
+    /// ```
     #[inline]
-    pub fn from_rng<R: TryRngCore + TryCryptoRng>(
-        len: usize,
-        rng: &mut R,
-    ) -> Result<Self, R::Error> {
+    pub fn from_rng<R: TryRng + TryCryptoRng>(len: usize, rng: &mut R) -> Result<Self, R::Error> {
         let mut result = Ok(());
         let this = Self::new_with(|v| {
             v.resize(len, 0u8);
