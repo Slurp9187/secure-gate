@@ -9,12 +9,17 @@ repository.workspace = true
 
 [dependencies]
 secure-gate = { path = "../secure-gate-core" }
+zeroize = { version = "1.8", default-features = false }
+serde = { version = "1.0", optional = true, default-features = false, features = ["derive"] }
 
 [dev-dependencies]
 # Dual-parity testing baselines — pinned exact versions matching local source clones.
 # These compile as dev-deps always; the dual-compat-test feature gates the test module.
 secrecy-v08 = { package = "secrecy", version = "=0.8.0" }
 secrecy-v10 = { package = "secrecy", version = "=0.10.1" }
+trybuild = "1.0"
+serde_json = "1.0"
+proptest = "1.10"
 
 [features]
 # secrecy compatibility shims — drop-in replacements for secrecy v0.8.0 and v0.10.1.
@@ -23,7 +28,7 @@ secrecy-v10 = { package = "secrecy", version = "=0.10.1" }
 # Shared traits (ExposeSecret, CloneableSecret, zeroize re-export) live in compat root.
 # See `src/compat/` for the full migration guides and
 # `tests/compat_suite/` for the exhaustive migration test suite.
-secrecy-compat = ["secure-gate/alloc", "secure-gate/cloneable", "secure-gate/serde-serialize"]
+secrecy-compat = ["secure-gate/alloc", "secure-gate/cloneable", "secure-gate/serde-serialize", "serde"]
 
 # Enables side-by-side parity tests in tests/compat_dual/ that run the exact same
 # test body against both the real `secrecy` crate and the compat shim, proving drop-in
@@ -31,21 +36,13 @@ secrecy-compat = ["secure-gate/alloc", "secure-gate/cloneable", "secure-gate/ser
 # ordinary dev-dependencies); this feature just activates the test module.
 dual-compat-test = ["secrecy-compat"]
 
+alloc = ["secure-gate/alloc"]
+ct-eq = ["secure-gate/ct-eq"]
+serde-deserialize = ["secure-gate/serde-deserialize"]
+serde-serialize = ["secure-gate/serde-serialize"]
+serde = ["dep:serde"]
+
 [[test]]
 name = "migration_full"
 path = "tests/migration_full.rs"
 harness = false
-
-[[bin]]
-name = "compat_v08"
-path = "fuzz_targets/compat_v08.rs"
-test = false
-bench = false
-doc = false
-
-[[bin]]
-name = "compat_v10"
-path = "fuzz_targets/compat_v10.rs"
-test = false
-bench = false
-doc = false

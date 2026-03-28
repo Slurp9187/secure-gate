@@ -181,7 +181,7 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecret for Fixed<[T; N]> {
         // default value while the caller receives the real secret.
         // Default::default() is inferred as [T; N] from context; [T; N]: Default
         // is guaranteed by the where clause above.
-        let inner = core::mem::replace(&mut self.inner, Default::default());
+        let inner = core::mem::take(&mut self.inner);
         crate::InnerSecret::new(inner)
     }
 }
@@ -408,7 +408,10 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// Prefer this over [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked) in
     /// security-critical code to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32m(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+    pub fn try_from_bech32m(
+        s: &str,
+        expected_hrp: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
         let bytes_raw = s.try_from_bech32m(expected_hrp)?;
         let bytes = zeroize::Zeroizing::new(bytes_raw);
         if bytes.len() != N {

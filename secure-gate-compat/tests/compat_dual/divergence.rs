@@ -33,8 +33,8 @@
 /// same behavior. This test checks our shim is correct, not that it differs.
 #[test]
 fn compat_zeroize_on_drop_v08() {
-    use secure_gate::compat::v08::Secret;
-    use secure_gate::compat::ExposeSecret;
+    use secure_gate_compat::compat::v08::Secret;
+    use secure_gate_compat::compat::ExposeSecret;
 
     // Allocate a secret and capture the heap address of its contents.
     let data = vec![0xFFu8; 32];
@@ -84,7 +84,7 @@ fn compat_zeroize_on_drop_v08() {
 /// This test confirms our shim matches that behavior.
 #[test]
 fn compat_zeroize_on_drop_v10() {
-    use secure_gate::compat::v10::SecretBox;
+    use secure_gate_compat::compat::v10::SecretBox;
 
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
@@ -121,8 +121,8 @@ fn compat_zeroize_on_drop_v10() {
 /// This test documents the correct idiom.
 #[test]
 fn compat_v08_no_deref_correct_idiom() {
-    use secure_gate::compat::v08::Secret;
-    use secure_gate::compat::ExposeSecret;
+    use secure_gate_compat::compat::v08::Secret;
+    use secure_gate_compat::compat::ExposeSecret;
 
     let s = Secret::new(String::from("no_deref_value"));
     // CORRECT: use expose_secret() explicitly
@@ -140,8 +140,8 @@ fn compat_v08_no_deref_correct_idiom() {
 /// This test documents the correct idiom.
 #[test]
 fn compat_v08_no_asref_correct_idiom() {
-    use secure_gate::compat::v08::Secret;
-    use secure_gate::compat::ExposeSecret;
+    use secure_gate_compat::compat::v08::Secret;
+    use secure_gate_compat::compat::ExposeSecret;
 
     let s = Secret::new(String::from("no_asref_value"));
     // CORRECT: call expose_secret() then use AsRef on the inner value
@@ -159,7 +159,7 @@ fn compat_v08_no_asref_correct_idiom() {
 /// This test documents the correct idiom: implement `DebugSecret` on your type.
 #[test]
 fn compat_v08_debug_requires_marker_correct_idiom() {
-    use secure_gate::compat::v08::{DebugSecret, Secret};
+    use secure_gate_compat::compat::v08::{DebugSecret, Secret};
 
     // A custom type that opts in to debug display
     struct ApiKey(String);

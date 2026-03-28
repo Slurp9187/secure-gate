@@ -21,8 +21,8 @@
 ///   (all from `secrecy_v08::`)
 ///
 /// Shared imports injected into `compat_shim`:
-///   `Secret, SecretString, SecretVec, DebugSecret` from `secure_gate::compat::v08`
-///   `CloneableSecret, ExposeSecret` from `secure_gate::compat`
+///   `Secret, SecretString, SecretVec, DebugSecret` from `secure_gate_compat::compat::v08`
+///   `CloneableSecret, ExposeSecret` from `secure_gate_compat::compat`
 macro_rules! dual_test_v08 {
     ($name:ident { $($tt:tt)* }) => {
         mod $name {
@@ -41,9 +41,9 @@ macro_rules! dual_test_v08 {
             #[test]
             fn compat_shim() {
                 #[allow(unused_imports)]
-                use secure_gate::compat::v08::{DebugSecret, Secret, SecretString, SecretVec};
+                use secure_gate_compat::compat::v08::{DebugSecret, Secret, SecretString, SecretVec};
                 #[allow(unused_imports)]
-                use secure_gate::compat::{CloneableSecret, ExposeSecret};
+                use secure_gate_compat::compat::{CloneableSecret, ExposeSecret};
                 $($tt)*
             }
         }
@@ -57,8 +57,8 @@ macro_rules! dual_test_v08 {
 ///   (all from `secrecy_v10::`)
 ///
 /// Shared imports injected into `compat_shim`:
-///   `SecretBox, SecretString, SecretSlice` from `secure_gate::compat::v10`
-///   `ExposeSecret, ExposeSecretMut` from `secure_gate::compat`
+///   `SecretBox, SecretString, SecretSlice` from `secure_gate_compat::compat::v10`
+///   `ExposeSecret, ExposeSecretMut` from `secure_gate_compat::compat`
 macro_rules! dual_test_v10 {
     ($name:ident { $($tt:tt)* }) => {
         mod $name {
@@ -78,9 +78,9 @@ macro_rules! dual_test_v10 {
             #[test]
             fn compat_shim() {
                 #[allow(unused_imports)]
-                use secure_gate::compat::v10::{SecretBox, SecretSlice, SecretString};
+                use secure_gate_compat::compat::v10::{SecretBox, SecretSlice, SecretString};
                 #[allow(unused_imports)]
-                use secure_gate::compat::{CloneableSecret, ExposeSecret, ExposeSecretMut};
+                use secure_gate_compat::compat::{CloneableSecret, ExposeSecret, ExposeSecretMut};
                 $($tt)*
             }
         }

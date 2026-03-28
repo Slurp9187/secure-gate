@@ -46,8 +46,8 @@ fn main() {
 
 #[cfg(feature = "secrecy-compat")]
 fn stage1_v08_compat() {
-    use secure_gate::compat::v08::{Secret, SecretString, SecretVec};
-    use secure_gate::compat::ExposeSecret;
+    use secure_gate_compat::compat::v08::{Secret, SecretString, SecretVec};
+    use secure_gate_compat::compat::ExposeSecret;
 
     // Struct that a user would have before migration
     struct UserCredentials {
@@ -89,8 +89,8 @@ fn stage1_v08_compat() {
 
 #[cfg(feature = "secrecy-compat")]
 fn stage2_v10_compat() {
-    use secure_gate::compat::v10::{SecretBox, SecretSlice, SecretString};
-    use secure_gate::compat::{ExposeSecret, ExposeSecretMut};
+    use secure_gate_compat::compat::v10::{SecretBox, SecretSlice, SecretString};
+    use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
 
     struct ServiceConfig {
         api_endpoint: String,
@@ -173,9 +173,9 @@ fn stage3_native() {
 
 #[cfg(feature = "secrecy-compat")]
 fn stage4_cross_version_migration() {
-    use secure_gate::compat::v08::Secret as V08Secret;
-    use secure_gate::compat::v10::SecretBox as V10SecretBox;
-    use secure_gate::compat::ExposeSecret;
+    use secure_gate_compat::compat::v08::Secret as V08Secret;
+    use secure_gate_compat::compat::v10::SecretBox as V10SecretBox;
+    use secure_gate_compat::compat::ExposeSecret;
     use secure_gate::{Dynamic, Fixed, RevealSecret};
 
     let payload = "migration_payload_value";

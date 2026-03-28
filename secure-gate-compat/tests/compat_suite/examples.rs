@@ -6,9 +6,9 @@
 //!
 //! These examples are referenced from `MIGRATING_FROM_SECRECY.md`.
 
-use secure_gate::compat::v08::{DebugSecret, Secret as V08Secret, SecretString as V08SecretString};
-use secure_gate::compat::v10::{SecretBox, SecretSlice, SecretString as V10SecretString};
-use secure_gate::compat::{CloneableSecret, ExposeSecret, ExposeSecretMut};
+use secure_gate_compat::compat::v08::{DebugSecret, Secret as V08Secret, SecretString as V08SecretString};
+use secure_gate_compat::compat::v10::{SecretBox, SecretSlice, SecretString as V10SecretString};
+use secure_gate_compat::compat::{CloneableSecret, ExposeSecret, ExposeSecretMut};
 use secure_gate::{Dynamic, Fixed, RevealSecret};
 
 // ── Step 1: Mechanical import swap (v0.8 → secure-gate) ──────────────────────
@@ -17,8 +17,8 @@ use secure_gate::{Dynamic, Fixed, RevealSecret};
 //   use secrecy::{Secret, SecretString, ExposeSecret, CloneableSecret};
 //
 // After (one global find/replace):
-//   use secure_gate::compat::v08::{Secret, SecretString};
-//   use secure_gate::compat::{ExposeSecret, CloneableSecret};
+//   use secure_gate_compat::compat::v08::{Secret, SecretString};
+//   use secure_gate_compat::compat::{ExposeSecret, CloneableSecret};
 
 #[test]
 fn ex_v08_import_swap_secret() {
@@ -34,8 +34,8 @@ fn ex_v08_import_swap_secret() {
 //   use secrecy::{SecretBox, SecretString, ExposeSecret, ExposeSecretMut};
 //
 // After:
-//   use secure_gate::compat::v10::{SecretBox, SecretString};
-//   use secure_gate::compat::{ExposeSecret, ExposeSecretMut};
+//   use secure_gate_compat::compat::v10::{SecretBox, SecretString};
+//   use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
 
 #[test]
 fn ex_v10_import_swap_secret_box() {
@@ -210,11 +210,11 @@ fn ex_debug_secret_safe_logging() {
 //
 // secrecy re-exports `pub use zeroize;`. The compat layer mirrors this exactly,
 // so `use secrecy::zeroize::Zeroize;` becomes:
-//   `use secure_gate::compat::zeroize::Zeroize;`
+//   `use secure_gate_compat::compat::zeroize::Zeroize;`
 
 #[test]
 fn ex_zeroize_reexport_drop_in() {
-    use secure_gate::compat::zeroize::Zeroize;
+    use secure_gate_compat::compat::zeroize::Zeroize;
 
     let mut scratch_buffer: Vec<u8> = vec![0xFFu8; 64];
     scratch_buffer.zeroize();

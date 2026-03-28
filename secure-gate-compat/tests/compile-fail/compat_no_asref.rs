@@ -1,7 +1,7 @@
 // Proves that compat::v08::Secret<T> does not implement AsRef<str>.
 // Without this guarantee, a function accepting &impl AsRef<str> could receive a
 // secret by accident, silently bypassing the explicit-access requirement.
-use secure_gate::compat::v08::Secret;
+use secure_gate_compat::compat::v08::Secret;
 
 fn needs_str_ref<T: AsRef<str>>(t: &T) {
     let _ = t.as_ref();

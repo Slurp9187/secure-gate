@@ -14,8 +14,8 @@
 
 #![allow(deprecated)] // for the Secret<T> alias test
 
-use secure_gate::compat::v10::{SecretBox, SecretSlice, SecretString};
-use secure_gate::compat::{CloneableSecret, ExposeSecret, ExposeSecretMut};
+use secure_gate_compat::compat::v10::{SecretBox, SecretSlice, SecretString};
+use secure_gate_compat::compat::{CloneableSecret, ExposeSecret, ExposeSecretMut};
 use secure_gate::{Dynamic, Fixed};
 
 // ── 1. SecretBox construction ─────────────────────────────────────────────────
@@ -296,7 +296,7 @@ fn dynamic_vec_to_secret_box_vec() {
 
 #[test]
 fn zeroize_reexport_accessible() {
-    use secure_gate::compat::zeroize::Zeroize;
+    use secure_gate_compat::compat::zeroize::Zeroize;
     let mut val = vec![1u8, 2, 3];
     val.zeroize();
     assert!(val.iter().all(|&b| b == 0));
@@ -306,7 +306,7 @@ fn zeroize_reexport_accessible() {
 
 #[test]
 fn legacy_secret_alias_compiles() {
-    use secure_gate::compat::v10::Secret;
+    use secure_gate_compat::compat::v10::Secret;
     let _s: Secret<String> = Secret::new(Box::new(String::from("legacy")));
 }
 
@@ -331,7 +331,7 @@ fn secret_string_deserialize() {
 #[cfg(all(feature = "serde-serialize", feature = "serde-deserialize"))]
 #[test]
 fn secret_box_serialize_requires_marker() {
-    use secure_gate::compat::SerializableSecret;
+    use secure_gate_compat::compat::SerializableSecret;
     use zeroize::Zeroize;
 
     #[derive(Clone, Zeroize, serde::Serialize, serde::Deserialize)]

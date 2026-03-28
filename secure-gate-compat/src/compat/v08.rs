@@ -12,8 +12,8 @@
 //! use secrecy::{Secret, SecretString, SecretVec, DebugSecret, CloneableSecret, ExposeSecret};
 //!
 //! // After (one global find/replace)
-//! use secure_gate::compat::v08::{Secret, SecretString, SecretVec, DebugSecret};
-//! use secure_gate::compat::{CloneableSecret, ExposeSecret};
+//! use secure_gate_compat::compat::v08::{Secret, SecretString, SecretVec, DebugSecret};
+//! use secure_gate_compat::compat::{CloneableSecret, ExposeSecret};
 //! ```
 //!
 //! # API table
@@ -40,11 +40,11 @@
 //! # Step-by-step migration
 //!
 //! 1. Replace `secrecy` dependency with `secure-gate` + `features = ["secrecy-compat"]`
-//! 2. Find/replace `use secrecy::` → `use secure_gate::compat::v08::` (types) or
-//!    `use secure_gate::compat::` (traits)
-//! 3. Gradually replace `v08::Secret<String>` with [`Dynamic<String>`](crate::Dynamic) using
+//! 2. Find/replace `use secrecy::` → `use secure_gate_compat::compat::v08::` (types) or
+//!    `use secure_gate_compat::compat::` (traits)
+//! 3. Gradually replace `v08::Secret<String>` with [`Dynamic<String>`](secure_gate::Dynamic) using
 //!    the provided [`From`] conversions
-//! 4. Replace `v08::Secret<[T; N]>` with [`Fixed<[T; N]>`](crate::Fixed)
+//! 4. Replace `v08::Secret<[T; N]>` with [`Fixed<[T; N]>`](secure_gate::Fixed)
 //! 5. Remove `secrecy-compat` feature once fully migrated
 
 extern crate alloc;
@@ -60,6 +60,7 @@ use super::CloneableSecret;
 use super::ExposeSecret;
 #[cfg(feature = "serde-serialize")]
 use super::SerializableSecret;
+use secure_gate::RevealSecret;
 
 // ── DebugSecret ───────────────────────────────────────────────────────────────
 
@@ -74,7 +75,7 @@ use super::SerializableSecret;
 ///
 /// ```rust
 /// # #[cfg(feature = "secrecy-compat")] {
-/// use secure_gate::compat::v08::{DebugSecret, Secret};
+/// use secure_gate_compat::compat::v08::{DebugSecret, Secret};
 ///
 /// struct ApiKey(String);
 /// impl zeroize::Zeroize for ApiKey { fn zeroize(&mut self) { self.0.zeroize(); } }
@@ -130,7 +131,7 @@ impl<S: CloneableSecret + Zeroize> CloneableSecret for Vec<S> {}
 ///
 /// ```rust
 /// # #[cfg(feature = "secrecy-compat")] {
-/// use secure_gate::compat::v08::Secret;
+/// use secure_gate_compat::compat::v08::Secret;
 /// use secure_gate::Dynamic;
 ///
 /// // String → heap-allocated Dynamic<String>
@@ -153,7 +154,9 @@ where
 impl<S: Zeroize> Secret<S> {
     /// Takes ownership of a secret value.
     pub fn new(secret: S) -> Self {
-        Secret { inner_secret: secret }
+        Secret {
+            inner_secret: secret,
+        }
     }
 }
 
@@ -230,7 +233,7 @@ pub type SecretVec<T> = Secret<Vec<T>>;
 /// `Box<S>` must implement [`Zeroize`]. In zeroize ≥ 1.8, this is only provided for
 /// `Box<[Z]>` (heap slices, `Z: Zeroize`) and `Box<str>`. For sized secret buffers,
 /// prefer [`v10::SecretBox`](super::v10::SecretBox) or the native
-/// [`Dynamic<T>`](crate::Dynamic).
+/// [`Dynamic<T>`](secure_gate::Dynamic).
 pub type SecretBox<S> = Secret<Box<S>>;
 
 // ── Serde ─────────────────────────────────────────────────────────────────────
@@ -268,48 +271,48 @@ where
 // The clone is brief: the original is zeroized when it drops at the end of the
 // conversion function body.
 
-/// Converts `Secret<String>` into a [`Dynamic<String>`](crate::Dynamic).
-impl From<Secret<String>> for crate::Dynamic<String> {
+/// Converts `Secret<String>` into a [`Dynamic<String>`](secure_gate::Dynamic).
+impl From<Secret<String>> for secure_gate::Dynamic<String> {
     fn from(s: Secret<String>) -> Self {
-        crate::Dynamic::new(s.inner_secret.clone())
+        secure_gate::Dynamic::new(s.inner_secret.clone())
     }
 }
 
-/// Converts a [`Dynamic<String>`](crate::Dynamic) into `Secret<String>`.
-impl From<crate::Dynamic<String>> for Secret<String> {
-    fn from(d: crate::Dynamic<String>) -> Self {
-        let val = <crate::Dynamic<String> as crate::RevealSecret>::expose_secret(&d).clone();
+/// Converts a [`Dynamic<String>`](secure_gate::Dynamic) into `Secret<String>`.
+impl From<secure_gate::Dynamic<String>> for Secret<String> {
+    fn from(d: secure_gate::Dynamic<String>) -> Self {
+        let val = <secure_gate::Dynamic<String> as RevealSecret>::expose_secret(&d).clone();
         Secret::new(val)
     }
 }
 
-/// Converts `Secret<Vec<T>>` into a [`Dynamic<Vec<T>>`](crate::Dynamic).
-impl<T: Clone + Zeroize + 'static> From<Secret<Vec<T>>> for crate::Dynamic<Vec<T>> {
+/// Converts `Secret<Vec<T>>` into a [`Dynamic<Vec<T>>`](secure_gate::Dynamic).
+impl<T: Clone + Zeroize + 'static> From<Secret<Vec<T>>> for secure_gate::Dynamic<Vec<T>> {
     fn from(s: Secret<Vec<T>>) -> Self {
-        crate::Dynamic::new(s.inner_secret.clone())
+        secure_gate::Dynamic::new(s.inner_secret.clone())
     }
 }
 
-/// Converts a [`Dynamic<Vec<T>>`](crate::Dynamic) into `Secret<Vec<T>>`.
-impl<T: Clone + Zeroize + 'static> From<crate::Dynamic<Vec<T>>> for Secret<Vec<T>> {
-    fn from(d: crate::Dynamic<Vec<T>>) -> Self {
-        let val = <crate::Dynamic<Vec<T>> as crate::RevealSecret>::expose_secret(&d).clone();
+/// Converts a [`Dynamic<Vec<T>>`](secure_gate::Dynamic) into `Secret<Vec<T>>`.
+impl<T: Clone + Zeroize + 'static> From<secure_gate::Dynamic<Vec<T>>> for Secret<Vec<T>> {
+    fn from(d: secure_gate::Dynamic<Vec<T>>) -> Self {
+        let val = <secure_gate::Dynamic<Vec<T>> as RevealSecret>::expose_secret(&d).clone();
         Secret::new(val)
     }
 }
 
-/// Converts `Secret<[T; N]>` into a [`Fixed<[T; N]>`](crate::Fixed).
-impl<T: Clone + Zeroize, const N: usize> From<Secret<[T; N]>> for crate::Fixed<[T; N]> {
+/// Converts `Secret<[T; N]>` into a [`Fixed<[T; N]>`](secure_gate::Fixed).
+impl<T: Clone + Zeroize, const N: usize> From<Secret<[T; N]>> for secure_gate::Fixed<[T; N]> {
     fn from(s: Secret<[T; N]>) -> Self {
         let arr = s.inner_secret.clone();
-        crate::Fixed::new(arr)
+        secure_gate::Fixed::new(arr)
     }
 }
 
-/// Converts a [`Fixed<[T; N]>`](crate::Fixed) into `Secret<[T; N]>`.
-impl<T: Clone + Zeroize, const N: usize> From<crate::Fixed<[T; N]>> for Secret<[T; N]> {
-    fn from(f: crate::Fixed<[T; N]>) -> Self {
-        let arr = crate::RevealSecret::expose_secret(&f).clone();
+/// Converts a [`Fixed<[T; N]>`](secure_gate::Fixed) into `Secret<[T; N]>`.
+impl<T: Clone + Zeroize, const N: usize> From<secure_gate::Fixed<[T; N]>> for Secret<[T; N]> {
+    fn from(f: secure_gate::Fixed<[T; N]>) -> Self {
+        let arr = RevealSecret::expose_secret(&f).clone();
         Secret::new(arr)
     }
 }

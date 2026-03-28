@@ -8,9 +8,9 @@
 //! Value identity is asserted at every hop via `expose_secret()`.
 //! Constant-time equality checks are added where the `ct-eq` feature is active.
 
-use secure_gate::compat::v08::{Secret as V08Secret, SecretString as V08SecretString};
-use secure_gate::compat::v10::{SecretBox as V10SecretBox, SecretString as V10SecretString};
-use secure_gate::compat::{ExposeSecret, ExposeSecretMut};
+use secure_gate_compat::compat::v08::{Secret as V08Secret, SecretString as V08SecretString};
+use secure_gate_compat::compat::v10::{SecretBox as V10SecretBox, SecretString as V10SecretString};
+use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
 use secure_gate::{Dynamic, Fixed};
 
 // ── String: v08 → Dynamic → v10 → Dynamic → v08 ─────────────────────────────

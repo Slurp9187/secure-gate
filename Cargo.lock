@@ -733,9 +733,14 @@ dependencies = [
 name = "secure-gate-compat"
 version = "0.9.0-rc.4-dev"
 dependencies = [
+ "proptest",
  "secrecy 0.10.1",
  "secrecy 0.8.0",
  "secure-gate",
+ "serde",
+ "serde_json",
+ "trybuild",
+ "zeroize",
 ]
 
 [[package]]

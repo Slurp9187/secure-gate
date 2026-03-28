@@ -28,8 +28,8 @@
 //! use secrecy::{SecretBox, SecretString, ExposeSecret};
 //!
 //! // After (one global find/replace)
-//! use secure_gate::compat::v10::{SecretBox, SecretString};
-//! use secure_gate::compat::ExposeSecret;
+//! use secure_gate_compat::compat::v10::{SecretBox, SecretString};
+//! use secure_gate_compat::compat::ExposeSecret;
 //! ```
 //!
 //! **From secrecy 0.8.x:**
@@ -39,18 +39,19 @@
 //! use secrecy::{Secret, SecretString, DebugSecret, ExposeSecret};
 //!
 //! // After (one global find/replace)
-//! use secure_gate::compat::v08::{Secret, SecretString, DebugSecret};
-//! use secure_gate::compat::ExposeSecret;
+//! use secure_gate_compat::compat::v08::{Secret, SecretString, DebugSecret};
+//! use secure_gate_compat::compat::ExposeSecret;
 //! ```
 //!
 //! ## Bridge impls
 //!
-//! Native [`Dynamic<T>`](crate::Dynamic) and [`Fixed<[T; N]>`](crate::Fixed) implement
+//! Native [`Dynamic<T>`](secure_gate::Dynamic) and [`Fixed<[T; N]>`](secure_gate::Fixed) implement
 //! both [`ExposeSecret`] and [`ExposeSecretMut`] so that code written against the secrecy
 //! traits compiles unchanged when you swap the concrete type for a native secure-gate type.
 
 extern crate alloc;
 
+use secure_gate::{Dynamic, Fixed, RevealSecret, RevealSecretMut};
 use zeroize::Zeroize;
 
 // ── zeroize re-export ────────────────────────────────────────────────────────
@@ -58,7 +59,7 @@ use zeroize::Zeroize;
 /// Re-exported [`zeroize`] crate — mirrors `secrecy`'s own `pub use zeroize;`.
 ///
 /// Allows `use secrecy::zeroize::Zeroize` to migrate unchanged via
-/// `use secure_gate::compat::zeroize::Zeroize`.
+/// `use secure_gate_compat::compat::zeroize::Zeroize`.
 pub use zeroize;
 
 // ── ExposeSecret / ExposeSecretMut ───────────────────────────────────────────
@@ -66,12 +67,12 @@ pub use zeroize;
 /// Read-only access to a wrapped secret — mirrors `secrecy::ExposeSecret`.
 ///
 /// Implemented directly by [`v08::Secret`] and [`v10::SecretBox`], and by bridge
-/// impls on [`Dynamic<String>`](crate::Dynamic), [`Dynamic<Vec<T>>`](crate::Dynamic),
-/// and [`Fixed<[T; N]>`](crate::Fixed).
+/// impls on [`Dynamic<String>`](secure_gate::Dynamic), [`Dynamic<Vec<T>>`](secure_gate::Dynamic),
+/// and [`Fixed<[T; N]>`](secure_gate::Fixed).
 ///
 /// # Migration
 ///
-/// For new code, prefer [`RevealSecret`](crate::RevealSecret), which additionally provides
+/// For new code, prefer [`RevealSecret`](RevealSecret), which additionally provides
 /// scoped `with_secret` access and byte-length metadata.
 pub trait ExposeSecret<S: ?Sized> {
     /// Returns a shared reference to the inner secret.
@@ -85,7 +86,7 @@ pub trait ExposeSecret<S: ?Sized> {
 ///
 /// # Migration
 ///
-/// For new code, prefer [`RevealSecretMut`](crate::RevealSecretMut).
+/// For new code, prefer [`RevealSecretMut`](RevealSecretMut).
 pub trait ExposeSecretMut<S: ?Sized> {
     /// Returns a mutable reference to the inner secret.
     fn expose_secret_mut(&mut self) -> &mut S;
@@ -127,7 +128,7 @@ impl<Z: CloneableSecret, const N: usize> CloneableSecret for [Z; N] {}
 /// Requires the `serde-serialize` feature. Serialization of secret wrappers is
 /// deliberately opt-in to prevent accidental exfiltration.
 #[cfg(feature = "serde-serialize")]
-pub use crate::SerializableSecret;
+pub use secure_gate::SerializableSecret;
 
 // ── Bridge: secure-gate native types → ExposeSecret / ExposeSecretMut ────────
 //
@@ -137,45 +138,45 @@ pub use crate::SerializableSecret;
 // Explicit (rather than blanket) impls prevent the blanket from also catching
 // `SecretBox` / `Secret`, which carry their own direct impls.
 
-impl ExposeSecret<alloc::string::String> for crate::Dynamic<alloc::string::String> {
+impl ExposeSecret<alloc::string::String> for Dynamic<alloc::string::String> {
     #[inline]
     fn expose_secret(&self) -> &alloc::string::String {
-        crate::RevealSecret::expose_secret(self)
+        RevealSecret::expose_secret(self)
     }
 }
 
-impl ExposeSecretMut<alloc::string::String> for crate::Dynamic<alloc::string::String> {
+impl ExposeSecretMut<alloc::string::String> for Dynamic<alloc::string::String> {
     #[inline]
     fn expose_secret_mut(&mut self) -> &mut alloc::string::String {
-        crate::RevealSecretMut::expose_secret_mut(self)
+        RevealSecretMut::expose_secret_mut(self)
     }
 }
 
-impl<T: Zeroize> ExposeSecret<alloc::vec::Vec<T>> for crate::Dynamic<alloc::vec::Vec<T>> {
+impl<T: Zeroize> ExposeSecret<alloc::vec::Vec<T>> for Dynamic<alloc::vec::Vec<T>> {
     #[inline]
     fn expose_secret(&self) -> &alloc::vec::Vec<T> {
-        crate::RevealSecret::expose_secret(self)
+        RevealSecret::expose_secret(self)
     }
 }
 
-impl<T: Zeroize> ExposeSecretMut<alloc::vec::Vec<T>> for crate::Dynamic<alloc::vec::Vec<T>> {
+impl<T: Zeroize> ExposeSecretMut<alloc::vec::Vec<T>> for Dynamic<alloc::vec::Vec<T>> {
     #[inline]
     fn expose_secret_mut(&mut self) -> &mut alloc::vec::Vec<T> {
-        crate::RevealSecretMut::expose_secret_mut(self)
+        RevealSecretMut::expose_secret_mut(self)
     }
 }
 
-impl<const N: usize, T: Zeroize> ExposeSecret<[T; N]> for crate::Fixed<[T; N]> {
+impl<const N: usize, T: Zeroize> ExposeSecret<[T; N]> for Fixed<[T; N]> {
     #[inline]
     fn expose_secret(&self) -> &[T; N] {
-        crate::RevealSecret::expose_secret(self)
+        RevealSecret::expose_secret(self)
     }
 }
 
-impl<const N: usize, T: Zeroize> ExposeSecretMut<[T; N]> for crate::Fixed<[T; N]> {
+impl<const N: usize, T: Zeroize> ExposeSecretMut<[T; N]> for Fixed<[T; N]> {
     #[inline]
     fn expose_secret_mut(&mut self) -> &mut [T; N] {
-        crate::RevealSecretMut::expose_secret_mut(self)
+        RevealSecretMut::expose_secret_mut(self)
     }
 }
 

@@ -11,9 +11,9 @@
 //!   - SecretVec of non-u8 element type (e.g. u32)
 //!   - Multiple independent clones remain independent after mutation on native side
 
-use secure_gate::compat::v08::{DebugSecret, Secret, SecretString, SecretVec};
-use secure_gate::compat::v10::{SecretBox, SecretSlice};
-use secure_gate::compat::{ExposeSecret, ExposeSecretMut};
+use secure_gate_compat::compat::v08::{DebugSecret, Secret, SecretString, SecretVec};
+use secure_gate_compat::compat::v10::{SecretBox, SecretSlice};
+use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
 use secure_gate::{Dynamic, Fixed, RevealSecret};
 
 // ── Zero-sized array ──────────────────────────────────────────────────────────
@@ -226,7 +226,7 @@ fn cloned_v10_secrets_are_independent() {
 
 #[test]
 fn secret_box_str_access() {
-    use secure_gate::compat::v10::SecretString;
+    use secure_gate_compat::compat::v10::SecretString;
     let ss: SecretString = "str_payload".into();
     assert_eq!(ss.expose_secret(), "str_payload");
     // SecretBox<str> is not Clone by default — no CloneableSecret for str

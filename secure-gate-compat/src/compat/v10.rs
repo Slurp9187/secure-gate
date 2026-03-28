@@ -12,29 +12,29 @@
 //! use secrecy::{SecretBox, SecretString, SecretSlice, ExposeSecret, ExposeSecretMut};
 //!
 //! // After (one global find/replace)
-//! use secure_gate::compat::v10::{SecretBox, SecretString, SecretSlice};
-//! use secure_gate::compat::{ExposeSecret, ExposeSecretMut};
+//! use secure_gate_compat::compat::v10::{SecretBox, SecretString, SecretSlice};
+//! use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
 //! ```
 //!
 //! # Migration table
 //!
 //! | secrecy 0.10 | secure-gate native |
 //! |---|---|
-//! | `SecretBox<T>` | [`Dynamic<T>`](crate::Dynamic) |
+//! | `SecretBox<T>` | [`Dynamic<T>`](secure_gate::Dynamic) |
 //! | `SecretString` | `Dynamic<String>` |
 //! | `SecretSlice<T>` | `Dynamic<Vec<T>>` |
-//! | `ExposeSecret<T>` | [`RevealSecret`](crate::RevealSecret) |
-//! | `ExposeSecretMut<T>` | [`RevealSecretMut`](crate::RevealSecretMut) |
+//! | `ExposeSecret<T>` | [`RevealSecret`](RevealSecret) |
+//! | `ExposeSecretMut<T>` | [`RevealSecretMut`](RevealSecretMut) |
 //! | `CloneableSecret` | [`CloneableSecret`](crate::CloneableSecret) (with `cloneable` feature) |
 //! | `SerializableSecret` | [`SerializableSecret`](crate::SerializableSecret) (with `serde-serialize` feature) |
 //!
 //! # Step-by-step migration
 //!
 //! 1. Replace `secrecy` dependency with `secure-gate` + `features = ["secrecy-compat"]`
-//! 2. Find/replace `use secrecy::` → `use secure_gate::compat::v10::` (or `compat::` for traits)
-//! 3. Gradually replace `v10::SecretBox<T>` with [`Dynamic<T>`](crate::Dynamic) using the
+//! 2. Find/replace `use secrecy::` → `use secure_gate_compat::compat::v10::` (or `compat::` for traits)
+//! 3. Gradually replace `v10::SecretBox<T>` with [`Dynamic<T>`](secure_gate::Dynamic) using the
 //!    provided [`From`] conversions
-//! 4. Replace `compat::ExposeSecret` with [`RevealSecret`](crate::RevealSecret) — bridge impls
+//! 4. Replace `compat::ExposeSecret` with [`RevealSecret`](RevealSecret) — bridge impls
 //!    on `Dynamic` and `Fixed` mean that call-sites using `.expose_secret()` continue to compile
 //! 5. Remove `secrecy-compat` feature once fully migrated
 
@@ -48,9 +48,10 @@ use core::str::FromStr;
 use core::{any, fmt};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use super::{CloneableSecret, ExposeSecret, ExposeSecretMut};
 #[cfg(feature = "serde-serialize")]
 use super::SerializableSecret;
+use super::{CloneableSecret, ExposeSecret, ExposeSecretMut};
+use secure_gate::RevealSecret;
 
 // ── SecretBox ────────────────────────────────────────────────────────────────
 
@@ -62,12 +63,12 @@ use super::SerializableSecret;
 ///
 /// # Migration to native secure-gate
 ///
-/// For sized types, convert to [`Dynamic<S>`](crate::Dynamic) using the provided
+/// For sized types, convert to [`Dynamic<S>`](secure_gate::Dynamic) using the provided
 /// `From` impl:
 ///
 /// ```rust
 /// # #[cfg(feature = "secrecy-compat")] {
-/// use secure_gate::compat::v10::SecretBox;
+/// use secure_gate_compat::compat::v10::SecretBox;
 /// use secure_gate::Dynamic;
 ///
 /// let compat: SecretBox<String> = SecretBox::init_with(|| String::from("hunter2"));
@@ -180,7 +181,7 @@ impl<S: Zeroize + ?Sized> ExposeSecretMut<S> for SecretBox<S> {
 /// Secret string type — mirrors `secrecy::SecretString`.
 ///
 /// Type alias for `SecretBox<str>`. Construct from [`String`] or `&str`.
-/// Prefer [`Dynamic<String>`](crate::Dynamic) for new code.
+/// Prefer [`Dynamic<String>`](secure_gate::Dynamic) for new code.
 pub type SecretString = SecretBox<str>;
 
 impl From<String> for SecretString {
@@ -222,7 +223,7 @@ impl Default for SecretString {
 /// Secret slice type — mirrors `secrecy::SecretSlice`.
 ///
 /// Type alias for `SecretBox<[S]>`. Construct from [`Vec<S>`].
-/// Prefer [`Dynamic<Vec<S>>`](crate::Dynamic) for new code.
+/// Prefer [`Dynamic<Vec<S>>`](secure_gate::Dynamic) for new code.
 pub type SecretSlice<S> = SecretBox<[S]>;
 
 impl<S> From<Vec<S>> for SecretSlice<S>
@@ -259,56 +260,56 @@ where
 
 // ── Conversions: SecretBox ↔ Dynamic ─────────────────────────────────────────
 
-/// Converts a `SecretBox<S>` into a [`Dynamic<S>`](crate::Dynamic) (primary migration path).
+/// Converts a `SecretBox<S>` into a [`Dynamic<S>`](secure_gate::Dynamic) (primary migration path).
 ///
 /// Requires `S: Clone` because the inner `Box<S>` cannot be moved out of `SecretBox`
 /// without unsafe code (`SecretBox` has a `Drop` impl). The clone is immediately
 /// wrapped in `Dynamic` and the original is zeroized on drop.
 ///
 /// For zero-copy migration, construct `Dynamic<S>` directly instead.
-impl<S: Clone + Zeroize + 'static> From<SecretBox<S>> for crate::Dynamic<S> {
+impl<S: Clone + Zeroize + 'static> From<SecretBox<S>> for secure_gate::Dynamic<S> {
     fn from(sb: SecretBox<S>) -> Self {
-        crate::Dynamic::new(sb.inner_secret.as_ref().clone())
+        secure_gate::Dynamic::new(sb.inner_secret.as_ref().clone())
     }
 }
 
-/// Converts a [`Dynamic<String>`](crate::Dynamic) back into a `SecretBox<String>`.
+/// Converts a [`Dynamic<String>`](secure_gate::Dynamic) back into a `SecretBox<String>`.
 ///
 /// Clones the inner `String`. Both the source and the new wrapper are zeroized on drop.
-impl From<crate::Dynamic<String>> for SecretBox<String> {
-    fn from(d: crate::Dynamic<String>) -> Self {
-        let val = <crate::Dynamic<String> as crate::RevealSecret>::expose_secret(&d).clone();
+impl From<secure_gate::Dynamic<String>> for SecretBox<String> {
+    fn from(d: secure_gate::Dynamic<String>) -> Self {
+        let val = <secure_gate::Dynamic<String> as RevealSecret>::expose_secret(&d).clone();
         SecretBox::new(Box::new(val))
     }
 }
 
-/// Converts a [`Dynamic<String>`](crate::Dynamic) into a `SecretString` (= `SecretBox<str>`).
+/// Converts a [`Dynamic<String>`](secure_gate::Dynamic) into a `SecretString` (= `SecretBox<str>`).
 ///
 /// Clones the inner string. Both ends are zeroized on drop.
-impl From<crate::Dynamic<String>> for SecretString {
-    fn from(d: crate::Dynamic<String>) -> Self {
-        let val = <crate::Dynamic<String> as crate::RevealSecret>::expose_secret(&d).clone();
+impl From<secure_gate::Dynamic<String>> for SecretString {
+    fn from(d: secure_gate::Dynamic<String>) -> Self {
+        let val = <secure_gate::Dynamic<String> as RevealSecret>::expose_secret(&d).clone();
         SecretString::from(val)
     }
 }
 
-/// Converts a [`Dynamic<Vec<S>>`](crate::Dynamic) back into a `SecretBox<Vec<S>>`.
+/// Converts a [`Dynamic<Vec<S>>`](secure_gate::Dynamic) back into a `SecretBox<Vec<S>>`.
 ///
 /// Clones the inner `Vec`. Both ends are zeroized on drop.
-impl<S: Clone + Zeroize + 'static> From<crate::Dynamic<Vec<S>>> for SecretBox<Vec<S>> {
-    fn from(d: crate::Dynamic<Vec<S>>) -> Self {
-        let val = <crate::Dynamic<Vec<S>> as crate::RevealSecret>::expose_secret(&d).clone();
+impl<S: Clone + Zeroize + 'static> From<secure_gate::Dynamic<Vec<S>>> for SecretBox<Vec<S>> {
+    fn from(d: secure_gate::Dynamic<Vec<S>>) -> Self {
+        let val = <secure_gate::Dynamic<Vec<S>> as RevealSecret>::expose_secret(&d).clone();
         SecretBox::new(Box::new(val))
     }
 }
 
-/// Converts a `SecretString` (= `SecretBox<str>`) into a [`Dynamic<String>`](crate::Dynamic).
+/// Converts a `SecretString` (= `SecretBox<str>`) into a [`Dynamic<String>`](secure_gate::Dynamic).
 ///
 /// Clones the inner `str` into a new `String`. Both ends are zeroized on drop.
-impl From<SecretString> for crate::Dynamic<String> {
+impl From<SecretString> for secure_gate::Dynamic<String> {
     fn from(sb: SecretString) -> Self {
         let val = String::from(sb.inner_secret.as_ref());
-        crate::Dynamic::new(val)
+        secure_gate::Dynamic::new(val)
     }
 }
 
@@ -358,5 +359,8 @@ where
 ///
 /// **Note:** secrecy 0.8 users should use [`v08::Secret`](super::v08::Secret) instead,
 /// which mirrors the original stack-allocated semantics.
-#[deprecated(since = "0.8.0", note = "Use `SecretBox` instead (mirrors secrecy >=0.9)")]
+#[deprecated(
+    since = "0.8.0",
+    note = "Use `SecretBox` instead (mirrors secrecy >=0.9)"
+)]
 pub type Secret<S> = SecretBox<S>;

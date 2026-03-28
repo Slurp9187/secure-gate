@@ -17,8 +17,8 @@
 use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
-use secure_gate::compat::v08::{Secret, SecretString};
-use secure_gate::compat::ExposeSecret;
+use secure_gate_compat::compat::v08::{Secret, SecretString};
+use secure_gate_compat::compat::ExposeSecret;
 use secure_gate::{Dynamic, Fixed};
 
 fuzz_target!(|data: &[u8]| {

@@ -1,7 +1,7 @@
 // Proves that Debug for v08::Secret<T> requires T: DebugSecret.
 // A type that does not opt-in to DebugSecret cannot be formatted with {:?},
 // preventing accidental secret exposure through logging / tracing / panics.
-use secure_gate::compat::v08::Secret;
+use secure_gate_compat::compat::v08::Secret;
 use zeroize::Zeroize;
 
 struct SensitiveKey(Vec<u8>);
