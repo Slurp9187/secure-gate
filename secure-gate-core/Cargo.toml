@@ -1,0 +1,112 @@
+[package]
+name = "secure-gate"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Secure wrappers for secrets with explicit access and automatic zeroization (requires inner type: Zeroize)"
+repository = "https://github.com/Slurp9187/secure-gate/tree/release/0.8"
+documentation = "https://docs.rs/secure-gate"
+keywords = ["crypto", "no-std", "security", "zeroize"]
+categories = ["cryptography", "no-std", "data-structures"]
+include = [
+    "src/**/*.rs",
+    "CHANGELOG.md",
+    "LICENSE*",
+    "README.md",
+    "SECURITY.md",
+]
+
+[dependencies]
+base64 = { version = "0.22", optional = true }
+bech32 = { version = "0.11", default-features = false, optional = true }
+hex = { version = "0.4", optional = true }
+rand = { version = "0.9", optional = true }
+serde = { version = "1.0", optional = true, default-features = false, features = ["derive"] }
+subtle = { version = "2.5", optional = true }
+thiserror = "2.0"
+zeroize = { version = "1.7", default-features = false, features = ["zeroize_derive"] }
+
+# MSRV (rustc 1.70) compatibility caps for transitive proc-macro dependencies.
+# Prevents rustc 1.71+ requirement introduced in syn 2.0.115+.
+syn = ">=2.0, <2.0.115"
+# Prevents rustc 1.71+ requirement introduced in unicode-ident 1.0.23+.
+unicode-ident = ">=1.0, <1.0.23"
+# Prevents rustc 1.71+ requirement introduced in quote 1.0.45+.
+quote = ">=1.0, <1.0.45"
+# Prevents rustc 1.71+ requirement introduced in ryu 1.0.23+.
+ryu = ">=1.0, <1.0.23"
+# Prevents rustc 1.81+ requirement introduced in half 2.7.1+.
+half = ">=2.0, <2.7.1"
+
+[dev-dependencies]
+bincode = "1.0"
+# Dual-parity testing baselines — pinned exact versions matching local source clones.
+# These compile as dev-deps always; the dual-compat-test feature gates the test module.
+secrecy-v08 = { package = "secrecy", version = "=0.8.0" }
+secrecy-v10 = { package = "secrecy", version = "=0.10.1" }
+# criterion >=0.5 pulls transitive deps that break 1.70 (e.g. clap >=4.5/rayon-core >=1.13).
+criterion = { version = "=0.4.0", features = ["html_reports"] }
+# proptest >=1.10 requires newer rustc (1.84+); keep 1.70-compatible line.
+proptest = "=1.0.0"
+# serde_json >=1.0.149 pulls `zmij` (rustc 1.71+); pin to pre-zmij release.
+serde_json = "=1.0.132"
+# newer trybuild pulls `toml` 1.x (`toml_parser` edition 2024), which Cargo 1.70 cannot parse.
+trybuild = "=1.0.81"
+# tempfile >=3.27 pulls getrandom 0.4 (edition 2024); Cargo 1.70 cannot parse that manifest.
+tempfile = "=3.10.1"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+# Default: give users the most useful experience out of the box
+default = ["alloc"]
+
+# Enables heap allocation (Dynamic<T>, Box, Vec, String) + full zeroization of spare capacity
+alloc = ["zeroize/alloc"]
+
+# Full std support (implies alloc)
+std = ["alloc"]
+
+# Rand: secure random generation
+rand = ["dep:rand"]
+
+# ct-eq: constant-time equality (subtle)
+ct-eq = ["dep:subtle"]
+
+# Encoding features
+encoding = [
+  "encoding-hex",
+  "encoding-base64",
+  "encoding-bech32",
+  "encoding-bech32m",
+]
+encoding-hex = ["dep:hex", "hex?/alloc", "alloc"]
+encoding-base64 = ["dep:base64", "base64?/alloc", "alloc"]
+encoding-bech32 = ["dep:bech32", "bech32?/alloc", "alloc"]
+encoding-bech32m = ["dep:bech32", "bech32?/alloc", "alloc"]
+
+# Cloneable: opt-in cloning
+cloneable = []
+
+# Serde: meta-feature for both directions
+serde = ["serde-deserialize", "serde-serialize"]
+serde-deserialize = ["dep:serde", "serde?/alloc", "alloc"]
+serde-serialize = ["dep:serde", "serde?/alloc", "alloc"]
+
+# Full batteries-included combo (most common real-world usage)
+full = ["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]
+
+[[bench]]
+name = "fixed_vs_raw"
+harness = false
+
+[[bench]]
+name = "dynamic_vs_raw"
+harness = false
+
+[[bench]]
+name = "serde"
+harness = false

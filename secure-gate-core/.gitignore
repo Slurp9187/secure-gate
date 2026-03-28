@@ -1,0 +1,29 @@
+/benches/results
+/code_packages*/
+/docs
+/issues
+/target
+
+*conflict*
+*# Name clash*
+
+# Cargo.lock
+
+*.bak
+*.del
+*.mute
+
+*.errors
+*.log
+*.results
+
+# Agent internal docs (keep local/private)
+architecture.md
+GROK.md
+state.md
+AUDIT*.md
+prompt.md
+# test_all.sh
+AGENT.md
+
+**plan*/
