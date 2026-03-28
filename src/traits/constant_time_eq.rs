@@ -52,6 +52,7 @@
 //!
 //! These cover the most common secret types in cryptographic applications.
 #[cfg(feature = "ct-eq")]
+/// Constant-time equality for secret material (requires `ct-eq`).
 pub trait ConstantTimeEq {
     /// Performs equality comparison in constant time.
     ///

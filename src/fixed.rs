@@ -177,11 +177,10 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecret for Fixed<[T; N]> {
         Self: Sized,
         Self::Inner: Sized + Default + zeroize::Zeroize,
     {
-        // Replace inner with a zero-sentinel so Fixed::drop zeroizes a harmless
+        // Take inner and leave a zero-sentinel so Fixed::drop zeroizes a harmless
         // default value while the caller receives the real secret.
-        // Default::default() is inferred as [T; N] from context; [T; N]: Default
-        // is guaranteed by the where clause above.
-        let inner = core::mem::replace(&mut self.inner, Default::default());
+        // `take` uses Default; [T; N]: Default is guaranteed by the where clause above.
+        let inner = core::mem::take(&mut self.inner);
         crate::InnerSecret::new(inner)
     }
 }

@@ -65,4 +65,5 @@
 //! This trait is a **marker only** — it has no methods and adds no runtime behavior.
 //! It exists solely to gate `Serialize` (and optionally `Deserialize`) on wrapper types.
 #[cfg(feature = "serde-serialize")]
+/// Marker trait: inner types that opt in to serializing secret wrappers (requires `serde-serialize`).
 pub trait SerializableSecret: serde::Serialize {}

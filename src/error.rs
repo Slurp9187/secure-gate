@@ -19,7 +19,12 @@ pub enum FromSliceError {
     #[cfg(debug_assertions)]
     /// Length mismatch in debug builds (detailed).
     #[error("slice length mismatch: expected {expected}, got {actual}")]
-    InvalidLength { actual: usize, expected: usize },
+    InvalidLength {
+        /// Actual slice length in bytes.
+        actual: usize,
+        /// Expected length in bytes.
+        expected: usize,
+    },
     #[cfg(not(debug_assertions))]
     /// Length mismatch in release builds (generic).
     #[error("slice length mismatch")]
@@ -54,7 +59,12 @@ pub enum Bech32Error {
     #[cfg(debug_assertions)]
     /// Unexpected HRP in debug builds (detailed).
     #[error("unexpected HRP: expected {expected}, got {got}")]
-    UnexpectedHrp { expected: String, got: String },
+    UnexpectedHrp {
+        /// Human-readable part that was expected.
+        expected: String,
+        /// Human-readable part present in the input.
+        got: String,
+    },
     #[cfg(not(debug_assertions))]
     /// Unexpected HRP in release builds (generic).
     #[error("unexpected HRP")]
@@ -62,7 +72,12 @@ pub enum Bech32Error {
     #[cfg(debug_assertions)]
     /// Length mismatch in debug builds (detailed).
     #[error("decoded length mismatch: expected {expected}, got {got}")]
-    InvalidLength { expected: usize, got: usize },
+    InvalidLength {
+        /// Expected decoded length in bytes.
+        expected: usize,
+        /// Actual decoded length in bytes.
+        got: usize,
+    },
     #[cfg(not(debug_assertions))]
     /// Length mismatch in release builds (generic).
     #[error("decoded length mismatch")]
@@ -85,7 +100,12 @@ pub enum Base64Error {
     #[cfg(debug_assertions)]
     /// Length mismatch in debug builds (detailed).
     #[error("decoded length mismatch: expected {expected}, got {got}")]
-    InvalidLength { expected: usize, got: usize },
+    InvalidLength {
+        /// Expected decoded length in bytes.
+        expected: usize,
+        /// Actual decoded length in bytes.
+        got: usize,
+    },
     #[cfg(not(debug_assertions))]
     /// Length mismatch in release builds (generic).
     #[error("decoded length mismatch")]
@@ -108,7 +128,12 @@ pub enum HexError {
     #[cfg(debug_assertions)]
     /// Length mismatch in debug builds (detailed).
     #[error("decoded length mismatch: expected {expected}, got {got}")]
-    InvalidLength { expected: usize, got: usize },
+    InvalidLength {
+        /// Expected decoded length in bytes.
+        expected: usize,
+        /// Actual decoded length in bytes.
+        got: usize,
+    },
     #[cfg(not(debug_assertions))]
     /// Length mismatch in release builds (generic).
     #[error("decoded length mismatch")]
@@ -121,19 +146,27 @@ pub enum HexError {
 /// Always available; variants depend on enabled features.
 #[derive(Clone, Debug, Error)]
 pub enum DecodingError {
+    /// Bech32 or Bech32m decoding failed.
     #[cfg(feature = "encoding-bech32")]
     #[error("invalid bech32 string")]
     InvalidBech32(#[source] Bech32Error),
+    /// Base64url decoding failed.
     #[cfg(feature = "encoding-base64")]
     #[error("invalid base64 string")]
     InvalidBase64(#[source] Base64Error),
+    /// Hexadecimal decoding failed.
     #[cfg(feature = "encoding-hex")]
     #[error("invalid hex string")]
     InvalidHex(#[source] HexError),
+    /// Generic encoding failure in debug builds (includes a non-sensitive hint).
     #[cfg(debug_assertions)]
     #[error("invalid encoding: {hint}")]
-    InvalidEncoding { hint: String },
+    InvalidEncoding {
+        /// Short hint for developers (debug builds only).
+        hint: String,
+    },
     #[cfg(not(debug_assertions))]
+    /// Generic encoding failure in release builds (opaque).
     #[error("invalid encoding")]
     InvalidEncoding,
 }
