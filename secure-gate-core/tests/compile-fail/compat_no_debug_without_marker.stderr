@@ -1,0 +1,19 @@
+error[E0277]: the trait bound `SensitiveKey: DebugSecret` is not satisfied
+  --> tests/compile-fail/compat_no_debug_without_marker.rs:22:20
+   |
+22 |     requires_debug(s);
+   |     -------------- ^ the trait `DebugSecret` is not implemented for `SensitiveKey`
+   |     |
+   |     required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `DebugSecret`:
+             Box<S>
+             String
+             Vec<S>
+             [T; N]
+   = note: required for `Secret<SensitiveKey>` to implement `Debug`
+note: required by a bound in `requires_debug`
+  --> tests/compile-fail/compat_no_debug_without_marker.rs:16:22
+   |
+16 | fn requires_debug<T: core::fmt::Debug>(_: T) {}
+   |                      ^^^^^^^^^^^^^^^^ required by this bound in `requires_debug`

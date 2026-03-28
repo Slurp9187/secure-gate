@@ -1,0 +1,25 @@
+[package]
+name = "secure-gate-compat"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Compatibility layers for migrating from the secrecy crate (v0.8 and v0.10)"
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+secure-gate = { path = "../secure-gate-core", features = ["secrecy-compat"] }
+
+[[bin]]
+name = "compat_v08"
+path = "fuzz_targets/compat_v08.rs"
+test = false
+bench = false
+doc = false
+
+[[bin]]
+name = "compat_v10"
+path = "fuzz_targets/compat_v10.rs"
+test = false
+bench = false
+doc = false

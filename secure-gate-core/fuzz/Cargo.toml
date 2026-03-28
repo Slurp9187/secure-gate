@@ -1,0 +1,80 @@
+[package]
+name = "secure-gate-fuzz"
+version = "0.1.1"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+secure-gate = { path = "../", features = ["full", "secrecy-compat"] }
+arbitrary = { version = "1.4", features = ["derive"] }
+libfuzzer-sys = "0.4"
+
+# Required for zeroize::Zeroize usage in fuzz targets
+zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
+
+serde_json = "1.0"
+serde = "1.0"
+
+# Direct deps for encoding round-trip verification
+hex = "0.4"
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+bech32 = { version = "0.11", default-features = false, features = ["alloc"] }
+
+[features]
+default = ["rand", "ct-eq", "encoding", "serde", "encoding-bech32m", "cloneable"]
+
+rand = ["secure-gate/rand"]
+ct-eq = ["secure-gate/ct-eq"]
+encoding = ["secure-gate/encoding"]
+encoding-hex = ["secure-gate/encoding-hex"]
+encoding-base64 = ["secure-gate/encoding-base64"]
+encoding-bech32 = ["secure-gate/encoding-bech32"]
+encoding-bech32m = ["secure-gate/encoding-bech32m"]
+serde = ["secure-gate/serde"]
+cloneable = ["secure-gate/cloneable"]
+full = ["secure-gate/full"]
+
+[[bin]]
+name = "expose"
+path = "fuzz_targets/expose.rs"
+test = false
+bench = false
+doc = false
+
+[[bin]]
+name = "mut"
+path = "fuzz_targets/mut.rs"
+test = false
+bench = false
+doc = false
+
+[[bin]]
+name = "parsing"
+path = "fuzz_targets/parsing.rs"
+test = false
+bench = false
+doc = false
+
+[[bin]]
+name = "encoding"
+path = "fuzz_targets/encoding.rs"
+test = false
+bench = false
+doc = false
+
+[[bin]]
+name = "serde"
+path = "fuzz_targets/serde.rs"
+test = false
+bench = false
+doc = false
+
+[[bin]]
+name = "ct_eq"
+path = "fuzz_targets/ct_eq.rs"
+test = false
+bench = false
+doc = false

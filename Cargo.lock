@@ -732,6 +732,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "secure-gate-compat"
+version = "0.9.0-rc.4-dev"
+dependencies = [
+ "secure-gate",
+]
+
+[[package]]
 name = "semver"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
