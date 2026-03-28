@@ -153,7 +153,9 @@ where
 impl<S: Zeroize> Secret<S> {
     /// Takes ownership of a secret value.
     pub fn new(secret: S) -> Self {
-        Secret { inner_secret: secret }
+        Secret {
+            inner_secret: secret,
+        }
     }
 }
 

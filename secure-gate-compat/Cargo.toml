@@ -4,40 +4,20 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Secure wrappers for secrets with explicit access and automatic zeroization (requires inner type: Zeroize)"
+description = "Compatibility layer providing drop-in secrecy shims for secure-gate"
 repository = "https://github.com/Slurp9187/secure-gate/tree/release/0.8"
-documentation = "https://docs.rs/secure-gate"
-keywords = ["crypto", "no-std", "security", "zeroize"]
+documentation = "https://docs.rs/secure-gate-compat"
+keywords = ["crypto", "no-std", "security", "zeroize", "secrecy", "compat"]
 categories = ["cryptography", "no-std", "data-structures"]
 include = [
     "src/**/*.rs",
-    "CHANGELOG.md",
+    "MIGRATING_FROM_SECRECY.md",
     "LICENSE*",
-    "README.md",
-    "SECURITY.md",
 ]
 
 [dependencies]
-base64 = { version = "0.22", optional = true }
-bech32 = { version = "0.11", default-features = false, optional = true }
-hex = { version = "0.4", optional = true }
-rand = { version = "0.9", optional = true }
-serde = { version = "1.0", optional = true, default-features = false, features = ["derive"] }
-subtle = { version = "2.5", optional = true }
-thiserror = "2.0"
+secure-gate = { path = "../secure-gate-core", default-features = false }
 zeroize = { version = "1.7", default-features = false, features = ["zeroize_derive"] }
-
-# MSRV (rustc 1.70) compatibility caps for transitive proc-macro dependencies.
-# Prevents rustc 1.71+ requirement introduced in syn 2.0.115+.
-syn = ">=2.0, <2.0.115"
-# Prevents rustc 1.71+ requirement introduced in unicode-ident 1.0.23+.
-unicode-ident = ">=1.0, <1.0.23"
-# Prevents rustc 1.71+ requirement introduced in quote 1.0.45+.
-quote = ">=1.0, <1.0.45"
-# Prevents rustc 1.71+ requirement introduced in ryu 1.0.23+.
-ryu = ">=1.0, <1.0.23"
-# Prevents rustc 1.81+ requirement introduced in half 2.7.1+.
-half = ">=2.0, <2.7.1"
 
 [dev-dependencies]
 bincode = "1.0"
@@ -61,71 +41,29 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-# Default: give users the most useful experience out of the box
 default = ["alloc"]
 
-# Enables heap allocation (Dynamic<T>, Box, Vec, String) + full zeroization of spare capacity
-alloc = ["zeroize/alloc"]
+alloc = ["secure-gate/alloc", "zeroize/alloc"]
+std = ["alloc", "secure-gate/std"]
 
-# Full std support (implies alloc)
-std = ["alloc"]
-
-# Rand: secure random generation
-rand = ["dep:rand"]
-
-# ct-eq: constant-time equality (subtle)
-ct-eq = ["dep:subtle"]
-
-# Encoding features
-encoding = [
-  "encoding-hex",
-  "encoding-base64",
-  "encoding-bech32",
-  "encoding-bech32m",
-]
-encoding-hex = ["dep:hex", "hex?/alloc", "alloc"]
-encoding-base64 = ["dep:base64", "base64?/alloc", "alloc"]
-encoding-bech32 = ["dep:bech32", "bech32?/alloc", "alloc"]
-encoding-bech32m = ["dep:bech32", "bech32?/alloc", "alloc"]
-
-# Cloneable: opt-in cloning
-cloneable = []
-
-# Serde: meta-feature for both directions
-serde = ["serde-deserialize", "serde-serialize"]
-serde-deserialize = ["dep:serde", "serde?/alloc", "alloc"]
-serde-serialize = ["dep:serde", "serde?/alloc", "alloc"]
-
-# Full batteries-included combo (most common real-world usage)
-full = ["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]
+rand = ["secure-gate/rand"]
+ct-eq = ["secure-gate/ct-eq"]
+encoding = ["secure-gate/encoding"]
+encoding-hex = ["secure-gate/encoding-hex"]
+encoding-base64 = ["secure-gate/encoding-base64"]
+encoding-bech32 = ["secure-gate/encoding-bech32"]
+encoding-bech32m = ["secure-gate/encoding-bech32m"]
+serde = ["secure-gate/serde"]
+serde-serialize = ["secure-gate/serde-serialize"]
+serde-deserialize = ["secure-gate/serde-deserialize"]
+cloneable = ["secure-gate/cloneable"]
+full = ["secure-gate/full"]
 
 # secrecy compatibility shims — drop-in replacements for secrecy v0.8.0 and v0.10.1.
-# Enables `secure_gate::compat::v10` (SecretBox/SecretString/SecretSlice) and
-# `secure_gate::compat::v08` (Secret/SecretString/SecretVec/DebugSecret).
-# Shared traits (ExposeSecret, CloneableSecret, zeroize re-export) live in compat root.
-# See `src/compat/` for the full migration guides and
-# `tests/compat_suite/` for the exhaustive migration test suite.
 secrecy-compat = ["alloc"]
-
-# Enables side-by-side parity tests in tests/compat_dual/ that run the exact same
-# test body against both the real `secrecy` crate and the compat shim, proving drop-in
-# identity. Implies secrecy-compat. Real secrecy dev-deps are always compiled (they are
-# ordinary dev-dependencies); this feature just activates the test module.
 dual-compat-test = ["secrecy-compat"]
 
 [[test]]
 name = "migration_full"
 path = "tests/migration_full.rs"
-harness = false
-
-[[bench]]
-name = "fixed_vs_raw"
-harness = false
-
-[[bench]]
-name = "dynamic_vs_raw"
-harness = false
-
-[[bench]]
-name = "serde"
 harness = false

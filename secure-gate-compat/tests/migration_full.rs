@@ -46,8 +46,8 @@ fn main() {
 
 #[cfg(feature = "secrecy-compat")]
 fn stage1_v08_compat() {
-    use secure_gate::compat::v08::{Secret, SecretString, SecretVec};
-    use secure_gate::compat::ExposeSecret;
+    use secure_gate_compat::compat::v08::{Secret, SecretString, SecretVec};
+    use secure_gate_compat::compat::ExposeSecret;
 
     // Struct that a user would have before migration
     struct UserCredentials {
@@ -65,12 +65,18 @@ fn stage1_v08_compat() {
     assert_eq!(creds.username.as_str(), "alice");
 
     // Verify access
-    assert_eq!(creds.password.expose_secret(), "correct_horse_battery_staple");
+    assert_eq!(
+        creds.password.expose_secret(),
+        "correct_horse_battery_staple"
+    );
     assert_eq!(creds.session_key.expose_secret().len(), 32);
 
     // Verify Debug doesn't leak
     let dbg = format!("{:?}", creds.password);
-    assert!(!dbg.contains("correct_horse"), "stage1: password leaked in Debug");
+    assert!(
+        !dbg.contains("correct_horse"),
+        "stage1: password leaked in Debug"
+    );
 
     // Clone (String: CloneableSecret in v08)
     let pw_copy = creds.password.clone();
@@ -89,8 +95,8 @@ fn stage1_v08_compat() {
 
 #[cfg(feature = "secrecy-compat")]
 fn stage2_v10_compat() {
-    use secure_gate::compat::v10::{SecretBox, SecretSlice, SecretString};
-    use secure_gate::compat::{ExposeSecret, ExposeSecretMut};
+    use secure_gate_compat::compat::v10::{SecretBox, SecretSlice, SecretString};
+    use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
 
     struct ServiceConfig {
         api_endpoint: String,
@@ -127,7 +133,10 @@ fn stage2_v10_compat() {
 
     // Debug never leaks
     let dbg = format!("{:?}", config.api_key);
-    assert!(!dbg.contains("Bearer_tok"), "stage2: api_key leaked in Debug");
+    assert!(
+        !dbg.contains("Bearer_tok"),
+        "stage2: api_key leaked in Debug"
+    );
 
     println!("  Stage 2 (secrecy 0.10 compat): OK");
 }
@@ -173,10 +182,10 @@ fn stage3_native() {
 
 #[cfg(feature = "secrecy-compat")]
 fn stage4_cross_version_migration() {
-    use secure_gate::compat::v08::Secret as V08Secret;
-    use secure_gate::compat::v10::SecretBox as V10SecretBox;
-    use secure_gate::compat::ExposeSecret;
-    use secure_gate::{Dynamic, Fixed, RevealSecret};
+    use secure_gate_compat::compat::v08::Secret as V08Secret;
+    use secure_gate_compat::compat::v10::SecretBox as V10SecretBox;
+    use secure_gate_compat::compat::ExposeSecret;
+    use secure_gate_compat::{Dynamic, Fixed, RevealSecret};
 
     let payload = "migration_payload_value";
 
@@ -190,7 +199,11 @@ fn stage4_cross_version_migration() {
     let v10b: V10SecretBox<String> = V10SecretBox::init_with(|| String::from(payload));
     let native_b: Dynamic<String> = v10b.into();
     let v08_back: V08Secret<String> = native_b.into();
-    assert_eq!(v08_back.expose_secret(), payload, "B: v10→Dynamic→v08 failed");
+    assert_eq!(
+        v08_back.expose_secret(),
+        payload,
+        "B: v10→Dynamic→v08 failed"
+    );
 
     // Path C: v08 array → Fixed
     let v08_key: V08Secret<[u8; 32]> = V08Secret::new([0x42u8; 32]);
@@ -202,7 +215,11 @@ fn stage4_cross_version_migration() {
     let v08_vec: V08Secret<Vec<u8>> = V08Secret::new(vec![1u8, 2, 3, 4]);
     let native_c: Dynamic<Vec<u8>> = v08_vec.into();
     let v10_vec: V10SecretBox<Vec<u8>> = native_c.into();
-    assert_eq!(v10_vec.expose_secret(), &[1u8, 2, 3, 4], "D: v08→Dynamic→v10 Vec failed");
+    assert_eq!(
+        v10_vec.expose_secret(),
+        &[1u8, 2, 3, 4],
+        "D: v08→Dynamic→v10 Vec failed"
+    );
 
     println!("  Stage 4 (cross-version migration chain): OK");
 }
@@ -211,7 +228,7 @@ fn stage4_cross_version_migration() {
 
 #[cfg(feature = "secrecy-compat")]
 fn stage5_realistic_application_struct() {
-    use secure_gate::{Dynamic, Fixed, RevealSecret};
+    use secure_gate_compat::{Dynamic, Fixed, RevealSecret};
 
     // Fully migrated application config — no compat types remain.
     struct AppSecrets {
@@ -237,9 +254,9 @@ fn stage5_realistic_application_struct() {
     assert_eq!(hmac_len, 64);
 
     // Simulate fake crypto: derive a per-request token from the signing key and db password
-    let token_len = secrets.signing_key.with_secret(|arr| {
-        secrets.db_password.with_secret(|pw| arr.len() + pw.len())
-    });
+    let token_len = secrets
+        .signing_key
+        .with_secret(|arr| secrets.db_password.with_secret(|pw| arr.len() + pw.len()));
     assert!(token_len > 32);
 
     println!("  Stage 5 (realistic application struct): OK");

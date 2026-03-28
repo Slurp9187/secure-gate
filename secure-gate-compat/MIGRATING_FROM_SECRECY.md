@@ -1,6 +1,6 @@
 # Migrating from secrecy
 
-This guide covers dropping `secrecy` and using `secure-gate` instead. The
+This guide covers dropping `secrecy` and using `secure-gate-compat` instead. The
 `secrecy-compat` feature provides type- and import-compatible shims for both
 major secrecy generations so that migration can be done incrementally.
 
@@ -54,7 +54,7 @@ version sub-module) and work with both generations.
 # secrecy = "0.10"   (or "0.8")
 
 # Add:
-secure-gate = { version = "0.8.{x}", features = ["secrecy-compat"] }
+secure-gate-compat = { version = "0.8.{x}", features = ["secrecy-compat"] }
 ```
 
 Then do a global find/replace on imports (details below). Your code should
@@ -71,8 +71,8 @@ compile without any other changes.
 use secrecy::{SecretBox, SecretString, SecretSlice, ExposeSecret, ExposeSecretMut};
 
 // After (one global find/replace)
-use secure_gate::compat::v10::{SecretBox, SecretString, SecretSlice};
-use secure_gate::compat::{ExposeSecret, ExposeSecretMut};
+use secure_gate_compat::compat::v10::{SecretBox, SecretString, SecretSlice};
+use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
 ```
 
 ### Type mapping
