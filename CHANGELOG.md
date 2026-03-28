@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+(v0.6.0-rc.6-dev)
+
 ### Added
 
 - **`InnerSecret<T>`** — new newtype wrapping `zeroize::Zeroizing<T>` that is returned by
