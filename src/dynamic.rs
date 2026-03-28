@@ -225,7 +225,7 @@ impl crate::RevealSecret for Dynamic<String> {
         self.inner.len()
     }
 
-    /// Consumes `self` and returns the inner `String` wrapped in [`zeroize::Zeroizing`].
+    /// Consumes `self` and returns the inner `String` wrapped in [`crate::InnerSecret`].
     ///
     /// **Allocation note:** allocates one small `Box<String>` sentinel (24 bytes on
     /// 64-bit) before the swap. If that allocation panics (OOM), `self.inner` is
@@ -234,9 +234,9 @@ impl crate::RevealSecret for Dynamic<String> {
     /// `from_protected_bytes` and `deserialize_with_limit`.
     ///
     /// See [`RevealSecret::into_inner`] for full documentation including the
-    /// `Debug` warning.
+    /// redacted `Debug` behavior.
     #[inline(always)]
-    fn into_inner(mut self) -> zeroize::Zeroizing<String>
+    fn into_inner(mut self) -> crate::InnerSecret<String>
     where
         Self: Sized,
         Self::Inner: Sized + Default + zeroize::Zeroize,
@@ -246,7 +246,7 @@ impl crate::RevealSecret for Dynamic<String> {
         // it on unwind. After the swap, self.inner is Box<String::new()> — zeroized
         // on Dynamic::drop as a no-op. `*boxed` deref-moves the String out of the Box.
         let boxed = core::mem::replace(&mut self.inner, Box::new(String::new()));
-        zeroize::Zeroizing::new(*boxed)
+        crate::InnerSecret::new(*boxed)
     }
 }
 
@@ -271,7 +271,7 @@ impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
         self.inner.len() * core::mem::size_of::<T>()
     }
 
-    /// Consumes `self` and returns the inner `Vec<T>` wrapped in [`zeroize::Zeroizing`].
+    /// Consumes `self` and returns the inner `Vec<T>` wrapped in [`crate::InnerSecret`].
     ///
     /// **Allocation note:** allocates one small `Box<Vec<T>>` sentinel (24 bytes on
     /// 64-bit) before the swap. If that allocation panics (OOM), `self.inner` is
@@ -280,9 +280,9 @@ impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
     /// `from_protected_bytes` and `deserialize_with_limit`.
     ///
     /// See [`RevealSecret::into_inner`] for full documentation including the
-    /// `Debug` warning.
+    /// redacted `Debug` behavior.
     #[inline(always)]
-    fn into_inner(mut self) -> zeroize::Zeroizing<Vec<T>>
+    fn into_inner(mut self) -> crate::InnerSecret<Vec<T>>
     where
         Self: Sized,
         Self::Inner: Sized + Default + zeroize::Zeroize,
@@ -292,7 +292,7 @@ impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
         // unwind. After the swap, self.inner is Box<Vec::new()> — zeroized on
         // Dynamic::drop as a no-op. `*boxed` deref-moves the Vec out of the Box.
         let boxed = core::mem::replace(&mut self.inner, Box::new(Vec::new()));
-        zeroize::Zeroizing::new(*boxed)
+        crate::InnerSecret::new(*boxed)
     }
 }
 

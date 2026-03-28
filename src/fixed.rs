@@ -163,16 +163,16 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecret for Fixed<[T; N]> {
         N * core::mem::size_of::<T>()
     }
 
-    /// Consumes `self` and returns the inner `[T; N]` wrapped in [`zeroize::Zeroizing`].
+    /// Consumes `self` and returns the inner `[T; N]` wrapped in [`crate::InnerSecret`].
     ///
     /// Zero cost — no allocation. The sentinel placed in `self.inner` is
     /// `[T::default(); N]` (already zeroed for `u8`), so `Fixed::drop` zeroizes
     /// an already-zero array — a harmless no-op.
     ///
     /// See [`RevealSecret::into_inner`] for full documentation including the
-    /// `Default` bound rationale and the `Debug` warning.
+    /// `Default` bound rationale and redacted `Debug` behavior.
     #[inline(always)]
-    fn into_inner(mut self) -> zeroize::Zeroizing<[T; N]>
+    fn into_inner(mut self) -> crate::InnerSecret<[T; N]>
     where
         Self: Sized,
         Self::Inner: Sized + Default + zeroize::Zeroize,
@@ -182,7 +182,7 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecret for Fixed<[T; N]> {
         // Default::default() is inferred as [T; N] from context; [T; N]: Default
         // is guaranteed by the where clause above.
         let inner = core::mem::replace(&mut self.inner, Default::default());
-        zeroize::Zeroizing::new(inner)
+        crate::InnerSecret::new(inner)
     }
 }
 

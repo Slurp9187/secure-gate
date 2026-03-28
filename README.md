@@ -94,9 +94,9 @@ let raw: &[u8; 32] = key.expose_secret();
 // When you need to move the secret value out (FFI hand-off, type migration)
 use secure_gate::{Fixed, RevealSecret};
 let key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
-let owned: zeroize::Zeroizing<[u8; 32]> = key.into_inner();
+let owned: secure_gate::InnerSecret<[u8; 32]> = key.into_inner();
 // Zeroizes its 32 bytes when it drops — same guarantee as Fixed<[u8; 32]>.
-// ⚠ Do NOT log or format `owned` — Zeroizing<T> does not redact on Debug.
+assert_eq!(format!("{:?}", owned), "[REDACTED]");
 ```
 
 ### Macros for typed aliases

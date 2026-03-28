@@ -132,11 +132,11 @@ The crate is intentionally small and relies on well-vetted dependencies:
   sentinel allocation can OOM. Confidentiality is preserved — if `Box::new` panics
   before the swap, `self.inner` still holds the real secret and `Dynamic::drop` zeroizes
   it during unwind. `Fixed::into_inner` is zero-cost (no allocation).
-- **The `Zeroizing<T>` returned by `into_inner` does not redact on `Debug`.**
-  `{:?}` will print raw secret bytes for common inner types (`[u8; N]`, `Vec<u8>`,
-  `String`). This is a regression from the `[REDACTED]` invariant that `Fixed` and
-  `Dynamic` themselves enforce. Do not log, print, or format the return value of
-  `into_inner()`.
+- **`into_inner` now returns `InnerSecret<T>` with redacted `Debug`.**
+  `InnerSecret<T>` restores the wrapper-level `[REDACTED]` invariant after ownership
+  transfer by implementing `Debug` as constant redaction. Use
+  `InnerSecret::into_zeroizing()` only when interoperability requires the raw
+  `Zeroizing<T>` wrapper.
 - **`panic = "abort"` builds disable zeroization on panic.** When `panic = "abort"`
   is set in a profile, Rust aborts the process immediately on panic without running
   any `Drop` implementations. Secrets held in `Fixed<T>` or `Dynamic<T>` at the

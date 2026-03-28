@@ -94,6 +94,9 @@ pub use traits::RevealSecret;
 /// Provides `expose_secret_mut()` and `with_secret_mut()` methods.
 pub use traits::RevealSecretMut;
 
+/// Owned, redacted wrapper returned by `into_inner()`.
+pub use traits::InnerSecret;
+
 #[cfg(feature = "serde-serialize")]
 /// Marker trait for secrets that can be serialized with Serde.
 ///

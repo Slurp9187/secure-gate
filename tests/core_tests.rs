@@ -133,7 +133,7 @@ fn fixed_try_from_slice() {
 #[test]
 fn fixed_into_inner_returns_zeroizing() {
     let key = Fixed::new([0xABu8; 32]);
-    let owned: zeroize::Zeroizing<[u8; 32]> = key.into_inner();
+    let owned: secure_gate::InnerSecret<[u8; 32]> = key.into_inner();
     assert_eq!(*owned, [0xABu8; 32]);
 }
 
@@ -141,7 +141,7 @@ fn fixed_into_inner_returns_zeroizing() {
 #[test]
 fn dynamic_string_into_inner_returns_zeroizing() {
     let pw = Dynamic::<String>::new("hunter2".to_string());
-    let owned: zeroize::Zeroizing<String> = pw.into_inner();
+    let owned: secure_gate::InnerSecret<String> = pw.into_inner();
     assert_eq!(*owned, "hunter2");
 }
 
@@ -149,7 +149,7 @@ fn dynamic_string_into_inner_returns_zeroizing() {
 #[test]
 fn dynamic_vec_into_inner_returns_zeroizing() {
     let secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3]);
-    let owned: zeroize::Zeroizing<Vec<u8>> = secret.into_inner();
+    let owned: secure_gate::InnerSecret<Vec<u8>> = secret.into_inner();
     assert_eq!(*owned, [1u8, 2, 3]);
 }
 

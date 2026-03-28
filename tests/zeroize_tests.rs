@@ -291,14 +291,14 @@ fn dynamic_spare_capacity_vec_zeroized() {
 }
 
 /// `into_inner()` transfers the full zeroization contract — including spare capacity —
-/// to the returned `Zeroizing<Vec<T>>`.
+/// to the returned `InnerSecret<Vec<T>>`.
 ///
 /// This is the critical regression guard for the `into_inner` code path. It mirrors
 /// `dynamic_spare_capacity_vec_zeroized` exactly, but calls `secret.into_inner()`
 /// instead of `secret.zeroize()`, proving that:
 ///
 /// 1. `into_inner()` consumes the wrapper without running the secret through `zeroize()`.
-/// 2. The returned `Zeroizing<Vec<PanicOnNonZeroDrop>>` calls `Vec::zeroize()` on drop.
+/// 2. The returned `InnerSecret<Vec<PanicOnNonZeroDrop>>` calls `Vec::zeroize()` on drop.
 /// 3. `Vec::zeroize()` byte-zeroes spare capacity via `spare_capacity_mut()`.
 /// 4. `PanicOnNonZeroDrop::drop` finds `.0 == 0` for the spare-capacity element → passes. ✓
 #[test]
@@ -311,7 +311,10 @@ fn dynamic_into_inner_spare_capacity_zeroized() {
     let secret: Dynamic<Vec<PanicOnNonZeroDrop>> = Dynamic::new(v);
 
     // Consume the wrapper via into_inner; zeroization contract transfers to `extracted`.
-    let mut extracted: zeroize::Zeroizing<Vec<PanicOnNonZeroDrop>> = secret.into_inner();
+    let extracted: secure_gate::InnerSecret<Vec<PanicOnNonZeroDrop>> = secret.into_inner();
+    // This test needs temporary mutable Vec access for unsafe len restoration. Convert to
+    // the explicit interoperability wrapper; zeroization contract remains unchanged.
+    let mut extracted = extracted.into_zeroizing();
 
     // Restore len=2 so element[1] is visible as a `PanicOnNonZeroDrop` when Drop runs.
     // SAFETY: `PanicOnNonZeroDrop` wraps a `u64`; all-zero bytes are a valid `u64`

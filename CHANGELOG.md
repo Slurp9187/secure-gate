@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`into_inner` consuming method on `RevealSecret` trait** (`src/traits/reveal_secret.rs`, `src/fixed.rs`, `src/dynamic.rs`) — safe owned extraction returning `Zeroizing<Self::Inner>`, preserving automatic zeroization on drop. Implemented for `Fixed<[T; N]>`, `Dynamic<String>`, and `Dynamic<Vec<T>>`. Requires `Self::Inner: Sized + Default` (satisfied by all three concrete types: `[u8; N]`, `String`, `Vec<T>`). `Fixed::into_inner` is zero-cost (no allocation); `Dynamic::into_inner` allocates a small sentinel `Box` (24 bytes) that is OOM-panic-safe (secret is zeroized on unwind). **Debug warning:** the returned `Zeroizing<T>` does not redact on `Debug` — do not log or format the return value directly.
+- **`InnerSecret<T>` return type for `RevealSecret::into_inner`** (`src/traits/reveal_secret.rs`, `src/fixed.rs`, `src/dynamic.rs`) — `into_inner` now returns `InnerSecret<Self::Inner>` (wrapping `Zeroizing<T>`) to preserve automatic zeroization on drop **and** restore redacted `Debug` (`[REDACTED]`) after ownership transfer. Implemented for `Fixed<[T; N]>`, `Dynamic<String>`, and `Dynamic<Vec<T>>`.
+  `InnerSecret::into_zeroizing()` is available as an explicit interoperability escape hatch.
 
 ### Changed
+
+- **`RevealSecret::into_inner` bound documentation corrected** — required bound is `Self::Inner: Sized + Default + Zeroize` (not just `Sized + Default`).
 
 - **Trybuild snapshot baseline pinned to Rust 1.85 for local/dev runs** (`tests/compile-fail/*.stderr`) — restored `fixed_alias_zero_size.stderr` and `serializable_secret_misuse.stderr` to the 1.85 diagnostic format so `cargo +1.85 test --all-features` passes consistently on the declared toolchain.
 - **`SecretSlice<S>::clone()` compatibility internals simplified** (`src/compat/v10.rs`) — replaced `Vec::from(&*self.inner_secret)` with `self.inner_secret.as_ref().to_vec()` to keep identical behavior while reducing false positives from static analyzers that misclassify the former as a cleartext logging sink.
