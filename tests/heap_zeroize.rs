@@ -186,7 +186,7 @@ fn check_vec_zeroed(size: usize) {
         let mut secret: Dynamic<Vec<u8>> = Dynamic::new(Vec::with_capacity(size));
         secret.with_secret_mut(|v| {
             // Fill exactly N bytes so len == N before shrink_to_fit.
-            v.extend(std::iter::repeat(0xBBu8).take(size));
+            v.extend(std::iter::repeat_n(0xBBu8, size));
             v.shrink_to_fit();
             // Test realism guard: shrink_to_fit is best-effort; the allocator may
             // leave capacity larger than len. Assert exact capacity so TARGET_SIZE
@@ -223,7 +223,7 @@ fn check_string_zeroed(size: usize) {
         let mut secret: Dynamic<String> = Dynamic::new(String::with_capacity(size));
         secret.with_secret_mut(|s| {
             // Fill exactly `size` ASCII bytes so len == size before shrink_to_fit.
-            s.extend(std::iter::repeat('A').take(size));
+            s.extend(std::iter::repeat_n('A', size));
             s.shrink_to_fit();
             // Test realism guard: same rationale as check_vec_zeroed above.
             assert_eq!(
@@ -385,12 +385,12 @@ fn check_string_deserialized_zeroed(size: usize) {
 // Dynamic<Vec<u8>> — into_inner path backing-buffer zeroization tests
 //
 // Verifies that calling `into_inner()` on a `Dynamic<Vec<u8>>` and then
-// dropping the returned `Zeroizing<Vec<u8>>` physically zeroes the backing
+// dropping the returned `InnerSecret<Vec<u8>>` physically zeroes the backing
 // buffer before deallocation. This closes the physical verification gap for
 // the new `into_inner` code path: `zeroize_tests.rs` proves semantic
 // correctness (spare-capacity, drop order); this test proves LLVM has not
 // dead-store-eliminated the volatile writes through the
-// `Zeroizing` → `Vec::zeroize()` path.
+// `InnerSecret` → `Vec::zeroize()` path.
 //
 // The test follows the same pattern as `check_vec_zeroed`: fill a Vec of
 // exactly `size` bytes, `shrink_to_fit`, then call `into_inner()` and drop
@@ -401,7 +401,7 @@ fn check_into_inner_vec_zeroed(size: usize) {
     with_proxy_check(size, || {
         let mut secret: Dynamic<Vec<u8>> = Dynamic::new(Vec::with_capacity(size));
         secret.with_secret_mut(|v| {
-            v.extend(std::iter::repeat(0xCCu8).take(size));
+            v.extend(std::iter::repeat_n(0xCCu8, size));
             v.shrink_to_fit();
             assert_eq!(
                 v.capacity(),
@@ -410,7 +410,7 @@ fn check_into_inner_vec_zeroed(size: usize) {
             );
         });
         core::hint::black_box(&secret);
-        // Consume the wrapper; the returned Zeroizing<Vec<u8>> must zero the
+        // Consume the wrapper; the returned InnerSecret<Vec<u8>> must zero the
         // backing buffer when it drops.
         let extracted = secret.into_inner();
         core::hint::black_box(&extracted);
@@ -422,7 +422,7 @@ fn check_into_inner_vec_zeroed(size: usize) {
 // Panic-path positive-control test
 //
 // Verifies that `Zeroizing::drop` actually zeroes the backing buffer when a
-// panic fires while `Zeroizing<Vec<u8>>` is in scope — the exact guarantee
+// panic fires while `InnerSecret<Vec<u8>>` is in scope — the exact guarantee
 // that `from_protected_bytes` relies on.
 //
 // Design:
@@ -531,7 +531,7 @@ fn all_heap_zeroed() {
     }
 
     // into_inner path: verify Vec<u8> backing buffer is physically zeroed when the
-    // returned Zeroizing<Vec<u8>> drops (closes the physical verification gap for
+    // returned InnerSecret<Vec<u8>> drops (closes the physical verification gap for
     // the into_inner code path added in issue #105).
     for size in [16usize, 32, 64, 128] {
         check_into_inner_vec_zeroed(size);

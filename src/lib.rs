@@ -2,8 +2,10 @@
 
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
-//! secure-gate — Secure secret wrappers with explicit access & automatic zeroization
+//! Secure wrappers for secrets with **explicit access** and **mandatory zeroization** — a
+//! `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
 //!
 //! Secrets are **automatically zeroized on drop** (the inner type must implement [`Zeroize`](zeroize::Zeroize)).
 //! Explicit access only via [`RevealSecret`]/[`RevealSecretMut`] — no `Deref`, no accidental leaks.
@@ -91,6 +93,9 @@ pub use traits::RevealSecret;
 ///
 /// Provides `expose_secret_mut()` and `with_secret_mut()` methods.
 pub use traits::RevealSecretMut;
+
+/// Owned, redacted wrapper returned by `into_inner()`.
+pub use traits::InnerSecret;
 
 #[cfg(feature = "serde-serialize")]
 /// Marker trait for secrets that can be serialized with Serde.

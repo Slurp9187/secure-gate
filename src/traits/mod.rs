@@ -40,6 +40,7 @@
 //! See individual trait docs for detailed usage and examples.
 
 pub mod reveal_secret;
+pub use reveal_secret::InnerSecret;
 pub use reveal_secret::RevealSecret;
 
 pub mod reveal_secret_mut;

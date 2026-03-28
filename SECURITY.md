@@ -1,6 +1,6 @@
 # Security Considerations for secure-gate
 
-Last updated: March 2026 (for v0.8.0-rc.5)
+Last updated: March 2026 (for v0.9.0-rc.4)
 
 ## TL;DR
 
@@ -18,8 +18,8 @@ This document outlines the security model, design choices, strengths, known limi
 
 - **Process compromise / arbitrary memory read** — wrappers offer no defense if an attacker can read process memory
 - **OS swap, page files, core dumps** — secrets may be paged to disk; use `mlock` or encrypted swap at the OS level
-- **`panic = "abort"` / SIGKILL / hard crash** — `Drop` impls do not run; secrets are not cleared
-- **`static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized
+- `**panic = "abort"` / SIGKILL / hard crash** — `Drop` impls do not run; secrets are not cleared
+- `**static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized
 - **Copies made by caller code** — after `expose_secret()`, encoding, or serialization, the caller holds ordinary non-zeroized memory
 - **Encoded/serialized output** — `to_hex()`, `to_base64url()`, serde `Serialize` output are full secret exposure into ordinary, non-zeroizing `String`s
 - **All side channels beyond equality timing** — cache, power, EM, and branch-predictor side channels are outside scope
@@ -48,6 +48,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 ## Core Security Model
 
+
 | Property                       | Guarantee / Design Choice                                                                                          |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | Explicit exposure              | Private inner fields; access only via audited methods (`expose_secret`, `with_secret`)                             |
@@ -60,24 +61,27 @@ The crate is intentionally small and relies on well-vetted dependencies:
 | Redacted debug                 | `Debug` impl always prints `[REDACTED]`                                                                            |
 | No unsafe code                 | `#![forbid(unsafe_code)]` enforced at crate level                                                                  |
 
+
 ## Feature Security Implications
 
-| Feature             | Security Impact                                                                                                                                                                                                                                                                            | Recommendation                                                                                                                                                                                                          |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alloc` _(default)_ | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Use `default-features = false` for no-heap builds.                                                                                                                                                               | Enable unless on embedded/pure-stack target                                                                                                                                                                             |
-| `std`               | Full `std` support (implies `alloc`). Adds no additional security surface beyond `alloc`.                                                                                                                                                                                                  | Optional; `alloc` is sufficient for most targets                                                                                                                                                                        |
-| `ct-eq`             | Timing-safe direct byte comparison (`.ct_eq()`)                                                                                                                                                                                                                                            | Strongly recommended; avoid `==`                                                                                                                                                                                        |
-| `rand`              | Secure random via `OsRng`; panics on failure                                                                                                                                                                                                                                               | Use only in trusted entropy environments                                                                                                                                                                                |
-| `serde-deserialize` | Decodes to inner type; temporary buffers use `zeroize::Zeroizing` (zeroized on rejection too). 1 MiB default limit (`MAX_DESERIALIZE_BYTES`). See allocation notes below.                                                                                                                  | Enable for trusted deserialization sources; set a tight limit for untrusted input and enforce transport-level size caps upstream                                                                                        |
-| `serde-serialize`   | Opt-in export via marker trait; audit all implementations                                                                                                                                                                                                                                  | Enable sparingly; monitor exfiltration risk                                                                                                                                                                             |
-| `encoding`          | Meta: enables all encoding sub-features (hex, base64url, bech32, bech32m); always requires `alloc`                                                                                                                                                                                         | Enable per-format instead for minimal surface                                                                                                                                                                           |
-| `encoding-hex`      | Hex encoding/decoding: `ToHex`, `FromHexStr`; requires `alloc`                                                                                                                                                                                                                             | Validate inputs upstream; prefer `try_from_hex`                                                                                                                                                                         |
-| `encoding-base64`   | Base64url encoding/decoding: `ToBase64Url`, `FromBase64UrlStr`; requires `alloc`                                                                                                                                                                                                           | Validate inputs upstream; prefer `try_from_base64url`                                                                                                                                                                   |
-| `encoding-bech32`   | Bech32/BIP-173 encoding/decoding: `ToBech32`, `FromBech32Str`                                                                                                                                                                                                                              | Validate inputs upstream; test empty/invalid HRP                                                                                                                                                                        |
-| `encoding-bech32m`  | Bech32m/BIP-350 encoding/decoding: `ToBech32m`, `FromBech32mStr`                                                                                                                                                                                                                           | Validate inputs upstream; test empty/invalid HRP                                                                                                                                                                        |
-| `cloneable`         | Opt-in cloning via marker trait; increases exposure surface                                                                                                                                                                                                                                | Use minimally; prefer move semantics                                                                                                                                                                                    |
-| `secrecy-compat`    | Drop-in secrecy 0.8/0.10 compatibility layer (requires `alloc`). Compat wrappers carry the same zeroize-on-drop + redacted-`Debug` invariants as native types. Bridge impls expose native `Dynamic`/`Fixed` via the compat `ExposeSecret` trait, adding a second auditable access surface. | Treat as transitional; migrate to native `RevealSecret` APIs and remove `secrecy-compat` once call sites are updated. Audit both `expose_secret` (compat) and `with_secret`/`expose_secret` (native) during transition. |
-| `full`              | All features enabled — convenient but increases attack surface                                                                                                                                                                                                                             | Development only; audit for production                                                                                                                                                                                  |
+
+| Feature             | Security Impact                                                                                                                                                           | Recommendation                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `alloc` *(default)* | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Use `default-features = false` for no-heap builds.                                              | Enable unless on embedded/pure-stack target                                                                                      |
+| `std`               | Full `std` support (implies `alloc`). Adds no additional security surface beyond `alloc`.                                                                                 | Optional; `alloc` is sufficient for most targets                                                                                 |
+| `ct-eq`             | Timing-safe direct byte comparison (`.ct_eq()`)                                                                                                                           | Strongly recommended; avoid `==`                                                                                                 |
+| `rand`              | `from_random()` uses system `OsRng` (`rand` 0.10) and panics on failure; `from_rng()` accepts caller-supplied `TryRng + TryCryptoRng` and returns `Result`            | Use trusted entropy sources; prefer `from_rng()` where RNG failure should be handled explicitly                                 |
+| `serde-deserialize` | Decodes to inner type; temporary buffers use `zeroize::Zeroizing` (zeroized on rejection too). 1 MiB default limit (`MAX_DESERIALIZE_BYTES`). See allocation notes below. | Enable for trusted deserialization sources; set a tight limit for untrusted input and enforce transport-level size caps upstream |
+| `serde-serialize`   | Opt-in export via marker trait; audit all implementations                                                                                                                 | Enable sparingly; monitor exfiltration risk                                                                                      |
+| `encoding`          | Meta: enables all encoding sub-features (hex, base64url, bech32, bech32m); always requires `alloc`                                                                        | Enable per-format instead for minimal surface                                                                                    |
+| `encoding-hex`      | Hex encoding/decoding: `ToHex`, `FromHexStr`; requires `alloc`                                                                                                            | Validate inputs upstream; prefer `try_from_hex`                                                                                  |
+| `encoding-base64`   | Base64url encoding/decoding: `ToBase64Url`, `FromBase64UrlStr`; requires `alloc`                                                                                          | Validate inputs upstream; prefer `try_from_base64url`                                                                            |
+| `encoding-bech32`   | Bech32/BIP-173 encoding/decoding: `ToBech32`, `FromBech32Str`                                                                                                             | Validate inputs upstream; test empty/invalid HRP                                                                                 |
+| `encoding-bech32m`  | Bech32m/BIP-350 encoding/decoding: `ToBech32m`, `FromBech32mStr`                                                                                                          | Validate inputs upstream; test empty/invalid HRP                                                                                 |
+| `cloneable`         | Opt-in cloning via marker trait; increases exposure surface                                                                                                               | Use minimally; prefer move semantics                                                                                             |
+| `secrecy-compat`    | Drop-in secrecy 0.8/0.10 compatibility layer (requires `alloc`). Compat wrappers carry the same zeroize-on-drop + redacted-Debug invariants as native types. Bridge impls expose native `Dynamic`/`Fixed` via the compat `ExposeSecret` trait, adding a second auditable access surface. | Treat as transitional; migrate to native `RevealSecret` APIs and remove `secrecy-compat` once call sites are updated. Audit both `expose_secret` (compat) and `with_secret`/`expose_secret` (native) during transition. |
+| `full`              | All features enabled — convenient but increases attack surface                                                                                                            | Development only; audit for production                                                                                           |
+
 
 #### `serde-deserialize` — Allocation & Limit Notes
 
@@ -99,7 +103,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 ## Module-by-Module Security Notes
 
-> Security invariants (no `Deref`/`AsRef`, `Debug` prints `[REDACTED]`, zeroize on drop, opt-in clone/serialize) are documented in full on the [`Fixed`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html) and [`Dynamic`](https://docs.rs/secure-gate/latest/secure_gate/struct.Dynamic.html) rustdoc. This section focuses on weaknesses and mitigations not visible from the API surface.
+> Security invariants (no `Deref`/`AsRef`, `Debug` prints `[REDACTED]`, zeroize on drop, opt-in clone/serialize) are documented in full on the `[Fixed](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html)` and `[Dynamic](https://docs.rs/secure-gate/latest/secure_gate/struct.Dynamic.html)` rustdoc. This section focuses on weaknesses and mitigations not visible from the API surface.
 
 ### Wrappers (`dynamic.rs`, `fixed.rs`)
 
@@ -128,11 +132,11 @@ The crate is intentionally small and relies on well-vetted dependencies:
   sentinel allocation can OOM. Confidentiality is preserved — if `Box::new` panics
   before the swap, `self.inner` still holds the real secret and `Dynamic::drop` zeroizes
   it during unwind. `Fixed::into_inner` is zero-cost (no allocation).
-- **The `Zeroizing<T>` returned by `into_inner` does not redact on `Debug`.**
-  `{:?}` will print raw secret bytes for common inner types (`[u8; N]`, `Vec<u8>`,
-  `String`). This is a regression from the `[REDACTED]` invariant that `Fixed` and
-  `Dynamic` themselves enforce. Do not log, print, or format the return value of
-  `into_inner()`.
+- **`into_inner` now returns `InnerSecret<T>` with redacted `Debug`.**
+  `InnerSecret<T>` restores the wrapper-level `[REDACTED]` invariant after ownership
+  transfer by implementing `Debug` as constant redaction. Use
+  `InnerSecret::into_zeroizing()` only when interoperability requires the raw
+  `Zeroizing<T>` wrapper.
 - **`panic = "abort"` builds disable zeroization on panic.** When `panic = "abort"`
   is set in a profile, Rust aborts the process immediately on panic without running
   any `Drop` implementations. Secrets held in `Fixed<T>` or `Dynamic<T>` at the
@@ -147,10 +151,34 @@ The crate is intentionally small and relies on well-vetted dependencies:
   over `expose_secret()` / `expose_secret_mut()` — they keep the exposed reference tightly
   bound and make accidental long-lived borrows visible at the call site.
 - **For constructing secrets:** prefer `Fixed::new_with(|arr| { ... })` or
-  `Dynamic::<Vec<u8>>::new_with(|v| { ... })` over `Fixed::new(value)` / `Dynamic::new(value)`
-  when constructing from computed data inline — these write directly into the wrapper's storage
-  and avoid any intermediate copy. `Dynamic<T>` remains the strictest option (heap-only; secret
-  bytes never on the stack).
+  `Dynamic::<Vec<u8>>::new_with(|v| { ... })` / `Dynamic::<String>::new_with(|s| { ... })`
+  over `Fixed::new(value)` / `Dynamic::new(value)` when constructing from computed data
+  inline — these write directly into the wrapper's storage and avoid any intermediate copy.
+  `Dynamic<T>` remains the strictest option (heap-only; secret bytes never on the stack).
+
+**Security-first construction and access patterns**
+
+Just as `with_secret` / `with_secret_mut` are the recommended scoped methods for *accessing*
+secrets — keeping the exposed reference tightly bound to the closure lifetime —
+`Fixed::new_with` is the recommended constructor for *building* `Fixed` secrets when
+minimizing stack residue matters. It writes secret material **directly** into the wrapper's
+own storage, eliminating the intermediate stack temporary that can exist with the ergonomic
+`new(value)` constructor.
+
+`Dynamic<T>` is already heap-only (`from_protected_bytes` + `mem::swap`), so its
+`new_with` variants (`Dynamic::<Vec<u8>>::new_with` / `Dynamic::<String>::new_with`)
+exist purely for API symmetry — not because `Dynamic` carries any stack-residue risk.
+If stack residue is a concern, `Dynamic<T>` remains the strictest overall choice.
+
+For high-assurance `Fixed` construction, prefer:
+
+- `Fixed::new_with(|arr| { … })` over `Fixed::new(value)`
+
+The regular `new(value)` constructors and `expose_secret` / `expose_secret_mut` remain
+available as convenient defaults and auditable escape hatches respectively. This mirrors a
+consistent "scoped / minimal lifetime" philosophy across both construction and access — the
+same defensive mindset applied throughout the crate.
+
 - Audit all `expose_secret()` calls
 - Contextualize errors to avoid side-channel information
 - Never store a wrapper in a `static` — use local variables or heap-allocated structs instead
