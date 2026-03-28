@@ -16,13 +16,14 @@ secure-gate = { path = "../secure-gate-core" }
 secrecy-v08 = { package = "secrecy", version = "=0.8.0" }
 secrecy-v10 = { package = "secrecy", version = "=0.10.1" }
 
+[features]
 # secrecy compatibility shims — drop-in replacements for secrecy v0.8.0 and v0.10.1.
 # Enables `secure_gate::compat::v10` (SecretBox/SecretString/SecretSlice) and
 # `secure_gate::compat::v08` (Secret/SecretString/SecretVec/DebugSecret).
 # Shared traits (ExposeSecret, CloneableSecret, zeroize re-export) live in compat root.
 # See `src/compat/` for the full migration guides and
 # `tests/compat_suite/` for the exhaustive migration test suite.
-secrecy-compat = ["alloc"]
+secrecy-compat = ["secure-gate/alloc", "secure-gate/cloneable", "secure-gate/serde-serialize"]
 
 # Enables side-by-side parity tests in tests/compat_dual/ that run the exact same
 # test body against both the real `secrecy` crate and the compat shim, proving drop-in
