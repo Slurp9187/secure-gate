@@ -229,22 +229,11 @@ Prefer `Display` (`{}`) over `Debug` (`{:?}`) when logging errors in production 
 
 Coarse error categories are still present in release and can aid attacker fingerprinting in niche threat models. Redact or suppress error details in logs for high-sensitivity contexts.
 
-### Compatibility Layer (`compat/`)
+### Compatibility Layer
 
-The `secrecy-compat` feature provides drop-in wrappers mirroring `secrecy` 0.8.0 and 0.10.1. These wrappers (`Secret<S>`, `SecretBox<S>`, etc.) carry the same zeroize-on-drop and redacted-`Debug` invariants as native `Fixed<T>` / `Dynamic<T>`.
+The `secrecy-compat` feature and all related code (`compat::v08`, `compat::v10`, bridge traits, migration tests, etc.) have been extracted into the separate [`secure-gate-compat`](https://crates.io/crates/secure-gate-compat) crate.
 
-**Potential weaknesses**
-
-- During migration, two parallel access traits exist: compat `ExposeSecret` and native `RevealSecret`. Both are grep-able, but audit sweeps must cover both surfaces.
-- Bridge impls on `Dynamic<T>` and `Fixed<[T; N]>` implement compat `ExposeSecret` / `ExposeSecretMut` by delegating to the native trait. This is safe but widens the set of method names that grant secret access.
-- `v10::SecretBox<S> → Dynamic<S>` conversion requires `S: Clone` (the `Drop` impl on `SecretBox` prevents moving out of the `Box`); the stack copy is zeroized immediately, but the clone window is inherent.
-- `v08::Secret<S>` stores the secret inline (no heap). `Drop` zeroizes the value, but the same stack-residue caveats as `Fixed<T>` apply.
-
-**Mitigations**
-
-- Treat the compat layer as transitional — migrate to native `RevealSecret` / `RevealSecretMut` and remove `secrecy-compat` once all call sites are updated.
-- During transition, audit for **both** `expose_secret` (compat) and `with_secret` / `expose_secret` (native) access patterns.
-- Prefer `SecretBox::init_with_mut` over `SecretBox::init_with` to avoid the clone-then-zeroize path.
+**For security considerations around the compat layer, see its own `SECURITY.md` (or the migration guide).** The core `secure-gate` crate no longer includes any of this code, further reducing its attack surface.
 
 ## Vulnerability Reporting
 
