@@ -89,7 +89,7 @@ PACKAGES = [
             "fuzz/Cargo.toml",
             ".github/workflows/fuzz-miri.yml",
             ".github/workflows/fuzz-nightly.yml",
-            ".github/workflows/fuzz-nightly-compat.yml",
+            ".github/workflows/fuzz-nightly-lts.yml",
             ".github/workflows/fuzz-quick.yml",
         ],
         "include_dirs": ["fuzz/fuzz_targets"],
