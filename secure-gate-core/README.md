@@ -17,7 +17,7 @@
 | Status  | LTS / stable patches | Active development |
 | Branch  |    `release/0.8`     |       `main`       |
 
-Current crates.io version: 0.8.0-rc.6 (see `Cargo.toml` for exact version).
+Current crates.io version: 0.8.0-rc.7 (see `Cargo.toml` for exact version).
 
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
