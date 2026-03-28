@@ -264,7 +264,7 @@ fn fixed_new_with_is_zero_cost() {
 #[cfg(feature = "rand")]
 struct FailingRng;
 
-// rand 0.10 requires TryRng::Error: core::error::Error, so &'static str is not enough.
+// Use a dedicated error type for `TryRngCore::Error` so callers see a real `Error` impl (matches typical RNG usage).
 #[cfg(feature = "rand")]
 #[derive(Debug)]
 struct RngError;
@@ -280,7 +280,7 @@ impl core::fmt::Display for RngError {
 impl std::error::Error for RngError {}
 
 #[cfg(feature = "rand")]
-impl rand::TryRng for FailingRng {
+impl rand::TryRngCore for FailingRng {
     type Error = RngError;
     fn try_next_u32(&mut self) -> Result<u32, Self::Error> { Err(RngError) }
     fn try_next_u64(&mut self) -> Result<u64, Self::Error> { Err(RngError) }

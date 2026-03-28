@@ -206,12 +206,13 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecretMut for Fixed<[T; N]> {
 impl<const N: usize> Fixed<[u8; N]> {
     /// Fills a new `[u8; N]` with cryptographically secure random bytes and wraps it.
     ///
-    /// Uses the system RNG ([`SysRng`](rand::rngs::SysRng)). Requires the `rand` feature.
-    /// Heap-free and works in `no_std` / `no_alloc` builds.
+    /// Uses the system RNG ([`OsRng`](rand::rngs::OsRng)) via [`TryRngCore::try_fill_bytes`](rand::TryRngCore::try_fill_bytes).
+    /// In `rand` 0.9, `OsRng` is a zero-sized handle to the OS generator (not user-seedable). Requires the `rand`
+    /// feature. Heap-free and works in `no_std` / `no_alloc` builds.
     ///
     /// # Panics
     ///
-    /// Panics if the system RNG fails to provide bytes ([`TryRng::try_fill_bytes`](rand::TryRng::try_fill_bytes)
+    /// Panics if the system RNG fails to provide bytes ([`TryRngCore::try_fill_bytes`](rand::TryRngCore::try_fill_bytes)
     /// returns `Err`). This is treated as a fatal environment error.
     ///
     /// # Examples
@@ -229,37 +230,54 @@ impl<const N: usize> Fixed<[u8; N]> {
     #[inline]
     pub fn from_random() -> Self {
         Self::new_with(|arr| {
-            SysRng
+            OsRng
                 .try_fill_bytes(arr)
-                .expect("SysRng failure is a program error");
+                .expect("OsRng failure is a program error");
         })
     }
 
     /// Fills a new `[u8; N]` from `rng` and wraps it.
     ///
-    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRng`](rand::TryRng) — for example,
-    /// a seeded [`OsRng`](rand::rngs::OsRng) for deterministic tests. Requires the `rand`
+    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRngCore`](rand::TryRngCore).
+    /// Pass [`OsRng`](rand::rngs::OsRng) for the same system entropy as [`from_random`](Self::from_random)
+    /// with a fallible interface. **Do not use `OsRng` for deterministic tests** — in `rand` 0.9 it is a
+    /// unit struct backed by the OS and is **not** seedable; use a seedable PRNG such as
+    /// [`StdRng`](rand::rngs::StdRng) with [`SeedableRng`](rand::SeedableRng) instead. Requires the `rand`
     /// feature. Heap-free.
     ///
     /// # Errors
     ///
-    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRng::try_fill_bytes) fails.
+    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRngCore::try_fill_bytes) fails.
     ///
     /// # Examples
+    ///
+    /// System RNG (same source as `from_random`, `Result`-based):
     ///
     /// ```rust
     /// # #[cfg(feature = "rand")]
     /// # {
     /// use rand::rngs::OsRng;
+    /// use secure_gate::Fixed;
+    ///
+    /// let key: Fixed<[u8; 16]> = Fixed::from_rng(&mut OsRng).expect("rng fill");
+    /// # }
+    /// ```
+    ///
+    /// Deterministic fill (tests) with a seedable generator:
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "rand")]
+    /// # {
+    /// use rand::rngs::StdRng;
     /// use rand::SeedableRng;
     /// use secure_gate::Fixed;
     ///
-    /// let mut rng = OsRng::from_seed([1u8; 32]);
+    /// let mut rng = StdRng::from_seed([1u8; 32]);
     /// let key: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng).expect("rng fill");
     /// # }
     /// ```
     #[inline]
-    pub fn from_rng<R: TryRng + TryCryptoRng>(rng: &mut R) -> Result<Self, R::Error> {
+    pub fn from_rng<R: TryRngCore + TryCryptoRng>(rng: &mut R) -> Result<Self, R::Error> {
         let mut result = Ok(());
         let this = Self::new_with(|arr| {
             result = rng.try_fill_bytes(arr);

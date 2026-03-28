@@ -186,7 +186,7 @@ fn check_vec_zeroed(size: usize) {
         let mut secret: Dynamic<Vec<u8>> = Dynamic::new(Vec::with_capacity(size));
         secret.with_secret_mut(|v| {
             // Fill exactly N bytes so len == N before shrink_to_fit.
-            v.extend(std::iter::repeat_n(0xBBu8, size));
+            v.extend(std::iter::repeat(0xBBu8).take(size));
             v.shrink_to_fit();
             // Test realism guard: shrink_to_fit is best-effort; the allocator may
             // leave capacity larger than len. Assert exact capacity so TARGET_SIZE
@@ -223,7 +223,7 @@ fn check_string_zeroed(size: usize) {
         let mut secret: Dynamic<String> = Dynamic::new(String::with_capacity(size));
         secret.with_secret_mut(|s| {
             // Fill exactly `size` ASCII bytes so len == size before shrink_to_fit.
-            s.extend(std::iter::repeat_n('A', size));
+            s.extend(std::iter::repeat('A').take(size));
             s.shrink_to_fit();
             // Test realism guard: same rationale as check_vec_zeroed above.
             assert_eq!(
@@ -401,7 +401,7 @@ fn check_into_inner_vec_zeroed(size: usize) {
     with_proxy_check(size, || {
         let mut secret: Dynamic<Vec<u8>> = Dynamic::new(Vec::with_capacity(size));
         secret.with_secret_mut(|v| {
-            v.extend(std::iter::repeat_n(0xCCu8, size));
+            v.extend(std::iter::repeat(0xCCu8).take(size));
             v.shrink_to_fit();
             assert_eq!(
                 v.capacity(),

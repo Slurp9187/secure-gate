@@ -332,12 +332,13 @@ impl<T: zeroize::Zeroize> crate::RevealSecretMut for Dynamic<Vec<T>> {
 impl Dynamic<alloc::vec::Vec<u8>> {
     /// Fills a new `Vec<u8>` with `len` cryptographically secure random bytes and wraps it.
     ///
-    /// Uses the system RNG ([`SysRng`](rand::rngs::SysRng)). Requires the `rand` feature (and
-    /// `alloc`, which `Dynamic<Vec<u8>>` always needs).
+    /// Uses the system RNG ([`OsRng`](rand::rngs::OsRng)) via [`TryRngCore::try_fill_bytes`](rand::TryRngCore::try_fill_bytes).
+    /// In `rand` 0.9, `OsRng` is a zero-sized handle to the OS generator (not user-seedable). Requires the `rand`
+    /// feature (and `alloc`, which `Dynamic<Vec<u8>>` always needs).
     ///
     /// # Panics
     ///
-    /// Panics if the system RNG fails to provide bytes ([`TryRng::try_fill_bytes`](rand::TryRng::try_fill_bytes)
+    /// Panics if the system RNG fails to provide bytes ([`TryRngCore::try_fill_bytes`](rand::TryRngCore::try_fill_bytes)
     /// returns `Err`). This is treated as a fatal environment error.
     ///
     /// # Examples
@@ -356,37 +357,54 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     pub fn from_random(len: usize) -> Self {
         Self::new_with(|v| {
             v.resize(len, 0u8);
-            SysRng
+            OsRng
                 .try_fill_bytes(v)
-                .expect("SysRng failure is a program error");
+                .expect("OsRng failure is a program error");
         })
     }
 
     /// Allocates a `Vec<u8>` of length `len`, fills it from `rng`, and wraps it.
     ///
-    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRng`](rand::TryRng) — for example,
-    /// a seeded [`OsRng`](rand::rngs::OsRng) for deterministic tests. Requires the `rand`
+    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRngCore`](rand::TryRngCore).
+    /// Pass [`OsRng`](rand::rngs::OsRng) for the same system entropy as [`from_random`](Self::from_random)
+    /// with a fallible interface. **Do not use `OsRng` for deterministic tests** — in `rand` 0.9 it is a
+    /// unit struct backed by the OS and is **not** seedable; use a seedable PRNG such as
+    /// [`StdRng`](rand::rngs::StdRng) with [`SeedableRng`](rand::SeedableRng) instead. Requires the `rand`
     /// feature and `alloc` (implicit — [`Dynamic<T>`](crate::Dynamic) itself requires it).
     ///
     /// # Errors
     ///
-    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRng::try_fill_bytes) fails.
+    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRngCore::try_fill_bytes) fails.
     ///
     /// # Examples
+    ///
+    /// System RNG (same source as `from_random`, `Result`-based):
     ///
     /// ```rust
     /// # #[cfg(all(feature = "alloc", feature = "rand"))]
     /// # {
     /// use rand::rngs::OsRng;
+    /// use secure_gate::Dynamic;
+    ///
+    /// let nonce: Dynamic<Vec<u8>> = Dynamic::from_rng(24, &mut OsRng).expect("rng fill");
+    /// # }
+    /// ```
+    ///
+    /// Deterministic fill (tests) with a seedable generator:
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "alloc", feature = "rand"))]
+    /// # {
+    /// use rand::rngs::StdRng;
     /// use rand::SeedableRng;
     /// use secure_gate::Dynamic;
     ///
-    /// let mut rng = OsRng::from_seed([9u8; 32]);
+    /// let mut rng = StdRng::from_seed([9u8; 32]);
     /// let nonce: Dynamic<Vec<u8>> = Dynamic::from_rng(24, &mut rng).expect("rng fill");
     /// # }
     /// ```
     #[inline]
-    pub fn from_rng<R: TryRng + TryCryptoRng>(len: usize, rng: &mut R) -> Result<Self, R::Error> {
+    pub fn from_rng<R: TryRngCore + TryCryptoRng>(len: usize, rng: &mut R) -> Result<Self, R::Error> {
         let mut result = Ok(());
         let this = Self::new_with(|v| {
             v.resize(len, 0u8);

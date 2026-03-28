@@ -19,7 +19,7 @@
 //! - `alloc` *(default)*: Heap-allocated [`Dynamic<T>`] + full zeroization of spare capacity
 //! - `std`: Full `std` support (implies `alloc`)
 //! - `ct-eq`: [`ConstantTimeEq`] constant-time equality (`subtle`)
-//! - `rand`: `from_random()` via `SysRng`; `from_rng()` for any caller-supplied `TryRng + TryCryptoRng`; `no_std` compatible for `Fixed<T>` (no heap required)
+//! - `rand` (0.9): `from_random()` via system [`OsRng`](https://docs.rs/rand/0.9.2/rand/rngs/struct.OsRng.html); `from_rng()` for any `TryRngCore + TryCryptoRng` (e.g. `OsRng` or seedable [`StdRng`](https://docs.rs/rand/0.9.2/rand/rngs/struct.StdRng.html) for tests); `no_std` compatible for `Fixed<T>` (no heap required)
 //! - `cloneable`: [`CloneableSecret`] opt-in cloning
 //! - `serde-serialize` / `serde-deserialize`: Serde support
 //! - `encoding-hex` / `encoding-base64` / `encoding-bech32` / `encoding-bech32m`: Per-format encoding

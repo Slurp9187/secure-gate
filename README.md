@@ -43,7 +43,7 @@ Current crates.io version: 0.8.0-rc.5 (see `Cargo.toml` for exact version).
 - **Explicit access only** — `.with_secret()` (preferred) or `.expose_secret()` required; no silent `Deref`/`AsRef` leaks
 - **Mandatory zeroize on drop** — always active, no feature gate (inner type must implement `Zeroize`)
 - **Timing-safe equality** — `ct-eq` feature for deterministic constant-time byte comparison (`subtle`)
-- **Secure random generation** — `from_random()` (system `OsRng`) and `from_rng()` for any caller-supplied `TryCryptoRng` + `TryRngCore` (`rand` feature)
+- **Secure random generation** (`rand` 0.9) — `from_random()` (system `OsRng`, not seedable) and `from_rng()` for any caller-supplied `TryCryptoRng` + `TryRngCore` (e.g. `StdRng` + `SeedableRng` for deterministic tests)
 - **Orthogonal encoding** — symmetric per-format traits + direct `try_from_*` constructors on `Fixed` and `Dynamic<Vec<u8>>` (hex, base64url, bech32/BIP-173, bech32m/BIP-350); each format is opt-in and zero-overhead when unused
 - **Serde** — direct deserialization to inner types (binary-safe); opt-in serialization requires `SerializableSecret` marker
 - **Ergonomic aliases** — `dynamic_alias!`, `fixed_alias!`, `fixed_generic_alias!`, `dynamic_generic_alias!` for typed newtypes
@@ -117,23 +117,23 @@ secure-gate = { version = "0.8.0-rc.{x}", features = ["full"] }
 
 ## Features
 
-| Feature             | Description                                                                                                                                                                                                                          |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                                                                                      |
-| `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                                                                             |
-| `rand`              | `from_random()` (system `OsRng`) and fallible `from_rng()` for custom RNGs; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random` / `from_rng` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
-| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                                                                                     |
-| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                                                                                                  |
-| `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                                                                                                               |
-| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr`                                                                                                                                                                                                   |
-| `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                                                                                                                                                               |
-| `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                                                                                                                                                             |
-| `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                                                                                                                                                        |
-| `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                                                                                 |
-| `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                                                                               |
-| `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                                                                                     |
-| `secrecy-compat`    | Drop-in compatibility shim for `secrecy` 0.8.x and 0.10.x — `compat::v08` and `compat::v10` modules with matching types, traits, and `From` conversions to native wrappers                                                           |
-| `full`              | All features combined                                                                                                                                                                                                                |
+| Feature             | Description                                                                                                                                                                                                                                                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                                                                                                                      |
+| `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                                                                                                             |
+| `rand`              | `rand` 0.9: `from_random()` (system `OsRng`) and fallible `from_rng()` for any `TryRngCore + TryCryptoRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random` / `from_rng` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
+| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                                                                                                                     |
+| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                                                                                                                                  |
+| `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                                                                                                                                               |
+| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr`                                                                                                                                                                                                                                   |
+| `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                                                                                                                                                                                               |
+| `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                                                                                                                                                                                             |
+| `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                                                                                                                                                                                        |
+| `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                                                                                                                 |
+| `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                                                                                                               |
+| `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                                                                                                                     |
+| `secrecy-compat`    | Drop-in compatibility shim for `secrecy` 0.8.x and 0.10.x — `compat::v08` and `compat::v10` modules with matching types, traits, and `From` conversions to native wrappers                                                                                           |
+| `full`              | All features combined                                                                                                                                                                                                                                                |
 
 `no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding, and serde require `alloc`. Disabled features have zero overhead.
 
@@ -144,7 +144,7 @@ secure-gate = { version = "0.8.0-rc.{x}", features = ["full"] }
 - Redact `Debug` output to `[REDACTED]`
 - Implement `len()` and `is_empty()` without exposing secret contents
 - Zeroize contents on drop (mandatory)
-- Owned extraction via `.into_inner()` → `Zeroizing<T>` (transfers zeroization to caller)
+- Owned extraction via `.into_inner()` → `InnerSecret<T>` (transfers zeroization to caller; always redacts `Debug`)
 
 The preferred and recommended way to access secrets is the scoped `with_secret` / `with_secret_mut` methods. `expose_secret` / `expose_secret_mut` are escape hatches for rare cases and should be audited closely.
 
@@ -175,11 +175,11 @@ let raw: &[u8; 32] = key.expose_secret();
 
 ```rust
 // When you need to move the secret value out (FFI hand-off, type migration)
-use secure_gate::{Fixed, RevealSecret};
+use secure_gate::{Fixed, InnerSecret, RevealSecret};
 let key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
-let owned: zeroize::Zeroizing<[u8; 32]> = key.into_inner();
-// Zeroizes its 32 bytes when it drops — same guarantee as Fixed<[u8; 32]>.
-// ⚠ Do NOT log or format `owned` — Zeroizing<T> does not redact on Debug.
+let owned: InnerSecret<[u8; 32]> = key.into_inner();
+// Zeroizes on drop — same guarantee as Fixed<[u8; 32]>.
+// Safe to format — Debug always prints [REDACTED].
 ```
 
 ### Macros for typed aliases
@@ -302,7 +302,7 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 }
 ```
 
-`from_random()` uses the system RNG ([`OsRng`](https://docs.rs/rand/latest/rand/rngs/struct.OsRng.html)), panics on failure, and is heap-free for `Fixed<T>` (`no_std` / `no_alloc`). `from_rng` fills from any [`TryCryptoRng`](https://docs.rs/rand/latest/rand/trait.TryCryptoRng.html) + [`TryRngCore`](https://docs.rs/rand/latest/rand/trait.TryRngCore.html) and returns `Result` (e.g. seeded `StdRng` in tests). `Dynamic::from_random` / `from_rng` require `alloc` (implicit — `Dynamic<T>` itself already requires it). See [`Fixed::from_random`], [`Fixed::from_rng`], [`Dynamic::from_random`], and [`Dynamic::from_rng`] in the [API docs](https://docs.rs/secure-gate).
+`from_random()` uses the system RNG ([`OsRng`](https://docs.rs/rand/0.9.2/rand/rngs/struct.OsRng.html)) (a unit struct in `rand` 0.9 — not seedable), panics on failure, and is heap-free for `Fixed<T>` (`no_std` / `no_alloc`). `from_rng` fills from any [`TryCryptoRng`](https://docs.rs/rand/0.9.2/rand/trait.TryCryptoRng.html) + [`TryRngCore`](https://docs.rs/rand/0.9.2/rand/trait.TryRngCore.html) and returns `Result`; use [`StdRng`](https://docs.rs/rand/0.9.2/rand/rngs/struct.StdRng.html) with [`SeedableRng`](https://docs.rs/rand/0.9.2/rand/trait.SeedableRng.html) for deterministic tests, or `OsRng` when you want fallible system entropy. `Dynamic::from_random` / `from_rng` require `alloc` (implicit — `Dynamic<T>` itself already requires it). See [`Fixed::from_random`], [`Fixed::from_rng`], [`Dynamic::from_random`], and [`Dynamic::from_rng`] in the [API docs](https://docs.rs/secure-gate).
 
 ## Security Model
 
