@@ -229,11 +229,7 @@ Prefer `Display` (`{}`) over `Debug` (`{:?}`) when logging errors in production 
 
 Coarse error categories are still present in release and can aid attacker fingerprinting in niche threat models. Redact or suppress error details in logs for high-sensitivity contexts.
 
-### Compatibility Layer
 
-The `secrecy-compat` feature and all related code (`compat::v08`, `compat::v10`, bridge traits, migration tests, etc.) have been extracted into the separate [`secure-gate-compat`](https://crates.io/crates/secure-gate-compat) crate.
-
-**For security considerations around the compat layer, see its own `SECURITY.md` (or the migration guide).** The core `secure-gate` crate no longer includes any of this code, further reducing its attack surface.
 
 ## Vulnerability Reporting
 
