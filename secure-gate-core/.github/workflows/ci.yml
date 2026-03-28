@@ -36,10 +36,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Clippy (${{ matrix.name }})
-        run: cargo clippy --tests --benches ${{ matrix.features }}
+        run: cargo clippy -p secure-gate-core --tests --benches ${{ matrix.features }}
 
       - name: Doctests (${{ matrix.name }})
-        run: cargo test --doc ${{ matrix.features }}
+        run: cargo test -p secure-gate-core --doc ${{ matrix.features }}
 
   test:
     runs-on: ubuntu-latest
@@ -126,7 +126,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run tests (${{ matrix.name }})
-        run: cargo test --tests ${{ matrix.features }}
+        run: cargo test -p secure-gate-core --tests ${{ matrix.features }}
 
   # ---------------------------------------------------------------------------
   # MSRV job — verify declared rust-version is actually buildable
@@ -153,16 +153,16 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: cargo check – default features
-        run: cargo +1.70 check --locked
+        run: cargo +1.70 check -p secure-gate-core --locked
 
       - name: cargo check – full features
-        run: cargo +1.70 check --locked --features=full
+        run: cargo +1.70 check -p secure-gate-core --locked --features=full
 
       - name: cargo test – all features (MSRV compatibility)
         # Skip compile-fail tests: trybuild snapshot format differs between Rust 1.70
         # and stable (diagnostic wording changed). Compile-fail tests verify error
         # message wording, not MSRV compatibility — they run in the stable `test` job.
-        run: cargo +1.70 test --locked --all-features -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse
+        run: cargo +1.70 test -p secure-gate-core --locked --all-features -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse
 
   # ---------------------------------------------------------------------------
   # AddressSanitizer job — heap zeroization oracle
@@ -194,7 +194,7 @@ jobs:
           RUSTFLAGS: "-Zsanitizer=address -Zsanitizer=leak -C debuginfo=2"
           ASAN_OPTIONS: "detect_leaks=1:abort_on_error=1:symbolize=1"
         run: >
-          cargo +nightly test
+          cargo +nightly test -p secure-gate-core
           --features alloc
           --test heap_zeroize
           -Z build-std
