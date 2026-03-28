@@ -23,7 +23,6 @@ serde = "1.0"
 # Direct deps for encoding round-trip verification
 hex = "0.4"
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
-bech32 = { version = "0.11", default-features = false, features = ["alloc"] }
 
 [features]
 default = ["rand", "ct-eq", "encoding", "serde", "encoding-bech32m", "cloneable"]
@@ -80,6 +79,3 @@ path = "fuzz_targets/ct_eq.rs"
 test = false
 bench = false
 doc = false
-
-[package.metadata.cargo-machete]
-ignored = ["bech32"]

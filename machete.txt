@@ -1,16 +1,5 @@
 Analyzing dependencies of crates in this directory...
 cargo-machete found the following unused dependencies in this directory:
-secure-gate-compat -- .\secure-gate-compat\Cargo.toml:
-	bincode
-	criterion
-	tempfile
-secure-gate -- .\secure-gate-core\Cargo.toml:
-	half
-	quote
-	ryu
-	syn
-	tempfile
-	unicode-ident
 secure-gate-fuzz -- .\secure-gate-core\fuzz\Cargo.toml:
 	bech32
 
@@ -22,4 +11,3 @@ For example:
 [package.metadata.cargo-machete]
 ignored = ["prost"]
 Done!
-

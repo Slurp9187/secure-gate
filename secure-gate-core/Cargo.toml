@@ -27,18 +27,6 @@ subtle = { version = "2.5", optional = true }
 thiserror = "2.0"
 zeroize = { version = "1.7", default-features = false, features = ["zeroize_derive"] }
 
-# MSRV (rustc 1.70) compatibility caps for transitive proc-macro dependencies.
-# Prevents rustc 1.71+ requirement introduced in syn 2.0.115+.
-syn = ">=2.0, <2.0.115"
-# Prevents rustc 1.71+ requirement introduced in unicode-ident 1.0.23+.
-unicode-ident = ">=1.0, <1.0.23"
-# Prevents rustc 1.71+ requirement introduced in quote 1.0.45+.
-quote = ">=1.0, <1.0.45"
-# Prevents rustc 1.71+ requirement introduced in ryu 1.0.23+.
-ryu = ">=1.0, <1.0.23"
-# Prevents rustc 1.81+ requirement introduced in half 2.7.1+.
-half = ">=2.0, <2.7.1"
-
 [dev-dependencies]
 bincode = "1.0"
 # criterion >=0.5 pulls transitive deps that break 1.70 (e.g. clap >=4.5/rayon-core >=1.13).
@@ -49,8 +37,8 @@ proptest = "=1.0.0"
 serde_json = "=1.0.132"
 # newer trybuild pulls `toml` 1.x (`toml_parser` edition 2024), which Cargo 1.70 cannot parse.
 trybuild = "=1.0.81"
-# tempfile >=3.27 pulls getrandom 0.4 (edition 2024); Cargo 1.70 cannot parse that manifest.
-tempfile = "=3.10.1"
+# # tempfile >=3.27 pulls getrandom 0.4 (edition 2024); Cargo 1.70 cannot parse that manifest.
+# tempfile = "=3.10.1"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -106,6 +94,3 @@ harness = false
 [[bench]]
 name = "serde"
 harness = false
-
-[package.metadata.cargo-machete]
-ignored = ["half", "quote", "ryu", "syn", "tempfile", "unicode-ident"]
