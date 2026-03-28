@@ -11,10 +11,14 @@
 
 mod common;
 mod encoding_suite;
-mod macros_suite;
 mod serde_suite;
+mod macros_suite;
+#[cfg(feature = "secrecy-compat")]
+mod compat_suite;
 // Proptest is valuable on native runs, but prohibitively slow under Miri's
 // interpreter; deterministic suites and the dedicated fuzz/Miri workflow still
 // cover UB-oriented paths there.
 #[cfg(not(miri))]
 mod proptest_suite;
+#[cfg(feature = "dual-compat-test")]
+mod compat_dual;

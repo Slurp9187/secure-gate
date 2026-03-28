@@ -1,7 +1,8 @@
 [package]
 name = "secure-gate-fuzz"
-version = "0.1.1"
+version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 publish = false
 
 [package.metadata]
@@ -36,48 +37,6 @@ encoding-bech32m = ["secure-gate/encoding-bech32m"]
 serde = ["secure-gate/serde"]
 cloneable = ["secure-gate/cloneable"]
 full = ["secure-gate/full"]
-
-[[bin]]
-name = "expose"
-path = "fuzz_targets/expose.rs"
-test = false
-bench = false
-doc = false
-
-[[bin]]
-name = "mut"
-path = "fuzz_targets/mut.rs"
-test = false
-bench = false
-doc = false
-
-[[bin]]
-name = "parsing"
-path = "fuzz_targets/parsing.rs"
-test = false
-bench = false
-doc = false
-
-[[bin]]
-name = "encoding"
-path = "fuzz_targets/encoding.rs"
-test = false
-bench = false
-doc = false
-
-[[bin]]
-name = "serde"
-path = "fuzz_targets/serde.rs"
-test = false
-bench = false
-doc = false
-
-[[bin]]
-name = "ct_eq"
-path = "fuzz_targets/ct_eq.rs"
-test = false
-bench = false
-doc = false
 
 [[bin]]
 name = "compat_v08"

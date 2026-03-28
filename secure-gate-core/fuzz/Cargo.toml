@@ -8,7 +8,6 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-secure-gate = { path = "../", features = ["full", "secrecy-compat"] }
 arbitrary = { version = "1.4", features = ["derive"] }
 libfuzzer-sys = "0.4"
 

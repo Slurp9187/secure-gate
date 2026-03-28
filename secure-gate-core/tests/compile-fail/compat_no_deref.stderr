@@ -1,5 +1,0 @@
-error[E0614]: type `Secret<String>` cannot be dereferenced
- --> tests/compile-fail/compat_no_deref.rs:9:13
-  |
-9 |     let _ = *s;
-  |             ^^
