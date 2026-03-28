@@ -58,7 +58,6 @@ PACKAGES = [
             "README.md",
             "ROADMAP.md",
             "SECURITY.md",
-            "ZERO_COST_WRAPPERS.md",
         ],
         "include_dirs": [],
         "file_pattern": "*.md",

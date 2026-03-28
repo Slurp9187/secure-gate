@@ -9,7 +9,7 @@
 Secure wrappers for secrets with **explicit access** and **mandatory zeroization** — a `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
 
 > **Security Notice**: This crate has **not undergone independent audit**.
-> Review the code and [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) before production use.
+> Review the code and [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) before production use.
 > No unsafe code — enforced with `#![forbid(unsafe_code)]`.
 
 ## Quick Start
@@ -132,7 +132,7 @@ fn log_length<S: RevealSecret>(secret: &S) {
 
 ## What You Get
 
-- **Zero-cost safety** — mandatory zeroization on drop; `no_std` / `no_alloc` support. See [ZERO_COST_WRAPPERS.md](https://github.com/Slurp9187/secure-gate/blob/main/ZERO_COST_WRAPPERS.md) for benchmarks.
+- **Zero-cost safety** — mandatory zeroization on drop; `no_std` / `no_alloc` support.
 - **Audit-first API** — secrets cannot leak via `Deref`. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch.
 - **Type-safe wrappers** — macros create newtype aliases that redact `Debug` output automatically.
 - **Batteries included** — optional, zero-overhead support for serde, constant-time comparison (`subtle`), and secure encoding (hex, base64url, bech32/m).

@@ -38,6 +38,7 @@ Your existing code should compile with only import changes. See the full guide f
 ## Further Reading
 
 - **[MIGRATING_FROM_SECRECY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-compat/MIGRATING_FROM_SECRECY.md)** — complete migration guide, parity test suite, and security notes
+- **[SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-compat/SECURITY.md)** — security considerations for the compatibility layer (including migration-specific risks)
 - [Core `secure-gate` documentation](https://docs.rs/secure-gate) — preferred API for new code
 
 The compat layer is a thin, zero-overhead shim. Once migration is complete, remove the `secrecy-compat` feature and the `secure-gate-compat` dependency.

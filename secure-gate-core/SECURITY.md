@@ -6,6 +6,7 @@ Last updated: March 2026 (for v0.9.0-rc.4)
 
 - **No independent audit** — review the source code yourself before production use.
 - **No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally.
+- **3-tier access model** — all secret access follows an explicit hierarchy (prefer Tier 1). Audit Tier 2 and Tier 3 calls separately.
 - **Explicit exposure only** — all secret access requires `.expose_secret()` / `.with_secret()` or mutable equivalents; no `Deref`, `AsRef`, or implicit borrowing.
 - **Zeroization on drop** — full buffer (including spare capacity) always wiped on drop (inner type must implement `Zeroize`).
 - **Timing-safe equality** — use `ConstantTimeEq` / `.ct_eq()` (`ct-eq`); `==` is deliberately not implemented.
@@ -45,6 +46,15 @@ The crate is intentionally small and relies on well-vetted dependencies:
   - `tests/heap_zeroize.rs` — physical layer: verifies heap bytes are zeroed before deallocation via `ProxyAllocator` interception
   - `tests/ct_eq_tests.rs` and `tests/proptest_suite/` — timing-safe equality coverage
 - Dependency versions and their security history
+
+## 3-Tier Access Model
+All secret access follows this explicit hierarchy:
+
+- **Tier 1 — Scoped borrow (preferred)**: `with_secret` / `with_secret_mut` — borrow ends when closure returns, minimizing exposure.
+- **Tier 2 — Direct reference (escape hatch)**: `expose_secret` / `expose_secret_mut` — long-lived references; use only for FFI or third-party APIs requiring `&T`/`&mut T`.
+- **Tier 3 — Owned consumption**: `into_inner` — returns `InnerSecret<T>` (wraps `Zeroizing<T>`); zeroization transfers to caller. Audit separately.
+
+**Audit note**: `into_inner` calls must be reviewed independently. Tier 2 and Tier 3 calls do not appear in simple `expose_secret` grep sweeps.
 
 ## Core Security Model
 
@@ -91,8 +101,9 @@ The crate is intentionally small and relies on well-vetted dependencies:
 
 > See the [TL;DR](#tldr) for the shortest version of the most important points.
 
+- Prefer **Tier 1 scoped methods** (`with_secret` / `with_secret_mut`) in all application code to limit secret lifetime.
+- Audit every Tier 2 (`expose_*`) and Tier 3 (`into_inner`) call site separately — they do not appear in simple `expose_secret` grep sweeps.
 - The `alloc` feature is enabled by default and provides `Dynamic<T>` with full zeroization; use `default-features = false` for embedded / pure-stack builds (`Fixed<T>` only)
-- Prefer scoped `with_secret` / `with_secret_mut` over `expose_secret` / `expose_secret_mut` in application code
 - For equality, use `.ct_eq()` (`ct-eq` feature) for all secret comparisons — deterministic and constant-time. Bound input sizes at the transport/parser layer for untrusted data.
 - Audit every `CloneableSecret` / `SerializableSecret` impl
 - Validate and sanitize all inputs before encoding/decoding
@@ -184,7 +195,7 @@ same defensive mindset applied throughout the crate.
 - Never store a wrapper in a `static` — use local variables or heap-allocated structs instead
 - Keep the default `panic = "unwind"` profile in security-sensitive builds; if `panic = "abort"` is required, document and accept the constraint that secrets may not be cleared on panic
 
-Zero-cost claim: performance indistinguishable from raw arrays; for detailed benchmarks, see [ZERO_COST_WRAPPERS.md](ZERO_COST_WRAPPERS.md).
+Zero-cost claim: performance is indistinguishable from raw arrays (see benchmarks in the test suite and `size_of_val` assertions); the wrapper adds no runtime overhead beyond the required zeroization on drop.
 
 ### Traits (`traits/`)
 
