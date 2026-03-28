@@ -11,7 +11,7 @@ from typing import Optional
 
 # ========================== CONFIGURATION ==========================
 MSRV = "1.85"
-PROJECT_TITLE = "secure-gate"
+PROJECT_TITLE = "secure-gate-compat"
 OUTPUT_DIR = f"code_packages_{MSRV}"
 ENCODING = "utf-8"
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
@@ -89,7 +89,7 @@ PACKAGES = [
             "fuzz/Cargo.toml",
             ".github/workflows/fuzz-miri.yml",
             ".github/workflows/fuzz-nightly.yml",
-            ".github/workflows/fuzz-nightly-compat.yml",
+            ".github/workflows/fuzz-nightly-lts.yml",
             ".github/workflows/fuzz-quick.yml",
         ],
         "include_dirs": ["fuzz/fuzz_targets"],

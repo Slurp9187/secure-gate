@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 description = "Compatibility layers for migrating from the secrecy crate (v0.8 and v0.10)"
 license.workspace = true
-repository.workspace = true
+repository = "https://github.com/Slurp9187/secure-gate/tree/main/secure-gate-compat"
 
 [dependencies]
 secure-gate = { path = "../secure-gate-core" }

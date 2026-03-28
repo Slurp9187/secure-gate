@@ -1,3 +1,5 @@
+[workspace]
+
 [package]
 name = "secure-gate-fuzz"
 version = "0.1.0"
@@ -9,7 +11,8 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-secure-gate = { path = "../", features = ["full", "secrecy-compat"] }
+secure-gate = { path = "../../secure-gate-core", features = ["full"] }
+secure-gate-compat = { path = "..", features = ["secrecy-compat"] }
 arbitrary = { version = "1.4", features = ["derive"] }
 libfuzzer-sys = "0.4"
 
@@ -36,7 +39,8 @@ encoding-bech32 = ["secure-gate/encoding-bech32"]
 encoding-bech32m = ["secure-gate/encoding-bech32m"]
 serde = ["secure-gate/serde"]
 cloneable = ["secure-gate/cloneable"]
-full = ["secure-gate/full"]
+secrecy-compat = ["secure-gate-compat/secrecy-compat"]
+full = ["secure-gate/full", "secrecy-compat"]
 
 [[bin]]
 name = "compat_v08"

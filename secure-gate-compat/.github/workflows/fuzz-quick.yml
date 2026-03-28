@@ -1,4 +1,3 @@
-# .github/workflows/fuzz-quick.yml
 name: Fuzz (quick smoke)
 
 permissions:
@@ -7,17 +6,12 @@ permissions:
 on:
   push:
     branches: [main]
-    tags: ["v*.*.*"]
     paths:
-      - "fuzz/**"
-      - "src/**"
-      - "Cargo.toml"
+      - "secure-gate-compat/**"
   pull_request:
     paths:
-      - "fuzz/**"
-      - "src/**"
-      - "Cargo.toml"
-  workflow_dispatch: # manual trigger when you need a long run
+      - "secure-gate-compat/**"
+  workflow_dispatch:
 
 jobs:
   fuzz:
@@ -26,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [expose, mut, parsing, encoding, serde, ct_eq]
+        target: [compat_v08, compat_v10]
 
     steps:
       - name: Checkout repository
@@ -39,13 +33,16 @@ jobs:
 
       - name: Cache cargo registry + target dir
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "secure-gate-compat/fuzz"
 
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
 
       - name: Quick smoke test – ${{ matrix.target }} (90 s)
         run: |
-          cargo +nightly fuzz run ${{ matrix.target }} -- \
+          cargo +nightly fuzz run ${{ matrix.target }} \
+            --manifest-path secure-gate-compat/fuzz/Cargo.toml -- \
             -fork=1 \
             -max_total_time=90 \
             -timeout=30
@@ -55,5 +52,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fuzz-crash-${{ matrix.target }}-${{ github.run_id }}
-          path: fuzz/artifacts/${{ matrix.target }}/**
+          path: secure-gate-compat/fuzz/artifacts/${{ matrix.target }}/**
           retention-days: 7
