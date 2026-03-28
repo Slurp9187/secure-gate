@@ -9,6 +9,7 @@ Compatibility shims for migrating from the [`secrecy`](https://crates.io/crates/
 - Follows the 3-tier access model: (1) scoped (`with_secret`/`with_secret_mut` — preferred), (2) direct (`expose_secret`/`expose_secret_mut` — escape hatch), (3) owned (`into_inner` — for FFI/type migration).
 - No unsafe code. All zeroization and access control is delegated to the core crate and `zeroize`.
 - Audit for **both** `ExposeSecret` (compat) and `RevealSecret` / `with_secret` (native) during transition.
+- **No formal audit or peer review** — this crate has not undergone an official security audit or independent peer review; treat it as experimental until then.
 
 ## Key Risks & Mitigations
 
@@ -56,5 +57,7 @@ See the core crate's [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob
 ## Disclaimer
 
 This document reflects design intent and observed properties as of the current release.
+
+This crate has not undergone an official security audit or independent peer review. Until then, it should be treated as experimental.
 
 **No warranties are provided**. Users are solely responsible for their own security evaluation, threat modeling, and audit.

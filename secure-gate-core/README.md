@@ -21,8 +21,8 @@ Current crates.io version: 0.8.0-rc.6 (see `Cargo.toml` for exact version).
 
 `no_std`-compatible secret wrappers with explicit, auditable access and **mandatory zeroization on drop**.
 
-> **Security Notice**: This crate has **not undergone independent audit**.
-> Review the code and [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) before production use.
+> **Security Notice**: This crate has not undergone an official security audit or independent peer review; treat it as experimental until then.
+> Review the code and [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md) before production use.
 > No unsafe code — enforced with `#![forbid(unsafe_code)]`.
 
 ## What changed in 0.8.0
@@ -48,8 +48,6 @@ Current crates.io version: 0.8.0-rc.6 (see `Cargo.toml` for exact version).
 - **Serde** — direct deserialization to inner types (binary-safe); opt-in serialization requires `SerializableSecret` marker
 - **Ergonomic aliases** — `dynamic_alias!`, `fixed_alias!`, `fixed_generic_alias!`, `dynamic_generic_alias!` for typed newtypes
 - **Auditable** — every secret exposure point (including encoding methods) is grep-able using the consolidated pattern shown in the [Encoding](#encoding) section; `no_std` + `alloc` compatible
-
-For zero-cost performance justification see [ZERO_COST_WRAPPERS.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/ZERO_COST_WRAPPERS.md).
 
 ## Quick Start
 
@@ -311,7 +309,7 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 - **Timing-safe equality** — `ct-eq` feature (`.ct_eq()`)
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
 
-Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) for the full threat model and mitigations.
+Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md) for the full threat model and mitigations.
 
 ## Migrating from secrecy
 
