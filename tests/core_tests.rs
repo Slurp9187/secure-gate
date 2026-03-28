@@ -1,4 +1,4 @@
-// Core API tests for Fixed<T> and Dynamic<T> — v0.8.0 style
+// Core API tests for `Fixed<T>` and `Dynamic<T>` (`RevealSecret` / `RevealSecretMut`).
 
 #[cfg(feature = "cloneable")]
 use secure_gate::CloneableSecret;
@@ -105,22 +105,6 @@ fn dynamic_generate_random() {
     random.with_secret(|s| assert!(!s.iter().all(|&b| b == 0)));
 }
 
-#[cfg(feature = "rand")]
-#[cfg(feature = "alloc")]
-#[test]
-fn dynamic_from_rng_seeded() {
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
-    use secure_gate::Dynamic;
-
-    let mut rng = StdRng::from_seed([9u8; 32]);
-    let a: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).unwrap();
-    let b: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).unwrap();
-    a.with_secret(|sa| {
-        b.with_secret(|sb| assert_ne!(sa, sb, "sequential draws should differ"));
-    });
-}
-
 // === Dynamic<Vec<u8>> from slice ===
 #[cfg(feature = "alloc")]
 #[test]
@@ -149,7 +133,7 @@ fn fixed_try_from_slice() {
 #[test]
 fn fixed_into_inner_returns_zeroizing() {
     let key = Fixed::new([0xABu8; 32]);
-    let owned: zeroize::Zeroizing<[u8; 32]> = key.into_inner();
+    let owned: secure_gate::InnerSecret<[u8; 32]> = key.into_inner();
     assert_eq!(*owned, [0xABu8; 32]);
 }
 
@@ -157,7 +141,7 @@ fn fixed_into_inner_returns_zeroizing() {
 #[test]
 fn dynamic_string_into_inner_returns_zeroizing() {
     let pw = Dynamic::<String>::new("hunter2".to_string());
-    let owned: zeroize::Zeroizing<String> = pw.into_inner();
+    let owned: secure_gate::InnerSecret<String> = pw.into_inner();
     assert_eq!(*owned, "hunter2");
 }
 
@@ -165,7 +149,7 @@ fn dynamic_string_into_inner_returns_zeroizing() {
 #[test]
 fn dynamic_vec_into_inner_returns_zeroizing() {
     let secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3]);
-    let owned: zeroize::Zeroizing<Vec<u8>> = secret.into_inner();
+    let owned: secure_gate::InnerSecret<Vec<u8>> = secret.into_inner();
     assert_eq!(*owned, [1u8, 2, 3]);
 }
 
@@ -220,14 +204,30 @@ fn fixed_from_random() {
 #[cfg(feature = "rand")]
 #[test]
 fn fixed_from_rng_seeded_deterministic() {
-    use rand::rngs::StdRng;
     use rand::SeedableRng;
+    use rand::rngs::StdRng;
 
     let mut rng_a = StdRng::from_seed([1u8; 32]);
     let mut rng_b = StdRng::from_seed([1u8; 32]);
-    let key_a: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_a).unwrap();
-    let key_b: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_b).unwrap();
-    key_a.with_secret(|a| key_b.with_secret(|b| assert_eq!(a, b)));
+    let key_a: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_a).expect("rng fill");
+    let key_b: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_b).expect("rng fill");
+    key_a.with_secret(|a| key_b.with_secret(|b| assert_eq!(a, b, "same seed must yield same bytes")));
+}
+
+#[cfg(feature = "rand")]
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_from_rng_seeded() {
+    use rand::SeedableRng;
+    use rand::rngs::StdRng;
+    use secure_gate::Dynamic;
+
+    let mut rng = StdRng::from_seed([9u8; 32]);
+    let a: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).expect("rng fill");
+    let b: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).expect("rng fill");
+    a.with_secret(|sa| {
+        b.with_secret(|sb| assert_ne!(sa, sb, "sequential draws from same RNG should differ"));
+    });
 }
 
 // === new_with Construction ===
@@ -264,12 +264,27 @@ fn fixed_new_with_is_zero_cost() {
 #[cfg(feature = "rand")]
 struct FailingRng;
 
+// Use a dedicated error type for `TryRngCore::Error` so callers see a real `Error` impl (matches typical RNG usage).
+#[cfg(feature = "rand")]
+#[derive(Debug)]
+struct RngError;
+
+#[cfg(feature = "rand")]
+impl core::fmt::Display for RngError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("simulated RNG failure")
+    }
+}
+
+#[cfg(feature = "rand")]
+impl std::error::Error for RngError {}
+
 #[cfg(feature = "rand")]
 impl rand::TryRngCore for FailingRng {
-    type Error = &'static str;
-    fn try_next_u32(&mut self) -> Result<u32, Self::Error> { Err("fail") }
-    fn try_next_u64(&mut self) -> Result<u64, Self::Error> { Err("fail") }
-    fn try_fill_bytes(&mut self, _: &mut [u8]) -> Result<(), Self::Error> { Err("fail") }
+    type Error = RngError;
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> { Err(RngError) }
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> { Err(RngError) }
+    fn try_fill_bytes(&mut self, _: &mut [u8]) -> Result<(), Self::Error> { Err(RngError) }
 }
 
 #[cfg(feature = "rand")]

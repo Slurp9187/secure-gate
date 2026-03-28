@@ -7,16 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+(v0.6.0-rc.6-dev)
+
 ### Added
 
+- **`InnerSecret<T>`** — new newtype wrapping `zeroize::Zeroizing<T>` that is returned by
+  `RevealSecret::into_inner`. Provides redacted `Debug` (always prints `[REDACTED]`), read-only
+  `Deref` to `T`, and an `into_zeroizing()` escape hatch to recover the underlying
+  `Zeroizing<T>`. Zeroization on drop is inherited from `Zeroizing<T>`. Available as
+  `secure_gate::InnerSecret`.
 - **`RevealSecret::into_inner`** — consuming method that returns the inner secret wrapped in
-  `zeroize::Zeroizing<T>`, transferring the zeroization guarantee to the caller. Implemented for
-  `Fixed<[T; N]>` (zero-cost, no allocation), `Dynamic<String>`, and `Dynamic<Vec<T>>` (small
-  24-byte sentinel allocation; OOM-panic-safe). Requires `Self::Inner: Sized + Default + Zeroize`.
-  Use `with_secret` / `expose_secret` when borrowing suffices; `into_inner` is for ownership
-  hand-off (FFI, type migration, APIs taking `T` by value).
-  **Debug Warning:** `Zeroizing<T>` does not redact on `{:?}` — do not log or format the return
-  value.
+  [`InnerSecret<T>`] (wraps `zeroize::Zeroizing<T>`), transferring the zeroization guarantee to
+  the caller. Implemented for `Fixed<[T; N]>` (zero-cost, no allocation), `Dynamic<String>`, and
+  `Dynamic<Vec<T>>` (small 24-byte sentinel allocation; OOM-panic-safe). Requires
+  `Self::Inner: Sized + Default + Zeroize`. Use `with_secret` / `expose_secret` when borrowing
+  suffices; `into_inner` is for ownership hand-off (FFI, type migration, APIs taking `T` by value).
+  **Breaking change** from the initial rc: return type changed from `zeroize::Zeroizing<T>` to
+  `InnerSecret<T>`.
 
 ## [0.8.0-rc.5] - 2026-03-26
 

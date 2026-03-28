@@ -38,15 +38,7 @@
 //! - **Scoped access preferred** — `with_secret` / `with_secret_mut` limit borrow lifetime, reducing leak risk.
 //! - **Direct exposure** (`expose_secret` / `expose_secret_mut`) is provided for legitimate needs (FFI, third-party APIs), but marked as an escape hatch.
 //! - **Owned consumption** (`into_inner`) is available when the secret must be moved out of the wrapper.
-//!   Zeroization transfers to the returned `Zeroizing<T>` — the caller must let it drop normally.
-//!
-//! # `Debug` Warning for `into_inner`
-//!
-//! `with_secret`/`expose_secret` retain the `[REDACTED]` `Debug` invariant because the
-//! wrapper is still live. After `into_inner`, the caller holds a `Zeroizing<T>`, which
-//! delegates `Debug` directly to `T` with **no redaction**. Printing `{:?}` on the
-//! return value will expose raw secret bytes for common inner types (`[u8; N]`, `Vec<u8>`,
-//! `String`). **Do not log, print, or format the result of `into_inner()` directly.**
+//!   Zeroization transfers to the returned `InnerSecret<T>` — the caller must let it drop normally.
 //!
 //! # Note for `RevealSecret` Implementors
 //!
@@ -108,10 +100,10 @@
 //! use secure_gate::{Fixed, RevealSecret};
 //!
 //! let key = Fixed::new([0xABu8; 16]);
-//! // Consumes `key`; zeroization transfers to the returned Zeroizing<[u8; 16]>.
-//! let owned: zeroize::Zeroizing<[u8; 16]> = key.into_inner();
+//! // Consumes `key`; zeroization transfers to the returned InnerSecret<[u8; 16]>.
+//! let owned: secure_gate::InnerSecret<[u8; 16]> = key.into_inner();
 //! assert_eq!(*owned, [0xABu8; 16]);
-//! // ⚠ Do NOT: println!("{:?}", owned);  — Zeroizing<T> does not redact on Debug.
+//! assert_eq!(format!("{:?}", owned), "[REDACTED]");
 //! // `owned` zeroizes its bytes when it drops.
 //! ```
 //!
@@ -133,6 +125,55 @@
 //! Long-lived `expose_secret()` references can defeat scoping — the borrow outlives the
 //! call site and the compiler cannot enforce that the secret is not retained. This is an
 //! intentional escape hatch for FFI and legacy APIs; audit every call site.
+
+/// Owned, zeroizing secret extracted via [`RevealSecret::into_inner`].
+///
+/// `InnerSecret<T>` preserves the zeroization contract by wrapping
+/// [`zeroize::Zeroizing<T>`], while restoring a strict redaction policy for `Debug`:
+/// formatting this type always prints `[REDACTED]`, regardless of `T`.
+///
+/// Use [`into_zeroizing`](Self::into_zeroizing) only when an API explicitly requires
+/// a `Zeroizing<T>` value.
+pub struct InnerSecret<T: zeroize::Zeroize>(zeroize::Zeroizing<T>);
+
+impl<T: zeroize::Zeroize> InnerSecret<T> {
+    #[inline(always)]
+    pub(crate) fn new(inner: T) -> Self {
+        Self(zeroize::Zeroizing::new(inner))
+    }
+
+    /// Unwraps and returns the underlying [`zeroize::Zeroizing<T>`].
+    ///
+    /// This is an explicit escape hatch for interoperability with APIs that accept
+    /// `Zeroizing<T>` directly.
+    #[inline(always)]
+    pub fn into_zeroizing(self) -> zeroize::Zeroizing<T> {
+        self.0
+    }
+}
+
+impl<T: zeroize::Zeroize> core::fmt::Debug for InnerSecret<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("[REDACTED]")
+    }
+}
+
+impl<T: zeroize::Zeroize> core::ops::Deref for InnerSecret<T> {
+    type Target = T;
+
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+/// Read-only access to a wrapped secret.
+///
+/// Implemented by [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic).
+/// Prefer the scoped [`with_secret`](Self::with_secret) method; use
+/// [`expose_secret`](Self::expose_secret) only when a long-lived reference is
+/// unavoidable. See [`RevealSecretMut`](crate::RevealSecretMut) for the mutable
+/// counterpart.
 pub trait RevealSecret {
     /// The inner secret type being revealed.
     ///
@@ -190,7 +231,7 @@ pub trait RevealSecret {
         self.len() == 0
     }
 
-    /// Consumes the wrapper and returns the inner value wrapped in [`zeroize::Zeroizing`],
+    /// Consumes the wrapper and returns the inner value wrapped in [`InnerSecret`],
     /// preserving automatic zeroization on drop.
     ///
     /// This is the safe, idiomatic path when ownership of the secret is required — for
@@ -198,7 +239,7 @@ pub trait RevealSecret {
     /// wrapper types, or at FFI boundaries where the callee takes ownership.
     ///
     /// The zeroization contract transfers to the caller: when the returned
-    /// `Zeroizing<Self::Inner>` drops, it calls `Self::Inner::zeroize()` automatically,
+    /// `InnerSecret<Self::Inner>` drops, it calls `Self::Inner::zeroize()` automatically,
     /// exactly as the wrapper's own `Drop` impl would have.
     ///
     /// # Availability
@@ -206,7 +247,7 @@ pub trait RevealSecret {
     /// Only callable when `Self::Inner: Sized + Default + Zeroize`. The `Default` bound
     /// is required to construct a zero-sentinel that the wrapper's `Drop` impl runs on
     /// after the real secret is moved out. The `Zeroize` bound is required so the
-    /// returned `Zeroizing<T>` can call `zeroize()` on drop. For types that intentionally
+    /// returned `InnerSecret<T>` can call `zeroize()` on drop. For types that intentionally
     /// omit `Default` (e.g. custom key types where an all-zero value is invalid or
     /// dangerous), `into_inner` is not callable — use `with_secret` or `expose_secret`
     /// instead.
@@ -216,14 +257,10 @@ pub trait RevealSecret {
     /// - `Dynamic<String>` — `String: Default + Zeroize` ✓
     /// - `Dynamic<Vec<T>>` — `Vec<T>: Default + Zeroize` ✓
     ///
-    /// # Debug Warning
+    /// # Debug Behavior
     ///
-    /// The returned `Zeroizing<T>` does **not** redact on `Debug` if `T: Debug`.
-    /// Printing it (e.g. `{:?}`) **will reveal the secret bytes** for common inner types
-    /// like `[u8; N]`, `Vec<u8>`, or `String`.
-    ///
-    /// **Do not log, print, or format the result of `into_inner()` directly.**
-    /// Use it only to transfer ownership to code that consumes the value without exposing it.
+    /// The returned [`InnerSecret<T>`] always redacts `Debug` as `[REDACTED]`, preserving
+    /// the wrapper-level redaction invariant after ownership transfer.
     ///
     /// # Examples
     ///
@@ -231,10 +268,10 @@ pub trait RevealSecret {
     /// use secure_gate::{Fixed, RevealSecret};
     ///
     /// let key = Fixed::new([0xABu8; 16]);
-    /// let owned: zeroize::Zeroizing<[u8; 16]> = key.into_inner();
+    /// let owned: secure_gate::InnerSecret<[u8; 16]> = key.into_inner();
     /// // `owned` zeroizes its 16 bytes when it drops — same guarantee as Fixed<[u8; 16]>.
     /// assert_eq!(*owned, [0xABu8; 16]);
-    /// // ⚠ Do NOT log or format `owned` — Zeroizing<[u8; 16]> prints raw bytes on Debug.
+    /// assert_eq!(format!("{:?}", owned), "[REDACTED]");
     /// ```
     ///
     /// ```rust
@@ -243,12 +280,12 @@ pub trait RevealSecret {
     /// use secure_gate::{Dynamic, RevealSecret};
     ///
     /// let pw = Dynamic::<String>::new("hunter2".to_string());
-    /// let owned: zeroize::Zeroizing<String> = pw.into_inner();
+    /// let owned: secure_gate::InnerSecret<String> = pw.into_inner();
     /// assert_eq!(*owned, "hunter2");
     /// // `owned` zeroizes its heap buffer when it drops.
     /// # }
     /// ```
-    fn into_inner(self) -> zeroize::Zeroizing<Self::Inner>
+    fn into_inner(self) -> InnerSecret<Self::Inner>
     where
         Self: Sized,
         Self::Inner: Sized + Default + zeroize::Zeroize;
