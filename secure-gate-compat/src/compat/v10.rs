@@ -48,9 +48,9 @@ use core::str::FromStr;
 use core::{any, fmt};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use super::{CloneableSecret, ExposeSecret, ExposeSecretMut};
 #[cfg(feature = "serde-serialize")]
 use super::SerializableSecret;
+use super::{CloneableSecret, ExposeSecret, ExposeSecretMut};
 
 // ── SecretBox ────────────────────────────────────────────────────────────────
 
@@ -67,8 +67,9 @@ use super::SerializableSecret;
 ///
 /// ```rust
 /// # #[cfg(feature = "secrecy-compat")] {
-/// use secure_gate::compat::v10::SecretBox;
-/// use secure_gate::Dynamic;
+/// # extern crate secure_gate_compat;
+/// use secure_gate_compat::compat::v10::SecretBox;
+/// use secure_gate_compat::Dynamic;
 ///
 /// let compat: SecretBox<String> = SecretBox::init_with(|| String::from("hunter2"));
 /// let native: Dynamic<String> = compat.into();
@@ -358,5 +359,8 @@ where
 ///
 /// **Note:** secrecy 0.8 users should use [`v08::Secret`](super::v08::Secret) instead,
 /// which mirrors the original stack-allocated semantics.
-#[deprecated(since = "0.8.0", note = "Use `SecretBox` instead (mirrors secrecy >=0.9)")]
+#[deprecated(
+    since = "0.8.0",
+    note = "Use `SecretBox` instead (mirrors secrecy >=0.9)"
+)]
 pub type Secret<S> = SecretBox<S>;

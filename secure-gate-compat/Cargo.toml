@@ -17,24 +17,20 @@ include = [
 
 [dependencies]
 secure-gate = { path = "../secure-gate-core", default-features = false }
+serde = { version = "1.0", optional = true, default-features = false, features = ["derive"] }
 zeroize = { version = "1.7", default-features = false, features = ["zeroize_derive"] }
 
 [dev-dependencies]
-bincode = "1.0"
 # Dual-parity testing baselines — pinned exact versions matching local source clones.
 # These compile as dev-deps always; the dual-compat-test feature gates the test module.
 secrecy-v08 = { package = "secrecy", version = "=0.8.0" }
 secrecy-v10 = { package = "secrecy", version = "=0.10.1" }
-# criterion >=0.5 pulls transitive deps that break 1.70 (e.g. clap >=4.5/rayon-core >=1.13).
-criterion = { version = "=0.4.0", features = ["html_reports"] }
-# proptest >=1.10 requires newer rustc (1.84+); keep 1.70-compatible line.
+# # proptest >=1.10 requires newer rustc (1.84+); keep 1.70-compatible line.
 proptest = "=1.0.0"
 # serde_json >=1.0.149 pulls `zmij` (rustc 1.71+); pin to pre-zmij release.
 serde_json = "=1.0.132"
 # newer trybuild pulls `toml` 1.x (`toml_parser` edition 2024), which Cargo 1.70 cannot parse.
 trybuild = "=1.0.81"
-# tempfile >=3.27 pulls getrandom 0.4 (edition 2024); Cargo 1.70 cannot parse that manifest.
-tempfile = "=3.10.1"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -53,9 +49,9 @@ encoding-hex = ["secure-gate/encoding-hex"]
 encoding-base64 = ["secure-gate/encoding-base64"]
 encoding-bech32 = ["secure-gate/encoding-bech32"]
 encoding-bech32m = ["secure-gate/encoding-bech32m"]
-serde = ["secure-gate/serde"]
-serde-serialize = ["secure-gate/serde-serialize"]
-serde-deserialize = ["secure-gate/serde-deserialize"]
+serde = ["dep:serde", "secure-gate/serde"]
+serde-serialize = ["dep:serde", "secure-gate/serde-serialize"]
+serde-deserialize = ["dep:serde", "secure-gate/serde-deserialize"]
 cloneable = ["secure-gate/cloneable"]
 full = ["secure-gate/full"]
 

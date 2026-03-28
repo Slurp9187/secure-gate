@@ -74,7 +74,8 @@ use super::SerializableSecret;
 ///
 /// ```rust
 /// # #[cfg(feature = "secrecy-compat")] {
-/// use secure_gate::compat::v08::{DebugSecret, Secret};
+/// extern crate secure_gate_compat;
+/// use secure_gate_compat::compat::v08::{DebugSecret, Secret};
 ///
 /// struct ApiKey(String);
 /// impl zeroize::Zeroize for ApiKey { fn zeroize(&mut self) { self.0.zeroize(); } }
@@ -130,15 +131,16 @@ impl<S: CloneableSecret + Zeroize> CloneableSecret for Vec<S> {}
 ///
 /// ```rust
 /// # #[cfg(feature = "secrecy-compat")] {
-/// use secure_gate::compat::v08::Secret;
-/// use secure_gate::Dynamic;
+/// extern crate secure_gate_compat;
+/// use secure_gate_compat::compat::v08::Secret;
+/// use secure_gate_compat::Dynamic;
 ///
 /// // String → heap-allocated Dynamic<String>
 /// let old: Secret<String> = Secret::new(String::from("hunter2"));
 /// let native: Dynamic<String> = old.into();
 ///
 /// // [u8; 32] → stack-allocated Fixed<[u8; 32]>
-/// use secure_gate::Fixed;
+/// use secure_gate_compat::Fixed;
 /// let key: Secret<[u8; 32]> = Secret::new([0xABu8; 32]);
 /// let fixed: Fixed<[u8; 32]> = key.into();
 /// # }

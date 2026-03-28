@@ -713,14 +713,12 @@ dependencies = [
 name = "secure-gate-compat"
 version = "0.8.0-rc.7-dev"
 dependencies = [
- "bincode",
- "criterion",
  "proptest",
  "secrecy 0.10.1",
  "secrecy 0.8.0",
  "secure-gate",
+ "serde",
  "serde_json",
- "tempfile",
  "trybuild",
  "zeroize",
 ]

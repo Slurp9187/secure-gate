@@ -80,3 +80,6 @@ path = "fuzz_targets/ct_eq.rs"
 test = false
 bench = false
 doc = false
+
+[package.metadata.cargo-machete]
+ignored = ["bech32"]
