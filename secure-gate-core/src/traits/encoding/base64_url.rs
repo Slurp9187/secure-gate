@@ -10,9 +10,9 @@
 //!
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
-//! - **Zeroizing variants**: For `Fixed`/`Dynamic` wrappers, prefer `to_base64url_zeroizing()` which
-//!   returns [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`). Use plain
-//!   `to_base64url()` only for public values.
+//! - **Zeroizing variants**: Prefer `to_base64url_zeroizing()`, which returns [`EncodedSecret`]
+//!   (wrapping `Zeroizing<String>` with redacted `Debug`). Use plain `to_base64url()`
+//!   only for public values.
 //! - **Explicit exposure**: `to_base64url()` (and the other encoding methods) perform deliberate full-secret exposure —
 //!   the same security contract as `with_secret` or `expose_secret`. Direct calls do not
 //!   appear in `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams
@@ -63,6 +63,9 @@ use base64_crate::Engine;
 pub trait ToBase64Url {
     /// Encode bytes as URL-safe base64 (no padding).
     fn to_base64url(&self) -> alloc::string::String;
+
+    /// Encode bytes as URL-safe base64 and wrap the result in [`crate::EncodedSecret`].
+    fn to_base64url_zeroizing(&self) -> crate::EncodedSecret;
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
@@ -71,5 +74,10 @@ impl<T: AsRef<[u8]> + ?Sized> ToBase64Url for T {
     #[inline(always)]
     fn to_base64url(&self) -> alloc::string::String {
         URL_SAFE_NO_PAD.encode(self.as_ref())
+    }
+
+    #[inline(always)]
+    fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
+        crate::EncodedSecret::new(self.to_base64url())
     }
 }

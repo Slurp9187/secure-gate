@@ -10,9 +10,9 @@
 //!
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
-//! - **Zeroizing variants**: Wrapper methods like `to_hex_zeroizing()` / `to_hex_upper_zeroizing()`
-//!   return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`). Prefer these
-//!   when the encoded form itself is sensitive. They internally use `with_secret` for auditability.
+//! - **Zeroizing variants**: `to_hex_zeroizing()` / `to_hex_upper_zeroizing()` return
+//!   [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`). Prefer these
+//!   when the encoded form itself is sensitive.
 //! - **Audit visibility**: Direct calls (`key.to_hex()` / `key.to_hex_upper()`) do **not** appear in
 //!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
 //!   multi-step operations, prefer `with_secret(|b| b.to_hex())` — the borrow checker
@@ -58,6 +58,12 @@ pub trait ToHex {
 
     /// Encode bytes as uppercase hexadecimal.
     fn to_hex_upper(&self) -> alloc::string::String;
+
+    /// Encode bytes as lowercase hexadecimal and wrap the result in [`crate::EncodedSecret`].
+    fn to_hex_zeroizing(&self) -> crate::EncodedSecret;
+
+    /// Encode bytes as uppercase hexadecimal and wrap the result in [`crate::EncodedSecret`].
+    fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret;
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
@@ -71,5 +77,15 @@ impl<T: AsRef<[u8]> + ?Sized> ToHex for T {
     #[inline(always)]
     fn to_hex_upper(&self) -> alloc::string::String {
         hex_crate::encode_upper(self.as_ref())
+    }
+
+    #[inline(always)]
+    fn to_hex_zeroizing(&self) -> crate::EncodedSecret {
+        crate::EncodedSecret::new(self.to_hex())
+    }
+
+    #[inline(always)]
+    fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
+        crate::EncodedSecret::new(self.to_hex_upper())
     }
 }
