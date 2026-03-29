@@ -139,7 +139,7 @@ impl Dynamic<Vec<u8>> {
     #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s: &Vec<u8>| crate::EncodedSecret::new(s.to_hex()))
+        self.with_secret(|s: &Vec<u8>| s.to_hex_zeroizing())
     }
 
     /// Encodes the secret bytes as an uppercase hex string.
@@ -161,7 +161,7 @@ impl Dynamic<Vec<u8>> {
     #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s: &Vec<u8>| crate::EncodedSecret::new(s.to_hex_upper()))
+        self.with_secret(|s: &Vec<u8>| s.to_hex_upper_zeroizing())
     }
 
     /// Encodes the secret bytes as an unpadded Base64url string.
@@ -183,7 +183,7 @@ impl Dynamic<Vec<u8>> {
     #[cfg(feature = "encoding-base64")]
     #[inline]
     pub fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s: &Vec<u8>| crate::EncodedSecret::new(s.to_base64url()))
+        self.with_secret(|s: &Vec<u8>| s.to_base64url_zeroizing())
     }
 
     /// Tries to encode the secret bytes as a Bech32 string with the given HRP, returning [`EncodedSecret`] on success.
@@ -196,7 +196,7 @@ impl Dynamic<Vec<u8>> {
         &self,
         hrp: &str,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s: &Vec<u8>| s.try_to_bech32(hrp).map(crate::EncodedSecret::new))
+        self.with_secret(|s: &Vec<u8>| s.try_to_bech32_zeroizing(hrp))
     }
 
     /// Tries to encode the secret bytes as a Bech32m string with the given HRP, returning [`EncodedSecret`] on success.
@@ -209,7 +209,7 @@ impl Dynamic<Vec<u8>> {
         &self,
         hrp: &str,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s: &Vec<u8>| s.try_to_bech32m(hrp).map(crate::EncodedSecret::new))
+        self.with_secret(|s: &Vec<u8>| s.try_to_bech32m_zeroizing(hrp))
     }
 
     /// Transfers `protected` bytes into a freshly boxed `Vec`, keeping

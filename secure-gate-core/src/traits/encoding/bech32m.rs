@@ -11,9 +11,8 @@
 //!   for Taproot, SegWit v1+, and modern address formats.
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive.
-//! - **Zeroizing variants**: For `Fixed`/`Dynamic` wrappers, prefer the `_zeroizing` variants
-//!   (e.g. `try_to_bech32m_zeroizing`) that return [`EncodedSecret`] (wrapping `Zeroizing<String>`
-//!   with redacted `Debug`). They internally use `with_secret` for better auditability and hygiene.
+//! - **Zeroizing variants**: Prefer `try_to_bech32m_zeroizing`, which returns [`EncodedSecret`]
+//!   (wrapping `Zeroizing<String>` with redacted `Debug`) when the encoded form remains sensitive.
 //! - **Audit visibility**: Direct wrapper calls (`key.try_to_bech32m(...)`) do **not** appear in
 //!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
 //!   multi-step operations, prefer `with_secret(|b| b.try_to_bech32m(...))` — the borrow
@@ -81,6 +80,9 @@ pub trait ToBech32m {
     /// # Ok::<(), secure_gate::Bech32Error>(())
     /// ```
     fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error>;
+
+    /// Fallibly encodes bytes as Bech32m and wraps the result in [`crate::EncodedSecret`].
+    fn try_to_bech32m_zeroizing(&self, hrp: &str) -> Result<crate::EncodedSecret, Bech32Error>;
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
@@ -90,6 +92,11 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
     fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error> {
         let hrp_parsed = Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
         encode_lower::<Bech32m>(hrp_parsed, self.as_ref()).map_err(|_| Bech32Error::OperationFailed)
+    }
+
+    #[inline(always)]
+    fn try_to_bech32m_zeroizing(&self, hrp: &str) -> Result<crate::EncodedSecret, Bech32Error> {
+        self.try_to_bech32m(hrp).map(crate::EncodedSecret::new)
     }
 }
 
