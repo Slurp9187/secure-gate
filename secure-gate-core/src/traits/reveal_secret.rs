@@ -1,7 +1,9 @@
 //! Traits for controlled, polymorphic secret revelation.
 //!
-//! This module defines the core traits that enforce explicit, auditable access to
-//! secret data across all wrapper types (`Fixed<T>`, `Dynamic<T>`, aliases, etc.).
+//! This module defines the core `RevealSecret` trait. The owned wrapper types
+//! (`InnerSecret<T>` and `EncodedSecret`) have been moved to the
+//! [`revealed_secrets`](crate::traits::revealed_secrets) module for better
+//! organization and auditability.
 //!
 //! The design ensures:
 //! - No implicit borrowing (`Deref`, `AsRef`, etc.)
@@ -126,47 +128,6 @@
 //! call site and the compiler cannot enforce that the secret is not retained. This is an
 //! intentional escape hatch for FFI and legacy APIs; audit every call site.
 
-/// Owned, zeroizing secret extracted via [`RevealSecret::into_inner`].
-///
-/// `InnerSecret<T>` preserves the zeroization contract by wrapping
-/// [`zeroize::Zeroizing<T>`], while restoring a strict redaction policy for `Debug`:
-/// formatting this type always prints `[REDACTED]`, regardless of `T`.
-///
-/// Use [`into_zeroizing`](Self::into_zeroizing) only when an API explicitly requires
-/// a `Zeroizing<T>` value.
-pub struct InnerSecret<T: zeroize::Zeroize>(zeroize::Zeroizing<T>);
-
-impl<T: zeroize::Zeroize> InnerSecret<T> {
-    #[inline(always)]
-    pub(crate) fn new(inner: T) -> Self {
-        Self(zeroize::Zeroizing::new(inner))
-    }
-
-    /// Unwraps and returns the underlying [`zeroize::Zeroizing<T>`].
-    ///
-    /// This is an explicit escape hatch for interoperability with APIs that accept
-    /// `Zeroizing<T>` directly.
-    #[inline(always)]
-    pub fn into_zeroizing(self) -> zeroize::Zeroizing<T> {
-        self.0
-    }
-}
-
-impl<T: zeroize::Zeroize> core::fmt::Debug for InnerSecret<T> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str("[REDACTED]")
-    }
-}
-
-impl<T: zeroize::Zeroize> core::ops::Deref for InnerSecret<T> {
-    type Target = T;
-
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 /// Read-only access to a wrapped secret.
 ///
 /// Implemented by [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic).
@@ -285,7 +246,7 @@ pub trait RevealSecret {
     /// // `owned` zeroizes its heap buffer when it drops.
     /// # }
     /// ```
-    fn into_inner(self) -> InnerSecret<Self::Inner>
+    fn into_inner(self) -> crate::InnerSecret<Self::Inner>
     where
         Self: Sized,
         Self::Inner: Sized + Default + zeroize::Zeroize;

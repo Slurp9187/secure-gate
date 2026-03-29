@@ -20,4 +20,7 @@
 #[cfg(feature = "alloc")]
 pub use self::encoded_secret::EncodedSecret;
 
+pub use self::inner_secret::InnerSecret;
+
 mod encoded_secret;
+mod inner_secret;
