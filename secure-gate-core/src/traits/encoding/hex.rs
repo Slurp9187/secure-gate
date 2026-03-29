@@ -10,6 +10,9 @@
 //!
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
+//! - **Zeroizing variants**: Wrapper methods like `to_hex_zeroizing()` / `to_hex_upper_zeroizing()`
+//!   return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`). Prefer these
+//!   when the encoded form itself is sensitive. They internally use `with_secret` for auditability.
 //! - **Audit visibility**: Direct calls (`key.to_hex()` / `key.to_hex_upper()`) do **not** appear in
 //!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
 //!   multi-step operations, prefer `with_secret(|b| b.to_hex())` — the borrow checker

@@ -7,8 +7,12 @@
 //! Requires the `encoding-base64` feature.
 //!
 //! # Security Notes
+//!
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
+//! - **Zeroizing variants**: For `Fixed`/`Dynamic` wrappers, prefer `to_base64url_zeroizing()` which
+//!   returns [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`). Use plain
+//!   `to_base64url()` only for public values.
 //! - **Explicit exposure**: `to_base64url()` (and the other encoding methods) perform deliberate full-secret exposure —
 //!   the same security contract as `with_secret` or `expose_secret`. Direct calls do not
 //!   appear in `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams
@@ -31,6 +35,10 @@
 //!
 //! // Wrapper method (Direct Fixed<[u8; N]> API — same result):
 //! assert_eq!(secret.to_base64url(), "QkJCQg");
+//!
+//! // Zeroizing variant for sensitive encoded output:
+//! let b64z = secret.to_base64url_zeroizing();
+//! // b64z is EncodedSecret — zeroized on drop, redacted Debug
 //! }
 //! ```
 #[cfg(feature = "encoding-base64")]

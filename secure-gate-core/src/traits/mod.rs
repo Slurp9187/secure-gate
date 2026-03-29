@@ -43,6 +43,11 @@ pub mod reveal_secret;
 pub use reveal_secret::InnerSecret;
 pub use reveal_secret::RevealSecret;
 
+pub mod revealed_secrets;
+
+#[cfg(feature = "alloc")]
+pub use revealed_secrets::EncodedSecret;
+
 pub mod reveal_secret_mut;
 pub use reveal_secret_mut::RevealSecretMut;
 

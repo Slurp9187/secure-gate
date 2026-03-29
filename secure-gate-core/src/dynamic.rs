@@ -25,12 +25,21 @@ extern crate alloc;
 use alloc::boxed::Box;
 use zeroize::Zeroize;
 
-#[cfg(any(feature = "encoding-hex", feature = "encoding-base64"))]
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base64",
+    feature = "encoding-bech32",
+    feature = "encoding-bech32m",
+))]
 use crate::RevealSecret;
 
 // Encoding traits
 #[cfg(feature = "encoding-base64")]
 use crate::traits::encoding::base64_url::ToBase64Url;
+#[cfg(feature = "encoding-bech32")]
+use crate::traits::encoding::bech32::ToBech32;
+#[cfg(feature = "encoding-bech32m")]
+use crate::traits::encoding::bech32m::ToBech32m;
 #[cfg(feature = "encoding-hex")]
 use crate::traits::encoding::hex::ToHex;
 
@@ -144,6 +153,67 @@ impl Dynamic<Vec<u8>> {
     #[inline]
     pub fn to_base64url(&self) -> alloc::string::String {
         self.with_secret(|s: &Vec<u8>| s.to_base64url())
+    }
+
+    /// Encodes the secret bytes as a lowercase hex string, returning [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
+    ///
+    /// Use this variant when the encoded form should still be treated as sensitive (e.g. private keys).
+    /// Requires the `encoding-hex` feature.
+    #[cfg(feature = "encoding-hex")]
+    #[must_use]
+    #[inline]
+    pub fn to_hex_zeroizing(&self) -> crate::EncodedSecret {
+        self.with_secret(|s: &Vec<u8>| crate::EncodedSecret::new(s.to_hex()))
+    }
+
+    /// Encodes the secret bytes as an uppercase hex string, returning [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
+    ///
+    /// Use this variant when the encoded form should still be treated as sensitive.
+    /// Requires the `encoding-hex` feature.
+    #[cfg(feature = "encoding-hex")]
+    #[must_use]
+    #[inline]
+    pub fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
+        self.with_secret(|s: &Vec<u8>| crate::EncodedSecret::new(s.to_hex_upper()))
+    }
+
+    /// Encodes the secret bytes as an unpadded Base64url string, returning [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
+    ///
+    /// Use this variant when the encoded form should still be treated as sensitive.
+    /// Requires the `encoding-base64` feature.
+    #[cfg(feature = "encoding-base64")]
+    #[must_use]
+    #[inline]
+    pub fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
+        self.with_secret(|s: &Vec<u8>| crate::EncodedSecret::new(s.to_base64url()))
+    }
+
+    /// Tries to encode the secret bytes as a Bech32 string with the given HRP, returning [`EncodedSecret`](crate::EncodedSecret) on success.
+    ///
+    /// Delegates to the `ToBech32` trait. Use this variant when the encoded value should remain sensitive.
+    /// Requires the `encoding-bech32` feature.
+    #[cfg(feature = "encoding-bech32")]
+    #[must_use]
+    #[inline]
+    pub fn try_to_bech32_zeroizing(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s: &Vec<u8>| s.try_to_bech32(hrp).map(crate::EncodedSecret::new))
+    }
+
+    /// Tries to encode the secret bytes as a Bech32m string with the given HRP, returning [`EncodedSecret`](crate::EncodedSecret) on success.
+    ///
+    /// Delegates to the `ToBech32m` trait. Use this variant when the encoded value should remain sensitive.
+    /// Requires the `encoding-bech32m` feature.
+    #[cfg(feature = "encoding-bech32m")]
+    #[must_use]
+    #[inline]
+    pub fn try_to_bech32m_zeroizing(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s: &Vec<u8>| s.try_to_bech32m(hrp).map(crate::EncodedSecret::new))
     }
 
     /// Transfers `protected` bytes into a freshly boxed `Vec`, keeping

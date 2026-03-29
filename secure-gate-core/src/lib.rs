@@ -97,6 +97,11 @@ pub use traits::RevealSecretMut;
 /// Owned, redacted wrapper returned by `into_inner()`.
 pub use traits::InnerSecret;
 
+#[cfg(feature = "alloc")]
+/// Owned, redacted wrapper for encoded strings returned by the zeroizing
+/// encoding methods (`to_hex_zeroizing`, etc.).
+pub use traits::EncodedSecret;
+
 #[cfg(feature = "serde-serialize")]
 /// Marker trait for secrets that can be serialized with Serde.
 ///

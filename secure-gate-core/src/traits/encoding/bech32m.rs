@@ -11,6 +11,9 @@
 //!   for Taproot, SegWit v1+, and modern address formats.
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive.
+//! - **Zeroizing variants**: For `Fixed`/`Dynamic` wrappers, prefer the `_zeroizing` variants
+//!   (e.g. `try_to_bech32m_zeroizing`) that return [`EncodedSecret`] (wrapping `Zeroizing<String>`
+//!   with redacted `Debug`). They internally use `with_secret` for better auditability and hygiene.
 //! - **Audit visibility**: Direct wrapper calls (`key.try_to_bech32m(...)`) do **not** appear in
 //!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
 //!   multi-step operations, prefer `with_secret(|b| b.try_to_bech32m(...))` — the borrow
@@ -34,6 +37,12 @@
 //! // Use try_to_bech32m — the sole encoding API:
 //! let encoded = secret.with_secret(|s| s.try_to_bech32m("key")).unwrap();
 //! assert!(encoded.starts_with("key1"));
+//!
+//! // Zeroizing variant for sensitive encoded output:
+//! let encoded_z = secret.try_to_bech32m_zeroizing("key")?;
+//! assert!(encoded_z.starts_with("key1"));
+//! // encoded_z is EncodedSecret — zeroized on drop, redacted Debug
+//! # Ok::<(), secure_gate::Bech32Error>(())
 //! ```
 #[cfg(feature = "encoding-bech32m")]
 use bech32::{encode_lower, Bech32m, Hrp};
