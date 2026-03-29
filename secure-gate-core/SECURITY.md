@@ -32,7 +32,7 @@ All secret access follows this explicit hierarchy:
 - **`panic = "abort"` / SIGKILL / hard crash** — `Drop` impls do not run; secrets are not cleared.
 - **`static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized.
 - **Copies made by caller code** — after `expose_secret()`, encoding, or serialization, the caller holds ordinary non-zeroized memory.
-- **Encoded/serialized output** — `to_hex()`, `to_base64url()`, serde `Serialize` output are full secret exposure into ordinary, non-zeroizing `String`s. Prefer the new zeroizing variants (`to_*_zeroizing`) that return `EncodedSecret` (which wraps `Zeroizing<String>` with redacted `Debug`) when the encoded form must remain sensitive.
+- **Encoded/serialized output** — `to_hex()`, `to_base64url()`, serde `Serialize` output are full secret exposure into ordinary, non-zeroizing `String`s. Prefer the zeroizing variants (`to_*_zeroizing`, `try_to_bech32*_zeroizing`) that return `EncodedSecret` (which wraps `Zeroizing<String>` with redacted `Debug`) when the encoded form must remain sensitive. These APIs are available both as wrapper conveniences (`Fixed` / `Dynamic`) and on encoding traits (`ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
 - **All side channels beyond equality timing** — cache, power, EM, and branch-predictor side channels are outside scope (enable `ct-eq` feature for constant-time equality where needed).
 - **Allocation-based DoS from deserialization** — `MAX_DESERIALIZE_BYTES` (and `deserialize_with_limit`) is only a post-materialization result-length acceptance bound. The upstream deserializer may have already allocated the full payload. For untrusted inputs, enforce size limits at the transport or parser layer upstream before deserialization.
 - **Stack/register residue outside wrapper control** — temporaries in caller code, FFI boundaries, and compiler-generated spills are not managed by this crate.
@@ -46,12 +46,12 @@ All secret access follows this explicit hierarchy:
 - Enable `serde-serialize` / `serde-deserialize` only when needed.
 - For `serde-deserialize` on untrusted data: enforce size limits at the transport or parser layer upstream before passing to the deserializer (see `deserialize_with_limit` docs).
 - Run full test suite (`cargo test --all-features`).
-- For encoding: chain immediately or audit the binding lifetime. Prefer zeroizing methods (`to_hex_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, `try_to_bech32m_zeroizing`, etc.) that return `EncodedSecret` when the encoded value should remain protected.
+- For encoding: chain immediately or audit the binding lifetime. Prefer zeroizing methods (`to_hex_zeroizing`, `to_hex_upper_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, `try_to_bech32m_zeroizing`, etc.) that return `EncodedSecret` when the encoded value should remain protected.
 
 ## Encoding: Sensitive vs. Public Output
 
-- Use plain encoding methods (`to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`) when output is intentionally public (addresses, nonces, transaction IDs).
-- Use zeroizing variants (`*_zeroizing`) when encoded output remains sensitive (private keys, long-lived tokens, full secret exports).
+- Use plain encoding methods (`to_hex`, `to_hex_upper`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`) when output is intentionally public (addresses, nonces, transaction IDs).
+- Use zeroizing variants (`to_hex_zeroizing`, `to_hex_upper_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, `try_to_bech32m_zeroizing`) when encoded output remains sensitive (private keys, long-lived tokens, full secret exports).
 - `EncodedSecret` redacts `Debug` and zeroizes on drop. Keep values in this form as long as possible.
 - `EncodedSecret::into_inner()` returns a plain `String` and ends zeroization protection; use only when an API requires ownership of `String`.
 - `EncodedSecret::into_zeroizing()` preserves the zeroization wrapper and should be preferred when a downstream API accepts `Zeroizing<String>`.

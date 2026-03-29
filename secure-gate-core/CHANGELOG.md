@@ -12,7 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `EncodedSecret` newtype (wrapping `zeroize::Zeroizing<String>`) with redacted `Debug` (`[REDACTED]`), `Deref<Target=str>`, `AsRef<str>`, `AsRef<[u8]>`, `Display`, `into_inner()`, `into_zeroizing()`, and `new` (internal). Added under `alloc` feature.
 - Zeroizing variants of encoding methods on `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` (`to_hex_zeroizing`, `to_hex_upper_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, `try_to_bech32m_zeroizing`) that return `EncodedSecret` to preserve zeroization for sensitive encoded values. Plain `to_*()` methods remain unchanged for public encodings.
+- Trait-level `_zeroizing` encoding APIs on existing encoding traits — added `to_hex_zeroizing` / `to_hex_upper_zeroizing` to `ToHex`, `to_base64url_zeroizing` to `ToBase64Url`, `try_to_bech32_zeroizing` to `ToBech32`, and `try_to_bech32m_zeroizing` to `ToBech32m`.
+- Wrapper delegation alignment for `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` — inherent `*_zeroizing` methods now delegate through `with_secret(...)` to trait-level implementations, mirroring the non-zeroizing flow and removing duplicated conversion logic.
 - Refactored owned secret wrappers into `traits/revealed_secrets/` (`inner_secret.rs`, `encoded_secret.rs`) and narrowed `traits/reveal_secret.rs` to the `RevealSecret` trait.
+- Expanded zeroizing test coverage across hex/base64/bech32/bech32m, including parity vs non-zeroizing methods, invalid-HRP/error paths, bech32m oversize payload behavior, redacted `Debug`, and edge cases (empty/all-zero/single-byte payloads).
+- Added `tests/revealed_secrets_suite` integration coverage for both wrappers: `revealed_secrets_suite/encoded_secret.rs` and `revealed_secrets_suite/inner_secret.rs`, wired through `tests/integration.rs`.
 - Updated docs in `SECURITY.md`, `README.md`, encoding traits, and module docs with guidance on preferring zeroizing methods when the encoded form is sensitive.
 
 ### Changed

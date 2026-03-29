@@ -226,19 +226,25 @@ fn log_length<S: RevealSecret>(secret: &S) {
 
 ### Encoding (to string)
 
-Use trait methods or inherent convenience methods on the wrappers. Plain methods return `String` (for public values). Use the zeroizing variants (returning [`EncodedSecret`]) when the encoded form should remain sensitive.
+Use trait methods or inherent convenience methods on wrappers. Plain methods return `String` (for public values). Use the zeroizing variants (returning [`EncodedSecret`]) when the encoded form should remain sensitive. Zeroizing APIs are available both on wrapper conveniences and on encoding traits (`ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
 
 ```rust
 let key: Fixed<[u8; 32]> = ...;
 
 let hex    = key.to_hex();                    // String (public use)
+let hex_u  = key.to_hex_upper();              // String (public use)
 let hex_z  = key.to_hex_zeroizing();          // EncodedSecret (preserves zeroization)
+let hex_u_z = key.to_hex_upper_zeroizing();   // EncodedSecret (preserves zeroization)
 let b64    = key.to_base64url();              // String
 let b64_z  = key.to_base64url_zeroizing();    // EncodedSecret
 let bech32 = key.try_to_bech32("bc")?;        // String with HRP
 let bech32_z = key.try_to_bech32_zeroizing("bc")?; // EncodedSecret
 let bech32m = key.try_to_bech32m("bc")?;      // String with HRP
 let bech32m_z = key.try_to_bech32m_zeroizing("bc")?; // EncodedSecret
+
+// Trait-level zeroizing paths on inner bytes (useful in scoped/audit-first flows)
+let hex_trait_z = key.with_secret(|s| s.to_hex_zeroizing());
+let b64_trait_z = key.with_secret(|s| s.to_base64url_zeroizing());
 ```
 
 ### Direct Constructors (Recommended)
@@ -272,7 +278,7 @@ Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing
 **Audit every exposure point** by searching your codebase for:
 
 - **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
-- **Encode:** `to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, `to_*_zeroizing`, `try_to_bech32*_zeroizing`
+- **Encode:** `to_hex`, `to_hex_upper`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, `to_*_zeroizing`, `try_to_bech32*_zeroizing`
 - **Decode:** `try_from_hex`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
 
 **Best practice**: Prefer scoped methods (`with_secret` / `with_secret_mut`) when possible — they keep exposure minimal.
