@@ -226,15 +226,19 @@ fn log_length<S: RevealSecret>(secret: &S) {
 
 ### Encoding (to string)
 
-Use trait methods on the wrapper:
+Use trait methods or inherent convenience methods on the wrappers. Plain methods return `String` (for public values). Use the zeroizing variants (returning [`EncodedSecret`]) when the encoded form should remain sensitive.
 
 ```rust
 let key: Fixed<[u8; 32]> = ...;
 
-let hex    = key.to_hex();             // String
-let b64    = key.to_base64url();       // String
-let bech32 = key.try_to_bech32("bc")?; // String with HRP
-let bech32m = key.try_to_bech32m("bc")?; // String with HRP
+let hex    = key.to_hex();                    // String (public use)
+let hex_z  = key.to_hex_zeroizing();          // EncodedSecret (preserves zeroization)
+let b64    = key.to_base64url();              // String
+let b64_z  = key.to_base64url_zeroizing();    // EncodedSecret
+let bech32 = key.try_to_bech32("bc")?;        // String with HRP
+let bech32_z = key.try_to_bech32_zeroizing("bc")?; // EncodedSecret
+let bech32m = key.try_to_bech32m("bc")?;      // String with HRP
+let bech32m_z = key.try_to_bech32m_zeroizing("bc")?; // EncodedSecret
 ```
 
 ### Direct Constructors (Recommended)
@@ -255,6 +259,7 @@ Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from st
 - Prefer HRP-validated constructors to prevent cross-protocol confusion attacks.
 - Use `_unchecked` only when HRP is validated upstream.
 - All constructors guarantee zeroization even on OOM panic via `Zeroizing`.
+- For encoding *output*, prefer zeroizing methods when the encoded string itself is sensitive (see `EncodedSecret` and `SECURITY.md`).
 
 ## Audit Surface (Secret Materialization)
 
@@ -262,10 +267,12 @@ Encoding and decoding methods are **convenience wrappers** that internally use s
 
 They exist because users who call them have already decided to reveal the secret — the wrapper reduces boilerplate and avoids long-lived raw references.
 
+Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`) to maintain the zeroization guarantee for sensitive encoded output.
+
 **Audit every exposure point** by searching your codebase for:
 
 - **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
-- **Encode:** `to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`
+- **Encode:** `to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, `to_*_zeroizing`, `try_to_bech32*_zeroizing`
 - **Decode:** `try_from_hex`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
 
 **Best practice**: Prefer scoped methods (`with_secret` / `with_secret_mut`) when possible — they keep exposure minimal.

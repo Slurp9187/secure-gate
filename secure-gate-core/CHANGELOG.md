@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (v0.8.0-rc.7-dev)
 
+### Added
+- `EncodedSecret` newtype (wrapping `zeroize::Zeroizing<String>`) with redacted `Debug` (`[REDACTED]`), `Deref<Target=str>`, `AsRef<str>`, `AsRef<[u8]>`, `Display`, `into_inner()`, `into_zeroizing()`, and `new` (internal). Added under `alloc` feature.
+- Zeroizing variants of encoding methods on `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` (`to_hex_zeroizing`, `to_hex_upper_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, `try_to_bech32m_zeroizing`) that return `EncodedSecret` to preserve zeroization for sensitive encoded values. Plain `to_*()` methods remain unchanged for public encodings.
+- Refactored owned secret wrappers into `traits/revealed_secrets/` (`inner_secret.rs`, `encoded_secret.rs`) and narrowed `traits/reveal_secret.rs` to the `RevealSecret` trait.
+- Updated docs in `SECURITY.md`, `README.md`, encoding traits, and module docs with guidance on preferring zeroizing methods when the encoded form is sensitive.
+
 ### Changed
 - Major refactor: split the project into a Cargo workspace. `secure-gate-core` is now the minimal, auditable foundation (published as `secure-gate`), while `secure-gate-compat` isolates all `secrecy` migration shims, tests, and related code.
   - **Significantly reduces the security blast radius**: the core is no longer affected by compat-specific dependencies or vulnerabilities.
