@@ -21,7 +21,7 @@ This document outlines the security model, design choices, strengths, limitation
 - **`panic = "abort"` / SIGKILL / hard crash** — `Drop` impls do not run; secrets are not cleared.
 - **`static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized.
 - **Copies made by caller code** — after `expose_secret()`, encoding, or serialization, the caller holds ordinary non-zeroized memory.
-- **Encoded/serialized output** — `to_hex()`, `to_base64url()`, and serde `Serialize` produce full secrets in ordinary, non-zeroizing `String`s. Prefer the zeroizing variants (`to_*_zeroizing`, `try_to_bech32*_zeroizing`) that return `EncodedSecret` (wrapping `Zeroizing<String>` with redacted `Debug`) when the encoded form must remain sensitive.
+- **Encoded/serialized output** — `to_hex()`, `to_base64url()`, and serde `Serialize` produce full secrets in ordinary, non-zeroizing `String`s. Prefer the zeroizing variants (`to_*_zeroizing`, `try_to_bech32*_zeroizing`) that return `EncodedSecret` (wrapping `Zeroizing<String>` with redacted `Debug`) when the encoded form must remain sensitive. These zeroizing methods are available both as wrapper conveniences (`Fixed` / `Dynamic`) and on the encoding traits (`ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
 - **All side channels beyond equality timing** — cache, power, EM, and branch-predictor attacks are out of scope.
 - **Allocation-based DoS from deserialization** — `MAX_DESERIALIZE_BYTES` is a post-materialization bound only; the upstream deserializer may allocate arbitrarily first.
 - **Stack/register residue** — temporaries, FFI boundaries, and compiler spills are outside wrapper control.
@@ -105,7 +105,7 @@ All secret access follows this explicit hierarchy (the table below expands on th
 - Use `.ct_eq()` (`ct-eq` feature) for comparisons; avoid `==`. Bound untrusted input size at the transport/parser layer.
 - Audit all `CloneableSecret`/`SerializableSecret` implementations.
 - Validate inputs before encoding/decoding or using format-specific traits.
-- For encoding: prefer zeroizing methods (`to_hex_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, `try_to_bech32m_zeroizing`) that return `EncodedSecret` when the encoded value should remain protected.
+- For encoding: prefer zeroizing methods (`to_hex_zeroizing`, `to_hex_upper_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, `try_to_bech32m_zeroizing`) that return `EncodedSecret` when the encoded value should remain protected.
 - Monitor dependencies for CVEs.
 - Treat secrets as radioactive — minimize exposure surface.
 
@@ -245,12 +245,12 @@ Coarse error categories are still present in release and can aid attacker finger
 
 ## Encoding: Sensitive vs. Public Output
 
-Encoding methods on `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` come in two flavors:
+Encoding methods on `Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`, and the encoding traits (`ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`) come in two flavors:
 
 | Variant | Return type | Zeroized? | When to use |
 | ------- | ----------- | --------- | ----------- |
-| `to_hex()`, `to_base64url()`, `try_to_bech32()`, `try_to_bech32m()` | `String` / `Result<String, _>` | No | Public encodings — transaction IDs, addresses, non-sensitive identifiers |
-| `to_hex_zeroizing()`, `to_base64url_zeroizing()`, `try_to_bech32_zeroizing()`, `try_to_bech32m_zeroizing()` | `EncodedSecret` / `Result<EncodedSecret, _>` | Yes (on drop) | Sensitive encodings — private keys, long-lived tokens, full secret exports |
+| `to_hex()`, `to_hex_upper()`, `to_base64url()`, `try_to_bech32()`, `try_to_bech32m()` | `String` / `Result<String, _>` | No | Public encodings — transaction IDs, addresses, non-sensitive identifiers |
+| `to_hex_zeroizing()`, `to_hex_upper_zeroizing()`, `to_base64url_zeroizing()`, `try_to_bech32_zeroizing()`, `try_to_bech32m_zeroizing()` | `EncodedSecret` / `Result<EncodedSecret, _>` | Yes (on drop) | Sensitive encodings — private keys, long-lived tokens, full secret exports |
 
 `EncodedSecret` wraps `Zeroizing<String>`, redacts `Debug` as `[REDACTED]`, and zeroizes the string buffer on drop. Keep values in this form as long as possible.
 
