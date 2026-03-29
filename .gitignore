@@ -12,10 +12,12 @@
 *.bak
 *.del
 *.mute
+*.out
 
 *.errors
 *.log
 *.results
+.project/
 
 # Agent internal docs (keep local/private)
 architecture.md
