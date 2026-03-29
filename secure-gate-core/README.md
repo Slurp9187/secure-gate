@@ -174,23 +174,31 @@ secure-gate = { version = "0.9.0-rc.{x}", features = ["full"] }
 
 ### Encoding (to string)
 
-Use trait methods on the wrapper:
+Use trait methods or inherent convenience methods on the wrappers. Plain methods return `String` (for public values). Use the zeroizing variants (returning [`EncodedSecret`]) when the encoded form should remain sensitive.
 
 ```rust
 let key: Fixed<[u8; 32]> = ...;
 
-// Direct on the wrapper (convenient; omit `with_secret` from audit greps)
-let hex = key.to_hex();
-let b64 = key.to_base64url();
+// Plain — returns String (suitable for public encodings)
+let hex    = key.to_hex();
+let b64    = key.to_base64url();
 let bech32 = key.try_to_bech32("bc")?;
 let bech32m = key.try_to_bech32m("bc")?;
+
+// Zeroizing — returns EncodedSecret (preserves zeroization for sensitive encodings)
+let hex_z     = key.to_hex_zeroizing();
+let b64_z     = key.to_base64url_zeroizing();
+let bech32_z  = key.try_to_bech32_zeroizing("bc")?;
+let bech32m_z = key.try_to_bech32m_zeroizing("bc")?;
 
 // Scoped on the inner bytes (preferred when you want `with_secret` in audit sweeps)
 let hex_scoped = key.with_secret(|s| s.to_hex());
 let b64_scoped = key.with_secret(|s| s.to_base64url());
-let bech32_scoped = key.with_secret(|s| s.try_to_bech32("bc"))?;
+let bech32_scoped  = key.with_secret(|s| s.try_to_bech32("bc"))?;
 let bech32m_scoped = key.with_secret(|s| s.try_to_bech32m("bc"))?;
 ```
+
+Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`) to maintain the zeroization guarantee for sensitive encoded output.
 
 ### Direct Constructors (Recommended)
 
@@ -252,7 +260,7 @@ They exist because users who call them have already decided to reveal the secret
 **Audit every exposure point** by searching your codebase for:
 
 - **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
-- **Encode:** `to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`
+- **Encode:** `to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, `to_*_zeroizing`, `try_to_bech32*_zeroizing`
 - **Decode:** `try_from_hex`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
 
 **Best practice**: Prefer scoped methods (`with_secret` / `with_secret_mut`) when possible — they keep exposure minimal.

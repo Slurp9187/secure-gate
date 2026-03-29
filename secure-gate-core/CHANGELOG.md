@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`EncodedSecret` newtype** (`src/traits/revealed_secrets/encoded_secret.rs`, `alloc` feature) — wraps `zeroize::Zeroizing<String>` with redacted `Debug` (`[REDACTED]`), `Deref<Target=str>`, `AsRef<str>`, `AsRef<[u8]>`, `Display`, `into_inner() -> String`, and `into_zeroizing() -> Zeroizing<String>`. Returned by the new zeroizing encoding methods to preserve the zeroization guarantee for sensitive encoded output. Available as `secure_gate::EncodedSecret`.
+
+- **Zeroizing encoding variants** on `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` — `to_hex_zeroizing`, `to_hex_upper_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, `try_to_bech32m_zeroizing` — return `EncodedSecret` (or `Result<EncodedSecret, _>`) to maintain the zeroization contract when the encoded form is still sensitive. Plain `to_*()` methods are unchanged for public encodings.
+
 - **`InnerSecret<T>` return type for `RevealSecret::into_inner`** (`src/traits/reveal_secret.rs`, `src/fixed.rs`, `src/dynamic.rs`) — `into_inner` now returns `InnerSecret<Self::Inner>` (wrapping `Zeroizing<T>`) to preserve automatic zeroization on drop **and** restore redacted `Debug` (`[REDACTED]`) after ownership transfer. Implemented for `Fixed<[T; N]>`, `Dynamic<String>`, and `Dynamic<Vec<T>>`.
   `InnerSecret::into_zeroizing()` is available as an explicit interoperability escape hatch.
 
