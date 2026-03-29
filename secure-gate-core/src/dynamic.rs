@@ -160,7 +160,6 @@ impl Dynamic<Vec<u8>> {
     /// Use this variant when the encoded form should still be treated as sensitive (e.g. private keys).
     /// Requires the `encoding-hex` feature.
     #[cfg(feature = "encoding-hex")]
-    #[must_use]
     #[inline]
     pub fn to_hex_zeroizing(&self) -> crate::EncodedSecret {
         self.with_secret(|s: &Vec<u8>| crate::EncodedSecret::new(s.to_hex()))
@@ -171,7 +170,6 @@ impl Dynamic<Vec<u8>> {
     /// Use this variant when the encoded form should still be treated as sensitive.
     /// Requires the `encoding-hex` feature.
     #[cfg(feature = "encoding-hex")]
-    #[must_use]
     #[inline]
     pub fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
         self.with_secret(|s: &Vec<u8>| crate::EncodedSecret::new(s.to_hex_upper()))
@@ -182,7 +180,6 @@ impl Dynamic<Vec<u8>> {
     /// Use this variant when the encoded form should still be treated as sensitive.
     /// Requires the `encoding-base64` feature.
     #[cfg(feature = "encoding-base64")]
-    #[must_use]
     #[inline]
     pub fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
         self.with_secret(|s: &Vec<u8>| crate::EncodedSecret::new(s.to_base64url()))
@@ -193,7 +190,6 @@ impl Dynamic<Vec<u8>> {
     /// Delegates to the `ToBech32` trait. Use this variant when the encoded value should remain sensitive.
     /// Requires the `encoding-bech32` feature.
     #[cfg(feature = "encoding-bech32")]
-    #[must_use]
     #[inline]
     pub fn try_to_bech32_zeroizing(
         &self,
@@ -207,7 +203,6 @@ impl Dynamic<Vec<u8>> {
     /// Delegates to the `ToBech32m` trait. Use this variant when the encoded value should remain sensitive.
     /// Requires the `encoding-bech32m` feature.
     #[cfg(feature = "encoding-bech32m")]
-    #[must_use]
     #[inline]
     pub fn try_to_bech32m_zeroizing(
         &self,
