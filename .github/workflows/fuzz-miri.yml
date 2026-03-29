@@ -14,6 +14,9 @@ on:
       - "secure-gate-core/fuzz/**"
       - "secure-gate-core/tests/**"
       - "secure-gate-core/Cargo.toml"
+      - "secure-gate-compat/src/**"
+      - "secure-gate-compat/tests/**"
+      - "secure-gate-compat/Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
 
@@ -48,7 +51,7 @@ jobs:
             -Zmiri-disable-isolation
             -Zmiri-strict-provenance
         run: |
-          cargo miri test -p secure-gate-core --all-features -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse
+          cargo miri test --workspace --all-features -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse
 
       - name: Light corpus scan with Miri (weekly or manual)
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

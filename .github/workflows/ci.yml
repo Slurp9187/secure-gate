@@ -11,17 +11,29 @@ permissions:
 
 jobs:
   lint:
-    name: Lint (${{ matrix.name }})
+    name: Lint (${{ matrix.package }}/${{ matrix.name }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: no features
+            package: secure-gate-core
             features: "--no-default-features"
           - name: rand (no_std)
+            package: secure-gate-core
             features: "--no-default-features --features=rand"
           - name: full
+            package: secure-gate-core
+            features: "--features=full"
+          - name: no features
+            package: secure-gate-compat
+            features: "--no-default-features"
+          - name: rand (no_std)
+            package: secure-gate-compat
+            features: "--no-default-features --features=rand"
+          - name: full
+            package: secure-gate-compat
             features: "--features=full"
     steps:
       - name: Checkout repository
@@ -36,10 +48,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Clippy (${{ matrix.name }})
-        run: cargo clippy -p secure-gate-core --tests --benches ${{ matrix.features }}
+        run: cargo clippy -p ${{ matrix.package }} --tests --benches ${{ matrix.features }}
 
       - name: Doctests (${{ matrix.name }})
-        run: cargo test -p secure-gate-core --doc ${{ matrix.features }}
+        run: cargo test -p ${{ matrix.package }} --doc ${{ matrix.features }}
 
   test:
     runs-on: ubuntu-latest
@@ -152,17 +164,26 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: cargo check – default features
+      - name: cargo check – default features (core)
         run: cargo +1.70 check -p secure-gate-core --locked
 
-      - name: cargo check – full features
+      - name: cargo check – full features (core)
         run: cargo +1.70 check -p secure-gate-core --locked --features=full
 
-      - name: cargo test – all features (MSRV compatibility)
+      - name: cargo check – default features (compat)
+        run: cargo +1.70 check -p secure-gate-compat --locked
+
+      - name: cargo check – full features (compat)
+        run: cargo +1.70 check -p secure-gate-compat --locked --features=full
+
+      - name: cargo test – all features (core, MSRV compatibility)
         # Skip compile-fail tests: trybuild snapshot format differs between Rust 1.70
         # and stable (diagnostic wording changed). Compile-fail tests verify error
         # message wording, not MSRV compatibility — they run in the stable `test` job.
         run: cargo +1.70 test -p secure-gate-core --locked --all-features -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse
+
+      - name: cargo test – all features (compat, MSRV compatibility)
+        run: cargo +1.70 test -p secure-gate-compat --locked --all-features
 
   # ---------------------------------------------------------------------------
   # AddressSanitizer job — heap zeroization oracle

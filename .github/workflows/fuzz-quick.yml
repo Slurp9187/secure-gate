@@ -11,6 +11,8 @@ on:
       - "secure-gate-core/fuzz/**"
       - "secure-gate-core/src/**"
       - "secure-gate-core/Cargo.toml"
+      - "secure-gate-compat/src/**"
+      - "secure-gate-compat/Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
   pull_request:
@@ -19,6 +21,8 @@ on:
       - "secure-gate-core/fuzz/**"
       - "secure-gate-core/src/**"
       - "secure-gate-core/Cargo.toml"
+      - "secure-gate-compat/src/**"
+      - "secure-gate-compat/Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
   workflow_dispatch: # manual trigger when you need a long run
