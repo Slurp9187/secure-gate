@@ -10,9 +10,13 @@ on:
   push:
     branches: [main]
     paths:
-      - "src/**"
-      - "fuzz/**"
-      - "tests/**"
+      - "secure-gate-core/src/**"
+      - "secure-gate-core/fuzz/**"
+      - "secure-gate-core/tests/**"
+      - "secure-gate-compat/src/**"
+      - "secure-gate-compat/tests/**"
+      - "secure-gate-core/Cargo.toml"
+      - "secure-gate-compat/Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
 
@@ -60,7 +64,7 @@ jobs:
           echo "Starting light Miri corpus scan on fuzz targets (max 2 min each)..."
           for target in expose mut parsing encoding serde ct_eq; do
             echo "=== Miri scanning fuzz target: $target ==="
-            timeout 120 cargo miri run --bin $target -- -max_total_time=60 || \
+            timeout 120 cargo miri run --manifest-path secure-gate-core/fuzz/Cargo.toml --bin $target -- -max_total_time=60 || \
               echo "Warning: $target timed out or hit expected panic (ignored)"
           done
         continue-on-error: true
@@ -73,5 +77,5 @@ jobs:
           path: |
             ~/.miri/**
             target/miri/**
-            fuzz/artifacts/**
+            secure-gate-core/fuzz/artifacts/**
           retention-days: 14
