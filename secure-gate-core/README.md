@@ -63,7 +63,7 @@ pw.expose_secret_mut().clear();
 - `.len()` / `.is_empty()` without exposure
 - Zeroize on drop (always)
 - Access via `.with_secret(|s| ...)` (preferred) or `.expose_secret()` (auditable escape hatch)
-- Owned extraction via `.into_inner()` → `Zeroizing<T>` (transfers zeroization to caller)
+- Owned extraction via `.into_inner()` → `InnerSecret<T>` (wraps `Zeroizing<T>`, transfers zeroization to caller)
 
 ### Preferred: scoped access
 
@@ -181,12 +181,14 @@ let key: Fixed<[u8; 32]> = ...;
 
 // Plain — returns String (suitable for public encodings)
 let hex    = key.to_hex();
+let hex_u  = key.to_hex_upper();
 let b64    = key.to_base64url();
 let bech32 = key.try_to_bech32("bc")?;
 let bech32m = key.try_to_bech32m("bc")?;
 
 // Zeroizing — returns EncodedSecret (preserves zeroization for sensitive encodings)
 let hex_z     = key.to_hex_zeroizing();
+let hex_u_z   = key.to_hex_upper_zeroizing();
 let b64_z     = key.to_base64url_zeroizing();
 let bech32_z  = key.try_to_bech32_zeroizing("bc")?;
 let bech32m_z = key.try_to_bech32m_zeroizing("bc")?;
@@ -196,9 +198,13 @@ let hex_scoped = key.with_secret(|s| s.to_hex());
 let b64_scoped = key.with_secret(|s| s.to_base64url());
 let bech32_scoped  = key.with_secret(|s| s.try_to_bech32("bc"))?;
 let bech32m_scoped = key.with_secret(|s| s.try_to_bech32m("bc"))?;
+
+// Trait-level zeroizing APIs are also available on byte-like values:
+let hex_trait_z = key.with_secret(|s| s.to_hex_zeroizing());
+let b64_trait_z = key.with_secret(|s| s.to_base64url_zeroizing());
 ```
 
-Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`) to maintain the zeroization guarantee for sensitive encoded output.
+Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`) to maintain the zeroization guarantee for sensitive encoded output. These APIs are available both on wrapper conveniences (`Fixed` / `Dynamic`) and on encoding traits (`ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
 
 ### Direct Constructors (Recommended)
 
@@ -260,7 +266,7 @@ They exist because users who call them have already decided to reveal the secret
 **Audit every exposure point** by searching your codebase for:
 
 - **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
-- **Encode:** `to_hex`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, `to_*_zeroizing`, `try_to_bech32*_zeroizing`
+- **Encode:** `to_hex`, `to_hex_upper`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, `to_*_zeroizing`, `try_to_bech32*_zeroizing`
 - **Decode:** `try_from_hex`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
 
 **Best practice**: Prefer scoped methods (`with_secret` / `with_secret_mut`) when possible — they keep exposure minimal.
