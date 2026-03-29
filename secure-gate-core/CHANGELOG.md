@@ -15,8 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Zeroizing encoding variants** on `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` — `to_hex_zeroizing`, `to_hex_upper_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, `try_to_bech32m_zeroizing` — return `EncodedSecret` (or `Result<EncodedSecret, _>`) to maintain the zeroization contract when the encoded form is still sensitive. Plain `to_*()` methods are unchanged for public encodings.
 
+- **Trait-level `_zeroizing` encoding APIs** on existing encoding traits — added `to_hex_zeroizing` / `to_hex_upper_zeroizing` to `ToHex`, `to_base64url_zeroizing` to `ToBase64Url`, `try_to_bech32_zeroizing` to `ToBech32`, and `try_to_bech32m_zeroizing` to `ToBech32m`. This keeps existing trait imports while allowing callers to opt into `EncodedSecret`-returning paths directly from trait methods.
+
+- **Wrapper delegation alignment** for `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` zeroizing helpers — inherent `*_zeroizing` methods now delegate through `with_secret(...)` to trait-level implementations, mirroring the non-zeroizing flow and removing duplicated conversion logic.
+
 - **`InnerSecret<T>` return type for `RevealSecret::into_inner`** (`src/traits/reveal_secret.rs`, `src/fixed.rs`, `src/dynamic.rs`) — `into_inner` now returns `InnerSecret<Self::Inner>` (wrapping `Zeroizing<T>`) to preserve automatic zeroization on drop **and** restore redacted `Debug` (`[REDACTED]`) after ownership transfer. Implemented for `Fixed<[T; N]>`, `Dynamic<String>`, and `Dynamic<Vec<T>>`.
   `InnerSecret::into_zeroizing()` is available as an explicit interoperability escape hatch.
+
+- **Expanded zeroizing test coverage** — added comprehensive tests for trait-level and wrapper-level zeroizing encoding paths across hex/base64/bech32/bech32m, including parity against non-zeroizing outputs, invalid HRP/error paths, oversize bech32m payload handling, redacted `Debug`, and edge cases (empty/all-zero/single-byte payloads).
+
+- **`revealed_secrets_suite` integration tests** — moved `EncodedSecret` tests under `tests/revealed_secrets_suite/encoded_secret.rs`, added dedicated `InnerSecret` tests under `tests/revealed_secrets_suite/inner_secret.rs`, and wired the suite into `tests/integration.rs` to ensure both revealed-secret wrappers are exercised in the directory-based integration binary.
 
 ### Changed
 
