@@ -2,12 +2,12 @@
 
 #[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 use secure_gate::Bech32Error;
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(any(feature = "encoding-bech32", feature = "encoding-bech32m"), feature = "alloc"))]
 use secure_gate::Dynamic;
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(any(feature = "encoding-bech32", feature = "encoding-bech32m"), feature = "alloc"))]
 use secure_gate::RevealSecret;
 #[cfg(feature = "encoding-bech32")]
-use secure_gate::{FromBech32Str, ToBech32};
+use secure_gate::{Fixed, FromBech32Str, ToBech32};
 #[cfg(feature = "encoding-bech32m")]
 use secure_gate::{FromBech32mStr, ToBech32m};
 
@@ -24,9 +24,71 @@ fn bech32_unchecked_roundtrip_preserves_hrp() {
 
 #[cfg(feature = "encoding-bech32")]
 #[test]
+fn fixed_try_to_bech32_zeroizing_matches_plain() {
+    let fixed = Fixed::new([1u8, 2, 3, 4]);
+    let plain = fixed
+        .with_secret(|s| s.try_to_bech32("fuzz"))
+        .expect("plain encode");
+    let zeroizing = fixed
+        .try_to_bech32_zeroizing("fuzz")
+        .expect("zeroizing encode");
+    assert_eq!(&*zeroizing, plain.as_str());
+}
+
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+#[test]
+fn dynamic_try_to_bech32_zeroizing_roundtrip() {
+    let secret: Dynamic<Vec<u8>> = vec![9, 8, 7, 6].into();
+    let encoded = secret
+        .try_to_bech32_zeroizing("dyn")
+        .expect("zeroizing encode");
+    let encoded_plain = encoded.into_inner();
+    let decoded = encoded_plain.as_str().try_from_bech32("dyn").expect("decode");
+    assert_eq!(decoded, vec![9, 8, 7, 6]);
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn fixed_try_to_bech32_zeroizing_debug_is_redacted() {
+    let fixed = Fixed::new([1u8, 2, 3, 4]);
+    let encoded = fixed
+        .try_to_bech32_zeroizing("fuzz")
+        .expect("zeroizing encode");
+    assert_eq!(format!("{encoded:?}"), "[REDACTED]");
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn slice_try_to_bech32_zeroizing() {
+    let encoded = b"hello"
+        .try_to_bech32_zeroizing("fuzz")
+        .expect("zeroizing encode");
+    assert!(encoded.starts_with("fuzz1"));
+    assert_eq!(&*encoded, b"hello".try_to_bech32("fuzz").expect("plain encode"));
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
 fn bech32_invalid_hrp_encode_fails() {
     let err = b"data".try_to_bech32("");
     assert_eq!(err, Err(Bech32Error::InvalidHrp));
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn try_to_bech32_zeroizing_invalid_hrp_returns_err() {
+    let err = b"data".try_to_bech32_zeroizing("");
+    assert!(matches!(err, Err(Bech32Error::InvalidHrp)));
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn try_to_bech32_zeroizing_empty_bytes() {
+    let encoded = b""
+        .try_to_bech32_zeroizing("fuzz")
+        .expect("empty payload should still encode");
+    assert!(!encoded.is_empty());
+    assert!(encoded.starts_with("fuzz1"));
 }
 
 #[cfg(feature = "encoding-bech32")]
@@ -68,9 +130,68 @@ fn bech32m_roundtrip() {
 
 #[cfg(feature = "encoding-bech32m")]
 #[test]
+fn fixed_try_to_bech32m_zeroizing_matches_plain() {
+    let fixed = Fixed::new([1u8, 2, 3, 4]);
+    let plain = fixed
+        .with_secret(|s| s.try_to_bech32m("fuzzm"))
+        .expect("plain encode");
+    let zeroizing = fixed
+        .try_to_bech32m_zeroizing("fuzzm")
+        .expect("zeroizing encode");
+    assert_eq!(&*zeroizing, plain.as_str());
+}
+
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[test]
+fn dynamic_try_to_bech32m_zeroizing_roundtrip() {
+    let secret: Dynamic<Vec<u8>> = vec![1, 3, 3, 7].into();
+    let encoded = secret
+        .try_to_bech32m_zeroizing("dyn")
+        .expect("zeroizing encode");
+    let encoded_plain = encoded.into_inner();
+    let decoded = encoded_plain.as_str().try_from_bech32m("dyn").expect("decode");
+    assert_eq!(decoded, vec![1, 3, 3, 7]);
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn fixed_try_to_bech32m_zeroizing_debug_is_redacted() {
+    let fixed = Fixed::new([1u8, 2, 3, 4]);
+    let encoded = fixed
+        .try_to_bech32m_zeroizing("fuzzm")
+        .expect("zeroizing encode");
+    assert_eq!(format!("{encoded:?}"), "[REDACTED]");
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn slice_try_to_bech32m_zeroizing() {
+    let encoded = b"hello"
+        .try_to_bech32m_zeroizing("fuzzm")
+        .expect("zeroizing encode");
+    assert!(encoded.starts_with("fuzzm1"));
+    assert_eq!(&*encoded, b"hello".try_to_bech32m("fuzzm").expect("plain encode"));
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
 fn bech32m_invalid_hrp_encode_fails() {
     let err = b"data".try_to_bech32m("");
     assert_eq!(err, Err(Bech32Error::InvalidHrp));
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn try_to_bech32m_zeroizing_invalid_hrp_returns_err() {
+    let err = b"data".try_to_bech32m_zeroizing("");
+    assert!(matches!(err, Err(Bech32Error::InvalidHrp)));
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn try_to_bech32m_zeroizing_data_too_large_returns_err() {
+    let err = vec![0u8; 800].try_to_bech32m_zeroizing("fuzzm");
+    assert!(matches!(err, Err(Bech32Error::OperationFailed)));
 }
 
 #[cfg(feature = "encoding-bech32m")]
