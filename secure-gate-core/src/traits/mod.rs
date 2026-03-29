@@ -40,8 +40,13 @@
 //! See individual trait docs for detailed usage and examples.
 
 pub mod reveal_secret;
-pub use reveal_secret::InnerSecret;
+pub mod revealed_secrets;
+
 pub use reveal_secret::RevealSecret;
+pub use revealed_secrets::InnerSecret;
+
+#[cfg(feature = "alloc")]
+pub use revealed_secrets::EncodedSecret;
 
 pub mod reveal_secret_mut;
 pub use reveal_secret_mut::RevealSecretMut;
