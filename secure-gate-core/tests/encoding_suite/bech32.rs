@@ -302,3 +302,151 @@ fn fixed_try_from_bech32m_hrp_mismatch_fails() {
     let encoded = data.try_to_bech32m("key").expect("encode");
     assert!(Fixed::<[u8; 4]>::try_from_bech32m(&encoded, "other").is_err());
 }
+
+// --- Additional no-alloc Bech32 decode path tests ---
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn fixed_try_from_bech32_single_byte() {
+    use secure_gate::ToBech32;
+    let data = [0xABu8];
+    let encoded = data.try_to_bech32("t").expect("encode");
+    let decoded = Fixed::<[u8; 1]>::try_from_bech32(&encoded, "t").expect("decode");
+    decoded.with_secret(|b| assert_eq!(b, &[0xABu8]));
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn fixed_try_from_bech32_hrp_case_insensitive() {
+    use secure_gate::ToBech32;
+    let data = [1u8, 2, 3, 4];
+    // bech32 encoding lowercases the HRP; decoding should accept any case
+    let encoded = data.try_to_bech32("test").expect("encode");
+    let decoded = Fixed::<[u8; 4]>::try_from_bech32(&encoded, "TEST").expect("case-insensitive");
+    decoded.with_secret(|b| assert_eq!(b, &[1u8, 2, 3, 4]));
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn fixed_try_from_bech32_invalid_checksum() {
+    use secure_gate::ToBech32;
+    let data = [1u8, 2, 3, 4];
+    let mut encoded = data.try_to_bech32("test").expect("encode");
+    // Flip the last character to corrupt the checksum
+    let len = encoded.len();
+    let last = encoded.as_bytes()[len - 1];
+    let flipped = if last == b'q' { b'p' } else { b'q' };
+    unsafe { encoded.as_bytes_mut()[len - 1] = flipped; }
+    assert!(Fixed::<[u8; 4]>::try_from_bech32(&encoded, "test").is_err());
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn fixed_try_from_bech32_too_short() {
+    use secure_gate::ToBech32;
+    // Encode 2 bytes, try to decode as 4-byte Fixed
+    let data = [1u8, 2];
+    let encoded = data.try_to_bech32("test").expect("encode");
+    assert!(Fixed::<[u8; 4]>::try_from_bech32(&encoded, "test").is_err());
+}
+
+#[cfg(all(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[test]
+fn fixed_try_from_bech32_rejects_bech32m_checksum() {
+    use secure_gate::ToBech32m;
+    // Encode with bech32m checksum, try to decode as bech32 (standard) — should fail
+    let data = [1u8, 2, 3, 4];
+    let encoded = data.try_to_bech32m("test").expect("bech32m encode");
+    assert!(Fixed::<[u8; 4]>::try_from_bech32(&encoded, "test").is_err());
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn fixed_try_from_bech32_unchecked_wrong_length() {
+    use secure_gate::ToBech32;
+    let data = [1u8, 2, 3, 4, 5];
+    let encoded = data.try_to_bech32("test").expect("encode");
+    assert!(Fixed::<[u8; 4]>::try_from_bech32_unchecked(&encoded).is_err());
+}
+
+// --- Additional no-alloc Bech32m decode path tests ---
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn fixed_try_from_bech32m_single_byte() {
+    use secure_gate::ToBech32m;
+    let data = [0xCDu8];
+    let encoded = data.try_to_bech32m("t").expect("encode");
+    let decoded = Fixed::<[u8; 1]>::try_from_bech32m(&encoded, "t").expect("decode");
+    decoded.with_secret(|b| assert_eq!(b, &[0xCDu8]));
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn fixed_try_from_bech32m_hrp_case_insensitive() {
+    use secure_gate::ToBech32m;
+    let data = [1u8, 2, 3, 4];
+    let encoded = data.try_to_bech32m("key").expect("encode");
+    let decoded = Fixed::<[u8; 4]>::try_from_bech32m(&encoded, "KEY").expect("case-insensitive");
+    decoded.with_secret(|b| assert_eq!(b, &[1u8, 2, 3, 4]));
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn fixed_try_from_bech32m_invalid_checksum() {
+    use secure_gate::ToBech32m;
+    let data = [1u8, 2, 3, 4];
+    let mut encoded = data.try_to_bech32m("key").expect("encode");
+    let len = encoded.len();
+    let last = encoded.as_bytes()[len - 1];
+    let flipped = if last == b'q' { b'p' } else { b'q' };
+    unsafe { encoded.as_bytes_mut()[len - 1] = flipped; }
+    assert!(Fixed::<[u8; 4]>::try_from_bech32m(&encoded, "key").is_err());
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn fixed_try_from_bech32m_too_long() {
+    use secure_gate::ToBech32m;
+    let data = [1u8, 2, 3, 4, 5];
+    let encoded = data.try_to_bech32m("key").expect("encode");
+    assert!(Fixed::<[u8; 4]>::try_from_bech32m(&encoded, "key").is_err());
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn fixed_try_from_bech32m_too_short() {
+    use secure_gate::ToBech32m;
+    let data = [1u8, 2];
+    let encoded = data.try_to_bech32m("key").expect("encode");
+    assert!(Fixed::<[u8; 4]>::try_from_bech32m(&encoded, "key").is_err());
+}
+
+#[cfg(all(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[test]
+fn fixed_try_from_bech32m_rejects_bech32_checksum() {
+    use secure_gate::ToBech32;
+    // Encode with bech32 (standard) checksum, try to decode as bech32m — should fail
+    let data = [1u8, 2, 3, 4];
+    let encoded = data.try_to_bech32("test").expect("bech32 encode");
+    assert!(Fixed::<[u8; 4]>::try_from_bech32m(&encoded, "test").is_err());
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn fixed_try_from_bech32m_unchecked_roundtrip() {
+    use secure_gate::ToBech32m;
+    let data = [5u8, 6, 7, 8];
+    let encoded = data.try_to_bech32m("myhrp").expect("encode");
+    let decoded = Fixed::<[u8; 4]>::try_from_bech32m_unchecked(&encoded).expect("decode");
+    decoded.with_secret(|b| assert_eq!(b, &[5u8, 6, 7, 8]));
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn fixed_try_from_bech32m_unchecked_wrong_length() {
+    use secure_gate::ToBech32m;
+    let data = [1u8, 2, 3, 4, 5];
+    let encoded = data.try_to_bech32m("key").expect("encode");
+    assert!(Fixed::<[u8; 4]>::try_from_bech32m_unchecked(&encoded).is_err());
+}
