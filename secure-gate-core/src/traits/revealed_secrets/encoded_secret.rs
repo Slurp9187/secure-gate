@@ -70,6 +70,12 @@ impl core::convert::AsRef<[u8]> for EncodedSecret {
 
 #[cfg(feature = "alloc")]
 impl core::fmt::Display for EncodedSecret {
+    /// Outputs the encoded secret content.
+    ///
+    /// Unlike `Debug` (which prints `[REDACTED]`), `Display` is intentionally transparent
+    /// so the value can be written to a sink or used in format strings.
+    /// **Do not log with `{}` in production** — prefer `Debug` for diagnostic output
+    /// to avoid accidental secret exposure in log files.
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         core::fmt::Display::fmt(&**self, f)
     }

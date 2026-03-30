@@ -4,7 +4,7 @@
 use secure_gate::Bech32Error;
 #[cfg(all(any(feature = "encoding-bech32", feature = "encoding-bech32m"), feature = "alloc"))]
 use secure_gate::Dynamic;
-#[cfg(all(any(feature = "encoding-bech32", feature = "encoding-bech32m"), feature = "alloc"))]
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 use secure_gate::RevealSecret;
 #[cfg(feature = "encoding-bech32")]
 use secure_gate::{Fixed, FromBech32Str, ToBech32};
@@ -242,4 +242,63 @@ fn dynamic_try_from_bech32_invalid_input_returns_err() {
 #[test]
 fn dynamic_try_from_bech32m_invalid_input_returns_err() {
     assert!(Dynamic::<Vec<u8>>::try_from_bech32m_unchecked("notabech32mstring").is_err());
+}
+
+// No-alloc decode path tests: Fixed::try_from_bech32 / try_from_bech32m work without alloc feature
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn fixed_try_from_bech32_roundtrip() {
+    use secure_gate::ToBech32;
+    let data = [1u8, 2, 3, 4];
+    let encoded = data.try_to_bech32("test").expect("encode");
+    let decoded = Fixed::<[u8; 4]>::try_from_bech32(&encoded, "test").expect("decode");
+    decoded.with_secret(|b| assert_eq!(b, &[1u8, 2, 3, 4]));
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn fixed_try_from_bech32_hrp_mismatch_fails() {
+    use secure_gate::ToBech32;
+    let data = [1u8, 2, 3, 4];
+    let encoded = data.try_to_bech32("test").expect("encode");
+    assert!(Fixed::<[u8; 4]>::try_from_bech32(&encoded, "other").is_err());
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn fixed_try_from_bech32_unchecked_roundtrip() {
+    use secure_gate::ToBech32;
+    let data = [5u8, 6, 7, 8];
+    let encoded = data.try_to_bech32("myhrp").expect("encode");
+    let decoded = Fixed::<[u8; 4]>::try_from_bech32_unchecked(&encoded).expect("decode");
+    decoded.with_secret(|b| assert_eq!(b, &[5u8, 6, 7, 8]));
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn fixed_try_from_bech32_wrong_length_fails() {
+    use secure_gate::ToBech32;
+    // Encode 5 bytes but try to decode as 4-byte Fixed
+    let data = [1u8, 2, 3, 4, 5];
+    let encoded = data.try_to_bech32("test").expect("encode");
+    assert!(Fixed::<[u8; 4]>::try_from_bech32(&encoded, "test").is_err());
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn fixed_try_from_bech32m_roundtrip() {
+    use secure_gate::ToBech32m;
+    let data = [0xAAu8, 0xBB, 0xCC, 0xDD];
+    let encoded = data.try_to_bech32m("key").expect("encode");
+    let decoded = Fixed::<[u8; 4]>::try_from_bech32m(&encoded, "key").expect("decode");
+    decoded.with_secret(|b| assert_eq!(b, &[0xAAu8, 0xBB, 0xCC, 0xDD]));
+}
+
+#[cfg(feature = "encoding-bech32m")]
+#[test]
+fn fixed_try_from_bech32m_hrp_mismatch_fails() {
+    use secure_gate::ToBech32m;
+    let data = [1u8, 2, 3, 4];
+    let encoded = data.try_to_bech32m("key").expect("encode");
+    assert!(Fixed::<[u8; 4]>::try_from_bech32m(&encoded, "other").is_err());
 }

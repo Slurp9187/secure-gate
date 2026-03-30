@@ -111,28 +111,28 @@ pub use traits::SerializableSecret;
 // Type alias macros (always available)
 mod macros;
 
-#[cfg(feature = "encoding-base64")]
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use traits::FromBase64UrlStr;
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use traits::FromBech32Str;
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 pub use traits::FromBech32mStr;
 
-#[cfg(feature = "encoding-hex")]
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub use traits::FromHexStr;
 
-#[cfg(feature = "encoding-base64")]
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use traits::ToBase64Url;
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use traits::ToBech32;
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 pub use traits::ToBech32m;
 
-#[cfg(feature = "encoding-hex")]
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub use traits::ToHex;
 
 #[cfg(any(

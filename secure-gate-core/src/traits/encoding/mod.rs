@@ -14,11 +14,12 @@ pub mod bech32;
 pub mod bech32m;
 pub mod hex;
 
-#[cfg(feature = "encoding-base64")]
-pub use self::base64_url::ToBase64Url;
-#[cfg(feature = "encoding-bech32")]
-pub use self::bech32::ToBech32;
-#[cfg(feature = "encoding-bech32m")]
-pub use self::bech32m::ToBech32m;
-#[cfg(feature = "encoding-hex")]
-pub use self::hex::ToHex;
+// Encoding traits produce String / EncodedSecret — all require alloc
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
+pub use base64_url::ToBase64Url;
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+pub use bech32::ToBech32;
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+pub use bech32m::ToBech32m;
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
+pub use hex::ToHex;

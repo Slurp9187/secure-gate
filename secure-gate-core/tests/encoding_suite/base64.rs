@@ -87,3 +87,34 @@ fn dynamic_try_from_base64url_roundtrip() {
 fn dynamic_try_from_base64url_invalid_input_returns_err() {
     assert!(Dynamic::<Vec<u8>>::try_from_base64url("not valid base64url!!!").is_err());
 }
+
+// No-alloc decode path tests: Fixed::try_from_base64url works with only encoding-base64 (no alloc feature)
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn fixed_try_from_base64url_wrong_length_too_long() {
+    // "AAAAAAA" decodes to 5 bytes — too long for [u8; 4]
+    assert!(Fixed::<[u8; 4]>::try_from_base64url("AAAAAAA").is_err());
+}
+
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn fixed_try_from_base64url_wrong_length_too_short() {
+    // "AAAA" decodes to 3 bytes — too short for [u8; 4]
+    assert!(Fixed::<[u8; 4]>::try_from_base64url("AAAA").is_err());
+}
+
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn fixed_try_from_base64url_invalid_chars() {
+    // '!' is not valid base64url
+    assert!(Fixed::<[u8; 4]>::try_from_base64url("!!!!").is_err());
+}
+
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn fixed_try_from_base64url_all_zeros() {
+    // [0u8; 3] encodes as "AAAA" in base64url
+    let result = Fixed::<[u8; 3]>::try_from_base64url("AAAA");
+    assert!(result.is_ok());
+    result.unwrap().with_secret(|b| assert_eq!(b, &[0u8; 3]));
+}

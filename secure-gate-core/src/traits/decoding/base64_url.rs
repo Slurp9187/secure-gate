@@ -33,26 +33,21 @@
 //! assert!("!!!".try_from_base64url().is_err());
 //! }
 //! ```
-#[cfg(feature = "encoding-base64")]
-use ::base64 as base64_crate;
-
-#[cfg(feature = "encoding-base64")]
-use base64_crate::engine::general_purpose::URL_SAFE_NO_PAD;
-
-#[cfg(feature = "encoding-base64")]
-use base64_crate::Engine;
-
-#[cfg(feature = "encoding-base64")]
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 use crate::error::Base64Error;
 
 /// Extension trait for decoding URL-safe base64 strings into byte vectors.
 ///
-/// *Requires feature `encoding-base64`.*
+/// *Requires features `encoding-base64` and `alloc`.*
 ///
-/// Blanket-implemented for all `AsRef<str>` types. Uses the RFC 4648 URL-safe
-/// alphabet without `=` padding. Treat all input as untrusted; validate lengths
-/// and content upstream before wrapping decoded bytes in secrets.
-#[cfg(feature = "encoding-base64")]
+/// Blanket-implemented for all `AsRef<str>` types. Returns `Vec<u8>` — requires heap
+/// allocation. For no-alloc targets, use `Fixed::try_from_base64url` instead, which
+/// decodes directly into a stack-allocated `[u8; N]` buffer.
+///
+/// Uses the RFC 4648 URL-safe alphabet without `=` padding. Treat all input as
+/// untrusted; validate lengths and content upstream before wrapping decoded bytes
+/// in secrets.
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub trait FromBase64UrlStr {
     /// Decodes a URL-safe base64 string (no padding) into a byte vector.
     ///
@@ -72,15 +67,15 @@ pub trait FromBase64UrlStr {
     /// assert!("!!!".try_from_base64url().is_err()); // invalid chars
     /// # Ok::<(), secure_gate::Base64Error>(())
     /// ```
-    fn try_from_base64url(&self) -> Result<Vec<u8>, Base64Error>;
+    fn try_from_base64url(&self) -> Result<alloc::vec::Vec<u8>, Base64Error>;
 }
 
 // Blanket impl to cover any AsRef<str> (e.g., &str, String, etc.)
-#[cfg(feature = "encoding-base64")]
+// Returns Vec<u8> — alloc required.
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 impl<T: AsRef<str> + ?Sized> FromBase64UrlStr for T {
-    fn try_from_base64url(&self) -> Result<Vec<u8>, Base64Error> {
-        URL_SAFE_NO_PAD
-            .decode(self.as_ref())
-            .map_err(|_| Base64Error::InvalidBase64)
+    fn try_from_base64url(&self) -> Result<alloc::vec::Vec<u8>, Base64Error> {
+        use base64ct::{Base64UrlUnpadded, Encoding};
+        Base64UrlUnpadded::decode_vec(self.as_ref()).map_err(|_| Base64Error::InvalidBase64)
     }
 }

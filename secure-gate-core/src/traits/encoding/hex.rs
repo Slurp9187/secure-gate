@@ -40,8 +40,8 @@
 //! assert_eq!(secret.to_hex(), "0a0b0c0d");
 //! }
 //! ```
-#[cfg(feature = "encoding-hex")]
-use ::hex as hex_crate;
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
+use base16ct;
 
 /// Extension trait for encoding byte data as hexadecimal strings.
 ///
@@ -51,7 +51,7 @@ use ::hex as hex_crate;
 /// To encode a secret wrapper, call the inherent `to_hex()` method directly (ergonomically
 /// safest for single operations — no reference in the caller's hands), or use
 /// `with_secret(|b| b.to_hex())` for multi-step operations or when audit-greppability matters.
-#[cfg(feature = "encoding-hex")]
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub trait ToHex {
     /// Encode bytes as lowercase hexadecimal.
     fn to_hex(&self) -> alloc::string::String;
@@ -67,16 +67,17 @@ pub trait ToHex {
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
-#[cfg(feature = "encoding-hex")]
+// encode_string requires alloc — the trait itself is alloc-gated.
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 impl<T: AsRef<[u8]> + ?Sized> ToHex for T {
     #[inline(always)]
     fn to_hex(&self) -> alloc::string::String {
-        hex_crate::encode(self.as_ref())
+        base16ct::lower::encode_string(self.as_ref())
     }
 
     #[inline(always)]
     fn to_hex_upper(&self) -> alloc::string::String {
-        hex_crate::encode_upper(self.as_ref())
+        base16ct::upper::encode_string(self.as_ref())
     }
 
     #[inline(always)]

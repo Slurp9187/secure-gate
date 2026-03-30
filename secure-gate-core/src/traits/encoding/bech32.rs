@@ -38,8 +38,10 @@
 //! assert!(encoded.starts_with("test1"));
 //! }
 //! ```
-#[cfg(feature = "encoding-bech32")]
-use bech32::{encode_lower, Hrp};
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+use bech32::encode_lower;
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+use bech32::Hrp;
 
 #[cfg(feature = "encoding-bech32")]
 use bech32::primitives::checksum::Checksum;
@@ -69,7 +71,7 @@ impl Checksum for Bech32Large {
     const TARGET_RESIDUE: u32 = 1;
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use crate::error::Bech32Error;
 
 /// Extension trait for encoding byte data as Bech32 (BIP-173) strings.
@@ -78,7 +80,7 @@ use crate::error::Bech32Error;
 ///
 /// Blanket-implemented for all `AsRef<[u8]>` types. Use [`try_to_bech32`](Self::try_to_bech32)
 /// with the protocol's HRP. Test empty and invalid HRP inputs in security-critical code.
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub trait ToBech32 {
     /// Fallibly encodes bytes as a Bech32 (BIP-173) string with the given HRP.
     ///
@@ -103,7 +105,8 @@ pub trait ToBech32 {
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
-#[cfg(feature = "encoding-bech32")]
+// encode_lower returns String — requires alloc.
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
     #[inline(always)]
     fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error> {

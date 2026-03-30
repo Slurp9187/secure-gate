@@ -39,14 +39,14 @@
 //!
 //! See individual trait docs for detailed usage and examples.
 
-pub mod reveal_secret;
 pub mod revealed_secrets;
-
-pub use reveal_secret::RevealSecret;
 pub use revealed_secrets::InnerSecret;
 
 #[cfg(feature = "alloc")]
 pub use revealed_secrets::EncodedSecret;
+
+pub mod reveal_secret;
+pub use reveal_secret::RevealSecret;
 
 pub mod reveal_secret_mut;
 pub use reveal_secret_mut::RevealSecretMut;
@@ -59,30 +59,33 @@ pub use constant_time_eq::ConstantTimeEq;
 pub mod decoding;
 pub mod encoding;
 
-// Re-export per-format decoding traits (feature-gated)
-#[cfg(feature = "encoding-base64")]
+// Re-export per-format decoding traits (feature-gated; blanket impls return Vec<u8> — alloc required)
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use decoding::FromBase64UrlStr;
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use decoding::FromBech32Str;
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 pub use decoding::FromBech32mStr;
 
-#[cfg(feature = "encoding-hex")]
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub use decoding::FromHexStr;
 
 // Re-export per-format encoding traits (feature-gated)
-#[cfg(feature = "encoding-base64")]
+// Note: blanket impls of ToBase64Url, ToBech32, ToBech32m require alloc (String output).
+// The traits themselves are exported unconditionally so inherent methods on Fixed/Dynamic
+// can call them; the blanket impls gate the alloc dependency.
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use encoding::ToBase64Url;
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use encoding::ToBech32;
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 pub use encoding::ToBech32m;
 
-#[cfg(feature = "encoding-hex")]
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub use encoding::ToHex;
 
 /// Marker trait for types that support secure encoding operations.
