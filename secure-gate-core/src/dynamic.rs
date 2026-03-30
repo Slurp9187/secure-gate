@@ -30,6 +30,7 @@ use zeroize::Zeroize;
     feature = "encoding-base64",
     feature = "encoding-bech32",
     feature = "encoding-bech32m",
+    feature = "ct-eq",
 ))]
 use crate::RevealSecret;
 
@@ -526,7 +527,10 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// # }
     /// ```
     #[inline]
-    pub fn from_rng<R: TryRngCore + TryCryptoRng>(len: usize, rng: &mut R) -> Result<Self, R::Error> {
+    pub fn from_rng<R: TryRngCore + TryCryptoRng>(
+        len: usize,
+        rng: &mut R,
+    ) -> Result<Self, R::Error> {
         let mut result = Ok(());
         let this = Self::new_with(|v| {
             v.resize(len, 0u8);
@@ -541,9 +545,10 @@ impl Dynamic<alloc::vec::Vec<u8>> {
 impl<T: ?Sized + zeroize::Zeroize> crate::ConstantTimeEq for Dynamic<T>
 where
     T: crate::ConstantTimeEq,
+    Self: crate::RevealSecret<Inner = T>,
 {
     fn ct_eq(&self, other: &Self) -> bool {
-        self.inner.ct_eq(&other.inner)
+        self.expose_secret().ct_eq(other.expose_secret())
     }
 }
 
