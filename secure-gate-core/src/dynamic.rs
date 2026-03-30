@@ -30,6 +30,7 @@ use zeroize::Zeroize;
     feature = "encoding-base64",
     feature = "encoding-bech32",
     feature = "encoding-bech32m",
+    feature = "ct-eq",
 ))]
 use crate::RevealSecret;
 
