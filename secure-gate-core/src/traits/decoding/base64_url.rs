@@ -1,5 +1,7 @@
 //! URL-safe Base64 decoding trait.
 //!
+//! > **Import path:** `use secure_gate::FromBase64UrlStr;`
+//!
 //! This trait provides secure, explicit decoding of base64url-encoded strings
 //! (URL-safe alphabet, no padding) to byte vectors. It is designed for handling
 //! untrusted input in cryptographic contexts, such as decoding encoded keys or tokens.

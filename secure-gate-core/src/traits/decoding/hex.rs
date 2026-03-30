@@ -1,5 +1,7 @@
 //! Hexadecimal decoding trait.
 //!
+//! > **Import path:** `use secure_gate::FromHexStr;`
+//!
 //! This trait provides secure, explicit decoding of hexadecimal strings
 //! to byte vectors. It is designed for handling untrusted input in
 //! cryptographic contexts, such as decoding hex-encoded keys or nonces.
@@ -8,7 +10,7 @@
 //!
 //! # Security Notes
 //!
-//! - Treat all input as untrusted**: validate hex strings upstream before wrapping in secrets. Invalid input fails immediately.
+//! - **Treat all input as untrusted**: validate hex strings upstream before wrapping
 //!   in secrets. Invalid hex may indicate tampering or injection attempts.
 //! - **Heap allocation**: Returns `Vec<u8>` — wrap in [`Fixed`](crate::Fixed) or
 //!   [`Dynamic`](crate::Dynamic) to store as a secret.
