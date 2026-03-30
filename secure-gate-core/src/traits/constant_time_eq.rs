@@ -1,5 +1,7 @@
 //! Constant-time equality comparison for cryptographic secrets.
 //!
+//! > **Import path:** `use secure_gate::ConstantTimeEq;`
+//!
 //! This module defines the [`ConstantTimeEq`] trait, which provides timing-attack-
 //! resistant equality checks. Regular `==` operators can short-circuit on the first
 //! differing byte, leaking information about secret values through execution time.
@@ -94,6 +96,9 @@ impl ConstantTimeEq for alloc::vec::Vec<u8> {
 
 #[cfg(all(feature = "ct-eq", feature = "alloc"))]
 /// Constant-time equality for owned strings.
+///
+/// Compares raw UTF-8 bytes — callers must normalize Unicode before comparing
+/// if normalization matters for their use case.
 impl ConstantTimeEq for alloc::string::String {
     /// Compares the UTF-8 byte contents of two `String`s in constant time.
     #[inline(always)]
