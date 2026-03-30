@@ -1,12 +1,26 @@
 //! Centralized error types for the secure-gate crate.
 //!
-//! Errors are designed with security in mind: debug builds include detailed context
-//! (e.g., expected vs. actual lengths, HRP values) to aid development and testing,
-//! while release builds use generic messages to avoid leaking sensitive information
-//! about decoding failures or secret properties.
+//! # Error types
 //!
-//! All decoding-related errors follow this hardening pattern.
-//! (Zeroization is handled at the wrapper level — see `Fixed`/`Dynamic` docs.)
+//! | Type | Produced by | Feature |
+//! |------|------------|---------|
+//! | [`FromSliceError`] | [`Fixed::try_from(&[u8])`](crate::Fixed) | Always |
+//! | [`HexError`] | [`Fixed::try_from_hex`](crate::Fixed::try_from_hex), [`FromHexStr`](crate::FromHexStr) | `encoding-hex` |
+//! | [`Base64Error`] | [`Fixed::try_from_base64url`](crate::Fixed::try_from_base64url), [`FromBase64UrlStr`](crate::FromBase64UrlStr) | `encoding-base64` |
+//! | [`Bech32Error`] | `try_from_bech32*`, [`FromBech32Str`](crate::FromBech32Str), [`FromBech32mStr`](crate::FromBech32mStr) | `encoding-bech32` / `encoding-bech32m` |
+//! | [`DecodingError`] | Unified wrapper for all above | Always |
+//!
+//! # Security: debug vs release error metadata
+//!
+//! In **debug builds** (`cfg(debug_assertions)`), decoding errors include detailed
+//! hints — expected vs actual lengths, received HRP values — to aid development.
+//! In **release builds** these details are stripped to prevent length/HRP oracles.
+//!
+//! Prefer `Display` (`{}`) over `Debug` (`{:?}`) when logging errors in production —
+//! `Debug` may expose struct fields in debug builds.
+//!
+//! See [SECURITY.md — Error Metadata](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#error-metadata-debug-vs-release)
+//! for full guidance.
 
 use thiserror::Error;
 
