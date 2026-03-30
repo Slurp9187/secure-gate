@@ -1,7 +1,17 @@
 //! Owned zeroizing wrapper for encoded secret strings.
 //!
-//! This is part of the `revealed_secrets` module. See `mod.rs` for overview
-//! and `SECURITY.md` for when to use it (sensitive encoded output).
+//! > **Import path:** `use secure_gate::EncodedSecret;`
+//!
+//! [`EncodedSecret`] wraps `Zeroizing<String>` with `Debug` → `[REDACTED]`. It is
+//! returned by all `*_zeroizing` encoding methods (`to_hex_zeroizing`,
+//! `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.).
+//!
+//! Prefer zeroizing variants when the encoded form is sensitive (private keys, tokens).
+//! Use plain `String` variants for public encodings (addresses, transaction IDs).
+//!
+//! This is **not** a secret wrapper like [`Fixed`](crate::Fixed) / [`Dynamic`](crate::Dynamic)
+//! — it is a zeroizing `String` wrapper for encoded output. It implements
+//! `Deref<Target = str>` and `Display`.
 
 #[cfg(feature = "alloc")]
 /// Owned wrapper for encoded secret strings. Guarantees zeroization on drop

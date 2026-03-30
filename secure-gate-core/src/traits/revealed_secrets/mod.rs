@@ -1,5 +1,7 @@
 //! Owned wrapper types that complete the reveal model (Tier 3 owned consumption).
 //!
+//! > **Import paths:** `use secure_gate::{InnerSecret, EncodedSecret};`
+//!
 //! These types provide strong zeroization guarantees for secrets that have been
 //! intentionally extracted from a [`RevealSecret`] wrapper:
 //!
