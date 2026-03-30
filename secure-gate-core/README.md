@@ -1,7 +1,7 @@
 # secure-gate
 
-[![Crates.io](https://img.shields.io/crates/v/secure-gate.svg)](https://crates.io/crates/secure-gate)
-[![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate)
+[![Crates.io](https://img.shields.io/crates/v/secure-gate.svg)](https://crates.io/crates/secure-gate/0.8.0-rc.7)
+[![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate/0.8.0-rc.7/secure_gate/)
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg?branch=release%2F0.8)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml?query=branch%3Arelease%2F0.8)
 [![MSRV: 1.70](https://img.shields.io/badge/msrv-1.70-blue)](https://github.com/Slurp9187/secure-gate/blob/release/0.8/Cargo.toml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
@@ -131,7 +131,7 @@ See [`fixed_alias!`], [`dynamic_alias!`], [`fixed_generic_alias!`], and [`dynami
 `fixed_alias!(Name, N)` rejects `N = 0` at compile time (via a const-eval index-out-of-bounds guard).
 However, `fixed_generic_alias!`, `dynamic_alias!`, and `dynamic_generic_alias!` **allow** zero-sized types (`SecretBuffer<0>`, `Dynamic<[u8; 0]>`, `Dynamic<()>` etc.). These compile successfully but have no cryptographic value and should never be used in production. Always validate that the effective size is > 0 in your unit tests when using the generic or dynamic alias macros.
 
-See also the Best Practices section in [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) for the equivalent guidance.
+See also the Best Practices section in [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md) for the equivalent guidance.
 
 ### Polymorphic / generic code
 
@@ -316,13 +316,9 @@ For Rust < 1.85, pin `secure-gate = "0.8"` — the `release/0.8` branch (Edition
 
 ## Migrating from secrecy
 
-Enable `secrecy-compat` and swap imports — your code compiles unchanged. Then replace compat types with native `Dynamic<T>` / `Fixed<[T; N]>` at your own pace using the provided `From` conversions.
+See the [`secure-gate-compat`](https://github.com/Slurp9187/secure-gate/tree/release/0.8/secure-gate-compat) crate for drop-in replacements for `secrecy` 0.8.x and 0.10.x.
 
-```toml
-secure-gate = { version = "0.8.0-rc.{x}", features = ["secrecy-compat"] }
-```
-
-See **[MIGRATING_FROM_SECRECY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/MIGRATING_FROM_SECRECY.md)** for the full guide, including per-version import tables, type mappings, step-by-step instructions, and security notes for the transition period.
+See [MIGRATING_FROM_SECRECY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-compat/MIGRATING_FROM_SECRECY.md) for the full guide.
 
 ## Features
 
@@ -343,7 +339,6 @@ Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = 
 | `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                         |
 | `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                       |
 | `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                             |
-| `secrecy-compat`    | Drop-in compatibility shim for `secrecy` 0.8.x and 0.10.x — `compat::v08` and `compat::v10` modules with matching types, traits, and `From` conversions to native wrappers   |
 | `full`              | All features combined                                                                                                                                                        |
 
 `no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding traits, and serde require `alloc`. `Fixed::try_from_*` decoding works without `alloc` using constant-time stack-based decoders. Disabled features have zero overhead.
