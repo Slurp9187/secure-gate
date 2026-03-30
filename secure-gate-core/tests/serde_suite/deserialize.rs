@@ -95,3 +95,52 @@ fn dynamic_string_deserialize_with_limit_rejects_over_limit() {
     let result = Dynamic::<String>::deserialize_with_limit(&mut de, 4);
     assert!(result.is_err());
 }
+
+// ---------------------------------------------------------------------------
+// deserialize_with_limit — boundary conditions
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_vec_deserialize_with_limit_zero_accepts_empty() {
+    use secure_gate::{Dynamic, RevealSecret};
+    let mut de = serde_json::Deserializer::from_str("[]");
+    let result = Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, 0).expect("empty within limit 0");
+    assert!(result.expose_secret().is_empty());
+}
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_vec_deserialize_with_limit_zero_rejects_nonempty() {
+    use secure_gate::Dynamic;
+    let mut de = serde_json::Deserializer::from_str("[1]");
+    let result = Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, 0);
+    assert!(result.is_err());
+}
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_string_deserialize_with_limit_zero_accepts_empty() {
+    use secure_gate::{Dynamic, RevealSecret};
+    let mut de = serde_json::Deserializer::from_str("\"\"");
+    let result = Dynamic::<String>::deserialize_with_limit(&mut de, 0).expect("empty within limit 0");
+    assert!(result.expose_secret().is_empty());
+}
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_string_deserialize_with_limit_zero_rejects_nonempty() {
+    use secure_gate::Dynamic;
+    let mut de = serde_json::Deserializer::from_str("\"a\"");
+    let result = Dynamic::<String>::deserialize_with_limit(&mut de, 0);
+    assert!(result.is_err());
+}
+
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_vec_deserialize_with_limit_one() {
+    use secure_gate::{Dynamic, RevealSecret};
+    let mut de = serde_json::Deserializer::from_str("[42]");
+    let result = Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, 1).expect("single element within limit 1");
+    assert_eq!(result.expose_secret(), &[42u8]);
+}

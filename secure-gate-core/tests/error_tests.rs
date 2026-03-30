@@ -152,6 +152,38 @@ fn bech32_error_invalid_length_cfg() {
     }
 }
 
+/// Test DecodingError #[source] chain — verifies the thiserror source() method
+/// returns the inner error for each feature-gated variant.
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn decoding_error_source_hex() {
+    use std::error::Error;
+    let inner = secure_gate::HexError::InvalidHex;
+    let outer = DecodingError::InvalidHex(inner.clone());
+    let source = outer.source().expect("DecodingError::InvalidHex must have a source");
+    assert!(source.to_string().contains("invalid hex"));
+}
+
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn decoding_error_source_base64() {
+    use std::error::Error;
+    let inner = secure_gate::Base64Error::InvalidBase64;
+    let outer = DecodingError::InvalidBase64(inner.clone());
+    let source = outer.source().expect("DecodingError::InvalidBase64 must have a source");
+    assert!(source.to_string().contains("invalid base64"));
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn decoding_error_source_bech32() {
+    use std::error::Error;
+    let inner = Bech32Error::OperationFailed;
+    let outer = DecodingError::InvalidBech32(inner.clone());
+    let source = outer.source().expect("DecodingError::InvalidBech32 must have a source");
+    assert!(source.to_string().contains("bech32 operation failed"));
+}
+
 /// Test Bech32Error UnexpectedHrp cfg-split
 #[cfg(feature = "encoding-bech32")]
 #[test]

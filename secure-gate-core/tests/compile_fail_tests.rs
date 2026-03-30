@@ -23,3 +23,13 @@ fn serializable_secret_misuse() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/serializable_secret_misuse.rs");
 }
+
+// Compile-fail test: Dynamic<String> must not expose encoding methods (hex, base64, etc.)
+// These methods are intentionally defined only on Dynamic<Vec<u8>>.
+#[cfg(all(feature = "alloc", feature = "encoding-hex"))]
+#[cfg(not(miri))]
+#[test]
+fn dynamic_string_no_hex_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/dynamic_string_no_hex.rs");
+}

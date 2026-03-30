@@ -114,6 +114,40 @@ fn dynamic_vec_from_slice() {
     dyn_vec.with_secret(|s| assert_eq!(s, b"hello world"));
 }
 
+// === Dynamic<T> From impls ===
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_from_box_vec() {
+    let boxed: Box<Vec<u8>> = Box::new(vec![1u8, 2, 3]);
+    let d: Dynamic<Vec<u8>> = boxed.into();
+    d.with_secret(|s| assert_eq!(s, &[1u8, 2, 3]));
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_from_box_string() {
+    let boxed: Box<String> = Box::new(String::from("boxed_secret"));
+    let d: Dynamic<String> = boxed.into();
+    d.with_secret(|s| assert_eq!(s, "boxed_secret"));
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_from_owned_vec() {
+    let v = vec![10u8, 20, 30];
+    let d: Dynamic<Vec<u8>> = v.into();
+    d.with_secret(|s| assert_eq!(s, &[10u8, 20, 30]));
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_from_owned_string() {
+    let s = String::from("owned_secret");
+    let d: Dynamic<String> = s.into();
+    d.with_secret(|s| assert_eq!(s, "owned_secret"));
+}
+
 // === TryFrom for Fixed ===
 #[test]
 fn fixed_try_from_slice() {
