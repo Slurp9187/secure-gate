@@ -260,9 +260,9 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 
 ## Security Model
 
-- **Explicit access only** — `.with_secret()` / `.expose_secret()` required; no silent leaks
+- **Explicit access only** — all caller-facing access requires `.with_secret()` / `.expose_secret()`; no silent leaks. Internal impls (`Clone`, `Serialize`) access `.inner` directly but require opt-in marker traits.
 - **Zeroize on drop** — always active; inner type must implement `Zeroize`
-- **Timing-safe equality** — `ct-eq` feature (`.ct_eq()`)
+- **Timing-safe equality** — `ct-eq` feature (`.ct_eq()`) routes through `expose_secret()`, honoring the explicit-access model
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
 
 Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for the full threat model and mitigations.
@@ -310,7 +310,7 @@ Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = 
 | `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                              |
 | `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                     |
 | `rand`              | `from_random()` (system `SysRng`) and fallible `from_rng()` for any `TryRng + TryCryptoRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` / `from_rng()` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
-| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                             |
+| `ct-eq`             | `ConstantTimeEq` — timing-safe comparison via `expose_secret()` (`subtle`)                                                                                                   |
 | `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m). Encoding traits require `alloc`; `Fixed::try_from_*` decoding is no-alloc.                                |
 | `encoding-hex`      | `ToHex` / `FromHexStr` — constant-time via `base16ct`                                                                                                                       |
 | `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr` — constant-time via `base64ct`                                                                                                           |
