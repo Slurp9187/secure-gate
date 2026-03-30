@@ -9,13 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (v0.8.0-rc.7-dev)
 
-**Summary:** Zeroizing APIs for encoded secrets (`EncodedSecret`, trait `_zeroizing` methods, and
-`Fixed` / `Dynamic` delegation via `with_secret`), RustCrypto constant-time hex/base64 backends
-(`base16ct`, `base64ct`), no-alloc `Fixed::try_from_*` decoding where applicable, broader tests
-(including `revealed_secrets_suite`), and documentation updates. The crate is also split into a
-**workspace** (publishable `secure-gate` core + `secure-gate-compat`). **MSRV 1.70** remains a
-goal; see **Fixed** and the maintainer note below for recurring dependency/resolver conflicts
-(`syn`, lockfile pins, `--all-features` Bech32 naming).
+**Summary:** Comprehensive rustdoc overhaul across all public types and traits; zeroizing APIs for
+encoded secrets (`EncodedSecret`, trait `_zeroizing` methods, and `Fixed` / `Dynamic` delegation
+via `with_secret`); RustCrypto constant-time hex/base64 backends (`base16ct`, `base64ct`); no-alloc
+`Fixed::try_from_*` decoding where applicable; broader tests (including `revealed_secrets_suite`);
+and v0.8-specific README/SECURITY customizations. The crate is also split into a **workspace**
+(publishable `secure-gate` core + `secure-gate-compat`). **MSRV 1.70** remains a goal; see
+**Fixed** and the maintainer note below for recurring dependency/resolver conflicts (`syn`, lockfile
+pins, `--all-features` Bech32 naming).
 
 ### Added
 - `EncodedSecret` newtype (wrapping `zeroize::Zeroizing<String>`) with redacted `Debug` (`[REDACTED]`), `Deref<Target=str>`, `AsRef<str>`, `AsRef<[u8]>`, `Display`, `into_inner()`, `into_zeroizing()`, and `new` (internal). Added under `alloc` feature.
@@ -39,6 +40,14 @@ goal; see **Fixed** and the maintainer note below for recurring dependency/resol
 - **`EncodedSecret::Display` doc note** — added warning that `Display` outputs the encoded
   secret content (unlike `Debug` which prints `[REDACTED]`).
 - **Edge-case tests for `Fixed` encoding decoders** — added tests covering empty input, single-byte, invalid chars, padding, checksum errors, length mismatches, HRP case-insensitivity, and cross-variant rejection for hex, base64url, bech32, and bech32m.
+- **`.editorconfig` and `.gitattributes`** — added project-wide editor configuration and LF line-ending normalization rules for consistent formatting across contributors and platforms.
+
+### Documentation
+
+- **Comprehensive rustdoc overhaul** — rewrote and expanded documentation for all public types and traits: crate-level usage guide with module structure, `Fixed<T>` and `Dynamic<T>` security models and construction guidance, `RevealSecret`/`RevealSecretMut` 3-tier access model, `CloneableSecret`, `ConstantTimeEq` (including Unicode note), encoding traits (`ToHex`, `FromHexStr`, `ToBase64Url`, `FromBase64UrlStr`, `ToBech32`, `FromBech32Str`, `ToBech32m`, `FromBech32mStr`), decoding traits, revealed secret wrappers (`EncodedSecret`, `InnerSecret`), error types with debug-vs-release security notes, and alias macros with cross-references. Each item now includes import paths, security invariants, and usage examples.
+- **Module-level re-export notes** — added documentation noting that key traits and types are re-exported from the crate root for convenience.
+- **README.md** — customized for v0.8 branch (rand 0.9, `OsRng`, MSRV 1.70); refined security model section to clarify explicit access requirements and timing-safe equality implementation.
+- **SECURITY.md** — customized for v0.8 branch (rand 0.9, `OsRng`); clarified security model regarding explicit exposure and timing safety.
 
 ### Fixed
 
