@@ -22,10 +22,14 @@ base16ct = { version = "0.2", optional = true, default-features = false }
 base64ct = { version = "=1.6.0", optional = true, default-features = false }
 bech32 = { version = "0.11", default-features = false, optional = true }
 rand = { version = "0.9", optional = true }
-serde = { version = "1.0", optional = true, default-features = false, features = ["derive"] }
+serde = { version = "1.0", optional = true, default-features = false, features = [
+    "derive",
+] }
 subtle = { version = "2.5", optional = true }
 thiserror = "2.0"
-zeroize = { version = "1.7", default-features = false, features = ["zeroize_derive"] }
+zeroize = { version = "1.7", default-features = false, features = [
+    "zeroize_derive",
+] }
 
 [dev-dependencies]
 bincode = "1.0"
@@ -35,10 +39,12 @@ criterion = { version = "=0.4.0", features = ["html_reports"] }
 proptest = "=1.0.0"
 # serde_json >=1.0.149 pulls `zmij` (rustc 1.71+); pin to pre-zmij release.
 serde_json = "=1.0.132"
+# syn >=2.0.117 declares rust-version 1.71; pin for MSRV 1.70 (serde_derive, thiserror-impl).
+syn = "=2.0.100"
 # newer trybuild pulls `toml` 1.x (`toml_parser` edition 2024), which Cargo 1.70 cannot parse.
 trybuild = "=1.0.81"
-# # tempfile >=3.27 pulls getrandom 0.4 (edition 2024); Cargo 1.70 cannot parse that manifest.
-# tempfile = "=3.10.1"
+# tempfile >=3.27 pulls getrandom 0.4 (edition 2024); Cargo 1.70 cannot parse that manifest.
+tempfile = "=3.10.1"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -51,12 +57,7 @@ default = ["alloc"]
 # Enables heap allocation (Dynamic<T>, Box, Vec, String) + full zeroization of spare capacity.
 # Also activates the alloc-dependent APIs of optional encoding crates (encode_string,
 # decode_vec, encode_lower) when those crates are already in the dependency graph.
-alloc = [
-    "zeroize/alloc",
-    "base16ct?/alloc",
-    "base64ct?/alloc",
-    "bech32?/alloc",
-]
+alloc = ["zeroize/alloc", "base16ct?/alloc", "base64ct?/alloc", "bech32?/alloc"]
 
 # Full std support (implies alloc)
 std = ["alloc"]
@@ -69,10 +70,10 @@ ct-eq = ["dep:subtle"]
 
 # Encoding features
 encoding = [
-  "encoding-hex",
-  "encoding-base64",
-  "encoding-bech32",
-  "encoding-bech32m",
+    "encoding-hex",
+    "encoding-base64",
+    "encoding-bech32",
+    "encoding-bech32m",
 ]
 encoding-hex = ["dep:base16ct"]
 encoding-base64 = ["dep:base64ct"]

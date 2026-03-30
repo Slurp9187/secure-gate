@@ -18,7 +18,7 @@ pub mod hex;
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use base64_url::ToBase64Url;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-pub use bech32::ToBech32;
+pub use self::bech32::ToBech32;
 #[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 pub use bech32m::ToBech32m;
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]

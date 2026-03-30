@@ -18,6 +18,7 @@
 *.log
 *.results
 .project/
+.claude/
 
 # Agent internal docs (keep local/private)
 architecture.md

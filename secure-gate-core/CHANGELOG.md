@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (v0.8.0-rc.7-dev)
 
+**Summary:** Zeroizing APIs for encoded secrets (`EncodedSecret`, trait `_zeroizing` methods, and
+`Fixed` / `Dynamic` delegation via `with_secret`), RustCrypto constant-time hex/base64 backends
+(`base16ct`, `base64ct`), no-alloc `Fixed::try_from_*` decoding where applicable, broader tests
+(including `revealed_secrets_suite`), and documentation updates. The crate is also split into a
+**workspace** (publishable `secure-gate` core + `secure-gate-compat`). **MSRV 1.70** remains a
+goal; see **Fixed** and the maintainer note below for recurring dependency/resolver conflicts
+(`syn`, lockfile pins, `--all-features` Bech32 naming).
+
 ### Added
 - `EncodedSecret` newtype (wrapping `zeroize::Zeroizing<String>`) with redacted `Debug` (`[REDACTED]`), `Deref<Target=str>`, `AsRef<str>`, `AsRef<[u8]>`, `Display`, `into_inner()`, `into_zeroizing()`, and `new` (internal). Added under `alloc` feature.
 - Zeroizing variants of encoding methods on `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` (`to_hex_zeroizing`, `to_hex_upper_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, `try_to_bech32m_zeroizing`) that return `EncodedSecret` to preserve zeroization for sensitive encoded values. Plain `to_*()` methods remain unchanged for public encodings.
@@ -30,6 +38,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still require `alloc` (return `String`), but `Fixed::try_from_*` decoding is fully no-alloc.
 - **`EncodedSecret::Display` doc note** — added warning that `Display` outputs the encoded
   secret content (unlike `Debug` which prints `[REDACTED]`).
+
+### Fixed
+
+- **MSRV 1.70 — `syn` resolution** — Recent `syn` releases (from **2.0.117** onward) set
+  `rust-version = "1.71"`, so a fresh `cargo update` can pull a `syn` that **refuses to build on
+  Rust 1.70** even though this crate’s declared MSRV is still 1.70. `serde_derive`,
+  `thiserror-impl`, and other proc-macro crates depend on `syn`; the failure shows up as a
+  resolver/build error before any crate tests run. **Mitigation:** pin **`syn = "=2.0.100"`** in
+  `dev-dependencies` (alongside the existing pins for `serde_json`, `trybuild`, `tempfile`,
+  `criterion`, `proptest`, etc.) and keep **`Cargo.lock` committed**. Verify with
+  `cargo +1.70 test -p secure-gate --all-features --locked` after dependency churn.
+- **`--all-features` — ambiguous Bech32 trait re-exports (E0659)** — Enabling
+  `encoding-bech32` links in the **`bech32`** dependency crate *and* defines local submodules
+  named `bech32` under `traits::encoding` and `traits::decoding`. Unqualified
+  `pub use bech32::ToBech32` / `FromBech32Str` then conflicted with the extern crate. Re-exports
+  now use **`pub use self::bech32::...`** so the traits always come from the in-crate modules.
+
+> **Maintainer note — recurring “MSRV vs. latest crates.io” conflicts:**  
+> Upstream crates often raise `rust-version`, adopt **edition 2024** manifests (which **Cargo
+> 1.70 cannot parse**), or add transitive deps that outpace this workspace’s MSRV. That shows up
+> as either **“requires rustc X or newer”** (e.g. `syn`, `zmij` via `serde_json`) or **lockfile /
+> manifest parse failures** (e.g. `trybuild` → `toml_parser`, `tempfile` → `getrandom 0.4`). This
+> release line uses **explicit dev-dependency pins** plus a **frozen `Cargo.lock`**; CI should use
+> **`--locked`** on MSRV jobs so a clean checkout matches what maintainers verified (see also
+> **[0.8.0-rc.4]** — removal of nondeterministic `cargo update` on MSRV, and caps on `ryu` /
+> `half`). When a pin is no longer available or security fixes require a bump, **either** relax
+> the pin and re-run the full 1.70 matrix **or** document an intentional MSRV increase — avoid
+> silent drift from `cargo update` alone.
 
 ### Changed
 - Major refactor: split the project into a Cargo workspace. `secure-gate-core` is now the minimal, auditable foundation (published as `secure-gate`), while `secure-gate-compat` isolates all `secrecy` migration shims, tests, and related code.
