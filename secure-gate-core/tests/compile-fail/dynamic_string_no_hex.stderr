@@ -1,0 +1,8 @@
+error[E0599]: no method named `to_hex` found for struct `Dynamic<String>` in the current scope
+ --> tests/compile-fail/dynamic_string_no_hex.rs:6:20
+  |
+6 |     let _ = secret.to_hex();
+  |                    ^^^^^^ method not found in `Dynamic<String>`
+  |
+  = note: the method was found for
+          - `Dynamic<Vec<u8>>`

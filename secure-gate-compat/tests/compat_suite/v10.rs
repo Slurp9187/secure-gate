@@ -75,6 +75,34 @@ fn secret_box_expose_secret_mut() {
     assert_eq!(sb.expose_secret(), "original_modified");
 }
 
+// ── 2b. SecretString / SecretSlice expose_secret_mut ─────────────────────────
+
+#[test]
+fn secret_string_expose_secret_mut() {
+    // SecretString = SecretBox<str>, so expose_secret_mut returns &mut str.
+    // &mut str does not support push_str, but we can modify bytes in-place.
+    let mut ss: SecretString = "hello".into();
+    let s: &mut str = ExposeSecretMut::expose_secret_mut(&mut ss);
+    // Verify we get mutable access and can modify individual bytes.
+    unsafe { s.as_bytes_mut()[0] = b'H'; }
+    assert_eq!(ss.expose_secret(), "Hello");
+}
+
+#[test]
+fn secret_slice_expose_secret_mut_modify() {
+    // SecretSlice<u8> = SecretBox<[u8]>, so expose_secret_mut returns &mut [u8].
+    let mut sl: SecretSlice<u8> = vec![10u8, 20, 30].into();
+    ExposeSecretMut::expose_secret_mut(&mut sl)[0] = 99;
+    assert_eq!(sl.expose_secret()[0], 99);
+}
+
+#[test]
+fn secret_slice_expose_secret_mut_fill() {
+    let mut sl: SecretSlice<u8> = vec![0u8; 4].into();
+    ExposeSecretMut::expose_secret_mut(&mut sl).fill(0xFF);
+    assert_eq!(sl.expose_secret(), &[0xFFu8; 4]);
+}
+
 // ── 3. SecretString ───────────────────────────────────────────────────────────
 
 #[test]
