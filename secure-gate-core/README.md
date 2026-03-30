@@ -273,9 +273,9 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 
 ## Security Model
 
-- **Explicit access only** — `.with_secret()` / `.expose_secret()` required; no silent leaks
+- **Explicit access only** — all caller-facing access requires `.with_secret()` / `.expose_secret()`; no silent leaks. Internal impls (`Clone`, `Serialize`) access `.inner` directly but require opt-in marker traits.
 - **Zeroize on drop** — always active; inner type must implement `Zeroize`
-- **Timing-safe equality** — `ct-eq` feature (`.ct_eq()`)
+- **Timing-safe equality** — `ct-eq` feature (`.ct_eq()`) routes through `expose_secret()`, honoring the explicit-access model
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
 
 Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md) for the full threat model and mitigations.
