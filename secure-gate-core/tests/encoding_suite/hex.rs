@@ -167,3 +167,34 @@ fn fixed_try_from_hex_all_zeros() {
     assert!(result.is_ok());
     result.unwrap().with_secret(|b| assert_eq!(b, &[0u8; 4]));
 }
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn fixed_try_from_hex_empty_input() {
+    assert!(Fixed::<[u8; 4]>::try_from_hex("").is_err());
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn fixed_try_from_hex_single_byte() {
+    let result = Fixed::<[u8; 1]>::try_from_hex("ff");
+    assert!(result.is_ok());
+    result.unwrap().with_secret(|b| assert_eq!(b, &[0xFF]));
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn fixed_try_from_hex_odd_length() {
+    // Odd-length hex is invalid (not a whole number of bytes)
+    assert!(Fixed::<[u8; 2]>::try_from_hex("abc").is_err());
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn fixed_try_from_hex_large_n() {
+    let data = [0x42u8; 128];
+    let hex: String = data.iter().map(|b| format!("{b:02x}")).collect();
+    let result = Fixed::<[u8; 128]>::try_from_hex(&hex);
+    assert!(result.is_ok());
+    result.unwrap().with_secret(|b| assert_eq!(b, &[0x42u8; 128]));
+}

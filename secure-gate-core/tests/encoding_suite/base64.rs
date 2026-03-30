@@ -118,3 +118,43 @@ fn fixed_try_from_base64url_all_zeros() {
     assert!(result.is_ok());
     result.unwrap().with_secret(|b| assert_eq!(b, &[0u8; 3]));
 }
+
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn fixed_try_from_base64url_empty_input() {
+    assert!(Fixed::<[u8; 4]>::try_from_base64url("").is_err());
+}
+
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn fixed_try_from_base64url_single_byte() {
+    // [0x00] encodes as "AA" in base64url (unpadded)
+    let result = Fixed::<[u8; 1]>::try_from_base64url("AA");
+    assert!(result.is_ok());
+    result.unwrap().with_secret(|b| assert_eq!(b, &[0u8]));
+}
+
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn fixed_try_from_base64url_rejects_standard_base64_chars() {
+    // '+' and '/' are standard base64 but NOT base64url (which uses '-' and '_')
+    assert!(Fixed::<[u8; 4]>::try_from_base64url("ab+d").is_err());
+    assert!(Fixed::<[u8; 4]>::try_from_base64url("ab/d").is_err());
+}
+
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn fixed_try_from_base64url_rejects_padding() {
+    // base64url unpadded should reject '=' padding chars
+    assert!(Fixed::<[u8; 3]>::try_from_base64url("AAAA=").is_err());
+}
+
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn fixed_try_from_base64url_large_n() {
+    let data = [0x42u8; 128];
+    let encoded = data.to_base64url();
+    let result = Fixed::<[u8; 128]>::try_from_base64url(&encoded);
+    assert!(result.is_ok());
+    result.unwrap().with_secret(|b| assert_eq!(b, &[0x42u8; 128]));
+}
