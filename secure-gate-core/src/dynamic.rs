@@ -1,24 +1,71 @@
 //! Heap-allocated wrapper for variable-length secrets.
 //!
-//! Provides [`Dynamic<T>`], a zero-cost wrapper enforcing explicit access to sensitive data.
-//! Treat secrets as radioactive — minimize exposure surface.
+//! > **Import path:** `use secure_gate::Dynamic;` (not `secure_gate::dynamic::Dynamic`)
 //!
-//! **Inner type must implement `Zeroize`** for automatic zeroization on drop (including spare capacity).
-//! Requires the `alloc` feature.
+//! [`Dynamic<T>`] is a zero-cost wrapper that enforces explicit, auditable access to
+//! sensitive data stored on the heap. It is the primary secret type for variable-length
+//! material such as passwords, API keys, and ciphertexts. Requires the `alloc` feature.
 //!
-//! # Examples
+//! # Security invariants
+//!
+//! - **No `Deref`, `AsRef`, or `Copy`** — the inner value cannot leak through
+//!   implicit conversions.
+//! - **`Debug` always prints `[REDACTED]`** — secrets never appear in logs or
+//!   panic messages.
+//! - **Unconditional zeroization on drop** — includes `Vec`/`String` spare capacity.
+//! - **Heap-only** — secret bytes never reside on the stack. Inner value stored in `Box<T>`.
+//! - **Opt-in `Clone`** — requires `T: CloneableSecret` and the `cloneable` feature.
+//! - **Opt-in `Serialize`/`Deserialize`** — requires marker traits and the
+//!   `serde-serialize`/`serde-deserialize` features.
+//! - **Panic safety** — all decode constructors use the `from_protected_bytes` pattern:
+//!   a `Zeroizing` wrapper survives OOM panics from `Box::new`.
+//!
+//! # Construction
+//!
+//! | Constructor | Notes |
+//! |---|---|
+//! | [`Dynamic::new(value)`](Dynamic::new) | Ergonomic default; accepts `String`, `Vec<u8>`, `&str`, `Box<T>`, etc. |
+//! | [`Dynamic::<Vec<u8>>::new_with(f)`](Dynamic::new_with) | Scoped; for API symmetry with [`Fixed::new_with`](crate::Fixed::new_with) |
+//! | [`Dynamic::<String>::new_with(f)`](Dynamic::new_with) | Scoped; for API symmetry |
+//!
+//! Unlike [`Fixed::new_with`](crate::Fixed::new_with), `Dynamic` is already heap-only so
+//! `new_with` exists for consistent API idiom, not for stack-residue avoidance.
+//!
+//! # 3-tier access model
 //!
 //! ```rust
 //! # #[cfg(feature = "alloc")]
-//! use secure_gate::{Dynamic, RevealSecret};
+//! # {
+//! use secure_gate::{Dynamic, RevealSecret, RevealSecretMut};
 //!
-//! # #[cfg(feature = "alloc")]
-//! {
-//! let secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3, 4]);
-//! let sum = secret.with_secret(|s| s.iter().sum::<u8>());
-//! assert_eq!(sum, 10);
+//! let mut pw: Dynamic<String> = Dynamic::new(String::from("hunter2"));
+//!
+//! // Tier 1 — scoped (preferred): borrow is confined to the closure.
+//! let len = pw.with_secret(|s: &String| s.len());
+//! assert_eq!(len, 7);
+//!
+//! // Tier 1 mutable — scoped mutation.
+//! pw.with_secret_mut(|s: &mut String| s.push('!'));
+//!
+//! // Tier 2 — direct reference (escape hatch).
+//! assert_eq!(pw.expose_secret(), "hunter2!");
+//!
+//! // Tier 3 — owned consumption.
+//! let owned = pw.into_inner();
+//! assert_eq!(format!("{:?}", owned), "[REDACTED]");
 //! # }
 //! ```
+//!
+//! # Warning
+//!
+//! Ensure your profile sets `panic = "unwind"` — `panic = "abort"` skips destructors
+//! and therefore skips zeroization. (`Dynamic` cannot be `static` since it requires
+//! `Box` allocation, so the static-secret warning from `Fixed` does not apply.)
+//!
+//! # See also
+//!
+//! - [`Fixed<T>`](crate::Fixed) — stack-allocated alternative for fixed-size secrets
+//!   (always available, no `alloc` required).
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -60,16 +107,46 @@ use crate::traits::decoding::hex::FromHexStr;
 
 /// Zero-cost heap-allocated wrapper for variable-length secrets.
 ///
-/// Requires `alloc`. **Inner type must implement `Zeroize`** for automatic zeroization on drop
-/// (including spare capacity in `Vec`/`String`).
+/// `Dynamic<T>` stores a `T: Zeroize` value in a `Box<T>` and unconditionally zeroizes
+/// it on drop (including `Vec`/`String` spare capacity). There is no `Deref`, `AsRef`,
+/// or `Copy` — every access is explicit through [`RevealSecret`](crate::RevealSecret)
+/// or [`RevealSecretMut`](crate::RevealSecretMut).
 ///
-/// No `Deref`, `AsRef`, or `Copy` by default — all access requires
-/// [`expose_secret()`](crate::RevealSecret::expose_secret) or
-/// [`with_secret()`](crate::RevealSecret::with_secret) (scoped, preferred).
-/// For the common concrete types, [`Dynamic::<Vec<u8>>::new_with`](Dynamic::new_with) and
-/// [`Dynamic::<String>::new_with`](Dynamic::new_with) are the matching scoped constructors —
-/// closures that write directly into the wrapper. [`new(value)`](Dynamic::new) remains
-/// available as the ergonomic default. `Debug` always prints `[REDACTED]`.
+/// This is **not** `Fixed<T>` — it is the heap-allocated alternative for variable-length
+/// secrets. Secret bytes never reside on the stack.
+///
+/// # Examples
+///
+/// ```rust
+/// # #[cfg(feature = "alloc")]
+/// # {
+/// use secure_gate::{Dynamic, RevealSecret};
+///
+/// let pw: Dynamic<String> = Dynamic::new(String::from("hunter2"));
+/// assert_eq!(pw.with_secret(|s: &String| s.len()), 7);
+/// assert_eq!(format!("{:?}", pw), "[REDACTED]");
+/// # }
+/// ```
+///
+/// # Constructors for `Dynamic<Vec<u8>>`
+///
+/// | Constructor | Feature | Notes |
+/// |---|---|---|
+/// | [`new(value)`](Self::new) | — | Accepts `Vec<u8>`, `&[u8]`, `Box<Vec<u8>>` |
+/// | [`new_with(f)`](Self::new_with) | — | Scoped closure construction |
+/// | [`try_from_hex(s)`](Self::try_from_hex) | `encoding-hex` | Constant-time hex decoding |
+/// | [`try_from_base64url(s)`](Self::try_from_base64url) | `encoding-base64` | Constant-time Base64url decoding |
+/// | [`try_from_bech32(s, hrp)`](Self::try_from_bech32) | `encoding-bech32` | HRP-validated Bech32 |
+/// | [`try_from_bech32_unchecked(s)`](Self::try_from_bech32_unchecked) | `encoding-bech32` | Bech32 without HRP check |
+/// | [`try_from_bech32m(s, hrp)`](Self::try_from_bech32m) | `encoding-bech32m` | HRP-validated Bech32m |
+/// | [`try_from_bech32m_unchecked(s)`](Self::try_from_bech32m_unchecked) | `encoding-bech32m` | Bech32m without HRP check |
+/// | [`from_random(len)`](Self::from_random) | `rand` | System RNG |
+/// | [`from_rng(len, rng)`](Self::from_rng) | `rand` | Custom RNG |
+///
+/// # See also
+///
+/// - [`RevealSecret`](crate::RevealSecret) / [`RevealSecretMut`](crate::RevealSecretMut) — the 3-tier access traits.
+/// - [`Fixed<T>`](crate::Fixed) — stack-allocated alternative.
 pub struct Dynamic<T: ?Sized + zeroize::Zeroize> {
     inner: Box<T>,
 }
@@ -95,7 +172,7 @@ impl<T: ?Sized + zeroize::Zeroize> Dynamic<T> {
     }
 }
 
-// From impls
+/// Zero-copy wrapping of an already-boxed value.
 impl<T: ?Sized + zeroize::Zeroize> From<Box<T>> for Dynamic<T> {
     #[inline(always)]
     fn from(boxed: Box<T>) -> Self {
@@ -103,6 +180,7 @@ impl<T: ?Sized + zeroize::Zeroize> From<Box<T>> for Dynamic<T> {
     }
 }
 
+/// Copies a byte slice to the heap and wraps it.
 impl From<&[u8]> for Dynamic<Vec<u8>> {
     #[inline(always)]
     fn from(slice: &[u8]) -> Self {
@@ -110,6 +188,7 @@ impl From<&[u8]> for Dynamic<Vec<u8>> {
     }
 }
 
+/// Copies a string to the heap and wraps it.
 impl From<&str> for Dynamic<String> {
     #[inline(always)]
     fn from(input: &str) -> Self {
@@ -117,6 +196,7 @@ impl From<&str> for Dynamic<String> {
     }
 }
 
+/// Boxes the value and wraps it.
 impl<T: 'static + zeroize::Zeroize> From<T> for Dynamic<T> {
     #[inline(always)]
     fn from(value: T) -> Self {
@@ -540,7 +620,9 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     }
 }
 
-// ConstantTimeEq
+/// Constant-time equality for `Dynamic<T>` — routes through [`expose_secret()`](crate::RevealSecret::expose_secret).
+///
+/// `==` is **deliberately not implemented**. Always use `ct_eq`.
 #[cfg(feature = "ct-eq")]
 impl<T: ?Sized + zeroize::Zeroize> crate::ConstantTimeEq for Dynamic<T>
 where
@@ -552,14 +634,15 @@ where
     }
 }
 
-// Debug
+/// Always prints `[REDACTED]` — secrets never appear in debug output.
 impl<T: ?Sized + zeroize::Zeroize> core::fmt::Debug for Dynamic<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
     }
 }
 
-// Clone
+/// Opt-in cloning — requires `cloneable` feature and [`CloneableSecret`](crate::CloneableSecret)
+/// marker. Each clone is independently zeroized on drop, but cloning increases exposure surface.
 #[cfg(feature = "cloneable")]
 impl<T: zeroize::Zeroize + crate::CloneableSecret> Clone for Dynamic<T> {
     fn clone(&self) -> Self {
@@ -567,7 +650,9 @@ impl<T: zeroize::Zeroize + crate::CloneableSecret> Clone for Dynamic<T> {
     }
 }
 
-// Serialize
+/// Opt-in serialization — requires `serde-serialize` feature and
+/// [`SerializableSecret`](crate::SerializableSecret) marker. Serialization exposes the
+/// full secret — audit every impl.
 #[cfg(feature = "serde-serialize")]
 impl<T: zeroize::Zeroize + crate::SerializableSecret> serde::Serialize for Dynamic<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -681,17 +766,23 @@ impl<'de> serde::Deserialize<'de> for Dynamic<String> {
     }
 }
 
-// Zeroize + Drop (now always present with bound)
+/// Zeroizes the inner value (including `Vec`/`String` spare capacity).
+///
+/// **Warning:** does not run under `panic = "abort"`.
 impl<T: ?Sized + zeroize::Zeroize> zeroize::Zeroize for Dynamic<T> {
     fn zeroize(&mut self) {
         self.inner.zeroize();
     }
 }
 
+/// Unconditionally zeroizes the inner value when the wrapper is dropped.
+///
+/// **Warning:** `Drop` does not run under `panic = "abort"`.
 impl<T: ?Sized + zeroize::Zeroize> Drop for Dynamic<T> {
     fn drop(&mut self) {
         self.zeroize();
     }
 }
 
+/// Marker confirming that `Dynamic<T>` always zeroizes on drop.
 impl<T: ?Sized + zeroize::Zeroize> zeroize::ZeroizeOnDrop for Dynamic<T> {}
