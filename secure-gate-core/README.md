@@ -208,22 +208,23 @@ Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing
 
 ### Direct Constructors (Recommended)
 
-Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer the same one-shot constructors from strings (call `Fixed::…` or `Dynamic::…` depending on which wrapper you need). These use panic-safe `Zeroizing` + pre-alloc swap internally.
+Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from strings. These use panic-safe `Zeroizing` + pre-alloc swap internally.
 
-| Format              | Method (both wrappers)              | Notes                                       |
-| ------------------- | ----------------------------------- | ------------------------------------------- |
-| Hex                 | `try_from_hex(s)`                   | `HexError`                                  |
-| Base64URL           | `try_from_base64url(s)`             | `Base64Error` (unpadded, URL-safe)          |
-| Bech32 (BIP-173)    | `try_from_bech32(s, hrp)`           | HRP validated; `Bech32Error::UnexpectedHrp` |
-| Bech32 (unchecked)  | `try_from_bech32_unchecked(s)`      | No HRP; `Bech32Error`                       |
-| Bech32m (BIP-350)   | `try_from_bech32m(s, hrp)`          | HRP validated; `Bech32Error::UnexpectedHrp` |
-| Bech32m (unchecked) | `try_from_bech32m_unchecked(s)`     | No HRP; `Bech32Error`                       |
+| Format              | `Fixed<[u8; N]>`                       | `Dynamic<Vec<u8>>`                       | Notes                                       |
+| ------------------- | -------------------------------------- | ---------------------------------------- | ------------------------------------------- |
+| Hex                 | `Fixed::try_from_hex(s)`               | `Dynamic::try_from_hex(s)`               | `HexError`                                  |
+| Base64URL           | `Fixed::try_from_base64url(s)`         | `Dynamic::try_from_base64url(s)`         | `Base64Error` (unpadded, URL-safe)          |
+| Bech32 (BIP-173)    | `Fixed::try_from_bech32(s, hrp)`       | `Dynamic::try_from_bech32(s, hrp)`       | HRP validated; `Bech32Error::UnexpectedHrp` |
+| Bech32 (unchecked)  | `Fixed::try_from_bech32_unchecked(s)`  | `Dynamic::try_from_bech32_unchecked(s)`  | No HRP; `Bech32Error`                       |
+| Bech32m (BIP-350)   | `Fixed::try_from_bech32m(s, hrp)`      | `Dynamic::try_from_bech32m(s, hrp)`      | HRP validated; `Bech32Error::UnexpectedHrp` |
+| Bech32m (unchecked) | `Fixed::try_from_bech32m_unchecked(s)` | `Dynamic::try_from_bech32m_unchecked(s)` | No HRP; `Bech32Error`                       |
 
 **Security notes**:
 
 - Prefer HRP-validated constructors to prevent cross-protocol confusion attacks.
 - Use `_unchecked` only when HRP is validated upstream.
 - All constructors guarantee zeroization even on OOM panic via `Zeroizing`.
+- For encoding *output*, prefer zeroizing methods when the encoded string itself is sensitive (see `EncodedSecret` and `SECURITY.md`).
 
 ## Serde
 
@@ -257,11 +258,22 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 
 `from_random()` uses the system RNG ([`SysRng`](https://docs.rs/rand/latest/rand/rngs/struct.SysRng.html)), panics on failure, and is heap-free for `Fixed<T>` (`no_std` / `no_alloc`). `from_rng` fills from any [`TryCryptoRng`](https://docs.rs/rand/latest/rand/trait.TryCryptoRng.html) + [`TryRng`](https://docs.rs/rand/latest/rand/trait.TryRng.html) and returns `Result` (e.g. seeded `StdRng` in tests). `Dynamic::from_random` / `from_rng` require `alloc` (implicit — `Dynamic<T>` itself already requires it). See [`Fixed::from_random`], [`Fixed::from_rng`], [`Dynamic::from_random`], and [`Dynamic::from_rng`] in the [API docs](https://docs.rs/secure-gate).
 
-## Audit Guide
+## Security Model
+
+- **Explicit access only** — `.with_secret()` / `.expose_secret()` required; no silent leaks
+- **Zeroize on drop** — always active; inner type must implement `Zeroize`
+- **Timing-safe equality** — `ct-eq` feature (`.ct_eq()`)
+- **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
+
+Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for the full threat model and mitigations.
+
+## Audit Surface (Secret Materialization)
 
 Encoding and decoding methods are **convenience wrappers** that internally use scoped `with_secret` access — they do **not** bypass the security model, but return the fully materialized encoded value.
 
 They exist because users who call them have already decided to reveal the secret — the wrapper reduces boilerplate and avoids long-lived raw references.
+
+Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`) to maintain the zeroization guarantee for sensitive encoded output.
 
 **Audit every exposure point** by searching your codebase for:
 
@@ -270,8 +282,6 @@ They exist because users who call them have already decided to reveal the secret
 - **Decode:** `try_from_hex`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
 
 **Best practice**: Prefer scoped methods (`with_secret` / `with_secret_mut`) when possible — they keep exposure minimal.
-
-Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for the full threat model and mitigations.
 
 ## What changed in 0.9.0
 
