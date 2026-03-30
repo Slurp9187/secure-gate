@@ -1,5 +1,7 @@
 //! Bech32m encoding trait.
 //!
+//! > **Import path:** `use secure_gate::ToBech32m;`
+//!
 //! This trait provides secure, explicit encoding of byte data to Bech32m strings
 //! (BIP-350 checksum) with a specified HRP. Designed for intentional export.
 //!
