@@ -1,5 +1,7 @@
 //! Traits for mutable secret revelation.
 //!
+//! > **Import path:** `use secure_gate::RevealSecretMut;`
+//!
 //! This module defines the [`RevealSecretMut`] trait, which extends
 //! [`RevealSecret`] to provide controlled mutable access to secrets.
 //!
@@ -92,5 +94,19 @@ pub trait RevealSecretMut: RevealSecret {
     ///
     /// Long-lived mutable references can defeat scoping — prefer
     /// [`with_secret_mut`](Self::with_secret_mut) in application code.
+    /// Audit every call site.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "alloc")]
+    /// # {
+    /// use secure_gate::{Dynamic, RevealSecret, RevealSecretMut};
+    ///
+    /// let mut pw: Dynamic<String> = Dynamic::new(String::from("hunter2"));
+    /// pw.expose_secret_mut().push('!');
+    /// assert_eq!(pw.expose_secret(), "hunter2!");
+    /// # }
+    /// ```
     fn expose_secret_mut(&mut self) -> &mut Self::Inner;
 }

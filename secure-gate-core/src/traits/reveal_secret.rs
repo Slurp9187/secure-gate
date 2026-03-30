@@ -1,9 +1,10 @@
 //! Traits for controlled, polymorphic secret revelation.
 //!
-//! This module defines the core `RevealSecret` trait. The owned wrapper types
-//! (`InnerSecret<T>` and `EncodedSecret`) have been moved to the
-//! [`revealed_secrets`](crate::traits::revealed_secrets) module for better
-//! organization and auditability.
+//! > **Import path:** `use secure_gate::RevealSecret;`
+//!
+//! This module defines the core `RevealSecret` trait. See
+//! [`revealed_secrets`](crate::traits::revealed_secrets) for the owned wrapper types
+//! [`InnerSecret<T>`](crate::InnerSecret) and [`EncodedSecret`](crate::EncodedSecret).
 //!
 //! The design ensures:
 //! - No implicit borrowing (`Deref`, `AsRef`, etc.)
