@@ -33,6 +33,7 @@ All secret access follows this explicit hierarchy:
 - **`static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized.
 - **Copies made by caller code** — after `expose_secret()`, encoding, or serialization, the caller holds ordinary non-zeroized memory.
 - **Encoded/serialized output** — `to_hex()`, `to_base64url()`, serde `Serialize` output are full secret exposure into ordinary, non-zeroizing `String`s. Prefer the zeroizing variants (`to_*_zeroizing`, `try_to_bech32*_zeroizing`) that return `EncodedSecret` (which wraps `Zeroizing<String>` with redacted `Debug`) when the encoded form must remain sensitive. These APIs are available both as wrapper conveniences (`Fixed` / `Dynamic`) and on encoding traits (`ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
+- **Encoding backends** — hex encoding/decoding uses `base16ct` (constant-time, RustCrypto); base64url uses `base64ct` (constant-time, RustCrypto); bech32/bech32m uses the `bech32` crate. HRP comparison in bech32/bech32m decoding is non-constant-time — this is intentional as HRP is public metadata, not secret material.
 - **All side channels beyond equality timing** — cache, power, EM, and branch-predictor side channels are outside scope (enable `ct-eq` feature for constant-time equality where needed).
 - **Allocation-based DoS from deserialization** — `MAX_DESERIALIZE_BYTES` (and `deserialize_with_limit`) is only a post-materialization result-length acceptance bound. The upstream deserializer may have already allocated the full payload. For untrusted inputs, enforce size limits at the transport or parser layer upstream before deserialization.
 - **Stack/register residue outside wrapper control** — temporaries in caller code, FFI boundaries, and compiler-generated spills are not managed by this crate.
@@ -67,4 +68,3 @@ This document reflects design intent as of the current release.
 This crate has not undergone an official security audit or independent peer review. Until then, it should be treated as experimental.
 
 **No warranties are provided**. Users are solely responsible for their own security evaluation, threat modeling, and audit.
-```

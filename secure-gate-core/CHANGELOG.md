@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded zeroizing test coverage across hex/base64/bech32/bech32m, including parity vs non-zeroizing methods, invalid-HRP/error paths, bech32m oversize payload behavior, redacted `Debug`, and edge cases (empty/all-zero/single-byte payloads).
 - Added `tests/revealed_secrets_suite` integration coverage for both wrappers: `revealed_secrets_suite/encoded_secret.rs` and `revealed_secrets_suite/inner_secret.rs`, wired through `tests/integration.rs`.
 - Updated docs in `SECURITY.md`, `README.md`, encoding traits, and module docs with guidance on preferring zeroizing methods when the encoded form is sensitive.
+- **Encoding backends replaced with RustCrypto constant-time crates** — `hex` and `base64`
+  dependencies removed. Replaced by `base16ct` v0.2 (hex) and `base64ct` v1.6 (base64url), which
+  provide portable constant-time encoding and decoding with no transitive dependencies and
+  full `no_std` / no-alloc support.
+- **No-alloc decoding for `Fixed<[u8; N]>`** — `Fixed::try_from_hex`,
+  `Fixed::try_from_base64url`, `Fixed::try_from_bech32`, `Fixed::try_from_bech32m`
+  now work without the `alloc` feature by decoding directly into a stack-allocated
+  `Zeroizing<[u8; N]>` buffer. Blanket traits (`FromHexStr`, etc.) remain `alloc`-only.
+- **`encoding-hex` and `encoding-base64` no longer require `alloc`** — encoding traits
+  still require `alloc` (return `String`), but `Fixed::try_from_*` decoding is fully no-alloc.
+- **`EncodedSecret::Display` doc note** — added warning that `Display` outputs the encoded
+  secret content (unlike `Debug` which prints `[REDACTED]`).
 
 ### Changed
 - Major refactor: split the project into a Cargo workspace. `secure-gate-core` is now the minimal, auditable foundation (published as `secure-gate`), while `secure-gate-compat` isolates all `secrecy` migration shims, tests, and related code.
