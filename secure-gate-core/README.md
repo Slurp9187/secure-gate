@@ -221,16 +221,16 @@ Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing
 
 ### Direct Constructors (Recommended)
 
-Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from strings. These use panic-safe `Zeroizing` + pre-alloc swap internally.
+Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from strings. Both use panic-safe `Zeroizing`-wrapped decode buffers internally. `Fixed` also supports a no-alloc path that decodes directly into stack storage when `alloc` is disabled.
 
-| Format              | `Fixed<[u8; N]>`                       | `Dynamic<Vec<u8>>`                       | Notes                                       |
-| ------------------- | -------------------------------------- | ---------------------------------------- | ------------------------------------------- |
-| Hex                 | `Fixed::try_from_hex(s)`               | `Dynamic::try_from_hex(s)`               | `HexError`                                  |
-| Base64URL           | `Fixed::try_from_base64url(s)`         | `Dynamic::try_from_base64url(s)`         | `Base64Error` (unpadded, URL-safe)          |
-| Bech32 (BIP-173)    | `Fixed::try_from_bech32(s, hrp)`       | `Dynamic::try_from_bech32(s, hrp)`       | HRP validated; `Bech32Error::UnexpectedHrp` |
-| Bech32 (unchecked)  | `Fixed::try_from_bech32_unchecked(s)`  | `Dynamic::try_from_bech32_unchecked(s)`  | No HRP; `Bech32Error`                       |
-| Bech32m (BIP-350)   | `Fixed::try_from_bech32m(s, hrp)`      | `Dynamic::try_from_bech32m(s, hrp)`      | HRP validated; `Bech32Error::UnexpectedHrp` |
-| Bech32m (unchecked) | `Fixed::try_from_bech32m_unchecked(s)` | `Dynamic::try_from_bech32m_unchecked(s)` | No HRP; `Bech32Error`                       |
+| Format              | Method                           | Notes                                       |
+| ------------------- | -------------------------------- | ------------------------------------------- |
+| Hex                 | `try_from_hex(s)`                | `HexError`                                  |
+| Base64URL           | `try_from_base64url(s)`          | `Base64Error` (unpadded, URL-safe)          |
+| Bech32 (BIP-173)    | `try_from_bech32(s, hrp)`        | HRP validated; `Bech32Error::UnexpectedHrp` |
+| Bech32 (unchecked)  | `try_from_bech32_unchecked(s)`   | No HRP; `Bech32Error`                       |
+| Bech32m (BIP-350)   | `try_from_bech32m(s, hrp)`       | HRP validated; `Bech32Error::UnexpectedHrp` |
+| Bech32m (unchecked) | `try_from_bech32m_unchecked(s)`  | No HRP; `Bech32Error`                       |
 
 **Security notes**:
 
