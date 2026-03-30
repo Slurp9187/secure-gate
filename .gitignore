@@ -4,6 +4,8 @@
 /issues
 /target
 
+**/.project/
+
 *conflict*
 *# Name clash*
 
@@ -16,6 +18,7 @@
 *.errors
 *.log
 *.results
+
 
 # Agent internal docs (keep local/private)
 architecture.md
