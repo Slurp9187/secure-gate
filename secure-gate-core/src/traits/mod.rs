@@ -1,5 +1,9 @@
 //! Traits for polymorphic secret handling.
 //!
+//! > **Note:** All traits in this module are re-exported at the crate root
+//! > (`secure_gate::RevealSecret`, not `secure_gate::traits::RevealSecret`).
+//! > You should never need to import from `secure_gate::traits::*` directly.
+//!
 //! This module defines the core traits that enable generic, zero-cost, and secure
 //! operations across different secret wrapper types (`Fixed<T>`, `Dynamic<T>`, etc.).
 //! These traits allow writing polymorphic code that preserves strong security invariants:
