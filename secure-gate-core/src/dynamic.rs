@@ -541,9 +541,10 @@ impl Dynamic<alloc::vec::Vec<u8>> {
 impl<T: ?Sized + zeroize::Zeroize> crate::ConstantTimeEq for Dynamic<T>
 where
     T: crate::ConstantTimeEq,
+    Self: crate::RevealSecret<Inner = T>,
 {
     fn ct_eq(&self, other: &Self) -> bool {
-        self.inner.ct_eq(&other.inner)
+        self.expose_secret().ct_eq(other.expose_secret())
     }
 }
 

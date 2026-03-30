@@ -675,9 +675,10 @@ impl<const N: usize> Fixed<[u8; N]> {
 impl<T: zeroize::Zeroize> crate::ConstantTimeEq for Fixed<T>
 where
     T: crate::ConstantTimeEq,
+    Self: crate::RevealSecret<Inner = T>,
 {
     fn ct_eq(&self, other: &Self) -> bool {
-        self.inner.ct_eq(&other.inner)
+        self.expose_secret().ct_eq(other.expose_secret())
     }
 }
 
