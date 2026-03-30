@@ -41,14 +41,8 @@
 //! // b64z is EncodedSecret — zeroized on drop, redacted Debug
 //! }
 //! ```
-#[cfg(feature = "encoding-base64")]
-use ::base64 as base64_crate;
-
-#[cfg(feature = "encoding-base64")]
-use base64_crate::engine::general_purpose::URL_SAFE_NO_PAD;
-
-#[cfg(feature = "encoding-base64")]
-use base64_crate::Engine;
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
+use base64ct::{Base64UrlUnpadded, Encoding};
 
 /// Extension trait for encoding byte data as URL-safe base64 strings (no padding).
 ///
@@ -59,7 +53,7 @@ use base64_crate::Engine;
 /// `to_base64url()` method directly (ergonomically safest for single operations), or
 /// use `with_secret(|b| b.to_base64url())` for multi-step operations or when
 /// audit-greppability matters.
-#[cfg(feature = "encoding-base64")]
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub trait ToBase64Url {
     /// Encode bytes as URL-safe base64 (no padding).
     fn to_base64url(&self) -> alloc::string::String;
@@ -69,11 +63,11 @@ pub trait ToBase64Url {
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
-#[cfg(feature = "encoding-base64")]
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 impl<T: AsRef<[u8]> + ?Sized> ToBase64Url for T {
     #[inline(always)]
     fn to_base64url(&self) -> alloc::string::String {
-        URL_SAFE_NO_PAD.encode(self.as_ref())
+        Base64UrlUnpadded::encode_string(self.as_ref())
     }
 
     #[inline(always)]

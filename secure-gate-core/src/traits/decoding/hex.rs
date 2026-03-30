@@ -31,19 +31,20 @@
 //! assert!("xyz!".try_from_hex().is_err());
 //! }
 //! ```
-#[cfg(feature = "encoding-hex")]
-use ::hex as hex_crate;
-
-#[cfg(feature = "encoding-hex")]
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 use crate::error::HexError;
 
 /// Extension trait for decoding hexadecimal strings into byte vectors.
 ///
-/// *Requires feature `encoding-hex`.*
+/// *Requires features `encoding-hex` and `alloc`.*
 ///
-/// Blanket-implemented for all `AsRef<str>` types. Treat all input as untrusted;
-/// validate lengths and content upstream before wrapping decoded bytes in secrets.
-#[cfg(feature = "encoding-hex")]
+/// Blanket-implemented for all `AsRef<str>` types. Returns `Vec<u8>` — requires heap
+/// allocation. For no-alloc targets, use `Fixed::try_from_hex` instead, which decodes
+/// directly into a stack-allocated `[u8; N]` buffer.
+///
+/// Treat all input as untrusted; validate lengths and content upstream before wrapping
+/// decoded bytes in secrets.
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub trait FromHexStr {
     /// Decodes a hexadecimal string into a byte vector.
     ///
@@ -65,13 +66,14 @@ pub trait FromHexStr {
     /// assert!("a".try_from_hex().is_err());    // odd length
     /// # Ok::<(), secure_gate::HexError>(())
     /// ```
-    fn try_from_hex(&self) -> Result<Vec<u8>, HexError>;
+    fn try_from_hex(&self) -> Result<alloc::vec::Vec<u8>, HexError>;
 }
 
 // Blanket impl to cover any AsRef<str> (e.g., &str, String, etc.)
-#[cfg(feature = "encoding-hex")]
+// Returns Vec<u8> — alloc required.
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 impl<T: AsRef<str> + ?Sized> FromHexStr for T {
-    fn try_from_hex(&self) -> Result<Vec<u8>, HexError> {
-        hex_crate::decode(self.as_ref()).map_err(|_| HexError::InvalidHex)
+    fn try_from_hex(&self) -> Result<alloc::vec::Vec<u8>, HexError> {
+        base16ct::mixed::decode_vec(self.as_ref().as_bytes()).map_err(|_| HexError::InvalidHex)
     }
 }

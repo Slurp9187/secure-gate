@@ -20,9 +20,9 @@ include = [
 ]
 
 [dependencies]
-base64 = { version = "0.22", optional = true }
+base16ct = { version = "1", optional = true, default-features = false }
+base64ct = { version = "1", optional = true, default-features = false }
 bech32 = { version = "0.11", default-features = false, optional = true }
-hex = { version = "0.4", optional = true }
 rand = { version = "0.10", optional = true }
 serde = { version = "1.0", optional = true, default-features = false, features = ["derive"] }
 subtle = { version = "2.6", optional = true }
@@ -44,8 +44,15 @@ rustdoc-args = ["--cfg", "docsrs"]
 # Default: give users the most useful experience out of the box
 default = ["alloc"]
 
-# Enables heap allocation (Dynamic<T>, Box, Vec, String) + full zeroization of spare capacity
-alloc = ["zeroize/alloc"]
+# Enables heap allocation (Dynamic<T>, Box, Vec, String) + full zeroization of spare capacity.
+# Also activates the alloc-dependent APIs of optional encoding crates (encode_string,
+# decode_vec, encode_lower) when those crates are already in the dependency graph.
+alloc = [
+    "zeroize/alloc",
+    "base16ct?/alloc",
+    "base64ct?/alloc",
+    "bech32?/alloc",
+]
 
 # Full std support (implies alloc)
 std = ["alloc"]
@@ -63,10 +70,10 @@ encoding = [
   "encoding-bech32",
   "encoding-bech32m",
 ]
-encoding-hex = ["dep:hex", "hex?/alloc", "alloc"]
-encoding-base64 = ["dep:base64", "base64?/alloc", "alloc"]
-encoding-bech32 = ["dep:bech32", "bech32?/alloc", "alloc"]
-encoding-bech32m = ["dep:bech32", "bech32?/alloc", "alloc"]
+encoding-hex = ["dep:base16ct"]
+encoding-base64 = ["dep:base64ct"]
+encoding-bech32 = ["dep:bech32"]
+encoding-bech32m = ["dep:bech32"]
 
 # Cloneable: opt-in cloning
 cloneable = []

@@ -130,3 +130,40 @@ fn secure_decoding_marker_trait_is_available() {
     let bytes = input.try_from_hex().expect("hex");
     assert_eq!(bytes, vec![0x00, 0xFF]);
 }
+
+// No-alloc decode path tests: Fixed::try_from_hex works with only encoding-hex (no alloc feature)
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn fixed_try_from_hex_mixed_case() {
+    let result = Fixed::<[u8; 4]>::try_from_hex("AAbbCCdd");
+    assert!(result.is_ok());
+    result.unwrap().with_secret(|b| assert_eq!(b, &[0xAA, 0xBB, 0xCC, 0xDD]));
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn fixed_try_from_hex_wrong_length_too_long() {
+    // 5 bytes encoded → 4-byte Fixed
+    assert!(Fixed::<[u8; 4]>::try_from_hex("aabbccddee").is_err());
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn fixed_try_from_hex_wrong_length_too_short() {
+    // 3 bytes encoded → 4-byte Fixed
+    assert!(Fixed::<[u8; 4]>::try_from_hex("aabbcc").is_err());
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn fixed_try_from_hex_invalid_chars() {
+    assert!(Fixed::<[u8; 4]>::try_from_hex("xxyyzz00").is_err());
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn fixed_try_from_hex_all_zeros() {
+    let result = Fixed::<[u8; 4]>::try_from_hex("00000000");
+    assert!(result.is_ok());
+    result.unwrap().with_secret(|b| assert_eq!(b, &[0u8; 4]));
+}

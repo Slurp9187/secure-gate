@@ -46,6 +46,8 @@ use crate::traits::encoding::hex::ToHex;
 #[cfg(feature = "rand")]
 use rand::{TryCryptoRng, TryRng, rngs::SysRng};
 
+// Dynamic<Vec<u8>> is always alloc-dependent, so the alloc-gated blanket traits
+// are always available when encoding features are enabled for this type.
 #[cfg(feature = "encoding-base64")]
 use crate::traits::decoding::base64_url::FromBase64UrlStr;
 #[cfg(feature = "encoding-bech32")]
@@ -123,73 +125,88 @@ impl<T: 'static + zeroize::Zeroize> From<T> for Dynamic<T> {
     }
 }
 
-// Encoding helpers for Dynamic<Vec<u8>>
+// Hex encoding and decoding for Dynamic<Vec<u8>>.
+// Dynamic is always heap-allocated, so no no-alloc split is needed.
+#[cfg(feature = "encoding-hex")]
 impl Dynamic<Vec<u8>> {
     /// Encodes the secret bytes as a lowercase hex string.
-    ///
-    /// Delegates to [`ToHex::to_hex`](crate::ToHex::to_hex) on the inner `Vec<u8>`.
-    /// Requires the `encoding-hex` feature.
-    #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex(&self) -> alloc::string::String {
         self.with_secret(|s: &Vec<u8>| s.to_hex())
     }
 
     /// Encodes the secret bytes as an uppercase hex string.
-    ///
-    /// Delegates to [`ToHex::to_hex_upper`](crate::ToHex::to_hex_upper) on the inner `Vec<u8>`.
-    /// Requires the `encoding-hex` feature.
-    #[cfg(feature = "encoding-hex")]
     #[inline]
     pub fn to_hex_upper(&self) -> alloc::string::String {
         self.with_secret(|s: &Vec<u8>| s.to_hex_upper())
     }
 
-    /// Encodes the secret bytes as an unpadded Base64url string.
-    ///
-    /// Delegates to [`ToBase64Url::to_base64url`](crate::ToBase64Url::to_base64url) on the inner `Vec<u8>`.
-    /// Requires the `encoding-base64` feature.
-    #[cfg(feature = "encoding-base64")]
-    #[inline]
-    pub fn to_base64url(&self) -> alloc::string::String {
-        self.with_secret(|s: &Vec<u8>| s.to_base64url())
-    }
-
-    /// Encodes the secret bytes as a lowercase hex string, returning [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
-    ///
-    /// Use this variant when the encoded form should still be treated as sensitive (e.g. private keys).
-    /// Requires the `encoding-hex` feature.
-    #[cfg(feature = "encoding-hex")]
+    /// Encodes the secret bytes as a lowercase hex string, returning
+    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
     #[inline]
     pub fn to_hex_zeroizing(&self) -> crate::EncodedSecret {
         self.with_secret(|s: &Vec<u8>| s.to_hex_zeroizing())
     }
 
-    /// Encodes the secret bytes as an uppercase hex string, returning [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
-    ///
-    /// Use this variant when the encoded form should still be treated as sensitive.
-    /// Requires the `encoding-hex` feature.
-    #[cfg(feature = "encoding-hex")]
+    /// Encodes the secret bytes as an uppercase hex string, returning
+    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
     #[inline]
     pub fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
         self.with_secret(|s: &Vec<u8>| s.to_hex_upper_zeroizing())
     }
 
-    /// Encodes the secret bytes as an unpadded Base64url string, returning [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
+    /// Decodes a hex string (lowercase, uppercase, or mixed) into `Dynamic<Vec<u8>>`.
     ///
-    /// Use this variant when the encoded form should still be treated as sensitive.
-    /// Requires the `encoding-base64` feature.
-    #[cfg(feature = "encoding-base64")]
+    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
+    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
+    pub fn try_from_hex(s: &str) -> Result<Self, crate::error::HexError> {
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
+            s.try_from_hex()?,
+        )))
+    }
+}
+
+// Base64url encoding and decoding for Dynamic<Vec<u8>>.
+#[cfg(feature = "encoding-base64")]
+impl Dynamic<Vec<u8>> {
+    /// Encodes the secret bytes as an unpadded Base64url string (RFC 4648, URL-safe alphabet).
+    #[inline]
+    pub fn to_base64url(&self) -> alloc::string::String {
+        self.with_secret(|s: &Vec<u8>| s.to_base64url())
+    }
+
+    /// Encodes the secret bytes as an unpadded Base64url string, returning
+    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
     #[inline]
     pub fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
         self.with_secret(|s: &Vec<u8>| s.to_base64url_zeroizing())
     }
 
-    /// Tries to encode the secret bytes as a Bech32 string with the given HRP, returning [`EncodedSecret`](crate::EncodedSecret) on success.
+    /// Decodes a Base64url (unpadded) string into `Dynamic<Vec<u8>>`.
     ///
-    /// Delegates to the `ToBech32` trait. Use this variant when the encoded value should remain sensitive.
-    /// Requires the `encoding-bech32` feature.
-    #[cfg(feature = "encoding-bech32")]
+    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
+    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
+    pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
+            s.try_from_base64url()?,
+        )))
+    }
+}
+
+// Bech32 (BIP-173) encoding and decoding for Dynamic<Vec<u8>>.
+#[cfg(feature = "encoding-bech32")]
+impl Dynamic<Vec<u8>> {
+    /// Encodes the secret bytes as a Bech32 (BIP-173) string with the given HRP.
+    #[inline]
+    pub fn try_to_bech32(
+        &self,
+        hrp: &str,
+    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
+        self.with_secret(|s: &Vec<u8>| s.try_to_bech32(hrp))
+    }
+
+    /// Encodes the secret bytes as a Bech32 string, returning
+    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
     #[inline]
     pub fn try_to_bech32_zeroizing(
         &self,
@@ -198,11 +215,44 @@ impl Dynamic<Vec<u8>> {
         self.with_secret(|s: &Vec<u8>| s.try_to_bech32_zeroizing(hrp))
     }
 
-    /// Tries to encode the secret bytes as a Bech32m string with the given HRP, returning [`EncodedSecret`](crate::EncodedSecret) on success.
+    /// Decodes a Bech32 (BIP-173) string into `Dynamic<Vec<u8>>`, validating the HRP
+    /// (case-insensitive).
     ///
-    /// Delegates to the `ToBech32m` trait. Use this variant when the encoded value should remain sensitive.
-    /// Requires the `encoding-bech32m` feature.
-    #[cfg(feature = "encoding-bech32m")]
+    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
+    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
+    ///
+    /// HRP comparison is non-constant-time — this is intentional, as the HRP is public
+    /// metadata, not secret material.
+    pub fn try_from_bech32(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
+            s.try_from_bech32(expected_hrp)?,
+        )))
+    }
+
+    /// Decodes a Bech32 (BIP-173) string into `Dynamic<Vec<u8>>` without validating the HRP.
+    ///
+    /// Use [`try_from_bech32`](Self::try_from_bech32) in security-critical code to prevent
+    /// cross-protocol confusion attacks.
+    pub fn try_from_bech32_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes) = s.try_from_bech32_unchecked()?;
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(bytes)))
+    }
+}
+
+// Bech32m (BIP-350) encoding and decoding for Dynamic<Vec<u8>>.
+#[cfg(feature = "encoding-bech32m")]
+impl Dynamic<Vec<u8>> {
+    /// Encodes the secret bytes as a Bech32m (BIP-350) string with the given HRP.
+    #[inline]
+    pub fn try_to_bech32m(
+        &self,
+        hrp: &str,
+    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
+        self.with_secret(|s: &Vec<u8>| s.try_to_bech32m(hrp))
+    }
+
+    /// Encodes the secret bytes as a Bech32m string, returning
+    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
     #[inline]
     pub fn try_to_bech32m_zeroizing(
         &self,
@@ -211,6 +261,31 @@ impl Dynamic<Vec<u8>> {
         self.with_secret(|s: &Vec<u8>| s.try_to_bech32m_zeroizing(hrp))
     }
 
+    /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>`, validating the HRP
+    /// (case-insensitive).
+    ///
+    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
+    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
+    pub fn try_from_bech32m(
+        s: &str,
+        expected_hrp: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
+            s.try_from_bech32m(expected_hrp)?,
+        )))
+    }
+
+    /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>` without validating the HRP.
+    ///
+    /// Use [`try_from_bech32m`](Self::try_from_bech32m) in security-critical code.
+    pub fn try_from_bech32m_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes) = s.try_from_bech32m_unchecked()?;
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(bytes)))
+    }
+}
+
+/// Construction helpers and random generation for `Dynamic<Vec<u8>>`.
+impl Dynamic<Vec<u8>> {
     /// Transfers `protected` bytes into a freshly boxed `Vec`, keeping
     /// [`zeroize::Zeroizing`] alive across the only allocation that can panic.
     ///
@@ -458,100 +533,6 @@ impl Dynamic<alloc::vec::Vec<u8>> {
             result = rng.try_fill_bytes(v);
         });
         result.map(|_| this)
-    }
-}
-
-// Decoding constructors
-#[cfg(feature = "encoding-hex")]
-impl Dynamic<alloc::vec::Vec<u8>> {
-    /// Decodes a lowercase hex string into `Dynamic<Vec<u8>>`.
-    ///
-    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
-    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
-    pub fn try_from_hex(s: &str) -> Result<Self, crate::error::HexError> {
-        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
-            s.try_from_hex()?,
-        )))
-    }
-}
-
-#[cfg(feature = "encoding-base64")]
-impl Dynamic<alloc::vec::Vec<u8>> {
-    /// Decodes a Base64url (unpadded) string into `Dynamic<Vec<u8>>`.
-    ///
-    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
-    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
-    pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
-        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
-            s.try_from_base64url()?,
-        )))
-    }
-}
-
-#[cfg(feature = "encoding-bech32")]
-impl Dynamic<alloc::vec::Vec<u8>> {
-    /// Decodes a Bech32 (BIP-173) string into `Dynamic<Vec<u8>>`.
-    ///
-    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
-    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
-    ///
-    /// # Warning
-    ///
-    /// The HRP is **not validated** — any HRP will be accepted as long as the checksum
-    /// is valid. For security-critical code where cross-protocol confusion must be
-    /// prevented, use [`try_from_bech32`](Self::try_from_bech32).
-    pub fn try_from_bech32_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes) = s.try_from_bech32_unchecked()?;
-        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(bytes)))
-    }
-
-    /// Decodes a Bech32 (BIP-173) string into `Dynamic<Vec<u8>>`, validating that the HRP
-    /// matches `expected_hrp` (case-insensitive).
-    ///
-    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
-    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
-    ///
-    /// Prefer this over [`try_from_bech32_unchecked`](Self::try_from_bech32_unchecked) in
-    /// security-critical code to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
-        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
-            s.try_from_bech32(expected_hrp)?,
-        )))
-    }
-}
-
-#[cfg(feature = "encoding-bech32m")]
-impl Dynamic<alloc::vec::Vec<u8>> {
-    /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>`.
-    ///
-    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
-    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
-    ///
-    /// # Warning
-    ///
-    /// The HRP is **not validated** — any HRP will be accepted as long as the checksum
-    /// is valid. For security-critical code where cross-protocol confusion must be
-    /// prevented, use [`try_from_bech32m`](Self::try_from_bech32m).
-    pub fn try_from_bech32m_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes) = s.try_from_bech32m_unchecked()?;
-        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(bytes)))
-    }
-
-    /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>`, validating that the HRP
-    /// matches `expected_hrp` (case-insensitive).
-    ///
-    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
-    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
-    ///
-    /// Prefer this over [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked) in
-    /// security-critical code to prevent cross-protocol confusion attacks.
-    pub fn try_from_bech32m(
-        s: &str,
-        expected_hrp: &str,
-    ) -> Result<Self, crate::error::Bech32Error> {
-        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
-            s.try_from_bech32m(expected_hrp)?,
-        )))
     }
 }
 

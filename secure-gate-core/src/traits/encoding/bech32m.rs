@@ -43,10 +43,12 @@
 //! // encoded_z is EncodedSecret — zeroized on drop, redacted Debug
 //! # Ok::<(), secure_gate::Bech32Error>(())
 //! ```
-#[cfg(feature = "encoding-bech32m")]
-use bech32::{encode_lower, Bech32m, Hrp};
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+use bech32::encode_lower;
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+use bech32::{Bech32m, Hrp};
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 use crate::error::Bech32Error;
 
 /// Extension trait for encoding byte data as Bech32m (BIP-350) strings.
@@ -61,7 +63,7 @@ use crate::error::Bech32Error;
 /// limit is deliberate; oversized Bech32m strings break interoperability with wallets
 /// and address parsers. For large secrets (encryption recipients, ciphertexts,
 /// arbitrary keys ≥ ~50 bytes), use [`ToBech32`](crate::ToBech32) / `Bech32Large`.
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 pub trait ToBech32m {
     /// Fallibly encodes bytes as a Bech32m (BIP-350) string with the given HRP.
     ///
@@ -86,7 +88,8 @@ pub trait ToBech32m {
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
-#[cfg(feature = "encoding-bech32m")]
+// encode_lower returns String — requires alloc.
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
     #[inline(always)]
     fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error> {
