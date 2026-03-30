@@ -31,7 +31,6 @@ use crate::traits::encoding::hex::ToHex;
 use rand::{rngs::OsRng, TryCryptoRng, TryRngCore};
 use zeroize::Zeroize;
 
-
 /// Zero-cost stack-allocated wrapper for fixed-size secrets.
 ///
 /// Always available. Inner type **must implement `Zeroize`** for automatic zeroization on drop.
@@ -105,7 +104,6 @@ impl<const N: usize> Fixed<[u8; N]> {
         f(&mut this.inner);
         this
     }
-
 }
 
 /// Hex encoding and decoding for `Fixed<[u8; N]>`.
@@ -331,12 +329,9 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// cross-protocol confusion attacks.
     ///
     /// Works without `alloc` — decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
-    pub fn try_from_bech32(
-        s: &str,
-        expected_hrp: &str,
-    ) -> Result<Self, crate::error::Bech32Error> {
-        use bech32::primitives::decode::CheckedHrpstring;
+    pub fn try_from_bech32(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
         use crate::traits::encoding::bech32::Bech32Large;
+        use bech32::primitives::decode::CheckedHrpstring;
         let checked = CheckedHrpstring::new::<Bech32Large>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         // HRP check (case-insensitive comparison follows — timing leak is acceptable since HRP is public metadata)
@@ -385,8 +380,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// Works without `alloc` — decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
     pub fn try_from_bech32_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        use bech32::primitives::decode::CheckedHrpstring;
         use crate::traits::encoding::bech32::Bech32Large;
+        use bech32::primitives::decode::CheckedHrpstring;
         let checked = CheckedHrpstring::new::<Bech32Large>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         let mut buf = zeroize::Zeroizing::new([0u8; N]);
@@ -463,7 +458,7 @@ impl<const N: usize> Fixed<[u8; N]> {
         s: &str,
         expected_hrp: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
-        use bech32::{Bech32m, primitives::decode::CheckedHrpstring};
+        use bech32::{primitives::decode::CheckedHrpstring, Bech32m};
         let checked = CheckedHrpstring::new::<Bech32m>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         // HRP check (case-insensitive comparison follows — timing leak is acceptable since HRP is public metadata)
@@ -512,7 +507,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// Works without `alloc` — decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
     pub fn try_from_bech32m_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        use bech32::{Bech32m, primitives::decode::CheckedHrpstring};
+        use bech32::{primitives::decode::CheckedHrpstring, Bech32m};
         let checked = CheckedHrpstring::new::<Bech32m>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         let mut buf = zeroize::Zeroizing::new([0u8; N]);
@@ -676,9 +671,10 @@ impl<const N: usize> Fixed<[u8; N]> {
 impl<T: zeroize::Zeroize> crate::ConstantTimeEq for Fixed<T>
 where
     T: crate::ConstantTimeEq,
+    Self: crate::RevealSecret<Inner = T>,
 {
     fn ct_eq(&self, other: &Self) -> bool {
-        self.inner.ct_eq(&other.inner)
+        self.expose_secret().ct_eq(other.expose_secret())
     }
 }
 
