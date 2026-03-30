@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`revealed_secrets_suite` integration tests** — moved `EncodedSecret` tests under `tests/revealed_secrets_suite/encoded_secret.rs`, added dedicated `InnerSecret` tests under `tests/revealed_secrets_suite/inner_secret.rs`, and wired the suite into `tests/integration.rs` to ensure both revealed-secret wrappers are exercised in the directory-based integration binary.
 
+- **Expanded test coverage for encoding edge cases, Dynamic conversions, and serde round-trips** — added tests for `Dynamic<T>` `From<Box<T>>` / `From<T>` impls, `ConstantTimeEq` for `String` (unit + wrapper-level), serde wrapper round-trip for `Fixed<[u8;N]>` / `Dynamic<Vec<u8>>` / `Dynamic<String>`, `deserialize_with_limit` boundary conditions, compile-fail guard for `Dynamic<String>` encoding methods, and `DecodingError` source chain coverage. Also added edge-case tests for `Fixed` encoding decoders covering empty input, single-byte, invalid chars, padding, checksum errors, length mismatches, HRP case-insensitivity, and cross-variant rejection.
+
 - **Encoding backends replaced with RustCrypto constant-time crates** — `hex` and `base64`
   dependencies removed. Replaced by `base16ct` (hex) and `base64ct` (base64url), which
   provide portable constant-time encoding and decoding with no transitive dependencies and
@@ -52,6 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   production — prefer `Debug` for diagnostic output.
 
 ### Changed
+
+- **`ConstantTimeEq` impls now route through `expose_secret()`** (`src/fixed.rs`, `src/dynamic.rs`) — `Fixed` and `Dynamic` `ConstantTimeEq` implementations previously accessed `.inner` directly, bypassing the `RevealSecret` trait. They now call `expose_secret()` with a `Self: RevealSecret<Inner = T>` bound, making the "explicit access only via RevealSecret" guarantee honest for external-facing constant-time comparisons. `Clone` and `Serialize` intentionally retain direct `.inner` access to support custom wrapped types that implement `CloneableSecret`/`SerializableSecret` without `RevealSecret`.
+
+- **`RevealSecret` access claim scoped to callers** — documentation reworded from "explicit access only via RevealSecret" to accurately scope the guarantee to external consumers, since internal impls like `Clone` and `Serialize` necessarily access `.inner` directly.
 
 - **`RevealSecret::into_inner` bound documentation corrected** — required bound is `Self::Inner: Sized + Default + Zeroize` (not just `Sized + Default`).
 
