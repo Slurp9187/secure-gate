@@ -1,5 +1,7 @@
 //! Bech32m decoding trait.
 //!
+//! > **Import path:** `use secure_gate::FromBech32mStr;`
+//!
 //! This trait provides secure, explicit decoding of Bech32m strings (BIP-350 checksum)
 //! to byte vectors, with HRP validation as the primary path. It is designed for handling
 //! untrusted input in cryptographic contexts, such as decoding encoded addresses or keys.

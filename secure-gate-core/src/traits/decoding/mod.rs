@@ -1,4 +1,11 @@
-//! Re-exports for all decoding traits.
+//! Decoding traits for explicit string-to-bytes conversion.
+//!
+//! > **Import paths:** `use secure_gate::FromHexStr;` etc. (not `secure_gate::traits::decoding::hex::FromHexStr`)
+//!
+//! All decoding traits return `Vec<u8>` (require `alloc`). For no-alloc targets, use
+//! `Fixed::try_from_hex`, `Fixed::try_from_base64url`, etc. — these decode directly into
+//! a stack-allocated buffer. Treat all input as untrusted. Prefer HRP-validated bech32 methods.
+//! See the [`encoding`](super::encoding) module for the reverse direction.
 //!
 //! Each decoding trait has its own feature gate:
 //!
