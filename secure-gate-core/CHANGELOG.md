@@ -53,7 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   secret content (unlike `Debug` which prints `[REDACTED]`). Avoid logging with `{}` in
   production — prefer `Debug` for diagnostic output.
 
+- **`.editorconfig` and `.gitattributes`** — added project-wide editor configuration and line-ending normalization rules to ensure consistent formatting across contributors and platforms.
+
 ### Changed
+
+- **`ct-eq` feature gate added for `RevealSecret` in `Dynamic`** (`src/dynamic.rs`) — `expose_secret()` usage in `Dynamic` now compiles only when the `ct-eq` feature is enabled, aligning the feature-gate boundary with `Fixed`.
+
+- **Workspace refactored for v0.9** — `secure-gate-core` is now the minimal auditable foundation (published as `secure-gate`); the `secrecy-compat` layer has been extracted into a separate `secure-gate-compat` crate. This reduces the security blast radius and allows the crates to evolve independently. `ZERO_COST_WRAPPERS.md` removed (content integrated into rustdoc). MSRV raised to 1.85.
 
 - **`ConstantTimeEq` impls now route through `expose_secret()`** (`src/fixed.rs`, `src/dynamic.rs`) — `Fixed` and `Dynamic` `ConstantTimeEq` implementations previously accessed `.inner` directly, bypassing the `RevealSecret` trait. They now call `expose_secret()` with a `Self: RevealSecret<Inner = T>` bound, making the "explicit access only via RevealSecret" guarantee honest for external-facing constant-time comparisons. `Clone` and `Serialize` intentionally retain direct `.inner` access to support custom wrapped types that implement `CloneableSecret`/`SerializableSecret` without `RevealSecret`.
 
@@ -62,7 +68,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`RevealSecret::into_inner` bound documentation corrected** — required bound is `Self::Inner: Sized + Default + Zeroize` (not just `Sized + Default`).
 
 - **Trybuild snapshot baseline pinned to Rust 1.85 for local/dev runs** (`tests/compile-fail/*.stderr`) — restored `fixed_alias_zero_size.stderr` and `serializable_secret_misuse.stderr` to the 1.85 diagnostic format so `cargo +1.85 test --all-features` passes consistently on the declared toolchain.
+
 - **`SecretSlice<S>::clone()` compatibility internals simplified** (`src/compat/v10.rs`) — replaced `Vec::from(&*self.inner_secret)` with `self.inner_secret.as_ref().to_vec()` to keep identical behavior while reducing false positives from static analyzers that misclassify the former as a cleartext logging sink.
+
+### Documentation
+
+- **Comprehensive rustdoc overhaul** — rewrote and expanded documentation for all public types and traits: crate-level usage guide, `Fixed<T>` and `Dynamic<T>` security models, `RevealSecret`/`RevealSecretMut`, `CloneableSecret`, `ConstantTimeEq`, encoding traits (`ToHex`, `FromHexStr`, `ToBase64Url`, `FromBase64UrlStr`, `ToBech32`, `FromBech32Str`, `ToBech32m`, `FromBech32mStr`), decoding traits, revealed secret wrappers (`EncodedSecret`, `InnerSecret`), error types, and alias macros. Each item now includes import paths, security invariants, cross-references, and usage examples.
+
+- **Module-level re-export notes** — added documentation noting that key traits and types are re-exported from the crate root for convenience.
+
+- **README.md** — refined security model section to clarify explicit access requirements and timing-safe equality implementation.
+
+- **SECURITY.md** — clarified security model regarding explicit exposure and timing safety.
 
 ### CI
 
