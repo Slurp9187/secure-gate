@@ -25,9 +25,16 @@
 /// # Implementation Notes
 ///
 /// Macro-generated generic aliases lack runtime size checks. Validate expected
-/// inner types and sizes in unit tests.
-/// As with `dynamic_alias!`, zero-sized or empty inner types are permitted
-/// (no compile-time size check is possible); validate non-zero size in tests.
+/// inner types and sizes in unit tests. As with `dynamic_alias!`, zero-sized or
+/// empty inner types are permitted; validate non-zero size in tests.
+///
+/// The inner type `T` must implement `Zeroize` — this is enforced by `Dynamic<T>`,
+/// not the macro.
+///
+/// # See also
+///
+/// - [`dynamic_alias!`](crate::dynamic_alias) — preferred when the inner type is known
+/// - [`fixed_generic_alias!`](crate::fixed_generic_alias) — stack-allocated alternative
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! dynamic_generic_alias {

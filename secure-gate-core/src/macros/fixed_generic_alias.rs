@@ -30,11 +30,11 @@
 /// that guard because `N` is a const generic parameter not known at macro-invocation
 /// time. As a result, `SecretBuffer::<0>` compiles successfully and produces a
 /// zero-byte `Fixed<[u8; 0]>`. Such a type is valid Rust but has no cryptographic
-/// utility and should never appear in production code.
-/// Unlike the non-generic `fixed_alias!` macro, which rejects `N = 0` at compile time,
-/// this generic version cannot perform that check because `N` is a const generic parameter resolved later.
-/// Validate that `N > 0` in your
+/// utility and should never appear in production code. Validate that `N > 0` in your
 /// tests (e.g. `assert!(core::mem::size_of::<SecretBuffer<32>>() == 32);`).
+///
+/// See also [`fixed_alias!`](crate::fixed_alias) (preferred when size is known at the
+/// call site) and [`dynamic_generic_alias!`](crate::dynamic_generic_alias) (heap alternative).
 #[macro_export]
 macro_rules! fixed_generic_alias {
     ($vis:vis $name:ident, $doc:literal) => {
