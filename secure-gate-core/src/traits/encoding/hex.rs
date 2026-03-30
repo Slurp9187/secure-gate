@@ -1,5 +1,7 @@
 //! Hexadecimal encoding trait.
 //!
+//! > **Import path:** `use secure_gate::ToHex;`
+//!
 //! This trait provides secure, explicit encoding of byte data to lowercase
 //! (or uppercase) hexadecimal strings. It is intended for intentional export
 //! only (QR codes, audited logs, API responses).

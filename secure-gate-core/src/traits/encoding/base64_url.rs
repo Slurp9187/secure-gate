@@ -1,5 +1,7 @@
 //! URL-safe Base64 encoding trait.
 //!
+//! > **Import path:** `use secure_gate::ToBase64Url;`
+//!
 //! This trait provides secure, explicit encoding of byte data to URL-safe
 //! base64 strings (no padding, RFC 4648). It is intended for intentional
 //! export scenarios only (QR codes, API responses, audited logging).
