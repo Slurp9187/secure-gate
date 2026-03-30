@@ -301,9 +301,9 @@ Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = 
 | `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                     |
 | `rand`              | `from_random()` (system `SysRng`) and fallible `from_rng()` for any `TryRng + TryCryptoRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` / `from_rng()` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
 | `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                             |
-| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m); requires `alloc`                                                                                          |
-| `encoding-hex`      | `ToHex` / `FromHexStr`                                                                                                                                                       |
-| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr`                                                                                                                                           |
+| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m). Encoding traits require `alloc`; `Fixed::try_from_*` decoding is no-alloc.                                |
+| `encoding-hex`      | `ToHex` / `FromHexStr` — constant-time via `base16ct`                                                                                                                       |
+| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr` — constant-time via `base64ct`                                                                                                           |
 | `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                                                                                                       |
 | `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                                                                                                     |
 | `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                                                                                                |
@@ -312,7 +312,7 @@ Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = 
 | `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                             |
 | `full`              | All features combined                                                                                                                                                        |
 
-`no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding, and serde require `alloc`. Disabled features have zero overhead.
+`no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding traits, and serde require `alloc`. `Fixed::try_from_*` decoding works without `alloc` using constant-time stack-based decoders. Disabled features have zero overhead.
 
 ## Contributing
 

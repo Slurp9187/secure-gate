@@ -26,6 +26,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`revealed_secrets_suite` integration tests** — moved `EncodedSecret` tests under `tests/revealed_secrets_suite/encoded_secret.rs`, added dedicated `InnerSecret` tests under `tests/revealed_secrets_suite/inner_secret.rs`, and wired the suite into `tests/integration.rs` to ensure both revealed-secret wrappers are exercised in the directory-based integration binary.
 
+- **Encoding backends replaced with RustCrypto constant-time crates** — `hex` and `base64`
+  dependencies removed. Replaced by `base16ct` (hex) and `base64ct` (base64url), which
+  provide portable constant-time encoding and decoding with no transitive dependencies and
+  full `no_std` / no-alloc support.
+  - `to_hex()` / `to_hex_upper()` now use `base16ct::lower/upper::encode_string`
+  - `to_base64url()` now uses `base64ct::Base64UrlUnpadded::encode_string`
+  - Encoding output is identical (same alphabet, same padding behavior)
+
+- **No-alloc decoding for `Fixed<[u8; N]>`** — `Fixed::try_from_hex`,
+  `Fixed::try_from_base64url`, `Fixed::try_from_bech32`, `Fixed::try_from_bech32m`
+  now work without the `alloc` feature by decoding directly into a stack-allocated
+  `Zeroizing<[u8; N]>` buffer. No heap allocation occurs on this path.
+  The `alloc` path (heap-decoded `Vec<u8>` → copy) is preserved when `alloc` is enabled.
+  The blanket traits (`FromHexStr`, `FromBase64UrlStr`, `FromBech32Str`, `FromBech32mStr`)
+  remain `alloc`-only as they return `Vec<u8>`.
+
+- **`encoding-hex` and `encoding-base64` no longer require `alloc`** — features can now be
+  enabled on `no_std` + no-alloc targets. `encoding-bech32` and `encoding-bech32m` similarly
+  decoupled. Encoding traits (`ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`) still require
+  `alloc` (they return `String`), but decoding into `Fixed<[u8; N]>` is fully no-alloc.
+
+- **`EncodedSecret::Display` doc note** — added warning that `Display` outputs the encoded
+  secret content (unlike `Debug` which prints `[REDACTED]`). Avoid logging with `{}` in
+  production — prefer `Debug` for diagnostic output.
+
 ### Changed
 
 - **`RevealSecret::into_inner` bound documentation corrected** — required bound is `Self::Inner: Sized + Default + Zeroize` (not just `Sized + Default`).
