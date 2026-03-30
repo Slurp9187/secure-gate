@@ -38,6 +38,7 @@ goal; see **Fixed** and the maintainer note below for recurring dependency/resol
   still require `alloc` (return `String`), but `Fixed::try_from_*` decoding is fully no-alloc.
 - **`EncodedSecret::Display` doc note** — added warning that `Display` outputs the encoded
   secret content (unlike `Debug` which prints `[REDACTED]`).
+- **Edge-case tests for `Fixed` encoding decoders** — added tests covering empty input, single-byte, invalid chars, padding, checksum errors, length mismatches, HRP case-insensitivity, and cross-variant rejection for hex, base64url, bech32, and bech32m.
 
 ### Fixed
 
@@ -68,6 +69,8 @@ goal; see **Fixed** and the maintainer note below for recurring dependency/resol
 > silent drift from `cargo update` alone.
 
 ### Changed
+- **`ConstantTimeEq` impls now route through `expose_secret()`** (`src/fixed.rs`, `src/dynamic.rs`) — previously accessed `.inner` directly, bypassing `RevealSecret`. Now calls `expose_secret()` with a `Self: RevealSecret<Inner = T>` bound. `Clone` and `Serialize` intentionally retain direct `.inner` access to support custom wrapped types without `RevealSecret`.
+- **`Dynamic` `RevealSecret` impls use `mem::take`** — `into_inner` and `expose_secret_mut` now use `mem::take` instead of manual default construction. Comments updated to reference `Default::default()`.
 - Major refactor: split the project into a Cargo workspace. `secure-gate-core` is now the minimal, auditable foundation (published as `secure-gate`), while `secure-gate-compat` isolates all `secrecy` migration shims, tests, and related code.
   - **Significantly reduces the security blast radius**: the core is no longer affected by compat-specific dependencies or vulnerabilities.
   - Simplifies maintenance, CI matrices, and independent evolution of each crate.
