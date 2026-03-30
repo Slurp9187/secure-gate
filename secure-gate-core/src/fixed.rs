@@ -1,9 +1,76 @@
 //! Stack-allocated wrapper for fixed-size secrets.
 //!
-//! Provides [`Fixed<T>`], a zero-cost wrapper enforcing explicit access to sensitive data.
-//! Treat secrets as radioactive — minimize exposure surface.
+//! [`Fixed<T>`] is a zero-cost wrapper that enforces explicit, auditable access to
+//! sensitive data stored inline on the stack. It is the primary secret type for
+//! fixed-length material such as cryptographic keys, nonces, and seeds.
 //!
-//! Inner type **must implement `Zeroize`** for automatic zeroization on drop.
+//! # Security invariants
+//!
+//! - **No `Deref`, `AsRef`, or `Copy`** — the inner value cannot leak through
+//!   implicit conversions.
+//! - **`Debug` always prints `[REDACTED]`** — secrets never appear in logs or
+//!   panic messages.
+//! - **Unconditional zeroization on drop** — the inner `T` is overwritten with
+//!   zeroes when the wrapper is dropped, even on error paths.
+//! - **Opt-in `Clone`** — requires `T: CloneableSecret` and the `cloneable` feature.
+//! - **Opt-in `Serialize`/`Deserialize`** — requires marker traits and the
+//!   `serde-serialize`/`serde-deserialize` features.
+//!
+//! # Construction
+//!
+//! | Constructor | Notes |
+//! |---|---|
+//! | [`Fixed::new(value)`](Fixed::new) | Ergonomic default; `const fn`. |
+//! | [`Fixed::new_with(f)`](Fixed::new_with) | Scoped — preferred for stack-residue minimization. |
+//!
+//! Prefer [`new_with`](Fixed::new_with) in high-assurance code: it writes directly
+//! into the wrapper's storage, avoiding the intermediate stack copy that `new` may
+//! produce.
+//!
+//! # 3-tier access model
+//!
+//! ```rust
+//! use secure_gate::{Fixed, RevealSecret, RevealSecretMut};
+//!
+//! let mut secret = Fixed::new([1u8, 2, 3, 4]);
+//!
+//! // Tier 1 — scoped (preferred): borrow is confined to the closure.
+//! let sum = secret.with_secret(|arr| arr.iter().sum::<u8>());
+//! assert_eq!(sum, 10);
+//!
+//! // Tier 2 — direct: returns a reference. Use as an escape hatch.
+//! let first: u8 = secret.expose_secret()[0];
+//! assert_eq!(first, 1);
+//!
+//! // Tier 1 mutable — scoped mutation (preferred over Tier 2 mutable).
+//! secret.with_secret_mut(|arr| arr[0] = 0xFF);
+//!
+//! // Tier 3 — owned: consumes the wrapper for final use.
+//! let owned = secret.into_inner();
+//! ```
+//!
+//! # Warning: no `static` secrets
+//!
+//! `Drop` does not run on `static` items. Placing a `Fixed` in a `static` or
+//! `lazy_static!` will **skip zeroization**. Always use stack or heap allocation.
+//!
+//! Also ensure your profile sets `panic = "unwind"` — `panic = "abort"` skips
+//! destructors and therefore skips zeroization.
+//!
+//! # Import path
+//!
+//! All public items are re-exported at the crate root. Use:
+//!
+//! ```rust
+//! use secure_gate::Fixed;
+//! ```
+//!
+//! Not `secure_gate::fixed::Fixed`.
+//!
+//! # See also
+//!
+//! - [`Dynamic<T>`](crate::Dynamic) — heap-allocated alternative for variable-length
+//!   secrets (passwords, API keys, ciphertexts). Requires the `alloc` feature.
 //!
 //! # Examples
 //!
@@ -31,31 +98,92 @@ use crate::traits::encoding::hex::ToHex;
 use rand::{TryCryptoRng, TryRng, rngs::SysRng};
 use zeroize::Zeroize;
 
-
 /// Zero-cost stack-allocated wrapper for fixed-size secrets.
 ///
-/// Always available. Inner type **must implement `Zeroize`** for automatic zeroization on drop.
+/// `Fixed<T>` stores a `T: Zeroize` value inline and unconditionally zeroizes it
+/// on drop. There is no `Deref`, `AsRef`, or `Copy` — every access is explicit
+/// through [`RevealSecret`] or [`RevealSecretMut`].
 ///
-/// No `Deref`, `AsRef`, or `Copy` by default — all access requires
-/// [`expose_secret()`](RevealSecret::expose_secret) or
-/// [`with_secret()`](RevealSecret::with_secret) (scoped, preferred).
-/// For construction of `Fixed<[u8; N]>`, [`new_with`](Fixed::new_with) is the
-/// matching scoped constructor — it writes directly into the wrapper's storage
-/// and avoids any intermediate stack copy. [`new(value)`](Fixed::new) remains
-/// available as the ergonomic default.
-/// `Debug` always prints `[REDACTED]`. Performance indistinguishable from raw arrays.
+/// # Examples
+///
+/// ```rust
+/// use secure_gate::{Fixed, RevealSecret};
+///
+/// // Create a secret key.
+/// let key = Fixed::new([0xABu8; 32]);
+///
+/// // Scoped access — the borrow cannot escape the closure.
+/// let first = key.with_secret(|k| k[0]);
+/// assert_eq!(first, 0xAB);
+///
+/// // Debug is always redacted.
+/// assert_eq!(format!("{:?}", key), "[REDACTED]");
+/// ```
+///
+/// # Constructors
+///
+/// | Constructor | Feature | Notes |
+/// |---|---|---|
+/// | [`new(value)`](Self::new) | — | `const fn`, ergonomic default |
+/// | [`new_with(f)`](Self::new_with) | — | Scoped; preferred for stack-residue minimization |
+/// | [`From<[u8; N]>`](#impl-From<%5Bu8;+N%5D>-for-Fixed<%5Bu8;+N%5D>) | — | Equivalent to `new` |
+/// | [`TryFrom<&[u8]>`](#impl-TryFrom<%26%5Bu8%5D>-for-Fixed<%5Bu8;+N%5D>) | — | Length-checked slice conversion |
+/// | [`try_from_hex`](Self::try_from_hex) | `encoding-hex` | Constant-time hex decoding |
+/// | [`try_from_base64url`](Self::try_from_base64url) | `encoding-base64` | Constant-time Base64url decoding |
+/// | [`try_from_bech32`](Self::try_from_bech32) | `encoding-bech32` | HRP-validated Bech32 decoding |
+/// | [`try_from_bech32_unchecked`](Self::try_from_bech32_unchecked) | `encoding-bech32` | Bech32 without HRP check |
+/// | [`try_from_bech32m`](Self::try_from_bech32m) | `encoding-bech32m` | HRP-validated Bech32m decoding |
+/// | [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked) | `encoding-bech32m` | Bech32m without HRP check |
+/// | [`from_random()`](Self::from_random) | `rand` | System RNG |
+/// | [`from_rng(rng)`](Self::from_rng) | `rand` | Custom RNG |
+///
+/// # See also
+///
+/// - [`RevealSecret`] / [`RevealSecretMut`] — the 3-tier access traits.
+/// - [`new_with`](Self::new_with) — scoped constructor preferred over [`new`](Self::new).
+///
+/// # Note
+///
+/// `const fn new` compiles in `static` position, but **must not** be used there
+/// because `Drop` does not run on statics, which means zeroization is skipped.
 pub struct Fixed<T: zeroize::Zeroize> {
     inner: T,
 }
 
 impl<T: zeroize::Zeroize> Fixed<T> {
     /// Creates a new [`Fixed<T>`] by wrapping a value.
+    ///
+    /// This is a `const fn`, so it can be evaluated at compile time. However,
+    /// **do not** use it to initialize `static` items — `Drop` does not run on
+    /// statics, so zeroization would be skipped.
+    ///
+    /// For `Fixed<[u8; N]>`, prefer [`new_with`](Fixed::new_with) when minimizing
+    /// stack residue matters, as `new` may leave an intermediate copy of `value`
+    /// on the caller's stack frame.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::{Fixed, RevealSecret};
+    ///
+    /// let secret = Fixed::new([0u8; 32]);
+    /// assert_eq!(secret.len(), 32);
+    /// ```
     #[inline(always)]
     pub const fn new(value: T) -> Self {
         Fixed { inner: value }
     }
 }
 
+/// Converts a byte array into a [`Fixed`] wrapper (equivalent to [`Fixed::new`]).
+///
+/// # Examples
+///
+/// ```rust
+/// use secure_gate::Fixed;
+///
+/// let secret: Fixed<[u8; 4]> = [1u8, 2, 3, 4].into();
+/// ```
 impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
     #[inline(always)]
     fn from(arr: [u8; N]) -> Self {
@@ -63,6 +191,31 @@ impl<const N: usize> From<[u8; N]> for Fixed<[u8; N]> {
     }
 }
 
+/// Converts a byte slice into `Fixed<[u8; N]>`, failing if the length does not
+/// match `N`.
+///
+/// Internally uses [`Fixed::new_with`] so the secret is written directly into
+/// the wrapper's storage.
+///
+/// # Errors
+///
+/// Returns [`FromSliceError::InvalidLength`](crate::error::FromSliceError) when
+/// `slice.len() != N`.
+///
+/// # Examples
+///
+/// ```rust
+/// use secure_gate::{Fixed, RevealSecret};
+///
+/// // Success — exact length.
+/// let data = [0xFFu8; 4];
+/// let secret = Fixed::<[u8; 4]>::try_from(data.as_slice()).unwrap();
+/// assert_eq!(secret.expose_secret()[0], 0xFF);
+///
+/// // Failure — wrong length.
+/// let short = [0u8; 2];
+/// assert!(Fixed::<[u8; 4]>::try_from(short.as_slice()).is_err());
+/// ```
 impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
     type Error = crate::error::FromSliceError;
 
@@ -89,13 +242,33 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// [`new(value)`](Self::new) when minimizing stack residue matters
     /// (long-lived keys, high-assurance environments).
     ///
+    /// # Security rationale
+    ///
+    /// With [`Fixed::new(value)`](Self::new), the caller first builds `value` on
+    /// its own stack frame, then moves it into the wrapper. The compiler *may*
+    /// elide the copy, but this is not guaranteed — leaving a plaintext residue
+    /// on the stack. `new_with` avoids this by giving the closure a mutable
+    /// reference to the wrapper's *own* storage, so the secret is never placed
+    /// anywhere else.
+    ///
     /// # Examples
     ///
     /// ```rust
-    /// use secure_gate::Fixed;
+    /// use secure_gate::{Fixed, RevealSecret};
     ///
+    /// // Fill from a closure — no intermediate stack copy.
     /// let secret = Fixed::<[u8; 4]>::new_with(|arr| arr.fill(0xAB));
+    /// assert_eq!(secret.expose_secret(), &[0xAB; 4]);
+    ///
+    /// // Copy from an existing slice.
+    /// let src = [1u8, 2, 3, 4];
+    /// let secret = Fixed::<[u8; 4]>::new_with(|arr| arr.copy_from_slice(&src));
     /// ```
+    ///
+    /// # See also
+    ///
+    /// - [`Dynamic::new_with`](crate::Dynamic::new_with) — the heap-allocated
+    ///   equivalent (requires `alloc`).
     #[inline(always)]
     pub fn new_with<F>(f: F) -> Self
     where
@@ -105,7 +278,6 @@ impl<const N: usize> Fixed<[u8; N]> {
         f(&mut this.inner);
         this
     }
-
 }
 
 /// Hex encoding and decoding for `Fixed<[u8; N]>`.
@@ -118,6 +290,18 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// Encodes the secret bytes as a lowercase hex string.
     ///
     /// Requires the `encoding-hex` and `alloc` features.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
+    /// # {
+    /// use secure_gate::Fixed;
+    ///
+    /// let secret = Fixed::new([0xDE, 0xAD]);
+    /// assert_eq!(secret.to_hex(), "dead");
+    /// # }
+    /// ```
     #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_hex(&self) -> alloc::string::String {
@@ -127,6 +311,18 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// Encodes the secret bytes as an uppercase hex string.
     ///
     /// Requires the `encoding-hex` and `alloc` features.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
+    /// # {
+    /// use secure_gate::Fixed;
+    ///
+    /// let secret = Fixed::new([0xDE, 0xAD]);
+    /// assert_eq!(secret.to_hex_upper(), "DEAD");
+    /// # }
+    /// ```
     #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_hex_upper(&self) -> alloc::string::String {
@@ -136,8 +332,25 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// Encodes the secret bytes as a lowercase hex string, returning
     /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
     ///
-    /// Prefer this when the encoded form should still be treated as sensitive
-    /// (e.g. private keys). Requires the `encoding-hex` and `alloc` features.
+    /// Prefer this over [`to_hex`](Self::to_hex) when the encoded form should
+    /// still be treated as sensitive (e.g. private keys). The returned
+    /// [`EncodedSecret`](crate::EncodedSecret) is zeroized on drop.
+    ///
+    /// Requires the `encoding-hex` and `alloc` features.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
+    /// # {
+    /// use secure_gate::{Fixed, RevealSecret};
+    ///
+    /// let secret = Fixed::new([0xCA, 0xFE]);
+    /// let encoded = secret.to_hex_zeroizing();
+    /// assert_eq!(&*encoded, "cafe");
+    /// // `encoded` is zeroized when it goes out of scope.
+    /// # }
+    /// ```
     #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_hex_zeroizing(&self) -> crate::EncodedSecret {
@@ -148,6 +361,19 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
     ///
     /// Requires the `encoding-hex` and `alloc` features.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
+    /// # {
+    /// use secure_gate::{Fixed, RevealSecret};
+    ///
+    /// let secret = Fixed::new([0xCA, 0xFE]);
+    /// let encoded = secret.to_hex_upper_zeroizing();
+    /// assert_eq!(&*encoded, "CAFE");
+    /// # }
+    /// ```
     #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
@@ -167,6 +393,27 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// - [`HexError::InvalidHex`] — non-hex characters or odd-length input.
     /// - [`HexError::InvalidLength`] — decoded byte count does not equal `N`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "encoding-hex")]
+    /// # {
+    /// use secure_gate::{Fixed, RevealSecret};
+    ///
+    /// // Round-trip: encode then decode.
+    /// let original = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
+    /// # #[cfg(feature = "alloc")]
+    /// # {
+    /// let hex_str = original.to_hex();
+    /// let decoded = Fixed::<[u8; 4]>::try_from_hex(&hex_str).unwrap();
+    /// assert_eq!(decoded.expose_secret(), &[0xDE, 0xAD, 0xBE, 0xEF]);
+    /// # }
+    ///
+    /// // Wrong length fails.
+    /// assert!(Fixed::<[u8; 2]>::try_from_hex("deadbeef").is_err());
+    /// # }
+    /// ```
     pub fn try_from_hex(hex: &str) -> Result<Self, crate::error::HexError> {
         #[cfg(feature = "alloc")]
         {
@@ -219,6 +466,19 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// Encodes the secret bytes as an unpadded Base64url string (RFC 4648, URL-safe alphabet).
     ///
     /// Requires the `encoding-base64` and `alloc` features.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
+    /// # {
+    /// use secure_gate::Fixed;
+    ///
+    /// let secret = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
+    /// let encoded = secret.to_base64url();
+    /// assert_eq!(encoded, "3q2-7w");
+    /// # }
+    /// ```
     #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_base64url(&self) -> alloc::string::String {
@@ -228,8 +488,25 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// Encodes the secret bytes as an unpadded Base64url string, returning
     /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
     ///
-    /// Prefer this when the encoded form should still be treated as sensitive.
+    /// Prefer this over [`to_base64url`](Self::to_base64url) when the encoded
+    /// form should still be treated as sensitive. The returned
+    /// [`EncodedSecret`](crate::EncodedSecret) is zeroized on drop.
+    ///
     /// Requires the `encoding-base64` and `alloc` features.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
+    /// # {
+    /// use secure_gate::{Fixed, RevealSecret};
+    ///
+    /// let secret = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
+    /// let encoded = secret.to_base64url_zeroizing();
+    /// assert_eq!(&*encoded, "3q2-7w");
+    /// // `encoded` is zeroized when it goes out of scope.
+    /// # }
+    /// ```
     #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
@@ -248,6 +525,24 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// - [`Base64Error::InvalidBase64`] — non-base64 characters or invalid padding.
     /// - [`Base64Error::InvalidLength`] — decoded byte count does not equal `N`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "encoding-base64")]
+    /// # {
+    /// use secure_gate::{Fixed, RevealSecret};
+    ///
+    /// # #[cfg(feature = "alloc")]
+    /// # {
+    /// // Round-trip.
+    /// let original = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
+    /// let encoded = original.to_base64url();
+    /// let decoded = Fixed::<[u8; 4]>::try_from_base64url(&encoded).unwrap();
+    /// assert_eq!(decoded.expose_secret(), &[0xDE, 0xAD, 0xBE, 0xEF]);
+    /// # }
+    /// # }
+    /// ```
     pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
         #[cfg(feature = "alloc")]
         {
@@ -331,12 +626,9 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// cross-protocol confusion attacks.
     ///
     /// Works without `alloc` — decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
-    pub fn try_from_bech32(
-        s: &str,
-        expected_hrp: &str,
-    ) -> Result<Self, crate::error::Bech32Error> {
-        use bech32::primitives::decode::CheckedHrpstring;
+    pub fn try_from_bech32(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
         use crate::traits::encoding::bech32::Bech32Large;
+        use bech32::primitives::decode::CheckedHrpstring;
         let checked = CheckedHrpstring::new::<Bech32Large>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         // HRP check (case-insensitive comparison follows — timing leak is acceptable since HRP is public metadata)
@@ -385,8 +677,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// Works without `alloc` — decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
     pub fn try_from_bech32_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        use bech32::primitives::decode::CheckedHrpstring;
         use crate::traits::encoding::bech32::Bech32Large;
+        use bech32::primitives::decode::CheckedHrpstring;
         let checked = CheckedHrpstring::new::<Bech32Large>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         let mut buf = zeroize::Zeroizing::new([0u8; N]);
@@ -671,6 +963,22 @@ impl<const N: usize> Fixed<[u8; N]> {
     }
 }
 
+/// Constant-time equality for `Fixed<T>` — routes through [`expose_secret()`](crate::RevealSecret::expose_secret).
+///
+/// `==` is **deliberately not implemented** on `Fixed`. Always use `ct_eq`.
+///
+/// ```rust
+/// # #[cfg(feature = "ct-eq")]
+/// # {
+/// use secure_gate::{Fixed, ConstantTimeEq};
+///
+/// let a = Fixed::new([1u8; 4]);
+/// let b = Fixed::new([1u8; 4]);
+/// let c = Fixed::new([2u8; 4]);
+/// assert!(a.ct_eq(&b));
+/// assert!(!a.ct_eq(&c));
+/// # }
+/// ```
 #[cfg(feature = "ct-eq")]
 impl<T: zeroize::Zeroize> crate::ConstantTimeEq for Fixed<T>
 where
@@ -682,12 +990,23 @@ where
     }
 }
 
+/// Always prints `[REDACTED]` — secrets never appear in debug output.
+///
+/// ```rust
+/// use secure_gate::Fixed;
+///
+/// let key = Fixed::new([0xABu8; 32]);
+/// assert_eq!(format!("{:?}", key), "[REDACTED]");
+/// ```
 impl<T: zeroize::Zeroize> core::fmt::Debug for Fixed<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
     }
 }
 
+/// Opt-in cloning — requires `cloneable` feature and [`CloneableSecret`](crate::CloneableSecret)
+/// marker on the inner type. Each clone is independently zeroized on drop, but cloning
+/// increases the in-memory exposure surface. Use sparingly.
 #[cfg(feature = "cloneable")]
 impl<T: zeroize::Zeroize + crate::CloneableSecret> Clone for Fixed<T> {
     fn clone(&self) -> Self {
@@ -695,6 +1014,9 @@ impl<T: zeroize::Zeroize + crate::CloneableSecret> Clone for Fixed<T> {
     }
 }
 
+/// Opt-in serialization — requires `serde-serialize` feature and
+/// [`SerializableSecret`](crate::SerializableSecret) marker on the inner type.
+/// Serialization exposes the full secret — audit every impl.
 #[cfg(feature = "serde-serialize")]
 impl<T: zeroize::Zeroize + crate::SerializableSecret> serde::Serialize for Fixed<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -705,6 +1027,7 @@ impl<T: zeroize::Zeroize + crate::SerializableSecret> serde::Serialize for Fixed
     }
 }
 
+/// Deserialization uses `Zeroizing`-wrapped temporary buffers — zeroized even on rejection.
 #[cfg(feature = "serde-deserialize")]
 impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -744,17 +1067,23 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
     }
 }
 
-// Zeroize integration — now always present
+/// Zeroizes the inner value. Called automatically by [`Drop`].
+///
+/// **Warning:** zeroization does not run for `static` items or under `panic = "abort"`.
 impl<T: zeroize::Zeroize> zeroize::Zeroize for Fixed<T> {
     fn zeroize(&mut self) {
         self.inner.zeroize();
     }
 }
 
+/// Unconditionally zeroizes the inner value when the wrapper is dropped.
+///
+/// **Warning:** `Drop` does not run for `static` items or under `panic = "abort"`.
 impl<T: zeroize::Zeroize> Drop for Fixed<T> {
     fn drop(&mut self) {
         self.zeroize();
     }
 }
 
+/// Marker confirming that `Fixed<T>` always zeroizes on drop.
 impl<T: zeroize::Zeroize> zeroize::ZeroizeOnDrop for Fixed<T> {}
