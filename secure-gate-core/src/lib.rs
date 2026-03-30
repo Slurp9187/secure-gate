@@ -8,7 +8,8 @@
 //! `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
 //!
 //! Secrets are **automatically zeroized on drop** (the inner type must implement [`Zeroize`](zeroize::Zeroize)).
-//! Explicit access only via [`RevealSecret`]/[`RevealSecretMut`] — no `Deref`, no accidental leaks.
+//! No `Deref`, no accidental leaks — callers access the inner secret only via
+//! [`RevealSecret`]/[`RevealSecretMut`].
 //! `Debug` always prints `[REDACTED]`.
 //!
 //! - [`Fixed<T>`] — stack-allocated, compile-time-sized secrets (keys, nonces, tokens)
