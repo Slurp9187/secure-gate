@@ -381,11 +381,11 @@ impl crate::RevealSecret for Dynamic<String> {
         Self: Sized,
         Self::Inner: Sized + Default + zeroize::Zeroize,
     {
-        // Swap in an empty-String sentinel. If Box::new panics (OOM) before the
-        // swap, self.inner still holds the real secret and Dynamic::drop zeroizes
+        // Swap in an empty-String sentinel. If Default::default() panics (OOM) before
+        // the swap, self.inner still holds the real secret and Dynamic::drop zeroizes
         // it on unwind. After the swap, self.inner is Box<String::new()> — zeroized
         // on Dynamic::drop as a no-op. `*boxed` deref-moves the String out of the Box.
-        let boxed = core::mem::replace(&mut self.inner, Box::new(String::new()));
+        let boxed = core::mem::take(&mut self.inner);
         crate::InnerSecret::new(*boxed)
     }
 }
@@ -427,11 +427,11 @@ impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
         Self: Sized,
         Self::Inner: Sized + Default + zeroize::Zeroize,
     {
-        // Swap in an empty-Vec sentinel. If Box::new panics (OOM) before the swap,
-        // self.inner still holds the real secret and Dynamic::drop zeroizes it on
+        // Swap in an empty-Vec sentinel. If Default::default() panics (OOM) before the
+        // swap, self.inner still holds the real secret and Dynamic::drop zeroizes it on
         // unwind. After the swap, self.inner is Box<Vec::new()> — zeroized on
         // Dynamic::drop as a no-op. `*boxed` deref-moves the Vec out of the Box.
-        let boxed = core::mem::replace(&mut self.inner, Box::new(Vec::new()));
+        let boxed = core::mem::take(&mut self.inner);
         crate::InnerSecret::new(*boxed)
     }
 }

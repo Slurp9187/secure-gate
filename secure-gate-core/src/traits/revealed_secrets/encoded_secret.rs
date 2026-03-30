@@ -15,6 +15,12 @@ pub struct EncodedSecret(zeroize::Zeroizing<alloc::string::String>);
 
 #[cfg(feature = "alloc")]
 impl EncodedSecret {
+    #[cfg(any(
+        feature = "encoding-hex",
+        feature = "encoding-base64",
+        feature = "encoding-bech32",
+        feature = "encoding-bech32m",
+    ))]
     #[inline(always)]
     pub(crate) fn new(s: alloc::string::String) -> Self {
         Self(zeroize::Zeroizing::new(s))
