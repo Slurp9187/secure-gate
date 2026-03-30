@@ -59,6 +59,16 @@
 /// // In your tests:
 /// assert_eq!(core::mem::size_of::<ChaChaKey>(), 32);
 /// ```
+///
+/// # Security
+///
+/// Generated aliases inherit all [`Fixed`](crate::Fixed) security guarantees: zeroize on
+/// drop, redacted `Debug`, explicit access only.
+///
+/// # See also
+///
+/// - [`fixed_generic_alias!`](crate::fixed_generic_alias) — when multiple sizes are needed
+/// - [`dynamic_alias!`](crate::dynamic_alias) — heap-allocated alternative
 #[macro_export]
 macro_rules! fixed_alias {
     ($vis:vis $name:ident, $size:literal, $doc:literal) => {

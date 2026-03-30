@@ -52,6 +52,16 @@
 /// dynamic_alias!(pub ApiToken, Vec<u8>);
 /// // In your tests: assert!(token.len() > 0);
 /// ```
+///
+/// # Security
+///
+/// Generated aliases inherit all [`Dynamic`](crate::Dynamic) security guarantees: zeroize
+/// on drop (including spare capacity), redacted `Debug`, explicit access only.
+///
+/// # See also
+///
+/// - [`dynamic_generic_alias!`](crate::dynamic_generic_alias) — when the inner type varies
+/// - [`fixed_alias!`](crate::fixed_alias) — stack-allocated alternative
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! dynamic_alias {
