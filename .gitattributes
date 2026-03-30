@@ -1,0 +1,9 @@
+# Normalize all text files to LF in the repo, let Git handle platform endings
+* text=auto
+
+# Force specific files if needed (e.g., shell scripts must stay LF)
+*.sh text eol=lf
+*.py text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+# Add more extensions as needed for your project
