@@ -7,7 +7,7 @@ Last updated: March 2026 (v0.8.0-rc.7)
 - **No independent audit** — review the source code yourself before production use.
 - **No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally.
 - **3-tier access model** — explicit hierarchy (prefer Tier 1 scoped methods). Audit Tier 2/3 calls separately.
-- **Explicit exposure only** — requires `with_secret`/`expose_secret` (or mutable equivalents); no `Deref`/`AsRef`.
+- **Explicit exposure only** — all external access requires `with_secret`/`expose_secret` (or mutable equivalents); no `Deref`/`AsRef`. Internal impls (`Clone`, `Serialize`) access `.inner` directly by design — they require opt-in marker traits and do not expose secrets to callers.
 - **Zeroization on drop** — full buffer (incl. spare capacity) is wiped (inner type must implement `Zeroize`).
 - **Timing-safe equality** — use `.ct_eq()` (`ct-eq` feature); `==` is deliberately not implemented.
 - **Opt-in risk** — cloning/serialization requires marker traits (`CloneableSecret`/`SerializableSecret`).
@@ -62,12 +62,12 @@ All secret access follows this explicit hierarchy (the table below expands on th
 
 | Property                       | Guarantee / Design Choice                                                                                          |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| Explicit exposure              | Private inner fields; access only via audited methods (`expose_secret`, `with_secret`)                             |
+| Explicit exposure              | Private inner fields; all caller-facing access via audited methods (`expose_secret`, `with_secret`). Internal impls (`Clone`, `Serialize`) access `.inner` directly but require opt-in marker traits; `ConstantTimeEq` routes through `expose_secret()` with a `RevealSecret` bound. |
 | Scoped exposure (preferred)    | Closures limit borrow lifetime; prevents long-lived references                                                     |
 | Direct exposure (escape hatch) | `expose_secret()` / `expose_secret_mut()` — grep-able, auditable                                                   |
 | No implicit leaks              | No `Deref`, `AsRef`, `Copy`, `Clone` (unless `cloneable` + marker)                                                 |
 | Zeroization                    | Full allocation always wiped on drop; includes `Vec`/`String` spare capacity (inner type must implement `Zeroize`) |
-| Timing safety                  | `ConstantTimeEq` (`.ct_eq()`) — deterministic constant-time comparison. Avoid `==`.                                |
+| Timing safety                  | `ConstantTimeEq` (`.ct_eq()`) — deterministic constant-time comparison via `expose_secret()`. Avoid `==`.          |
 | Opt-in risky features          | Cloning/serialization gated by marker traits (`CloneableSecret`, `SerializableSecret`)                             |
 | Redacted debug                 | `Debug` impl always prints `[REDACTED]`                                                                            |
 | No unsafe code                 | `#![forbid(unsafe_code)]` enforced at crate level                                                                  |
