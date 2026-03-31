@@ -1,6 +1,6 @@
 # secure-gate
 
-[![Crates.io](https://img.shields.io/crates/v/secure-gate.svg)](https://crates.io/crates/secure-gate/0.8.0-rc.7)
+[![Crates.io (secure-gate)](https://img.shields.io/badge/crates.io-v0.8.0--rc.7-orange.svg)](https://crates.io/crates/secure-gate/0.8.0-rc.7)
 [![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate/0.8.0-rc.7/secure_gate/)
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg?branch=release%2F0.8)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml?query=branch%3Arelease%2F0.8)
 [![MSRV: 1.70](https://img.shields.io/badge/msrv-1.70-blue)](https://github.com/Slurp9187/secure-gate/blob/release/0.8/Cargo.toml)
@@ -221,21 +221,21 @@ Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing
 
 Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from strings. Both use panic-safe `Zeroizing`-wrapped decode buffers internally. `Fixed` also supports a no-alloc path that decodes directly into stack storage when `alloc` is disabled.
 
-| Format              | Method                           | Notes                                       |
-| ------------------- | -------------------------------- | ------------------------------------------- |
-| Hex                 | `try_from_hex(s)`                | `HexError`                                  |
-| Base64URL           | `try_from_base64url(s)`          | `Base64Error` (unpadded, URL-safe)          |
-| Bech32 (BIP-173)    | `try_from_bech32(s, hrp)`        | HRP validated; `Bech32Error::UnexpectedHrp` |
-| Bech32 (unchecked)  | `try_from_bech32_unchecked(s)`   | No HRP; `Bech32Error`                       |
-| Bech32m (BIP-350)   | `try_from_bech32m(s, hrp)`       | HRP validated; `Bech32Error::UnexpectedHrp` |
-| Bech32m (unchecked) | `try_from_bech32m_unchecked(s)`  | No HRP; `Bech32Error`                       |
+| Format              | Method                          | Notes                                       |
+| ------------------- | ------------------------------- | ------------------------------------------- |
+| Hex                 | `try_from_hex(s)`               | `HexError`                                  |
+| Base64URL           | `try_from_base64url(s)`         | `Base64Error` (unpadded, URL-safe)          |
+| Bech32 (BIP-173)    | `try_from_bech32(s, hrp)`       | HRP validated; `Bech32Error::UnexpectedHrp` |
+| Bech32 (unchecked)  | `try_from_bech32_unchecked(s)`  | No HRP; `Bech32Error`                       |
+| Bech32m (BIP-350)   | `try_from_bech32m(s, hrp)`      | HRP validated; `Bech32Error::UnexpectedHrp` |
+| Bech32m (unchecked) | `try_from_bech32m_unchecked(s)` | No HRP; `Bech32Error`                       |
 
 **Security notes**:
 
 - Prefer HRP-validated constructors to prevent cross-protocol confusion attacks.
 - Use `_unchecked` only when HRP is validated upstream.
 - All constructors guarantee zeroization even on OOM panic via `Zeroizing`.
-- For encoding *output*, prefer zeroizing methods when the encoded string itself is sensitive (see `EncodedSecret` and `SECURITY.md`).
+- For encoding _output_, prefer zeroizing methods when the encoded string itself is sensitive (see `EncodedSecret` and `SECURITY.md`).
 
 ## Serde
 
@@ -322,22 +322,22 @@ See [MIGRATING_FROM_SECRECY.md](https://github.com/Slurp9187/secure-gate/blob/re
 
 Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = false` for heap-free `Fixed` only.
 
-| Feature             | Description                                                                                                                                                                  |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                              |
-| `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                     |
+| Feature             | Description                                                                                                                                                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                                                                                                              |
+| `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                                                                                                     |
 | `rand`              | `from_random()` (system `OsRng`) and fallible `from_rng()` for any `TryRngCore + TryCryptoRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` / `from_rng()` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
-| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                             |
-| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m). Encoding traits require `alloc`; `Fixed::try_from_*` decoding is no-alloc.                                |
-| `encoding-hex`      | `ToHex` / `FromHexStr` — constant-time via `base16ct`                                                                                                                       |
-| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr` — constant-time via `base64ct`                                                                                                           |
-| `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                                                                                                       |
-| `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                                                                                                     |
-| `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                                                                                                |
-| `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                         |
-| `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                       |
-| `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                             |
-| `full`              | All features combined                                                                                                                                                        |
+| `ct-eq`             | `ConstantTimeEq` — timing-safe direct byte comparison (`subtle`)                                                                                                                                                                                             |
+| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m). Encoding traits require `alloc`; `Fixed::try_from_*` decoding is no-alloc.                                                                                                                |
+| `encoding-hex`      | `ToHex` / `FromHexStr` — constant-time via `base16ct`                                                                                                                                                                                                        |
+| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr` — constant-time via `base64ct`                                                                                                                                                                                            |
+| `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                                                                                                                                                                                       |
+| `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                                                                                                                                                                                     |
+| `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                                                                                                                                                                                |
+| `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                                                                                                         |
+| `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                                                                                                       |
+| `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                                                                                                             |
+| `full`              | All features combined                                                                                                                                                                                                                                        |
 
 `no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding traits, and serde require `alloc`. `Fixed::try_from_*` decoding works without `alloc` using constant-time stack-based decoders. Disabled features have zero overhead.
 

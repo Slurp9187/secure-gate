@@ -1,10 +1,10 @@
 # secure-gate workspace
 
-[![Crates.io (secure-gate)](https://img.shields.io/crates/v/secure-gate.svg)](https://crates.io/crates/secure-gate)
-[![Crates.io (secure-gate-compat)](https://img.shields.io/crates/v/secure-gate-compat.svg)](https://crates.io/crates/secure-gate-compat)
-[![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate)
-[![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
-[![MSRV: 1.70](https://img.shields.io/badge/msrv-1.70-blue)](Cargo.toml)
+[![Crates.io (secure-gate)](https://img.shields.io/badge/crates.io-v0.8.0--rc.7-orange.svg)](https://crates.io/crates/secure-gate/0.8.0-rc.7)
+[![Crates.io (secure-gate-compat)](https://img.shields.io/badge/crates.io-v0.8.0--rc.7-orange.svg)](https://crates.io/crates/secure-gate-compat/0.8.0-rc.7)
+[![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate/0.8.0-rc.7/secure_gate/)
+[![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg?branch=release%2F0.8)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml?query=branch%3Arelease%2F0.8)
+[![MSRV: 1.70](https://img.shields.io/badge/msrv-1.70-blue)](https://github.com/Slurp9187/secure-gate/blob/release/0.8/Cargo.toml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 
 Secure wrappers for in-memory secrets with **explicit access** and **mandatory zeroization** — a `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
