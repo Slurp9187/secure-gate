@@ -5,6 +5,7 @@
 [![MSRV: 1.70](https://img.shields.io/badge/msrv-1.70-blue)](https://github.com/Slurp9187/secure-gate/blob/release/0.8/Cargo.toml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
+> [!NOTE]
 > **Note:** This is the **LTS (Long-Term Support) branch** for secure-gate 0.8.x (`release/0.8`).
 > It targets **Rust Edition 2021** and **MSRV 1.70**, making it the right choice for projects
 > that cannot yet move to Rust 1.85+. For the latest features see the `main` branch (v0.9.x).

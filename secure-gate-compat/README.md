@@ -5,7 +5,8 @@
 
 Compatibility shims for migrating from the [`secrecy`](https://crates.io/crates/secrecy) crate (v0.8.0 and v0.10.1). Targets Rust 2021 + MSRV 1.70.
 
-**This crate is intended for migration only.** New code should use the native types from the [`secure-gate`](https://crates.io/crates/secure-gate) crate directly.
+> [!WARNING]
+>**This crate is intended for migration only.** New code should use the native types from the [`secure-gate`](https://crates.io/crates/secure-gate) crate directly.
 
 ## Installation
 
