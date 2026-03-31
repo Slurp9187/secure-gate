@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.4] - 2026-03-30
+
 ### Changed
 
 - Extracted the compatibility layer into its own published crate (`secure-gate-compat`).
