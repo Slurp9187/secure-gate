@@ -11,7 +11,6 @@ Secure wrappers for secrets with **explicit access** and **mandatory zeroization
 > [!WARNING]
 > **Security Notice**: This crate has **not undergone independent audit**.
 > Review the code and [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) before production use.
-> No unsafe code — enforced with `#![forbid(unsafe_code)]`.
 
 ## Quick Start
 
