@@ -101,23 +101,25 @@ jobs:
             features: "--no-default-features --features=ct-eq,alloc"
 
           # ── Encoding ──────────────────────────────────────────────────────────
+          # Encoding traits return String and require alloc; integration tests
+          # import the traits, so alloc is needed to compile the test binaries.
           - name: encoding (all formats)
-            features: "--no-default-features --features=encoding"
+            features: "--no-default-features --features=alloc,encoding"
 
           - name: encoding-hex only
-            features: "--no-default-features --features=encoding-hex"
+            features: "--no-default-features --features=alloc,encoding-hex"
 
           - name: encoding-base64 only
-            features: "--no-default-features --features=encoding-base64"
+            features: "--no-default-features --features=alloc,encoding-base64"
 
           - name: encoding-bech32 only
-            features: "--no-default-features --features=encoding-bech32"
+            features: "--no-default-features --features=alloc,encoding-bech32"
 
           - name: encoding-bech32m only
-            features: "--no-default-features --features=encoding-bech32m"
+            features: "--no-default-features --features=alloc,encoding-bech32m"
 
           - name: encoding-bech32 + bech32m
-            features: "--no-default-features --features=encoding-bech32,encoding-bech32m"
+            features: "--no-default-features --features=alloc,encoding-bech32,encoding-bech32m"
 
           # ── Serde ─────────────────────────────────────────────────────────────
           - name: serde (serialize + deserialize)

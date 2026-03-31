@@ -123,7 +123,7 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
     }
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[cfg(test)]
 mod tests {
     use super::*;
