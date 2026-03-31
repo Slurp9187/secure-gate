@@ -150,7 +150,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run tests (${{ matrix.name }})
-        run: cargo test -p secure-gate --tests ${{ matrix.features }}
+        # Trybuild snapshots are pinned to Rust 1.85 diagnostic format.
+        # Stable rustc diagnostics drift over time, so skip compile-fail cases here.
+        run: cargo test -p secure-gate --tests ${{ matrix.features }} -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse
 
   # ---------------------------------------------------------------------------
   # MSRV job — verify declared rust-version is actually buildable
