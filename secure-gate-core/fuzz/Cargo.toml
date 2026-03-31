@@ -25,7 +25,14 @@ hex = "0.4"
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 
 [features]
-default = ["rand", "ct-eq", "encoding", "serde", "encoding-bech32m", "cloneable"]
+default = [
+  "rand",
+  "ct-eq",
+  "encoding",
+  "serde",
+  "encoding-bech32m",
+  "cloneable",
+]
 
 rand = ["secure-gate/rand"]
 ct-eq = ["secure-gate/ct-eq"]
