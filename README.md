@@ -9,7 +9,7 @@
 
 Secure wrappers for in-memory secrets with **explicit access** and **mandatory zeroization** — a `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
 
-> [!CAUTION]
+> [!WARNING]
 > This crate has **not undergone independent audit**.
 > Review the code and [SECURITY.md](secure-gate-core/SECURITY.md) before production use.
 
