@@ -5,7 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Unreleased] (0.9.0-rc.5-dev in progress)
+
+### Documentation
+
+- **README security audit warning** — `secure-gate-core/README.md` now includes a prominent warning that the library has not yet undergone an independent security audit; caution note upgraded to a warning-level callout.
+- **README content refreshed** — security model section rewritten for clarity; explicit access requirements and timing-safe equality implementation better described.
 
 ## [0.9.0-rc.4] - 2026-03-30
 
