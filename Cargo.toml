@@ -1,12 +1,9 @@
 [workspace]
-members = [
-    "secure-gate-core",
-    "secure-gate-compat",
-]
+members = ["secure-gate-core", "secure-gate-compat"]
 resolver = "2"
 
 [workspace.package]
-version = "0.9.0-rc.4-dev"
+version = "0.9.0-rc.4"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
