@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 CHANGELOG.md#12-25
 ## [Unreleased]
 
-(v0.8.0-rc.7-dev)
+## [0.8.0-rc.7] - 2026-03-30
 
 ### Changed
 - Split the project into a Cargo workspace with `secure-gate-core` (minimal, auditable core library published as `secure-gate`) and `secure-gate-compat` (isolates all `secrecy` migration shims, tests, and related code).

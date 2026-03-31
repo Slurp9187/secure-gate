@@ -17,8 +17,6 @@
 | Status  | LTS / stable patches | Active development |
 | Branch  |    `release/0.8`     |       `main`       |
 
-Current crates.io version: 0.8.0-rc.7 (see `Cargo.toml` for exact version).
-
 Secure wrappers for secrets with **explicit access** and **mandatory zeroization** — a `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
 
 > **Security Notice**: This crate has **not undergone independent audit**.
