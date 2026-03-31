@@ -81,6 +81,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **SECURITY.md** — clarified security model regarding explicit exposure and timing safety.
 
+### Fixed
+
+- **CI: `-p secure-gate-core` → `-p secure-gate`** (`.github/workflows/ci.yml`) — all `cargo` commands referenced the directory name `secure-gate-core` instead of the package name `secure-gate`, causing every CI job to fail with "did not match any packages".
+
+- **CI: encoding test matrix now includes `alloc`** — encoding traits return `String` (requires `alloc`) and integration tests import them, so `--features=encoding` without `alloc` failed to compile. All encoding CI entries now include `alloc`.
+
+- **CI: compat lint matrix uses correct features** — the `secure-gate-compat` lint entries referenced `rand` and `full` features that don't exist in the compat crate. Replaced with `secrecy-compat` and `--all-features`.
+
+- **Bech32/Bech32m in-crate test modules gated on `alloc`** (`src/traits/encoding/bech32.rs`, `src/traits/encoding/bech32m.rs`) — test modules used `bech32::decode` and `bech32::encode_lower` which require bech32's `alloc` feature. Added `feature = "alloc"` to the `#[cfg]` gate.
+
+- **Bech32 integration test `Fixed` import scoped to both bech32 features** (`tests/encoding_suite/bech32.rs`) — `Fixed` was imported only under `encoding-bech32`, but bech32m tests also use it. Import now gated on `any(encoding-bech32, encoding-bech32m)`.
+
+- **Fuzz crate missing `secure-gate` dependency** (`fuzz/Cargo.toml`) — feature forwarding (`secure-gate/cloneable`, etc.) referenced `secure-gate` but no such dependency was declared. Added `secure-gate = { path = "..", default-features = false, features = ["alloc"] }`.
+
 ### CI
 
 - **Stable CI test matrix now skips two toolchain-sensitive trybuild cases** (`.github/workflows/ci.yml`) — `fixed_alias_zero_size_compile_fail` and `serializable_secret_misuse` are excluded from the stable `cargo test --tests ...` step to avoid false failures from rustc diagnostic drift across stable releases.
