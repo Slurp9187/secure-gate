@@ -11,6 +11,8 @@ cargo-fuzz = true
 arbitrary = { version = "1.4", features = ["derive"] }
 libfuzzer-sys = "0.4"
 
+secure-gate = { path = "..", default-features = false, features = ["alloc"] }
+
 # Required for zeroize::Zeroize usage in fuzz targets
 zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
 
