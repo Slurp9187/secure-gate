@@ -1,6 +1,6 @@
 # secure-gate-compat
 
-[![Crates.io (secure-gate-compat)](https://img.shields.io/badge/crates.io-v0.8.0--rc.7-orange.svg)](https://crates.io/crates/secure-gate-compat/0.8.0-rc.7)
+[![secure-gate-compat](https://img.shields.io/badge/secure--gate--compat-v0.8.0--rc.7-orange.svg)](https://crates.io/crates/secure-gate-compat/0.8.0-rc.7)
 [![Docs.rs](https://docs.rs/secure-gate-compat/badge.svg)](https://docs.rs/secure-gate-compat)
 [![MSRV: 1.70](https://img.shields.io/badge/msrv-1.70-blue)](https://github.com/Slurp9187/secure-gate/blob/release/0.8/Cargo.toml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
