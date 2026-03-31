@@ -41,12 +41,12 @@ jobs:
           - name: no features
             package: secure-gate-compat
             features: "--no-default-features"
-          - name: rand (no_std)
+          - name: secrecy-compat
             package: secure-gate-compat
-            features: "--no-default-features --features=rand"
-          - name: full
+            features: "--features=secrecy-compat"
+          - name: all features
             package: secure-gate-compat
-            features: "--features=full"
+            features: "--all-features"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
