@@ -6,8 +6,10 @@ use secure_gate::Bech32Error;
 use secure_gate::Dynamic;
 #[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 use secure_gate::RevealSecret;
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+use secure_gate::Fixed;
 #[cfg(feature = "encoding-bech32")]
-use secure_gate::{Fixed, FromBech32Str, ToBech32};
+use secure_gate::{FromBech32Str, ToBech32};
 #[cfg(feature = "encoding-bech32m")]
 use secure_gate::{FromBech32mStr, ToBech32m};
 
