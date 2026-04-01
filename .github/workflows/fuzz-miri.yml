@@ -1,4 +1,4 @@
-name: Fuzz (Miri UB checks)
+name: Fuzz (Miri UB checks - release 0.8)
 
 permissions:
   contents: read

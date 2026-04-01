@@ -1,4 +1,4 @@
-name: Fuzz (quick smoke)
+name: Fuzz (quick smoke - release/0.8)
 
 permissions:
   contents: read
