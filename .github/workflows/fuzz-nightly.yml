@@ -96,7 +96,6 @@ jobs:
             printf 'DEADBEEF' > "$dir/seed_hex_upper"
             printf 'QkJCQg' > "$dir/seed_base64"
             printf 'test1abcdef' > "$dir/seed_bech32"
-          fi
             printf '{}' > "$dir/seed_empty_object"
             printf '[]' > "$dir/seed_empty_array"
             printf 'null' > "$dir/seed_null"
@@ -107,7 +106,6 @@ jobs:
           dir="secure-gate-core/fuzz/corpus/encoding"
           if [ -d "$dir" ]; then
             printf 'deadbeef' > "$dir/seed_hex"
-          fi
             printf 'DEADBEEF' > "$dir/seed_hex_upper"
             printf 'QkJCQg' > "$dir/seed_base64"
             printf 'test1abcdef' > "$dir/seed_bech32"
