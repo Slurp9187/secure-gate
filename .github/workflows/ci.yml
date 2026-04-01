@@ -1,6 +1,7 @@
 name: CI release/0.8
 
 on:
+  workflow_dispatch:
   push:
     branches: [release/0.8]
     paths:
