@@ -1,5 +1,5 @@
 # .github/workflows/fuzz-nightly-lts.yml
-name: Fuzz (nightly – LTS release/0.8)
+name: Fuzz (nightly – 0.8 core)
 
 on:
   schedule:
@@ -115,9 +115,9 @@ jobs:
             print_stats=1
         run: |
           echo "Fuzzing ${{ matrix.target }} (${{ matrix.mode }}) for ≈58 minutes…"
-          cargo +nightly fuzz run --manifest-path secure-gate-core/fuzz/Cargo.toml \
+          cd secure-gate-core && cargo +nightly fuzz run \
             ${{ matrix.target }} \
-            secure-gate-core/fuzz/corpus/${{ matrix.target }} \
+            fuzz/corpus/${{ matrix.target }} \
             -- \
             ${{ env.FUZZER_ARGS }}
 
@@ -164,7 +164,7 @@ jobs:
         run: cargo install cargo-fuzz --locked
 
       - name: Build fuzz targets in release mode
-        run: cargo +nightly fuzz build --manifest-path secure-gate-core/fuzz/Cargo.toml --release
+        run: cd secure-gate-core && cargo +nightly fuzz build --release
 
       - name: Download all fresh corpora
         uses: actions/download-artifact@v4
@@ -193,8 +193,9 @@ jobs:
             binary=$(find secure-gate-core/fuzz/target -type f -name "$target" -perm /a=x -print -quit)
             [ -z "$binary" ] && { echo "Binary not found for $target"; continue; }
 
-            cargo +nightly fuzz coverage --manifest-path secure-gate-core/fuzz/Cargo.toml \
-              "$target" "$corpus" -- -runs=300000
+            cd secure-gate-core && cargo +nightly fuzz coverage \
+              "$target" "../$corpus" -- -runs=300000
+            cd ..
 
             llvm-cov show \
               --instr-profile="secure-gate-core/fuzz/coverage/$target/coverage.profdata" \
@@ -204,8 +205,9 @@ jobs:
               --output-dir="coverage/html/$target" \
               || true
 
-            cargo +nightly fuzz coverage --manifest-path secure-gate-core/fuzz/Cargo.toml \
-              "$target" "$corpus" --lcov --output-path="coverage/lcov/$target.info" || true
+            cd secure-gate-core && cargo +nightly fuzz coverage \
+              "$target" "../$corpus" --lcov --output-path="../coverage/lcov/$target.info" || true
+            cd ..
           done
 
       - name: Upload HTML coverage report

@@ -65,8 +65,8 @@ jobs:
           ASAN_OPTIONS: "detect_leaks=1:abort_on_error=1:symbolize=1:allocator_may_return_null=1"
         run: |
           echo "Fuzzing ${{ matrix.target }} (${{ matrix.mode }})..."
-          cargo +nightly fuzz run ${{ matrix.target }} \
-            --manifest-path secure-gate-compat/fuzz/Cargo.toml \
+          cd secure-gate-compat && cargo +nightly fuzz run \
+            ${{ matrix.target }} \
             -- \
             ${{ env.FUZZER_ARGS }}
 

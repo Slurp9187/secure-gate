@@ -123,9 +123,9 @@ jobs:
             print_stats=1
         run: |
           echo "Fuzzing ${{ matrix.target }} (${{ matrix.mode }}) for ≈58 minutes…"
-          cargo +nightly fuzz run --manifest-path secure-gate-core/fuzz/Cargo.toml \
+          cd secure-gate-core && cargo +nightly fuzz run \
             ${{ matrix.target }} \
-            secure-gate-core/fuzz/corpus/${{ matrix.target }} \
+            fuzz/corpus/${{ matrix.target }} \
             -- \
             ${{ env.FUZZER_ARGS }}
 
@@ -199,8 +199,9 @@ jobs:
             binary=$(find secure-gate-core/fuzz/target -type f -name "$target" -perm /a=x -print -quit)
             [ -z "$binary" ] && { echo "Binary not found for $target"; continue; }
 
-            cargo +nightly fuzz coverage --manifest-path secure-gate-core/fuzz/Cargo.toml \
-              "$target" "$corpus" -- -runs=300000
+            cd secure-gate-core && cargo +nightly fuzz coverage \
+              "$target" "../$corpus" -- -runs=300000
+            cd ..
 
             llvm-cov show \
               --instr-profile="secure-gate-core/fuzz/coverage/$target/coverage.profdata" \
@@ -210,8 +211,9 @@ jobs:
               --output-dir="coverage/html/$target" \
               || true
 
-            cargo +nightly fuzz coverage --manifest-path secure-gate-core/fuzz/Cargo.toml \
-              "$target" "$corpus" --lcov --output-path="coverage/lcov/$target.info" || true
+            cd secure-gate-core && cargo +nightly fuzz coverage \
+              "$target" "../$corpus" --lcov --output-path="../coverage/lcov/$target.info" || true
+            cd ..
           done
 
       - name: Upload HTML coverage report
