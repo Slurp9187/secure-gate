@@ -123,7 +123,8 @@ jobs:
             print_stats=1
         run: |
           echo "Fuzzing ${{ matrix.target }} (${{ matrix.mode }}) for ≈58 minutes…"
-          cargo +nightly fuzz run ${{ matrix.target }} \
+          cargo +nightly fuzz run --manifest-path secure-gate-core/fuzz/Cargo.toml \
+            ${{ matrix.target }} \
             secure-gate-core/fuzz/corpus/${{ matrix.target }} \
             -- \
             ${{ env.FUZZER_ARGS }}
@@ -192,23 +193,25 @@ jobs:
 
           for target in expose mut parsing encoding serde ct_eq; do
             echo "=== Generating coverage for $target ==="
-            corpus="fuzz/corpus/$target"
+            corpus="secure-gate-core/fuzz/corpus/$target"
             [ ! -d "$corpus" ] || [ -z "$(ls -A "$corpus")" ] && continue
 
-            binary=$(find fuzz/target -type f -name "$target" -perm /a=x -print -quit)
+            binary=$(find secure-gate-core/fuzz/target -type f -name "$target" -perm /a=x -print -quit)
             [ -z "$binary" ] && { echo "Binary not found for $target"; continue; }
 
-            cargo +nightly fuzz coverage "$target" "$corpus" -- -runs=300000
+            cargo +nightly fuzz coverage --manifest-path secure-gate-core/fuzz/Cargo.toml \
+              "$target" "$corpus" -- -runs=300000
 
             llvm-cov show \
-              --instr-profile="fuzz/coverage/$target/coverage.profdata" \
+              --instr-profile="secure-gate-core/fuzz/coverage/$target/coverage.profdata" \
               --object="$binary" \
               --format=html \
               --ignore-filename-regex='/.cargo|/rustc/|.*/libfuzzer_sys/' \
               --output-dir="coverage/html/$target" \
               || true
 
-            cargo +nightly fuzz coverage "$target" "$corpus" --lcov --output-path="coverage/lcov/$target.info" || true
+            cargo +nightly fuzz coverage --manifest-path secure-gate-core/fuzz/Cargo.toml \
+              "$target" "$corpus" --lcov --output-path="coverage/lcov/$target.info" || true
           done
 
       - name: Upload HTML coverage report
