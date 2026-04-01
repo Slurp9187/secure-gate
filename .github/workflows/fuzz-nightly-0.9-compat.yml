@@ -1,4 +1,4 @@
-name: Fuzz (nightly – compat)
+name: Fuzz (nightly – 0.9 compat)
 
 on:
   schedule:
