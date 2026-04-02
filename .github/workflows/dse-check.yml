@@ -1,0 +1,49 @@
+name: DSE zeroization check
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1' # weekly, Monday 03:00 UTC
+  push:
+    branches: [main]
+    paths:
+      - 'secure-gate-core/src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'secure-gate-core/src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+permissions:
+  contents: read
+
+jobs:
+  dse-check:
+    name: DSE – volatile zero-store survival (${{ matrix.toolchain }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: [stable, nightly]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust ${{ matrix.toolchain }}
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run DSE check (${{ matrix.toolchain }})
+        run: >
+          cargo +${{ matrix.toolchain }} test
+          -p secure-gate
+          --release
+          --test asm_dse_check
+          -- --ignored --nocapture
