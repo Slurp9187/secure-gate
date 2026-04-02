@@ -92,6 +92,10 @@ serde-serialize = ["dep:serde", "serde?/alloc", "alloc"]
 # Full batteries-included combo (most common real-world usage)
 full = ["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]
 
+[[bin]]
+name = "asm_check"
+# Not a user-facing tool. Exists solely for the asm_dse_check integration test.
+
 [[bench]]
 name = "fixed_vs_raw"
 harness = false
