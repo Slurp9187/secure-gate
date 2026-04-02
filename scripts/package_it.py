@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Optional
 
 # ========================== CONFIGURATION ==========================
-MSRV = "1.85"
-PROJECT_TITLE = "secure-gate"
+MSRV = "1.70"
+PROJECT_TITLE = "secure-gate-workspace"
 OUTPUT_DIR = f"code_packages_{MSRV}"
 ENCODING = "utf-8"
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
@@ -51,50 +51,14 @@ PROJECT_ROOT = find_project_root()
 # =================================================================
 PACKAGES = [
     {
-        "suffix": "docs",
+        "suffix": "workflows",
         "root_files": [
             "Cargo.toml",
-            "*.md",
         ],
-        "include_dirs": [],
-        "file_patterns": ["*.md"],
-        "description": "Full documentation source",
-    },
-    {
-        "suffix": "src",
-        "root_files": [
-            "Cargo.toml",
-            # "CHANGELOG.md",
-            # "README.md",
-            # "SECURITY.md",
-        ],
-        "include_dirs": ["src"],
-        "file_patterns": ["*.rs"],
-        "description": "Full library source + Cargo.toml",
-    },
-    {
-        "suffix": "tests",
-        "root_files": [],
-        "include_dirs": ["tests"],
-        "file_patterns": ["*.rs"],
-        "description": "All integration tests",
-    },
-    {
-        "suffix": "fuzz",
-        "root_files": [
-            "fuzz/Cargo.toml",
-        ],
-        "include_dirs": ["fuzz/fuzz_targets", "fuzz/src"],
-        "file_patterns": ["*.rs"],
-        "description": "Fuzzing targets",
-    },
-    {
-        "suffix": "benches",
-        "root_files": [],
-        "include_dirs": ["benches"],
-        "file_patterns": ["*.rs"],
-        "description": "benches (benchmarking)",
-    },
+        "include_dirs": [".github/workflows"],
+        "file_patterns": ["*.yml"],
+        "description": "GitHub Workflows",
+    }
 ]
 
 # =================================================================
