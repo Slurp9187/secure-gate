@@ -187,6 +187,78 @@ fn dynamic_vec_into_inner_returns_zeroizing() {
     assert_eq!(*owned, [1u8, 2, 3]);
 }
 
+// === Streaming I/O (std) ===
+
+#[cfg(feature = "std")]
+#[test]
+fn dynamic_write_appends_bytes() {
+    use std::io::Write;
+    let mut secret = Dynamic::<Vec<u8>>::new(vec![]);
+    secret.write_all(b"hello").unwrap();
+    secret.write_all(b" world").unwrap();
+    secret.with_secret(|v| assert_eq!(v.as_slice(), b"hello world"));
+}
+
+#[cfg(feature = "std")]
+#[test]
+fn dynamic_write_to_existing() {
+    use std::io::Write;
+    let mut secret = Dynamic::<Vec<u8>>::new(vec![1, 2, 3]);
+    secret.write_all(b"\x04\x05").unwrap();
+    secret.with_secret(|v| assert_eq!(v.as_slice(), &[1, 2, 3, 4, 5]));
+}
+
+#[cfg(feature = "std")]
+#[test]
+fn dynamic_reader_full() {
+    use std::io::Read;
+    let secret = Dynamic::<Vec<u8>>::new(vec![10, 20, 30, 40, 50]);
+    let mut out = Vec::new();
+    secret.as_reader().read_to_end(&mut out).unwrap();
+    assert_eq!(out, [10, 20, 30, 40, 50]);
+}
+
+#[cfg(feature = "std")]
+#[test]
+fn dynamic_reader_partial_chunks() {
+    use std::io::Read;
+    let secret = Dynamic::<Vec<u8>>::new(vec![1, 2, 3, 4, 5]);
+    let mut reader = secret.as_reader();
+    let mut buf = [0u8; 2];
+
+    assert_eq!(reader.read(&mut buf).unwrap(), 2);
+    assert_eq!(buf, [1, 2]);
+
+    assert_eq!(reader.read(&mut buf).unwrap(), 2);
+    assert_eq!(buf, [3, 4]);
+
+    assert_eq!(reader.read(&mut buf).unwrap(), 1);
+    assert_eq!(buf[0], 5);
+
+    assert_eq!(reader.read(&mut buf).unwrap(), 0); // EOF
+}
+
+#[cfg(feature = "std")]
+#[test]
+fn dynamic_reader_empty() {
+    use std::io::Read;
+    let secret = Dynamic::<Vec<u8>>::new(vec![]);
+    let mut buf = [0u8; 16];
+    assert_eq!(secret.as_reader().read(&mut buf).unwrap(), 0);
+}
+
+#[cfg(feature = "std")]
+#[test]
+fn dynamic_write_then_read_roundtrip() {
+    use std::io::{Read, Write};
+    let mut secret = Dynamic::<Vec<u8>>::new(vec![]);
+    secret.write_all(b"roundtrip").unwrap();
+
+    let mut out = Vec::new();
+    secret.as_reader().read_to_end(&mut out).unwrap();
+    assert_eq!(out, b"roundtrip");
+}
+
 // === CloneableSecret ===
 
 #[cfg(feature = "cloneable")]
