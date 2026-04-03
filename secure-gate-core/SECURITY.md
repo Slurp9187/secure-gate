@@ -55,7 +55,9 @@ All secret access follows this explicit hierarchy (the table below expands on th
 - **Tier 2 — Direct reference (escape hatch)**: `expose_secret` / `expose_secret_mut` — long-lived references; use only for FFI or third-party APIs requiring `&T`/`&mut T`.
 - **Tier 3 — Owned consumption**: `into_inner` — returns `InnerSecret<T>` (wraps `Zeroizing<T>`); zeroization transfers to caller. Audit separately.
 
-**Audit note**: Tier 2 and Tier 3 calls do not appear in simple `expose_secret` grep sweeps and must be reviewed independently.
+- **Streaming I/O (via `as_reader()`)**: `DynamicReader` implements `std::io::Read` by copying secret bytes into caller-provided buffers through `with_secret` internally. The caller owns zeroization of the destination buffer. `std::io::Write` on `Dynamic<Vec<u8>>` flows data **into** the wrapper and is not an exposure surface. Requires the `std` feature.
+
+**Audit note**: Tier 2, Tier 3, and `as_reader` calls do not appear in simple `expose_secret` grep sweeps and must be reviewed independently.
 
 ## Core Security Model
 
