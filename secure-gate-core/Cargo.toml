@@ -60,7 +60,7 @@ default = ["alloc"]
 # decode_vec, encode_lower) when those crates are already in the dependency graph.
 alloc = ["zeroize/alloc", "base16ct?/alloc", "base64ct?/alloc", "bech32?/alloc"]
 
-# Full std support (implies alloc)
+# Full std support (implies alloc). Enables std::io::Read/Write for Dynamic<Vec<u8>>.
 std = ["alloc"]
 
 # Rand: secure random generation
