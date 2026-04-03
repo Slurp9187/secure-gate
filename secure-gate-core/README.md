@@ -64,6 +64,7 @@ pw.expose_secret_mut().clear();
 - Zeroize on drop (always)
 - Access via `.with_secret(|s| ...)` (preferred) or `.expose_secret()` (auditable escape hatch)
 - Owned extraction via `.into_inner()` → `InnerSecret<T>` (wraps `Zeroizing<T>`, transfers zeroization to caller)
+- Streaming I/O via `impl Write` and `.as_reader()` for `Dynamic<Vec<u8>>` (requires `std`)
 
 ### Preferred: scoped access
 
@@ -306,7 +307,7 @@ Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = 
 | Feature             | Description                                                                                                                                                                                                                                               |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                                                                                                           |
-| `std`               | Full `std` support (implies `alloc`). Use `default-features = false` for no-heap builds.                                                                                                                                                                  |
+| `std`               | Full `std` support (implies `alloc`). Enables `std::io::Read`/`Write` for `Dynamic<Vec<u8>>` via `as_reader()` and direct `Write` impl. Use `default-features = false` for no-heap builds. |
 | `rand`              | `from_random()` (system `SysRng`) and fallible `from_rng()` for any `TryRng + TryCryptoRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` / `from_rng()` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
 | `ct-eq`             | `ConstantTimeEq` — timing-safe comparison via `expose_secret()` (`subtle`)                                                                                                                                                                                |
 | `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m). Encoding traits require `alloc`; `Fixed::try_from_*` decoding is no-alloc.                                                                                                             |
