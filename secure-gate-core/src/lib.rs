@@ -201,6 +201,10 @@ pub mod traits;
 #[cfg(feature = "alloc")]
 pub use dynamic::Dynamic;
 
+/// Cursor-like reader over [`Dynamic<Vec<u8>>`] — see [`Dynamic::as_reader`].
+#[cfg(feature = "std")]
+pub use dynamic::DynamicReader;
+
 #[cfg(all(feature = "alloc", feature = "serde-deserialize"))]
 /// Default maximum byte length for `Dynamic<Vec<u8>>` / `Dynamic<String>` deserialization (1 MiB).
 ///

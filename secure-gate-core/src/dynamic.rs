@@ -647,6 +647,117 @@ impl<T: zeroize::Zeroize + crate::CloneableSecret> Clone for Dynamic<T> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Streaming I/O (std only)
+// ---------------------------------------------------------------------------
+
+/// Streams bytes directly into the protected buffer via [`RevealSecretMut`](crate::RevealSecretMut).
+///
+/// Data flows **into** the wrapper — this is a pure security improvement over
+/// accumulating plaintext in a bare `Vec<u8>` before wrapping.
+///
+/// # Example
+///
+/// ```rust
+/// # #[cfg(feature = "std")] {
+/// use std::io::Write;
+/// use secure_gate::Dynamic;
+///
+/// let mut secret = Dynamic::<Vec<u8>>::new(vec![]);
+/// secret.write_all(b"decrypted payload").unwrap();
+///
+/// // Secret material was protected from the first byte —
+/// // no intermediate unprotected buffer ever existed.
+/// # }
+/// ```
+#[cfg(feature = "std")]
+impl std::io::Write for Dynamic<alloc::vec::Vec<u8>> {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        use crate::RevealSecretMut;
+        self.with_secret_mut(|v| std::io::Write::write(v, buf))
+    }
+
+    #[inline]
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// Cursor-like reader over a [`Dynamic<Vec<u8>>`].
+///
+/// Created by [`Dynamic::<Vec<u8>>::as_reader`]. Borrows the `Dynamic`
+/// immutably and tracks the read position internally. Each [`Read::read`]
+/// call goes through [`with_secret`](crate::RevealSecret::with_secret),
+/// preserving the crate's auditable access model.
+///
+/// # Security
+///
+/// `Read::read()` copies secret bytes into the caller-supplied buffer.
+/// The caller is responsible for zeroizing that buffer. Prefer piping
+/// directly into encrypted writers (`io::copy` into an encryptor, etc.)
+/// rather than reading into intermediate `Vec<u8>` buffers.
+///
+/// The `Dynamic` wrapper continues to zeroize its contents on drop
+/// regardless of how many bytes have been read out.
+#[cfg(feature = "std")]
+pub struct DynamicReader<'a> {
+    secret: &'a Dynamic<alloc::vec::Vec<u8>>,
+    offset: usize,
+}
+
+#[cfg(feature = "std")]
+impl std::io::Read for DynamicReader<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        use crate::RevealSecret;
+        let offset = self.offset;
+        let n = self.secret.with_secret(|v| {
+            let remaining = v.len().saturating_sub(offset);
+            let n = remaining.min(buf.len());
+            buf[..n].copy_from_slice(&v[offset..offset + n]);
+            n
+        });
+        self.offset += n;
+        Ok(n)
+    }
+}
+
+#[cfg(feature = "std")]
+impl Dynamic<alloc::vec::Vec<u8>> {
+    /// Returns a [`DynamicReader`] that implements [`std::io::Read`].
+    ///
+    /// This replaces the common `with_secret` + `Cursor` boilerplate:
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "std")] {
+    /// use std::io::Read;
+    /// use secure_gate::Dynamic;
+    ///
+    /// let secret = Dynamic::<Vec<u8>>::new(vec![1, 2, 3, 4]);
+    ///
+    /// // Before: awkward closure + Cursor dance
+    /// // secret.with_secret(|b| io::copy(&mut Cursor::new(b), &mut writer))?;
+    ///
+    /// // After: clean streaming
+    /// let mut out = Vec::new();
+    /// secret.as_reader().read_to_end(&mut out).unwrap();
+    /// assert_eq!(out, [1, 2, 3, 4]);
+    /// # }
+    /// ```
+    ///
+    /// # Security
+    ///
+    /// Each `read()` call copies secret bytes into the caller's buffer.
+    /// The caller must zeroize that buffer when done.
+    #[inline]
+    pub fn as_reader(&self) -> DynamicReader<'_> {
+        DynamicReader {
+            secret: self,
+            offset: 0,
+        }
+    }
+}
+
 /// Opt-in serialization — requires `serde-serialize` feature and
 /// [`SerializableSecret`](crate::SerializableSecret) marker. Serialization exposes the
 /// full secret — audit every impl.

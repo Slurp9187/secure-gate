@@ -54,7 +54,7 @@ alloc = [
     "bech32?/alloc",
 ]
 
-# Full std support (implies alloc)
+# Full std support (implies alloc). Enables std::io::Read/Write for Dynamic<Vec<u8>>.
 std = ["alloc"]
 
 # Rand: secure random generation
