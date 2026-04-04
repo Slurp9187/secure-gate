@@ -1,7 +1,5 @@
 # Security Considerations for secure-gate
 
-Last updated: March 2026 (v0.9.0-rc.4)
-
 ## TL;DR
 
 - **No independent audit** — review the source code yourself before production use.
