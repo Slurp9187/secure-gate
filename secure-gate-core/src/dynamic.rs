@@ -712,7 +712,6 @@ pub struct DynamicReader<'a> {
 #[cfg(feature = "std")]
 impl std::io::Read for DynamicReader<'_> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        use crate::RevealSecret;
         let offset = self.offset;
         let n = self.secret.with_secret(|v| {
             let remaining = v.len().saturating_sub(offset);
