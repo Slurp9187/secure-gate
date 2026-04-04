@@ -732,25 +732,26 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// ```rust
     /// # #[cfg(feature = "std")] {
-    /// use std::io::Read;
+    /// use std::io::{self, Write};
     /// use secure_gate::Dynamic;
     ///
     /// let secret = Dynamic::<Vec<u8>>::new(vec![1, 2, 3, 4]);
     ///
     /// // Before: awkward closure + Cursor dance
-    /// // secret.with_secret(|b| io::copy(&mut Cursor::new(b), &mut writer))?;
+    /// // secret.with_secret(|b| io::copy(&mut Cursor::new(b), &mut encryptor))?;
     ///
-    /// // After: clean streaming
-    /// let mut out = Vec::new();
-    /// secret.as_reader().read_to_end(&mut out).unwrap();
-    /// assert_eq!(out, [1, 2, 3, 4]);
+    /// // After: pipe directly into an encrypted writer — no intermediate buffer
+    /// let mut encryptor = io::sink(); // stand-in for a real encryptor
+    /// io::copy(&mut secret.as_reader(), &mut encryptor).unwrap();
     /// # }
     /// ```
     ///
     /// # Security
     ///
     /// Each `read()` call copies secret bytes into the caller's buffer.
-    /// The caller must zeroize that buffer when done.
+    /// Prefer piping directly into encrypted writers rather than reading
+    /// into intermediate buffers. The caller is responsible for zeroizing
+    /// any destination buffer.
     #[inline]
     pub fn as_reader(&self) -> DynamicReader<'_> {
         DynamicReader {
