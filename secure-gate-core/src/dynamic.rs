@@ -78,6 +78,7 @@ use zeroize::Zeroize;
     feature = "encoding-bech32",
     feature = "encoding-bech32m",
     feature = "ct-eq",
+    feature = "std",
 ))]
 use crate::RevealSecret;
 
@@ -732,7 +733,7 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// ```rust
     /// # #[cfg(feature = "std")] {
-    /// use std::io::{self, Write};
+    /// use std::io;
     /// use secure_gate::Dynamic;
     ///
     /// let secret = Dynamic::<Vec<u8>>::new(vec![1, 2, 3, 4]);
