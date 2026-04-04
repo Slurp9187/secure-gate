@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0-rc.8] - 2026-04-03
+
+### Added
+
+- `std::io::Write` impl for `Dynamic<Vec<u8>>` — streams bytes directly into the protected buffer via `with_secret_mut`. Data flows *in*; no secret exposure.
+- `DynamicReader` cursor wrapper + `Dynamic::<Vec<u8>>::as_reader()` for `std::io::Read` — replaces `with_secret` + `Cursor` boilerplate. Each `read()` call goes through `with_secret` internally.
+- Both gated behind the existing `std` feature. Makes secure streaming the ergonomic default.
+
 ## [0.8.0-rc.7] - 2026-03-30
 
 **Summary:** Comprehensive rustdoc overhaul across all public types and traits; zeroizing APIs for
