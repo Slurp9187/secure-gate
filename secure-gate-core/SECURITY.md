@@ -1,6 +1,6 @@
 # Security Considerations for secure-gate
 
-Last updated: March 2026 (v0.8.0-rc.8)
+Last updated: March 2026
 
 ## TL;DR
 
