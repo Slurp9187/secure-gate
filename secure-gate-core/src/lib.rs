@@ -16,7 +16,7 @@
 //! # Which type should I use?
 //!
 //! | Type | Allocation | Use case | Feature |
-//! |------|-----------|----------|---------|
+//! |------|-----------|----------|----------|
 //! | [`Fixed<T>`] | Stack | Keys, nonces, tokens — compile-time-known size | Always available |
 //! | [`Dynamic<T>`] | Heap | Passwords, API keys, ciphertexts — variable length | `alloc` (default) |
 //!
@@ -85,6 +85,18 @@
 //!
 //! All public items are re-exported at the crate root. Use `secure_gate::Fixed`,
 //! not `secure_gate::fixed::Fixed`.
+//!
+//! # Type taxonomy
+//!
+//! | Category | Types | `Deref` to secret? | Purpose |
+//! |----------|-------|-------------------|----------|
+//! | **Secret wrappers** | [`Fixed<T>`], [`Dynamic<T>`] | No — use [`RevealSecret`] | Hold live secrets; `Debug` → `[REDACTED]` |
+//! | **Output wrappers** | [`InnerSecret<T>`], [`EncodedSecret`] | Yes — caller owns the data | Hold extracted or encoded results |
+//! | **Opt-in markers** | [`CloneableSecret`], [`SerializableSecret`] | — (no methods) | Implement on inner type `T` to unlock gated impls |
+//!
+//! `CloneableSecret` and `SerializableSecret` are implemented on the **inner type `T`**,
+//! not on `Fixed<T>` or `Dynamic<T>` directly. Output wrappers ([`InnerSecret`],
+//! [`EncodedSecret`]) are not secret wrappers and do not interact with these markers.
 //!
 //! # Import paths
 //!
@@ -238,8 +250,11 @@ pub use fixed::Fixed;
 /// impl on [`Fixed`] and [`Dynamic`]. Each clone is independently zeroized on drop,
 /// but increases the in-memory exposure surface. Requires `cloneable` feature.
 ///
-/// **This marker is deliberately not implemented by default** on `Fixed<T>`, `Dynamic<T>`,
-/// or `EncodedSecret<T>` — cloning is an opt-in risk that must be explicitly enabled.
+/// Implement this on your inner type `T`; `Fixed<T>` and `Dynamic<T>` then gain the
+/// gated `Clone` impl automatically. **This marker is deliberately not implemented by
+/// default** on `Fixed<T>` or `Dynamic<T>` — cloning is an opt-in risk that must be
+/// explicitly enabled. Without the `cloneable` feature this type does not exist at all.
+///
 /// See also [`SerializableSecret`] (the other opt-in marker trait).
 #[cfg(feature = "cloneable")]
 pub use traits::CloneableSecret;
@@ -284,31 +299,34 @@ pub use traits::RevealSecret;
 /// Only [`Fixed`] and [`Dynamic`] implement this — read-only wrappers deliberately do not.
 pub use traits::RevealSecretMut;
 
-/// Owned, redacted wrapper returned by [`RevealSecret::into_inner`] (Tier 3 access).
+/// Owned extraction **output wrapper** returned by [`RevealSecret::into_inner`] (Tier 3 access).
 ///
 /// Wraps [`Zeroizing<T>`](zeroize::Zeroizing) with `Debug` → `[REDACTED]`. Implements
 /// `Deref<Target = T>` for ergonomic access (the **only** type in this crate that derefs
 /// to the secret — [`Fixed`] and [`Dynamic`] deliberately do not).
 ///
-/// This is **not** a secret wrapper like `Fixed`/`Dynamic` — it is the owned extraction
-/// result. Use [`into_zeroizing()`](InnerSecret::into_zeroizing) when an API requires
+/// This is an **output wrapper**, not a secret wrapper like [`Fixed`]/[`Dynamic`] — it
+/// holds the owned result of Tier 3 extraction, with zeroization transferred to the
+/// caller. See also [`EncodedSecret`] (the other output wrapper, for encoded strings).
+/// Use [`into_zeroizing()`](InnerSecret::into_zeroizing) when an API requires
 /// `Zeroizing<T>` directly.
 pub use traits::InnerSecret;
 
-/// Owned, redacted wrapper for zeroizing encoded strings.
+/// Encoded string **output wrapper** for zeroizing encoded output.
 ///
-/// **Note:** This type exists *only* to keep encoded data protected until it drops.
-/// It is **not** a general-purpose secret wrapper (unlike `Fixed<T>` or `Dynamic<T>`).
+/// This is an **output wrapper** — it exists *only* to keep encoded data zeroized until
+/// it drops. It is **not** a secret wrapper like [`Fixed`]/[`Dynamic`] and does not
+/// accept [`CloneableSecret`] or [`SerializableSecret`] markers. See also
+/// [`InnerSecret`] (the other output wrapper, for owned secret extraction).
 ///
 /// Returned by all `*_zeroizing` encoding methods (`to_hex_zeroizing`,
 /// `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.). Wraps
 /// `Zeroizing<String>` with `Debug` → `[REDACTED]`. Implements `Deref<Target = str>`
 /// and `Display`.
 ///
-/// This is **not** a secret wrapper like `Fixed`/`Dynamic` — it is a zeroizing `String`
-/// wrapper for encoded output. Use [`into_inner()`](EncodedSecret::into_inner) to extract
-/// a plain `String` (ends zeroization) or [`into_zeroizing()`](EncodedSecret::into_zeroizing)
-/// to preserve it.
+/// Use [`into_inner()`](EncodedSecret::into_inner) to extract a plain `String`
+/// (ends zeroization) or [`into_zeroizing()`](EncodedSecret::into_zeroizing) to
+/// preserve it.
 ///
 /// Requires `alloc` feature.
 #[cfg(feature = "alloc")]
@@ -318,11 +336,16 @@ pub use traits::EncodedSecret;
 /// `Serialize` impl on [`Fixed`] and [`Dynamic`]. Serialization exposes the full secret;
 /// audit every impl. Requires `serde-serialize` feature.
 ///
-/// `Deserialize` is gated separately by the `serde-deserialize` feature and does **not**
-/// require this marker — it has its own feature-gated impls on the wrapper types directly.
+/// **`Deserialize` does NOT require this marker** — it is gated separately by the
+/// `serde-deserialize` feature with its own impls on the wrapper types directly. This
+/// marker controls `Serialize` only.
 ///
-/// **This marker is deliberately not implemented by default** on `Fixed<T>`, `Dynamic<T>`,
-/// or `EncodedSecret<T>` — serialization is an opt-in risk that must be explicitly enabled.
+/// Implement this on your inner type `T`; `Fixed<T>` and `Dynamic<T>` then gain the
+/// gated `Serialize` impl automatically. **This marker is deliberately not implemented
+/// by default** on `Fixed<T>` or `Dynamic<T>` — serialization is an opt-in risk that
+/// must be explicitly enabled. Without the `serde-serialize` feature this type does not
+/// exist at all.
+///
 /// See also [`CloneableSecret`] (the other opt-in marker trait).
 #[cfg(feature = "serde-serialize")]
 pub use traits::SerializableSecret;
