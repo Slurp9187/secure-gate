@@ -72,23 +72,23 @@
 #[macro_export]
 macro_rules! fixed_alias {
     ($vis:vis $name:ident, $size:literal, $doc:literal) => {
-        #[doc = $doc]
         const _: () = { let _ = [(); $size][0]; };
+        #[doc = $doc]
         $vis type $name = $crate::Fixed<[u8; $size]>;
     };
     ($vis:vis $name:ident, $size:literal) => {
-        #[doc = concat!("Fixed-size secure secret (", stringify!($size), " bytes)")]
         const _: () = { let _ = [(); $size][0]; };
+        #[doc = concat!("Fixed-size secure secret (", stringify!($size), " bytes)")]
         $vis type $name = $crate::Fixed<[u8; $size]>;
     };
     ($name:ident, $size:literal, $doc:literal) => {
-        #[doc = $doc]
         const _: () = { let _ = [(); $size][0]; };
+        #[doc = $doc]
         type $name = $crate::Fixed<[u8; $size]>;
     };
     ($name:ident, $size:literal) => {
-        #[doc = concat!("Fixed-size secure secret (", stringify!($size), " bytes)")]
         const _: () = { let _ = [(); $size][0]; };
+        #[doc = concat!("Fixed-size secure secret (", stringify!($size), " bytes)")]
         type $name = $crate::Fixed<[u8; $size]>;
     };
 }

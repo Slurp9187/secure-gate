@@ -53,6 +53,15 @@
 //! - `Vec<u8>` / `String` (when `alloc` feature is enabled)
 //!
 //! These cover the most common secret types in cryptographic applications.
+//!
+//! # Length is not constant-time
+//!
+//! For variable-length inputs (`[u8]`, `Vec<u8>`, `String`) the underlying `subtle`
+//! impl returns `false` immediately when lengths differ — only the equal-length
+//! comparison is constant-time. Length is generally not secret in real-world use
+//! (key sizes, MAC sizes, and signature sizes are public protocol parameters), so
+//! this is acceptable. **If length itself is sensitive in your threat model, use a
+//! fixed-size type (`[u8; N]` / `Fixed<[u8; N]>`).**
 #[cfg(feature = "ct-eq")]
 /// Constant-time equality for secret material (requires `ct-eq`).
 pub trait ConstantTimeEq {

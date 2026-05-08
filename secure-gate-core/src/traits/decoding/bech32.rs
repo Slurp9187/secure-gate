@@ -58,6 +58,12 @@ use crate::error::Bech32Error;
 /// values, ~5 KB (5,115 bytes maximum payload)) — significantly larger than Bech32m's standard 90-byte
 /// limit. Strings encoded via [`ToBech32`](crate::ToBech32) round-trip correctly here
 /// but will fail with [`FromBech32mStr`](crate::FromBech32mStr) when they exceed ~90 bytes.
+///
+/// **The returned `Vec<u8>` is plain heap memory and is not zeroized on drop.** Wrap
+/// the result in [`Fixed`](crate::Fixed) or [`Dynamic`](crate::Dynamic) immediately
+/// (or in [`zeroize::Zeroizing`]) if the decoded bytes are sensitive. Prefer
+/// `Fixed::try_from_bech32` / `Dynamic::try_from_bech32`, which perform the wrapping
+/// for you and zeroize their internal temporaries.
 #[cfg(feature = "encoding-bech32")]
 pub trait FromBech32Str {
     /// Decodes a Bech32 (BIP-173) string, validating that the HRP matches `expected_hrp`.
