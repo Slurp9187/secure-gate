@@ -31,11 +31,15 @@ jobs:
         mode: [normal, asan]
 
     env:
+      # NOTE: do not add `-runs=0`. In libFuzzer fork mode (`-fork=1`) the
+      # parent's run budget is checked against zero immediately, causing the
+      # whole fuzz session to exit in ~2s regardless of -max_total_time.
+      # Omit -runs entirely; the default (-1, infinite) plus -max_total_time
+      # gives the intended ~50-minute wall-clock budget.
       FUZZER_ARGS: >-
         -fork=1
         -timeout=30
         -rss_limit_mb=4096
-        -runs=0
         -max_total_time=3000
         -max_len=4096
         -use_value_profile=1
