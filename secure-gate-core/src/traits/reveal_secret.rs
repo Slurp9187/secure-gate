@@ -224,6 +224,15 @@ pub trait RevealSecret {
     /// The returned [`InnerSecret<T>`] always redacts `Debug` as `[REDACTED]`, preserving
     /// the wrapper-level redaction invariant after ownership transfer.
     ///
+    /// # Allocation Behavior
+    ///
+    /// `Fixed::into_inner` is zero-cost (no allocation). The `Dynamic::into_inner`
+    /// impls allocate one small `Box<T>` sentinel (24 bytes on 64-bit) before swapping
+    /// out the real secret; if that allocation panics (OOM), the original `inner` is
+    /// untouched and `Dynamic::drop` zeroizes the secret during unwind. Confidentiality
+    /// is preserved on the panic path. See the per-impl docs on
+    /// [`Dynamic`](crate::Dynamic) for the exact pattern.
+    ///
     /// # Examples
     ///
     /// ```rust

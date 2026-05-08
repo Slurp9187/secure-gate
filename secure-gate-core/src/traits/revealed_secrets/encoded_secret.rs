@@ -12,6 +12,15 @@
 //! This is **not** a secret wrapper like [`Fixed`](crate::Fixed) / [`Dynamic`](crate::Dynamic)
 //! — it is a zeroizing `String` wrapper for encoded output. It implements
 //! `Deref<Target = str>` and `Display`.
+//!
+//! # `Display` is intentionally transparent
+//!
+//! Unlike `Debug` (which always prints `[REDACTED]`), `Display` (`{}`) outputs the
+//! encoded secret content verbatim — needed so the value can be written to a sink,
+//! used in format strings, or sent over a wire. **Do not log `EncodedSecret` values
+//! with `{}` in production.** Prefer `{:?}` for diagnostic output to avoid accidental
+//! secret exposure in log files. See the [`Display`] impl on [`EncodedSecret`] for
+//! the same warning at the type-doc level.
 
 #[cfg(feature = "alloc")]
 /// Owned wrapper for encoded secret strings. Guarantees zeroization on drop
