@@ -46,9 +46,16 @@ use crate::error::Base64Error;
 /// allocation. For no-alloc targets, use `Fixed::try_from_base64url` instead, which
 /// decodes directly into a stack-allocated `[u8; N]` buffer.
 ///
-/// Uses the RFC 4648 URL-safe alphabet without `=` padding. Treat all input as
-/// untrusted; validate lengths and content upstream before wrapping decoded bytes
-/// in secrets.
+/// Uses the RFC 4648 URL-safe alphabet without `=` padding.
+///
+/// **The returned `Vec<u8>` is plain heap memory and is not zeroized on drop.** Wrap
+/// the result in [`Fixed`](crate::Fixed) or [`Dynamic`](crate::Dynamic) immediately
+/// (or in [`zeroize::Zeroizing`]) if the decoded bytes are sensitive. Prefer
+/// `Fixed::try_from_base64url` / `Dynamic::try_from_base64url`, which perform the
+/// wrapping for you and zeroize their internal temporaries.
+///
+/// Treat all input as untrusted; validate lengths and content upstream before wrapping
+/// decoded bytes in secrets.
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub trait FromBase64UrlStr {
     /// Decodes a URL-safe base64 string (no padding) into a byte vector.

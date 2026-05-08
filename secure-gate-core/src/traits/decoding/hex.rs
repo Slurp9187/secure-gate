@@ -44,6 +44,12 @@ use crate::error::HexError;
 /// allocation. For no-alloc targets, use `Fixed::try_from_hex` instead, which decodes
 /// directly into a stack-allocated `[u8; N]` buffer.
 ///
+/// **The returned `Vec<u8>` is plain heap memory and is not zeroized on drop.** Wrap
+/// the result in [`Fixed`](crate::Fixed) or [`Dynamic`](crate::Dynamic) immediately
+/// (or in [`zeroize::Zeroizing`]) if the decoded bytes are sensitive. Prefer
+/// `Fixed::try_from_hex` / `Dynamic::try_from_hex`, which perform the wrapping for
+/// you and zeroize their internal temporaries.
+///
 /// Treat all input as untrusted; validate lengths and content upstream before wrapping
 /// decoded bytes in secrets.
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
