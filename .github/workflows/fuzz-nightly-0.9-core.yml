@@ -49,7 +49,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked
+        # Do not pass `--locked`: cargo-fuzz 0.13.1's bundled lockfile pins
+        # rustix 0.36.5, which fails to build on current nightly rustc with
+        # "attributes starting with `rustc` are reserved". Fresh resolution
+        # picks a newer rustix that compiles cleanly.
+        run: cargo install cargo-fuzz
 
       - name: Download previous corpora (best effort)
         uses: actions/download-artifact@v4
@@ -167,7 +171,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked
+        # See note in the fuzz job — `--locked` pulls rustix 0.36.5 which no
+        # longer compiles on current nightly.
+        run: cargo install cargo-fuzz
 
       - name: Build fuzz targets in release mode
         run: cd secure-gate-core && cargo +nightly fuzz build --release
