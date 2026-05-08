@@ -238,6 +238,8 @@ pub use fixed::Fixed;
 /// impl on [`Fixed`] and [`Dynamic`]. Each clone is independently zeroized on drop,
 /// but increases the in-memory exposure surface. Requires `cloneable` feature.
 ///
+/// **This marker is deliberately not implemented by default** on `Fixed<T>`, `Dynamic<T>`,
+/// or `EncodedSecret<T>` — cloning is an opt-in risk that must be explicitly enabled.
 /// See also [`SerializableSecret`] (the other opt-in marker trait).
 #[cfg(feature = "cloneable")]
 pub use traits::CloneableSecret;
@@ -295,6 +297,9 @@ pub use traits::InnerSecret;
 
 /// Owned, redacted wrapper for zeroizing encoded strings.
 ///
+/// **Note:** This type exists *only* to keep encoded data protected until it drops.
+/// It is **not** a general-purpose secret wrapper (unlike `Fixed<T>` or `Dynamic<T>`).
+///
 /// Returned by all `*_zeroizing` encoding methods (`to_hex_zeroizing`,
 /// `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.). Wraps
 /// `Zeroizing<String>` with `Debug` → `[REDACTED]`. Implements `Deref<Target = str>`
@@ -316,6 +321,8 @@ pub use traits::EncodedSecret;
 /// `Deserialize` is gated separately by the `serde-deserialize` feature and does **not**
 /// require this marker — it has its own feature-gated impls on the wrapper types directly.
 ///
+/// **This marker is deliberately not implemented by default** on `Fixed<T>`, `Dynamic<T>`,
+/// or `EncodedSecret<T>` — serialization is an opt-in risk that must be explicitly enabled.
 /// See also [`CloneableSecret`] (the other opt-in marker trait).
 #[cfg(feature = "serde-serialize")]
 pub use traits::SerializableSecret;
