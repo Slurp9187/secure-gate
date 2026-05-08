@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Security model, test coverage, and zeroization evidence chain (semantic `PanicOnNonZeroDrop` + `needs_drop` regression guard + `ProxyAllocator` physical verification + LLVM-level DSE asm check) are at parity with v0.9.0.
 - Recommended for users on Rust 1.70–1.84 who cannot move to edition 2024.
 
-### Documentation (post-audit polish)
+### Documentation (post-review polish)
 
 - `fixed_alias!` macro: move `#[doc = $doc]` off the anonymous `const _:` zero-size guard onto the type alias itself. The previous order silently dropped user-supplied doc strings.
 - `ConstantTimeEq` module doc: explicit note that length is not constant-time for variable-length inputs (`Vec<u8>` / `String` / `[u8]`); recommend fixed-size types when length is sensitive.
