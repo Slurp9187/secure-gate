@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-05-08
+
+### Release Notes
+
+- **Stable v0.8.0 release** — First stable version of the 0.8 LTS line (Rust edition 2021, MSRV 1.70). Sister to v0.9.0 on `main`.
+- Security model, test coverage, and zeroization evidence chain (semantic `PanicOnNonZeroDrop` + `needs_drop` regression guard + `ProxyAllocator` physical verification + LLVM-level DSE asm check) are at parity with v0.9.0.
+- Recommended for users on Rust 1.70–1.84 who cannot move to edition 2024.
+
+### Documentation (post-audit polish)
+
+- `fixed_alias!` macro: move `#[doc = $doc]` off the anonymous `const _:` zero-size guard onto the type alias itself. The previous order silently dropped user-supplied doc strings.
+- `ConstantTimeEq` module doc: explicit note that length is not constant-time for variable-length inputs (`Vec<u8>` / `String` / `[u8]`); recommend fixed-size types when length is sensitive.
+- `FromHexStr` / `FromBase64UrlStr` / `FromBech32Str` / `FromBech32mStr` trait docs: promote the "wrap immediately" guidance into each trait's RustDoc.
+- `EncodedSecret` module doc: hoist the existing `Display` warning ("do not log with `{}` in production") to module level.
+- `RevealSecret::into_inner` trait method: cross-reference per-impl allocation behavior (`Fixed` = zero-cost; `Dynamic` = 24-byte sentinel, panic-safe).
+
 ## [0.8.0-rc.8] - 2026-04-03
 
 ### Added
