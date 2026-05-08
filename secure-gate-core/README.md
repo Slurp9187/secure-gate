@@ -145,19 +145,19 @@ fn log_length<S: RevealSecret>(secret: &S) {
 
 ```toml
 [dependencies]
-secure-gate = "0.9.0-rc.{x}"
+secure-gate = "0.9"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.9.0-rc.{x}", default-features = false }
+secure-gate = { version = "0.9", default-features = false }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.9.0-rc.{x}", features = ["full"] }
+secure-gate = { version = "0.9", features = ["full"] }
 ```
 
 ## Encoding & Decoding
