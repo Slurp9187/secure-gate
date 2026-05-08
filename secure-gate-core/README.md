@@ -1,6 +1,6 @@
 # secure-gate
 
-[![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate/0.8.0-rc.9/secure_gate/)
+[![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate/0.8.0/secure_gate/)
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg?branch=release%2F0.8)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml?query=branch%3Arelease%2F0.8)
 [![MSRV: 1.70](https://img.shields.io/badge/msrv-1.70-blue)](https://github.com/Slurp9187/secure-gate/blob/release/0.8/Cargo.toml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
@@ -156,19 +156,19 @@ fn log_length<S: RevealSecret>(secret: &S) {
 
 ```toml
 [dependencies]
-secure-gate = "0.8.0-rc.{x}"
+secure-gate = "0.8"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.8.0-rc.{x}", default-features = false }
+secure-gate = { version = "0.8", default-features = false }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.8.0-rc.{x}", features = ["full"] }
+secure-gate = { version = "0.8", features = ["full"] }
 ```
 
 ## Encoding & Decoding
