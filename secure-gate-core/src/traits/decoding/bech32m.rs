@@ -61,6 +61,12 @@ use crate::error::Bech32Error;
 /// Bech32m strings (Bitcoin Taproot/SegWit v1+ compatible). The `Bech32Large`
 /// variant used by [`ToBech32`](crate::ToBech32) is a distinct non-standard format
 /// for large payloads; decode those with [`FromBech32Str`](crate::FromBech32Str).
+///
+/// **The returned `Vec<u8>` is plain heap memory and is not zeroized on drop.** Wrap
+/// the result in [`Fixed`](crate::Fixed) or [`Dynamic`](crate::Dynamic) immediately
+/// (or in [`zeroize::Zeroizing`]) if the decoded bytes are sensitive. Prefer
+/// `Fixed::try_from_bech32m` / `Dynamic::try_from_bech32m`, which perform the
+/// wrapping for you and zeroize their internal temporaries.
 #[cfg(feature = "encoding-bech32m")]
 pub trait FromBech32mStr {
     /// Decodes a Bech32m (BIP-350) string, validating that the HRP matches `expected_hrp`.
