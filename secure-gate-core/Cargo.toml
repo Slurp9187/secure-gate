@@ -14,7 +14,6 @@ include = [
     "src/**/*.rs",
     "CHANGELOG.md",
     "LICENSE*",
-    "MIGRATING_FROM_SECRECY.md",
     "README.md",
     "SECURITY.md",
 ]
