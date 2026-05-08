@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Release Notes
 
 - **Stable v0.9.0 release** — First stable version of the 0.9 series (Rust edition 2024, MSRV 1.85).
-- Sister to the v0.8.0 LTS line on `release/0.8` (Rust edition 2021, MSRV 1.70). Functionality, security model, and test coverage are at parity; the two lines diverge only on toolchain floor and a small set of dependency surfaces (`rand` 0.10 vs 0.9, `subtle` 2.6 vs 2.5, `zeroize` 1.8 vs 1.7, `base16ct` 1 vs 0.2, `base64ct` 1 vs =1.6).
+- Parallel to the v0.8.0 LTS line on `release/0.8` (Rust edition 2021, MSRV 1.70). Functionality, security model, and test coverage are at parity; the two lines diverge only on toolchain floor and a small set of dependency surfaces (`rand` 0.10 vs 0.9, `subtle` 2.6 vs 2.5, `zeroize` 1.8 vs 1.7, `base16ct` 1 vs 0.2, `base64ct` 1 vs =1.6).
 - Major security and architectural improvements from the 0.8.0 security overhaul (real `Drop` + zeroize, 3-tier access model, opt-in marker-trait gating, panic-safe `from_protected_bytes`, allocator-level zeroize verification via `ProxyAllocator`, LLVM-level DSE asm regression guard) are now considered mature and production-ready on this line.
 - Clean workspace separation between `secure-gate` (core) and `secure-gate-compat`.
 - Comprehensive testing, zeroization verification, and documentation finalized.
