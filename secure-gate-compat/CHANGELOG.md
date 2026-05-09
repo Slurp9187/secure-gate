@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-08
+
 ### Security
 
 - **Finding 5 — `SecretBox::init_with` / `try_init_with` clone-panic leak
@@ -30,8 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `try_init_with_zeros_original_on_clone_panic`) in
   `tests/compat_suite/edge_cases.rs` use a custom `S` whose `Clone` always
   panics and verify the original's `Zeroize::zeroize` runs during unwind.
-
-## [0.9.0] - 2026-05-08
 
 ### Release Notes
 
