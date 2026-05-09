@@ -7,12 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.0] - 2026-05-08
+## [0.8.0-rc.9] - 2026-05-09
 
 ### Release Notes
 
-- **Stable v0.8.0 release** — First stable version of the 0.8 LTS line (Rust edition 2021, MSRV 1.70). Parallel to v0.9.0 on `main`.
-- Security model, test coverage, and zeroization evidence chain (semantic `PanicOnNonZeroDrop` + `needs_drop` regression guard + `ProxyAllocator` physical verification + LLVM-level DSE asm check) are at parity with v0.9.0.
+- **v0.8.0-rc.9 release candidate** — Pre-release of the 0.8 LTS line (Rust edition 2021, MSRV 1.70). Not yet recommended for production use. Parallel to v0.9.0-rc.6 on `main`.
+- Security model, test coverage, and zeroization evidence chain (semantic `PanicOnNonZeroDrop` + `needs_drop` regression guard + `ProxyAllocator` physical verification + LLVM-level DSE asm check) are in place.
+- Open before stable: document `Dynamic::new` OOM-panic safety boundary; resolve `#[unsafe(no_mangle)]` in published binary vs. "no unsafe code" claim.
 - Recommended for users on Rust 1.70–1.84 who cannot move to edition 2024.
 
 ### Security
@@ -126,7 +127,7 @@ pins, `--all-features` Bech32 naming).
 
 - **MSRV 1.70 — `syn` resolution** — Recent `syn` releases (from **2.0.117** onward) set
   `rust-version = "1.71"`, so a fresh `cargo update` can pull a `syn` that **refuses to build on
-  Rust 1.70** even though this crate’s declared MSRV is still 1.70. `serde_derive`,
+  Rust 1.70** even though this crate's declared MSRV is still 1.70. `serde_derive`,
   `thiserror-impl`, and other proc-macro crates depend on `syn`; the failure shows up as a
   resolver/build error before any crate tests run. **Mitigation:** pin **`syn = "=2.0.100"`** in
   `dev-dependencies` (alongside the existing pins for `serde_json`, `trybuild`, `tempfile`,
@@ -138,10 +139,10 @@ pins, `--all-features` Bech32 naming).
   `pub use bech32::ToBech32` / `FromBech32Str` then conflicted with the extern crate. Re-exports
   now use **`pub use self::bech32::...`** so the traits always come from the in-crate modules.
 
-> **Maintainer note — recurring “MSRV vs. latest crates.io” conflicts:**  
+> **Maintainer note — recurring "MSRV vs. latest crates.io" conflicts:**  
 > Upstream crates often raise `rust-version`, adopt **edition 2024** manifests (which **Cargo
-> 1.70 cannot parse**), or add transitive deps that outpace this workspace’s MSRV. That shows up
-> as either **“requires rustc X or newer”** (e.g. `syn`, `zmij` via `serde_json`) or **lockfile /
+> 1.70 cannot parse**), or add transitive deps that outpace this workspace's MSRV. That shows up
+> as either **"requires rustc X or newer"** (e.g. `syn`, `zmij` via `serde_json`) or **lockfile /
 > manifest parse failures** (e.g. `trybuild` → `toml_parser`, `tempfile` → `getrandom 0.4`). This
 > release line uses **explicit dev-dependency pins** plus a **frozen `Cargo.lock`**; CI should use
 > **`--locked`** on MSRV jobs so a clean checkout matches what maintainers verified (see also

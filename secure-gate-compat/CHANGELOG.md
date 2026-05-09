@@ -7,13 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.0] - 2026-05-08
+## [0.8.0-rc.9] - 2026-05-09
 
 ### Release Notes
 
-- **Stable v0.8.0 release** — First stable version of the compat shim on the 0.8 LTS line (Rust edition 2021, MSRV 1.70). Tracks `secure-gate = "0.8"`.
-- No API changes since `0.8.0-rc.7`; all `secrecy` v0.8 / v0.10 migration shims (`Secret`, `SecretBox`, `SecretString`, `SecretSlice`, `SecretVec`, `DebugSecret`) plus dual-version parity tests, fuzz targets, and migration guide are considered stable.
-- Recommended for teams migrating off `secrecy` who target Rust 1.70+. Prefer dropping the `secrecy-compat` feature once migration is complete.
+- **v0.8.0-rc.9 release candidate** — Pre-release of the compat shim on the 0.8 LTS line (Rust edition 2021, MSRV 1.70). Tracks `secure-gate = "0.8.0-rc.9"`.
+- No API changes since `0.8.0-rc.8`; all `secrecy` v0.8 / v0.10 migration shims (`Secret`, `SecretBox`, `SecretString`, `SecretSlice`, `SecretVec`, `DebugSecret`) plus dual-version parity tests, fuzz targets, and migration guide are in place.
+- Not yet recommended for production use; promoted to stable once `secure-gate` core reaches stable.
+- Recommended for teams migrating off `secrecy` who target Rust 1.70+.
 
 ### Security
 
