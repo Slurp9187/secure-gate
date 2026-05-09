@@ -30,6 +30,12 @@ Compatibility shims for migrating from the [`secrecy`](https://crates.io/crates/
 - **Stack residue in v0.8 types** (`Secret<S>` uses inline storage, like core `Fixed<T>`): zeroization on drop is best-effort only.  
   *Mitigation*: Treat values as short-lived. Prefer Tier 1 scoped access (`with_secret`/`with_secret_mut`) to minimize exposure window.
 
+- **Compat-layer relaxations vs. core**: The compat layer deliberately relaxes certain security properties to remain a drop-in replacement for `secrecy`.
+  - `SecretString` (v10) and `Secret<String>` (v08) are unconditionally `Clone` (matches `secrecy`; `secure-gate` core is opt-in via `CloneableSecret`).
+  - `SecretBox::init_with` has a residual `Box::new` panic-window leak (documented on the method).
+  - The `From` migration shims for generic `S` and `Vec<T>` (e.g. `From<SecretBox<S>> for Dynamic<S>`) have a similar `Box::new` panic-window leak.
+  - `From<String> for SecretString` and `From<Vec<S>> for SecretSlice<S>` will leak secret bytes in spare capacity if the input has `capacity > len` due to standard allocator shrink-realloc behavior.
+
 - **serde feature**: serialization is opt-in via `SerializableSecret`.  
   *Mitigation*: Only enable when needed; never serialize secrets unintentionally.
 

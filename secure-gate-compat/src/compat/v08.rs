@@ -274,7 +274,7 @@ where
 /// Converts `Secret<String>` into a [`Dynamic<String>`](secure_gate::Dynamic).
 impl From<Secret<String>> for secure_gate::Dynamic<String> {
     fn from(s: Secret<String>) -> Self {
-        secure_gate::Dynamic::new(s.inner_secret.clone())
+        secure_gate::Dynamic::<String>::new_with(|str_buf| str_buf.push_str(&s.inner_secret))
     }
 }
 
@@ -287,6 +287,9 @@ impl From<secure_gate::Dynamic<String>> for Secret<String> {
 }
 
 /// Converts `Secret<Vec<T>>` into a [`Dynamic<Vec<T>>`](secure_gate::Dynamic).
+///
+/// **Residual best-effort window:** `Dynamic::new` allocates a `Box`. If that allocation
+/// panics (OOM), the cloned `Vec<T>` drops normally without zeroization.
 impl<T: Clone + Zeroize + 'static> From<Secret<Vec<T>>> for secure_gate::Dynamic<Vec<T>> {
     fn from(s: Secret<Vec<T>>) -> Self {
         secure_gate::Dynamic::new(s.inner_secret.clone())

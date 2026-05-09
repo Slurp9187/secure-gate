@@ -201,6 +201,10 @@ impl<S: Zeroize + ?Sized> ExposeSecretMut<S> for SecretBox<S> {
 pub type SecretString = SecretBox<str>;
 
 impl From<String> for SecretString {
+    /// **Warning:** If the `String` has excess capacity (`capacity > len`), `into_boxed_str()`
+    /// will reallocate to shrink the buffer. The standard allocator frees the old buffer
+    /// without zeroizing it, leaking any secret bytes in the spare capacity. Construct
+    /// with exact capacity or use `shrink_to_fit()` before passing to this constructor.
     fn from(s: String) -> Self {
         Self::from(s.into_boxed_str())
     }
@@ -247,6 +251,10 @@ where
     S: Zeroize,
     [S]: Zeroize,
 {
+    /// **Warning:** If the `Vec` has excess capacity (`capacity > len`), `into_boxed_slice()`
+    /// will reallocate to shrink the buffer. The standard allocator frees the old buffer
+    /// without zeroizing it, leaking any secret bytes in the spare capacity. Construct
+    /// with exact capacity or use `shrink_to_fit()` before passing to this constructor.
     fn from(vec: Vec<S>) -> Self {
         Self::from(vec.into_boxed_slice())
     }
@@ -282,7 +290,9 @@ where
 /// without unsafe code (`SecretBox` has a `Drop` impl). The clone is immediately
 /// wrapped in `Dynamic` and the original is zeroized on drop.
 ///
-/// For zero-copy migration, construct `Dynamic<S>` directly instead.
+/// **Residual best-effort window:** `Dynamic::new` allocates a `Box`. If that allocation
+/// panics (OOM), the cloned `S` drops normally. Unless `S: ZeroizeOnDrop`, it will not
+/// be zeroized. For zero-copy migration, construct `Dynamic<S>` directly instead.
 impl<S: Clone + Zeroize + 'static> From<SecretBox<S>> for secure_gate::Dynamic<S> {
     fn from(sb: SecretBox<S>) -> Self {
         secure_gate::Dynamic::new(sb.inner_secret.as_ref().clone())
@@ -292,6 +302,9 @@ impl<S: Clone + Zeroize + 'static> From<SecretBox<S>> for secure_gate::Dynamic<S
 /// Converts a [`Dynamic<String>`](secure_gate::Dynamic) back into a `SecretBox<String>`.
 ///
 /// Clones the inner `String`. Both the source and the new wrapper are zeroized on drop.
+///
+/// **Residual best-effort window:** `SecretBox::new` allocates a `Box`. If that allocation
+/// panics (OOM), the cloned `String` drops normally without zeroization.
 impl From<secure_gate::Dynamic<String>> for SecretBox<String> {
     fn from(d: secure_gate::Dynamic<String>) -> Self {
         let val = <secure_gate::Dynamic<String> as RevealSecret>::expose_secret(&d).clone();
@@ -312,6 +325,9 @@ impl From<secure_gate::Dynamic<String>> for SecretString {
 /// Converts a [`Dynamic<Vec<S>>`](secure_gate::Dynamic) back into a `SecretBox<Vec<S>>`.
 ///
 /// Clones the inner `Vec`. Both ends are zeroized on drop.
+///
+/// **Residual best-effort window:** `SecretBox::new` allocates a `Box`. If that allocation
+/// panics (OOM), the cloned `Vec<S>` drops normally without zeroization.
 impl<S: Clone + Zeroize + 'static> From<secure_gate::Dynamic<Vec<S>>> for SecretBox<Vec<S>> {
     fn from(d: secure_gate::Dynamic<Vec<S>>) -> Self {
         let val = <secure_gate::Dynamic<Vec<S>> as RevealSecret>::expose_secret(&d).clone();
@@ -324,8 +340,7 @@ impl<S: Clone + Zeroize + 'static> From<secure_gate::Dynamic<Vec<S>>> for Secret
 /// Clones the inner `str` into a new `String`. Both ends are zeroized on drop.
 impl From<SecretString> for secure_gate::Dynamic<String> {
     fn from(sb: SecretString) -> Self {
-        let val = String::from(sb.inner_secret.as_ref());
-        secure_gate::Dynamic::new(val)
+        secure_gate::Dynamic::<String>::new_with(|s| s.push_str(sb.inner_secret.as_ref()))
     }
 }
 
