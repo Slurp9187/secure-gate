@@ -1,32 +1,32 @@
 name: DSE zeroization check
 
+# The DSE asm-grep test in tests/asm_dse_check.rs is gated to
+# x86_64 (cfg(target_arch = "x86_64")). It checks both AT&T
+# (ubuntu-latest) and Intel (windows-latest, MSVC) syntax.
+# ARM64 macOS runners (macos-latest) silently skip the test
+# and are therefore not in the matrix; if x86_64 macOS coverage
+# is needed, switch to macos-13.
+
 on:
   workflow_dispatch:
   schedule:
     - cron: '0 3 * * 1' # weekly, Monday 03:00 UTC
   push:
     branches: [main]
-    paths:
-      - 'secure-gate-core/src/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
   pull_request:
     branches: [main]
-    paths:
-      - 'secure-gate-core/src/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
 
 permissions:
   contents: read
 
 jobs:
   dse-check:
-    name: DSE – volatile zero-store survival (${{ matrix.toolchain }})
-    runs-on: ubuntu-latest
+    name: DSE - volatile zero-store survival (${{ matrix.os }}, ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         toolchain: [stable, nightly]
     steps:
       - name: Checkout repository
