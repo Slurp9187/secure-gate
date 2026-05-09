@@ -46,7 +46,7 @@ use alloc::vec::Vec;
 use core::convert::Infallible;
 use core::str::FromStr;
 use core::{any, fmt};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 #[cfg(feature = "serde-serialize")]
 use super::SerializableSecret;
@@ -120,25 +120,41 @@ impl<S: Zeroize + Default> SecretBox<S> {
 impl<S: Zeroize + Clone> SecretBox<S> {
     /// Creates a `SecretBox` from the return value of `ctr`.
     ///
-    /// Makes an effort to zeroize the stack copy before boxing, but this is
-    /// best-effort. Prefer [`init_with_mut`](Self::init_with_mut) when possible.
+    /// **Zeroization scope.** The original return value of `ctr` is held in
+    /// [`Zeroizing<S>`](zeroize::Zeroizing) and is unconditionally zeroized
+    /// when this function returns or unwinds — including the case where
+    /// `S::clone()` itself panics partway through.
+    ///
+    /// **Residual best-effort window.** The cloned copy is briefly held as an
+    /// unwrapped stack temporary while it is being moved into `Box::new`. If
+    /// `Box::new` panics (e.g., OOM under a panicking allocator), that
+    /// temporary drops as `S`, which only zeroizes when `S` implements
+    /// [`ZeroizeOnDrop`] — the `Zeroize` bound alone is not enough. For the
+    /// common case where `S = Vec<u8>` / `String` / `[u8; N]`, this means the
+    /// post-clone `Box::new` panic window is *not* covered. Most real-world
+    /// allocators abort on OOM rather than panic, so this window is narrow,
+    /// but it is not zero.
+    ///
+    /// Prefer [`init_with_mut`](Self::init_with_mut) when possible: it
+    /// initializes a heap-resident default value in place and has no
+    /// stack-temporary window.
     pub fn init_with(ctr: impl FnOnce() -> S) -> Self {
-        let mut data = ctr();
-        let secret = Self {
-            inner_secret: Box::new(data.clone()),
-        };
-        data.zeroize();
-        secret
+        let data: Zeroizing<S> = Zeroizing::new(ctr());
+        Self {
+            inner_secret: Box::new((*data).clone()),
+        }
+        // `data` drops here (or during unwind); Zeroizing wipes the original.
     }
 
     /// Fallible variant of [`init_with`](Self::init_with).
+    ///
+    /// Carries the same panic-safety guarantees and the same residual
+    /// best-effort window as [`init_with`](Self::init_with).
     pub fn try_init_with<E>(ctr: impl FnOnce() -> Result<S, E>) -> Result<Self, E> {
-        let mut data = ctr()?;
-        let secret = Self {
-            inner_secret: Box::new(data.clone()),
-        };
-        data.zeroize();
-        Ok(secret)
+        let data: Zeroizing<S> = Zeroizing::new(ctr()?);
+        Ok(Self {
+            inner_secret: Box::new((*data).clone()),
+        })
     }
 }
 
