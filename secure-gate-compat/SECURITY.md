@@ -35,6 +35,7 @@ Compatibility shims for migrating from the [`secrecy`](https://crates.io/crates/
   - `SecretBox::init_with` has a residual `Box::new` panic-window leak (documented on the method).
   - The `From` migration shims for generic `S` and `Vec<T>` (e.g. `From<SecretBox<S>> for Dynamic<S>`) have a similar `Box::new` panic-window leak.
   - `From<String> for SecretString` and `From<Vec<S>> for SecretSlice<S>` will leak secret bytes in spare capacity if the input has `capacity > len` due to standard allocator shrink-realloc behavior.
+  - `SecretSlice<S>::clone()` (v10) uses `to_vec().into_boxed_slice()`, which may shrink-realloc if the cloned Vec's capacity exceeds its length, leaking bytes from the spare capacity.
 
 - **serde feature**: serialization is opt-in via `SerializableSecret`.  
   *Mitigation*: Only enable when needed; never serialize secrets unintentionally.

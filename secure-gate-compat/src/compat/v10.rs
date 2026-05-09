@@ -265,6 +265,9 @@ where
     S: CloneableSecret + Zeroize,
     [S]: Zeroize,
 {
+    /// **Warning:** Uses `to_vec().into_boxed_slice()`, which may shrink-realloc if the
+    /// intermediate Vec's capacity exceeds its length. Any secret bytes in spare capacity
+    /// will be leaked via the standard allocator. Prefer `init_with_mut` for in-place cloning.
     fn clone(&self) -> Self {
         SecretBox {
             inner_secret: self.inner_secret.as_ref().to_vec().into_boxed_slice(),
