@@ -1,7 +1,6 @@
 # secure-gate workspace
 
 [![Crates.io (secure-gate)](https://img.shields.io/crates/v/secure-gate.svg)](https://crates.io/crates/secure-gate)
-[![Crates.io (secure-gate-compat)](https://img.shields.io/crates/v/secure-gate-compat.svg)](https://crates.io/crates/secure-gate-compat)
 [![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate)
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
 [![MSRV: 1.85](https://img.shields.io/badge/msrv-1.85-blue)](Cargo.toml)
