@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0] - 2026-05-08
 
+### Release Notes
+
+- **Stable v0.9.0 release** — First stable version of the compat shim on the 0.9 line (Rust edition 2024, MSRV 1.85). Tracks `secure-gate = "0.9"`.
+- No API changes since `0.9.0-rc.5`; all `secrecy` v0.8 / v0.10 migration shims (`Secret`, `SecretBox`, `SecretString`, `SecretSlice`, `SecretVec`, `DebugSecret`) plus dual-version parity tests, fuzz targets, and migration guide are considered stable.
+- Parallel to v0.8.0 on `release/0.8` (Rust 2021 / MSRV 1.70).
+- Recommended for teams migrating off `secrecy` who target Rust 1.85+. Prefer dropping the `secrecy-compat` feature once migration is complete.
+
 ### Security
 
 - **Finding 5 — `SecretBox::init_with` / `try_init_with` clone-panic leak
@@ -32,13 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `try_init_with_zeros_original_on_clone_panic`) in
   `tests/compat_suite/edge_cases.rs` use a custom `S` whose `Clone` always
   panics and verify the original's `Zeroize::zeroize` runs during unwind.
-
-### Release Notes
-
-- **Stable v0.9.0 release** — First stable version of the compat shim on the 0.9 line (Rust edition 2024, MSRV 1.85). Tracks `secure-gate = "0.9"`.
-- No API changes since `0.9.0-rc.5`; all `secrecy` v0.8 / v0.10 migration shims (`Secret`, `SecretBox`, `SecretString`, `SecretSlice`, `SecretVec`, `DebugSecret`) plus dual-version parity tests, fuzz targets, and migration guide are considered stable.
-- Parallel to v0.8.0 on `release/0.8` (Rust 2021 / MSRV 1.70).
-- Recommended for teams migrating off `secrecy` who target Rust 1.85+. Prefer dropping the `secrecy-compat` feature once migration is complete.
 
 ## [0.9.0-rc.5] - 2026-04-03
 
