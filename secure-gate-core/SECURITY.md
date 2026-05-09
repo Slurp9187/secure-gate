@@ -154,6 +154,37 @@ All secret access follows this explicit hierarchy (the table below expands on th
   inherent limitation of the `zeroize` ecosystem — `zeroize`, `secrecy`, and other
   crates share the same constraint. Prefer `panic = "unwind"` (the default) in
   security-sensitive builds.
+- **`Dynamic<Vec<T>>` / `Dynamic<String>` mutation via reallocation leaves the
+  *previous* heap buffer unzeroized.** `Dynamic<T>` zeroizes the *currently held*
+  allocation on drop (including `Vec` / `String` spare capacity). Mutation
+  operations through `with_secret_mut` / `expose_secret_mut` that exceed the
+  current capacity (`push`, `push_str`, `extend`, `reserve`, `resize` past
+  `capacity()`, `insert`, etc.) cause `Vec` / `String` to allocate a new buffer,
+  copy the data, and free the old one through the standard allocator — *without
+  zeroizing the old buffer first*. The freed bytes remain readable in the heap
+  until the allocator reuses or unmaps the page, and they survive into core
+  dumps and swap.
+
+  **If your threat model includes process-memory disclosure (heap scrape, swap,
+  core dump) of secrets that have been mutated in place after construction,
+  avoid capacity-changing mutations on `Dynamic<Vec>` / `Dynamic<String>`.**
+  Either:
+
+  - pre-allocate to the maximum needed size with `Vec::with_capacity` /
+    `String::with_capacity` before wrapping, then mutate in place — every
+    capacity-stable mutation rewrites bytes in the same buffer, which is
+    zeroized on drop;
+  - use `Fixed<[u8; N]>` for known-size secrets (no realloc surface; the
+    allocation is fixed and zeroized on drop); or
+  - replace the wrapper with a fresh `Dynamic::new_with(...)` rather than
+    mutating in place — the old `Dynamic` zeroizes its buffer on drop.
+
+  This is a fundamental limitation of `Vec<T>` / `String` in Rust — the
+  standard library exposes no allocator hook to zeroize-on-realloc. The same
+  limitation applies to `secrecy`, `zeroize`-wrapped collections, and every
+  other secret wrapper around the standard collections; a custom-allocator
+  workaround exists but trades off significant complexity and is not enabled
+  by default in this crate. **`Fixed<T>` is exempt** — it has no realloc surface.
 
 **Mitigations**
 

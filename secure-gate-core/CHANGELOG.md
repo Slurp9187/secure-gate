@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Finding 1 — `Dynamic::new_with` closure-panic leak (HIGH).** The intermediate
+  buffer used by `Dynamic::<Vec<u8>>::new_with` and `Dynamic::<String>::new_with`
+  is now wrapped in `Zeroizing` for the entire lifetime of the closure. A closure
+  that wrote secret bytes and then panicked previously dropped a plain `Vec<u8>` /
+  `String` during unwind, leaking those bytes to the heap. The fix routes through
+  the existing `from_protected_bytes` swap pattern (newly added for `Dynamic<String>`
+  and the `cfg` gate removed for `Dynamic<Vec<u8>>`). New regression tests
+  (`check_new_with_panic_zeroed_vec` / `_string`) in `tests/heap_zeroize.rs`
+  verify the buffer is zeroed via the existing `ProxyAllocator` panic-mode hook.
+- **Finding 3 — `deserialize_with_limit` zeroization-scope misclaim (MEDIUM,
+  docs-only).** The rustdoc on `Dynamic::<Vec<u8>>::deserialize_with_limit` and
+  `Dynamic::<String>::deserialize_with_limit` previously suggested the
+  `Zeroizing` guarantee covered the full deserialize path. It does not — only
+  the post-deserialize buffer is protected; partial bytes accumulated by the
+  upstream visitor on error paths are owned by the visitor and dropped as
+  plain `Vec<u8>` / `String`. Docstrings now describe the zeroization
+  boundary precisely; no behavior change.
+- **Finding 2 — `with_secret_mut` realloc threat-model gap (MEDIUM, docs-only).**
+  `SECURITY.md` now documents that capacity-changing mutations through
+  `with_secret_mut` / `expose_secret_mut` on `Dynamic<Vec<T>>` /
+  `Dynamic<String>` cause `Vec` / `String` to free the *previous* buffer
+  through the standard allocator without zeroization. Added concrete
+  guidance: pre-allocate to max needed size, prefer `Fixed<[u8; N]>` for
+  known-size secrets, or replace the wrapper rather than mutate in place.
+  This is a fundamental limitation of standard-library collections shared
+  across the ecosystem; `Fixed<T>` is exempt.
+- **Finding 4 — DSE workflow coverage gaps (LOW, CI-only).** The DSE
+  zeroization-check workflow no longer uses `paths:` filters, so edits to
+  the test or workflow itself trigger the check on every PR. The matrix now
+  includes `windows-latest` (which exercises the Intel-syntax branch of the
+  asm-grep test); macOS is not in the matrix because `macos-latest` is
+  ARM64 and would silently skip the `cfg(target_arch = "x86_64")`-gated
+  test.
+
 ## [0.9.0] - 2026-05-08
 
 ### Release Notes

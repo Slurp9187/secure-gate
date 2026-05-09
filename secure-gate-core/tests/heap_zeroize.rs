@@ -473,6 +473,70 @@ fn check_panic_path_bytes_zeroed(size: usize) {
 }
 
 // ---------------------------------------------------------------------------
+// `Dynamic::<Vec<u8>>::new_with` closure-panic regression test
+//
+// Regression: prior to the Finding 1 fix, `new_with` constructed the
+// intermediate buffer as a plain `Vec<u8>` and only wrapped it after the
+// closure returned. A closure that wrote secret bytes and then panicked
+// would leak those bytes — the plain `Vec` dropped during unwind without
+// zeroization. After the fix, the intermediate buffer is `Zeroizing<Vec<u8>>`
+// for the entire lifetime of the closure, so unwind triggers zeroize → dealloc.
+//
+// Test shape mirrors `check_panic_path_bytes_zeroed`: poison-fill the buffer,
+// pin its backing-buffer pointer in `PANIC_CHECK_PTR`, then panic. The
+// proxy allocator records whether the matching dealloc saw all-zero bytes.
+// ---------------------------------------------------------------------------
+
+fn check_new_with_panic_zeroed_vec(size: usize) {
+    PANIC_CHECK_PTR.store(0, Ordering::SeqCst);
+    PANIC_CHECK_ZEROED.store(false, Ordering::SeqCst);
+    PANIC_CHECK_ACTIVE.store(true, Ordering::SeqCst);
+
+    let result = std::panic::catch_unwind(|| {
+        let _secret: Dynamic<Vec<u8>> = Dynamic::<Vec<u8>>::new_with(|v: &mut Vec<u8>| {
+            v.reserve_exact(size);
+            v.extend(std::iter::repeat_n(0xAAu8, size));
+            // Pin the backing-buffer pointer before panicking.
+            PANIC_CHECK_PTR.store(v.as_ptr() as usize, Ordering::SeqCst);
+            panic!("simulated closure failure after writing secret bytes");
+        });
+        // Unreachable: closure always panics. Reference the binding so the
+        // optimizer cannot lift it out of the protected region.
+        core::hint::black_box(&_secret);
+    });
+
+    PANIC_CHECK_ACTIVE.store(false, Ordering::SeqCst);
+    assert!(result.is_err(), "catch_unwind should have captured the panic");
+    assert!(
+        PANIC_CHECK_ZEROED.load(Ordering::SeqCst),
+        "Dynamic::<Vec<u8>>::new_with must zero its intermediate buffer on closure panic"
+    );
+}
+
+fn check_new_with_panic_zeroed_string(size: usize) {
+    PANIC_CHECK_PTR.store(0, Ordering::SeqCst);
+    PANIC_CHECK_ZEROED.store(false, Ordering::SeqCst);
+    PANIC_CHECK_ACTIVE.store(true, Ordering::SeqCst);
+
+    let result = std::panic::catch_unwind(|| {
+        let _secret: Dynamic<String> = Dynamic::<String>::new_with(|s: &mut String| {
+            s.reserve_exact(size);
+            s.extend(std::iter::repeat_n('A', size));
+            PANIC_CHECK_PTR.store(s.as_ptr() as usize, Ordering::SeqCst);
+            panic!("simulated closure failure after writing secret bytes");
+        });
+        core::hint::black_box(&_secret);
+    });
+
+    PANIC_CHECK_ACTIVE.store(false, Ordering::SeqCst);
+    assert!(result.is_err(), "catch_unwind should have captured the panic");
+    assert!(
+        PANIC_CHECK_ZEROED.load(Ordering::SeqCst),
+        "Dynamic::<String>::new_with must zero its intermediate buffer on closure panic"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Aggregate test
 // ---------------------------------------------------------------------------
 
@@ -540,4 +604,11 @@ fn all_heap_zeroed() {
     // Panic-path positive control: proves Zeroizing zeroes bytes on unwind.
     // Size 8192 avoids collision with panic-machinery allocations (see comment above).
     check_panic_path_bytes_zeroed(8192);
+
+    // Finding 1 regression: Dynamic::new_with closure-panic leak.
+    // Verifies that a closure panicking after writing secret bytes does not
+    // leak those bytes — the intermediate buffer must be Zeroizing-protected
+    // for the entire lifetime of the closure. Same size rationale as above.
+    check_new_with_panic_zeroed_vec(8192);
+    check_new_with_panic_zeroed_string(8192);
 }

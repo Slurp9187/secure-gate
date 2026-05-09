@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Finding 5 — `SecretBox::init_with` / `try_init_with` clone-panic leak
+  (MEDIUM, partial mitigation).** The closure return value is now wrapped in
+  `Zeroizing<S>` before `S::clone()` is called, so a panic during clone (e.g.,
+  OOM in `Vec::clone`) zeroes the original on unwind. The previous code
+  dropped the original as plain `S`, which only zeroizes when `S: ZeroizeOnDrop`
+  — the `S: Zeroize + Clone` bound alone is not enough.
+
+  **Residual best-effort window remains:** the cloned copy is briefly held as
+  an unwrapped stack temporary while it is moved into `Box::new`. If
+  `Box::new` itself panics (e.g., OOM under a panicking allocator) the
+  temporary drops as `S`, which still only zeroizes when `S: ZeroizeOnDrop`.
+  Closing this window would require tightening the trait bound to
+  `ZeroizeOnDrop`, which is rejected as an API break vs. `secrecy::SecretBox`
+  whose contract this shim mirrors. The residual window is now precisely
+  documented in the rustdoc; users who need full panic-safety should prefer
+  `init_with_mut`, which has no stack-temporary surface.
+
+  New regression tests (`init_with_zeros_original_on_clone_panic` /
+  `try_init_with_zeros_original_on_clone_panic`) in
+  `tests/compat_suite/edge_cases.rs` use a custom `S` whose `Clone` always
+  panics and verify the original's `Zeroize::zeroize` runs during unwind.
+
 ## [0.9.0] - 2026-05-08
 
 ### Release Notes
