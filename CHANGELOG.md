@@ -7,21 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.9.0] - 2026-05-08
-
-### Release Notes
-
-- **Stable v0.9.0 release** — First stable version of the 0.9 series.
-- Major security and architectural improvements from the 0.8.0 security overhaul are now considered mature and production-ready.
-- Clean workspace separation between `secure-gate` (core) and `secure-gate-compat`.
-- Comprehensive testing, zeroization verification, and documentation finalized.
-- Ready for general use alongside the 0.8.x LTS track.
-
-See the per-crate changelogs for detailed changes:
-
-- [`secure-gate-core/CHANGELOG.md`](secure-gate-core/CHANGELOG.md)
-- [`secure-gate-compat/CHANGELOG.md`](secure-gate-compat/CHANGELOG.md)
-
 ## [0.9.0-rc.5] - 2026-04-03
 
 ### Added
