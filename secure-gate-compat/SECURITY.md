@@ -2,11 +2,13 @@
 
 Compatibility shims for migrating from the [`secrecy`](https://crates.io/crates/secrecy) crate (v0.8.0 and v0.10.1).
 
+**Last updated:** March 2026 (for v0.9.0)
+
 ## TL;DR
 
 - Thin transitional layer providing drop-in replacements (`Secret<S>`, `SecretBox<S>`, `SecretString`, etc.) with the same zeroize-on-drop and redacted-`Debug` guarantees as the core library.
 - **Use only for migration** — switch to native `secure-gate` types (`Dynamic<T>`, `Fixed<[T; N]>`, `RevealSecret`) as soon as possible.
-- Follows the 3-tier access model: (1) scoped (`with_secret`/`with_secret_mut` — preferred), (2) direct (`expose_secret`/`expose_secret_mut` — escape hatch), (3) owned (`into_inner` — for FFI/type migration).
+- Follows the **3-tier access model** (prefer Tier 1): scoped (`with_secret`/`with_secret_mut`), direct (`expose_secret`/`expose_secret_mut`), owned (`into_inner`).
 - No unsafe code. All zeroization and access control is delegated to the core crate and `zeroize`.
 - Audit for **both** `ExposeSecret` (compat) and `RevealSecret` / `with_secret` (native) during transition.
 - **No formal audit or peer review** — this crate has not undergone an official security audit or independent peer review; treat it as experimental until then.
@@ -27,6 +29,12 @@ Compatibility shims for migrating from the [`secrecy`](https://crates.io/crates/
 
 - **Stack residue in v0.8 types** (`Secret<S>` uses inline storage, like core `Fixed<T>`): zeroization on drop is best-effort only.  
   *Mitigation*: Treat values as short-lived. Prefer Tier 1 scoped access (`with_secret`/`with_secret_mut`) to minimize exposure window.
+
+- **Compat-layer relaxations vs. core**: The compat layer deliberately relaxes certain security properties to remain a drop-in replacement for `secrecy`.
+  - `SecretString` (v10) and `Secret<String>` (v08) are unconditionally `Clone` (matches `secrecy`; `secure-gate` core is opt-in via `CloneableSecret`).
+  - `SecretBox::init_with` has a residual `Box::new` panic-window leak (documented on the method).
+  - The `From` migration shims for generic `S` and `Vec<T>` (e.g. `From<SecretBox<S>> for Dynamic<S>`) have a similar `Box::new` panic-window leak.
+  - `From<String> for SecretString` and `From<Vec<S>> for SecretSlice<S>` will leak secret bytes in spare capacity if the input has `capacity > len` due to standard allocator shrink-realloc behavior.
 
 - **serde feature**: serialization is opt-in via `SerializableSecret`.  
   *Mitigation*: Only enable when needed; never serialize secrets unintentionally.
@@ -52,7 +60,7 @@ Report vulnerabilities through the main repository:
 
 Expected response time: acknowledgment within 48 hours, coordinated disclosure after a fix is prepared.
 
-See the core crate's [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md) for the full policy.
+See the core crate's [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for the full policy.
 
 ## Disclaimer
 
