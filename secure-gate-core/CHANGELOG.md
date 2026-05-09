@@ -7,15 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.0-rc.9] - 2026-05-09
-
-### Release Notes
-
-- **v0.8.0-rc.9 release candidate** — Pre-release of the 0.8 LTS line (Rust edition 2021, MSRV 1.70). Not yet recommended for production use. Parallel to v0.9.0-rc.6 on `main`.
-- Security model, test coverage, and zeroization evidence chain (semantic `PanicOnNonZeroDrop` + `needs_drop` regression guard + `ProxyAllocator` physical verification + LLVM-level DSE asm check) are in place.
-- Open before stable: document `Dynamic::new` OOM-panic safety boundary; resolve `#[unsafe(no_mangle)]` in published binary vs. "no unsafe code" claim.
-- Recommended for users on Rust 1.70–1.84 who cannot move to edition 2024.
-
 ### Security
 
 - **Finding 1 — `Dynamic::new_with` closure-panic leak (HIGH).** The intermediate
