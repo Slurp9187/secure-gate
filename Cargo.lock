@@ -686,7 +686,7 @@ dependencies = [
 
 [[package]]
 name = "secure-gate"
-version = "0.8.0"
+version = "0.8.0-rc.9"
 dependencies = [
  "base16ct",
  "base64ct",
@@ -707,7 +707,7 @@ dependencies = [
 
 [[package]]
 name = "secure-gate-compat"
-version = "0.8.0"
+version = "0.8.0-rc.9"
 dependencies = [
  "proptest",
  "secrecy 0.10.1",
