@@ -382,12 +382,6 @@ impl Dynamic<Vec<u8>> {
     /// Note: `Box::new(*protected)` would be cleaner but does not compile —
     /// `Zeroizing` implements `Deref` (returning `&T`), not a move-out, so
     /// `*protected` yields a reference rather than an owned value (E0507).
-    #[cfg(any(
-        feature = "encoding-hex",
-        feature = "encoding-base64",
-        feature = "encoding-bech32",
-        feature = "encoding-bech32m",
-    ))]
     #[inline(always)]
     fn from_protected_bytes(mut protected: zeroize::Zeroizing<alloc::vec::Vec<u8>>) -> Self {
         // Only fallible allocation; protected stays live across it for panic-safety
@@ -396,32 +390,52 @@ impl Dynamic<Vec<u8>> {
         Self::from(boxed)
     }
 
-    /// Closure-based constructor for consistent API with [`Fixed::new_with`](crate::Fixed::new_with).
-    /// The actual secret data is allocated on the heap; this method exists
-    /// for consistent security-first construction idiom across the crate.
+    /// Closure-based constructor that protects against closure panics.
+    ///
+    /// The intermediate `Vec<u8>` is held inside a `Zeroizing` wrapper for the
+    /// entire duration of the closure, so any bytes the closure writes are
+    /// zeroed during stack unwinding if `f` panics. Constructed via the same
+    /// `Zeroizing` + swap pattern used by `from_protected_bytes`.
     #[inline(always)]
     pub fn new_with<F>(f: F) -> Self
     where
         F: FnOnce(&mut alloc::vec::Vec<u8>),
     {
-        let mut v = alloc::vec::Vec::new();
+        let mut v: zeroize::Zeroizing<alloc::vec::Vec<u8>> =
+            zeroize::Zeroizing::new(alloc::vec::Vec::new());
         f(&mut v);
-        Self::new(v)
+        Self::from_protected_bytes(v)
     }
 }
 
 impl Dynamic<alloc::string::String> {
-    /// Closure-based constructor for consistent API with [`Fixed::new_with`](crate::Fixed::new_with).
-    /// The actual secret data is allocated on the heap; this method exists
-    /// for consistent security-first construction idiom across the crate.
+    /// Heap-only construction from a `Zeroizing<String>`. Swaps the protected
+    /// buffer into a default-initialized `Box<String>` and returns the
+    /// `Dynamic`. Panic-safe: if the `Box` allocation OOM-panics, `protected`
+    /// stays live and `Zeroizing::drop` zeroes the secret bytes during unwind.
+    #[inline(always)]
+    fn from_protected_bytes(mut protected: zeroize::Zeroizing<alloc::string::String>) -> Self {
+        // Only fallible allocation; protected stays live across it for panic-safety
+        let mut boxed = Box::<alloc::string::String>::default();
+        core::mem::swap(&mut *boxed, &mut *protected);
+        Self::from(boxed)
+    }
+
+    /// Closure-based constructor that protects against closure panics.
+    ///
+    /// The intermediate `String` is held inside a `Zeroizing` wrapper for the
+    /// entire duration of the closure, so any bytes the closure writes are
+    /// zeroed during stack unwinding if `f` panics. Constructed via the same
+    /// `Zeroizing` + swap pattern used by `from_protected_bytes`.
     #[inline(always)]
     pub fn new_with<F>(f: F) -> Self
     where
         F: FnOnce(&mut alloc::string::String),
     {
-        let mut s = alloc::string::String::new();
+        let mut s: zeroize::Zeroizing<alloc::string::String> =
+            zeroize::Zeroizing::new(alloc::string::String::new());
         f(&mut s);
-        Self::new(s)
+        Self::from_protected_bytes(s)
     }
 }
 
@@ -797,9 +811,20 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// The standard [`serde::Deserialize`] impl calls this with [`MAX_DESERIALIZE_BYTES`].
     /// Use this method directly when you need a tighter or looser ceiling.
     ///
-    /// The intermediate buffer is kept inside a `Zeroizing` wrapper until after the `Box`
-    /// allocation completes, guaranteeing zeroization even on OOM panic. Oversized buffers
-    /// are also zeroized before the error is returned.
+    /// **Zeroization scope.** Once the upstream deserializer returns a complete
+    /// `Vec<u8>`, the value is wrapped in `Zeroizing` and stays protected for the
+    /// rest of this function: oversized buffers are zeroized before the error is
+    /// returned, and an OOM panic in the subsequent `Box` allocation triggers
+    /// zeroization on unwind. **However, this guarantee does *not* extend backwards
+    /// into the deserializer itself.** If the upstream `Vec<u8>` visitor accumulates
+    /// bytes element-by-element (e.g., a JSON sequence) and fails partway through,
+    /// the partial buffer is owned by the visitor and dropped as a plain `Vec<u8>` —
+    /// not zeroized. In the typical untrusted-input threat model the partial bytes
+    /// are attacker-controlled (the malformed payload they sent), so the practical
+    /// disclosure surface is bounded; but if your threat model includes deserialization
+    /// of trusted-but-corruptible secret material, treat the deserialize step as
+    /// outside the zeroization boundary and use `from_protected_bytes` (private API)
+    /// or `new_with` for in-process construction instead.
     ///
     /// **Important:** this limit is enforced *after* the upstream deserializer has fully
     /// materialized the payload. It is a **result-length acceptance bound**, not a
@@ -831,9 +856,20 @@ impl Dynamic<String> {
     /// The standard [`serde::Deserialize`] impl calls this with [`MAX_DESERIALIZE_BYTES`].
     /// Use this method directly when you need a tighter or looser ceiling.
     ///
-    /// The intermediate buffer is kept inside a `Zeroizing` wrapper until after the `Box`
-    /// allocation completes, guaranteeing zeroization even on OOM panic. Oversized buffers
-    /// are also zeroized before the error is returned.
+    /// **Zeroization scope.** Once the upstream deserializer returns a complete
+    /// `String`, the value is wrapped in `Zeroizing` and stays protected for the
+    /// rest of this function: oversized buffers are zeroized before the error is
+    /// returned, and an OOM panic in the subsequent `Box` allocation triggers
+    /// zeroization on unwind. **However, this guarantee does *not* extend backwards
+    /// into the deserializer itself.** If the upstream `String` visitor accumulates
+    /// characters and fails partway through (e.g., on an invalid UTF-8 boundary),
+    /// the partial buffer is owned by the visitor and dropped as a plain `String` —
+    /// not zeroized. In the typical untrusted-input threat model the partial bytes
+    /// are attacker-controlled (the malformed payload they sent), so the practical
+    /// disclosure surface is bounded; but if your threat model includes deserialization
+    /// of trusted-but-corruptible secret material, treat the deserialize step as
+    /// outside the zeroization boundary and use `from_protected_bytes` (private API)
+    /// or `new_with` for in-process construction instead.
     ///
     /// **Important:** this limit is enforced *after* the upstream deserializer has fully
     /// materialized the payload. It is a **result-length acceptance bound**, not a
