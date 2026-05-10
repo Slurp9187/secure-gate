@@ -12,6 +12,7 @@ keywords = ["crypto", "no-std", "security", "zeroize"]
 categories = ["cryptography", "no-std", "data-structures"]
 include = [
     "src/**/*.rs",
+    "benches/**/*.rs",
     "CHANGELOG.md",
     "LICENSE*",
     "README.md",
