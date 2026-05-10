@@ -56,6 +56,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the ergonomic and performance trade-offs (`FnOnce` → `FnMut`, no direct return
   value, dynamic dispatch overhead).
 
+### Breaking
+
+- **`RevealSecret::len()` now returns element count.** Previously all impls returned
+  `n_elements * size_of::<T>()` (bytes), which is correct only for `T = u8` and
+  violates Rust's universal `len()` = element-count contract (`Vec::len`,
+  `slice::len`, etc.). Fixed impls now return element count (`inner.len()` for
+  `Dynamic<Vec<T>>`, `N` for `Fixed<[T; N]>`). A new provided method
+  `RevealSecret::byte_len()` returns the byte size and is overridden for multi-byte
+  element types. **Behavior is unchanged** for the common cases `Dynamic<Vec<u8>>`,
+  `Dynamic<String>`, and `Fixed<[u8; N]>`.
+
 ### Documentation (post-review polish)
 
 - `fixed_alias!` macro: move `#[doc = $doc]` off the anonymous `const _:` zero-size guard onto the type alias itself. The previous order silently dropped user-supplied doc strings.
