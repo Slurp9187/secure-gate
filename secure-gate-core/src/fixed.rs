@@ -855,6 +855,11 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecret for Fixed<[T; N]> {
 
     #[inline(always)]
     fn len(&self) -> usize {
+        N
+    }
+
+    #[inline(always)]
+    fn byte_len(&self) -> usize {
         N * core::mem::size_of::<T>()
     }
 
