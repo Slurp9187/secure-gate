@@ -43,6 +43,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ARM64 and would silently skip the `cfg(target_arch = "x86_64")`-gated
   test.
 
+### Breaking
+
+- **`RevealSecret::len()` now returns element count.** Previously all impls returned
+  `n_elements * size_of::<T>()` (bytes), which is correct only for `T = u8` and
+  violates Rust's universal `len()` = element-count contract (`Vec::len`,
+  `slice::len`, etc.). Fixed impls now return element count (`inner.len()` for
+  `Dynamic<Vec<T>>`, `N` for `Fixed<[T; N]>`). A new provided method
+  `RevealSecret::byte_len()` returns the byte size and is overridden for multi-byte
+  element types. **Behavior is unchanged** for the common cases `Dynamic<Vec<u8>>`,
+  `Dynamic<String>`, and `Fixed<[u8; N]>`.
+
+### Fixed
+
+- **`secure-gate-compat` keyword count.** Dropped `"no-std"` from `Cargo.toml`
+  keywords (crates.io rejects more than 5).
+- **MSRV documentation corrected.** `README.md` and `ROADMAP.md` incorrectly
+  stated `release/0.8` MSRV as 1.75; corrected to 1.70.
+- **`#![forbid(unsafe_code)]` scope clarified.** `SECURITY.md` previously said
+  "enforced unconditionally"; updated to "enforced in the library crate" to
+  reflect that the binary crate `src/bin/asm_check.rs` uses
+  `#[unsafe(no_mangle)]` (Rust 2024 syntax), which is unrelated to the
+  library's guarantee.
+
 ### Documentation
 
 - **`RevealSecret` type-erasure stance clarified (design note).** `Box<dyn

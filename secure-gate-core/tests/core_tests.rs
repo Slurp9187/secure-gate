@@ -443,3 +443,35 @@ fn dynamic_from_rng_error_returns_err() {
     let result = Dynamic::<Vec<u8>>::from_rng(32, &mut FailingRng);
     assert!(result.is_err());
 }
+
+// === len() element-count semantics (issue #5) ===
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_vec_u32_len_is_element_count() {
+    let secret: Dynamic<Vec<u32>> = Dynamic::from(vec![0u32; 4]);
+    assert_eq!(secret.len(), 4);
+    assert_eq!(secret.byte_len(), 16);
+}
+
+#[test]
+fn fixed_u32_len_is_element_count() {
+    let secret: Fixed<[u32; 4]> = Fixed::new([0u32; 4]);
+    assert_eq!(secret.len(), 4);
+    assert_eq!(secret.byte_len(), 16);
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_vec_u8_len_unchanged() {
+    let secret: Dynamic<Vec<u8>> = Dynamic::from(vec![0u8; 8]);
+    assert_eq!(secret.len(), 8);
+    assert_eq!(secret.byte_len(), 8);
+}
+
+#[test]
+fn fixed_u8_len_unchanged() {
+    let secret: Fixed<[u8; 8]> = Fixed::new([0u8; 8]);
+    assert_eq!(secret.len(), 8);
+    assert_eq!(secret.byte_len(), 8);
+}

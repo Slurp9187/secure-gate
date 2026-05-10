@@ -180,10 +180,24 @@ pub trait RevealSecret {
     /// ```
     fn expose_secret(&self) -> &Self::Inner;
 
-    /// Returns the length of the secret in bytes.
+    /// Returns the number of elements in the secret, matching the underlying
+    /// container's `len()` — element count for `Vec<T>` and `[T; N]`, byte count
+    /// for `String`/`str` (where the element is a byte).
     ///
     /// Always safe to call — does not expose secret contents.
     fn len(&self) -> usize;
+
+    /// Returns the total size of the secret in bytes.
+    ///
+    /// For single-byte element types (`Vec<u8>`, `String`, `[u8; N]`) this equals
+    /// `len()`. For multi-byte element types override this method to return
+    /// `len() * core::mem::size_of::<T>()`.
+    ///
+    /// Always safe to call — does not expose secret contents.
+    #[inline(always)]
+    fn byte_len(&self) -> usize {
+        self.len()
+    }
 
     /// Returns `true` if the secret is empty.
     ///
