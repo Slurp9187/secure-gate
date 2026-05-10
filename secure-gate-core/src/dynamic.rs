@@ -504,6 +504,11 @@ impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
 
     #[inline(always)]
     fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    #[inline(always)]
+    fn byte_len(&self) -> usize {
         self.inner.len() * core::mem::size_of::<T>()
     }
 

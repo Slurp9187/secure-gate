@@ -3,7 +3,7 @@
 ## TL;DR
 
 - **No independent audit** — review the source code yourself before production use.
-- **No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally.
+- **No unsafe code** — `#![forbid(unsafe_code)]` enforced in the library crate.
 - **3-tier access model** — explicit hierarchy (prefer Tier 1 scoped methods). Audit Tier 2/3 calls separately.
 - **Explicit exposure only** — all external access requires `with_secret`/`expose_secret` (or mutable equivalents); no `Deref`/`AsRef`. Internal impls (`Clone`, `Serialize`) access `.inner` directly by design — they require opt-in marker traits and do not expose secrets to callers.
 - **Zeroization on drop** — full buffer (incl. spare capacity) is wiped (inner type must implement `Zeroize`).
@@ -70,7 +70,7 @@ All secret access follows this explicit hierarchy (the table below expands on th
 | Timing safety                  | `ConstantTimeEq` (`.ct_eq()`) — deterministic constant-time comparison via `expose_secret()`. Avoid `==`.          |
 | Opt-in risky features          | Cloning/serialization gated by marker traits (`CloneableSecret`, `SerializableSecret`)                             |
 | Redacted debug                 | `Debug` impl always prints `[REDACTED]`                                                                            |
-| No unsafe code                 | `#![forbid(unsafe_code)]` enforced at crate level                                                                  |
+| No unsafe code                 | `#![forbid(unsafe_code)]` enforced in the library crate                                                            |
 
 
 ## Feature Security Implications
