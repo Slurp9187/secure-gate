@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`rust-toolchain.toml`** (workspace root) — pins the workspace to Rust
+  channel `1.70` (matching the LTS MSRV) with `cargo`, `rustc`, `rust-std`,
+  `clippy`, and `rustfmt` components. Contributors no longer need
+  `cargo +1.70 …` for local builds; switching from `main` to this branch
+  swaps in the 1.70 toolchain automatically. CI jobs that set an explicit
+  toolchain still override the file.
+- **`.cargo/config.toml`** (workspace root) — sets
+  `[resolver] incompatible-rust-versions = "fallback"`. Cargo 1.70 itself
+  ignores this field (no MSRV-aware resolver until 1.84+), so it's a no-op
+  on the LTS toolchain. It takes effect the moment anyone runs
+  `cargo +1.85 update` against this branch — useful for bulk lockfile
+  refreshes that need to keep crate versions compatible with
+  `rust-version = "1.70"`. Day-to-day, the LTS branch's `Cargo.lock`
+  remains frozen and updates use targeted `--precise` pins.
+
 ## [0.8.0-rc.7] - 2026-03-30
 
 ### Documentation
