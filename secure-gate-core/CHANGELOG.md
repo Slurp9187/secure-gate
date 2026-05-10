@@ -65,6 +65,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reflect that the binary crate `src/bin/asm_check.rs` uses
   `#[unsafe(no_mangle)]` (Rust 2024 syntax), which is unrelated to the
   library's guarantee.
+- **Trybuild snapshots refreshed for rustc 1.85.1 diagnostic drift**
+  (`tests/compile-fail/fixed_alias_zero_size.stderr`,
+  `tests/compile-fail/serializable_secret_misuse.stderr`) — rustc 1.85.0 →
+  1.85.1 reformatted the `E0080` "evaluation of constant value" headline and
+  collapsed the `E0277` `help:` blocks for trait-impl pointers into single
+  inline `= help:` notes. Snapshots regenerated against 1.85.1 so
+  `cargo test --all-features --workspace` passes on the pinned toolchain
+  without needing `TRYBUILD=overwrite`. Stable CI continues to skip these
+  two cases (see prior entry under [0.9.0-rc.4] CI).
 
 ### Documentation
 
