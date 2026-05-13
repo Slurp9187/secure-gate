@@ -1,8 +1,15 @@
-//! Convenience macros for creating typed aliases to secure secret wrappers.
+//! Convenience macros for creating named aliases to secure secret wrappers.
 //!
-//! These macros create domain-specific newtype aliases (e.g., `Aes256Key`, `Password`)
+//! These macros create domain-specific type aliases (e.g., `Aes256Key`, `Password`)
 //! that inherit all security guarantees from [`Fixed`](crate::Fixed) or
 //! [`Dynamic`](crate::Dynamic): zeroize on drop, redacted `Debug`, explicit access only.
+//!
+//! These are plain Rust `type` aliases, **not** newtypes. Two aliases over the same
+//! underlying type (e.g. two `fixed_alias!` invocations with the same `N`) resolve to
+//! the same nominal type and are freely assignable to each other. The aliases improve
+//! readability and audit grep targets; they do not provide compile-time separation
+//! between distinct cryptographic roles. If you need nominal separation, wrap the alias
+//! in a `struct` newtype yourself.
 //!
 //! | Macro                   | Generates                   | Feature   |
 //! |-------------------------|-----------------------------|-----------|

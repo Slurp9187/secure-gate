@@ -113,7 +113,7 @@ assert_eq!(format!("{:?}", owned), "[REDACTED]");
 
 ### Macros for typed aliases
 
-`fixed_alias!`, `dynamic_alias!`, `fixed_generic_alias!`, and `dynamic_generic_alias!` create typed newtype wrappers with full visibility control, optional doc strings, and compile-time zero-size guards:
+`fixed_alias!`, `dynamic_alias!`, `fixed_generic_alias!`, and `dynamic_generic_alias!` create named type aliases over `Fixed<T>` / `Dynamic<T>` with full visibility control, optional doc strings, and (for `fixed_alias!`) a compile-time zero-size guard. They expand to plain `pub type` aliases, **not** newtypes — two aliases over the same underlying type are the same nominal type and assignable to each other. Use them for readability and audit grep targets, not for nominal separation between cryptographic roles:
 
 ```rust
 use secure_gate::{fixed_alias, dynamic_alias};
@@ -146,7 +146,7 @@ fn log_length<S: RevealSecret>(secret: &S) {
 
 - **Zero-cost safety** — mandatory zeroization on drop; `no_std` / `no_alloc` support.
 - **Audit-first API** — secrets cannot leak via `Deref`. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch.
-- **Type-safe wrappers** — macros create newtype aliases that redact `Debug` output automatically.
+- **Named aliases** — macros create `type` aliases over `Fixed` / `Dynamic` that inherit redacted `Debug` and zeroize-on-drop. These are plain type aliases, not newtypes: same-shape aliases (e.g. two `Fixed<[u8; 32]>` aliases) are interchangeable at the type level — wrap in a `struct` newtype yourself if you need nominal separation.
 - **Batteries included** — optional, zero-overhead support for serde, constant-time comparison (`subtle`), and secure encoding (hex, base64url, bech32/m).
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`.
 
