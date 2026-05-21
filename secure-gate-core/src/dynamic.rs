@@ -44,11 +44,12 @@
 //! let len = pw.with_secret(|s: &String| s.len());
 //! assert_eq!(len, 7);
 //!
-//! // Tier 1 mutable — scoped mutation.
-//! pw.with_secret_mut(|s: &mut String| s.push('!'));
+//! // Tier 1 mutable — scoped mutation. Prefer capacity-stable mutations for
+//! // Dynamic<String> / Dynamic<Vec<u8>>; see SECURITY.md for realloc notes.
+//! pw.with_secret_mut(|s: &mut String| s.make_ascii_uppercase());
 //!
 //! // Tier 2 — direct reference (escape hatch).
-//! assert_eq!(pw.expose_secret(), "hunter2!");
+//! assert_eq!(pw.expose_secret(), "HUNTER2");
 //!
 //! // Tier 3 — owned consumption.
 //! let owned = pw.into_inner();
@@ -61,6 +62,12 @@
 //! Ensure your profile sets `panic = "unwind"` — `panic = "abort"` skips destructors
 //! and therefore skips zeroization. (`Dynamic` cannot be `static` since it requires
 //! `Box` allocation, so the static-secret warning from `Fixed` does not apply.)
+//!
+//! For `Dynamic<Vec<_>>` and `Dynamic<String>`, capacity-changing mutations can
+//! cause the standard allocator to free the previous buffer without zeroizing it.
+//! Pre-allocate to the maximum size, use capacity-stable mutations, or prefer
+//! [`Fixed<T>`](crate::Fixed) for known-size secrets. See `SECURITY.md` for the
+//! full threat-model discussion and deployment-level mitigations.
 //!
 //! # See also
 //!
