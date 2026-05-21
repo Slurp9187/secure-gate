@@ -26,7 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guidance: pre-allocate to max needed size, prefer `Fixed<[u8; N]>` for
   known-size secrets, or replace the wrapper rather than mutate in place.
   This is a fundamental limitation of standard-library collections shared
-  across the ecosystem; `Fixed<T>` is exempt.
+  across the ecosystem; `Fixed<T>` is exempt. The docs also point stricter
+  deployments at process / OS-level mitigations such as zero-on-dealloc global
+  allocators, Linux `init_on_free=1`, disabling core dumps, and encrypted swap.
+  `Dynamic::into_inner` rustdoc now also notes that capacity-changing mutations
+  after ownership transfer have the same realloc-residue caveat.
 - **Finding 3 — `deserialize_with_limit` zeroization-scope misclaim (MEDIUM,
   docs-only).** The rustdoc on `Dynamic::<Vec<u8>>::deserialize_with_limit` and
   `Dynamic::<String>::deserialize_with_limit` previously suggested the

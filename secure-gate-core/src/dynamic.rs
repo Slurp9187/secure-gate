@@ -44,11 +44,12 @@
 //! let len = pw.with_secret(|s: &String| s.len());
 //! assert_eq!(len, 7);
 //!
-//! // Tier 1 mutable — scoped mutation.
-//! pw.with_secret_mut(|s: &mut String| s.push('!'));
+//! // Tier 1 mutable — scoped mutation. Prefer capacity-stable mutations for
+//! // Dynamic<String> / Dynamic<Vec<u8>>; see SECURITY.md for realloc notes.
+//! pw.with_secret_mut(|s: &mut String| s.make_ascii_uppercase());
 //!
 //! // Tier 2 — direct reference (escape hatch).
-//! assert_eq!(pw.expose_secret(), "hunter2!");
+//! assert_eq!(pw.expose_secret(), "HUNTER2");
 //!
 //! // Tier 3 — owned consumption.
 //! let owned = pw.into_inner();
@@ -61,6 +62,12 @@
 //! Ensure your profile sets `panic = "unwind"` — `panic = "abort"` skips destructors
 //! and therefore skips zeroization. (`Dynamic` cannot be `static` since it requires
 //! `Box` allocation, so the static-secret warning from `Fixed` does not apply.)
+//!
+//! For `Dynamic<Vec<_>>` and `Dynamic<String>`, capacity-changing mutations can
+//! cause the standard allocator to free the previous buffer without zeroizing it.
+//! Pre-allocate to the maximum size, use capacity-stable mutations, or prefer
+//! [`Fixed<T>`](crate::Fixed) for known-size secrets. See `SECURITY.md` for the
+//! full threat-model discussion and deployment-level mitigations.
 //!
 //! # See also
 //!
@@ -93,7 +100,7 @@ use crate::traits::encoding::bech32m::ToBech32m;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{TryCryptoRng, TryRng, rngs::SysRng};
+use rand::{rngs::SysRng, TryCryptoRng, TryRng};
 
 // Dynamic<Vec<u8>> is always alloc-dependent, so the alloc-gated blanket traits
 // are always available when encoding features are enabled for this type.
@@ -469,6 +476,10 @@ impl crate::RevealSecret for Dynamic<String> {
     /// confidentiality is preserved. This is the same OOM-safety pattern used by
     /// `from_protected_bytes` and `deserialize_with_limit`.
     ///
+    /// After ownership transfer, capacity-changing mutations on the returned
+    /// `InnerSecret<String>` have the same realloc-residue caveats as mutating
+    /// `Dynamic<String>` in place; see `SECURITY.md`.
+    ///
     /// See [`RevealSecret::into_inner`] for full documentation including the
     /// redacted `Debug` behavior.
     #[inline(always)]
@@ -519,6 +530,10 @@ impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
     /// unchanged and `Dynamic::drop` zeroizes the real secret during unwind —
     /// confidentiality is preserved. This is the same OOM-safety pattern used by
     /// `from_protected_bytes` and `deserialize_with_limit`.
+    ///
+    /// After ownership transfer, capacity-changing mutations on the returned
+    /// `InnerSecret<Vec<T>>` have the same realloc-residue caveats as mutating
+    /// `Dynamic<Vec<T>>` in place; see `SECURITY.md`.
     ///
     /// See [`RevealSecret::into_inner`] for full documentation including the
     /// redacted `Debug` behavior.

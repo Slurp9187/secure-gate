@@ -32,17 +32,17 @@ use secure_gate::{dynamic_alias, fixed_alias, RevealSecret, RevealSecretMut};
 dynamic_alias!(pub Password, String);  // Dynamic<String>
 fixed_alias!(pub Aes256Key, 32);       // Fixed<[u8; 32]>
 
-let mut pw: Password = "hunter2".into();
-let key: Aes256Key = Aes256Key::new([42u8; 32]);
+let pw: Password = "hunter2".into();
+let mut key: Aes256Key = Aes256Key::new([42u8; 32]);
 
 // Scoped access — the borrow cannot outlive the closure
 pw.with_secret(|s| println!("length: {}", s.len()));
 
 // Mutable scoped access
-pw.with_secret_mut(|s: &mut String| s.push('!'));
+key.with_secret_mut(|bytes| bytes[0] = 0);
 
 // Direct reference — auditable escape hatch (FFI, third-party APIs)
-assert_eq!(pw.expose_secret(), "hunter2!");
+assert_eq!(pw.expose_secret(), "hunter2");
 ```
 
 All types print `[REDACTED]` in `Debug` output and zeroize their memory on drop.
@@ -55,6 +55,10 @@ All types print `[REDACTED]` in `Debug` output and zeroize their memory on drop.
 - **Timing-safe comparison** — `.ct_eq()` via the `ct-eq` feature (uses `subtle`)
 - **Opt-in risk** — cloning and serialization require explicit marker traits (`CloneableSecret`, `SerializableSecret`)
 - **Verified** — semantic drop-order tests, physical heap-byte verification via `ProxyAllocator`, AddressSanitizer in CI, Miri on nightly
+
+For `Dynamic<Vec<_>>` and `Dynamic<String>`, avoid capacity-changing mutations
+after wrapping unless your deployment handles allocator-level residue. See
+[`secure-gate-core/SECURITY.md`](secure-gate-core/SECURITY.md) for details.
 
 ## Workspace Layout
 
