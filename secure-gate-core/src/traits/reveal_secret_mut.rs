@@ -99,14 +99,11 @@ pub trait RevealSecretMut: RevealSecret {
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(feature = "alloc")]
-    /// # {
-    /// use secure_gate::{Dynamic, RevealSecret, RevealSecretMut};
+    /// use secure_gate::{Fixed, RevealSecret, RevealSecretMut};
     ///
-    /// let mut pw: Dynamic<String> = Dynamic::new(String::from("hunter2"));
-    /// pw.expose_secret_mut().push('!');
-    /// assert_eq!(pw.expose_secret(), "hunter2!");
-    /// # }
+    /// let mut secret = Fixed::new([0u8; 4]);
+    /// secret.expose_secret_mut()[0] = 42;
+    /// assert_eq!(secret.expose_secret()[0], 42);
     /// ```
     fn expose_secret_mut(&mut self) -> &mut Self::Inner;
 }
