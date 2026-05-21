@@ -476,6 +476,10 @@ impl crate::RevealSecret for Dynamic<String> {
     /// confidentiality is preserved. This is the same OOM-safety pattern used by
     /// `from_protected_bytes` and `deserialize_with_limit`.
     ///
+    /// After ownership transfer, capacity-changing mutations on the returned
+    /// `InnerSecret<String>` have the same realloc-residue caveats as mutating
+    /// `Dynamic<String>` in place; see `SECURITY.md`.
+    ///
     /// See [`RevealSecret::into_inner`] for full documentation including the
     /// redacted `Debug` behavior.
     #[inline(always)]
@@ -526,6 +530,10 @@ impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
     /// unchanged and `Dynamic::drop` zeroizes the real secret during unwind —
     /// confidentiality is preserved. This is the same OOM-safety pattern used by
     /// `from_protected_bytes` and `deserialize_with_limit`.
+    ///
+    /// After ownership transfer, capacity-changing mutations on the returned
+    /// `InnerSecret<Vec<T>>` have the same realloc-residue caveats as mutating
+    /// `Dynamic<Vec<T>>` in place; see `SECURITY.md`.
     ///
     /// See [`RevealSecret::into_inner`] for full documentation including the
     /// redacted `Debug` behavior.
