@@ -100,7 +100,7 @@ use crate::traits::encoding::bech32m::ToBech32m;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{TryCryptoRng, TryRng, rngs::SysRng};
+use rand::{rngs::SysRng, TryCryptoRng, TryRng};
 
 // Dynamic<Vec<u8>> is always alloc-dependent, so the alloc-gated blanket traits
 // are always available when encoding features are enabled for this type.
