@@ -186,6 +186,15 @@ All secret access follows this explicit hierarchy (the table below expands on th
   workaround exists but trades off significant complexity and is not enabled
   by default in this crate. **`Fixed<T>` is exempt** — it has no realloc surface.
 
+  For stricter deployment threat models, handle this below the library layer:
+  install a zero-on-dealloc global allocator such as `zeroizing-alloc` in the
+  final binary, use OS or allocator zero-on-free facilities where available
+  (for example Linux `init_on_free=1` or hardened allocators), disable core
+  dumps for secret-holding processes, and ensure swap / hibernation storage is
+  encrypted. These are process-wide operational choices, so `secure-gate` treats
+  allocator-level zeroization as deployment configuration rather than a crate
+  feature.
+
 **Mitigations**
 
 - **For accessing secrets:** prefer the scoped `with_secret()` / `with_secret_mut()` closures

@@ -32,16 +32,17 @@ dynamic_alias!(pub Password, String);    // Dynamic<String>
 fixed_alias!(pub Aes256Key, 32);         // Fixed<[u8; 32]>
 
 let mut pw: Password = "hunter2".into();
-let key: Aes256Key = Aes256Key::new([42u8; 32]);
+let mut key: Aes256Key = Aes256Key::new([42u8; 32]);
 
 // Scoped access — preferred; the borrow cannot outlive the closure
 pw.with_secret(|s| println!("length: {}", s.len()));
 
-// Mutable scoped access
-pw.with_secret_mut(|s: &mut String| s.push('!'));
+// Mutable scoped access. For Dynamic<String> / Dynamic<Vec<u8>>, prefer
+// capacity-stable mutations or pre-allocate before wrapping; see SECURITY.md.
+key.with_secret_mut(|bytes| bytes[0] = 0);
 
 // Direct reference — auditable escape hatch (e.g. FFI, third-party APIs)
-assert_eq!(pw.expose_secret(), "hunter2!");
+assert_eq!(pw.expose_secret(), "hunter2");
 pw.expose_secret_mut().clear();
 
 #[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
@@ -276,6 +277,10 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 - **Zeroize on drop** — always active; inner type must implement `Zeroize`
 - **Timing-safe equality** — `ct-eq` feature (`.ct_eq()`) routes through `expose_secret()`, honoring the explicit-access model
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
+
+For `Dynamic<Vec<_>>` and `Dynamic<String>`, avoid capacity-changing mutations
+after wrapping unless your deployment handles allocator-level residue. See
+`SECURITY.md` for the realloc threat-model note and operational mitigations.
 
 Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md) for the full threat model and mitigations.
 
