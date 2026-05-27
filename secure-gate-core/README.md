@@ -268,10 +268,22 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
 
 For `Dynamic<Vec<_>>` and `Dynamic<String>`, avoid capacity-changing mutations
-after wrapping unless your deployment handles allocator-level residue. See
-`SECURITY.md` for the realloc threat-model note and operational mitigations.
+after wrapping unless your deployment handles allocator-level residue. For
+known-size heap-only key material, prefer `Dynamic<[u8; N]>` (boxed array — no
+realloc surface). See `SECURITY.md` for the realloc threat-model note and
+operational mitigations.
 
-Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for the full threat model and mitigations.
+### Inherent Rust limitations
+
+Three universal in-memory-secret limits apply (same across C, C++, Go, and
+Rust): **stack-move residue** (mitigated by `Fixed::new_with`, pass-by-reference,
+or switching to `Dynamic<T>`), **heap-reallocation residue** (mitigated by
+pre-sizing, `Dynamic<[u8; N]>`, or the
+[`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) global allocator),
+and **swap / core dumps** (OS-level — `mlock`, encrypted swap, disabled core
+dumps).
+
+Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for the full threat model and mitigations, including the dedicated [§ Inherent Rust Limitations](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#inherent-rust-limitations) section.
 
 ## Audit Surface (Secret Materialization)
 

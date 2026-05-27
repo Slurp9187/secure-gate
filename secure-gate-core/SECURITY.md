@@ -24,6 +24,71 @@ This document outlines the security model, design choices, strengths, limitation
 - **Allocation-based DoS from deserialization** — `MAX_DESERIALIZE_BYTES` is a post-materialization bound only; the upstream deserializer may allocate arbitrarily first.
 - **Stack/register residue** — temporaries, FFI boundaries, and compiler spills are outside wrapper control.
 
+## Inherent Rust Limitations
+
+These three limitations are inherent to systems languages with a stack, a
+growable heap, and an OS that pages memory. They are **not unique to
+`secure-gate`** — `secrecy`, `zeroize`-wrapped collections, C/C++ secret
+crates, and Go's `memguard` all share the same threat model. The crate
+documents them honestly rather than overclaiming.
+
+### 1. Stack-move residue (`Fixed<T>`)
+
+When a `Fixed<T>` is moved (returned, passed by value, stored into a
+struct field), the bytes are bitwise-copied to the new location and the
+**original stack slot retains the original bits** until a later stack
+frame overwrites them. `ZeroizeOnDrop` only fires on the *current*
+location. The Rust language has no facility to direct the compiler to
+zero an out-of-scope stack slot.
+
+**Recommended patterns:**
+
+- Use [`Fixed::new_with`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html#method.new_with) instead of [`Fixed::new`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html#method.new) to write secret material directly into the wrapper's storage — eliminates the construction-site stack temporary.
+- Pass `&Fixed<T>` / `&mut Fixed<T>` by reference rather than `Fixed<T>` by value. Keep the wrapper short-scope.
+- For long-lived secrets, prefer [`Dynamic<T>`](https://docs.rs/secure-gate/latest/secure_gate/struct.Dynamic.html) — heap-only, no stack surface to leak from.
+- For address-stability needs (FFI, self-referential structs), users may pin the wrapper at the call site: `let key = core::pin::pin!(Fixed::new_with(|a| …));`. This is opt-in; the crate does not impose pinning by default because it would break idiomatic use (returning, storing).
+
+### 2. Heap-reallocation residue (`Dynamic<Vec<T>>` / `Dynamic<String>`)
+
+When a `Vec<T>` or `String` grows past its current capacity, the
+standard library allocates a new buffer, memcpys the contents, and frees
+the old buffer **without zeroing**. `ZeroizingOnDrop` only zeros the
+*currently held* allocation. The freed bytes remain readable in heap
+memory until the allocator reuses or unmaps the page; they survive into
+core dumps and swap.
+
+**Recommended patterns:**
+
+- For **known-size key material**, prefer [`Fixed<[u8; N]>`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html) (no allocation) or `Dynamic<[u8; N]>` (heap-only, fixed size — no realloc surface).
+- For **bounded-size variable-length secrets**, pre-size with `Vec::with_capacity(MAX)` / `String::with_capacity(MAX)` *before* wrapping in `Dynamic`, then only perform capacity-stable mutations through `with_secret_mut`.
+- For **infrequent updates**, replace the entire wrapper rather than mutating in place: `dyn_secret = Dynamic::new_with(|v| …)` — the old `Dynamic` zeroizes its buffer on drop.
+- For **deployment-level remediation**, install a zero-on-deallocate global allocator such as [`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) in the final binary, or rely on OS facilities (Linux `init_on_free=1`, hardened allocators). These are process-wide operational choices rather than a per-crate feature.
+
+A custom-allocator-parameterized `Dynamic<T, A>` (analogous to C++'s
+`std::vector<T, ZeroingAllocator<T>>`) would resolve this at the type
+level but currently requires nightly Rust (`allocator_api`) and `unsafe`
+code. `secure-gate` does not enable it; users with strict realloc-residue
+requirements should adopt the global-allocator approach above.
+
+### 3. Swap / core dumps / external memory exposure
+
+Process memory may be paged to disk (swap, hibernation) or written to a
+core dump on crash. Once written, zeroization-on-drop in the running
+process is irrelevant — the bytes already left the process's address
+space. This applies identically to C, C++, Go, and Rust; it is OS-level
+and outside any in-process library's reach.
+
+**Recommended patterns (deployment-level):**
+
+- Use **encrypted swap** (default on most modern Linux distributions, FileVault on macOS, BitLocker on Windows).
+- Disable core dumps for secret-holding processes: `prctl(PR_SET_DUMPABLE, 0)` on Linux, `setrlimit(RLIMIT_CORE, 0)` for the whole process, or container `--ulimit core=0`.
+- `mlock` / `mlockall` to prevent specific allocations from being paged out — at the cost of pinning physical memory and consuming the process's lock budget.
+- Disable hibernation on machines that hold long-lived keys, or ensure hibernation storage is encrypted.
+
+`secure-gate` treats all three of these mitigations as deployment
+configuration. The crate does not call `mlock` or set process flags
+itself.
+
 ## Audit Status
 
 `secure-gate` has **not** undergone an independent security audit.
@@ -187,13 +252,16 @@ All secret access follows this explicit hierarchy (the table below expands on th
   by default in this crate. **`Fixed<T>` is exempt** — it has no realloc surface.
 
   For stricter deployment threat models, handle this below the library layer:
-  install a zero-on-dealloc global allocator such as `zeroizing-alloc` in the
-  final binary, use OS or allocator zero-on-free facilities where available
+  install a zero-on-dealloc global allocator such as
+  [`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) in the final
+  binary (the recommended approach when downstream code controls the global
+  allocator), use OS or allocator zero-on-free facilities where available
   (for example Linux `init_on_free=1` or hardened allocators), disable core
   dumps for secret-holding processes, and ensure swap / hibernation storage is
   encrypted. These are process-wide operational choices, so `secure-gate` treats
   allocator-level zeroization as deployment configuration rather than a crate
-  feature.
+  feature. See the "Inherent Rust Limitations" section above for the broader
+  context.
 
 **Mitigations**
 
