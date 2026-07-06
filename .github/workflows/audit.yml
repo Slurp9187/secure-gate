@@ -1,0 +1,66 @@
+name: Security audit
+
+on:
+  schedule:
+    # Weekly (Mondays 05:00 UTC). Advisories are time-sensitive; a monthly
+    # cadence would leave up to a four-week blind window.
+    - cron: "0 5 * * 1"
+  push:
+    branches: [main, "release/0.8"]
+    paths:
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/audit.yml"
+  pull_request:
+    paths:
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Audits the ref that triggered the event (dependency changes on push / PR).
+  audit:
+    name: cargo audit (event ref)
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - name: cargo audit
+        run: cargo audit
+
+  # Scheduled sweep over BOTH release lines. Scheduled workflows only run from
+  # the default branch, so the LTS lockfile must be checked out explicitly —
+  # its older pinned dependencies are the more likely place for advisories to
+  # accumulate.
+  audit-scheduled:
+    name: cargo audit (${{ matrix.ref }})
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ref: [main, "release/0.8"]
+    steps:
+      - name: Checkout ${{ matrix.ref }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - name: cargo audit
+        run: cargo audit

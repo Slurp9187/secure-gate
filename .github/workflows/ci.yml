@@ -179,6 +179,36 @@ jobs:
         run: cargo test -p secure-gate --tests ${{ matrix.features }} -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip dynamic_string_no_hex_compile_fail
 
   # ---------------------------------------------------------------------------
+  # Release-profile test job — build-invariance oracle
+  #
+  # The error API guarantees identical shapes and messages in debug and release
+  # builds, and several tests assert exact Display output. The matrix above runs
+  # the debug profile only, so run the full suites once under --release to keep
+  # the build-invariance property continuously verified.
+  # ---------------------------------------------------------------------------
+  test-release:
+    name: Test – release profile
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run core tests (release, full features)
+        run: cargo test -p secure-gate --tests --release --features=full -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip dynamic_string_no_hex_compile_fail
+
+      - name: Run compat tests (release, all features)
+        run: cargo test -p secure-gate-compat --release --all-features
+
+  # ---------------------------------------------------------------------------
   # no_std job — cross-build for a bare-metal target
   #
   # The hosted "--no-default-features" jobs above silently link std, so they
