@@ -26,7 +26,8 @@ impl SerializableSecret for TestSerializableVec {}
 fn fixed_roundtrip() {
     let original = TestSerializableArray([1u8, 2, 3, 4]);
     let serialized = serde_json::to_string(&original).expect("serialize");
-    let deserialized: TestSerializableArray = serde_json::from_str(&serialized).expect("deserialize");
+    let deserialized: TestSerializableArray =
+        serde_json::from_str(&serialized).expect("deserialize");
     assert_eq!(original.0, deserialized.0);
 }
 
@@ -88,7 +89,11 @@ fn fixed_wrapper_serializes_correctly() {
 
 /// Dynamic<T: SerializableSecret + Zeroize + Serialize> delegates serialization
 /// to the inner value. Verifies the wrapper serializes correctly.
-#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize", feature = "alloc"))]
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "serde-serialize",
+    feature = "alloc"
+))]
 #[test]
 fn dynamic_wrapper_serializes_correctly() {
     use secure_gate::Dynamic;

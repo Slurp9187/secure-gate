@@ -7,7 +7,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Security
+### Added
+
+- **`Fixed<[u8; N]>` deserialization now accepts byte-string input.** The
+  visitor implements `visit_bytes` / `visit_byte_buf` in addition to
+  `visit_seq`, so self-describing formats that encode byte arrays as byte
+  strings (e.g. CBOR) round-trip. The `deserialize_seq` entry point is
+  unchanged, so the wire format for non-self-describing formats (bincode) is
+  unaffected. Owned buffers handed over through `visit_byte_buf` are wrapped
+  in `Zeroizing` and wiped after the copy.
+
+### Security (pre-v0.9.0 security sweep)
+
+### Security (backport of the pre-v0.9.0 security sweep — main PR #139)
+
+- **`no_std` support was advertised but did not exist — now real and CI-verified.**
+  The crate never declared `#![no_std]`, so it unconditionally linked `std` and
+  failed to build on bare-metal targets despite the `no-std` keyword/category and
+  README claims. Fixed end to end: added
+  `#![cfg_attr(not(feature = "std"), no_std)]`; disabled the default `std`
+  feature of `subtle`; **removed `thiserror` entirely on this branch** — its
+  `no_std` support requires `core::error::Error` (Rust 1.81+), above this
+  branch's MSRV 1.70, so `error.rs` hand-writes `Display` and gates
+  `std::error::Error` (including `DecodingError::source()`) behind the `std`
+  feature; switched `rand` to
+  `default-features = false, features = ["os_rng"]` (with `std_rng` moved to a
+  dev-dependency for tests); removed all `String` usage from no-alloc code paths;
+  gated `FromBech32Str` / `FromBech32mStr` on `alloc` (matching the other decoding
+  traits — their blanket impls always returned `Vec`); and gave the internal
+  `asm_check` binary `required-features = ["std"]`. A new CI job cross-builds the
+  library for `thumbv7em-none-eabihf` across all no-alloc feature combinations so
+  this cannot regress silently. Note: on bare metal, `from_random` additionally
+  requires a user-configured `getrandom` backend (documented in lib.rs).
+- **`Fixed<[u8; N]>` deserialization could leak a secret prefix through realloc.**
+  The `visit_seq` visitor reserved `N` bytes but pushed unboundedly: an input
+  sequence with more than `N` elements grew the `Zeroizing<Vec<u8>>` past its
+  capacity, and the reallocation freed the old buffer — already holding the first
+  `N` secret bytes — without zeroization, before the length check rejected the
+  input. Over-length sequences are now rejected *before* the buffer can grow.
+  Regression test: `fixed_deserialize_over_length_rejected`.
+- **Bech32/Bech32m HRP-checked decoding no longer materializes payload bytes
+  before validating the HRP.** `FromBech32Str::try_from_bech32` and
+  `FromBech32mStr::try_from_bech32m` (used by `Dynamic::try_from_bech32*`)
+  previously decoded the full payload into a plain `Vec<u8>` and *then* compared
+  HRPs — on mismatch, the decoded secret was dropped unzeroized. The HRP is now
+  validated on the checksum-verified string before a single payload byte is
+  produced, matching what `Fixed::try_from_bech32*` already did. Payload
+  collection is a single exact-size allocation (`byte_iter()` is an
+  `ExactSizeIterator`), so no realloc copies are left behind either.
+
+### Changed (breaking — API stabilization ahead of v0.8.0, mirrors main)
+
+- **Error enums are build-invariant, heap-free, `Copy`, and `#[non_exhaustive]`.**
+  Previously, `FromSliceError`, `HexError`, `Base64Error`, `Bech32Error`, and
+  `DecodingError` changed *shape* between debug and release builds
+  (`cfg(debug_assertions)`-gated variants) — downstream code matching
+  `InvalidLength { expected, got }` compiled in dev and broke under `--release`.
+  Now, in every build profile:
+  - `InvalidLength { expected: usize, got: usize }` always carries both lengths
+    (lengths are public protocol parameters; `FromSliceError`'s field `actual`
+    was renamed to `got` for consistency).
+  - `Bech32Error::UnexpectedHrp` and `DecodingError::InvalidEncoding` are
+    fieldless — input-derived strings (received HRPs, hint text) are never
+    captured, in any build. This also removes every `String` from the error
+    types, making them `Copy` and `no_std`-clean.
+  - All five enums and their struct variants are `#[non_exhaustive]`: variants
+    and fields can be added without a semver-major bump; downstream matches need
+    a wildcard arm, and length-mismatch errors can no longer be constructed
+    outside the crate.
+- **`RevealSecret::into_inner` bound changed from `Default` to the new
+  `SentinelValue` trait — now usable for `Fixed<[u8; N]>` with `N > 32`.**
+  The previous `Self::Inner: Default` bound silently made `into_inner`
+  uncallable for arrays longer than 32 elements (std's `Default` limit), which
+  covers common sizes such as 64-byte Ed25519 expanded keys and HMAC-SHA512
+  keys — contradicting the trait docs. `SentinelValue` (exported at the crate
+  root) provides the inert placeholder left behind after extraction and is
+  implemented for `[T; N]` (any `N`, `T: Default`), `String`, and `Vec<T>`;
+  downstream crates can implement it for custom inner types. Regression test:
+  `fixed_into_inner_beyond_default_limit`.
+
+### Documentation
+
+- **Marker traits (`CloneableSecret`, `SerializableSecret`): documented the
+  orphan-rule consequence.** Downstream crates cannot implement these markers
+  for foreign types (`String`, `Vec<u8>`, `[u8; N]`), so the `cloneable` /
+  `serde-serialize` features only apply to local newtype inner types. The trait
+  and re-export docs now state this explicitly, explain why it is intentional
+  (pre-implementing the markers for std containers would silently opt in every
+  wrapped secret in a dependency graph), and show the newtype pattern.
+- `SECURITY.md`: rewrote the error-metadata section for the build-invariant
+  design; documented the serde over-length guard, the HRP-before-decode
+  ordering, and the CI-verified `no_std` claim.
+
+### Security (earlier audit findings)
 
 - **Finding 1 — `Dynamic::new_with` closure-panic leak (HIGH).** The intermediate
   buffer used by `Dynamic::<Vec<u8>>::new_with` and `Dynamic::<String>::new_with`

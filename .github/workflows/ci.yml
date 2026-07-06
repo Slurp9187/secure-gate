@@ -23,6 +23,24 @@ permissions:
   contents: read
 
 jobs:
+  fmt:
+    name: rustfmt – check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Pin to this branch's toolchain (rust-toolchain.toml, 1.70): rustfmt
+      # output differs across toolchains, and the tree is formatted with 1.70.
+      - name: Install Rust 1.70 + rustfmt
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: "1.70"
+          components: rustfmt
+
+      - name: cargo fmt --all --check
+        run: cargo +1.70 fmt --all --check
+
   lint:
     name: Lint (${{ matrix.package }}/${{ matrix.name }})
     runs-on: ubuntu-latest
@@ -153,9 +171,64 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run tests (${{ matrix.name }})
-        # Trybuild snapshots are pinned to Rust 1.85 diagnostic format.
-        # Stable rustc diagnostics drift over time, so skip compile-fail cases here.
-        run: cargo test -p secure-gate --tests ${{ matrix.features }} -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse
+        # The three trybuild snapshots are blessed against this branch's pinned
+        # toolchain (rust-toolchain.toml, 1.70). Stable rustc diagnostics drift
+        # over time (dynamic_string_no_hex broke when stable switched E0599's
+        # candidate note to a single-line form), so skip those cases here and
+        # keep them covered by local/toolchain-pinned runs.
+        run: cargo test -p secure-gate --tests ${{ matrix.features }} -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip dynamic_string_no_hex_compile_fail
+
+  # ---------------------------------------------------------------------------
+  # no_std job — cross-build for a bare-metal target
+  #
+  # The hosted "--no-default-features" jobs above silently link std, so they
+  # cannot catch std leakage (missing #![no_std], dependencies with default
+  # `std` features, prelude-only type usage). Cross-building for a target with
+  # no std at all is the only authoritative check. `rand` is excluded: it needs
+  # a user-configured getrandom backend on bare metal (documented in lib.rs).
+  # ---------------------------------------------------------------------------
+  no-std:
+    name: no_std – cross-build (thumbv7em-none-eabihf)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable + thumbv7em target
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: thumbv7em-none-eabihf
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cross-build library for bare metal (feature matrix)
+        run: |
+          set -eux
+          for features in \
+            "" \
+            "encoding-hex" \
+            "encoding-base64" \
+            "encoding-bech32" \
+            "encoding-bech32m" \
+            "encoding-hex,encoding-base64,encoding-bech32,encoding-bech32m" \
+            "ct-eq" \
+            "ct-eq,encoding-hex,encoding-base64,encoding-bech32,encoding-bech32m"
+          do
+            cargo build -p secure-gate --lib \
+              --target thumbv7em-none-eabihf \
+              --no-default-features \
+              ${features:+--features "$features"}
+          done
+
+      - name: Cross-build compat for bare metal
+        # secure-gate-compat is unconditionally #![no_std] (alloc-based shims).
+        run: |
+          set -eux
+          cargo build -p secure-gate-compat --lib --target thumbv7em-none-eabihf
+          cargo build -p secure-gate-compat --lib --target thumbv7em-none-eabihf --features secrecy-compat
 
   # ---------------------------------------------------------------------------
   # MSRV job — verify declared rust-version is actually buildable

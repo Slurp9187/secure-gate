@@ -51,6 +51,10 @@ fn fixed_drop_emits_volatile_zero_stores() {
             "--release",
             "--bin",
             "asm_check",
+            // The binary declares required-features = ["std"] so it is skipped
+            // in no_std target builds; enable the feature explicitly here.
+            "--features",
+            "std",
             "--",
             "--emit=asm",
         ])

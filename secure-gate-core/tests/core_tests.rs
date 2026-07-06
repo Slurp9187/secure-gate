@@ -4,7 +4,7 @@
 use secure_gate::CloneableSecret;
 #[cfg(feature = "alloc")]
 use secure_gate::Dynamic;
-use secure_gate::{RevealSecret, RevealSecretMut, Fixed};
+use secure_gate::{Fixed, RevealSecret, RevealSecretMut};
 
 // === Basic Functionality ===
 
@@ -137,6 +137,33 @@ fn fixed_into_inner_returns_zeroizing() {
     assert_eq!(*owned, [0xABu8; 32]);
 }
 
+/// Regression: `into_inner` must work for arrays larger than 32 elements.
+/// A plain `Default` bound would fail here — std only implements `Default`
+/// for arrays up to 32; the `SentinelValue` bound has no such limit.
+#[test]
+fn fixed_into_inner_beyond_default_limit() {
+    let key64 = Fixed::new([0xCDu8; 64]);
+    let owned64: secure_gate::InnerSecret<[u8; 64]> = key64.into_inner();
+    assert_eq!(*owned64, [0xCDu8; 64]);
+
+    let key128 = Fixed::new([0xEFu8; 128]);
+    let owned128: secure_gate::InnerSecret<[u8; 128]> = key128.into_inner();
+    assert_eq!(*owned128, [0xEFu8; 128]);
+}
+
+/// `SentinelValue` is implementable for downstream inner types, and generic
+/// code can rely on the bound.
+#[test]
+fn sentinel_value_provided_impls() {
+    use secure_gate::SentinelValue;
+    assert_eq!(<[u8; 64]>::sentinel_value(), [0u8; 64]);
+    #[cfg(feature = "alloc")]
+    {
+        assert_eq!(String::sentinel_value(), String::new());
+        assert_eq!(Vec::<u8>::sentinel_value(), Vec::<u8>::new());
+    }
+}
+
 #[cfg(feature = "alloc")]
 #[test]
 fn dynamic_string_into_inner_returns_zeroizing() {
@@ -250,7 +277,7 @@ fn cloneable_secret_works() {
     // below would corrupt the other, causing UB or a panic in CloneKey::zeroize.
     let w: Fixed<CloneKey> = Fixed::new(CloneKey(vec![0xBBu8; 4]));
     let w2 = w.clone();
-    drop(w);  // zeroizes w's Vec<u8> backing via CloneKey::zeroize
+    drop(w); // zeroizes w's Vec<u8> backing via CloneKey::zeroize
     drop(w2); // independently zeroizes w2's backing — no UB/panic = independent
 }
 
@@ -276,22 +303,24 @@ fn fixed_from_random() {
 #[cfg(feature = "rand")]
 #[test]
 fn fixed_from_rng_seeded_deterministic() {
-    use rand::SeedableRng;
     use rand::rngs::StdRng;
+    use rand::SeedableRng;
 
     let mut rng_a = StdRng::from_seed([1u8; 32]);
     let mut rng_b = StdRng::from_seed([1u8; 32]);
     let key_a: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_a).expect("rng fill");
     let key_b: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_b).expect("rng fill");
-    key_a.with_secret(|a| key_b.with_secret(|b| assert_eq!(a, b, "same seed must yield same bytes")));
+    key_a.with_secret(|a| {
+        key_b.with_secret(|b| assert_eq!(a, b, "same seed must yield same bytes"))
+    });
 }
 
 #[cfg(feature = "rand")]
 #[cfg(feature = "alloc")]
 #[test]
 fn dynamic_from_rng_seeded() {
-    use rand::SeedableRng;
     use rand::rngs::StdRng;
+    use rand::SeedableRng;
     use secure_gate::Dynamic;
 
     let mut rng = StdRng::from_seed([9u8; 32]);
@@ -354,9 +383,15 @@ impl std::error::Error for RngError {}
 #[cfg(feature = "rand")]
 impl rand::TryRngCore for FailingRng {
     type Error = RngError;
-    fn try_next_u32(&mut self) -> Result<u32, Self::Error> { Err(RngError) }
-    fn try_next_u64(&mut self) -> Result<u64, Self::Error> { Err(RngError) }
-    fn try_fill_bytes(&mut self, _: &mut [u8]) -> Result<(), Self::Error> { Err(RngError) }
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        Err(RngError)
+    }
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        Err(RngError)
+    }
+    fn try_fill_bytes(&mut self, _: &mut [u8]) -> Result<(), Self::Error> {
+        Err(RngError)
+    }
 }
 
 #[cfg(feature = "rand")]

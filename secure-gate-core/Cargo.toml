@@ -23,12 +23,22 @@ include = [
 base16ct = { version = "0.2", optional = true, default-features = false }
 base64ct = { version = "=1.6.0", optional = true, default-features = false }
 bech32 = { version = "0.11", default-features = false, optional = true }
-rand = { version = "0.9", optional = true }
+# `os_rng` provides `rngs::OsRng` without pulling `std`; the `TryRngCore` /
+# `TryCryptoRng` traits come from `rand_core` and are always available.
+# On bare-metal targets `getrandom` additionally requires a user-configured
+# backend (see the `rand` feature docs in lib.rs).
+rand = { version = "0.9", optional = true, default-features = false, features = [
+    "os_rng",
+] }
 serde = { version = "1.0", optional = true, default-features = false, features = [
     "derive",
 ] }
-subtle = { version = "2.5", optional = true }
-thiserror = "2.0"
+# default-features = false: subtle's default `std` feature would silently break
+# no_std builds; nothing in this crate needs it.
+subtle = { version = "2.5", optional = true, default-features = false }
+# NOTE (0.8 LTS): unlike main, this branch does NOT use thiserror. Its no_std
+# support requires core::error::Error (Rust 1.81+), above our MSRV 1.70, so
+# error.rs hand-writes Display and a std-gated std::error::Error impl instead.
 zeroize = { version = "1.7", default-features = false, features = [
     "zeroize_derive",
 ] }
@@ -39,6 +49,12 @@ bincode = "1.0"
 criterion = { version = "=0.4.0", features = ["html_reports"] }
 # proptest >=1.10 requires newer rustc (1.84+); keep 1.70-compatible line.
 proptest = "=1.0.0"
+# `std_rng` adds `rngs::StdRng` for deterministic tests and doctests without
+# forcing it (or `std`) on downstream users of the library's `rand` feature.
+rand = { version = "0.9", default-features = false, features = [
+    "std_rng",
+    "os_rng",
+] }
 # serde_json >=1.0.149 pulls `zmij` (rustc 1.71+); pin to pre-zmij release.
 serde_json = "=1.0.132"
 # syn >=2.0.117 declares rust-version 1.71; pin for MSRV 1.70 (serde_derive, thiserror-impl).
@@ -96,6 +112,9 @@ full = ["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]
 [[bin]]
 name = "asm_check"
 # Not a user-facing tool. Exists solely for the asm_dse_check integration test.
+# `required-features` keeps this std-using binary out of no_std target builds
+# (e.g. `cargo build --target thumbv7em-none-eabihf --no-default-features`).
+required-features = ["std"]
 
 [[bench]]
 name = "fixed_vs_raw"

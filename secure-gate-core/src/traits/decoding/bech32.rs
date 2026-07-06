@@ -22,9 +22,9 @@
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "encoding-bech32")]
+//! # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 //! use secure_gate::FromBech32Str;
-//! # #[cfg(feature = "encoding-bech32")]
+//! # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 //! {
 //! // BIP-173 minimal valid Bech32 test vector
 //! let bech32 = "A12UEL5L";
@@ -40,12 +40,16 @@
 //! assert!("not-bech32".try_from_bech32("a").is_err());
 //! }
 //! ```
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use super::super::encoding::bech32::Bech32Large;
-#[cfg(feature = "encoding-bech32")]
-use bech32::primitives::decode::CheckedHrpstring;
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use crate::error::Bech32Error;
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+use alloc::string::{String, ToString};
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+use alloc::vec::Vec;
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+use bech32::primitives::decode::CheckedHrpstring;
 
 /// Extension trait for decoding Bech32 (BIP-173) strings into byte vectors.
 ///
@@ -64,7 +68,7 @@ use crate::error::Bech32Error;
 /// (or in [`zeroize::Zeroizing`]) if the decoded bytes are sensitive. Prefer
 /// `Fixed::try_from_bech32` / `Dynamic::try_from_bech32`, which perform the wrapping
 /// for you and zeroize their internal temporaries.
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub trait FromBech32Str {
     /// Decodes a Bech32 (BIP-173) string, validating that the HRP matches `expected_hrp`.
     ///
@@ -119,7 +123,7 @@ pub trait FromBech32Str {
 }
 
 // Blanket impl to cover any AsRef<str> (e.g., &str, String, etc.)
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<T: AsRef<str> + ?Sized> FromBech32Str for T {
     fn try_from_bech32_unchecked(&self) -> Result<(String, Vec<u8>), Bech32Error> {
         let s = self.as_ref();
@@ -130,23 +134,28 @@ impl<T: AsRef<str> + ?Sized> FromBech32Str for T {
         // Get HRP (lowercase)
         let hrp = checked.hrp().to_string();
 
-        // Collect data as 8-bit bytes (handles empty)
+        // Collect data as 8-bit bytes (handles empty). `byte_iter()` is an
+        // ExactSizeIterator, so this is a single exact-size allocation — no
+        // reallocation copies of the payload are left on the heap.
         let data: Vec<u8> = checked.byte_iter().collect();
 
         Ok((hrp, data))
     }
 
     fn try_from_bech32(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error> {
-        let (got_hrp, data) = self.try_from_bech32_unchecked()?;
-        if !got_hrp.eq_ignore_ascii_case(expected_hrp) {
-            #[cfg(debug_assertions)]
-            return Err(Bech32Error::UnexpectedHrp {
-                expected: expected_hrp.to_string(),
-                got: got_hrp,
-            });
-            #[cfg(not(debug_assertions))]
+        let s = self.as_ref();
+        let checked =
+            CheckedHrpstring::new::<Bech32Large>(s).map_err(|_| Bech32Error::OperationFailed)?;
+
+        // Validate the HRP *before* materializing any payload bytes, so an
+        // HRP mismatch never leaves decoded secret material in unzeroized
+        // memory. (Case-insensitive comparison — timing leak is acceptable
+        // since the HRP is public metadata.)
+        if !checked.hrp().as_str().eq_ignore_ascii_case(expected_hrp) {
             return Err(Bech32Error::UnexpectedHrp);
         }
-        Ok(data)
+
+        // Single exact-size allocation (byte_iter is an ExactSizeIterator).
+        Ok(checked.byte_iter().collect())
     }
 }

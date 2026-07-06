@@ -2,10 +2,10 @@
 
 #[cfg(feature = "ct-eq")]
 use secure_gate::ConstantTimeEq;
-#[cfg(all(feature = "ct-eq", feature = "alloc"))]
-use secure_gate::Fixed;
 #[cfg(feature = "alloc")]
 use secure_gate::Dynamic;
+#[cfg(all(feature = "ct-eq", feature = "alloc"))]
+use secure_gate::Fixed;
 
 #[cfg(feature = "ct-eq")]
 #[test]

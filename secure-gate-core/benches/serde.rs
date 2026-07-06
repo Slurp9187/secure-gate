@@ -8,10 +8,10 @@ use criterion::{criterion_group, criterion_main, Criterion};
 #[cfg(feature = "serde-serialize")]
 use std::hint::black_box;
 
-#[cfg(feature = "serde-serialize")]
-use serde_json::to_string;
 #[cfg(all(feature = "serde-serialize", feature = "serde-deserialize"))]
 use serde_json::from_str;
+#[cfg(feature = "serde-serialize")]
+use serde_json::to_string;
 
 #[cfg(feature = "serde-serialize")]
 use secure_gate::{Dynamic, Fixed, SerializableSecret};
@@ -100,7 +100,8 @@ fn bench_dynamic_serialize(c: &mut Criterion) {
     let exportable_str = SerializableString(data_str.clone());
 
     let wrapped_vec: Dynamic<SerializableVec> = Dynamic::new(SerializableVec(data_vec.clone()));
-    let wrapped_str: Dynamic<SerializableString> = Dynamic::new(SerializableString(data_str.clone()));
+    let wrapped_str: Dynamic<SerializableString> =
+        Dynamic::new(SerializableString(data_str.clone()));
 
     let mut group = c.benchmark_group("dynamic_1kb");
 
