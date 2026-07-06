@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0-rc.10] - 2026-07-06
+
 ### Added
 
 - **`Fixed<[u8; N]>` deserialization now accepts byte-string input.** The
@@ -16,8 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged, so the wire format for non-self-describing formats (bincode) is
   unaffected. Owned buffers handed over through `visit_byte_buf` are wrapped
   in `Zeroizing` and wiped after the copy.
-
-### Security (pre-v0.9.0 security sweep)
 
 ### Security (backport of the pre-v0.9.0 security sweep — main PR #139)
 
@@ -98,8 +98,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SECURITY.md`: rewrote the error-metadata section for the build-invariant
   design; documented the serde over-length guard, the HRP-before-decode
   ordering, and the CI-verified `no_std` claim.
+- **Inherent Rust memory-residue limitations consolidated** — README and
+  `SECURITY.md` now document allocator realloc residue, `Dynamic::into_inner`
+  post-transfer mutations, and process/OS mitigations (zero-on-dealloc
+  allocators, Linux `init_on_free=1`, core dumps, encrypted swap) in one
+  place; Finding 2 rustdoc cross-links updated accordingly.
+- **Alias macros (`fixed_alias!`, `dynamic_alias!`)** — rustdoc now states they
+  are type aliases, not distinct newtypes (no extra type safety vs. a manual
+  `type` alias).
+- **`#[must_use]`** on selected APIs so ignored `Result`s and secret wrappers
+  trigger rustc warnings.
 
-### Security (earlier audit findings)
+## [0.8.0-rc.9] - 2026-05-10
+
+### Security
 
 - **Finding 1 — `Dynamic::new_with` closure-panic leak (HIGH).** The intermediate
   buffer used by `Dynamic::<Vec<u8>>::new_with` and `Dynamic::<String>::new_with`
@@ -118,11 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guidance: pre-allocate to max needed size, prefer `Fixed<[u8; N]>` for
   known-size secrets, or replace the wrapper rather than mutate in place.
   This is a fundamental limitation of standard-library collections shared
-  across the ecosystem; `Fixed<T>` is exempt. The docs also point stricter
-  deployments at process / OS-level mitigations such as zero-on-dealloc global
-  allocators, Linux `init_on_free=1`, disabling core dumps, and encrypted swap.
-  `Dynamic::into_inner` rustdoc now also notes that capacity-changing mutations
-  after ownership transfer have the same realloc-residue caveat.
+  across the ecosystem; `Fixed<T>` is exempt.
 - **Finding 3 — `deserialize_with_limit` zeroization-scope misclaim (MEDIUM,
   docs-only).** The rustdoc on `Dynamic::<Vec<u8>>::deserialize_with_limit` and
   `Dynamic::<String>::deserialize_with_limit` previously suggested the
@@ -139,6 +147,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ARM64 and would silently skip the `cfg(target_arch = "x86_64")`-gated
   test.
 
+### Breaking
+
+- **`RevealSecret::len()` now returns element count.** Previously all impls returned
+  `n_elements * size_of::<T>()` (bytes), which is correct only for `T = u8` and
+  violates Rust's universal `len()` = element-count contract (`Vec::len`,
+  `slice::len`, etc.). Fixed impls now return element count (`inner.len()` for
+  `Dynamic<Vec<T>>`, `N` for `Fixed<[T; N]>`). A new provided method
+  `RevealSecret::byte_len()` returns the byte size and is overridden for multi-byte
+  element types. **Behavior is unchanged** for the common cases `Dynamic<Vec<u8>>`,
+  `Dynamic<String>`, and `Fixed<[u8; N]>`.
+
 ### Documentation
 
 - **`RevealSecret` type-erasure stance clarified (design note).** `Box<dyn
@@ -151,25 +170,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   type-erasure demand (plugin registries, heterogeneous secret stores) justifies
   the ergonomic and performance trade-offs (`FnOnce` → `FnMut`, no direct return
   value, dynamic dispatch overhead).
-
-### Breaking
-
-- **`RevealSecret::len()` now returns element count.** Previously all impls returned
-  `n_elements * size_of::<T>()` (bytes), which is correct only for `T = u8` and
-  violates Rust's universal `len()` = element-count contract (`Vec::len`,
-  `slice::len`, etc.). Fixed impls now return element count (`inner.len()` for
-  `Dynamic<Vec<T>>`, `N` for `Fixed<[T; N]>`). A new provided method
-  `RevealSecret::byte_len()` returns the byte size and is overridden for multi-byte
-  element types. **Behavior is unchanged** for the common cases `Dynamic<Vec<u8>>`,
-  `Dynamic<String>`, and `Fixed<[u8; N]>`.
-
-### Documentation (post-review polish)
-
-- `fixed_alias!` macro: move `#[doc = $doc]` off the anonymous `const _:` zero-size guard onto the type alias itself. The previous order silently dropped user-supplied doc strings.
-- `ConstantTimeEq` module doc: explicit note that length is not constant-time for variable-length inputs (`Vec<u8>` / `String` / `[u8]`); recommend fixed-size types when length is sensitive.
-- `FromHexStr` / `FromBase64UrlStr` / `FromBech32Str` / `FromBech32mStr` trait docs: promote the "wrap immediately" guidance into each trait's RustDoc.
-- `EncodedSecret` module doc: hoist the existing `Display` warning ("do not log with `{}` in production") to module level.
-- `RevealSecret::into_inner` trait method: cross-reference per-impl allocation behavior (`Fixed` = zero-cost; `Dynamic` = 24-byte sentinel, panic-safe).
+- **Post-review rustdoc polish** — `fixed_alias!` doc attribute ordering;
+  `ConstantTimeEq` length-sensitivity note; decoding-trait “wrap immediately”
+  guidance; `EncodedSecret` `Display` warning at module level;
+  `RevealSecret::into_inner` per-impl allocation notes.
 
 ## [0.8.0-rc.8] - 2026-04-03
 

@@ -19,7 +19,7 @@ include = [
 ]
 
 [dependencies]
-secure-gate = { path = "../secure-gate-core", version = "0.8.0-rc.9", default-features = false }
+secure-gate = { path = "../secure-gate-core", version = "0.8.0-rc.10", default-features = false }
 serde = { version = "1.0", optional = true, default-features = false, features = ["derive"] }
 zeroize = { version = "1.7", default-features = false, features = ["zeroize_derive"] }
 
