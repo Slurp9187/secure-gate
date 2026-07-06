@@ -185,6 +185,27 @@
 //! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md)
 //! for the full threat model.
 //!
+//! # Inherent Rust Limitations
+//!
+//! Three universal limits apply to any in-memory secret library in Rust (and in
+//! C, C++, and Go) — `secure-gate` documents them honestly rather than
+//! overclaiming:
+//!
+//! - **Stack-move residue**: moving a [`Fixed<T>`] by value leaves the prior stack
+//!   slot uncleared until a later frame overwrites it. Prefer
+//!   [`Fixed::new_with`](Fixed::new_with), pass by reference, or use
+//!   [`Dynamic<T>`] for long-lived secrets.
+//! - **Heap-reallocation residue**: `Vec` / `String` realloc frees the old buffer
+//!   unzeroed. Pre-size, use `Dynamic<[u8; N]>` (boxed array — no realloc surface),
+//!   or install a zero-on-dealloc global allocator such as `zeroizing-alloc` at
+//!   the binary level.
+//! - **Swap / core dumps**: process memory paged to disk or written on crash is
+//!   outside any in-process library's reach. Use OS facilities (`mlock`,
+//!   encrypted swap, disabled core dumps).
+//!
+//! Full discussion in
+//! [SECURITY.md § Inherent Rust Limitations](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#inherent-rust-limitations).
+//!
 //! See the [README](https://github.com/Slurp9187/secure-gate/blob/main/README.md) and
 //! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for full details.
 

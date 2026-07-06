@@ -15,6 +15,12 @@
 //! - **Opt-in `Clone`** — requires `T: CloneableSecret` and the `cloneable` feature.
 //! - **Opt-in `Serialize`/`Deserialize`** — requires marker traits and the
 //!   `serde-serialize`/`serde-deserialize` features.
+//! - **Avoid move-by-value for long-lived secrets.** Each move of a `Fixed<T>`
+//!   bitwise-copies the bytes to a new location and leaves the original stack
+//!   slot uncleared until a later frame overwrites it. Pass `&Fixed<T>` /
+//!   `&mut Fixed<T>` by reference, keep the wrapper short-scope, or use
+//!   [`Dynamic<T>`](crate::Dynamic) for long-lived material (heap-only — no
+//!   stack residue surface). See `SECURITY.md` § "Inherent Rust Limitations".
 //!
 //! # Construction
 //!
@@ -175,6 +181,7 @@ fn drain_bech32_payload<const N: usize>(
 ///
 /// `const fn new` compiles in `static` position, but **must not** be used there
 /// because `Drop` does not run on statics, which means zeroization is skipped.
+#[must_use = "Fixed<T> holds secret material; dropping it on the floor usually indicates a bug — bind with `let _name = ...` or chain a method call"]
 pub struct Fixed<T: zeroize::Zeroize> {
     inner: T,
 }
@@ -295,6 +302,10 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// - [`Dynamic::new_with`](crate::Dynamic::new_with) — the heap-allocated
     ///   equivalent (requires `alloc`).
+    ///
+    /// If the secret will outlive the current function, prefer
+    /// [`Dynamic<T>`](crate::Dynamic) over moving `Fixed<T>` around — each
+    /// move-by-value leaves residue in the previous stack slot.
     #[inline(always)]
     pub fn new_with<F>(f: F) -> Self
     where
