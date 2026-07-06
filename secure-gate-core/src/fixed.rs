@@ -206,7 +206,6 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     /// assert_eq!(secret.len(), 32);
     /// ```
     #[inline(always)]
-    #[must_use]
     pub const fn new(value: T) -> Self {
         Fixed { inner: value }
     }
@@ -308,7 +307,6 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// [`Dynamic<T>`](crate::Dynamic) over moving `Fixed<T>` around — each
     /// move-by-value leaves residue in the previous stack slot.
     #[inline(always)]
-    #[must_use]
     pub fn new_with<F>(f: F) -> Self
     where
         F: FnOnce(&mut [u8; N]),
@@ -851,7 +849,6 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// # }
     /// ```
     #[inline]
-    #[must_use]
     pub fn from_random() -> Self {
         Self::new_with(|arr| {
             SysRng

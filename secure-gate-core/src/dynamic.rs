@@ -192,7 +192,6 @@ impl<T: ?Sized + zeroize::Zeroize> Dynamic<T> {
     /// Requires the `alloc` feature (which `Dynamic<T>` itself always requires).
     #[doc(alias = "from")]
     #[inline(always)]
-    #[must_use]
     pub fn new<U>(value: U) -> Self
     where
         U: Into<Box<T>>,
@@ -426,7 +425,6 @@ impl Dynamic<Vec<u8>> {
     /// zeroed during stack unwinding if `f` panics. Constructed via the same
     /// `Zeroizing` + swap pattern used by `from_protected_bytes`.
     #[inline(always)]
-    #[must_use]
     pub fn new_with<F>(f: F) -> Self
     where
         F: FnOnce(&mut alloc::vec::Vec<u8>),
@@ -458,7 +456,6 @@ impl Dynamic<alloc::string::String> {
     /// zeroed during stack unwinding if `f` panics. Constructed via the same
     /// `Zeroizing` + swap pattern used by `from_protected_bytes`.
     #[inline(always)]
-    #[must_use]
     pub fn new_with<F>(f: F) -> Self
     where
         F: FnOnce(&mut alloc::string::String),
@@ -639,7 +636,6 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// # }
     /// ```
     #[inline]
-    #[must_use]
     pub fn from_random(len: usize) -> Self {
         Self::new_with(|v| {
             v.resize(len, 0u8);
