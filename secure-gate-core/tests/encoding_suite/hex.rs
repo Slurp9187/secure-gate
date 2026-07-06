@@ -1,9 +1,9 @@
 //! encoding_suite/hex.rs — hex encoding/decoding tests
 
-#[cfg(feature = "encoding-hex")]
-use secure_gate::{RevealSecret, Fixed, FromHexStr, SecureDecoding, ToHex};
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 use secure_gate::Dynamic;
+#[cfg(feature = "encoding-hex")]
+use secure_gate::{Fixed, FromHexStr, RevealSecret, SecureDecoding, ToHex};
 
 #[cfg(feature = "encoding-hex")]
 #[test]
@@ -137,7 +137,9 @@ fn secure_decoding_marker_trait_is_available() {
 fn fixed_try_from_hex_mixed_case() {
     let result = Fixed::<[u8; 4]>::try_from_hex("AAbbCCdd");
     assert!(result.is_ok());
-    result.unwrap().with_secret(|b| assert_eq!(b, &[0xAA, 0xBB, 0xCC, 0xDD]));
+    result
+        .unwrap()
+        .with_secret(|b| assert_eq!(b, &[0xAA, 0xBB, 0xCC, 0xDD]));
 }
 
 #[cfg(feature = "encoding-hex")]
@@ -200,5 +202,7 @@ fn fixed_try_from_hex_large_n() {
     });
     let result = Fixed::<[u8; 128]>::try_from_hex(&hex);
     assert!(result.is_ok());
-    result.unwrap().with_secret(|b| assert_eq!(b, &[0x42u8; 128]));
+    result
+        .unwrap()
+        .with_secret(|b| assert_eq!(b, &[0x42u8; 128]));
 }

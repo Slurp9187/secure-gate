@@ -448,7 +448,12 @@ impl<const N: usize> Fixed<[u8; N]> {
                 base16ct::mixed::decode_vec(hex.as_bytes())
                     .map_err(|_| crate::error::HexError::InvalidHex)?,
             );
-            if bytes.len() != N {                return Err(crate::error::HexError::InvalidLength {                    expected: N,                    got: bytes.len(),                });            }
+            if bytes.len() != N {
+                return Err(crate::error::HexError::InvalidLength {
+                    expected: N,
+                    got: bytes.len(),
+                });
+            }
             Ok(Self::new_with(|arr| arr.copy_from_slice(&bytes)))
         }
         #[cfg(not(feature = "alloc"))]
@@ -459,7 +464,12 @@ impl<const N: usize> Fixed<[u8; N]> {
             let mut buf = Zeroizing::new([0u8; N]);
             let decoded = base16ct::mixed::decode(hex.as_bytes(), &mut *buf)
                 .map_err(|_| crate::error::HexError::InvalidHex)?;
-            if decoded.len() != N {                return Err(crate::error::HexError::InvalidLength {                    expected: N,                    got: decoded.len(),                });            }
+            if decoded.len() != N {
+                return Err(crate::error::HexError::InvalidLength {
+                    expected: N,
+                    got: decoded.len(),
+                });
+            }
             Ok(Self::new_with(|arr| arr.copy_from_slice(decoded)))
             // buf is zeroized on drop (both success and error paths)
         }
@@ -562,7 +572,12 @@ impl<const N: usize> Fixed<[u8; N]> {
                 Base64UrlUnpadded::decode_vec(s)
                     .map_err(|_| crate::error::Base64Error::InvalidBase64)?,
             );
-            if bytes.len() != N {                return Err(crate::error::Base64Error::InvalidLength {                    expected: N,                    got: bytes.len(),                });            }
+            if bytes.len() != N {
+                return Err(crate::error::Base64Error::InvalidLength {
+                    expected: N,
+                    got: bytes.len(),
+                });
+            }
             Ok(Self::new_with(|arr| arr.copy_from_slice(&bytes)))
         }
         #[cfg(not(feature = "alloc"))]
@@ -572,7 +587,12 @@ impl<const N: usize> Fixed<[u8; N]> {
             let mut buf = Zeroizing::new([0u8; N]);
             let decoded = Base64UrlUnpadded::decode(s, &mut *buf)
                 .map_err(|_| crate::error::Base64Error::InvalidBase64)?;
-            if decoded.len() != N {                return Err(crate::error::Base64Error::InvalidLength {                    expected: N,                    got: decoded.len(),                });            }
+            if decoded.len() != N {
+                return Err(crate::error::Base64Error::InvalidLength {
+                    expected: N,
+                    got: decoded.len(),
+                });
+            }
             Ok(Self::new_with(|arr| arr.copy_from_slice(decoded)))
             // buf is zeroized on drop (both success and error paths)
         }

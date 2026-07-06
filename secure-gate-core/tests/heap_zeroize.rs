@@ -270,8 +270,7 @@ fn check_decode_hex_zeroed(hex: &str, expected_len: usize) {
 fn check_decode_base64_zeroed(data: &[u8]) {
     use secure_gate::ToBase64Url;
     let encoded = data.to_base64url();
-    let mut secret =
-        Dynamic::<Vec<u8>>::try_from_base64url(&encoded).expect("valid base64url");
+    let mut secret = Dynamic::<Vec<u8>>::try_from_base64url(&encoded).expect("valid base64url");
     // Shrink to exact len so TARGET_SIZE matches layout.size() on dealloc.
     secret.with_secret_mut(|v| {
         v.shrink_to_fit();
@@ -291,8 +290,7 @@ fn check_decode_base64_zeroed(data: &[u8]) {
 fn check_decode_bech32_zeroed(data: &[u8]) {
     use secure_gate::ToBech32;
     let encoded = data.try_to_bech32("test").expect("valid hrp");
-    let mut secret =
-        Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "test").expect("valid bech32");
+    let mut secret = Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "test").expect("valid bech32");
     secret.with_secret_mut(|v| {
         v.shrink_to_fit();
         assert_eq!(
@@ -344,8 +342,8 @@ fn check_vec_deserialized_zeroed(size: usize) {
         format!("[{}]", nums.join(","))
     };
     let mut de = serde_json::Deserializer::from_str(&json);
-    let mut secret = Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, size)
-        .expect("within limit");
+    let mut secret =
+        Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, size).expect("within limit");
     secret.with_secret_mut(|v| {
         v.shrink_to_fit();
         assert_eq!(
@@ -365,8 +363,8 @@ fn check_string_deserialized_zeroed(size: usize) {
     // Build JSON string of exactly `size` ASCII bytes outside the proxy window.
     let json: String = format!("\"{}\"", "A".repeat(size));
     let mut de = serde_json::Deserializer::from_str(&json);
-    let mut secret = Dynamic::<String>::deserialize_with_limit(&mut de, size)
-        .expect("within limit");
+    let mut secret =
+        Dynamic::<String>::deserialize_with_limit(&mut de, size).expect("within limit");
     secret.with_secret_mut(|s| {
         s.shrink_to_fit();
         assert_eq!(
@@ -465,7 +463,10 @@ fn check_panic_path_bytes_zeroed(size: usize) {
     });
 
     PANIC_CHECK_ACTIVE.store(false, Ordering::SeqCst); // defensive cleanup
-    assert!(result.is_err(), "catch_unwind should have captured the panic");
+    assert!(
+        result.is_err(),
+        "catch_unwind should have captured the panic"
+    );
     assert!(
         PANIC_CHECK_ZEROED.load(Ordering::SeqCst),
         "Zeroizing must zero its backing buffer even when a panic fires before Box::new"
@@ -507,7 +508,10 @@ fn check_new_with_panic_zeroed_vec(size: usize) {
     });
 
     PANIC_CHECK_ACTIVE.store(false, Ordering::SeqCst);
-    assert!(result.is_err(), "catch_unwind should have captured the panic");
+    assert!(
+        result.is_err(),
+        "catch_unwind should have captured the panic"
+    );
     assert!(
         PANIC_CHECK_ZEROED.load(Ordering::SeqCst),
         "Dynamic::<Vec<u8>>::new_with must zero its intermediate buffer on closure panic"
@@ -531,7 +535,10 @@ fn check_new_with_panic_zeroed_string(size: usize) {
     });
 
     PANIC_CHECK_ACTIVE.store(false, Ordering::SeqCst);
-    assert!(result.is_err(), "catch_unwind should have captured the panic");
+    assert!(
+        result.is_err(),
+        "catch_unwind should have captured the panic"
+    );
     assert!(
         PANIC_CHECK_ZEROED.load(Ordering::SeqCst),
         "Dynamic::<String>::new_with must zero its intermediate buffer on closure panic"

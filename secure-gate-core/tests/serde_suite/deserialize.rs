@@ -3,7 +3,7 @@
 #[cfg(feature = "serde-deserialize")]
 #[test]
 fn fixed_deserialize_from_array() {
-    use secure_gate::{RevealSecret, Fixed};
+    use secure_gate::{Fixed, RevealSecret};
     let result: Fixed<[u8; 4]> = serde_json::from_str("[1,2,3,4]").expect("deserialize");
     assert_eq!(result.expose_secret(), &[1, 2, 3, 4]);
 }

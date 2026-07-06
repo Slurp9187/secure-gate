@@ -52,7 +52,7 @@ use alloc::string::{String, ToString};
 #[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 use alloc::vec::Vec;
 #[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
-use bech32::{Bech32m, primitives::decode::CheckedHrpstring};
+use bech32::{primitives::decode::CheckedHrpstring, Bech32m};
 
 /// Extension trait for decoding Bech32m (BIP-350) strings into byte vectors.
 ///

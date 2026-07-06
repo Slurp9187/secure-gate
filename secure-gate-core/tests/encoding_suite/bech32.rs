@@ -2,12 +2,15 @@
 
 #[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 use secure_gate::Bech32Error;
-#[cfg(all(any(feature = "encoding-bech32", feature = "encoding-bech32m"), feature = "alloc"))]
+#[cfg(all(
+    any(feature = "encoding-bech32", feature = "encoding-bech32m"),
+    feature = "alloc"
+))]
 use secure_gate::Dynamic;
 #[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
-use secure_gate::RevealSecret;
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 use secure_gate::Fixed;
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+use secure_gate::RevealSecret;
 #[cfg(feature = "encoding-bech32")]
 use secure_gate::{FromBech32Str, ToBech32};
 #[cfg(feature = "encoding-bech32m")]
@@ -45,7 +48,10 @@ fn dynamic_try_to_bech32_zeroizing_roundtrip() {
         .try_to_bech32_zeroizing("dyn")
         .expect("zeroizing encode");
     let encoded_plain = encoded.into_inner();
-    let decoded = encoded_plain.as_str().try_from_bech32("dyn").expect("decode");
+    let decoded = encoded_plain
+        .as_str()
+        .try_from_bech32("dyn")
+        .expect("decode");
     assert_eq!(decoded, vec![9, 8, 7, 6]);
 }
 
@@ -66,7 +72,10 @@ fn slice_try_to_bech32_zeroizing() {
         .try_to_bech32_zeroizing("fuzz")
         .expect("zeroizing encode");
     assert!(encoded.starts_with("fuzz1"));
-    assert_eq!(&*encoded, b"hello".try_to_bech32("fuzz").expect("plain encode"));
+    assert_eq!(
+        &*encoded,
+        b"hello".try_to_bech32("fuzz").expect("plain encode")
+    );
 }
 
 #[cfg(feature = "encoding-bech32")]
@@ -151,7 +160,10 @@ fn dynamic_try_to_bech32m_zeroizing_roundtrip() {
         .try_to_bech32m_zeroizing("dyn")
         .expect("zeroizing encode");
     let encoded_plain = encoded.into_inner();
-    let decoded = encoded_plain.as_str().try_from_bech32m("dyn").expect("decode");
+    let decoded = encoded_plain
+        .as_str()
+        .try_from_bech32m("dyn")
+        .expect("decode");
     assert_eq!(decoded, vec![1, 3, 3, 7]);
 }
 
@@ -172,7 +184,10 @@ fn slice_try_to_bech32m_zeroizing() {
         .try_to_bech32m_zeroizing("fuzzm")
         .expect("zeroizing encode");
     assert!(encoded.starts_with("fuzzm1"));
-    assert_eq!(&*encoded, b"hello".try_to_bech32m("fuzzm").expect("plain encode"));
+    assert_eq!(
+        &*encoded,
+        b"hello".try_to_bech32m("fuzzm").expect("plain encode")
+    );
 }
 
 #[cfg(feature = "encoding-bech32m")]
@@ -338,7 +353,9 @@ fn fixed_try_from_bech32_invalid_checksum() {
     let len = encoded.len();
     let last = encoded.as_bytes()[len - 1];
     let flipped = if last == b'q' { b'p' } else { b'q' };
-    unsafe { encoded.as_bytes_mut()[len - 1] = flipped; }
+    unsafe {
+        encoded.as_bytes_mut()[len - 1] = flipped;
+    }
     assert!(Fixed::<[u8; 4]>::try_from_bech32(&encoded, "test").is_err());
 }
 
@@ -402,7 +419,9 @@ fn fixed_try_from_bech32m_invalid_checksum() {
     let len = encoded.len();
     let last = encoded.as_bytes()[len - 1];
     let flipped = if last == b'q' { b'p' } else { b'q' };
-    unsafe { encoded.as_bytes_mut()[len - 1] = flipped; }
+    unsafe {
+        encoded.as_bytes_mut()[len - 1] = flipped;
+    }
     assert!(Fixed::<[u8; 4]>::try_from_bech32m(&encoded, "key").is_err());
 }
 
