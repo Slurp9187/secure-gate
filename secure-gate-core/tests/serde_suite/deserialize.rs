@@ -32,6 +32,23 @@ fn fixed_deserialize_wrong_length() {
     assert!(result.is_err());
 }
 
+/// Regression: over-length sequences must be rejected *before* the visitor's
+/// buffer grows past its reserved capacity. Growing would reallocate and free
+/// the old buffer — already holding N secret bytes — without zeroization.
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn fixed_deserialize_over_length_rejected() {
+    use secure_gate::Fixed;
+    // One element too many.
+    let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str("[1,2,3,4,5]");
+    assert!(result.is_err());
+    // Grossly over-length input is rejected on the (N+1)-th element, without
+    // accumulating the remainder.
+    let big = format!("[{}]", vec!["7"; 10_000].join(","));
+    let result: Result<Fixed<[u8; 4]>, _> = serde_json::from_str(&big);
+    assert!(result.is_err());
+}
+
 #[cfg(feature = "serde-deserialize")]
 #[test]
 fn dynamic_vec_deserialize_malformed_input_returns_err() {

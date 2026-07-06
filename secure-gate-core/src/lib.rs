@@ -1,5 +1,8 @@
 // #![doc = include_str!("../README.md")] //uncomment for doctest runs
 
+// no_std by default; the `std` feature opts back into the standard library.
+// Verified in CI by cross-building for a bare-metal target.
+#![cfg_attr(not(feature = "std"), no_std)]
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -161,9 +164,17 @@
 //!
 //! # `no_std`
 //!
-//! `no_std` compatible. [`Fixed<T>`] works without `alloc`. Enable `alloc` (default) for
-//! [`Dynamic<T>`]. For pure stack / embedded builds, use `default-features = false`.
-//! MSRV: **1.85** (Rust edition 2024).
+//! `no_std` compatible (`#![no_std]` unless the `std` feature is enabled — verified in CI
+//! by cross-building for `thumbv7em-none-eabihf`). [`Fixed<T>`] works without `alloc`.
+//! Enable `alloc` (default) for [`Dynamic<T>`]. For pure stack / embedded builds, use
+//! `default-features = false`. MSRV: **1.70** (Rust edition 2021, LTS line).
+//!
+//! One caveat: the `rand` feature compiles without `std` or `alloc`, but
+//! [`Fixed::from_random`] relies on `getrandom`, which needs a platform entropy backend.
+//! On bare-metal targets you must configure one (see the `getrandom` crate's
+//! "custom backend" documentation); without it, builds enabling `rand` fail at link
+//! time on such targets. [`Fixed::from_rng`] with a caller-supplied RNG has no such
+//! requirement.
 //!
 //! # Security
 //!
@@ -255,6 +266,14 @@ pub use fixed::Fixed;
 /// default** on `Fixed<T>` or `Dynamic<T>` — cloning is an opt-in risk that must be
 /// explicitly enabled. Without the `cloneable` feature this type does not exist at all.
 ///
+///
+/// **Coherence note:** Rust's orphan rule prevents downstream crates from implementing
+/// this marker for foreign types such as `String`, `Vec<u8>`, or `[u8; N]` — so
+/// `Dynamic<String>` and `Fixed<[u8; N]>` themselves can never become `Clone`. To opt
+/// a secret into cloning, define a newtype inner type in your crate (deriving
+/// `Zeroize` and `Clone`) and implement the marker on it. This is intentional: it keeps
+/// every cloneable secret type visible in *your* code. See the trait-level docs for a
+/// worked example.
 /// See also [`SerializableSecret`] (the other opt-in marker trait).
 #[cfg(feature = "cloneable")]
 pub use traits::CloneableSecret;
@@ -312,6 +331,17 @@ pub use traits::RevealSecretMut;
 /// `Zeroizing<T>` directly.
 pub use traits::InnerSecret;
 
+/// Placeholder values left behind by [`RevealSecret::into_inner`] (Tier 3 access).
+///
+/// When `into_inner` moves the real secret out of a wrapper, it must leave *something*
+/// behind for the wrapper's `Drop` impl to zeroize. `SentinelValue::sentinel_value()`
+/// produces that inert placeholder (an all-default array, empty `String`, or empty
+/// `Vec`). Implemented for `[T; N]` (any `N`, `T: Default`), `String`, and `Vec<T>`.
+///
+/// Implement this for your own inner types to make `into_inner` available on wrappers
+/// around them. A sentinel must never contain secret material.
+pub use traits::SentinelValue;
+
 /// Encoded string **output wrapper** for zeroizing encoded output.
 ///
 /// This is an **output wrapper** — it exists *only* to keep encoded data zeroized until
@@ -346,6 +376,14 @@ pub use traits::EncodedSecret;
 /// must be explicitly enabled. Without the `serde-serialize` feature this type does not
 /// exist at all.
 ///
+///
+/// **Coherence note:** Rust's orphan rule prevents downstream crates from implementing
+/// this marker for foreign types such as `String`, `Vec<u8>`, or `[u8; N]` — so
+/// `Fixed<[u8; N]>` and `Dynamic<String>` themselves can never become `Serialize`. To
+/// opt a secret into serialization, define a newtype inner type in your crate (deriving
+/// `Zeroize` and `Serialize`) and implement the marker on it. This is intentional: it
+/// keeps every serializable secret type visible in *your* code. See the trait-level
+/// docs for a worked example.
 /// See also [`CloneableSecret`] (the other opt-in marker trait).
 #[cfg(feature = "serde-serialize")]
 pub use traits::SerializableSecret;
@@ -419,17 +457,18 @@ pub use traits::SecureDecoding;
 pub use traits::SecureEncoding;
 
 /// Errors from Bech32 (BIP-173) and Bech32m (BIP-350) decoding.
-/// Debug builds include detailed context; release builds use generic messages.
+/// Variant shapes are identical in debug and release builds; no secret material
+/// (payload bytes, HRP strings) is ever carried in an error.
 #[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 pub use error::Bech32Error;
 
-/// Errors from Base64url decoding. Debug builds include detailed context;
-/// release builds use generic messages.
+/// Errors from Base64url decoding. Variant shapes are identical in debug and
+/// release builds; only numeric length metadata is carried.
 #[cfg(feature = "encoding-base64")]
 pub use error::Base64Error;
 
-/// Errors from hex decoding. Debug builds include detailed context;
-/// release builds use generic messages.
+/// Errors from hex decoding. Variant shapes are identical in debug and
+/// release builds; only numeric length metadata is carried.
 #[cfg(feature = "encoding-hex")]
 pub use error::HexError;
 
