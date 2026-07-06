@@ -60,6 +60,16 @@ For `Dynamic<Vec<_>>` and `Dynamic<String>`, avoid capacity-changing mutations
 after wrapping unless your deployment handles allocator-level residue. See
 [`secure-gate-core/SECURITY.md`](secure-gate-core/SECURITY.md) for details.
 
+### Known limitations
+
+Three universal in-memory-secret limits apply (same in C, C++, Go, and Rust):
+
+- **Stack-move residue** — moving a `Fixed<T>` leaves bytes in the prior stack slot. Use `Fixed::new_with`, pass by reference, or use `Dynamic<T>` for long-lived secrets.
+- **Heap-reallocation residue** — `Vec`/`String` realloc frees old buffers unzeroed. Pre-size, use `Dynamic<[u8; N]>` (boxed array), or install [`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) as the global allocator.
+- **Swap / core dumps** — OS-level concerns; use `mlock`, encrypted swap, and disabled core dumps for sensitive processes.
+
+Full discussion: [`SECURITY.md` § Inherent Rust Limitations](secure-gate-core/SECURITY.md#inherent-rust-limitations).
+
 ## Workspace Layout
 
 ```

@@ -20,6 +20,21 @@
 //! - **Panic safety** — all decode constructors use the `from_protected_bytes` pattern:
 //!   a `Zeroizing` wrapper survives OOM panics from `Box::new`.
 //!
+//! # Choosing the inner type for security
+//!
+//! Different inner types have different reallocation-residue profiles:
+//!
+//! | Inner type | Realloc surface | Use case |
+//! |---|---|---|
+//! | `Dynamic<[u8; N]>` (boxed array) | **None** — fixed size | Long-lived known-size keys held on the heap |
+//! | `Dynamic<Vec<u8>>` pre-sized | None *if* you avoid capacity-growing mutations | Variable-length secrets with a known upper bound |
+//! | `Dynamic<Vec<u8>>` growable | **Yes** — each realloc leaves the old buffer unzeroed | Convenient, but see realloc-residue warning below |
+//! | `Dynamic<String>` | Same as `Dynamic<Vec<u8>>` | Passwords, API keys |
+//!
+//! For **long-lived, known-size key material**, prefer `Dynamic<[u8; N]>` —
+//! it combines `Dynamic`'s heap-only property with zero realloc surface.
+//! See `SECURITY.md` § "Inherent Rust Limitations" for the broader discussion.
+//!
 //! # Construction
 //!
 //! | Constructor | Notes |
@@ -65,9 +80,12 @@
 //!
 //! For `Dynamic<Vec<_>>` and `Dynamic<String>`, capacity-changing mutations can
 //! cause the standard allocator to free the previous buffer without zeroizing it.
-//! Pre-allocate to the maximum size, use capacity-stable mutations, or prefer
-//! [`Fixed<T>`](crate::Fixed) for known-size secrets. See `SECURITY.md` for the
-//! full threat-model discussion and deployment-level mitigations.
+//! Pre-allocate to the maximum size, use capacity-stable mutations, prefer
+//! `Dynamic<[u8; N]>` (no realloc surface) for known-size heap secrets, or use
+//! [`Fixed<T>`](crate::Fixed) for known-size stack secrets. See `SECURITY.md` for
+//! the full threat-model discussion and deployment-level mitigations including
+//! the [`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) global
+//! allocator.
 //!
 //! # See also
 //!
@@ -157,6 +175,7 @@ use crate::traits::decoding::hex::FromHexStr;
 ///
 /// - [`RevealSecret`](crate::RevealSecret) / [`RevealSecretMut`](crate::RevealSecretMut) — the 3-tier access traits.
 /// - [`Fixed<T>`](crate::Fixed) — stack-allocated alternative.
+#[must_use = "Dynamic<T> holds secret material; dropping it on the floor usually indicates a bug — bind with `let _name = ...` or chain a method call"]
 pub struct Dynamic<T: ?Sized + zeroize::Zeroize> {
     inner: Box<T>,
 }
