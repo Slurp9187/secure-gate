@@ -47,8 +47,7 @@ fn init_with_zeros_original_on_clone_panic() {
     ORIGINAL_ZEROIZED.store(false, Ordering::SeqCst);
 
     let result = std::panic::catch_unwind(|| {
-        let _: SecretBox<PanicOnClone> =
-            SecretBox::init_with(|| PanicOnClone(vec![0xAAu8; 64]));
+        let _: SecretBox<PanicOnClone> = SecretBox::init_with(|| PanicOnClone(vec![0xAAu8; 64]));
     });
 
     assert!(

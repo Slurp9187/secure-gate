@@ -26,7 +26,8 @@ impl SerializableSecret for TestSerializableVec {}
 fn fixed_roundtrip() {
     let original = TestSerializableArray([1u8, 2, 3, 4]);
     let serialized = serde_json::to_string(&original).expect("serialize");
-    let deserialized: TestSerializableArray = serde_json::from_str(&serialized).expect("deserialize");
+    let deserialized: TestSerializableArray =
+        serde_json::from_str(&serialized).expect("deserialize");
     assert_eq!(original.0, deserialized.0);
 }
 
@@ -90,7 +91,11 @@ fn fixed_wrapper_serializes_correctly() {
 
 /// Dynamic<T: SerializableSecret + Zeroize + Serialize> delegates serialization
 /// to the inner value. Verifies the wrapper serializes correctly.
-#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize", feature = "alloc"))]
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "serde-serialize",
+    feature = "alloc"
+))]
 #[test]
 fn dynamic_wrapper_serializes_correctly() {
     use secure_gate::Dynamic;
@@ -128,27 +133,37 @@ fn fixed_wrapper_serde_roundtrip() {
 
 /// Dynamic<Vec<u8>> serde round-trip: serialize the raw Vec, deserialize into
 /// the Dynamic wrapper, then verify inner data matches.
-#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize", feature = "alloc"))]
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "serde-serialize",
+    feature = "alloc"
+))]
 #[test]
 fn dynamic_vec_wrapper_serde_roundtrip() {
     use secure_gate::{Dynamic, RevealSecret};
 
     let data = vec![1u8, 2, 3, 4, 5];
     let json = serde_json::to_string(&data).expect("serialize raw Vec");
-    let restored: Dynamic<Vec<u8>> = serde_json::from_str(&json).expect("deserialize Dynamic<Vec<u8>>");
+    let restored: Dynamic<Vec<u8>> =
+        serde_json::from_str(&json).expect("deserialize Dynamic<Vec<u8>>");
     assert_eq!(restored.expose_secret().as_slice(), data.as_slice());
 }
 
 /// Dynamic<String> serde round-trip: serialize the raw String, deserialize into
 /// the Dynamic wrapper, then verify inner data matches.
-#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize", feature = "alloc"))]
+#[cfg(all(
+    feature = "serde-deserialize",
+    feature = "serde-serialize",
+    feature = "alloc"
+))]
 #[test]
 fn dynamic_string_wrapper_serde_roundtrip() {
     use secure_gate::{Dynamic, RevealSecret};
 
     let data = String::from("round_trip_secret");
     let json = serde_json::to_string(&data).expect("serialize raw String");
-    let restored: Dynamic<String> = serde_json::from_str(&json).expect("deserialize Dynamic<String>");
+    let restored: Dynamic<String> =
+        serde_json::from_str(&json).expect("deserialize Dynamic<String>");
     assert_eq!(restored.expose_secret().as_str(), data.as_str());
 }
 

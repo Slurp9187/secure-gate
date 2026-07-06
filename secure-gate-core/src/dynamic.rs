@@ -77,6 +77,8 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 use alloc::boxed::Box;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use zeroize::Zeroize;
 
 #[cfg(any(
@@ -100,7 +102,7 @@ use crate::traits::encoding::bech32m::ToBech32m;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{rngs::SysRng, TryCryptoRng, TryRng};
+use rand::{TryCryptoRng, TryRng, rngs::SysRng};
 
 // Dynamic<Vec<u8>> is always alloc-dependent, so the alloc-gated blanket traits
 // are always available when encoding features are enabled for this type.
@@ -486,13 +488,16 @@ impl crate::RevealSecret for Dynamic<String> {
     fn into_inner(mut self) -> crate::InnerSecret<String>
     where
         Self: Sized,
-        Self::Inner: Sized + Default + zeroize::Zeroize,
+        Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize,
     {
         // Swap in an empty-String sentinel. If Box::new panics (OOM) before the
         // swap, self.inner still holds the real secret and Dynamic::drop zeroizes
-        // it on unwind. After the swap, self.inner is Box<String::new()> — zeroized
+        // it on unwind. After the swap, self.inner is an empty sentinel — zeroized
         // on Dynamic::drop as a no-op. `*boxed` deref-moves the String out of the Box.
-        let boxed = core::mem::replace(&mut self.inner, Box::new(String::new()));
+        let boxed = core::mem::replace(
+            &mut self.inner,
+            Box::new(crate::SentinelValue::sentinel_value()),
+        );
         crate::InnerSecret::new(*boxed)
     }
 }
@@ -541,13 +546,16 @@ impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
     fn into_inner(mut self) -> crate::InnerSecret<Vec<T>>
     where
         Self: Sized,
-        Self::Inner: Sized + Default + zeroize::Zeroize,
+        Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize,
     {
         // Swap in an empty-Vec sentinel. If Box::new panics (OOM) before the swap,
         // self.inner still holds the real secret and Dynamic::drop zeroizes it on
-        // unwind. After the swap, self.inner is Box<Vec::new()> — zeroized on
+        // unwind. After the swap, self.inner is an empty sentinel — zeroized on
         // Dynamic::drop as a no-op. `*boxed` deref-moves the Vec out of the Box.
-        let boxed = core::mem::replace(&mut self.inner, Box::new(Vec::new()));
+        let boxed = core::mem::replace(
+            &mut self.inner,
+            Box::new(crate::SentinelValue::sentinel_value()),
+        );
         crate::InnerSecret::new(*boxed)
     }
 }

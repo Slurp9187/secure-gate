@@ -19,7 +19,7 @@
 
 #![allow(clippy::undocumented_unsafe_blocks)]
 
-use secure_gate::{RevealSecret, RevealSecretMut, Fixed};
+use secure_gate::{Fixed, RevealSecret, RevealSecretMut};
 use zeroize::Zeroize;
 
 #[cfg(feature = "alloc")]

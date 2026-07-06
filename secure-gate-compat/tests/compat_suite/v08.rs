@@ -17,9 +17,9 @@
 //  14.  Serde Deserialize/Serialize (feature-gated)
 //  15.  zeroize re-export accessible via compat::zeroize
 
+use secure_gate::{Dynamic, Fixed};
 use secure_gate_compat::compat::v08::{DebugSecret, Secret, SecretBox, SecretString, SecretVec};
 use secure_gate_compat::compat::{CloneableSecret, ExposeSecret};
-use secure_gate::{Dynamic, Fixed};
 
 // ── 1. Secret<S> construction ────────────────────────────────────────────────
 
@@ -66,9 +66,18 @@ fn debug_does_not_leak_value() {
 
     let s = Secret::new(Password(String::from("hunter2")));
     let dbg = format!("{:?}", s);
-    assert!(dbg.contains("[REDACTED"), "Debug must contain [REDACTED: {dbg}");
-    assert!(!dbg.contains("hunter2"), "Debug must not leak the value: {dbg}");
-    assert!(dbg.starts_with("Secret("), "Debug must wrap with Secret(): {dbg}");
+    assert!(
+        dbg.contains("[REDACTED"),
+        "Debug must contain [REDACTED: {dbg}"
+    );
+    assert!(
+        !dbg.contains("hunter2"),
+        "Debug must not leak the value: {dbg}"
+    );
+    assert!(
+        dbg.starts_with("Secret("),
+        "Debug must wrap with Secret(): {dbg}"
+    );
 }
 
 // ── 4. DebugSecret — default impl ────────────────────────────────────────────

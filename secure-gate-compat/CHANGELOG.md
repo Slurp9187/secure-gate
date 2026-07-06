@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The crate is now genuinely `no_std`.** It advertised the `no-std` category
+  but never declared `#![no_std]`, so it silently linked `std` and failed to
+  build on bare-metal targets. The crate root is now unconditionally
+  `#![no_std]` (the shims need `alloc`, never `std`); the one prelude-only
+  `ToString` usage in `compat::v08` now imports from `alloc`. Verified in CI by
+  cross-building for `thumbv7em-none-eabihf` (with and without
+  `secrecy-compat`).
+
 ### Security
 
 - **Finding 5 — `SecretBox::init_with` / `try_init_with` clone-panic leak

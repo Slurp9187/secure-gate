@@ -1,6 +1,6 @@
 //! macros_suite/fixed_generic.rs — fixed_generic_alias macro tests
 
-use secure_gate::{fixed_generic_alias, RevealSecret};
+use secure_gate::{RevealSecret, fixed_generic_alias};
 
 fixed_generic_alias!(GenericBuffer);
 

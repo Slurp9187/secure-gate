@@ -4,7 +4,7 @@
 // → compares raw Vec lifecycle vs Dynamic<T> (includes zeroize of live + spare capacity)
 
 #[cfg(feature = "alloc")]
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 #[cfg(feature = "alloc")]
 use secure_gate::{Dynamic, RevealSecret};

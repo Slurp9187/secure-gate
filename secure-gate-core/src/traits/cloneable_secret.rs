@@ -20,6 +20,20 @@
 //! backup/export scenarios). Prefer move semantics or single-instance ownership
 //! whenever possible to minimize attack surface.
 //!
+//! # A newtype inner type is required (orphan rule)
+//!
+//! Rust's coherence (orphan) rules prevent downstream crates from implementing
+//! this marker for foreign types: `impl CloneableSecret for String`,
+//! `Vec<u8>`, or `[u8; 32]` does **not compile** outside this crate, because
+//! both the trait and the type would be foreign. Consequently `Dynamic<String>`,
+//! `Dynamic<Vec<u8>>`, and `Fixed<[u8; N]>` can never be cloned directly.
+//!
+//! This is deliberate, not an oversight: if the marker were pre-implemented for
+//! the standard container types, enabling the `cloneable` feature would silently
+//! make *every* `Dynamic<String>` in a dependency graph cloneable. Requiring a
+//! local newtype (as in the example below) keeps each cloneable secret type
+//! defined — and auditable — in your own code.
+//!
 //! # Example
 //!
 //! ```rust

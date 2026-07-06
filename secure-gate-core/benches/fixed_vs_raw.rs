@@ -3,8 +3,8 @@
 // Run with: cargo bench --all-features --bench fixed_vs_raw
 // → opens HTML report showing negligible overhead (< 0.1 cycles typical)
 
-use criterion::{criterion_group, criterion_main, Criterion};
-use secure_gate::{fixed_alias, RevealSecret, RevealSecretMut, Fixed};
+use criterion::{Criterion, criterion_group, criterion_main};
+use secure_gate::{Fixed, RevealSecret, RevealSecretMut, fixed_alias};
 use std::hint::black_box;
 
 fixed_alias!(pub RawKey, 32); // Alias for semantic testing

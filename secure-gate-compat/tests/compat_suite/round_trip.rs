@@ -8,10 +8,10 @@
 //! Value identity is asserted at every hop via `expose_secret()`.
 //! Constant-time equality checks are added where the `ct-eq` feature is active.
 
+use secure_gate::{Dynamic, Fixed};
 use secure_gate_compat::compat::v08::{Secret as V08Secret, SecretString as V08SecretString};
 use secure_gate_compat::compat::v10::{SecretBox as V10SecretBox, SecretString as V10SecretString};
 use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
-use secure_gate::{Dynamic, Fixed};
 
 // ── String: v08 → Dynamic → v10 → Dynamic → v08 ─────────────────────────────
 
@@ -113,7 +113,10 @@ fn mutable_access_after_conversion_to_dynamic() {
     let v08str: V08SecretString = V08Secret::new(String::from("mutable_base"));
     let mut native: Dynamic<String> = v08str.into();
     ExposeSecretMut::expose_secret_mut(&mut native).push_str("_appended");
-    assert_eq!(ExposeSecret::expose_secret(&native), "mutable_base_appended");
+    assert_eq!(
+        ExposeSecret::expose_secret(&native),
+        "mutable_base_appended"
+    );
 
     // Convert back — the mutation is preserved
     let v08_final: V08Secret<String> = native.into();
@@ -137,7 +140,10 @@ mod ct_eq_checks {
         // Convert one through the compat layer and back
         let v08: V08Secret<String> = da.into();
         let da_back: Dynamic<String> = v08.into();
-        assert!(da_back.ct_eq(&db), "ct_eq must hold after round-trip through v08");
+        assert!(
+            da_back.ct_eq(&db),
+            "ct_eq must hold after round-trip through v08"
+        );
     }
 
     #[test]
@@ -149,7 +155,10 @@ mod ct_eq_checks {
 
         let v10: V10SecretBox<Vec<u8>> = da.into();
         let da_back: Dynamic<Vec<u8>> = v10.into();
-        assert!(da_back.ct_eq(&db), "ct_eq must hold after round-trip through v10");
+        assert!(
+            da_back.ct_eq(&db),
+            "ct_eq must hold after round-trip through v10"
+        );
     }
 
     #[test]
@@ -160,7 +169,10 @@ mod ct_eq_checks {
 
         let v10: V10SecretBox<Vec<u8>> = da.into();
         let da_back: Dynamic<Vec<u8>> = v10.into();
-        assert!(!da_back.ct_eq(&db), "ct_eq must still distinguish different values");
+        assert!(
+            !da_back.ct_eq(&db),
+            "ct_eq must still distinguish different values"
+        );
     }
 
     #[test]
@@ -172,6 +184,9 @@ mod ct_eq_checks {
 
         let v08: V08Secret<[u8; 32]> = fa.into();
         let fa_back: Fixed<[u8; 32]> = v08.into();
-        assert!(fa_back.ct_eq(&fb), "ct_eq must hold after Fixed → v08 → Fixed");
+        assert!(
+            fa_back.ct_eq(&fb),
+            "ct_eq must hold after Fixed → v08 → Fixed"
+        );
     }
 }

@@ -11,10 +11,10 @@
 //!   - SecretVec of non-u8 element type (e.g. u32)
 //!   - Multiple independent clones remain independent after mutation on native side
 
+use secure_gate::{Dynamic, Fixed, RevealSecret};
 use secure_gate_compat::compat::v08::{DebugSecret, Secret, SecretString, SecretVec};
 use secure_gate_compat::compat::v10::{SecretBox, SecretSlice};
 use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
-use secure_gate::{Dynamic, Fixed, RevealSecret};
 
 // ── Zero-sized array ──────────────────────────────────────────────────────────
 
@@ -101,7 +101,9 @@ fn custom_zeroize_only_v08() {
         }
     }
 
-    let key = HsmKey { material: [0x55u8; 64] };
+    let key = HsmKey {
+        material: [0x55u8; 64],
+    };
     let s: Secret<HsmKey> = Secret::new(key);
     assert_eq!(s.expose_secret().material[0], 0x55u8);
     // s drops here — Zeroize called on the material array
@@ -151,8 +153,14 @@ fn custom_debug_secret_no_leakage() {
     let s = Secret::new(PasswordHash(String::from("bcrypt$2b$very_long_hash")));
     let dbg = format!("{:?}", s);
     assert!(!dbg.contains("bcrypt"), "DebugSecret must redact the hash");
-    assert!(!dbg.contains("very_long_hash"), "DebugSecret must redact the hash");
-    assert!(dbg.contains("[REDACTED"), "DebugSecret output must contain [REDACTED");
+    assert!(
+        !dbg.contains("very_long_hash"),
+        "DebugSecret must redact the hash"
+    );
+    assert!(
+        dbg.contains("[REDACTED"),
+        "DebugSecret output must contain [REDACTED"
+    );
 }
 
 // ── Non-u8 element type in SecretVec ─────────────────────────────────────────

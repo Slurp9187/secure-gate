@@ -194,9 +194,9 @@ dual_test_v08!(empty_string_secret {
 /// then use the scoped-access API that `RevealSecret` provides.
 #[test]
 fn compat_v08_convert_to_dynamic_with_secret() {
-    use secure_gate_compat::compat::v08::Secret;
-    use secure_gate_compat::compat::ExposeSecret as CompatExposeSecret;
     use secure_gate::{Dynamic, RevealSecret};
+    use secure_gate_compat::compat::ExposeSecret as CompatExposeSecret;
+    use secure_gate_compat::compat::v08::Secret;
 
     let compat = Secret::new(String::from("hunter2"));
     // Verify compat access first
@@ -212,8 +212,8 @@ fn compat_v08_convert_to_dynamic_with_secret() {
 /// After migrating `Secret<String>` → `Dynamic<String>`, `with_secret_mut` can mutate.
 #[test]
 fn compat_v08_convert_to_dynamic_with_secret_mut() {
-    use secure_gate_compat::compat::v08::Secret;
     use secure_gate::{Dynamic, RevealSecret, RevealSecretMut};
+    use secure_gate_compat::compat::v08::Secret;
 
     let compat = Secret::new(String::from("hello"));
     let mut native: Dynamic<String> = compat.into();
@@ -228,8 +228,8 @@ fn compat_v08_convert_to_dynamic_with_secret_mut() {
 /// provide this guarantee.
 #[test]
 fn compat_v08_native_satisfies_expose_secret_trait() {
-    use secure_gate_compat::compat::ExposeSecret;
     use secure_gate::Dynamic;
+    use secure_gate_compat::compat::ExposeSecret;
 
     fn accepts_compat_trait<T: ExposeSecret<String>>(t: &T) -> usize {
         t.expose_secret().len()
