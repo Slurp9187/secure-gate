@@ -14,9 +14,9 @@
 
 #![allow(deprecated)] // for the Secret<T> alias test
 
+use secure_gate::{Dynamic, Fixed};
 use secure_gate_compat::compat::v10::{SecretBox, SecretSlice, SecretString};
 use secure_gate_compat::compat::{CloneableSecret, ExposeSecret, ExposeSecretMut};
-use secure_gate::{Dynamic, Fixed};
 
 // ── 1. SecretBox construction ─────────────────────────────────────────────────
 
@@ -84,7 +84,9 @@ fn secret_string_expose_secret_mut() {
     let mut ss: SecretString = "hello".into();
     let s: &mut str = ExposeSecretMut::expose_secret_mut(&mut ss);
     // Verify we get mutable access and can modify individual bytes.
-    unsafe { s.as_bytes_mut()[0] = b'H'; }
+    unsafe {
+        s.as_bytes_mut()[0] = b'H';
+    }
     assert_eq!(ss.expose_secret(), "Hello");
 }
 
@@ -165,7 +167,11 @@ fn secret_slice_clone() {
 fn secret_box_debug_redacted() {
     let sb: SecretBox<String> = SecretBox::init_with(|| String::from("sensitive"));
     let dbg = format!("{:?}", sb);
-    assert!(dbg.contains("[REDACTED]"), "Debug output should contain [REDACTED]: {}", dbg);
+    assert!(
+        dbg.contains("[REDACTED]"),
+        "Debug output should contain [REDACTED]: {}",
+        dbg
+    );
     assert!(!dbg.contains("sensitive"), "Debug must not leak the secret");
 }
 

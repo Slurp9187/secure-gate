@@ -16,8 +16,8 @@
 // Helper types shared across sub-modules are not all used in every config.
 #![allow(dead_code)]
 
-mod v08;
-mod v10;
-mod round_trip;
 mod edge_cases;
 mod examples;
+mod round_trip;
+mod v08;
+mod v10;

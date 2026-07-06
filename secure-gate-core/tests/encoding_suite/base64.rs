@@ -1,9 +1,9 @@
 //! encoding_suite/base64.rs — base64url encoding/decoding tests
 
-#[cfg(feature = "encoding-base64")]
-use secure_gate::{RevealSecret, Fixed, FromBase64UrlStr, ToBase64Url};
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 use secure_gate::Dynamic;
+#[cfg(feature = "encoding-base64")]
+use secure_gate::{Fixed, FromBase64UrlStr, RevealSecret, ToBase64Url};
 
 #[cfg(feature = "encoding-base64")]
 #[test]
@@ -156,5 +156,7 @@ fn fixed_try_from_base64url_large_n() {
     let encoded = data.to_base64url();
     let result = Fixed::<[u8; 128]>::try_from_base64url(&encoded);
     assert!(result.is_ok());
-    result.unwrap().with_secret(|b| assert_eq!(b, &[0x42u8; 128]));
+    result
+        .unwrap()
+        .with_secret(|b| assert_eq!(b, &[0x42u8; 128]));
 }

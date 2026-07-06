@@ -41,9 +41,9 @@
 //! }
 //! ```
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-use bech32::encode_lower;
-#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use bech32::Hrp;
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+use bech32::encode_lower;
 
 #[cfg(feature = "encoding-bech32")]
 use bech32::primitives::checksum::Checksum;
@@ -130,7 +130,7 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
     use bech32::primitives::iter::ByteIterExt;
-    use bech32::{decode, encode_lower, Bech32, Fe32, Fe32IterExt, NoChecksum};
+    use bech32::{Bech32, Fe32, Fe32IterExt, NoChecksum, decode, encode_lower};
 
     #[test]
     fn test_bech32_large_with_checksum() {

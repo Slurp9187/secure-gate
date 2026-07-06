@@ -3,7 +3,7 @@
 #[cfg(feature = "serde-deserialize")]
 #[test]
 fn fixed_deserialize_from_array() {
-    use secure_gate::{RevealSecret, Fixed};
+    use secure_gate::{Fixed, RevealSecret};
     let result: Fixed<[u8; 4]> = serde_json::from_str("[1,2,3,4]").expect("deserialize");
     assert_eq!(result.expose_secret(), &[1, 2, 3, 4]);
 }
@@ -180,7 +180,8 @@ fn dynamic_string_deserialize_with_limit_rejects_over_limit() {
 fn dynamic_vec_deserialize_with_limit_zero_accepts_empty() {
     use secure_gate::{Dynamic, RevealSecret};
     let mut de = serde_json::Deserializer::from_str("[]");
-    let result = Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, 0).expect("empty within limit 0");
+    let result =
+        Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, 0).expect("empty within limit 0");
     assert!(result.expose_secret().is_empty());
 }
 
@@ -198,7 +199,8 @@ fn dynamic_vec_deserialize_with_limit_zero_rejects_nonempty() {
 fn dynamic_string_deserialize_with_limit_zero_accepts_empty() {
     use secure_gate::{Dynamic, RevealSecret};
     let mut de = serde_json::Deserializer::from_str("\"\"");
-    let result = Dynamic::<String>::deserialize_with_limit(&mut de, 0).expect("empty within limit 0");
+    let result =
+        Dynamic::<String>::deserialize_with_limit(&mut de, 0).expect("empty within limit 0");
     assert!(result.expose_secret().is_empty());
 }
 
@@ -216,6 +218,7 @@ fn dynamic_string_deserialize_with_limit_zero_rejects_nonempty() {
 fn dynamic_vec_deserialize_with_limit_one() {
     use secure_gate::{Dynamic, RevealSecret};
     let mut de = serde_json::Deserializer::from_str("[42]");
-    let result = Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, 1).expect("single element within limit 1");
+    let result = Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, 1)
+        .expect("single element within limit 1");
     assert_eq!(result.expose_secret(), &[42u8]);
 }

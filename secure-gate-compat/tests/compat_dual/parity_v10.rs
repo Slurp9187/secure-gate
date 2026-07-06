@@ -190,8 +190,8 @@ dual_test_v10!(move_into_function_v10 {
 /// Real secrecy v0.10.1 only provides `From<String>`.
 #[test]
 fn compat_v10_string_from_str_ref() {
-    use secure_gate_compat::compat::v10::SecretString;
     use secure_gate_compat::compat::ExposeSecret;
+    use secure_gate_compat::compat::v10::SecretString;
 
     let ss = SecretString::from("from_str_ref");
     assert_eq!(ss.expose_secret(), "from_str_ref");
@@ -201,8 +201,8 @@ fn compat_v10_string_from_str_ref() {
 /// Real secrecy v0.10.1 does not implement `FromStr` for `SecretString`.
 #[test]
 fn compat_v10_string_from_str_parse() {
-    use secure_gate_compat::compat::v10::SecretString;
     use secure_gate_compat::compat::ExposeSecret;
+    use secure_gate_compat::compat::v10::SecretString;
 
     let ss: SecretString = "parse_me".parse().unwrap();
     assert_eq!(ss.expose_secret(), "parse_me");
@@ -212,8 +212,8 @@ fn compat_v10_string_from_str_parse() {
 /// Real secrecy v0.10.1 has no such impl because `str: !Default`.
 #[test]
 fn compat_v10_string_default() {
-    use secure_gate_compat::compat::v10::SecretString;
     use secure_gate_compat::compat::ExposeSecret;
+    use secure_gate_compat::compat::v10::SecretString;
 
     let ss = SecretString::default();
     assert!(ss.expose_secret().is_empty());
@@ -223,8 +223,8 @@ fn compat_v10_string_default() {
 /// Real secrecy v0.10.1 has no such impl because `[S]: !Default`.
 #[test]
 fn compat_v10_slice_default() {
-    use secure_gate_compat::compat::v10::SecretSlice;
     use secure_gate_compat::compat::ExposeSecret;
+    use secure_gate_compat::compat::v10::SecretSlice;
 
     let ss = SecretSlice::<u8>::default();
     assert!(ss.expose_secret().is_empty());
@@ -236,9 +236,9 @@ fn compat_v10_slice_default() {
 /// `with_secret` scoped API limits borrow lifetime and is audit-greppable.
 #[test]
 fn compat_v10_bridge_with_secret() {
+    use secure_gate::{Dynamic, RevealSecret};
     use secure_gate_compat::compat::ExposeSecret as CompatExposeSecret;
     use secure_gate_compat::compat::v10::SecretBox;
-    use secure_gate::{Dynamic, RevealSecret};
 
     let compat = SecretBox::new(Box::new(String::from("migrated")));
     // Verify compat access first

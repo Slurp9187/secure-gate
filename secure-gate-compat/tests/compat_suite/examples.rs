@@ -6,10 +6,12 @@
 //!
 //! These examples are referenced from `MIGRATING_FROM_SECRECY.md`.
 
-use secure_gate_compat::compat::v08::{DebugSecret, Secret as V08Secret, SecretString as V08SecretString};
+use secure_gate::{Dynamic, Fixed, RevealSecret};
+use secure_gate_compat::compat::v08::{
+    DebugSecret, Secret as V08Secret, SecretString as V08SecretString,
+};
 use secure_gate_compat::compat::v10::{SecretBox, SecretSlice, SecretString as V10SecretString};
 use secure_gate_compat::compat::{CloneableSecret, ExposeSecret, ExposeSecretMut};
-use secure_gate::{Dynamic, Fixed, RevealSecret};
 
 // ── Step 1: Mechanical import swap (v0.8 → secure-gate) ──────────────────────
 //

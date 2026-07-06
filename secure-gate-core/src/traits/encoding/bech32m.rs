@@ -109,7 +109,7 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
 #[cfg(test)]
 mod tests {
     use alloc::vec;
-    use bech32::{encode_lower, Bech32m, Hrp};
+    use bech32::{Bech32m, Hrp, encode_lower};
 
     #[test]
     #[should_panic(expected = "TooLong")]

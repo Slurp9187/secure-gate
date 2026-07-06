@@ -33,8 +33,8 @@
 /// same behavior. This test checks our shim is correct, not that it differs.
 #[test]
 fn compat_zeroize_on_drop_v08() {
-    use secure_gate_compat::compat::v08::Secret;
     use secure_gate_compat::compat::ExposeSecret;
+    use secure_gate_compat::compat::v08::Secret;
 
     // Allocate a secret and capture the heap address of its contents.
     let data = vec![0xFFu8; 32];
@@ -57,8 +57,8 @@ fn compat_zeroize_on_drop_v08() {
     // After drop the buffer has been freed; we cannot safely read it.
     // Instead, we verify that the type called zeroize by using a custom Zeroize
     // wrapper that records whether zeroize() was called.
-    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     struct ZeroizeWitness {
         called: Arc<AtomicBool>,
@@ -72,10 +72,16 @@ fn compat_zeroize_on_drop_v08() {
     }
 
     let called = Arc::new(AtomicBool::new(false));
-    let witness = ZeroizeWitness { called: Arc::clone(&called), _data: vec![0xFFu8; 8] };
+    let witness = ZeroizeWitness {
+        called: Arc::clone(&called),
+        _data: vec![0xFFu8; 8],
+    };
     let secret2 = Secret::new(witness);
     drop(secret2);
-    assert!(called.load(Ordering::SeqCst), "zeroize() must be called on drop");
+    assert!(
+        called.load(Ordering::SeqCst),
+        "zeroize() must be called on drop"
+    );
 }
 
 /// After dropping a `compat::v10::SecretBox<Vec<u8>>`, zeroize was called.
@@ -86,8 +92,8 @@ fn compat_zeroize_on_drop_v08() {
 fn compat_zeroize_on_drop_v10() {
     use secure_gate_compat::compat::v10::SecretBox;
 
-    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     struct ZeroizeWitness {
         called: Arc<AtomicBool>,
@@ -101,10 +107,16 @@ fn compat_zeroize_on_drop_v10() {
     }
 
     let called = Arc::new(AtomicBool::new(false));
-    let witness = ZeroizeWitness { called: Arc::clone(&called), _data: vec![0xAAu8; 8] };
+    let witness = ZeroizeWitness {
+        called: Arc::clone(&called),
+        _data: vec![0xAAu8; 8],
+    };
     let secret = SecretBox::new(Box::new(witness));
     drop(secret);
-    assert!(called.load(Ordering::SeqCst), "zeroize() must be called on drop");
+    assert!(
+        called.load(Ordering::SeqCst),
+        "zeroize() must be called on drop"
+    );
 }
 
 // ── Section B: Shim-only stricter behaviors ───────────────────────────────────
@@ -121,8 +133,8 @@ fn compat_zeroize_on_drop_v10() {
 /// This test documents the correct idiom.
 #[test]
 fn compat_v08_no_deref_correct_idiom() {
-    use secure_gate_compat::compat::v08::Secret;
     use secure_gate_compat::compat::ExposeSecret;
+    use secure_gate_compat::compat::v08::Secret;
 
     let s = Secret::new(String::from("no_deref_value"));
     // CORRECT: use expose_secret() explicitly
@@ -140,8 +152,8 @@ fn compat_v08_no_deref_correct_idiom() {
 /// This test documents the correct idiom.
 #[test]
 fn compat_v08_no_asref_correct_idiom() {
-    use secure_gate_compat::compat::v08::Secret;
     use secure_gate_compat::compat::ExposeSecret;
+    use secure_gate_compat::compat::v08::Secret;
 
     let s = Secret::new(String::from("no_asref_value"));
     // CORRECT: call expose_secret() then use AsRef on the inner value
@@ -173,7 +185,10 @@ fn compat_v08_debug_requires_marker_correct_idiom() {
     let key = Secret::new(ApiKey(String::from("sk_live_xyz")));
     let dbg = format!("{:?}", key);
     // Output is redacted — the value never appears
-    assert!(!dbg.contains("sk_live_xyz"), "Debug must redact the value: {dbg}");
+    assert!(
+        !dbg.contains("sk_live_xyz"),
+        "Debug must redact the value: {dbg}"
+    );
     assert!(dbg.contains("REDACTED"), "Debug must say REDACTED: {dbg}");
     // WRONG (will not compile): struct Unmarked(String); Secret::new(Unmarked(...))
     // then format!("{:?}", secret) without impl DebugSecret for Unmarked.
