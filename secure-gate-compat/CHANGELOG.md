@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.7] - 2026-07-06
+
 ### Fixed
 
 - **The crate is now genuinely `no_std`.** It advertised the `no-std` category
@@ -16,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ToString` usage in `compat::v08` now imports from `alloc`. Verified in CI by
   cross-building for `thumbv7em-none-eabihf` (with and without
   `secrecy-compat`).
+
+## [0.9.0-rc.6] - 2026-05-10
 
 ### Security
 

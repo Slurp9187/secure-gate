@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.7] - 2026-07-06
+
 ### Added
 
 - **`Fixed<[u8; N]>` deserialization now accepts byte-string input.** The
@@ -17,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unaffected. Owned buffers handed over through `visit_byte_buf` are wrapped
   in `Zeroizing` and wiped after the copy.
 
-### Security (pre-v0.9.0 security sweep)
+### Security
 
 - **`no_std` support was advertised but did not exist — now real and CI-verified.**
   The crate never declared `#![no_std]`, so it unconditionally linked `std` and
@@ -92,8 +94,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SECURITY.md`: rewrote the error-metadata section for the build-invariant
   design; documented the serde over-length guard, the HRP-before-decode
   ordering, and the CI-verified `no_std` claim.
+- **Inherent Rust memory-residue limitations consolidated** — README and
+  `SECURITY.md` now document allocator realloc residue, `Dynamic::into_inner`
+  post-transfer mutations, and process/OS mitigations (zero-on-dealloc
+  allocators, Linux `init_on_free=1`, core dumps, encrypted swap) in one
+  place; Finding 2 rustdoc cross-links updated accordingly.
+- **Alias macros (`fixed_alias!`, `dynamic_alias!`)** — rustdoc now states they
+  are type aliases, not distinct newtypes (no extra type safety vs. a manual
+  `type` alias).
+- **`#[must_use]`** on selected APIs so ignored `Result`s and secret wrappers
+  trigger rustc warnings.
 
-### Security (earlier audit findings)
+## [0.9.0-rc.6] - 2026-05-10
+
+### Security
 
 - **Finding 1 — `Dynamic::new_with` closure-panic leak (HIGH).** The intermediate
   buffer used by `Dynamic::<Vec<u8>>::new_with` and `Dynamic::<String>::new_with`
@@ -112,11 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guidance: pre-allocate to max needed size, prefer `Fixed<[u8; N]>` for
   known-size secrets, or replace the wrapper rather than mutate in place.
   This is a fundamental limitation of standard-library collections shared
-  across the ecosystem; `Fixed<T>` is exempt. The docs also point stricter
-  deployments at process / OS-level mitigations such as zero-on-dealloc global
-  allocators, Linux `init_on_free=1`, disabling core dumps, and encrypted swap.
-  `Dynamic::into_inner` rustdoc now also notes that capacity-changing mutations
-  after ownership transfer have the same realloc-residue caveat.
+  across the ecosystem; `Fixed<T>` is exempt.
 - **Finding 3 — `deserialize_with_limit` zeroization-scope misclaim (MEDIUM,
   docs-only).** The rustdoc on `Dynamic::<Vec<u8>>::deserialize_with_limit` and
   `Dynamic::<String>::deserialize_with_limit` previously suggested the

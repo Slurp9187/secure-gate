@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.7] - 2026-07-06
+
 ### Security
 
 - **Pre-v0.9.0 security sweep of `secure-gate-core`** — three security fixes and
@@ -26,6 +28,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `RevealSecret::into_inner` works for `Fixed<[u8; N]>` with `N > 32` via the
     new `SentinelValue` trait (breaking bound change from `Default`).
 
+### Fixed
+
+- **`secure-gate-compat` is now genuinely `no_std`** — see
+  [`secure-gate-compat/CHANGELOG.md`](secure-gate-compat/CHANGELOG.md).
+
+See the per-crate changelogs for full detail:
+
+- [`secure-gate-core/CHANGELOG.md`](secure-gate-core/CHANGELOG.md)
+- [`secure-gate-compat/CHANGELOG.md`](secure-gate-compat/CHANGELOG.md)
+
+## [0.9.0-rc.6] - 2026-05-10
+
 ### Added
 
 - **`rust-toolchain.toml`** (workspace root) — pins the workspace to Rust
@@ -39,6 +53,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the 0.9 line (cargo 1.85+) `cargo update` now refuses to select crate
   versions whose `rust-version` exceeds the workspace's `1.85`,
   preventing accidental MSRV breakage from routine dependency refreshes.
+
+### Security
+
+- **Second-LLM audit follow-ups in `secure-gate-core`** — closure-panic
+  zeroization for `Dynamic::new_with`, documented realloc and serde
+  zeroization boundaries, and expanded DSE CI matrix (Findings 1–4).
+- **`secure-gate-compat` Finding 5** — partial mitigation for
+  `SecretBox::init_with` / `try_init_with` clone-panic leaks.
+
+### Changed
+
+- **`RevealSecret::len()` now returns element count** (breaking for
+  non-`u8` element types); use `byte_len()` for byte size. Unchanged for
+  `Dynamic<Vec<u8>>`, `Dynamic<String>`, and `Fixed<[u8; N]>`.
+
+See the per-crate changelogs for full detail:
+
+- [`secure-gate-core/CHANGELOG.md`](secure-gate-core/CHANGELOG.md)
+- [`secure-gate-compat/CHANGELOG.md`](secure-gate-compat/CHANGELOG.md)
 
 ## [0.9.0-rc.5] - 2026-04-03
 
