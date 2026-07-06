@@ -202,6 +202,13 @@ jobs:
               ${features:+--features "$features"}
           done
 
+      - name: Cross-build compat for bare metal
+        # secure-gate-compat is unconditionally #![no_std] (alloc-based shims).
+        run: |
+          set -eux
+          cargo build -p secure-gate-compat --lib --target thumbv7em-none-eabihf
+          cargo build -p secure-gate-compat --lib --target thumbv7em-none-eabihf --features secrecy-compat
+
   # ---------------------------------------------------------------------------
   # MSRV job — verify declared rust-version is actually buildable
   #

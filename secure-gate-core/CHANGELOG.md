@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`Fixed<[u8; N]>` deserialization now accepts byte-string input.** The
+  visitor implements `visit_bytes` / `visit_byte_buf` in addition to
+  `visit_seq`, so self-describing formats that encode byte arrays as byte
+  strings (e.g. CBOR) round-trip. The `deserialize_seq` entry point is
+  unchanged, so the wire format for non-self-describing formats (bincode) is
+  unaffected. Owned buffers handed over through `visit_byte_buf` are wrapped
+  in `Zeroizing` and wiped after the copy.
+
+### Security (pre-v0.9.0 security sweep)
+
 ### Security (backport of the pre-v0.9.0 security sweep — main PR #139)
 
 - **`no_std` support was advertised but did not exist — now real and CI-verified.**

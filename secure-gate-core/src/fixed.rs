@@ -926,10 +926,16 @@ impl<T: zeroize::Zeroize + crate::SerializableSecret> serde::Serialize for Fixed
 
 /// Deserialization uses `Zeroizing`-wrapped temporary buffers — zeroized even on rejection.
 ///
-/// The buffer is pre-allocated to exactly `N` bytes and **never grows**: an input
-/// sequence longer than `N` is rejected before the element that would trigger a
+/// The sequence buffer is pre-allocated to exactly `N` bytes and **never grows**: an
+/// input sequence longer than `N` is rejected before the element that would trigger a
 /// reallocation is stored. This matters because a `Vec` reallocation frees the old
 /// buffer — which would already hold `N` secret bytes — without zeroizing it.
+///
+/// The entry point is `deserialize_seq` (unchanged wire format for non-self-describing
+/// formats such as bincode), but the visitor also accepts byte strings via
+/// `visit_bytes` / `visit_byte_buf`, so self-describing formats that encode byte
+/// arrays as byte strings (e.g. CBOR) round-trip too. Owned buffers handed over
+/// through `visit_byte_buf` are zeroized after the copy.
 #[cfg(feature = "serde-deserialize")]
 impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -963,6 +969,25 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
                     return Err(serde::de::Error::invalid_length(vec.len(), &self));
                 }
                 Ok(Fixed::new_with(|arr| arr.copy_from_slice(&vec)))
+            }
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if v.len() != M {
+                    return Err(serde::de::Error::invalid_length(v.len(), &self));
+                }
+                Ok(Fixed::new_with(|arr| arr.copy_from_slice(v)))
+            }
+            fn visit_byte_buf<E>(self, v: alloc::vec::Vec<u8>) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                // Take ownership under Zeroizing so the deserializer-provided
+                // buffer is wiped after the copy — the default forwarding impl
+                // would drop it unzeroized.
+                let v = zeroize::Zeroizing::new(v);
+                self.visit_bytes(&v)
             }
         }
         deserializer.deserialize_seq(FixedVisitor::<N>)

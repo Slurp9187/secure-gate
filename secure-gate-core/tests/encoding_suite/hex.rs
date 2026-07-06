@@ -193,7 +193,11 @@ fn fixed_try_from_hex_odd_length() {
 #[test]
 fn fixed_try_from_hex_large_n() {
     let data = [0x42u8; 128];
-    let hex: String = data.iter().map(|b| format!("{b:02x}")).collect();
+    let hex: String = data.iter().fold(String::new(), |mut acc, b| {
+        use std::fmt::Write;
+        write!(acc, "{b:02x}").unwrap();
+        acc
+    });
     let result = Fixed::<[u8; 128]>::try_from_hex(&hex);
     assert!(result.is_ok());
     result.unwrap().with_secret(|b| assert_eq!(b, &[0x42u8; 128]));

@@ -50,7 +50,7 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::str::FromStr;
 use core::{any, fmt};
