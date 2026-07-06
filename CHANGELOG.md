@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Pre-v0.9.0 security sweep of `secure-gate-core`** — three security fixes and
+  two breaking API stabilizations; see
+  [`secure-gate-core/CHANGELOG.md`](secure-gate-core/CHANGELOG.md) for details:
+  - `no_std` support is now real (`#![cfg_attr(not(feature = "std"), no_std)]`,
+    dependency `std`-feature fixes) and verified in CI by cross-building for
+    `thumbv7em-none-eabihf`.
+  - `Fixed<[u8; N]>` deserialization rejects over-length sequences before its
+    `Zeroizing` buffer can reallocate (realloc would free the first `N` secret
+    bytes unzeroized).
+  - Bech32/Bech32m HRP-checked decoding validates the HRP before materializing
+    any payload bytes (mismatches previously dropped decoded secrets unzeroized).
+  - Error enums are now build-invariant, heap-free, `Copy`, and
+    `#[non_exhaustive]` (breaking; previously variant shapes differed between
+    debug and release builds).
+  - `RevealSecret::into_inner` works for `Fixed<[u8; N]>` with `N > 32` via the
+    new `SentinelValue` trait (breaking bound change from `Default`).
+
 ### Added
 
 - **`rust-toolchain.toml`** (workspace root) — pins the workspace to Rust

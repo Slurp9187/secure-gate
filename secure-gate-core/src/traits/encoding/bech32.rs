@@ -127,6 +127,8 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
+    use alloc::vec::Vec;
     use bech32::primitives::iter::ByteIterExt;
     use bech32::{decode, encode_lower, Bech32, Fe32, Fe32IterExt, NoChecksum};
 

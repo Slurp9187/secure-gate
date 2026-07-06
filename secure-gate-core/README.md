@@ -326,7 +326,7 @@ Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = 
 | `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                                                                                                          |
 | `full`              | All features combined                                                                                                                                                                                                                                     |
 
-`no_std` compatible. `Fixed<T>` with `rand` works heap-free. `Dynamic<T>`, encoding traits, and serde require `alloc`. `Fixed::try_from_*` decoding works without `alloc` using constant-time stack-based decoders. Disabled features have zero overhead.
+`no_std` compatible — the crate is `#![no_std]` unless the `std` feature is enabled, verified in CI by cross-building for `thumbv7em-none-eabihf`. `Fixed<T>` with `rand` works heap-free (on bare-metal targets, `getrandom` additionally requires a user-configured platform backend for `from_random`; `from_rng` with a caller-supplied RNG has no such requirement). `Dynamic<T>`, encoding traits, and serde require `alloc`. `Fixed::try_from_*` decoding works without `alloc` using constant-time stack-based decoders. Disabled features have zero overhead.
 
 ## Contributing
 

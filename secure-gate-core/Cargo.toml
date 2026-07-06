@@ -22,16 +22,27 @@ include = [
 base16ct = { version = "1", optional = true, default-features = false }
 base64ct = { version = "1", optional = true, default-features = false }
 bech32 = { version = "0.11", default-features = false, optional = true }
-rand = { version = "0.10", optional = true }
+# `sys_rng` provides `rngs::SysRng` without pulling `std`; the `TryRng` /
+# `TryCryptoRng` traits come from `rand_core` and are always available.
+# On bare-metal targets `getrandom` additionally requires a user-configured
+# backend (see the `rand` feature docs in lib.rs).
+rand = { version = "0.10", optional = true, default-features = false, features = ["sys_rng"] }
 serde = { version = "1.0", optional = true, default-features = false, features = ["derive"] }
-subtle = { version = "2.6", optional = true }
-thiserror = "2.0"
+# default-features = false: subtle's default `std` feature would silently break
+# no_std builds; nothing in this crate needs it.
+subtle = { version = "2.6", optional = true, default-features = false }
+# default-features = false: thiserror's default `std` feature would silently break
+# no_std builds; error trait impls use core::error::Error (stable since 1.81).
+thiserror = { version = "2.0", default-features = false }
 zeroize = { version = "1.8", default-features = false, features = ["zeroize_derive"] }
 
 [dev-dependencies]
 bincode = { version = "2", features = ["serde"] }
 criterion = { version = "0.7", features = ["html_reports"] }
 proptest = "1.10"
+# `std_rng` adds `rngs::StdRng` for deterministic tests and doctests without
+# forcing it (or `std`) on downstream users of the library's `rand` feature.
+rand = { version = "0.10", default-features = false, features = ["std_rng", "sys_rng"] }
 serde_json = "1.0"
 trybuild = "1.0"
 
@@ -88,6 +99,9 @@ full = ["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]
 [[bin]]
 name = "asm_check"
 # Not a user-facing tool. Exists solely for the asm_dse_check integration test.
+# `required-features` keeps this std-using binary out of no_std target builds
+# (e.g. `cargo build --target thumbv7em-none-eabihf --no-default-features`).
+required-features = ["std"]
 
 [[bench]]
 name = "fixed_vs_raw"

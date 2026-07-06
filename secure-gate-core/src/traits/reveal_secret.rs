@@ -220,18 +220,21 @@ pub trait RevealSecret {
     ///
     /// # Availability
     ///
-    /// Only callable when `Self::Inner: Sized + Default + Zeroize`. The `Default` bound
-    /// is required to construct a zero-sentinel that the wrapper's `Drop` impl runs on
-    /// after the real secret is moved out. The `Zeroize` bound is required so the
-    /// returned `InnerSecret<T>` can call `zeroize()` on drop. For types that intentionally
-    /// omit `Default` (e.g. custom key types where an all-zero value is invalid or
-    /// dangerous), `into_inner` is not callable — use `with_secret` or `expose_secret`
-    /// instead.
+    /// Only callable when `Self::Inner: Sized + SentinelValue + Zeroize`. The
+    /// [`SentinelValue`](crate::SentinelValue) bound is required to construct the inert
+    /// placeholder that the wrapper's `Drop` impl runs on after the real secret is moved
+    /// out. (A plain `Default` bound is deliberately **not** used: the standard library
+    /// only implements `Default` for arrays up to 32 elements, which would make
+    /// `into_inner` unusable for `[u8; 64]` and other common key sizes.) The `Zeroize`
+    /// bound is required so the returned `InnerSecret<T>` can call `zeroize()` on drop.
+    /// For custom inner types that intentionally omit `SentinelValue` (e.g. key types
+    /// where no safe placeholder value exists), `into_inner` is not callable — use
+    /// `with_secret` or `expose_secret` instead.
     ///
     /// The three concrete implementations in this crate all satisfy the bounds:
-    /// - `Fixed<[u8; N]>` — `[u8; N]: Default + Zeroize` ✓
-    /// - `Dynamic<String>` — `String: Default + Zeroize` ✓
-    /// - `Dynamic<Vec<T>>` — `Vec<T>: Default + Zeroize` ✓
+    /// - `Fixed<[u8; N]>` — `[u8; N]: SentinelValue + Zeroize` for **any** `N` ✓
+    /// - `Dynamic<String>` — `String: SentinelValue + Zeroize` ✓
+    /// - `Dynamic<Vec<T>>` — `Vec<T>: SentinelValue + Zeroize` ✓
     ///
     /// # Debug Behavior
     ///
@@ -273,5 +276,5 @@ pub trait RevealSecret {
     fn into_inner(self) -> crate::InnerSecret<Self::Inner>
     where
         Self: Sized,
-        Self::Inner: Sized + Default + zeroize::Zeroize;
+        Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize;
 }

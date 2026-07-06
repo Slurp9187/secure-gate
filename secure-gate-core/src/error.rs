@@ -10,50 +10,58 @@
 //! | [`Bech32Error`] | `try_from_bech32*`, [`FromBech32Str`](crate::FromBech32Str), [`FromBech32mStr`](crate::FromBech32mStr) | `encoding-bech32` / `encoding-bech32m` |
 //! | [`DecodingError`] | Unified wrapper for all above | Always |
 //!
-//! # Security: debug vs release error metadata
+//! # Design: build-invariant, heap-free, forward-compatible
 //!
-//! In **debug builds** (`cfg(debug_assertions)`), decoding errors include detailed
-//! hints — expected vs actual lengths, received HRP values — to aid development.
-//! In **release builds** these details are stripped to prevent length/HRP oracles.
+//! - **Identical shapes in debug and release builds.** No variant is gated on
+//!   `cfg(debug_assertions)`, so code that matches on these enums compiles and
+//!   behaves the same under every profile.
+//! - **No heap data.** Errors carry at most `usize` length metadata; they never
+//!   contain payload bytes, HRP strings, or other input-derived text. All error
+//!   types are `Copy` and work without `alloc`.
+//! - **`#[non_exhaustive]`.** Variants (and fields of struct variants) may be
+//!   added in future releases without a semver-major bump; downstream matches
+//!   need a wildcard arm.
 //!
-//! Prefer `Display` (`{}`) over `Debug` (`{:?}`) when logging errors in production —
-//! `Debug` may expose struct fields in debug builds.
+//! # Security: what errors may reveal
 //!
-//! See [SECURITY.md — Error Metadata](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#error-metadata-debug-vs-release)
-//! for full guidance.
+//! `InvalidLength` variants carry the expected and actual byte counts in all
+//! builds. Expected lengths are compile-time protocol parameters (key sizes,
+//! nonce sizes) and actual lengths derive from the caller's own input, so
+//! neither is treated as secret — this matches the crate's threat model
+//! (see SECURITY.md). Genuinely input-derived strings (received HRPs, encoding
+//! hints) are **never** captured, in any build. If even coarse error categories
+//! are sensitive in your deployment, redact errors at the logging boundary.
 
 use thiserror::Error;
 
 /// Error returned when a byte slice cannot be converted to a fixed-size array.
 ///
-/// In **debug builds** includes expected and actual lengths for development debugging.
-/// In **release builds** uses generic messages to prevent leaking expected-length metadata.
+/// Carries the expected and actual lengths in all build profiles. Lengths are
+/// public protocol parameters, not secret material.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum FromSliceError {
-    #[cfg(debug_assertions)]
-    /// Length mismatch in debug builds (detailed).
-    #[error("slice length mismatch: expected {expected}, got {actual}")]
+    /// The slice length does not match the target array length.
+    #[error("slice length mismatch: expected {expected}, got {got}")]
+    #[non_exhaustive]
     InvalidLength {
-        /// Number of bytes actually provided.
-        actual: usize,
         /// Number of bytes the target array requires.
         expected: usize,
+        /// Number of bytes actually provided.
+        got: usize,
     },
-    #[cfg(not(debug_assertions))]
-    /// Length mismatch in release builds (generic).
-    #[error("slice length mismatch")]
-    InvalidLength,
 }
 
 /// Errors produced when decoding Bech32 (BIP-173) or Bech32m (BIP-350) strings.
 ///
 /// *Requires feature `encoding-bech32` or `encoding-bech32m`.*
 ///
-/// In **debug builds** `UnexpectedHrp` and `InvalidLength` carry `expected`/`got`
-/// fields for development debugging. In **release builds** these variants are opaque
-/// to prevent leaking expected-length or HRP metadata.
+/// Variant shapes are identical in debug and release builds. No input-derived
+/// strings (such as the received HRP) are ever captured — the caller already
+/// holds the input and the expected HRP.
 #[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
-#[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum Bech32Error {
     /// The Human-Readable Part (HRP) is invalid.
     #[error("invalid Human-Readable Part (HRP)")]
@@ -67,98 +75,81 @@ pub enum Bech32Error {
     /// fallible conversion path be introduced in a future release of the `bech32` crate.
     #[error("bit conversion failed")]
     ConversionFailed,
-    /// General bech32 operation failure.
+    /// General bech32 operation failure (malformed string or checksum mismatch).
     #[error("bech32 operation failed")]
     OperationFailed,
-    #[cfg(debug_assertions)]
-    /// Unexpected HRP in debug builds (detailed).
-    #[error("unexpected HRP: expected {expected}, got {got}")]
-    UnexpectedHrp {
-        /// The HRP the caller required.
-        expected: String,
-        /// The HRP found in the input string.
-        got: String,
-    },
-    #[cfg(not(debug_assertions))]
-    /// Unexpected HRP in release builds (generic).
+    /// The decoded HRP does not match the HRP the caller required.
+    ///
+    /// The received HRP is deliberately not captured — it is input-derived text.
+    /// The caller passed the expected HRP and holds the input string.
     #[error("unexpected HRP")]
     UnexpectedHrp,
-    #[cfg(debug_assertions)]
-    /// Length mismatch in debug builds (detailed).
+    /// The decoded payload length does not match the target type's length.
     #[error("decoded length mismatch: expected {expected}, got {got}")]
+    #[non_exhaustive]
     InvalidLength {
         /// Number of bytes the target type requires.
         expected: usize,
         /// Number of bytes actually decoded.
         got: usize,
     },
-    #[cfg(not(debug_assertions))]
-    /// Length mismatch in release builds (generic).
-    #[error("decoded length mismatch")]
-    InvalidLength,
 }
 
 /// Errors produced when decoding base64url strings.
 ///
 /// *Requires feature `encoding-base64`.*
 ///
-/// In **debug builds** `InvalidLength` carries `expected`/`got` fields for
-/// development debugging. In **release builds** this variant is opaque to
-/// prevent leaking expected-length metadata.
+/// Variant shapes are identical in debug and release builds; only numeric
+/// length metadata is carried.
 #[cfg(feature = "encoding-base64")]
-#[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum Base64Error {
     /// The string is not valid base64url.
     #[error("invalid base64 string")]
     InvalidBase64,
-    #[cfg(debug_assertions)]
-    /// Length mismatch in debug builds (detailed).
+    /// The decoded payload length does not match the target type's length.
     #[error("decoded length mismatch: expected {expected}, got {got}")]
+    #[non_exhaustive]
     InvalidLength {
         /// Number of bytes the target type requires.
         expected: usize,
         /// Number of bytes actually decoded.
         got: usize,
     },
-    #[cfg(not(debug_assertions))]
-    /// Length mismatch in release builds (generic).
-    #[error("decoded length mismatch")]
-    InvalidLength,
 }
 
 /// Errors produced when decoding hexadecimal strings.
 ///
 /// *Requires feature `encoding-hex`.*
 ///
-/// In **debug builds** `InvalidLength` carries `expected`/`got` fields for
-/// development debugging. In **release builds** this variant is opaque to
-/// prevent leaking expected-length metadata.
+/// Variant shapes are identical in debug and release builds; only numeric
+/// length metadata is carried.
 #[cfg(feature = "encoding-hex")]
-#[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum HexError {
     /// The string is not valid hexadecimal.
     #[error("invalid hex string")]
     InvalidHex,
-    #[cfg(debug_assertions)]
-    /// Length mismatch in debug builds (detailed).
+    /// The decoded payload length does not match the target type's length.
     #[error("decoded length mismatch: expected {expected}, got {got}")]
+    #[non_exhaustive]
     InvalidLength {
         /// Number of bytes the target type requires.
         expected: usize,
         /// Number of bytes actually decoded.
         got: usize,
     },
-    #[cfg(not(debug_assertions))]
-    /// Length mismatch in release builds (generic).
-    #[error("decoded length mismatch")]
-    InvalidLength,
 }
 
 /// Unified error type for multi-format decoding operations.
 ///
 /// Wraps format-specific errors from hex, base64url, bech32, and bech32m decoders.
-/// Always available; variants depend on enabled features.
-#[derive(Clone, Debug, Error)]
+/// Always available; variants depend on enabled features. Like the format-specific
+/// errors it wraps, this type is heap-free, `Copy`, and build-invariant.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum DecodingError {
     /// The input is not valid Bech32.
     #[cfg(feature = "encoding-bech32")]
@@ -172,15 +163,10 @@ pub enum DecodingError {
     #[cfg(feature = "encoding-hex")]
     #[error("invalid hex string")]
     InvalidHex(#[source] HexError),
-    /// Encoding could not be identified (debug builds include a human-readable hint).
-    #[cfg(debug_assertions)]
-    #[error("invalid encoding: {hint}")]
-    InvalidEncoding {
-        /// Free-form description of the failure (debug builds only).
-        hint: String,
-    },
-    /// Encoding could not be identified (release builds omit details).
-    #[cfg(not(debug_assertions))]
+    /// The encoding could not be identified.
+    ///
+    /// Deliberately carries no hint text — free-form diagnostics derived from
+    /// the input would embed input data in the error value.
     #[error("invalid encoding")]
     InvalidEncoding,
 }

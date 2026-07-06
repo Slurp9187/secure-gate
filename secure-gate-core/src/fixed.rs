@@ -98,6 +98,35 @@ use crate::traits::encoding::hex::ToHex;
 use rand::{TryCryptoRng, TryRng, rngs::SysRng};
 use zeroize::Zeroize;
 
+/// Drains a validated Bech32/Bech32m payload into a stack buffer.
+///
+/// Shared by the four `try_from_bech32*` constructors. Copies exactly `N`
+/// payload bytes into a `Zeroizing<[u8; N]>`; keeps counting (without storing)
+/// past `N` so the length-mismatch error reports the exact decoded length.
+/// The iteration count is bounded by the checksum-validated input string, so
+/// oversized inputs cost at most one bounded pass. Works without `alloc`.
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+fn drain_bech32_payload<const N: usize>(
+    checked: &bech32::primitives::decode::CheckedHrpstring<'_>,
+) -> Result<zeroize::Zeroizing<[u8; N]>, crate::error::Bech32Error> {
+    let mut buf = zeroize::Zeroizing::new([0u8; N]);
+    let mut count = 0usize;
+    for byte in checked.byte_iter() {
+        if count < N {
+            buf[count] = byte;
+        }
+        count += 1;
+    }
+    if count != N {
+        return Err(crate::error::Bech32Error::InvalidLength {
+            expected: N,
+            got: count,
+        });
+    }
+    Ok(buf)
+    // On the error path, buf is zeroized on drop.
+}
+
 /// Zero-cost stack-allocated wrapper for fixed-size secrets.
 ///
 /// `Fixed<T>` stores a `T: Zeroize` value inline and unconditionally zeroizes it
@@ -221,13 +250,10 @@ impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
 
     fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
         if slice.len() != N {
-            #[cfg(debug_assertions)]
             return Err(crate::error::FromSliceError::InvalidLength {
-                actual: slice.len(),
                 expected: N,
+                got: slice.len(),
             });
-            #[cfg(not(debug_assertions))]
-            return Err(crate::error::FromSliceError::InvalidLength);
         }
         Ok(Self::new_with(|arr| arr.copy_from_slice(slice)))
     }
@@ -423,13 +449,10 @@ impl<const N: usize> Fixed<[u8; N]> {
                     .map_err(|_| crate::error::HexError::InvalidHex)?,
             );
             if bytes.len() != N {
-                #[cfg(debug_assertions)]
                 return Err(crate::error::HexError::InvalidLength {
                     expected: N,
                     got: bytes.len(),
                 });
-                #[cfg(not(debug_assertions))]
-                return Err(crate::error::HexError::InvalidLength);
             }
             Ok(Self::new_with(|arr| arr.copy_from_slice(&bytes)))
         }
@@ -442,13 +465,10 @@ impl<const N: usize> Fixed<[u8; N]> {
             let decoded = base16ct::mixed::decode(hex.as_bytes(), &mut *buf)
                 .map_err(|_| crate::error::HexError::InvalidHex)?;
             if decoded.len() != N {
-                #[cfg(debug_assertions)]
                 return Err(crate::error::HexError::InvalidLength {
                     expected: N,
                     got: decoded.len(),
                 });
-                #[cfg(not(debug_assertions))]
-                return Err(crate::error::HexError::InvalidLength);
             }
             Ok(Self::new_with(|arr| arr.copy_from_slice(decoded)))
             // buf is zeroized on drop (both success and error paths)
@@ -553,13 +573,10 @@ impl<const N: usize> Fixed<[u8; N]> {
                     .map_err(|_| crate::error::Base64Error::InvalidBase64)?,
             );
             if bytes.len() != N {
-                #[cfg(debug_assertions)]
                 return Err(crate::error::Base64Error::InvalidLength {
                     expected: N,
                     got: bytes.len(),
                 });
-                #[cfg(not(debug_assertions))]
-                return Err(crate::error::Base64Error::InvalidLength);
             }
             Ok(Self::new_with(|arr| arr.copy_from_slice(&bytes)))
         }
@@ -571,13 +588,10 @@ impl<const N: usize> Fixed<[u8; N]> {
             let decoded = Base64UrlUnpadded::decode(s, &mut *buf)
                 .map_err(|_| crate::error::Base64Error::InvalidBase64)?;
             if decoded.len() != N {
-                #[cfg(debug_assertions)]
                 return Err(crate::error::Base64Error::InvalidLength {
                     expected: N,
                     got: decoded.len(),
                 });
-                #[cfg(not(debug_assertions))]
-                return Err(crate::error::Base64Error::InvalidLength);
             }
             Ok(Self::new_with(|arr| arr.copy_from_slice(decoded)))
             // buf is zeroized on drop (both success and error paths)
@@ -631,40 +645,12 @@ impl<const N: usize> Fixed<[u8; N]> {
         use bech32::primitives::decode::CheckedHrpstring;
         let checked = CheckedHrpstring::new::<Bech32Large>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
-        // HRP check (case-insensitive comparison follows — timing leak is acceptable since HRP is public metadata)
+        // HRP check before any payload byte is materialized (case-insensitive
+        // comparison — timing leak is acceptable since HRP is public metadata)
         if !checked.hrp().as_str().eq_ignore_ascii_case(expected_hrp) {
-            #[cfg(debug_assertions)]
-            return Err(crate::error::Bech32Error::UnexpectedHrp {
-                expected: expected_hrp.to_string(),
-                got: checked.hrp().as_str().to_string(),
-            });
-            #[cfg(not(debug_assertions))]
             return Err(crate::error::Bech32Error::UnexpectedHrp);
         }
-        let mut buf = zeroize::Zeroizing::new([0u8; N]);
-        let mut count = 0usize;
-        for byte in checked.byte_iter() {
-            if count >= N {
-                #[cfg(debug_assertions)]
-                return Err(crate::error::Bech32Error::InvalidLength {
-                    expected: N,
-                    got: count + 1,
-                });
-                #[cfg(not(debug_assertions))]
-                return Err(crate::error::Bech32Error::InvalidLength);
-            }
-            buf[count] = byte;
-            count += 1;
-        }
-        if count != N {
-            #[cfg(debug_assertions)]
-            return Err(crate::error::Bech32Error::InvalidLength {
-                expected: N,
-                got: count,
-            });
-            #[cfg(not(debug_assertions))]
-            return Err(crate::error::Bech32Error::InvalidLength);
-        }
+        let buf = drain_bech32_payload::<N>(&checked)?;
         Ok(Self::new_with(|arr| arr.copy_from_slice(&*buf)))
         // buf is zeroized on drop
     }
@@ -681,30 +667,7 @@ impl<const N: usize> Fixed<[u8; N]> {
         use bech32::primitives::decode::CheckedHrpstring;
         let checked = CheckedHrpstring::new::<Bech32Large>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
-        let mut buf = zeroize::Zeroizing::new([0u8; N]);
-        let mut count = 0usize;
-        for byte in checked.byte_iter() {
-            if count >= N {
-                #[cfg(debug_assertions)]
-                return Err(crate::error::Bech32Error::InvalidLength {
-                    expected: N,
-                    got: count + 1,
-                });
-                #[cfg(not(debug_assertions))]
-                return Err(crate::error::Bech32Error::InvalidLength);
-            }
-            buf[count] = byte;
-            count += 1;
-        }
-        if count != N {
-            #[cfg(debug_assertions)]
-            return Err(crate::error::Bech32Error::InvalidLength {
-                expected: N,
-                got: count,
-            });
-            #[cfg(not(debug_assertions))]
-            return Err(crate::error::Bech32Error::InvalidLength);
-        }
+        let buf = drain_bech32_payload::<N>(&checked)?;
         Ok(Self::new_with(|arr| arr.copy_from_slice(&*buf)))
         // buf is zeroized on drop
     }
@@ -758,40 +721,12 @@ impl<const N: usize> Fixed<[u8; N]> {
         use bech32::{Bech32m, primitives::decode::CheckedHrpstring};
         let checked = CheckedHrpstring::new::<Bech32m>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
-        // HRP check (case-insensitive comparison follows — timing leak is acceptable since HRP is public metadata)
+        // HRP check before any payload byte is materialized (case-insensitive
+        // comparison — timing leak is acceptable since HRP is public metadata)
         if !checked.hrp().as_str().eq_ignore_ascii_case(expected_hrp) {
-            #[cfg(debug_assertions)]
-            return Err(crate::error::Bech32Error::UnexpectedHrp {
-                expected: expected_hrp.to_string(),
-                got: checked.hrp().as_str().to_string(),
-            });
-            #[cfg(not(debug_assertions))]
             return Err(crate::error::Bech32Error::UnexpectedHrp);
         }
-        let mut buf = zeroize::Zeroizing::new([0u8; N]);
-        let mut count = 0usize;
-        for byte in checked.byte_iter() {
-            if count >= N {
-                #[cfg(debug_assertions)]
-                return Err(crate::error::Bech32Error::InvalidLength {
-                    expected: N,
-                    got: count + 1,
-                });
-                #[cfg(not(debug_assertions))]
-                return Err(crate::error::Bech32Error::InvalidLength);
-            }
-            buf[count] = byte;
-            count += 1;
-        }
-        if count != N {
-            #[cfg(debug_assertions)]
-            return Err(crate::error::Bech32Error::InvalidLength {
-                expected: N,
-                got: count,
-            });
-            #[cfg(not(debug_assertions))]
-            return Err(crate::error::Bech32Error::InvalidLength);
-        }
+        let buf = drain_bech32_payload::<N>(&checked)?;
         Ok(Self::new_with(|arr| arr.copy_from_slice(&*buf)))
         // buf is zeroized on drop
     }
@@ -807,30 +742,7 @@ impl<const N: usize> Fixed<[u8; N]> {
         use bech32::{Bech32m, primitives::decode::CheckedHrpstring};
         let checked = CheckedHrpstring::new::<Bech32m>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
-        let mut buf = zeroize::Zeroizing::new([0u8; N]);
-        let mut count = 0usize;
-        for byte in checked.byte_iter() {
-            if count >= N {
-                #[cfg(debug_assertions)]
-                return Err(crate::error::Bech32Error::InvalidLength {
-                    expected: N,
-                    got: count + 1,
-                });
-                #[cfg(not(debug_assertions))]
-                return Err(crate::error::Bech32Error::InvalidLength);
-            }
-            buf[count] = byte;
-            count += 1;
-        }
-        if count != N {
-            #[cfg(debug_assertions)]
-            return Err(crate::error::Bech32Error::InvalidLength {
-                expected: N,
-                got: count,
-            });
-            #[cfg(not(debug_assertions))]
-            return Err(crate::error::Bech32Error::InvalidLength);
-        }
+        let buf = drain_bech32_payload::<N>(&checked)?;
         Ok(Self::new_with(|arr| arr.copy_from_slice(&*buf)))
         // buf is zeroized on drop
     }
@@ -866,22 +778,21 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecret for Fixed<[T; N]> {
     /// Consumes `self` and returns the inner `[T; N]` wrapped in [`crate::InnerSecret`].
     ///
     /// Zero cost — no allocation. The sentinel placed in `self.inner` is
-    /// `[T::default(); N]` (already zeroed for `u8`), so `Fixed::drop` zeroizes
-    /// an already-zero array — a harmless no-op.
+    /// `[T::default(); N]` via [`crate::SentinelValue`] (already zeroed for `u8`),
+    /// so `Fixed::drop` zeroizes an already-zero array — a harmless no-op.
+    /// Works for **any** array length `N` (not limited to 32 like `Default`).
     ///
     /// See [`RevealSecret::into_inner`] for full documentation including the
-    /// `Default` bound rationale and redacted `Debug` behavior.
+    /// `SentinelValue` bound rationale and redacted `Debug` behavior.
     #[inline(always)]
     fn into_inner(mut self) -> crate::InnerSecret<[T; N]>
     where
         Self: Sized,
-        Self::Inner: Sized + Default + zeroize::Zeroize,
+        Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize,
     {
-        // Replace inner with a zero-sentinel so Fixed::drop zeroizes a harmless
-        // default value while the caller receives the real secret.
-        // Default::default() is inferred as [T; N] from context; [T; N]: Default
-        // is guaranteed by the where clause above.
-        let inner = core::mem::take(&mut self.inner);
+        // Replace inner with the sentinel so Fixed::drop zeroizes a harmless
+        // placeholder while the caller receives the real secret.
+        let inner = core::mem::replace(&mut self.inner, crate::SentinelValue::sentinel_value());
         crate::InnerSecret::new(inner)
     }
 }
@@ -1033,6 +944,11 @@ impl<T: zeroize::Zeroize + crate::SerializableSecret> serde::Serialize for Fixed
 }
 
 /// Deserialization uses `Zeroizing`-wrapped temporary buffers — zeroized even on rejection.
+///
+/// The buffer is pre-allocated to exactly `N` bytes and **never grows**: an input
+/// sequence longer than `N` is rejected before the element that would trigger a
+/// reallocation is stored. This matters because a `Vec` reallocation frees the old
+/// buffer — which would already hold `N` secret bytes — without zeroizing it.
 #[cfg(feature = "serde-deserialize")]
 impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -1054,16 +970,16 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
                 let mut vec: zeroize::Zeroizing<alloc::vec::Vec<u8>> =
                     zeroize::Zeroizing::new(alloc::vec::Vec::with_capacity(M));
                 while let Some(value) = seq.next_element()? {
+                    // Reject over-length input *before* pushing past the reserved
+                    // capacity: growing would realloc and free the old buffer
+                    // (already holding M secret bytes) without zeroization.
+                    if vec.len() == M {
+                        return Err(serde::de::Error::invalid_length(M + 1, &self));
+                    }
                     vec.push(value);
                 }
                 if vec.len() != M {
-                    #[cfg(debug_assertions)]
-                    return Err(serde::de::Error::invalid_length(
-                        vec.len(),
-                        &M.to_string().as_str(),
-                    ));
-                    #[cfg(not(debug_assertions))]
-                    return Err(serde::de::Error::custom("decoded length mismatch"));
+                    return Err(serde::de::Error::invalid_length(vec.len(), &self));
                 }
                 Ok(Fixed::new_with(|arr| arr.copy_from_slice(&vec)))
             }

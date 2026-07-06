@@ -171,6 +171,33 @@ fn fixed_into_inner_returns_zeroizing() {
     assert_eq!(*owned, [0xABu8; 32]);
 }
 
+/// Regression: `into_inner` must work for arrays larger than 32 elements.
+/// A plain `Default` bound would fail here — std only implements `Default`
+/// for arrays up to 32; the `SentinelValue` bound has no such limit.
+#[test]
+fn fixed_into_inner_beyond_default_limit() {
+    let key64 = Fixed::new([0xCDu8; 64]);
+    let owned64: secure_gate::InnerSecret<[u8; 64]> = key64.into_inner();
+    assert_eq!(*owned64, [0xCDu8; 64]);
+
+    let key128 = Fixed::new([0xEFu8; 128]);
+    let owned128: secure_gate::InnerSecret<[u8; 128]> = key128.into_inner();
+    assert_eq!(*owned128, [0xEFu8; 128]);
+}
+
+/// `SentinelValue` is implementable for downstream inner types, and generic
+/// code can rely on the bound.
+#[test]
+fn sentinel_value_provided_impls() {
+    use secure_gate::SentinelValue;
+    assert_eq!(<[u8; 64]>::sentinel_value(), [0u8; 64]);
+    #[cfg(feature = "alloc")]
+    {
+        assert_eq!(String::sentinel_value(), String::new());
+        assert_eq!(Vec::<u8>::sentinel_value(), Vec::<u8>::new());
+    }
+}
+
 #[cfg(feature = "alloc")]
 #[test]
 fn dynamic_string_into_inner_returns_zeroizing() {

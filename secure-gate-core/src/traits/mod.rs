@@ -15,6 +15,7 @@
 //! |------------------------|----------------------------------------------|--------------------------|-----------------------------------------------------------------------|
 //! | [`RevealSecret`]       | Read-only scoped / direct access + metadata  | Always available         | Preferred: `with_secret` (scoped); escape hatch: `expose_secret`      |
 //! | [`RevealSecretMut`]    | Mutable scoped / direct access               | Always available         | Same preference: `with_secret_mut` over `expose_secret_mut`           |
+//! | [`SentinelValue`]      | Inert placeholder left by `into_inner`       | Always available         | Implemented for `[T; N]` (any `N`), `String`, `Vec<T>`                |
 //! | [`ConstantTimeEq`]     | Deterministic constant-time equality         | `ct-eq`                  | Timing-attack resistant byte comparison                               |
 //! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for opt-in risk details. |
 //! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for opt-in risk details. |
@@ -54,6 +55,9 @@ pub use reveal_secret::RevealSecret;
 
 pub mod reveal_secret_mut;
 pub use reveal_secret_mut::RevealSecretMut;
+
+pub mod sentinel_value;
+pub use sentinel_value::SentinelValue;
 
 #[cfg(feature = "ct-eq")]
 pub mod constant_time_eq;

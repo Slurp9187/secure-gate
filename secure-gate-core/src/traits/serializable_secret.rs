@@ -31,6 +31,24 @@
 //! - Use ephemeral in-memory secrets
 //! - Avoid persisting raw secrets at all
 //!
+//! # A newtype inner type is required (orphan rule)
+//!
+//! Rust's coherence (orphan) rules prevent downstream crates from implementing
+//! this marker for foreign types: `impl SerializableSecret for String`,
+//! `Vec<u8>`, or `[u8; 32]` does **not compile** outside this crate, because
+//! both the trait and the type would be foreign. Consequently `Fixed<[u8; N]>`,
+//! `Dynamic<String>`, and `Dynamic<Vec<u8>>` can never be serialized directly.
+//!
+//! This is deliberate, not an oversight: if the marker were pre-implemented for
+//! the standard container types, enabling the `serde-serialize` feature would
+//! silently make *every* wrapped secret in a dependency graph serializable.
+//! Requiring a local newtype (as in the example below) keeps each serializable
+//! secret type defined — and auditable — in your own code.
+//!
+//! (`Deserialize` is unaffected: it is implemented on the wrapper types
+//! directly, gated by the `serde-deserialize` feature, because deserialization
+//! *constructs* a protected secret rather than exposing one.)
+//!
 //! # Example
 //!
 //! ```rust
