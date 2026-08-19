@@ -93,11 +93,23 @@ impl<T: zeroize::Zeroize> InnerSecret<T> {
 /// inner types that lack the marker.
 ///
 /// ```rust
+/// use secure_gate::{Fixed, InnerSecret, RevealSecret};
+///
+/// let owned: InnerSecret<[u8; 4]> = Fixed::new([0xABu8; 4]).into_inner();
+/// let copy: InnerSecret<[u8; 4]> = owned.clone(); // stays wrapped, not a bare [u8; 4]
+/// assert_eq!(format!("{copy:?}"), "[REDACTED]");
+/// ```
+///
+/// The heap case is the one the fallthrough actually bit, and needs `alloc`:
+///
+/// ```rust
+/// # #[cfg(feature = "alloc")] {
 /// use secure_gate::{Dynamic, InnerSecret, RevealSecret};
 ///
 /// let owned: InnerSecret<String> = Dynamic::<String>::new("s3cret".to_string()).into_inner();
-/// let copy: InnerSecret<String> = owned.clone(); // stays wrapped
+/// let copy: InnerSecret<String> = owned.clone(); // was a bare String before this impl
 /// assert_eq!(format!("{copy:?}"), "[REDACTED]");
+/// # }
 /// ```
 impl<T: zeroize::Zeroize + Clone> Clone for InnerSecret<T> {
     #[inline]
