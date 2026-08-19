@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Scoped every crate-level "no `Deref`" claim to `Fixed`/`Dynamic`.** The slogan had
+  drifted across `lib.rs`, `SECURITY.md` (TL;DR bullet and Core Security Model table),
+  `traits/mod.rs`, `traits/reveal_secret.rs`, and both READMEs, where it read as a
+  crate-wide invariant. It is not: the
+  output wrappers `InnerSecret<T>` and `EncodedSecret` implement `Deref` by design, as
+  the `lib.rs` type-taxonomy table already stated correctly. Claim now matches code
+  everywhere.
+- **New "Where accident-prevention ends" section** (`lib.rs` crate docs and
+  `SECURITY.md`, following the 3-Tier Access Model). States the boundary explicitly: the
+  crate keeps accidents from compiling while a secret is held in `Fixed`/`Dynamic`, and
+  that obligation ends at the named extraction (`into_inner`, `expose_secret`,
+  `to_*_zeroizing`). Accuracy of documented behavior does not end. Spells out what the
+  output wrappers still guarantee (zeroize-on-drop of the buffer they own, redacted
+  `Debug`) versus what they do not (tracking copies made through `Deref`).
+- **Corrected the false claim that `InnerSecret` is "the only type in this crate that
+  derefs to the secret"** (`inner_secret.rs` type doc and `Deref` impl doc, `lib.rs`
+  re-export doc). `EncodedSecret` derefs to `str`.
+- **Documented that `Debug` redaction does not survive a deref.**
+  `format!("{:?}", inner)` prints `[REDACTED]`; `format!("{:?}", &*inner)` prints the
+  secret, because redaction is a property of the wrapper and not of `T`.
+- **Documented `into_zeroizing()` as a `Debug` downgrade** on both `InnerSecret` and
+  `EncodedSecret`. It preserves zeroize-on-drop but not redaction: `zeroize` 1.8/1.9
+  derive `Debug` on `Zeroizing<T>`, so `{:?}` on the returned value can print the
+  secret. Also noted that this crate does not re-export `zeroize`, so naming the return
+  type requires taking a compatible `zeroize` dependency directly.
+
 ## [0.8.0-rc.10] - 2026-07-06
 
 ### Added

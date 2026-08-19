@@ -7,7 +7,9 @@
 //! [`InnerSecret<T>`](crate::InnerSecret) and [`EncodedSecret`](crate::EncodedSecret).
 //!
 //! The design ensures:
-//! - No implicit borrowing (`Deref`, `AsRef`, etc.)
+//! - No implicit borrowing (`Deref`, `AsRef`, etc.) from the secret wrapper itself —
+//!   the [`InnerSecret<T>`](crate::InnerSecret) returned by `into_inner` does deref,
+//!   because extraction hands ownership to the caller
 //! - Scoped access is preferred (minimizes lifetime of exposed references)
 //! - Direct exposure is possible but clearly marked as an escape hatch
 //! - Owned consumption is available for FFI hand-off and type migration
