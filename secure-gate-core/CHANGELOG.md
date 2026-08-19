@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- **BREAKING: `Display` on `EncodedSecret`.** `{}` on an `EncodedSecret` is now a
+- **BREAKING: `Display` on `EncodedSecret` (#149).** `{}` on an `EncodedSecret` is now a
   compile error. The type printed `[REDACTED]` for `Debug` and the full encoded secret
   for `Display`, which is the wrong way round for accident-prevention: redacted `Debug`
   teaches a caller that the type is safe to put in a log line, and a transparent
@@ -30,10 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/compile-fail/encoded_secret_no_display.rs`.
 
 ### Security
-### Security
 
 - **`InnerSecret<T>` did not implement `Clone`, so `inner.clone()` silently returned a
-  bare `T`.** With no inherent `Clone`, method resolution autoderefed through
+  bare `T` (#146).** With no inherent `Clone`, method resolution autoderefed through
   `Deref<Target = T>` and selected `T::clone`, producing an unprotected `String` /
   `Vec<u8>` / `[u8; N]` that is never zeroized — from a call site that names no
   extraction method and does not appear in an `expose_secret` or `into_inner` grep
@@ -57,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **The DSE zeroization guard was silently dead on nightly, and could assert against
-  stale assembly on any toolchain** (`tests/asm_dse_check.rs`). The test hardcoded
+  stale assembly on any toolchain** (`tests/asm_dse_check.rs`, #150). The test hardcoded
   `target/release/deps/` as the location of the `--emit=asm` output. Nightly Cargo moved
   intermediate artifacts to `target/release/build/<pkg>/<hash>/out/`, the glob found
   nothing, and the test panicked *before reading any assembly* — so for roughly two and a
@@ -87,14 +86,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Testing
 
 - **Compile-fail enforcement that the secret wrappers have no `Deref`/`AsRef`**
-  (`tests/compile-fail/fixed_no_deref.rs`, `tests/compile-fail/dynamic_no_deref.rs`).
+  (`tests/compile-fail/fixed_no_deref.rs`, `tests/compile-fail/dynamic_no_deref.rs`, #148).
   This is the crate's load-bearing "no implicit access" claim and it was previously
   asserted only in prose on the core side — `secure-gate-compat` had the equivalent
   guard, core did not. Each case pins three diagnostics: `E0614` for `*secret`, `E0599`
   for `secret.as_ref()`, and `E0308` for deref coercion at a call site wanting the inner
   type. Verified as a real guard by temporarily adding a `Deref` impl to `Fixed` and
   confirming the snapshot mismatches.
-- **New `compile-fail` CI job pinned to Rust 1.85.** The trybuild snapshots assert
+- **New `compile-fail` CI job pinned to Rust 1.85 (#148).** The trybuild snapshots assert
   compiler diagnostics, which drift on stable, so every test job skipped them by name —
   and the MSRV job runs `cargo check` only. The result was that no CI job ran any
   compile-fail test: the negative API guarantees were enforced nowhere. The new job runs
@@ -104,7 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- **Scoped every crate-level "no `Deref`" claim to `Fixed`/`Dynamic`.** The slogan had
+- **Scoped every crate-level "no `Deref`" claim to `Fixed`/`Dynamic` (#147).** The slogan had
   drifted across `lib.rs`, `SECURITY.md` (TL;DR bullet and Core Security Model table),
   `traits/mod.rs`, `traits/reveal_secret.rs`, and both READMEs, where it read as a
   crate-wide invariant. It is not: the
