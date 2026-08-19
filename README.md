@@ -49,7 +49,7 @@ All types print `[REDACTED]` in `Debug` output and zeroize their memory on drop.
 
 ## Security
 
-- **No `Deref`** — secrets cannot be accessed accidentally; all access is via `.with_secret()`, `.expose_secret()`, or `.into_inner()`
+- **No `Deref` while held** — a secret inside `Fixed`/`Dynamic` cannot be accessed accidentally; all access is via `.with_secret()`, `.expose_secret()`, or `.into_inner()`. The output wrappers returned by extraction deref by design
 - **Mandatory zeroization** — full buffer cleared on drop (including spare heap capacity)
 - **No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally
 - **Timing-safe comparison** — `.ct_eq()` via the `ct-eq` feature (uses `subtle`)

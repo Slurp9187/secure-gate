@@ -14,7 +14,7 @@ This document outlines key security aspects to consider when using the `secure-g
 ## Core Security Model
 - **Explicit Exposure**: Secret data access requires explicit `.expose_secret()` and `.expose_secret_mut()` calls, minimizing accidental leaks. Audit all `.expose_secret()` and `.expose_secret_mut()` calls in your code.
 - **Zeroization**: Memory is zeroized on drop when `zeroize` feature is enabled. Without it, data may linger until normal deallocation.
-- **No Implicit Access**: No `Deref` implementations prevent silent borrowing or copying.
+- **No Implicit Access**: `Fixed`/`Dynamic` implement no `Deref`, preventing silent borrowing or copying of a held secret. (The output wrappers returned by extraction deref by design.)
 - **Constant-Time Operations**: Timing-safe equality available with `ct-eq` feature; disable only with justification.
 - **No Unsafe Code**: The crate contains no `unsafe` code. `forbid(unsafe_code)` is applied in minimal configurations as a defensive measure.
 

@@ -56,6 +56,14 @@ impl EncodedSecret {
     /// Consumes self and returns the underlying `Zeroizing<String>`.
     ///
     /// This is an explicit escape hatch consistent with `InnerSecret`.
+    ///
+    /// # This downgrades `Debug`
+    ///
+    /// Zeroize-on-drop is preserved, but redaction is not: `Zeroizing<String>` derives
+    /// `Debug` (`zeroize` 1.8/1.9; a future release may change the rendering), so `{:?}`
+    /// on the returned value can print the encoded secret. This crate does not
+    /// re-export `zeroize`, so naming the return type means depending on a compatible
+    /// `zeroize` version directly.
     #[inline(always)]
     pub fn into_zeroizing(self) -> zeroize::Zeroizing<alloc::string::String> {
         self.0
