@@ -77,6 +77,35 @@ impl<T: zeroize::Zeroize> InnerSecret<T> {
     }
 }
 
+/// Clones the extracted secret, keeping it wrapped.
+///
+/// This impl exists to close a method-resolution hole rather than for convenience.
+/// Without it, `inner.clone()` does not fail to compile — it autoderefs and resolves to
+/// `T::clone`, silently producing a bare, unprotected `T` (a plain `String`, `Vec<u8>`,
+/// etc.) from a call site that names no exit. With it, `inner.clone()` resolves here and
+/// the result is another `InnerSecret<T>`: independently owned, and independently
+/// zeroized on drop.
+///
+/// This is deliberately **not** gated on [`CloneableSecret`](crate::CloneableSecret).
+/// That marker gates cloning a live [`Fixed`](crate::Fixed) / [`Dynamic`](crate::Dynamic)
+/// wrapper. An `InnerSecret` is already past the named extraction, so gating here would
+/// buy no protection — it would only re-open the silent `T::clone` fallthrough for
+/// inner types that lack the marker.
+///
+/// ```rust
+/// use secure_gate::{Dynamic, InnerSecret, RevealSecret};
+///
+/// let owned: InnerSecret<String> = Dynamic::new(String::from("s3cret")).into_inner();
+/// let copy: InnerSecret<String> = owned.clone(); // stays wrapped
+/// assert_eq!(format!("{copy:?}"), "[REDACTED]");
+/// ```
+impl<T: zeroize::Zeroize + Clone> Clone for InnerSecret<T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
 impl<T: zeroize::Zeroize> core::fmt::Debug for InnerSecret<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
