@@ -95,7 +95,7 @@ impl<T: zeroize::Zeroize> InnerSecret<T> {
 /// ```rust
 /// use secure_gate::{Dynamic, InnerSecret, RevealSecret};
 ///
-/// let owned: InnerSecret<String> = Dynamic::new(String::from("s3cret")).into_inner();
+/// let owned: InnerSecret<String> = Dynamic::<String>::new("s3cret".to_string()).into_inner();
 /// let copy: InnerSecret<String> = owned.clone(); // stays wrapped
 /// assert_eq!(format!("{copy:?}"), "[REDACTED]");
 /// ```
