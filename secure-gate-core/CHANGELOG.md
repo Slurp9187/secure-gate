@@ -54,6 +54,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by deref; a caller who explicitly annotated `let x: String = inner.clone();` must now
   write `inner.to_string()` or `(*inner).clone()`.
 
+### Fixed
+
+- **The DSE zeroization guard was silently dead on nightly, and could assert against
+  stale assembly on any toolchain** (`tests/asm_dse_check.rs`). The test hardcoded
+  `target/release/deps/` as the location of the `--emit=asm` output. Nightly Cargo moved
+  intermediate artifacts to `target/release/build/<pkg>/<hash>/out/`, the glob found
+  nothing, and the test panicked *before reading any assembly* — so for roughly two and a
+  half weeks the nightly half of the DSE matrix was not checking zeroization at all. Both
+  nightly jobs (ubuntu and windows) failed on `main` at the unchanged SHA `fb15c3d5`
+  starting 2026-08-03; both stable jobs passed. Reproduced locally on
+  `rustc 1.100.0-nightly (e71c0f1e3 2026-08-18)`.
+
+  The quieter half of the bug was worse: when an earlier build had left an
+  `asm_check*.s` in `deps/`, the glob found that **stale** file and the guard asserted
+  against assembly from a different compilation — a pass that proves nothing. This was
+  observed directly; the stale file from a `stable` run made the `nightly` run pass until
+  it was deleted.
+
+  Fixed by emitting to an explicit path (`--emit=asm=<path>`, a stable rustc CLI form
+  that accumulates with the `--emit` flags Cargo passes itself) and deleting that path
+  before the build, so the layout is never guessed and a leftover file can never be
+  mistaken for the current one. The build now goes into an isolated, wiped target
+  directory, because otherwise Cargo may consider the binary fresh — identical flags
+  since the last run, or a warm CI cache — skip the compile, and emit nothing. A new
+  assertion fails loudly if Cargo reports success but no assembly appears, so the
+  degenerate case can no longer masquerade as a pass. Side benefit: the isolated tree
+  builds only `asm_check`'s real dependencies rather than the workspace dev-dependencies,
+  cutting the test from a full release build to roughly 10 s. Verified on nightly,
+  stable, and the pinned 1.85, including back-to-back runs with identical flags.
+
 ### Testing
 
 - **Compile-fail enforcement that the secret wrappers have no `Deref`/`AsRef`**
