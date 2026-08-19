@@ -54,3 +54,14 @@ fn dynamic_no_deref_compile_fail() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/dynamic_no_deref.rs");
 }
+
+// Compile-fail test: `EncodedSecret` must not implement `Display`. Debug redaction
+// teaches callers the type is log-safe; a transparent `Display` on the same type would
+// punish exactly those callers. `&*encoded` remains available for intentional writes.
+#[cfg(all(feature = "alloc", feature = "encoding-hex"))]
+#[cfg(not(miri))]
+#[test]
+fn encoded_secret_no_display_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/encoded_secret_no_display.rs");
+}

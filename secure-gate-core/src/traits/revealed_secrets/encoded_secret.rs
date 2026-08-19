@@ -11,16 +11,38 @@
 //!
 //! This is **not** a secret wrapper like [`Fixed`](crate::Fixed) / [`Dynamic`](crate::Dynamic)
 //! — it is a zeroizing `String` wrapper for encoded output. It implements
-//! `Deref<Target = str>` and `Display`.
+//! `Deref<Target = str>` and `AsRef<str>` / `AsRef<[u8]>`.
 //!
-//! # `Display` is intentionally transparent
+//! # No `Display`
 //!
-//! Unlike `Debug` (which always prints `[REDACTED]`), `Display` (`{}`) outputs the
-//! encoded secret content verbatim — needed so the value can be written to a sink,
-//! used in format strings, or sent over a wire. **Do not log `EncodedSecret` values
-//! with `{}` in production.** Prefer `{:?}` for diagnostic output to avoid accidental
-//! secret exposure in log files. See the [`Display`] impl on [`EncodedSecret`] for
-//! the same warning at the type-doc level.
+//! `EncodedSecret` deliberately does **not** implement `Display`, so `{}` in a format
+//! string is a compile error. `Debug` printing `[REDACTED]` teaches callers that the
+//! type is safe to put in a log line; a transparent `Display` on the same type would
+//! then punish exactly the callers who checked. `tracing::info!("token: {tok}")` and
+//! `format!("{tok}")` are the accidents worth preventing, and they are the ones a
+//! missing `Display` prevents.
+//!
+//! Writing the encoded value out is still one deref away, and deliberately explicit:
+//!
+//! ```rust
+//! # #[cfg(all(feature = "encoding-hex", feature = "alloc"))] {
+//! use secure_gate::Fixed;
+//!
+//! let encoded = Fixed::new([0xABu8; 4]).to_hex_zeroizing();
+//!
+//! // Intentional: name the deref.
+//! let line = format!("{}", &*encoded);
+//! assert_eq!(line, "abababab");
+//!
+//! // Accidental: does not compile.
+//! // let line = format!("{}", encoded);
+//! # }
+//! ```
+//!
+//! This does **not** stop extraction by convenience. `Deref<Target = str>` still gives
+//! you `str::to_string()` and `.to_owned()`, both of which produce an ordinary
+//! unzeroized `String`. That is extraction, and it is what the type is for — see
+//! [Where accident-prevention ends](crate#where-accident-prevention-ends).
 
 #[cfg(feature = "alloc")]
 /// Owned wrapper for encoded secret strings. Guarantees zeroization on drop
@@ -98,18 +120,5 @@ impl core::convert::AsRef<str> for EncodedSecret {
 impl core::convert::AsRef<[u8]> for EncodedSecret {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl core::fmt::Display for EncodedSecret {
-    /// Outputs the encoded secret content.
-    ///
-    /// Unlike `Debug` (which prints `[REDACTED]`), `Display` is intentionally transparent
-    /// so the value can be written to a sink or used in format strings.
-    /// **Do not log with `{}` in production** — prefer `Debug` for diagnostic output
-    /// to avoid accidental secret exposure in log files.
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        core::fmt::Display::fmt(&**self, f)
     }
 }

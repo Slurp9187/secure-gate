@@ -406,8 +406,10 @@ pub use traits::SentinelValue;
 ///
 /// Returned by all `*_zeroizing` encoding methods (`to_hex_zeroizing`,
 /// `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.). Wraps
-/// `Zeroizing<String>` with `Debug` → `[REDACTED]`. Implements `Deref<Target = str>`
-/// and `Display`.
+/// `Zeroizing<String>` with `Debug` → `[REDACTED]`. Implements `Deref<Target = str>`,
+/// `AsRef<str>`, and `AsRef<[u8]>`. Deliberately **no** `Display`: `{}` on this type is
+/// a compile error, so `Debug` redaction cannot mislead a caller into logging the
+/// encoded secret. Write it out with `&*encoded`.
 ///
 /// Use [`into_inner()`](EncodedSecret::into_inner) to extract a plain `String`
 /// (ends zeroization) or [`into_zeroizing()`](EncodedSecret::into_zeroizing) to
