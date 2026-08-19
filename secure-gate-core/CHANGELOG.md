@@ -31,6 +31,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by deref; a caller who explicitly annotated `let x: String = inner.clone();` must now
   write `inner.to_string()` or `(*inner).clone()`.
 
+### Testing
+
+- **Compile-fail enforcement that the secret wrappers have no `Deref`/`AsRef`**
+  (`tests/compile-fail/fixed_no_deref.rs`, `tests/compile-fail/dynamic_no_deref.rs`).
+  This is the crate's load-bearing "no implicit access" claim and it was previously
+  asserted only in prose on the core side — `secure-gate-compat` had the equivalent
+  guard, core did not. Each case pins three diagnostics: `E0614` for `*secret`, `E0599`
+  for `secret.as_ref()`, and `E0308` for deref coercion at a call site wanting the inner
+  type. Verified as a real guard by temporarily adding a `Deref` impl to `Fixed` and
+  confirming the snapshot mismatches.
+- **New `compile-fail` CI job pinned to Rust 1.85.** The trybuild snapshots assert
+  compiler diagnostics, which drift on stable, so every test job skipped them by name —
+  and the MSRV job runs `cargo check` only. The result was that no CI job ran any
+  compile-fail test: the negative API guarantees were enforced nowhere. The new job runs
+  `--test compile_fail_tests` on 1.85, the toolchain the `.stderr` files are blessed
+  against, so diagnostics are stable by construction. Skip lists in the stable jobs are
+  updated to include the two new test names, per the existing convention.
+
 ### Documentation
 
 - **Scoped every crate-level "no `Deref`" claim to `Fixed`/`Dynamic`.** The slogan had
