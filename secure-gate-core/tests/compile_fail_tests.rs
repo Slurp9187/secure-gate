@@ -23,3 +23,24 @@ fn serializable_secret_misuse() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/serializable_secret_misuse.rs");
 }
+
+// Compile-fail tests: the secret wrappers must not implement `Deref` or `AsRef`.
+//
+// This is the crate's load-bearing "no implicit access" claim, so it is enforced by the
+// compiler rather than only asserted in SECURITY.md. The boundary is deliberate: the
+// output wrappers returned by extraction (`InnerSecret`, `EncodedSecret`) *do* deref.
+// See "Where accident-prevention ends" in the crate docs.
+#[cfg(not(miri))]
+#[test]
+fn fixed_no_deref_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/fixed_no_deref.rs");
+}
+
+#[cfg(feature = "alloc")]
+#[cfg(not(miri))]
+#[test]
+fn dynamic_no_deref_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/dynamic_no_deref.rs");
+}
