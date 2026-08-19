@@ -1,0 +1,27 @@
+error[E0614]: type `Fixed<[u8; 4]>` cannot be dereferenced
+  --> tests/compile-fail/fixed_no_deref.rs:17:31
+   |
+17 |     let _via_deref: [u8; 4] = *secret;
+   |                               ^^^^^^^
+
+error[E0599]: no method named `as_ref` found for struct `Fixed` in the current scope
+  --> tests/compile-fail/fixed_no_deref.rs:20:40
+   |
+20 |     let _via_as_ref: &[u8; 4] = secret.as_ref();
+   |                                        ^^^^^^ method not found in `Fixed<[u8; 4]>`
+
+error[E0308]: mismatched types
+  --> tests/compile-fail/fixed_no_deref.rs:23:21
+   |
+23 |     takes_inner_ref(&secret);
+   |     --------------- ^^^^^^^ expected `&[u8; 4]`, found `&Fixed<[u8; 4]>`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&[u8; 4]`
+              found reference `&Fixed<[u8; 4]>`
+note: function defined here
+  --> tests/compile-fail/fixed_no_deref.rs:11:4
+   |
+11 | fn takes_inner_ref(_: &[u8; 4]) {}
+   |    ^^^^^^^^^^^^^^^ -----------

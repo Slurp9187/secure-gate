@@ -6,8 +6,21 @@
 ///
 /// This is **not** a secret wrapper like [`Fixed`](crate::Fixed) or
 /// [`Dynamic`](crate::Dynamic) — it is the owned extraction result from
-/// [`into_inner()`](crate::RevealSecret::into_inner). It implements
-/// `Deref<Target = T>` (the **only** type in this crate that derefs to the secret).
+/// [`into_inner()`](crate::RevealSecret::into_inner), and it implements
+/// `Deref<Target = T>` by design. `Fixed` and `Dynamic` deliberately do not deref;
+/// the other output wrapper, [`EncodedSecret`](crate::EncodedSecret), derefs to `str`.
+///
+/// # What this type does and does not protect
+///
+/// It zeroizes the buffer it owns on drop, and its `Debug` prints `[REDACTED]`. It does
+/// **not** track copies made through `Deref`: `*inner` on a `Copy` type such as
+/// `[u8; N]`, or `.to_owned()` on the derefed value, yields ordinary untracked
+/// plaintext. That is the point of extraction — see
+/// [Where accident-prevention ends](crate#where-accident-prevention-ends).
+///
+/// Note also that `Debug` redaction does not survive a deref:
+/// `format!("{:?}", inner)` prints `[REDACTED]`, but `format!("{:?}", &*inner)` prints
+/// the secret. Redaction is a property of this wrapper, not of `T`.
 ///
 /// Use [`into_zeroizing`](Self::into_zeroizing) only when an API explicitly requires
 /// a `Zeroizing<T>` value.
@@ -43,9 +56,60 @@ impl<T: zeroize::Zeroize> InnerSecret<T> {
     ///
     /// This is an explicit escape hatch for interoperability with APIs that accept
     /// `Zeroizing<T>` directly.
+    ///
+    /// # This downgrades `Debug`
+    ///
+    /// Zeroize-on-drop is preserved, but redaction is not: `Zeroizing<T>` derives
+    /// `Debug` from `T` (`zeroize` 1.8/1.9; a future release may change the rendering),
+    /// so `{:?}` on the returned value can print the secret. Prefer keeping the
+    /// `InnerSecret` unless an API names `Zeroizing<T>` in its signature.
+    ///
+    /// This crate does not re-export `zeroize`, so naming the return type in your own
+    /// code means depending on a compatible `zeroize` version directly.
     #[inline(always)]
     pub fn into_zeroizing(self) -> zeroize::Zeroizing<T> {
         self.0
+    }
+}
+
+/// Clones the extracted secret, keeping it wrapped.
+///
+/// This impl exists to close a method-resolution hole rather than for convenience.
+/// Without it, `inner.clone()` does not fail to compile — it autoderefs and resolves to
+/// `T::clone`, silently producing a bare, unprotected `T` (a plain `String`, `Vec<u8>`,
+/// etc.) from a call site that names no exit. With it, `inner.clone()` resolves here and
+/// the result is another `InnerSecret<T>`: independently owned, and independently
+/// zeroized on drop.
+///
+/// This is deliberately **not** gated on [`CloneableSecret`](crate::CloneableSecret).
+/// That marker gates cloning a live [`Fixed`](crate::Fixed) / [`Dynamic`](crate::Dynamic)
+/// wrapper. An `InnerSecret` is already past the named extraction, so gating here would
+/// buy no protection — it would only re-open the silent `T::clone` fallthrough for
+/// inner types that lack the marker.
+///
+/// ```rust
+/// use secure_gate::{Fixed, InnerSecret, RevealSecret};
+///
+/// let owned: InnerSecret<[u8; 4]> = Fixed::new([0xABu8; 4]).into_inner();
+/// let copy: InnerSecret<[u8; 4]> = owned.clone(); // stays wrapped, not a bare [u8; 4]
+/// assert_eq!(format!("{copy:?}"), "[REDACTED]");
+/// ```
+///
+/// The heap case is the one the fallthrough actually bit, and needs `alloc`:
+///
+/// ```rust
+/// # #[cfg(feature = "alloc")] {
+/// use secure_gate::{Dynamic, InnerSecret, RevealSecret};
+///
+/// let owned: InnerSecret<String> = Dynamic::<String>::new("s3cret".to_string()).into_inner();
+/// let copy: InnerSecret<String> = owned.clone(); // was a bare String before this impl
+/// assert_eq!(format!("{copy:?}"), "[REDACTED]");
+/// # }
+/// ```
+impl<T: zeroize::Zeroize + Clone> Clone for InnerSecret<T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
     }
 }
 
@@ -55,9 +119,9 @@ impl<T: zeroize::Zeroize> core::fmt::Debug for InnerSecret<T> {
     }
 }
 
-/// Provides `&T` access via `*inner_secret`. This is the **only** type in the crate
-/// that implements `Deref` to the secret — [`Fixed`](crate::Fixed) and
-/// [`Dynamic`](crate::Dynamic) deliberately do not.
+/// Provides `&T` access via `*inner_secret`. Deref is the intended API for an output
+/// wrapper; the secret wrappers [`Fixed`](crate::Fixed) and [`Dynamic`](crate::Dynamic)
+/// deliberately do not implement it.
 impl<T: zeroize::Zeroize> core::ops::Deref for InnerSecret<T> {
     type Target = T;
 

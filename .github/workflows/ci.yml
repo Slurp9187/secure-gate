@@ -169,12 +169,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run tests (${{ matrix.name }})
-        # The three trybuild snapshots are intentionally blessed on Rust 1.85.
+        # The trybuild snapshots are intentionally blessed on Rust 1.85.
         # Stable rustc diagnostics drift over time (dynamic_string_no_hex broke
         # when stable switched E0599's candidate note to a single-line form), so
         # skip those cases here and keep them covered by local/toolchain-pinned
         # 1.85 runs.
-        run: cargo test -p secure-gate --tests ${{ matrix.features }} -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip dynamic_string_no_hex_compile_fail
+        run: cargo test -p secure-gate --tests ${{ matrix.features }} -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip dynamic_string_no_hex_compile_fail --skip fixed_no_deref_compile_fail --skip dynamic_no_deref_compile_fail --skip encoded_secret_no_display_compile_fail
 
   # ---------------------------------------------------------------------------
   # Release-profile test job — build-invariance oracle
@@ -207,7 +207,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run core tests (release, full features)
-        run: cargo test -p secure-gate --tests --release --features=full -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip dynamic_string_no_hex_compile_fail
+        run: cargo test -p secure-gate --tests --release --features=full -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip dynamic_string_no_hex_compile_fail --skip fixed_no_deref_compile_fail --skip dynamic_no_deref_compile_fail --skip encoded_secret_no_display_compile_fail
 
       - name: Run compat tests (release, all features)
         run: cargo test -p secure-gate-compat --release --all-features -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip compat_no_deref --skip compat_no_asref --skip compat_no_debug_without_marker
@@ -297,6 +297,38 @@ jobs:
 
       - name: cargo check – full features
         run: cargo +1.85 check --features=full
+
+  # ---------------------------------------------------------------------------
+  # Compile-fail job — API-surface enforcement on the blessing toolchain
+  #
+  # The trybuild snapshots assert compiler diagnostics, which drift on stable, so
+  # every other test job skips them. That left them running in no CI job at all:
+  # the negative API guarantees (no `Deref`/`AsRef` on the secret wrappers, no
+  # `Serialize` without `SerializableSecret`, no zero-size aliases, no encoding
+  # methods on `Dynamic<String>`) were asserted in prose and enforced nowhere.
+  #
+  # This job runs exactly those tests, pinned to 1.85 — the toolchain the .stderr
+  # files are blessed against — so the diagnostics are stable by construction.
+  # Regenerate snapshots with: TRYBUILD=overwrite cargo +1.85 test compile_fail
+  # ---------------------------------------------------------------------------
+  compile-fail:
+    name: Compile-fail – trybuild (1.85)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust 1.85
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: "1.85"
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run core compile-fail tests
+        run: cargo +1.85 test -p secure-gate --features=full --test compile_fail_tests
 
   # ---------------------------------------------------------------------------
   # AddressSanitizer job — heap zeroization oracle
