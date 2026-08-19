@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **BREAKING: `Display` on `EncodedSecret`.** `{}` on an `EncodedSecret` is now a
+  compile error. The type printed `[REDACTED]` for `Debug` and the full encoded secret
+  for `Display`, which is the wrong way round for accident-prevention: redacted `Debug`
+  teaches a caller that the type is safe to put in a log line, and a transparent
+  `Display` on that same type then punishes exactly the callers who checked.
+  `tracing::info!("token: {tok}")` and `format!("{tok}")` were the realistic accidents,
+  and a missing `Display` is what prevents them.
+
+  **Scope — this closes format strings, not extraction.** `Deref<Target = str>` is
+  retained, so `str::to_string()` and `.to_owned()` still yield an ordinary unzeroized
+  `String`. Removing `Display` does not change that and was never going to: those are
+  named, intentional extraction, and the crate stops there by design (see *Where
+  accident-prevention ends*). Do not read this change as making `EncodedSecret`
+  copy-proof.
+
+  **Migration:** write `&*encoded` where you previously relied on `Display`.
+  `format!("{}", &*encoded)`, `write!(w, "{}", &*encoded)`, and `encoded.as_ref()` all
+  work unchanged; `AsRef<str>` and `AsRef<[u8]>` are untouched. Enforced by
+  `tests/compile-fail/encoded_secret_no_display.rs`.
+
+### Security
 ### Security
 
 - **`InnerSecret<T>` did not implement `Clone`, so `inner.clone()` silently returned a
