@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **`InnerSecret<T>` did not implement `Clone`, so `inner.clone()` silently returned a
+  bare `T`.** With no inherent `Clone`, method resolution autoderefed through
+  `Deref<Target = T>` and selected `T::clone`, producing an unprotected `String` /
+  `Vec<u8>` / `[u8; N]` that is never zeroized — from a call site that names no
+  extraction method and does not appear in an `expose_secret` or `into_inner` grep
+  sweep. This was the one place where accident-prevention failed *before* a named exit:
+  every other route out of an output wrapper (`*inner`, `.to_string()`, `into_inner()`)
+  is something the caller asked for by name. Added
+  `impl<T: Zeroize + Clone> Clone for InnerSecret<T>`, which clones the inner
+  `Zeroizing<T>` so each clone is independently owned and independently zeroized on
+  drop; `inner.clone()` now resolves to `InnerSecret<T>`.
+
+  Deliberately **not** gated on `CloneableSecret`. That marker gates cloning a live
+  `Fixed`/`Dynamic`; an `InnerSecret` is already past the named extraction, so gating
+  here would buy no protection and would only restore the silent `T::clone`
+  fallthrough for inner types lacking the marker. `EncodedSecret` is unaffected — it
+  derefs to the unsized `str`, so no fallthrough was ever possible there.
+
+  Source-compatible for callers who bound the result with inference or used it as `T`
+  by deref; a caller who explicitly annotated `let x: String = inner.clone();` must now
+  write `inner.to_string()` or `(*inner).clone()`.
+
 ### Documentation
 
 - **Scoped every crate-level "no `Deref`" claim to `Fixed`/`Dynamic`.** The slogan had
