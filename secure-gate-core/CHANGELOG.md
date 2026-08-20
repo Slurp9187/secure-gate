@@ -31,6 +31,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **`std::io::Write` on `Dynamic<Vec<u8>>` left the secret in the outgoing buffer when
+  it grew (#152).** Writing past the current capacity delegated to `Vec::write`, so the
+  standard library reallocated: it copied the plaintext into the new allocation and
+  handed the **old** one back to the allocator with the secret still in it. Drop later
+  wiped only the new buffer, so a drop-time check reported success while a full copy of
+  the secret had already been freed — recoverable from a core dump, swap, or a heap
+  scrape until the allocator reused the page.
+
+  The docs made this worse rather than flagging it: the impl was described as "a pure
+  security improvement", `SECURITY.md` said `Write` "is not an exposure surface", and the
+  rustdoc example started from `vec![]` — capacity zero, so the documented happy path was
+  the worst case.
+
+  `Write` now grows by hand: it allocates the larger buffer, copies, zeroizes the old one
+  (contents *and* spare capacity, via `Vec::zeroize`, which does not free), and only then
+  releases it. Growth stays amortized — the new capacity mirrors `Vec`'s doubling — so
+  repeated writes remain linear, and the only added cost is the wipe itself. Pre-sizing
+  with `Vec::with_capacity` still avoids the copy entirely and is now what the example
+  shows.
+
+  **Scope.** This covers the growth `secure-gate` performs. It cannot cover
+  `with_secret_mut` / `expose_secret_mut`, which hand out `&mut Vec<T>` / `&mut String`;
+  a caller's own `push` / `extend` reallocates outside this crate. That case remains a
+  documented limitation, and `SECURITY.md` now separates the two instead of denying both.
+
+  Regression test: `tests/heap_zeroize.rs::check_write_growth_orphan_zeroed` grows a
+  *live* wrapper and inspects the freed page at the moment of growth. Every other check
+  in that file calls `shrink_to_fit` and only ever examines the allocation Drop releases,
+  which is exactly why this went unnoticed. Confirmed to fail before the fix
+  (`byte at offset 0 was not zeroed before dealloc`) and pass after, in the
+  `--no-default-features --features=std` configuration CI runs.
+
+### Security
+
 - **`InnerSecret<T>` did not implement `Clone`, so `inner.clone()` silently returned a
   bare `T` (#146).** With no inherent `Clone`, method resolution autoderefed through
   `Deref<Target = T>` and selected `T::clone`, producing an unprotected `String` /
