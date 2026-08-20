@@ -206,6 +206,54 @@ fn check_vec_zeroed(size: usize) {
 }
 
 // ---------------------------------------------------------------------------
+// Dynamic<Vec<u8>> — REALLOC-ORPHAN test (growth of a *live* wrapper)
+//
+// Every other check in this file calls `shrink_to_fit` and only ever inspects
+// the allocation that Drop releases. That leaves a blind spot: when a live
+// wrapper grows, `Vec` reallocates, and the *previous* buffer is freed with the
+// secret still in it. Drop later wipes the new buffer, so a drop-only oracle
+// reports success while a copy of the secret has already been handed back to
+// the allocator.
+//
+// The gate asserts on every dealloc of exactly `initial` bytes, so it observes
+// the orphan at the moment `write` grows the buffer — before Drop runs at all.
+//
+// Note this only works because `ProxyAllocator` does not override
+// `GlobalAlloc::realloc`: the default implementation is alloc + copy + dealloc,
+// so the orphaned buffer passes through `dealloc` where it can be inspected.
+// ---------------------------------------------------------------------------
+
+/// Grows a live `Dynamic<Vec<u8>>` past its capacity via `std::io::Write` and
+/// asserts the orphaned buffer was zeroized before being freed.
+#[cfg(feature = "std")]
+fn check_write_growth_orphan_zeroed(initial: usize) {
+    use std::io::Write;
+
+    let mut secret: Dynamic<Vec<u8>> = Dynamic::new({
+        let mut v = Vec::with_capacity(initial);
+        // MSRV 1.70: use repeat().take() (repeat_n stabilized in 1.82).
+        v.extend(std::iter::repeat(0xD7u8).take(initial));
+        v.shrink_to_fit();
+        assert_eq!(
+            v.capacity(),
+            initial,
+            "allocator rounded up capacity — orphan check would be skipped"
+        );
+        v
+    });
+
+    with_proxy_check(initial, || {
+        // Exceeds the remaining capacity (which is zero), forcing a grow.
+        secret
+            .write_all(&[0xE3u8; 64])
+            .expect("write into Dynamic<Vec<u8>> failed");
+        core::hint::black_box(&secret);
+    });
+
+    drop(secret);
+}
+
+// ---------------------------------------------------------------------------
 // Dynamic<String> — backing-buffer zeroization test
 //
 // `Dynamic<String>` wraps a `Box<String>`. The String's backing buffer is
@@ -567,6 +615,14 @@ fn all_heap_zeroed() {
     for size in [16usize, 32, 64, 128] {
         check_vec_zeroed(size);
         check_string_zeroed(size);
+    }
+
+    // Realloc-orphan zeroization when a *live* wrapper grows (SGC-002).
+    // Sizes chosen to avoid the 16/32/64/128 classes used above.
+    #[cfg(feature = "std")]
+    {
+        check_write_growth_orphan_zeroed(96);
+        check_write_growth_orphan_zeroed(192);
     }
 
     // Decode-path backing-buffer zeroization (#96 / from_protected_bytes fix)
