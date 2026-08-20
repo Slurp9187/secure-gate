@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> Backported from `main` (PR #145). Same five defects, adapted to this branch: the
+> `compile-fail` CI job is pinned to 1.70 rather than 1.85, `docs/security_hash_eq.md`
+> does not exist here so its claim-scoping edit is omitted, and there is no
+> `dynamic_string_no_hex` compile-fail test on this branch to reference.
+
 ### Removed
 
 - **BREAKING: `Display` on `EncodedSecret` (#149).** `{}` on an `EncodedSecret` is now a
@@ -81,7 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   degenerate case can no longer masquerade as a pass. Side benefit: the isolated tree
   builds only `asm_check`'s real dependencies rather than the workspace dev-dependencies,
   cutting the test from a full release build to roughly 10 s. Verified on nightly,
-  stable, and the pinned 1.85, including back-to-back runs with identical flags.
+  stable, and the pinned 1.70, including back-to-back runs with identical flags.
 
 ### Testing
 
@@ -93,13 +98,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for `secret.as_ref()`, and `E0308` for deref coercion at a call site wanting the inner
   type. Verified as a real guard by temporarily adding a `Deref` impl to `Fixed` and
   confirming the snapshot mismatches.
-- **New `compile-fail` CI job pinned to Rust 1.85 (#148).** The trybuild snapshots assert
-  compiler diagnostics, which drift on stable, so every test job skipped them by name —
-  and the MSRV job runs `cargo check` only. The result was that no CI job ran any
-  compile-fail test: the negative API guarantees were enforced nowhere. The new job runs
-  `--test compile_fail_tests` on 1.85, the toolchain the `.stderr` files are blessed
-  against, so diagnostics are stable by construction. Skip lists in the stable jobs are
-  updated to include the two new test names, per the existing convention.
+- **New `compile-fail` CI job pinned to Rust 1.70 (#148).** The trybuild snapshots assert
+  compiler diagnostics, which drift on stable, so the stable jobs skipped them by name
+  and the MSRV job skipped them too — each pointing at the other. The stable `test` job
+  said they were "covered by local/toolchain-pinned runs"; the MSRV job said they "run in
+  the stable `test` job". Both cannot be true, and neither was: no CI job ran any
+  compile-fail test, so the negative API guarantees were enforced nowhere. The new job
+  runs `--test compile_fail_tests` on 1.70 — this branch's pinned toolchain
+  (`rust-toolchain.toml`) and the one the `.stderr` files are blessed against — so
+  diagnostics are stable by construction. Confirmed empirically: all five snapshots pass
+  on 1.70 and every one of them mismatches on stable. Skip lists in the stable and MSRV
+  jobs are updated to include the new test names, and the MSRV job's stale claim that
+  compile-fail tests run in the stable job is corrected.
 
 ### Documentation
 
