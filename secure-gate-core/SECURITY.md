@@ -58,6 +58,19 @@ the old buffer **without zeroing**. `ZeroizingOnDrop` only zeros the
 memory until the allocator reuses or unmaps the page; they survive into
 core dumps and swap.
 
+**What the crate now handles, and what it cannot.** Where `secure-gate` owns the
+growth it wipes the outgoing buffer: `std::io::Write` on `Dynamic<Vec<u8>>`
+allocates the larger buffer, copies, zeroizes the old one (contents *and* spare
+capacity), and only then releases it. This is verified by an allocator-level
+regression test (`tests/heap_zeroize.rs`,
+`check_write_growth_orphan_zeroed`) that inspects the freed page at the moment
+of growth rather than only at drop.
+
+It cannot do the same for `with_secret_mut` / `expose_secret_mut`: those hand the
+caller a `&mut Vec<T>` or `&mut String`, and a `push` / `extend` / `insert` that
+grows it reallocates entirely outside this crate. **That case remains a real
+limitation**, and the patterns below are the mitigation.
+
 **Recommended patterns:**
 
 - For **known-size key material**, prefer [`Fixed<[u8; N]>`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html) (no allocation) or `Dynamic<[u8; N]>` (heap-only, fixed size — no realloc surface).
@@ -119,7 +132,7 @@ All secret access follows this explicit hierarchy (the table below expands on th
 - **Tier 2 — Direct reference (escape hatch)**: `expose_secret` / `expose_secret_mut` — long-lived references; use only for FFI or third-party APIs requiring `&T`/`&mut T`.
 - **Tier 3 — Owned consumption**: `into_inner` — returns `InnerSecret<T>` (wraps `Zeroizing<T>`); zeroization transfers to caller. Audit separately.
 
-- **Streaming I/O (via `as_reader()`)**: `DynamicReader` implements `std::io::Read` by copying secret bytes into caller-provided buffers through `with_secret` internally. The caller owns zeroization of the destination buffer. `std::io::Write` on `Dynamic<Vec<u8>>` flows data **into** the wrapper and is not an exposure surface. Requires the `std` feature.
+- **Streaming I/O (via `as_reader()`)**: `DynamicReader` implements `std::io::Read` by copying secret bytes into caller-provided buffers through `with_secret` internally. The caller owns zeroization of the destination buffer. `std::io::Write` on `Dynamic<Vec<u8>>` flows data **into** the wrapper, so it is not a *read* surface — but writing past capacity used to leave the outgoing buffer unwiped (see [Heap-reallocation residue](#2-heap-reallocation-residue-dynamicvect--dynamicstring)). That path now grows by hand and zeroizes the old allocation before releasing it. Requires the `std` feature.
 
 **Audit note**: Tier 2, Tier 3, and `as_reader` calls do not appear in simple `expose_secret` grep sweeps and must be reviewed independently.
 

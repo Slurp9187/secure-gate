@@ -718,29 +718,64 @@ impl<T: zeroize::Zeroize + crate::CloneableSecret> Clone for Dynamic<T> {
 
 /// Streams bytes directly into the protected buffer via [`RevealSecretMut`](crate::RevealSecretMut).
 ///
-/// Data flows **into** the wrapper — this is a pure security improvement over
-/// accumulating plaintext in a bare `Vec<u8>` before wrapping.
+/// Data flows **into** the wrapper, so no intermediate unprotected `Vec<u8>` is
+/// accumulated before wrapping.
 ///
-/// # Example
+/// # Growth wipes the outgoing buffer
+///
+/// Writing past the current capacity cannot simply delegate to `Vec`: `Vec` would
+/// reallocate, copy the secret into the new allocation, and hand the **old** one
+/// back to the allocator with the plaintext still in it. This impl grows by hand
+/// instead — it allocates the larger buffer, copies, zeroizes the old buffer
+/// (contents and spare capacity), and only then releases it.
+///
+/// Pre-sizing with `Vec::with_capacity` avoids the copy altogether and is worth
+/// doing when the length is known up front:
 ///
 /// ```rust
 /// # #[cfg(feature = "std")] {
 /// use std::io::Write;
 /// use secure_gate::Dynamic;
 ///
-/// let mut secret = Dynamic::<Vec<u8>>::new(vec![]);
-/// secret.write_all(b"decrypted payload").unwrap();
+/// let payload = b"decrypted payload";
 ///
-/// // Secret material was protected from the first byte —
-/// // no intermediate unprotected buffer ever existed.
+/// // Pre-sized: no growth, so no copy and nothing to wipe.
+/// let mut secret = Dynamic::<Vec<u8>>::new(Vec::with_capacity(payload.len()));
+/// secret.write_all(payload).unwrap();
 /// # }
 /// ```
+///
+/// This addresses only the buffer this impl owns. A caller who grows the `Vec`
+/// themselves through [`with_secret_mut`](crate::RevealSecretMut::with_secret_mut)
+/// or [`expose_secret_mut`](crate::RevealSecretMut::expose_secret_mut) holds
+/// `&mut Vec<u8>` directly, and their reallocation is outside this crate's
+/// control — see the heap-reallocation residue section in `SECURITY.md`.
 #[cfg(feature = "std")]
 impl std::io::Write for Dynamic<alloc::vec::Vec<u8>> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         use crate::RevealSecretMut;
-        self.with_secret_mut(|v| std::io::Write::write(v, buf))
+
+        self.with_secret_mut(|v: &mut alloc::vec::Vec<u8>| -> std::io::Result<usize> {
+            if buf.len() > v.capacity() - v.len() {
+                // Grow by hand so the outgoing allocation can be wiped before the
+                // allocator gets it back. `Vec`'s own realloc would copy the secret
+                // into the new buffer and free the old one still holding plaintext.
+                let needed = v.len().checked_add(buf.len()).ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::OutOfMemory, "capacity overflow")
+                })?;
+                // Mirror `Vec`'s amortized doubling so repeated writes stay linear.
+                let new_cap = core::cmp::max(needed, v.capacity().saturating_mul(2));
+                let mut grown = alloc::vec::Vec::with_capacity(new_cap);
+                grown.extend_from_slice(v);
+                // Wipes contents *and* spare capacity, and sets len to 0 without
+                // freeing; the assignment below then drops the zeroed allocation.
+                v.zeroize();
+                *v = grown;
+            }
+            v.extend_from_slice(buf);
+            Ok(buf.len())
+        })
     }
 
     #[inline]
