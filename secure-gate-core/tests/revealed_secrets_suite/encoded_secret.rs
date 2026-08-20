@@ -23,11 +23,16 @@ fn encoded_secret_debug_is_redacted() {
     assert_eq!(format!("{encoded:#?}"), "[REDACTED]");
 }
 
+// `EncodedSecret` has no `Display`: `{}` on it is a compile error, so a caller who
+// learned from `{:?}` that the type is log-safe cannot be surprised by `{}`. Writing the
+// value out stays available, but must name the deref. The compile-fail counterpart is
+// tests/compile-fail/encoded_secret_no_display.rs.
 #[cfg(feature = "encoding-hex")]
 #[test]
-fn encoded_secret_display_shows_content() {
+fn encoded_secret_content_requires_explicit_deref() {
     let encoded = sample_hex_secret();
-    assert_eq!(format!("{encoded}"), "deadbeef");
+    assert_eq!(format!("{}", &*encoded), "deadbeef");
+    assert_eq!(format!("{encoded:?}"), "[REDACTED]");
 }
 
 #[cfg(feature = "encoding-hex")]
@@ -78,7 +83,7 @@ fn encoded_secret_empty_string() {
     let encoded = empty.to_hex_zeroizing();
 
     assert_eq!(format!("{encoded:?}"), "[REDACTED]");
-    assert_eq!(format!("{encoded}"), "");
+    assert_eq!(format!("{}", &*encoded), "");
     assert_eq!(&*encoded, "");
     assert!(encoded.is_empty());
 

@@ -5,7 +5,8 @@
 - **No independent audit** — review the source code yourself before production use.
 - **No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally.
 - **3-tier access model** — explicit hierarchy (prefer Tier 1 scoped methods). Audit Tier 2/3 calls separately.
-- **Explicit exposure only** — all external access requires `with_secret`/`expose_secret` (or mutable equivalents); no `Deref`/`AsRef`. Internal impls (`Clone`, `Serialize`) access `.inner` directly by design — they require opt-in marker traits and do not expose secrets to callers.
+- **Explicit exposure while held** — while a secret is inside `Fixed`/`Dynamic`, all external access requires `with_secret`/`expose_secret` (or mutable equivalents); those two types implement no `Deref`/`AsRef`. Internal impls (`Clone`, `Serialize`) access `.inner` directly by design — they require opt-in marker traits and do not expose secrets to callers.
+- **Extraction is a hand-off** — the output wrappers (`InnerSecret`, `EncodedSecret`) returned by `into_inner` / `to_*_zeroizing` **do** implement `Deref`. They keep zeroize-on-drop and redacted `Debug` for the buffer they own; copies you make through `Deref` are ordinary values. See [Where accident-prevention ends](#where-accident-prevention-ends).
 - **Zeroization on drop** — full buffer (incl. spare capacity) is wiped (inner type must implement `Zeroize`).
 - **Timing-safe equality** — use `.ct_eq()` (`ct-eq` feature); `==` is deliberately not implemented.
 - **Opt-in risk** — cloning/serialization requires marker traits (`CloneableSecret`/`SerializableSecret`).
@@ -122,6 +123,48 @@ All secret access follows this explicit hierarchy (the table below expands on th
 
 **Audit note**: Tier 2, Tier 3, and `as_reader` calls do not appear in simple `expose_secret` grep sweeps and must be reviewed independently.
 
+## Where accident-prevention ends
+
+The tiers above describe **holding** a secret. They stop at the wrapper boundary, and
+the crate makes two different promises on either side of it.
+
+| Obligation | Scope |
+| ---------- | ----- |
+| Accidents must not compile | While the secret is held in `Fixed`/`Dynamic`. Ends at the named extraction. |
+| Documented behavior must be accurate | Everywhere, forever. |
+
+`into_inner`, `expose_secret`, and `to_*_zeroizing` are named exits. You typed the name,
+the call site is grep-able, and ownership transfers to you. Past that point the crate is
+not trying to follow the bytes — that would mean either a fourth wrapper or a false claim.
+
+**What the output wrappers still do**: zeroize the buffer they own on drop, and print
+`[REDACTED]` for `Debug`.
+
+**What they do not do**: track copies. `InnerSecret<T>` derefs to `T` and `EncodedSecret`
+derefs to `str`, so all of the following produce ordinary, untracked plaintext, by design:
+
+```rust,ignore
+let inner = key.into_inner();         // InnerSecret<[u8; 32]>
+let copy: [u8; 32] = *inner;          // arrays are Copy — untracked
+
+let enc = key.to_hex_zeroizing();     // EncodedSecret
+let s: String = enc.to_string();      // via Deref<Target = str> — untracked
+```
+
+Two specific consequences:
+
+- **`Debug` redaction does not survive a deref.** `format!("{:?}", inner)` prints
+  `[REDACTED]`; `format!("{:?}", &*inner)` prints the secret. Redaction is a property of
+  the wrapper, not of `T`.
+- **`into_zeroizing()` is a downgrade.** It returns `zeroize::Zeroizing<T>`, whose `Debug`
+  is not redacted (`zeroize` 1.8/1.9 derive it; a future release may change the
+  rendering). Zeroize-on-drop is preserved, redaction is not. It exists for APIs that
+  demand a `Zeroizing<T>` by name. Note that this crate does not re-export `zeroize`, so
+  naming that return type means taking a compatible `zeroize` dependency yourself.
+
+An encoded secret is still the whole secret in a different alphabet. `EncodedSecret` is a
+zeroizing `String` buffer with redacted `Debug` — not a redaction of the value.
+
 ## Core Security Model
 
 
@@ -130,7 +173,7 @@ All secret access follows this explicit hierarchy (the table below expands on th
 | Explicit exposure              | Private inner fields; all caller-facing access via audited methods (`expose_secret`, `with_secret`). Internal impls (`Clone`, `Serialize`) access `.inner` directly but require opt-in marker traits; `ConstantTimeEq` routes through `expose_secret()` with a `RevealSecret` bound. |
 | Scoped exposure (preferred)    | Closures limit borrow lifetime; prevents long-lived references                                                     |
 | Direct exposure (escape hatch) | `expose_secret()` / `expose_secret_mut()` — grep-able, auditable                                                   |
-| No implicit leaks              | No `Deref`, `AsRef`, `Copy`, `Clone` (unless `cloneable` + marker)                                                 |
+| No implicit leaks (while held) | `Fixed`/`Dynamic` implement no `Deref`, `AsRef`, `Copy`, or `Clone` (unless `cloneable` + marker). Output wrappers deref by design — see [Where accident-prevention ends](#where-accident-prevention-ends). |
 | Zeroization                    | Full allocation always wiped on drop; includes `Vec`/`String` spare capacity (inner type must implement `Zeroize`) |
 | Timing safety                  | `ConstantTimeEq` (`.ct_eq()`) — deterministic constant-time comparison via `expose_secret()`. Avoid `==`.          |
 | Opt-in risky features          | Cloning/serialization gated by marker traits (`CloneableSecret`, `SerializableSecret`)                             |

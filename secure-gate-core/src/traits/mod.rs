@@ -24,7 +24,9 @@
 //!
 //! # Security Guarantees
 //!
-//! - **No implicit access** — All secret data access requires explicit trait methods
+//! - **No implicit access while held** — Reaching a secret inside `Fixed`/`Dynamic`
+//!   requires an explicit trait method. The output wrappers returned by extraction
+//!   ([`InnerSecret`], [`EncodedSecret`]) deref by design
 //! - **Scoped preference** — `with_secret` / `with_secret_mut` limit borrow lifetime
 //! - **Zero-cost** — All methods use `#[inline(always)]` where possible
 //! - **Timing safety** — `ConstantTimeEq` provides constant-time equality

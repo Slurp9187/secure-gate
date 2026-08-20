@@ -146,7 +146,7 @@ fn log_length<S: RevealSecret>(secret: &S) {
 ## What You Get
 
 - **Zero-cost safety** — mandatory zeroization on drop; `no_std` / `no_alloc` support.
-- **Audit-first API** — secrets cannot leak via `Deref`. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch.
+- **Audit-first API** — a held secret cannot leak via `Deref`: `Fixed`/`Dynamic` implement none. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch. Extraction (`into_inner`, `to_*_zeroizing`) hands ownership to the caller and returns output wrappers that *do* deref — see [Where accident-prevention ends](SECURITY.md#where-accident-prevention-ends).
 - **Named aliases** — macros create `type` aliases over `Fixed` / `Dynamic` that inherit redacted `Debug` and zeroize-on-drop. These are plain type aliases, not newtypes: same-shape aliases (e.g. two `Fixed<[u8; 32]>` aliases) are interchangeable at the type level — wrap in a `struct` newtype yourself if you need nominal separation.
 - **Batteries included** — optional, zero-overhead support for serde, constant-time comparison (`subtle`), and secure encoding (hex, base64url, bech32/m).
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`.

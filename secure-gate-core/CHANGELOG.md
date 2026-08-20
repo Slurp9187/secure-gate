@@ -7,6 +7,138 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> Backported from `main` (PR #145). Same five defects, adapted to this branch: the
+> `compile-fail` CI job is pinned to 1.70 rather than 1.85, `docs/security_hash_eq.md`
+> does not exist here so its claim-scoping edit is omitted, and there is no
+> `dynamic_string_no_hex` compile-fail test on this branch to reference.
+
+### Removed
+
+- **BREAKING: `Display` on `EncodedSecret` (#149).** `{}` on an `EncodedSecret` is now a
+  compile error. The type printed `[REDACTED]` for `Debug` and the full encoded secret
+  for `Display`, which is the wrong way round for accident-prevention: redacted `Debug`
+  teaches a caller that the type is safe to put in a log line, and a transparent
+  `Display` on that same type then punishes exactly the callers who checked.
+  `tracing::info!("token: {tok}")` and `format!("{tok}")` were the realistic accidents,
+  and a missing `Display` is what prevents them.
+
+  **Scope — this closes format strings, not extraction.** `Deref<Target = str>` is
+  retained, so `str::to_string()` and `.to_owned()` still yield an ordinary unzeroized
+  `String`. Removing `Display` does not change that and was never going to: those are
+  named, intentional extraction, and the crate stops there by design (see *Where
+  accident-prevention ends*). Do not read this change as making `EncodedSecret`
+  copy-proof.
+
+  **Migration:** write `&*encoded` where you previously relied on `Display`.
+  `format!("{}", &*encoded)`, `write!(w, "{}", &*encoded)`, and `encoded.as_ref()` all
+  work unchanged; `AsRef<str>` and `AsRef<[u8]>` are untouched. Enforced by
+  `tests/compile-fail/encoded_secret_no_display.rs`.
+
+### Security
+
+- **`InnerSecret<T>` did not implement `Clone`, so `inner.clone()` silently returned a
+  bare `T` (#146).** With no inherent `Clone`, method resolution autoderefed through
+  `Deref<Target = T>` and selected `T::clone`, producing an unprotected `String` /
+  `Vec<u8>` / `[u8; N]` that is never zeroized — from a call site that names no
+  extraction method and does not appear in an `expose_secret` or `into_inner` grep
+  sweep. This was the one place where accident-prevention failed *before* a named exit:
+  every other route out of an output wrapper (`*inner`, `.to_string()`, `into_inner()`)
+  is something the caller asked for by name. Added
+  `impl<T: Zeroize + Clone> Clone for InnerSecret<T>`, which clones the inner
+  `Zeroizing<T>` so each clone is independently owned and independently zeroized on
+  drop; `inner.clone()` now resolves to `InnerSecret<T>`.
+
+  Deliberately **not** gated on `CloneableSecret`. That marker gates cloning a live
+  `Fixed`/`Dynamic`; an `InnerSecret` is already past the named extraction, so gating
+  here would buy no protection and would only restore the silent `T::clone`
+  fallthrough for inner types lacking the marker. `EncodedSecret` is unaffected — it
+  derefs to the unsized `str`, so no fallthrough was ever possible there.
+
+  Source-compatible for callers who bound the result with inference or used it as `T`
+  by deref; a caller who explicitly annotated `let x: String = inner.clone();` must now
+  write `inner.to_string()` or `(*inner).clone()`.
+
+### Fixed
+
+- **The DSE zeroization guard was silently dead on nightly, and could assert against
+  stale assembly on any toolchain** (`tests/asm_dse_check.rs`, #150). The test hardcoded
+  `target/release/deps/` as the location of the `--emit=asm` output. Nightly Cargo moved
+  intermediate artifacts to `target/release/build/<pkg>/<hash>/out/`, the glob found
+  nothing, and the test panicked *before reading any assembly* — so for roughly two and a
+  half weeks the nightly half of the DSE matrix was not checking zeroization at all. Both
+  nightly jobs (ubuntu and windows) failed on `main` at the unchanged SHA `fb15c3d5`
+  starting 2026-08-03; both stable jobs passed. Reproduced locally on
+  `rustc 1.100.0-nightly (e71c0f1e3 2026-08-18)`.
+
+  The quieter half of the bug was worse: when an earlier build had left an
+  `asm_check*.s` in `deps/`, the glob found that **stale** file and the guard asserted
+  against assembly from a different compilation — a pass that proves nothing. This was
+  observed directly; the stale file from a `stable` run made the `nightly` run pass until
+  it was deleted.
+
+  Fixed by emitting to an explicit path (`--emit=asm=<path>`, a stable rustc CLI form
+  that accumulates with the `--emit` flags Cargo passes itself) and deleting that path
+  before the build, so the layout is never guessed and a leftover file can never be
+  mistaken for the current one. The build now goes into an isolated, wiped target
+  directory, because otherwise Cargo may consider the binary fresh — identical flags
+  since the last run, or a warm CI cache — skip the compile, and emit nothing. A new
+  assertion fails loudly if Cargo reports success but no assembly appears, so the
+  degenerate case can no longer masquerade as a pass. Side benefit: the isolated tree
+  builds only `asm_check`'s real dependencies rather than the workspace dev-dependencies,
+  cutting the test from a full release build to roughly 10 s. Verified on nightly,
+  stable, and the pinned 1.70, including back-to-back runs with identical flags.
+
+### Testing
+
+- **Compile-fail enforcement that the secret wrappers have no `Deref`/`AsRef`**
+  (`tests/compile-fail/fixed_no_deref.rs`, `tests/compile-fail/dynamic_no_deref.rs`, #148).
+  This is the crate's load-bearing "no implicit access" claim and it was previously
+  asserted only in prose on the core side — `secure-gate-compat` had the equivalent
+  guard, core did not. Each case pins three diagnostics: `E0614` for `*secret`, `E0599`
+  for `secret.as_ref()`, and `E0308` for deref coercion at a call site wanting the inner
+  type. Verified as a real guard by temporarily adding a `Deref` impl to `Fixed` and
+  confirming the snapshot mismatches.
+- **New `compile-fail` CI job pinned to Rust 1.70 (#148).** The trybuild snapshots assert
+  compiler diagnostics, which drift on stable, so the stable jobs skipped them by name
+  and the MSRV job skipped them too — each pointing at the other. The stable `test` job
+  said they were "covered by local/toolchain-pinned runs"; the MSRV job said they "run in
+  the stable `test` job". Both cannot be true, and neither was: no CI job ran any
+  compile-fail test, so the negative API guarantees were enforced nowhere. The new job
+  runs `--test compile_fail_tests` on 1.70 — this branch's pinned toolchain
+  (`rust-toolchain.toml`) and the one the `.stderr` files are blessed against — so
+  diagnostics are stable by construction. Confirmed empirically: all five snapshots pass
+  on 1.70 and every one of them mismatches on stable. Skip lists in the stable and MSRV
+  jobs are updated to include the new test names, and the MSRV job's stale claim that
+  compile-fail tests run in the stable job is corrected.
+
+### Documentation
+
+- **Scoped every crate-level "no `Deref`" claim to `Fixed`/`Dynamic` (#147).** The slogan had
+  drifted across `lib.rs`, `SECURITY.md` (TL;DR bullet and Core Security Model table),
+  `traits/mod.rs`, `traits/reveal_secret.rs`, and both READMEs, where it read as a
+  crate-wide invariant. It is not: the
+  output wrappers `InnerSecret<T>` and `EncodedSecret` implement `Deref` by design, as
+  the `lib.rs` type-taxonomy table already stated correctly. Claim now matches code
+  everywhere.
+- **New "Where accident-prevention ends" section** (`lib.rs` crate docs and
+  `SECURITY.md`, following the 3-Tier Access Model). States the boundary explicitly: the
+  crate keeps accidents from compiling while a secret is held in `Fixed`/`Dynamic`, and
+  that obligation ends at the named extraction (`into_inner`, `expose_secret`,
+  `to_*_zeroizing`). Accuracy of documented behavior does not end. Spells out what the
+  output wrappers still guarantee (zeroize-on-drop of the buffer they own, redacted
+  `Debug`) versus what they do not (tracking copies made through `Deref`).
+- **Corrected the false claim that `InnerSecret` is "the only type in this crate that
+  derefs to the secret"** (`inner_secret.rs` type doc and `Deref` impl doc, `lib.rs`
+  re-export doc). `EncodedSecret` derefs to `str`.
+- **Documented that `Debug` redaction does not survive a deref.**
+  `format!("{:?}", inner)` prints `[REDACTED]`; `format!("{:?}", &*inner)` prints the
+  secret, because redaction is a property of the wrapper and not of `T`.
+- **Documented `into_zeroizing()` as a `Debug` downgrade** on both `InnerSecret` and
+  `EncodedSecret`. It preserves zeroize-on-drop but not redaction: `zeroize` 1.8/1.9
+  derive `Debug` on `Zeroizing<T>`, so `{:?}` on the returned value can print the
+  secret. Also noted that this crate does not re-export `zeroize`, so naming the return
+  type requires taking a compatible `zeroize` dependency directly.
+
 ## [0.8.0-rc.10] - 2026-07-06
 
 ### Added

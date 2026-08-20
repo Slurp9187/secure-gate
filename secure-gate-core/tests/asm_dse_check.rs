@@ -8,6 +8,13 @@
 //! is required), extracts that function's body, and asserts that store-to-zero
 //! instructions are present.
 //!
+//! The assembly is emitted to an explicit path (`--emit=asm=<path>` under the
+//! target directory) and that path is deleted before the build. Cargo's
+//! intermediate-artifact layout is not a stable interface — nightly moved these
+//! artifacts out of `target/release/deps/` — and searching for the `.s` file
+//! risks reading a stale one from an earlier build, which would make this guard
+//! assert against the wrong compilation.
+//!
 //! # Platform
 //!
 //! Assertion patterns are x86_64-specific. The test is gated to that arch and
@@ -19,7 +26,7 @@
 //! cargo test -p secure-gate --release --test asm_dse_check -- --nocapture
 //! ```
 //!
-//! The test triggers a full release build of the binary (~30 s first run) so it
+//! The test shells out to Cargo and rebuilds the binary every run (~10 s) so it
 //! is marked `#[ignore]` to keep `cargo test` fast by default. Run explicitly:
 //!
 //! ```text
@@ -29,7 +36,7 @@
 #![cfg(target_arch = "x86_64")]
 #![cfg(not(miri))] // test shells out to cargo; Miri cannot handle that
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 // ---------------------------------------------------------------------------
@@ -41,9 +48,63 @@ use std::process::Command;
 fn fixed_drop_emits_volatile_zero_stores() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
+    // Emit the assembly to a path we choose rather than guessing where Cargo
+    // put it.
+    //
+    // Cargo's intermediate-artifact layout is not a stable interface. This test
+    // used to glob `target/release/deps/asm_check*.s`, which broke when nightly
+    // moved intermediate artifacts to `target/release/build/<pkg>/<hash>/out/`.
+    // The silent-failure mode was worse than the loud one: when an earlier build
+    // had left a `.s` behind in `deps/`, the glob found that *stale* file and the
+    // test happily asserted against assembly from a different compilation.
+    //
+    // `--emit=asm=<path>` is a stable rustc CLI form and accumulates with the
+    // `--emit` flags Cargo passes itself, so this works under either layout.
+    let target_dir = std::env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            manifest_dir
+                .parent() // workspace root
+                .expect("manifest_dir has no parent")
+                .join("target")
+        });
+    std::fs::create_dir_all(&target_dir)
+        .unwrap_or_else(|e| panic!("failed to create {}: {e}", target_dir.display()));
+    let asm_path = target_dir.join("dse_check_asm_check.s");
+
+    // Build into an isolated, wiped target directory.
+    //
+    // Without this the build is not guaranteed to happen at all: if Cargo
+    // considers `asm_check` fresh (identical flags since the last run, or a
+    // warm CI cache) it skips the compile, no assembly is emitted, and the
+    // result depends on whatever happens to be on disk. Wiping a dedicated
+    // tree makes the emission unconditional and independent of cache state.
+    //
+    // This is also *cheaper* than sharing the main target dir: only
+    // `asm_check`'s real dependencies get built here, not the dev-dependencies
+    // (criterion, proptest, trybuild) that dominate a workspace release build.
+    let build_dir = target_dir.join("dse-check");
+    match std::fs::remove_dir_all(&build_dir) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => panic!("failed to clear {}: {e}", build_dir.display()),
+    }
+    let build_dir = build_dir
+        .to_str()
+        .expect("build dir path is not valid UTF-8")
+        .to_owned();
+
+    // Remove any previous emission too, so a leftover file from an earlier run
+    // (or an earlier toolchain) cannot be mistaken for this build's output.
+    match std::fs::remove_file(&asm_path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => panic!("failed to clear {}: {e}", asm_path.display()),
+    }
+
     // Use `cargo rustc` so `--emit=asm` only applies to the final crate (the
-    // binary), not to every dependency. This avoids cluttering the deps dir
-    // with unrelated .s files and prevents unnecessary recompilation of deps.
+    // binary) rather than to every dependency, which would emit a `.s` per
+    // crate and force all of them to recompile.
     let status = Command::new(env!("CARGO"))
         .current_dir(&manifest_dir)
         .args([
@@ -55,8 +116,10 @@ fn fixed_drop_emits_volatile_zero_stores() {
             // in no_std target builds; enable the feature explicitly here.
             "--features",
             "std",
+            "--target-dir",
+            &build_dir,
             "--",
-            "--emit=asm",
+            &format!("--emit=asm={}", asm_path.display()),
         ])
         .status()
         .expect("failed to invoke cargo");
@@ -66,21 +129,12 @@ fn fixed_drop_emits_volatile_zero_stores() {
         "cargo rustc --release --bin asm_check failed"
     );
 
-    // The .s file lands in target/release/deps/ named asm_check-<hash>.s.
-    let deps_dir = manifest_dir
-        .parent() // workspace root
-        .expect("manifest_dir has no parent")
-        .join("target")
-        .join("release")
-        .join("deps");
-
-    let asm_path = find_asm_file(&deps_dir, "asm_check").unwrap_or_else(|| {
-        panic!(
-            "could not find asm_check*.s in {}\n\
-             Ensure the crate compiled successfully and --emit=asm was honoured.",
-            deps_dir.display()
-        )
-    });
+    assert!(
+        asm_path.is_file(),
+        "cargo reported success but no assembly was emitted at {}\n\
+         The `--emit=asm=<path>` form may no longer be honoured by rustc.",
+        asm_path.display()
+    );
 
     let asm = std::fs::read_to_string(&asm_path)
         .unwrap_or_else(|e| panic!("failed to read {}: {e}", asm_path.display()));
@@ -143,19 +197,6 @@ fn fixed_drop_emits_volatile_zero_stores() {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/// Returns the first `.s` file in `dir` whose name starts with `prefix`.
-fn find_asm_file(dir: &Path, prefix: &str) -> Option<PathBuf> {
-    std::fs::read_dir(dir).ok()?.flatten().find_map(|e| {
-        let p = e.path();
-        let name = p.file_name()?.to_str()?;
-        if name.starts_with(prefix) && name.ends_with(".s") {
-            Some(p)
-        } else {
-            None
-        }
-    })
-}
 
 /// Extracts the lines of `name:` up to (but not including) `.cfi_endproc`,
 /// `.size`, or the next non-local, non-directive label.
