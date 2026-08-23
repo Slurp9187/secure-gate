@@ -117,11 +117,16 @@ newtypes**. So:
 - For core wrappers, the inner-type marker mechanism is unchanged — it is the
   only orphan-compatible design, and Move 1 is what makes it *worth using*
   (the pattern now yields a readable secret).
-- For local newtypes (the #155 macros), the newtype itself is local, so users
-  or the macro can implement `Clone`/`Serialize` on it directly; the marker
-  question dissolves there. This resolves the intent of #155 §5.1 for the
-  macro's future: derives become honest local impls, not a `with_secret`
-  back door around the marker system.
+- For local newtypes (the #155 macros), the newtype itself is local, so a user
+  *can* hand-write `Clone`/`Serialize` on it directly. This **narrows but does
+  not resolve** #155 §5.1: such an impl must still route through `with_secret`
+  (`Fixed<[u8; 32]>: Clone` requires `[u8; 32]: CloneableSecret`, permanently
+  unimplementable downstream — verified E0277), so the bypass mechanism is
+  unchanged. What changes is ownership: a hand-written impl is the user's
+  visible, greppable decision, whereas a `derive: [Clone]` token spells the
+  same bypass in one word inside a macro expansion. §5.1 is still open, and
+  its option (c) — drop the derives, let users write them — is now the
+  stronger candidate.
 
 ## Effect on the #155 newtype spike (updated in the same change)
 
@@ -133,9 +138,8 @@ newtypes**. So:
   newtypes now satisfy the same bounds as the wrappers.
 - Trap 7 of `docs/nominal_newtypes.md` (custom inner types cannot be newtyped)
   is fixed by Move 1 — previously they had no `RevealSecret` impl at all.
-  §3.3 of that document is now implemented. §5.1's blocker is resolved: a
-  generated newtype is a **local** type, so `Clone`/`Serialize` become honest
-  local impls rather than a `with_secret` back door around the marker system.
+  §3.3 of that document is now implemented. §5.1 is **narrowed but still
+  open** — see Move 3 above; it remains the gate on merging the macros.
 
 ### What this did *not* do: shrink the macros
 

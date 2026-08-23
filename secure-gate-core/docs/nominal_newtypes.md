@@ -10,11 +10,20 @@
 >
 > **Superseded in part by `docs/composability_restructure.md`** (same branch,
 > 0.9.0 candidate): §3.3 is now implemented (wrapper encoders are trait
-> impls), trap 7 is fixed (`RevealSecret` now covers custom inner types, which
-> previously had no access impl at all), and **§5.1's blocker is resolved** —
-> a generated newtype is a local type, so `Clone`/`Serialize` become honest
-> local impls rather than a `with_secret` back door around the marker system.
-> The spike macros in `src/macros/` have been updated to match.
+> impls) and trap 7 is fixed (`RevealSecret` now covers custom inner types,
+> which previously had no access impl at all). The spike macros in
+> `src/macros/` have been updated to match.
+>
+> **§5.1 remains the blocker** — an earlier revision of this note claimed the
+> restructure resolved it. It does not. A generated newtype being local means a
+> user *can* hand-write `impl Clone for EncKey` (verified), but that impl must
+> still route through `with_secret`, because `Fixed<[u8; 32]>: Clone` requires
+> `[u8; 32]: CloneableSecret` and that is permanently unimplementable
+> downstream (verified E0277). The "second door" is therefore **narrowed, not
+> closed**: what changed is that hand-writing the impl is now clearly viable
+> and is the user's own explicit, greppable decision, which makes option (c)
+> below — drop `Clone`/`Serialize` from `derive:` entirely — materially more
+> attractive than it was. The decision itself is still open.
 >
 > The restructure did **not** make these macros unnecessary, and an earlier
 > draft of this note overstated that. Measured: `src/macros/` went from 427 to
@@ -25,8 +34,8 @@
 > a blanket would give `Dynamic<String>` hex encoding — the exclusion pinned
 > by `tests/compile-fail/dynamic_string_no_hex.rs`. §5.3 is therefore
 > **narrowed and made mechanical** (bounded by the trait set) rather than
-> dissolved. What remains open for 0.10 is the macro-rules-vs-proc-macro
-> question (§5.2) and finishing the macro polish (§6).
+> dissolved. What remains open: §5.1 (above), the macro-rules-vs-proc-macro
+> question (§5.2), and finishing the macro polish (§6).
 
 ## Summary
 
@@ -247,9 +256,25 @@ anyway, which makes the derives unusable for stdlib inner types; (c) drop
 `Clone`/`Serialize` from `derive:` entirely and make users hand-write them;
 (d) gate them behind a distinct, louder opt-in token.
 
-**Recommendation: (a) or (d).** Not (b) — it ships a feature that cannot be
-used. Decide explicitly; do not let the spike's choice become the default by
+**Recommendation: (a), (c), or (d).** Not (b) — it ships a feature that cannot
+be used. Decide explicitly; do not let the spike's choice become the default by
 inertia.
+
+**What the composability restructure changed here (and what it did not).** It
+does **not** resolve this. Verified on the restructured branch:
+
+- A user can hand-write `impl Clone for EncKey` on a macro-generated newtype —
+  it compiles and works, because the newtype is local to their crate.
+- That impl must still route through `with_secret`, because
+  `Fixed<[u8; 32]>: Clone` requires `[u8; 32]: CloneableSecret`, which remains
+  permanently unimplementable downstream (**E0277**).
+
+So the bypass is unchanged in mechanism. What changed is *who owns it*: an
+explicit hand-written impl in the user's own code is a visible, greppable
+decision, whereas a `derive: [Clone]` token spells the same bypass in one word
+inside a macro expansion. That materially strengthens option **(c)** — drop
+`Clone`/`Serialize` from the `derive:` list and let users write them by hand
+when they mean it.
 
 ### 5.2 `macro_rules!` or proc macro?
 
