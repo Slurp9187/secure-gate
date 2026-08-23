@@ -153,30 +153,41 @@ macro_rules! __sg_newtype_opt {
             }
         }
     };
+    // `Clone` and `Serialize` are deliberately NOT offered here.
+    //
+    // Forwarding the wrapper's impls is impossible: `Fixed<[u8; N]>: Clone`
+    // requires `[u8; N]: CloneableSecret`, which the orphan rule makes
+    // permanently unimplementable downstream (deliberately — see
+    // `traits/cloneable_secret.rs`). The only mechanism available to a
+    // generated impl is to route through `with_secret` and rebuild, which
+    // opts the secret into cloning/serialization with no marker impl
+    // anywhere — a second door around the opt-in system, spelled in one word
+    // inside a macro expansion.
+    //
+    // A generated newtype is local to the caller's crate, so a caller who
+    // genuinely wants this can write the impl by hand, where the decision is
+    // visible and greppable in their own code. That is the intended path;
+    // see the `Clone` example on `fixed_newtype!`.
     (Clone, $name:ident, $wrapper:ty) => {
-        $crate::__sg_if_cloneable! {
-            impl ::core::clone::Clone for $name {
-                #[inline]
-                fn clone(&self) -> Self {
-                    Self($crate::RevealSecret::with_secret(&self.0, |inner| {
-                        ::core::convert::From::from(::core::clone::Clone::clone(inner))
-                    }))
-                }
-            }
-        }
+        ::core::compile_error!(
+            "secure_newtype: `derive: [Clone]` is not supported. Cloning a secret \
+             cannot be forwarded (the wrapper's `Clone` needs `CloneableSecret` on \
+             the inner type, which downstream crates cannot implement), so a \
+             generated impl would have to route around the opt-in marker system. \
+             Write `impl Clone for YourType` by hand if you mean it — the newtype \
+             is local to your crate, so the decision stays visible in your code."
+        );
     };
     (Serialize, $name:ident, $wrapper:ty) => {
-        $crate::__sg_if_ser! {
-            impl $crate::__private::Serialize for $name {
-                #[inline]
-                fn serialize<S>(&self, serializer: S) -> ::core::result::Result<S::Ok, S::Error>
-                where S: $crate::__private::Serializer {
-                    $crate::RevealSecret::with_secret(&self.0, |inner| {
-                        $crate::__private::Serialize::serialize(inner, serializer)
-                    })
-                }
-            }
-        }
+        ::core::compile_error!(
+            "secure_newtype: `derive: [Serialize]` is not supported. Serializing a \
+             secret cannot be forwarded (the wrapper's `Serialize` needs \
+             `SerializableSecret` on the inner type, which downstream crates cannot \
+             implement), so a generated impl would have to route around the opt-in \
+             marker system. Write `impl Serialize for YourType` by hand if you mean \
+             it — serialization exposes the full secret, so make it a visible, \
+             audited decision in your own code."
+        );
     };
     (Deserialize, $name:ident, $wrapper:ty) => {
         $crate::__sg_if_de! {
@@ -190,6 +201,14 @@ macro_rules! __sg_newtype_opt {
                 }
             }
         }
+    };
+    ($other:ident, $name:ident, $wrapper:ty) => {
+        ::core::compile_error!(::core::concat!(
+            "secure_newtype: unknown `derive:` option `",
+            ::core::stringify!($other),
+            "`. Supported: ConstantTimeEq, Deserialize. `Clone` and `Serialize` are \
+             deliberately unsupported — write them by hand."
+        ));
     };
 }
 

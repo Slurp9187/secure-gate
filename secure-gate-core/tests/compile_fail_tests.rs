@@ -76,3 +76,23 @@ fn custom_inner_no_len_compile_fail() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/custom_inner_no_len.rs");
 }
+
+// Compile-fail tests: `derive: [Clone]` and `derive: [Serialize]` on a generated
+// newtype are rejected with an explanatory message. Neither can be forwarded from
+// the wrapper (both need a marker impl on the inner type that downstream crates
+// cannot write), so a generated impl would have to route around the opt-in marker
+// system. The newtype is local to the caller's crate, so callers who genuinely
+// want either write the impl by hand where the decision stays visible.
+#[cfg(not(miri))]
+#[test]
+fn newtype_derive_clone_rejected_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/newtype_derive_clone_rejected.rs");
+}
+
+#[cfg(not(miri))]
+#[test]
+fn newtype_derive_serialize_rejected_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/newtype_derive_serialize_rejected.rs");
+}

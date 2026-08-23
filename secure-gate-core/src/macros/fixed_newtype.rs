@@ -1,13 +1,51 @@
 //! `fixed_newtype!` — nominal newtype over `Fixed<[u8; N]>`.
 //!
-//! **UNMERGED SPIKE — targets 0.10, not 0.9.0.** One design decision is
-//! unresolved; see `docs/nominal_newtypes.md` §5.1 before merging.
+//! **UNMERGED SPIKE — targets 0.10, not 0.9.0.** See
+//! `docs/nominal_newtypes.md` for the design record and remaining work
+//! (§5.2 macro_rules-vs-proc-macro, §6 polish) before merging.
 
 /// Creates a distinct nominal type wrapping [`Fixed<[u8; N]>`](crate::Fixed).
 ///
 /// Mirrors [`fixed_alias!`](crate::fixed_alias) syntax, but generates a `struct`
 /// rather than a `type` alias: two `fixed_newtype!` types of the same `N` are
 /// **not** interchangeable.
+///
+/// # Cloning and serialization are not generated
+///
+/// There is no `derive: [Clone]` or `derive: [Serialize]`, by design. Neither
+/// can be forwarded from the wrapper — `Fixed<[u8; N]>: Clone` requires
+/// `[u8; N]: `[`CloneableSecret`](crate::CloneableSecret), which the orphan
+/// rule makes permanently unimplementable downstream (deliberately so). A
+/// generated impl would therefore have to route through `with_secret` and
+/// rebuild, opting the secret into cloning with no marker impl anywhere — a
+/// second door around the opt-in system, spelled in one word inside a macro
+/// expansion. Asking for either is a compile error that says so.
+///
+/// The generated type is local to **your** crate, so write the impl by hand
+/// when you mean it. The decision then lives in your code, where it is
+/// visible, greppable, and reviewable:
+///
+/// ```rust
+/// use secure_gate::{fixed_newtype, Fixed, RevealSecret};
+///
+/// fixed_newtype!(pub SessionKey, 32);
+///
+/// // Deliberate: each clone is an independent copy, zeroized on its own drop.
+/// // Cloning widens the window for memory-extraction attacks — audit each use.
+/// impl Clone for SessionKey {
+///     fn clone(&self) -> Self {
+///         Self::new(self.with_secret(|bytes| *bytes))
+///     }
+/// }
+///
+/// let key = SessionKey::new([7u8; 32]);
+/// let copy = key.clone();
+/// assert_eq!(copy.expose_secret()[0], 7);
+/// ```
+///
+/// The same applies to `Serialize`, with a higher bar: serialization exposes
+/// the full secret, so treat a hand-written impl as a security decision and
+/// see [`SerializableSecret`](crate::SerializableSecret) for the risk notes.
 #[macro_export]
 macro_rules! fixed_newtype {
     ($(#[$attr:meta])* $vis:vis $name:ident, $size:literal, $doc:literal) => {

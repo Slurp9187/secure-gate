@@ -1,9 +1,11 @@
 # Nominal Newtypes over `Fixed` and `Dynamic` (`fixed_newtype!` / `dynamic_newtype!`)
 
 > **Status: unmerged spike. Targets 0.10 — deliberately NOT part of 0.9.0.**
-> The code on this branch compiles and its tests pass, but one design decision
-> (§5.1) is unresolved and is a security-posture call, not an implementation
-> detail. Do not merge until §5.1 is settled.
+> The code on this branch compiles and its tests pass. **§5.1 is now decided
+> and implemented** (option (c): `Clone`/`Serialize` dropped from `derive:`,
+> callers write them by hand). The remaining gates are §5.2
+> (macro_rules-vs-proc-macro) and §6 (polish) — engineering questions, not
+> security-posture ones.
 >
 > Tracking issue: #155. Branch: `claude/fixed-dynamic-newtype-hl7e19`.
 > Not a candidate for `release/0.8` — that branch is security patches only.
@@ -14,16 +16,16 @@
 > which previously had no access impl at all). The spike macros in
 > `src/macros/` have been updated to match.
 >
-> **§5.1 remains the blocker** — an earlier revision of this note claimed the
-> restructure resolved it. It does not. A generated newtype being local means a
-> user *can* hand-write `impl Clone for EncKey` (verified), but that impl must
-> still route through `with_secret`, because `Fixed<[u8; 32]>: Clone` requires
-> `[u8; 32]: CloneableSecret` and that is permanently unimplementable
-> downstream (verified E0277). The "second door" is therefore **narrowed, not
-> closed**: what changed is that hand-writing the impl is now clearly viable
-> and is the user's own explicit, greppable decision, which makes option (c)
-> below — drop `Clone`/`Serialize` from `derive:` entirely — materially more
-> attractive than it was. The decision itself is still open.
+> **§5.1 was decided in favour of option (c)** and is implemented. Note that
+> the restructure did **not** resolve it on its own — an interim revision of
+> this note claimed so and was retracted. A generated newtype being local
+> means a user *can* hand-write `impl Clone for EncKey` (verified), but that
+> impl must still route through `with_secret`, because `Fixed<[u8; 32]>:
+> Clone` requires `[u8; 32]: CloneableSecret`, permanently unimplementable
+> downstream (verified E0277). The restructure only changed *ownership* of
+> the bypass, which is what made (c) the right call: the macro no longer
+> spells it in one word, and a caller who wants it writes it visibly in their
+> own code.
 >
 > The restructure did **not** make these macros unnecessary, and an earlier
 > draft of this note overstated that. Measured: `src/macros/` went from 427 to
@@ -34,8 +36,8 @@
 > a blanket would give `Dynamic<String>` hex encoding — the exclusion pinned
 > by `tests/compile-fail/dynamic_string_no_hex.rs`. §5.3 is therefore
 > **narrowed and made mechanical** (bounded by the trait set) rather than
-> dissolved. What remains open: §5.1 (above), the macro-rules-vs-proc-macro
-> question (§5.2), and finishing the macro polish (§6).
+> dissolved. What remains open: the macro-rules-vs-proc-macro question (§5.2)
+> and finishing the macro polish (§6).
 
 ## Summary
 
@@ -87,7 +89,12 @@ There is no duplicated trait forwarding.
 `__sg_newtype_base!` emits: the `#[repr(transparent)]` struct, `from_wrapper` /
 `as_wrapper` / `as_wrapper_mut` / `into_wrapper`, `Debug` (always
 `[REDACTED]`), `From<Wrapper>`, `RevealSecret`, `RevealSecretMut`, `Zeroize`,
-`ZeroizeOnDrop`, and the opt-in `derive:` impls.
+`ZeroizeOnDrop`, and the opt-in `derive:` impls (`ConstantTimeEq`,
+`Deserialize` — `Clone`/`Serialize` are rejected, see §5.1).
+
+**Known gap (§6):** the front-end macros do not yet pass `derive:` through to
+`__sg_newtype_base!`, so the option list is currently reachable only by calling
+the base macro directly. Wiring it through is part of the remaining polish.
 
 `fixed_newtype!` adds: the `N = 0` guard, `const fn new`, `new_with`,
 `From<[u8; N]>`, `TryFrom<&[u8]>`, `from_random`, `try_from_hex`, `to_hex`,
@@ -230,9 +237,9 @@ Each was hit during development; the fix (where applicable) is in the code.
    would also close legitimate access to the wrapper API. Both hatch names are
    greppable. Document it; do not try to prevent it.
 
-## 5. Open questions — resolve before merging
+## 5. Open questions (§5.1 decided; §5.2–§5.4 open)
 
-### 5.1 BLOCKER: expose-based `Clone` / `Serialize` derives
+### 5.1 DECIDED (option (c)): `Clone` / `Serialize` are not generated
 
 `derive: [Clone]` cannot forward the wrapper's `Clone`, because that requires
 `[u8; 32]: CloneableSecret`, which the orphan rule makes **permanently**
@@ -256,9 +263,34 @@ anyway, which makes the derives unusable for stdlib inner types; (c) drop
 `Clone`/`Serialize` from `derive:` entirely and make users hand-write them;
 (d) gate them behind a distinct, louder opt-in token.
 
-**Recommendation: (a), (c), or (d).** Not (b) — it ships a feature that cannot
-be used. Decide explicitly; do not let the spike's choice become the default by
-inertia.
+**Decided: option (c).** `Clone` and `Serialize` are dropped from the `derive:`
+list. Asking for either is now a compile error carrying the reasoning and the
+alternative:
+
+```text
+secure_newtype: `derive: [Clone]` is not supported. Cloning a secret cannot be
+forwarded (the wrapper's `Clone` needs `CloneableSecret` on the inner type,
+which downstream crates cannot implement), so a generated impl would route
+around the opt-in marker system. Write `impl Clone for YourType` by hand if you
+mean it — the newtype is local to your crate, so the decision stays visible in
+your code.
+```
+
+Rationale for (c) over (a)/(d): the bypass cannot be removed — a hand-written
+impl must route through `with_secret` too — so the only question is **who owns
+the decision and how visible it is**. A `derive: [Clone]` token buries it in a
+macro expansion; a hand-written impl puts it in the caller's own code, where
+review and `grep` find it. (b) was rejected outright: requiring the marker
+would ship a feature unusable for every stdlib inner type.
+
+Implemented as: `compile_error!` arms in `__sg_newtype_opt!`, pinned by
+`tests/compile-fail/newtype_derive_clone_rejected.rs` and
+`newtype_derive_serialize_rejected.rs`; an unknown `derive:` token also gets a
+named error listing the supported set. The hand-written `Clone` path is shown
+as a compiling doctest on `fixed_newtype!`. `ConstantTimeEq` and `Deserialize`
+remain supported — neither bypasses anything: they delegate to wrapper impls
+that are already correctly gated (`Deserialize` *constructs* a protected
+secret rather than exposing one).
 
 **What the composability restructure changed here (and what it did not).** It
 does **not** resolve this. Verified on the restructured branch:

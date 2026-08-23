@@ -124,9 +124,10 @@ newtypes**. So:
   unimplementable downstream — verified E0277), so the bypass mechanism is
   unchanged. What changes is ownership: a hand-written impl is the user's
   visible, greppable decision, whereas a `derive: [Clone]` token spells the
-  same bypass in one word inside a macro expansion. §5.1 is still open, and
-  its option (c) — drop the derives, let users write them — is now the
-  stronger candidate.
+  same bypass in one word inside a macro expansion. **§5.1 was subsequently
+  decided in favour of option (c)** — `Clone`/`Serialize` dropped from
+  `derive:`, callers write them by hand — precisely because ownership, not
+  mechanism, was the part that could be improved.
 
 ## Effect on the #155 newtype spike (updated in the same change)
 
@@ -138,8 +139,9 @@ newtypes**. So:
   newtypes now satisfy the same bounds as the wrappers.
 - Trap 7 of `docs/nominal_newtypes.md` (custom inner types cannot be newtyped)
   is fixed by Move 1 — previously they had no `RevealSecret` impl at all.
-  §3.3 of that document is now implemented. §5.1 is **narrowed but still
-  open** — see Move 3 above; it remains the gate on merging the macros.
+  §3.3 of that document is now implemented. §5.1 is **decided** (option (c),
+  see Move 3 above); the remaining gates on merging the macros are §5.2 and
+  §6.
 
 ### What this did *not* do: shrink the macros
 
