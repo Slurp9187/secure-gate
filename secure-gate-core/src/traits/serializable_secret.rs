@@ -82,6 +82,11 @@
 //!
 //! This trait is a **marker only** — it has no methods and adds no runtime behavior.
 //! It exists solely to gate `Serialize` (and optionally `Deserialize`) on wrapper types.
+//!
+//! The pattern is fully supported: [`RevealSecret`](crate::RevealSecret) is
+//! implemented for **every** inner type, so a secret built this way remains
+//! readable after opting into serialization — the opt-in does not cost you
+//! the access API.
 
 /// Marker trait that opts a secret type into serialization.
 ///

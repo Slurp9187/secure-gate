@@ -106,10 +106,6 @@ macro_rules! __sg_newtype_base {
                 $crate::RevealSecret::expose_secret(&self.0)
             }
             #[inline(always)]
-            fn len(&self) -> usize { $crate::RevealSecret::len(&self.0) }
-            #[inline(always)]
-            fn byte_len(&self) -> usize { $crate::RevealSecret::byte_len(&self.0) }
-            #[inline(always)]
             fn into_inner(self) -> $crate::InnerSecret<Self::Inner>
             where
                 Self: Sized,
@@ -250,4 +246,25 @@ macro_rules! __sg_if_bech32 { ($($t:tt)*) => { $($t)* }; }
 #[cfg(not(feature = "encoding-bech32"))]
 macro_rules! __sg_if_bech32 {
     ($($t:tt)*) => {};
+}
+
+/// Internal: forwards [`SecretLen`](crate::SecretLen) to the wrapped field.
+/// Emitted by the front-end macros whose wrapper shape has a meaningful length
+/// (`Fixed<[u8; N]>`, `Dynamic<String>`, `Dynamic<Vec<u8>>`); the generic
+/// `dynamic_newtype!` arm deliberately does not emit it.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __sg_newtype_len {
+    ($name:ident) => {
+        impl $crate::SecretLen for $name {
+            #[inline(always)]
+            fn len(&self) -> usize {
+                $crate::SecretLen::len(&self.0)
+            }
+            #[inline(always)]
+            fn byte_len(&self) -> usize {
+                $crate::SecretLen::byte_len(&self.0)
+            }
+        }
+    };
 }

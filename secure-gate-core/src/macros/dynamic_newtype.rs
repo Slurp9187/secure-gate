@@ -18,6 +18,7 @@ macro_rules! dynamic_newtype {
     // ---- String arm: matched by literal tokens, before the generic arm ----
     ($(#[$attr:meta])* $vis:vis $name:ident, String) => {
         $crate::__sg_newtype_base!($(#[$attr])* $vis $name($crate::Dynamic<$crate::__private::String>));
+        $crate::__sg_newtype_len!($name);
         $crate::__sg_dynamic_ctor!($name, $crate::__private::String);
 
         impl ::core::convert::From<&str> for $name {
@@ -37,6 +38,7 @@ macro_rules! dynamic_newtype {
     // ---- Vec<u8> arm ----
     ($(#[$attr:meta])* $vis:vis $name:ident, Vec<u8>) => {
         $crate::__sg_newtype_base!($(#[$attr])* $vis $name($crate::Dynamic<$crate::__private::Vec<u8>>));
+        $crate::__sg_newtype_len!($name);
         $crate::__sg_dynamic_ctor!($name, $crate::__private::Vec<u8>);
 
         impl ::core::convert::From<&[u8]> for $name {
@@ -65,14 +67,28 @@ macro_rules! dynamic_newtype {
                 /// Constant-time hex decode into this secret type.
                 #[inline]
                 pub fn try_from_hex(s: &str) -> ::core::result::Result<Self, $crate::HexError> {
-                    ::core::result::Result::Ok(Self(<$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_hex(s)?))
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_hex(s)?,
+                    ))
                 }
-                /// Encodes as lowercase hex.
+            }
+            impl $crate::ToHex for $name {
                 #[inline]
-                pub fn to_hex(&self) -> $crate::__private::String { self.0.to_hex() }
-                /// Encodes as lowercase hex into a zeroizing wrapper.
+                fn to_hex(&self) -> $crate::__private::String {
+                    $crate::ToHex::to_hex(&self.0)
+                }
                 #[inline]
-                pub fn to_hex_zeroizing(&self) -> $crate::EncodedSecret { self.0.to_hex_zeroizing() }
+                fn to_hex_upper(&self) -> $crate::__private::String {
+                    $crate::ToHex::to_hex_upper(&self.0)
+                }
+                #[inline]
+                fn to_hex_zeroizing(&self) -> $crate::EncodedSecret {
+                    $crate::ToHex::to_hex_zeroizing(&self.0)
+                }
+                #[inline]
+                fn to_hex_upper_zeroizing(&self) -> $crate::EncodedSecret {
+                    $crate::ToHex::to_hex_upper_zeroizing(&self.0)
+                }
             }
         }
 

@@ -17,6 +17,7 @@ macro_rules! fixed_newtype {
         const _: () = { let _ = [(); $size][0]; };
 
         $crate::__sg_newtype_base!($(#[$attr])* $vis $name($crate::Fixed<[u8; $size]>));
+        $crate::__sg_newtype_len!($name);
 
         impl $name {
             /// Wraps a fixed-size byte array. `const fn`, like `Fixed::new`.
@@ -64,20 +65,22 @@ macro_rules! fixed_newtype {
                 }
             }
             $crate::__sg_if_alloc! {
-                impl $name {
-                    /// Encodes as lowercase hex.
+                impl $crate::ToHex for $name {
                     #[inline]
-                    pub fn to_hex(&self) -> $crate::__private::String { self.0.to_hex() }
-                    /// Encodes as uppercase hex.
+                    fn to_hex(&self) -> $crate::__private::String {
+                        $crate::ToHex::to_hex(&self.0)
+                    }
                     #[inline]
-                    pub fn to_hex_upper(&self) -> $crate::__private::String { self.0.to_hex_upper() }
-                    /// Encodes as lowercase hex into a zeroizing wrapper.
+                    fn to_hex_upper(&self) -> $crate::__private::String {
+                        $crate::ToHex::to_hex_upper(&self.0)
+                    }
                     #[inline]
-                    pub fn to_hex_zeroizing(&self) -> $crate::EncodedSecret { self.0.to_hex_zeroizing() }
-                    /// Encodes as uppercase hex into a zeroizing wrapper.
+                    fn to_hex_zeroizing(&self) -> $crate::EncodedSecret {
+                        $crate::ToHex::to_hex_zeroizing(&self.0)
+                    }
                     #[inline]
-                    pub fn to_hex_upper_zeroizing(&self) -> $crate::EncodedSecret {
-                        self.0.to_hex_upper_zeroizing()
+                    fn to_hex_upper_zeroizing(&self) -> $crate::EncodedSecret {
+                        $crate::ToHex::to_hex_upper_zeroizing(&self.0)
                     }
                 }
             }
@@ -85,13 +88,23 @@ macro_rules! fixed_newtype {
 
         $crate::__sg_if_bech32! {
             $crate::__sg_if_alloc! {
-                impl $name {
-                    /// Encodes as Bech32 with the given HRP.
+                impl $crate::ToBech32 for $name {
                     #[inline]
-                    pub fn try_to_bech32(&self, hrp: &str)
-                        -> ::core::result::Result<$crate::__private::String, $crate::Bech32Error> {
-                        self.0.try_to_bech32(hrp)
+                    fn try_to_bech32(
+                        &self,
+                        hrp: &str,
+                    ) -> ::core::result::Result<$crate::__private::String, $crate::Bech32Error> {
+                        $crate::ToBech32::try_to_bech32(&self.0, hrp)
                     }
+                    #[inline]
+                    fn try_to_bech32_zeroizing(
+                        &self,
+                        hrp: &str,
+                    ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
+                        $crate::ToBech32::try_to_bech32_zeroizing(&self.0, hrp)
+                    }
+                }
+                impl $name {
                     /// HRP-validated Bech32 decode into this secret type.
                     #[inline]
                     pub fn try_from_bech32(s: &str, expected_hrp: &str)

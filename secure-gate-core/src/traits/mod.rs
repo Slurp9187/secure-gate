@@ -13,7 +13,8 @@
 //!
 //! | Trait                  | Purpose                                      | Requires Feature         | Notes                                                                 |
 //! |------------------------|----------------------------------------------|--------------------------|-----------------------------------------------------------------------|
-//! | [`RevealSecret`]       | Read-only scoped / direct access + metadata  | Always available         | Preferred: `with_secret` (scoped); escape hatch: `expose_secret`      |
+//! | [`RevealSecret`]       | Read-only scoped / direct access             | Always available         | Preferred: `with_secret` (scoped); escape hatch: `expose_secret`      |
+//! | [`SecretLen`]          | Length metadata (`len`, `byte_len`, …)       | Always available         | Only for inner types with a meaningful length (`[T; N]`, `String`, `Vec<T>`) |
 //! | [`RevealSecretMut`]    | Mutable scoped / direct access               | Always available         | Same preference: `with_secret_mut` over `expose_secret_mut`           |
 //! | [`SentinelValue`]      | Inert placeholder left by `into_inner`       | Always available         | Implemented for `[T; N]` (any `N`), `String`, `Vec<T>`                |
 //! | [`ConstantTimeEq`]     | Deterministic constant-time equality         | `ct-eq`                  | Timing-attack resistant byte comparison                               |
@@ -53,7 +54,7 @@ pub use revealed_secrets::InnerSecret;
 pub use revealed_secrets::EncodedSecret;
 
 pub mod reveal_secret;
-pub use reveal_secret::RevealSecret;
+pub use reveal_secret::{RevealSecret, SecretLen};
 
 pub mod reveal_secret_mut;
 pub use reveal_secret_mut::RevealSecretMut;

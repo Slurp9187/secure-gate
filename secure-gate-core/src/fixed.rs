@@ -200,7 +200,7 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     /// # Examples
     ///
     /// ```rust
-    /// use secure_gate::{Fixed, RevealSecret};
+    /// use secure_gate::{Fixed, RevealSecret, SecretLen};
     ///
     /// let secret = Fixed::new([0u8; 32]);
     /// assert_eq!(secret.len(), 32);
@@ -324,99 +324,6 @@ impl<const N: usize> Fixed<[u8; N]> {
 /// `Zeroizing<[u8; N]>` stack buffer.
 #[cfg(feature = "encoding-hex")]
 impl<const N: usize> Fixed<[u8; N]> {
-    /// Encodes the secret bytes as a lowercase hex string.
-    ///
-    /// Requires the `encoding-hex` and `alloc` features.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
-    /// # {
-    /// use secure_gate::Fixed;
-    ///
-    /// let secret = Fixed::new([0xDE, 0xAD]);
-    /// assert_eq!(secret.to_hex(), "dead");
-    /// # }
-    /// ```
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub fn to_hex(&self) -> alloc::string::String {
-        self.with_secret(|s: &[u8; N]| s.to_hex())
-    }
-
-    /// Encodes the secret bytes as an uppercase hex string.
-    ///
-    /// Requires the `encoding-hex` and `alloc` features.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
-    /// # {
-    /// use secure_gate::Fixed;
-    ///
-    /// let secret = Fixed::new([0xDE, 0xAD]);
-    /// assert_eq!(secret.to_hex_upper(), "DEAD");
-    /// # }
-    /// ```
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub fn to_hex_upper(&self) -> alloc::string::String {
-        self.with_secret(|s: &[u8; N]| s.to_hex_upper())
-    }
-
-    /// Encodes the secret bytes as a lowercase hex string, returning
-    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
-    ///
-    /// Prefer this over [`to_hex`](Self::to_hex) when the encoded form should
-    /// still be treated as sensitive (e.g. private keys). The returned
-    /// [`EncodedSecret`](crate::EncodedSecret) is zeroized on drop.
-    ///
-    /// Requires the `encoding-hex` and `alloc` features.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
-    /// # {
-    /// use secure_gate::{Fixed, RevealSecret};
-    ///
-    /// let secret = Fixed::new([0xCA, 0xFE]);
-    /// let encoded = secret.to_hex_zeroizing();
-    /// assert_eq!(&*encoded, "cafe");
-    /// // `encoded` is zeroized when it goes out of scope.
-    /// # }
-    /// ```
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub fn to_hex_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s: &[u8; N]| s.to_hex_zeroizing())
-    }
-
-    /// Encodes the secret bytes as an uppercase hex string, returning
-    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
-    ///
-    /// Requires the `encoding-hex` and `alloc` features.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
-    /// # {
-    /// use secure_gate::{Fixed, RevealSecret};
-    ///
-    /// let secret = Fixed::new([0xCA, 0xFE]);
-    /// let encoded = secret.to_hex_upper_zeroizing();
-    /// assert_eq!(&*encoded, "CAFE");
-    /// # }
-    /// ```
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s: &[u8; N]| s.to_hex_upper_zeroizing())
-    }
-
     /// Decodes a hex string (lowercase, uppercase, or mixed) into `Fixed<[u8; N]>`.
     ///
     /// Uses a constant-time backend (`base16ct`) for both paths.
@@ -436,7 +343,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// ```rust
     /// # #[cfg(feature = "encoding-hex")]
     /// # {
-    /// use secure_gate::{Fixed, RevealSecret};
+    /// use secure_gate::{Fixed, RevealSecret, ToHex};
     ///
     /// // Round-trip: encode then decode.
     /// let original = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
@@ -494,56 +401,6 @@ impl<const N: usize> Fixed<[u8; N]> {
 /// `Zeroizing<[u8; N]>` stack buffer.
 #[cfg(feature = "encoding-base64")]
 impl<const N: usize> Fixed<[u8; N]> {
-    /// Encodes the secret bytes as an unpadded Base64url string (RFC 4648, URL-safe alphabet).
-    ///
-    /// Requires the `encoding-base64` and `alloc` features.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
-    /// # {
-    /// use secure_gate::Fixed;
-    ///
-    /// let secret = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
-    /// let encoded = secret.to_base64url();
-    /// assert_eq!(encoded, "3q2-7w");
-    /// # }
-    /// ```
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub fn to_base64url(&self) -> alloc::string::String {
-        self.with_secret(|s: &[u8; N]| s.to_base64url())
-    }
-
-    /// Encodes the secret bytes as an unpadded Base64url string, returning
-    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
-    ///
-    /// Prefer this over [`to_base64url`](Self::to_base64url) when the encoded
-    /// form should still be treated as sensitive. The returned
-    /// [`EncodedSecret`](crate::EncodedSecret) is zeroized on drop.
-    ///
-    /// Requires the `encoding-base64` and `alloc` features.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
-    /// # {
-    /// use secure_gate::{Fixed, RevealSecret};
-    ///
-    /// let secret = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
-    /// let encoded = secret.to_base64url_zeroizing();
-    /// assert_eq!(&*encoded, "3q2-7w");
-    /// // `encoded` is zeroized when it goes out of scope.
-    /// # }
-    /// ```
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s: &[u8; N]| s.to_base64url_zeroizing())
-    }
-
     /// Decodes an unpadded Base64url string (RFC 4648, URL-safe alphabet) into
     /// `Fixed<[u8; N]>`.
     ///
@@ -562,7 +419,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// ```rust
     /// # #[cfg(feature = "encoding-base64")]
     /// # {
-    /// use secure_gate::{Fixed, RevealSecret};
+    /// use secure_gate::{Fixed, RevealSecret, ToBase64Url};
     ///
     /// # #[cfg(feature = "alloc")]
     /// # {
@@ -616,31 +473,6 @@ impl<const N: usize> Fixed<[u8; N]> {
 /// the 90-character standard limit. For Bitcoin address formats use `ToBech32m`.
 #[cfg(feature = "encoding-bech32")]
 impl<const N: usize> Fixed<[u8; N]> {
-    /// Encodes the secret bytes as a Bech32 (BIP-173) string with the given HRP.
-    ///
-    /// Requires the `encoding-bech32` and `alloc` features.
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub fn try_to_bech32(
-        &self,
-        hrp: &str,
-    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
-        self.with_secret(|s: &[u8; N]| s.try_to_bech32(hrp))
-    }
-
-    /// Encodes the secret bytes as a Bech32 string, returning
-    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
-    ///
-    /// Requires the `encoding-bech32` and `alloc` features.
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub fn try_to_bech32_zeroizing(
-        &self,
-        hrp: &str,
-    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s: &[u8; N]| s.try_to_bech32_zeroizing(hrp))
-    }
-
     /// Decodes a Bech32 (BIP-173) string into `Fixed<[u8; N]>`, validating that the HRP
     /// matches `expected_hrp` (case-insensitive).
     ///
@@ -690,31 +522,6 @@ impl<const N: usize> Fixed<[u8; N]> {
 /// (ciphertexts, recipients) use `ToBech32` / `Bech32Large` instead.
 #[cfg(feature = "encoding-bech32m")]
 impl<const N: usize> Fixed<[u8; N]> {
-    /// Encodes the secret bytes as a Bech32m (BIP-350) string with the given HRP.
-    ///
-    /// Requires the `encoding-bech32m` and `alloc` features.
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub fn try_to_bech32m(
-        &self,
-        hrp: &str,
-    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
-        self.with_secret(|s: &[u8; N]| s.try_to_bech32m(hrp))
-    }
-
-    /// Encodes the secret bytes as a Bech32m string, returning
-    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
-    ///
-    /// Requires the `encoding-bech32m` and `alloc` features.
-    #[cfg(feature = "alloc")]
-    #[inline]
-    pub fn try_to_bech32m_zeroizing(
-        &self,
-        hrp: &str,
-    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s: &[u8; N]| s.try_to_bech32m_zeroizing(hrp))
-    }
-
     /// Decodes a Bech32m (BIP-350) string into `Fixed<[u8; N]>`, validating that the HRP
     /// matches `expected_hrp` (case-insensitive).
     ///
@@ -759,31 +566,122 @@ impl<const N: usize> Fixed<[u8; N]> {
     }
 }
 
+/// Hex encoding for `Fixed<[u8; N]>` — same constant-time backend as the
+/// [`ToHex`] blanket impl on the inner bytes; delegates via `with_secret`.
+///
+/// Bring the trait into scope to call these: `use secure_gate::ToHex;`.
+///
+/// ```rust
+/// use secure_gate::{Fixed, ToHex};
+///
+/// let key = Fixed::new([0xABu8; 4]);
+/// assert_eq!(key.to_hex(), "abababab");
+/// assert_eq!(key.to_hex_upper(), "ABABABAB");
+/// // Zeroizing variant — encoded form wipes itself on drop:
+/// assert_eq!(&*key.to_hex_zeroizing(), "abababab");
+/// ```
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
+impl<const N: usize> ToHex for Fixed<[u8; N]> {
+    #[inline]
+    fn to_hex(&self) -> alloc::string::String {
+        self.with_secret(|s| s.to_hex())
+    }
+
+    #[inline]
+    fn to_hex_upper(&self) -> alloc::string::String {
+        self.with_secret(|s| s.to_hex_upper())
+    }
+
+    #[inline]
+    fn to_hex_zeroizing(&self) -> crate::EncodedSecret {
+        self.with_secret(|s| s.to_hex_zeroizing())
+    }
+
+    #[inline]
+    fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
+        self.with_secret(|s| s.to_hex_upper_zeroizing())
+    }
+}
+
+/// Base64url encoding for `Fixed<[u8; N]>`; delegates via `with_secret`.
+///
+/// Bring the trait into scope to call these: `use secure_gate::ToBase64Url;`.
+///
+/// ```rust
+/// use secure_gate::{Fixed, ToBase64Url};
+///
+/// let key = Fixed::new([0xABu8; 4]);
+/// assert_eq!(key.to_base64url(), "q6urqw");
+/// ```
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
+impl<const N: usize> ToBase64Url for Fixed<[u8; N]> {
+    #[inline]
+    fn to_base64url(&self) -> alloc::string::String {
+        self.with_secret(|s| s.to_base64url())
+    }
+
+    #[inline]
+    fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
+        self.with_secret(|s| s.to_base64url_zeroizing())
+    }
+}
+
+/// Bech32 encoding for `Fixed<[u8; N]>`; delegates via `with_secret`.
+///
+/// Bring the trait into scope to call these: `use secure_gate::ToBech32;`.
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+impl<const N: usize> ToBech32 for Fixed<[u8; N]> {
+    #[inline]
+    fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32(hrp))
+    }
+
+    #[inline]
+    fn try_to_bech32_zeroizing(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32_zeroizing(hrp))
+    }
+}
+
+/// Bech32m encoding for `Fixed<[u8; N]>`; delegates via `with_secret`.
+///
+/// Bring the trait into scope to call these: `use secure_gate::ToBech32m;`.
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+impl<const N: usize> ToBech32m for Fixed<[u8; N]> {
+    #[inline]
+    fn try_to_bech32m(
+        &self,
+        hrp: &str,
+    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32m(hrp))
+    }
+
+    #[inline]
+    fn try_to_bech32m_zeroizing(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32m_zeroizing(hrp))
+    }
+}
+
 /// Explicit access to immutable [`Fixed<[T; N]>`] contents.
-impl<const N: usize, T: zeroize::Zeroize> RevealSecret for Fixed<[T; N]> {
-    type Inner = [T; N];
+impl<T: zeroize::Zeroize> RevealSecret for Fixed<T> {
+    type Inner = T;
 
     #[inline(always)]
     fn with_secret<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&[T; N]) -> R,
+        F: FnOnce(&T) -> R,
     {
         f(&self.inner)
     }
 
     #[inline(always)]
-    fn expose_secret(&self) -> &[T; N] {
+    fn expose_secret(&self) -> &T {
         &self.inner
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        N
-    }
-
-    #[inline(always)]
-    fn byte_len(&self) -> usize {
-        N * core::mem::size_of::<T>()
     }
 
     /// Consumes `self` and returns the inner `[T; N]` wrapped in [`crate::InnerSecret`].
@@ -796,7 +694,7 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecret for Fixed<[T; N]> {
     /// See [`RevealSecret::into_inner`] for full documentation including the
     /// `SentinelValue` bound rationale and redacted `Debug` behavior.
     #[inline(always)]
-    fn into_inner(mut self) -> crate::InnerSecret<[T; N]>
+    fn into_inner(mut self) -> crate::InnerSecret<T>
     where
         Self: Sized,
         Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize,
@@ -808,18 +706,31 @@ impl<const N: usize, T: zeroize::Zeroize> RevealSecret for Fixed<[T; N]> {
     }
 }
 
+/// Length is only meaningful for array-shaped secrets.
+impl<const N: usize, T: zeroize::Zeroize> crate::SecretLen for Fixed<[T; N]> {
+    #[inline(always)]
+    fn len(&self) -> usize {
+        N
+    }
+
+    #[inline(always)]
+    fn byte_len(&self) -> usize {
+        N * core::mem::size_of::<T>()
+    }
+}
+
 /// Explicit access to mutable [`Fixed<[T; N]>`] contents.
-impl<const N: usize, T: zeroize::Zeroize> RevealSecretMut for Fixed<[T; N]> {
+impl<T: zeroize::Zeroize> RevealSecretMut for Fixed<T> {
     #[inline(always)]
     fn with_secret_mut<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut [T; N]) -> R,
+        F: FnOnce(&mut T) -> R,
     {
         f(&mut self.inner)
     }
 
     #[inline(always)]
-    fn expose_secret_mut(&mut self) -> &mut [T; N] {
+    fn expose_secret_mut(&mut self) -> &mut T {
         &mut self.inner
     }
 }
@@ -840,7 +751,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// ```rust
     /// # #[cfg(feature = "rand")]
-    /// use secure_gate::{Fixed, RevealSecret};
+    /// use secure_gate::{Fixed, RevealSecret, SecretLen};
     ///
     /// # #[cfg(feature = "rand")]
     /// # {

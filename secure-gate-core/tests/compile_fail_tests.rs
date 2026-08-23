@@ -65,3 +65,14 @@ fn encoded_secret_no_display_compile_fail() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/encoded_secret_no_display.rs");
 }
+
+// Compile-fail test: `SecretLen` must stay narrow. `RevealSecret` covers every
+// inner type (including local user-defined ones), but a custom inner type has
+// no meaningful length — `len()` on it must not compile even with `SecretLen`
+// in scope.
+#[cfg(not(miri))]
+#[test]
+fn custom_inner_no_len_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/custom_inner_no_len.rs");
+}

@@ -1,7 +1,7 @@
 //! Spike: `fixed_newtype!` / `dynamic_newtype!` — see `docs/nominal_newtypes.md`.
 #![cfg(feature = "alloc")]
 
-use secure_gate::{RevealSecret, dynamic_newtype, fixed_newtype};
+use secure_gate::{RevealSecret, SecretLen, ToHex, dynamic_newtype, fixed_newtype};
 
 // Compare directly with the existing alias macros:
 //   fixed_alias!(pub Aes256Key, 32);         -> type alias, structural

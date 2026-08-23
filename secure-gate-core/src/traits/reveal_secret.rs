@@ -13,7 +13,7 @@
 //! - Scoped access is preferred (minimizes lifetime of exposed references)
 //! - Direct exposure is possible but clearly marked as an escape hatch
 //! - Owned consumption is available for FFI hand-off and type migration
-//! - Metadata (`len`, `is_empty`) is always available without full exposure
+//! - Metadata (`len`, `is_empty` via [`SecretLen`]) is available without full exposure
 //!
 //! # Three-Tier Access Model
 //!
@@ -32,7 +32,7 @@
 //!
 //! | Trait                  | Access     | Preferred Method          | Escape Hatch             | Metadata          | Feature     |
 //! |------------------------|------------|---------------------------|--------------------------|-------------------|-------------|
-//! | [`RevealSecret`]                | Read-only  | `with_secret` (scoped)    | `expose_secret`     | `len`, `is_empty` | Always |
+//! | [`RevealSecret`]                | Read-only  | `with_secret` (scoped)    | `expose_secret`     | — (see [`SecretLen`]) | Always |
 //! | [`crate::RevealSecretMut`]      | Mutable    | `with_secret_mut` (scoped)| `expose_secret_mut` | Inherits above    | Always |
 //!
 //! # Security Model
@@ -115,9 +115,9 @@
 //! Polymorphic generic code:
 //!
 //! ```rust
-//! use secure_gate::RevealSecret;
+//! use secure_gate::SecretLen;
 //!
-//! fn print_length<S: RevealSecret>(secret: &S) {
+//! fn print_length<S: SecretLen>(secret: &S) {
 //!     println!("Length: {} bytes", secret.len());
 //! }
 //! ```
@@ -133,7 +133,8 @@
 
 /// Read-only access to a wrapped secret.
 ///
-/// Implemented by [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic).
+/// Implemented for **all** [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic),
+/// whatever the inner type — length metadata lives in the narrower [`SecretLen`].
 /// Prefer the scoped [`with_secret`](Self::with_secret) method; use
 /// [`expose_secret`](Self::expose_secret) only when a long-lived reference is
 /// unavoidable. See [`RevealSecretMut`](crate::RevealSecretMut) for the mutable
@@ -181,33 +182,6 @@ pub trait RevealSecret {
     /// let _ = secret.expose_secret();
     /// ```
     fn expose_secret(&self) -> &Self::Inner;
-
-    /// Returns the number of elements in the secret, matching the underlying
-    /// container's `len()` — element count for `Vec<T>` and `[T; N]`, byte count
-    /// for `String`/`str` (where the element is a byte).
-    ///
-    /// Always safe to call — does not expose secret contents.
-    fn len(&self) -> usize;
-
-    /// Returns the total size of the secret in bytes.
-    ///
-    /// For single-byte element types (`Vec<u8>`, `String`, `[u8; N]`) this equals
-    /// `len()`. For multi-byte element types override this method to return
-    /// `len() * core::mem::size_of::<T>()`.
-    ///
-    /// Always safe to call — does not expose secret contents.
-    #[inline(always)]
-    fn byte_len(&self) -> usize {
-        self.len()
-    }
-
-    /// Returns `true` if the secret is empty.
-    ///
-    /// Always safe to call — does not expose secret contents.
-    #[inline(always)]
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
 
     /// Consumes the wrapper and returns the inner value wrapped in [`InnerSecret`],
     /// preserving automatic zeroization on drop.
@@ -279,4 +253,47 @@ pub trait RevealSecret {
     where
         Self: Sized,
         Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize;
+}
+
+/// Length metadata for secrets whose inner type has a meaningful length.
+///
+/// Separated from [`RevealSecret`] so the core access trait can be implemented
+/// for **every** inner type — including local user-defined ones (see the
+/// [`CloneableSecret`](crate::CloneableSecret) newtype pattern), which have no
+/// meaningful `len()`. Implemented for `Fixed<[T; N]>`, `Dynamic<String>`, and
+/// `Dynamic<Vec<T>>`.
+///
+/// All methods are always safe to call — they do not expose secret contents.
+///
+/// # Examples
+///
+/// ```rust
+/// use secure_gate::{Fixed, SecretLen};
+///
+/// let key = Fixed::new([0u8; 32]);
+/// assert_eq!(key.len(), 32);
+/// assert_eq!(key.byte_len(), 32);
+/// assert!(!key.is_empty());
+/// ```
+pub trait SecretLen: RevealSecret {
+    /// Returns the number of elements in the secret, matching the underlying
+    /// container's `len()` — element count for `Vec<T>` and `[T; N]`, byte
+    /// count for `String` (where the element is a byte).
+    fn len(&self) -> usize;
+
+    /// Returns the total size of the secret in bytes.
+    ///
+    /// For single-byte element types (`Vec<u8>`, `String`, `[u8; N]`) this
+    /// equals `len()`. Implementations for multi-byte element types override
+    /// this to return `len() * core::mem::size_of::<T>()`.
+    #[inline(always)]
+    fn byte_len(&self) -> usize {
+        self.len()
+    }
+
+    /// Returns `true` if the secret is empty.
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }

@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING (pre-release): `len`/`byte_len`/`is_empty` moved from `RevealSecret`
+  to a new `SecretLen` trait; `RevealSecret`/`RevealSecretMut` widened to every
+  inner type (#156).** `RevealSecret` was implemented only for `Fixed<[T; N]>`,
+  `Dynamic<String>`, and `Dynamic<Vec<T>>` — because it carried `len()`, which a
+  generic inner type cannot answer. That narrowness broke the crate's own
+  recommended opt-in pattern: the local inner newtype that
+  `CloneableSecret`/`SerializableSecret` docs instruct users to define produced a
+  secret that could be cloned, serialized, and zeroized but **never read** —
+  `Fixed<SessionKey>` had no `with_secret`, no `expose_secret`, nothing.
+
+  `RevealSecret` (access) and `RevealSecretMut` are now implemented for **all**
+  `Fixed<T>` / `Dynamic<T>`; length metadata lives in `SecretLen`, implemented
+  exactly where a length is meaningful (`Fixed<[T; N]>`, `Dynamic<String>`,
+  `Dynamic<Vec<T>>`). The custom-inner-type pattern is now fully usable —
+  pinned by `tests/composability.rs`; `SecretLen` staying narrow is pinned by
+  `tests/compile-fail/custom_inner_no_len.rs`.
+
+  **Migration:** call sites using `len()`/`byte_len()`/`is_empty()` on a wrapper
+  add `use secure_gate::SecretLen;`. No call-site rewrites; on this repo's own
+  suite every migration edit was an import line.
+
+- **BREAKING (pre-release): wrapper encoding methods are now trait impls, not
+  inherent methods (#156).** `to_hex`, `to_hex_upper`, `to_base64url`,
+  `try_to_bech32`, `try_to_bech32m`, and their `_zeroizing` variants on
+  `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` are now impls of the existing `ToHex`,
+  `ToBase64Url`, `ToBech32`, `ToBech32m` traits (delegating through
+  `with_secret`, unchanged behavior and gating). There is no coherence conflict
+  with the `AsRef<[u8]>` blanket impls — the wrappers are local and deliberately
+  never implement `AsRef<[u8]>`.
+
+  This makes the encoding surface generic: `fn fingerprint<S: ToHex>(s: &S)`
+  accepts `Fixed`, `Dynamic`, and any forwarding newtype — impossible with
+  inherent methods, which cannot be named as a bound or forwarded generically.
+  Decode constructors (`try_from_hex`, `try_from_base64url`,
+  `try_from_bech32*`) remain inherent: construction needs `Self`.
+  `Dynamic<String>` still has no hex encoding — the
+  `dynamic_string_no_hex` compile-fail now imports `ToHex` and proves the impl
+  genuinely does not exist, not merely that an import was missing.
+
+  **Migration:** add the format trait import at call sites
+  (`use secure_gate::ToHex;` etc.); call syntax is unchanged.
+
+  Design record for both changes: `docs/composability_restructure.md`.
+  The same restructure is planned as a backport to the 0.8 line before its
+  first stable release, so both lines expose the same trait shape.
+
 ### Removed
 
 - **BREAKING: `Display` on `EncodedSecret` (#149).** `{}` on an `EncodedSecret` is now a

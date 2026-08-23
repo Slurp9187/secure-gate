@@ -151,12 +151,15 @@
 //!
 //! | Call style | Example | Appears in audit sweep? |
 //! |-----------|---------|------------------------|
-//! | **Wrapper inherent** (ergonomic) | `key.to_hex()` | No — grep for `to_hex` directly |
+//! | **Wrapper trait impl** (ergonomic) | `key.to_hex()` (needs `use secure_gate::ToHex`) | No — grep for `to_hex` directly |
 //! | **Trait via scoped access** (audit-friendly) | `key.with_secret(\|b\| b.to_hex())` | Yes — `with_secret` is grep-able |
 //!
-//! The wrapper methods ([`Fixed::to_hex`], [`Dynamic::to_hex`](Dynamic::to_hex)) internally call
-//! `self.with_secret(|s| s.to_hex())` — they are convenience shorthands, not
-//! separate implementations.
+//! Both levels are impls of the **same** trait ([`ToHex`], [`ToBase64Url`],
+//! [`ToBech32`], [`ToBech32m`]): a blanket impl covers the raw bytes inside
+//! `with_secret`, and per-wrapper impls on `Fixed<[u8; N]>` / `Dynamic<Vec<u8>>`
+//! delegate through `with_secret` internally. One trait also means one bound:
+//! `fn fingerprint<S: ToHex>(s: &S)` accepts wrappers and forwarding newtypes
+//! alike.
 //!
 //! # Feature flags
 //!
@@ -378,11 +381,11 @@ pub use traits::ConstantTimeEq;
 ///   `&T` reference for FFI / third-party APIs.
 /// - **Tier 3** (consumption): [`into_inner()`](RevealSecret::into_inner) — returns
 ///   [`InnerSecret<T>`] with zeroization transferred to caller.
-/// - **Metadata**: [`len()`](RevealSecret::len) / [`is_empty()`](RevealSecret::is_empty) —
+/// - **Metadata**: [`len()`](SecretLen::len) / [`is_empty()`](SecretLen::is_empty) —
 ///   no secret exposure.
 ///
 /// See [`RevealSecretMut`] for the mutable counterpart.
-pub use traits::RevealSecret;
+pub use traits::{RevealSecret, SecretLen};
 
 /// Explicit mutable access to secret contents.
 ///

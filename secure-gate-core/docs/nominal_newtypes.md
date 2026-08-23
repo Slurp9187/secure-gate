@@ -7,6 +7,16 @@
 >
 > Tracking issue: #155. Branch: `claude/fixed-dynamic-newtype-hl7e19`.
 > Not a candidate for `release/0.8` — that branch is security patches only.
+>
+> **Superseded in part by `docs/composability_restructure.md`** (same branch,
+> 0.9.0 candidate): §3.3 is now implemented (wrapper encoders are trait
+> impls), trap 7 is fixed (`RevealSecret` covers custom inner types), §5.3 is
+> largely dissolved (forwarding is trait-shaped and mechanical), and §5.1's
+> resolution for the macro is local `Clone`/`Serialize` impls on the newtype
+> rather than a `with_secret` back door around the marker system. The spike
+> macros in `src/macros/` have been updated to match. What remains open for
+> 0.10 is the macro-rules-vs-proc-macro question (§5.2) and finishing the
+> macro polish (§6).
 
 ## Summary
 
