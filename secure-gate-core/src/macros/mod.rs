@@ -34,5 +34,8 @@
 //! ```
 mod dynamic_alias;
 mod dynamic_generic_alias;
+mod dynamic_newtype;
 mod fixed_alias;
 mod fixed_generic_alias;
+mod fixed_newtype;
+mod newtype_common;

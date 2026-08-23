@@ -258,6 +258,25 @@ mod error;
 /// Core traits for wrapper polymorphism - always available.
 pub mod traits;
 
+/// Implementation detail of the `*_newtype!` macros — not a public API.
+///
+/// Generated code needs to name `Zeroize`, `serde` traits, and `alloc` types
+/// without requiring the caller to depend on those crates directly, and
+/// `::alloc::…` paths do not resolve in an ordinary `std` crate. Re-exporting
+/// them here keeps expansions self-contained via `$crate::__private::…`.
+///
+/// Semver-exempt: items here may change or disappear in any release.
+#[doc(hidden)]
+pub mod __private {
+    #[cfg(feature = "alloc")]
+    pub use alloc::{boxed::Box, string::String, vec::Vec};
+    #[cfg(feature = "serde-deserialize")]
+    pub use serde::{Deserialize, Deserializer};
+    #[cfg(feature = "serde-serialize")]
+    pub use serde::{Serialize, Serializer};
+    pub use zeroize::{Zeroize, ZeroizeOnDrop};
+}
+
 /// Heap-allocated secret wrapper with explicit access and automatic zeroization on drop.
 ///
 /// Variable-length secrets (passwords, API keys, ciphertexts). Inner type must implement
