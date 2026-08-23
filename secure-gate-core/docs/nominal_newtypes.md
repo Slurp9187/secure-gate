@@ -3,9 +3,9 @@
 > **Status: unmerged spike. Targets 0.10 — deliberately NOT part of 0.9.0.**
 > The code on this branch compiles and its tests pass. **§5.1 is now decided
 > and implemented** (option (c): `Clone`/`Serialize` dropped from `derive:`,
-> callers write them by hand). The remaining gates are §5.2
-> (macro_rules-vs-proc-macro) and §6 (polish) — engineering questions, not
-> security-posture ones.
+> callers write them by hand), and **§5.2 is decided** (stay with
+> `macro_rules!`; trap 6 fixed by the explicit `generic` marker). The only
+> remaining gate is §6 (polish).
 >
 > Tracking issue: #155. Branch: `claude/fixed-dynamic-newtype-hl7e19`.
 > Not a candidate for `release/0.8` — that branch is security patches only.
@@ -36,8 +36,7 @@
 > a blanket would give `Dynamic<String>` hex encoding — the exclusion pinned
 > by `tests/compile-fail/dynamic_string_no_hex.rs`. §5.3 is therefore
 > **narrowed and made mechanical** (bounded by the trait set) rather than
-> dissolved. What remains open: the macro-rules-vs-proc-macro question (§5.2)
-> and finishing the macro polish (§6).
+> dissolved. What remains open: finishing the macro polish (§6).
 
 ## Summary
 
@@ -101,7 +100,12 @@ the base macro directly. Wiring it through is part of the remaining polish.
 `to_hex_upper`, `to_hex_zeroizing`, `to_hex_upper_zeroizing`, `try_to_bech32`,
 `try_from_bech32`.
 
-`dynamic_newtype!` adds, per arm: `new` for every inner type; `From<&str>` and
+`dynamic_newtype!` arms: `String` and `Vec<u8>` are matched as **literal
+tokens** and get the full API for their shape; any other inner type requires an
+explicit `generic` marker and gets the reduced surface (no `SecretLen`, no
+encoders); anything else is a compile error naming both options (trap 6).
+
+It adds, per arm: `new` for every inner type; `From<&str>` and
 `new_with` on the `String` arm; `From<&[u8]>`, `new_with`, `from_random(len)`,
 `try_from_hex`, `to_hex`, `to_hex_zeroizing`, `io::Write` and `as_reader` on
 the `Vec<u8>` arm.
@@ -219,12 +223,27 @@ Each was hit during development; the fix (where applicable) is in the code.
 5. **A user-added `Drop` on the newtype breaks `into_inner`.** **E0509**,
    "cannot move out of type which implements `Drop`". No `Drop` is needed —
    the wrapper's own runs — but the error is opaque. Needs a doc warning.
-6. **Literal-token arms are fragile.** `dynamic_newtype!(pub P, MyStr)` where
-   `type MyStr = String` silently falls through to the generic arm; `P::new_with`
-   then does not exist (**E0599** at the use site, far from the cause). Same for
-   a spelled-out `std::string::String`. `macro_rules!` matches tokens, not
-   resolved types. **There is no `macro_rules!` fix** — only documentation
-   ("write `String` and `Vec<u8>` exactly"), or a proc macro (§5.2).
+6. **Literal-token arms are fragile — FIXED via the `generic` marker.**
+   `dynamic_newtype!(pub P, MyStr)` where `type MyStr = String` used to fall
+   through to the generic arm silently; `P::new_with` then did not exist
+   (**E0599** at the use site, far from the cause). Same for a spelled-out
+   `std::string::String`. Macros match tokens, not resolved types — and this is
+   true of proc macros too, which run before type resolution (§5.2).
+
+   The fix is to remove the silent path, not to see through the alias: the
+   generic arm now requires an explicit `generic` marker
+   (`dynamic_newtype!(pub P, generic MyStr)`), and anything unrecognised hits a
+   catch-all that names both options. Pinned by
+   `tests/compile-fail/dynamic_newtype_alias_rejected.rs`.
+
+   **Arm-ordering hazard found while implementing this.** `macro_rules!` does
+   not backtrack once a `:ty` fragment has been parsed. A single
+   `$inner:ty, $doc:literal` doc arm placed first will consume the type, fail
+   to find the comma, and hard-error with "unexpected end of macro invocation"
+   — never reaching the literal arms below. Doc-string forms are therefore
+   written once per shape, matched by literal tokens, *before* any arm opening
+   with a `:ty` fragment; and the catch-all uses `$($rest:tt)+` rather than
+   `$inner:ty` so it can never itself hard-error on a malformed tail.
 7. **The macro's floor is `RevealSecret`'s floor.** `RevealSecret` is
    implemented only for `Fixed<[T; N]>`, `Dynamic<String>` and
    `Dynamic<Vec<T>>`. A custom inner type — including the `SessionKey` pattern
@@ -237,7 +256,7 @@ Each was hit during development; the fix (where applicable) is in the code.
    would also close legitimate access to the wrapper API. Both hatch names are
    greppable. Document it; do not try to prevent it.
 
-## 5. Open questions (§5.1 decided; §5.2–§5.4 open)
+## 5. Open questions (§5.1 and §5.2 decided; §5.3–§5.4 open)
 
 ### 5.1 DECIDED (option (c)): `Clone` / `Serialize` are not generated
 
@@ -308,14 +327,32 @@ inside a macro expansion. That materially strengthens option **(c)** — drop
 `Clone`/`Serialize` from the `derive:` list and let users write them by hand
 when they mean it.
 
-### 5.2 `macro_rules!` or proc macro?
+### 5.2 DECIDED: stay with `macro_rules!`
 
-Trap 6 has no `macro_rules!` fix. A proc macro would resolve inner types
-properly and remove the literal-arm fragility, but adds `syn` + `quote` to a
-crate whose selling points include a minimal dependency graph,
-`forbid(unsafe_code)`, and `no_std` cleanliness. Decide the mechanism **before**
-users depend on the behaviour — switching later is disruptive even if
-technically non-breaking.
+**Correction first.** Earlier revisions of this document claimed a proc macro
+"would resolve inner types properly" and so fix trap 6. That is **wrong**.
+Proc macros run during macro expansion, *before* name resolution and type
+checking; a proc macro receives `MyStr` as an opaque identifier token, exactly
+as `macro_rules!` does, and stable Rust exposes no API for looking through a
+type alias at that stage. Both macro kinds are equally blind here. Trap 6 is
+not a `macro_rules!` limitation — it is a property of macros.
+
+**What actually fixes trap 6** (implemented): make the fallback explicit. The
+generic arm now requires a `generic` marker, so an unrecognised bare type no
+longer falls through and silently loses the shaped API — it is a compile error
+that names the fix. See trap 6 for the current behaviour.
+
+**What a proc macro would still buy, honestly:** better diagnostics (precise
+spans and wording), and easier maintenance if the generation logic grows past
+what arms carry comfortably. The diagnostics point is real — see the arm-order
+note in trap 6 for how easily `macro_rules!` produces "unexpected end of macro
+invocation" when arms are arranged wrong.
+
+**Decision: stay with `macro_rules!`.** The correctness hazard (silent
+degradation) is fixed without new dependencies; what remains is message
+quality, which does not justify adding `syn` + `quote` to a crate whose
+selling points include a minimal dependency graph, `forbid(unsafe_code)`, and
+`no_std` cleanliness. Revisit only if the generation logic outgrows arms.
 
 ### 5.3 Scope of the forwarded surface
 

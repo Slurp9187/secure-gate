@@ -96,3 +96,16 @@ fn newtype_derive_serialize_rejected_compile_fail() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/newtype_derive_serialize_rejected.rs");
 }
+
+// Compile-fail test: `dynamic_newtype!` must reject an inner type that is not one
+// of the shaped literals (`String`, `Vec<u8>`) rather than silently degrading to
+// the reduced generic API. `macro_rules!` matches tokens, not resolved types, so a
+// type alias or fully-qualified path cannot reach the shaped arms; the caller must
+// either write the literal or opt in with `generic <type>`.
+#[cfg(feature = "alloc")]
+#[cfg(not(miri))]
+#[test]
+fn dynamic_newtype_alias_rejected_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/dynamic_newtype_alias_rejected.rs");
+}

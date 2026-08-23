@@ -1,18 +1,75 @@
 //! `dynamic_newtype!` — nominal newtype over `Dynamic<T>`.
 //!
-//! **UNMERGED SPIKE — targets 0.10, not 0.9.0.** One design decision is
-//! unresolved; see `docs/nominal_newtypes.md` §5.1 before merging.
+//! **UNMERGED SPIKE — targets 0.10, not 0.9.0.** See
+//! `docs/nominal_newtypes.md` for the design record and remaining work (§6
+//! polish) before merging.
 
 /// Creates a distinct nominal type wrapping [`Dynamic<T>`](crate::Dynamic).
 ///
-/// Mirrors [`dynamic_alias!`](crate::dynamic_alias) syntax. `String` and `Vec<u8>`
-/// (written exactly so) get the full byte/string API; any other `T` gets the
-/// shared trait surface plus `new`.
+/// Mirrors [`dynamic_alias!`](crate::dynamic_alias) syntax, but generates a
+/// `struct` rather than a `type` alias: two `dynamic_newtype!` types over the
+/// same inner type are **not** interchangeable.
+///
+/// # Inner types must be written literally
+///
+/// Macros match **tokens**, not resolved types. `String` and `Vec<u8>` are
+/// matched as literal tokens, so they must be spelled exactly that way to get
+/// the full API for their shape:
+///
+/// ```rust
+/// # #[cfg(feature = "alloc")] {
+/// use secure_gate::{dynamic_newtype, SecretLen};
+///
+/// dynamic_newtype!(pub ApiKey, String);       // full String API
+/// dynamic_newtype!(pub Token, Vec<u8>);       // full byte API: hex, io::Write, …
+///
+/// let k: ApiKey = "sk_live".into();
+/// assert_eq!(k.len(), 7);
+/// # }
+/// ```
+///
+/// A type alias (`type MyStr = String`) or a fully-qualified path
+/// (`std::string::String`) is a *different token sequence*, so it cannot reach
+/// those arms — and no macro can see through it, because macro expansion runs
+/// before type resolution. Rather than silently hand back a newtype missing
+/// half its API, such input is a **compile error** naming the fix.
+///
+/// When the inner type genuinely is something else, opt in with `generic`:
+///
+/// ```rust
+/// # #[cfg(feature = "alloc")] {
+/// use secure_gate::{dynamic_newtype, RevealSecret};
+///
+/// dynamic_newtype!(pub Counters, generic Vec<u32>);
+///
+/// let c = Counters::new(vec![1u32, 2, 3]);
+/// assert_eq!(c.with_secret(|v| v.len()), 3);
+/// # }
+/// ```
+///
+/// The `generic` form deliberately provides less: [`RevealSecret`](crate::RevealSecret),
+/// [`RevealSecretMut`](crate::RevealSecretMut), redacted `Debug`, `Zeroize`,
+/// `ZeroizeOnDrop`, and `new` — no [`SecretLen`](crate::SecretLen) and no
+/// encoders, since neither is meaningful for an arbitrary inner type. Writing
+/// the marker is how you say you know that.
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! dynamic_newtype {
-    ($(#[$attr:meta])* $vis:vis $name:ident, $inner:ty, $doc:literal) => {
-        $crate::dynamic_newtype!($(#[$attr])* #[doc = $doc] $vis $name, $inner);
+    // ---- doc-string forms, one per shape ----
+    //
+    // These must be matched by literal tokens *before* any arm that opens with
+    // a `$inner:ty` fragment. `macro_rules!` does not backtrack once a `:ty`
+    // fragment has been parsed: a single `$inner:ty, $doc:literal` arm would
+    // consume the type, fail to find the comma, and hard-error with "unexpected
+    // end of macro invocation" instead of falling through to the arms below.
+    ($(#[$attr:meta])* $vis:vis $name:ident, String, $doc:literal) => {
+        $crate::dynamic_newtype!($(#[$attr])* #[doc = $doc] $vis $name, String);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, Vec<u8>, $doc:literal) => {
+        $crate::dynamic_newtype!($(#[$attr])* #[doc = $doc] $vis $name, Vec<u8>);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic $inner:ty, $doc:literal) => {
+        $crate::dynamic_newtype!($(#[$attr])* #[doc = $doc] $vis $name, generic $inner);
     };
 
     // ---- String arm: matched by literal tokens, before the generic arm ----
@@ -109,10 +166,32 @@ macro_rules! dynamic_newtype {
         }
     };
 
-    // ---- generic arm: any other T ----
-    ($(#[$attr:meta])* $vis:vis $name:ident, $inner:ty) => {
+    // ---- explicit generic arm: caller opts in to the reduced API ----
+    //
+    // `String` and `Vec<u8>` above are matched as literal tokens, so a type
+    // alias (`type MyStr = String`) does not reach them. Rather than let such
+    // an input fall through and silently lose the shaped API, the fallback
+    // requires the `generic` marker; anything else hits the catch-all below.
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic $inner:ty) => {
         $crate::__sg_newtype_base!($(#[$attr])* $vis $name($crate::Dynamic<$inner>));
         $crate::__sg_dynamic_ctor!($name, $inner);
+    };
+
+    // ---- catch-all: unrecognised inner type ----
+    //
+    // Uses `$($rest:tt)+` rather than `$inner:ty` so it can never itself
+    // hard-error on a malformed tail; the message names what was written.
+    ($(#[$attr:meta])* $vis:vis $name:ident, $($rest:tt)+) => {
+        ::core::compile_error!(::core::concat!(
+            "dynamic_newtype!: `",
+            ::core::stringify!($($rest)+),
+            "` is not one of the shaped inner types. `String` and `Vec<u8>` are \
+             matched as literal tokens, so a type alias (e.g. `type MyStr = String`) \
+             or a fully-qualified path (e.g. `std::string::String`) does NOT match \
+             them. Write `String` or `Vec<u8>` literally to get the full API for \
+             that shape, or write `generic <type>` to accept the reduced API \
+             (RevealSecret, RevealSecretMut, Debug, Zeroize, and `new`) on purpose."
+        ));
     };
 }
 
