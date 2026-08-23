@@ -10,6 +10,24 @@
 /// `struct` rather than a `type` alias: two `dynamic_newtype!` types over the
 /// same inner type are **not** interchangeable.
 ///
+/// # Syntax
+///
+/// ```text
+/// dynamic_newtype!(pub Name, String);                    // shaped: full String API
+/// dynamic_newtype!(pub Name, Vec<u8>);                   // shaped: full byte API
+/// dynamic_newtype!(pub Name, generic T);                 // reduced API, opted into
+/// dynamic_newtype!(pub(crate) Name, String);             // crate-visible
+/// dynamic_newtype!(Name, String);                        // private
+/// dynamic_newtype!(pub Name, String, "doc string");      // with custom doc
+/// dynamic_newtype!(pub Name, String, derive: [ConstantTimeEq]);
+/// dynamic_newtype!(pub Name, String, "doc", derive: [ConstantTimeEq]);
+/// ```
+///
+/// Supported `derive:` options are `ConstantTimeEq` and `Deserialize`;
+/// `Clone` and `Serialize` are deliberately absent — see
+/// [`fixed_newtype!`](crate::fixed_newtype) for the reasoning and the
+/// hand-written pattern, which applies identically here.
+///
 /// # Inner types must be written literally
 ///
 /// Macros match **tokens**, not resolved types. `String` and `Vec<u8>` are
@@ -52,6 +70,47 @@
 /// `ZeroizeOnDrop`, and `new` — no [`SecretLen`](crate::SecretLen) and no
 /// encoders, since neither is meaningful for an arbitrary inner type. Writing
 /// the marker is how you say you know that.
+///
+/// # Implementation Notes
+///
+/// The generated type is `#[repr(transparent)]` over the wrapper and delegates
+/// through `#[inline]` methods, so it costs nothing at runtime.
+///
+/// Unlike [`fixed_newtype!`](crate::fixed_newtype) there is **no zero-size
+/// guard** — a `Dynamic` is pointer-sized whatever it holds, so the check
+/// would be meaningless. Validate expected lengths in your own tests.
+///
+/// **Do not add your own `Drop` impl.** None is needed: the wrapped
+/// [`Dynamic`](crate::Dynamic) still runs its own, so zeroization is
+/// unaffected. Adding one makes the inner field unmovable (**E0509**) and
+/// silently costs you [`into_inner`](crate::RevealSecret::into_inner).
+///
+/// # Security
+///
+/// Generated types inherit every [`Dynamic`](crate::Dynamic) guarantee:
+/// zeroize on drop including spare capacity, `Debug` that always prints
+/// `[REDACTED]`, and access only through
+/// [`RevealSecret`](crate::RevealSecret) /
+/// [`RevealSecretMut`](crate::RevealSecretMut). There is no `Deref`, so a
+/// generated newtype is not coercible to its wrapper — which is what keeps the
+/// nominal separation total rather than by-value-only.
+///
+/// **Nominal separation guards against mistakes, not intent.** `as_wrapper()`,
+/// `into_wrapper()`, and `from_wrapper()` will move a secret from one role to
+/// another; they exist so the full wrapper API stays reachable. Audit them the
+/// way you audit `expose_secret()` — all three names are greppable.
+///
+/// The heap caveats of [`Dynamic`](crate::Dynamic) carry over unchanged: see
+/// `SECURITY.md` on realloc residue for `Vec`/`String` growth after wrapping.
+///
+/// # See also
+///
+/// - [`dynamic_alias!`](crate::dynamic_alias) — a `type` alias instead, when
+///   readability rather than role separation is the goal
+/// - [`fixed_newtype!`](crate::fixed_newtype) — stack-allocated counterpart,
+///   and the reference for the `derive:` rules
+/// - [`dynamic_generic_alias!`](crate::dynamic_generic_alias) — one name
+///   across several inner types
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! dynamic_newtype {
@@ -62,19 +121,33 @@ macro_rules! dynamic_newtype {
     // fragment has been parsed: a single `$inner:ty, $doc:literal` arm would
     // consume the type, fail to find the comma, and hard-error with "unexpected
     // end of macro invocation" instead of falling through to the arms below.
+    ($(#[$attr:meta])* $vis:vis $name:ident, String, $doc:literal, derive: [$($opt:ident),* $(,)?]) => {
+        $crate::dynamic_newtype!($(#[$attr])* #[doc = $doc] $vis $name, String, derive: [$($opt),*]);
+    };
     ($(#[$attr:meta])* $vis:vis $name:ident, String, $doc:literal) => {
-        $crate::dynamic_newtype!($(#[$attr])* #[doc = $doc] $vis $name, String);
+        $crate::dynamic_newtype!($(#[$attr])* #[doc = $doc] $vis $name, String, derive: []);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, Vec<u8>, $doc:literal, derive: [$($opt:ident),* $(,)?]) => {
+        $crate::dynamic_newtype!($(#[$attr])* #[doc = $doc] $vis $name, Vec<u8>, derive: [$($opt),*]);
     };
     ($(#[$attr:meta])* $vis:vis $name:ident, Vec<u8>, $doc:literal) => {
-        $crate::dynamic_newtype!($(#[$attr])* #[doc = $doc] $vis $name, Vec<u8>);
+        $crate::dynamic_newtype!($(#[$attr])* #[doc = $doc] $vis $name, Vec<u8>, derive: []);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic $inner:ty, $doc:literal, derive: [$($opt:ident),* $(,)?]) => {
+        $crate::dynamic_newtype!($(#[$attr])* #[doc = $doc] $vis $name, generic $inner, derive: [$($opt),*]);
     };
     ($(#[$attr:meta])* $vis:vis $name:ident, generic $inner:ty, $doc:literal) => {
-        $crate::dynamic_newtype!($(#[$attr])* #[doc = $doc] $vis $name, generic $inner);
+        $crate::dynamic_newtype!($(#[$attr])* #[doc = $doc] $vis $name, generic $inner, derive: []);
     };
 
     // ---- String arm: matched by literal tokens, before the generic arm ----
     ($(#[$attr:meta])* $vis:vis $name:ident, String) => {
-        $crate::__sg_newtype_base!($(#[$attr])* $vis $name($crate::Dynamic<$crate::__private::String>));
+        $crate::dynamic_newtype!($(#[$attr])* $vis $name, String, derive: []);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, String, derive: [$($opt:ident),* $(,)?]) => {
+        $crate::__sg_newtype_base!(
+            $(#[$attr])* $vis $name($crate::Dynamic<$crate::__private::String>), derive: [$($opt),*]
+        );
         $crate::__sg_newtype_len!($name);
         $crate::__sg_dynamic_ctor!($name, $crate::__private::String);
 
@@ -94,7 +167,12 @@ macro_rules! dynamic_newtype {
 
     // ---- Vec<u8> arm ----
     ($(#[$attr:meta])* $vis:vis $name:ident, Vec<u8>) => {
-        $crate::__sg_newtype_base!($(#[$attr])* $vis $name($crate::Dynamic<$crate::__private::Vec<u8>>));
+        $crate::dynamic_newtype!($(#[$attr])* $vis $name, Vec<u8>, derive: []);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, Vec<u8>, derive: [$($opt:ident),* $(,)?]) => {
+        $crate::__sg_newtype_base!(
+            $(#[$attr])* $vis $name($crate::Dynamic<$crate::__private::Vec<u8>>), derive: [$($opt),*]
+        );
         $crate::__sg_newtype_len!($name);
         $crate::__sg_dynamic_ctor!($name, $crate::__private::Vec<u8>);
 
@@ -116,6 +194,17 @@ macro_rules! dynamic_newtype {
                 /// Generates `len` random bytes from the system RNG.
                 #[inline]
                 pub fn from_random(len: usize) -> Self { Self(<$crate::Dynamic<$crate::__private::Vec<u8>>>::from_random(len)) }
+
+                /// Generates `len` bytes from a caller-supplied CSPRNG.
+                #[inline]
+                pub fn from_rng<R>(len: usize, rng: &mut R) -> ::core::result::Result<Self, R::Error>
+                where
+                    R: $crate::__private::TryRng + $crate::__private::TryCryptoRng,
+                {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::from_rng(len, rng)?,
+                    ))
+                }
             }
         }
 
@@ -149,6 +238,76 @@ macro_rules! dynamic_newtype {
             }
         }
 
+        $crate::__sg_if_base64! {
+            impl $name {
+                /// Constant-time Base64url decode into this secret type.
+                #[inline]
+                pub fn try_from_base64url(s: &str) -> ::core::result::Result<Self, $crate::Base64Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_base64url(s)?,
+                    ))
+                }
+            }
+            impl $crate::ToBase64Url for $name {
+                #[inline]
+                fn to_base64url(&self) -> $crate::__private::String {
+                    $crate::ToBase64Url::to_base64url(&self.0)
+                }
+                #[inline]
+                fn to_base64url_zeroizing(&self) -> $crate::EncodedSecret {
+                    $crate::ToBase64Url::to_base64url_zeroizing(&self.0)
+                }
+            }
+        }
+
+        $crate::__sg_if_bech32! {
+            impl $name {
+                /// HRP-validated Bech32 decode into this secret type.
+                #[inline]
+                pub fn try_from_bech32(s: &str, expected_hrp: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32(s, expected_hrp)?,
+                    ))
+                }
+            }
+            impl $crate::ToBech32 for $name {
+                #[inline]
+                fn try_to_bech32(
+                    &self,
+                    hrp: &str,
+                ) -> ::core::result::Result<$crate::__private::String, $crate::Bech32Error> {
+                    $crate::ToBech32::try_to_bech32(&self.0, hrp)
+                }
+                #[inline]
+                fn try_to_bech32_zeroizing(
+                    &self,
+                    hrp: &str,
+                ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
+                    $crate::ToBech32::try_to_bech32_zeroizing(&self.0, hrp)
+                }
+            }
+        }
+
+        $crate::__sg_if_bech32m! {
+            impl $crate::ToBech32m for $name {
+                #[inline]
+                fn try_to_bech32m(
+                    &self,
+                    hrp: &str,
+                ) -> ::core::result::Result<$crate::__private::String, $crate::Bech32Error> {
+                    $crate::ToBech32m::try_to_bech32m(&self.0, hrp)
+                }
+                #[inline]
+                fn try_to_bech32m_zeroizing(
+                    &self,
+                    hrp: &str,
+                ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
+                    $crate::ToBech32m::try_to_bech32m_zeroizing(&self.0, hrp)
+                }
+            }
+        }
+
         $crate::__sg_if_std! {
             impl ::std::io::Write for $name {
                 #[inline]
@@ -173,7 +332,12 @@ macro_rules! dynamic_newtype {
     // an input fall through and silently lose the shaped API, the fallback
     // requires the `generic` marker; anything else hits the catch-all below.
     ($(#[$attr:meta])* $vis:vis $name:ident, generic $inner:ty) => {
-        $crate::__sg_newtype_base!($(#[$attr])* $vis $name($crate::Dynamic<$inner>));
+        $crate::dynamic_newtype!($(#[$attr])* $vis $name, generic $inner, derive: []);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic $inner:ty, derive: [$($opt:ident),* $(,)?]) => {
+        $crate::__sg_newtype_base!(
+            $(#[$attr])* $vis $name($crate::Dynamic<$inner>), derive: [$($opt),*]
+        );
         $crate::__sg_dynamic_ctor!($name, $inner);
     };
 

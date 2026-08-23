@@ -1,0 +1,21 @@
+error[E0509]: cannot move out of type `EncKey`, which implements the `Drop` trait
+ --> tests/compile-fail/newtype_manual_drop.rs:9:1
+  |
+9 | fixed_newtype!(pub EncKey, 32);
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  | |
+  | cannot move out of here
+  | move occurs because `self.0` has type `Fixed<[u8; 32]>`, which does not implement the `Copy` trait
+  |
+  = note: this error originates in the macro `$crate::__sg_newtype_base` which comes from the expansion of the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0509]: cannot move out of type `EncKey`, which implements the `Drop` trait
+ --> tests/compile-fail/newtype_manual_drop.rs:9:1
+  |
+9 | fixed_newtype!(pub EncKey, 32);
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  | |
+  | cannot move out of here
+  | move occurs because `self.0` has type `Fixed<[u8; 32]>`, which does not implement the `Copy` trait
+  |
+  = note: this error originates in the macro `$crate::__sg_newtype_base` which comes from the expansion of the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)

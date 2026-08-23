@@ -273,6 +273,8 @@ pub mod traits;
 pub mod __private {
     #[cfg(feature = "alloc")]
     pub use alloc::{boxed::Box, string::String, vec::Vec};
+    #[cfg(feature = "rand")]
+    pub use rand::{TryCryptoRng, TryRng};
     #[cfg(feature = "serde-deserialize")]
     pub use serde::{Deserialize, Deserializer};
     #[cfg(feature = "serde-serialize")]

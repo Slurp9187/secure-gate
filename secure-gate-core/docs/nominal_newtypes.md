@@ -3,9 +3,11 @@
 > **Status: unmerged spike. Targets 0.10 — deliberately NOT part of 0.9.0.**
 > The code on this branch compiles and its tests pass. **§5.1 is now decided
 > and implemented** (option (c): `Clone`/`Serialize` dropped from `derive:`,
-> callers write them by hand), and **§5.2 is decided** (stay with
-> `macro_rules!`; trap 6 fixed by the explicit `generic` marker). The only
-> remaining gate is §6 (polish).
+> callers write them by hand), **§5.2 is decided** (stay with `macro_rules!`;
+> trap 6 fixed by the explicit `generic` marker), and **§6 polish is
+> complete**. No design or engineering gates remain — only the release
+> decision: these macros are purely additive and were deliberately scheduled
+> for 0.10 rather than 0.9.0.
 >
 > Tracking issue: #155. Branch: `claude/fixed-dynamic-newtype-hl7e19`.
 > Not a candidate for `release/0.8` — that branch is security patches only.
@@ -368,26 +370,50 @@ be better to reject non-`String`/`Vec<u8>` inner types outright with a clear
 message than to hand back a type that silently lacks most of the API — which is
 also what makes trap 6 hurt.
 
-## 6. Remaining work to ship
+## 6. Polish — COMPLETE
 
-1. Resolve §5.1, then §5.2 and §5.3.
-2. Complete the forwarded surface per §5.3.
-3. Rustdoc in house style: syntax block, all visibility forms, custom-doc arm,
-   `# Implementation Notes`, `# Security`, `# See also` cross-links to the alias
-   macros — matching `fixed_alias!`. Also correct the prose that these macros
-   make obsolete: `src/macros/mod.rs` (module doc, and the macro table) and
-   `README.md` both currently end with "wrap the alias in a `struct` newtype
-   yourself", and `secure-gate-core/README.md` carries the same claim.
-4. Doc note for traps 5, 6, 7, 8.
-5. `trybuild` compile-fail cases: cross-role assignment (E0308), `N = 0`,
-   user-added `Drop` (E0509), `to_hex` absent on the `String` arm.
-6. Move the spike tests into `tests/macros_suite/`.
-7. Confirm zero-overhead against `benches/fixed_vs_raw.rs`; consider extending
-   `tests/asm_dse_check.rs` to a newtype.
-8. `CHANGELOG.md` entry under `Unreleased`.
-9. Feature-matrix CI: the relays mean expansions differ per feature
-   combination, so the newtype tests need to run across the same 20
-   combinations the crate already tests.
+All items done; the spike is feature-complete and ready to merge whenever the
+release decision (see the status header) says so.
+
+1. ✅ §5.1 decided (option (c)); §5.2 decided (stay with `macro_rules!`);
+   §5.3 narrowed and completed.
+2. ✅ Forwarded surface completed: hex, base64, bech32, bech32m (encode + the
+   `_zeroizing` variants + decode constructors, incl. the `_unchecked` forms),
+   `from_random`, `from_rng`. `derive:` is now passed through by both front
+   ends — previously it was reachable only via the base macro.
+3. ✅ Rustdoc in house style on both macros: syntax block, all visibility
+   forms, custom-doc and `derive:` arms, `# Implementation Notes`,
+   `# Security`, `# See also`. Obsolete prose corrected in
+   `src/macros/mod.rs` (module doc rewritten around the alias-vs-newtype
+   choice, macro table extended with a "Nominal?" column) and
+   `secure-gate-core/README.md` (macro section rewritten, security bullet
+   updated). The workspace `README.md` never carried the claim.
+4. ✅ Doc notes for traps 5 (`Drop`/E0509), 6 (`generic` marker), 7 (fixed by
+   #156), 8 (laundering via the named escape hatches).
+5. ✅ `trybuild` cases — 13 total, including cross-role assignment (E0308),
+   `N = 0`, user-added `Drop` (E0509), `to_hex` absent on the `String` arm,
+   the alias rejection, and both rejected `derive:` options.
+6. ✅ Tests moved into `tests/macros_suite/` (`newtype.rs`,
+   `newtype_surface.rs`). The no-std test stays a separate binary because it
+   needs a crate-level `no_std` attribute; renamed `tests/newtype_nostd.rs`.
+7. ✅ Zero-overhead confirmed, and more strongly than planned:
+   `src/bin/asm_check.rs` gained a `make_and_drop_newtype` symbol, and LLVM
+   emits `.set make_and_drop_newtype, make_and_drop_fixed` — identical-code
+   folding, i.e. the newtype compiles to *byte-identical* machine code, not
+   merely equivalent code. `tests/asm_dse_check.rs` follows the alias
+   directive and asserts the zero-stores against the fold target.
+8. ✅ `CHANGELOG.md` entry under `Unreleased`.
+9. ✅ Feature-matrix coverage: the newtype tests live inside the `integration`
+   binary (`macros_suite`), so the existing 20-combination CI matrix already
+   runs them — no workflow change needed. Verified locally across the 17 core
+   combinations the matrix uses; all green.
+
+**Pre-existing failure noted, not fixed:** under
+`--no-default-features --features=std`, `tests/compile-fail/dynamic_no_deref.rs`
+mismatches its expected stderr (one of the two expected errors is absent).
+Confirmed identical on the pre-restructure baseline, so it is unrelated to this
+work — but the CI matrix includes a "std explicit" job, so that job is presumably
+already red. Worth a separate issue.
 
 ## 7. Verification
 

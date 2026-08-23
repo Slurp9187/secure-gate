@@ -8,7 +8,61 @@
 ///
 /// Mirrors [`fixed_alias!`](crate::fixed_alias) syntax, but generates a `struct`
 /// rather than a `type` alias: two `fixed_newtype!` types of the same `N` are
-/// **not** interchangeable.
+/// **not** interchangeable. Use it when distinct cryptographic roles share a
+/// shape — an encryption key and a MAC key are both `Fixed<[u8; 32]>`, and
+/// under an alias the compiler cannot tell them apart.
+///
+/// # Syntax
+///
+/// ```text
+/// fixed_newtype!(pub Name, N);                          // public, auto-generated doc
+/// fixed_newtype!(pub(crate) Name, N);                   // crate-visible
+/// fixed_newtype!(Name, N);                              // private
+/// fixed_newtype!(pub Name, N, "doc string");            // with custom doc
+/// fixed_newtype!(pub Name, N, derive: [ConstantTimeEq]); // with opt-in impls
+/// fixed_newtype!(pub Name, N, "doc", derive: [ConstantTimeEq]);
+/// ```
+///
+/// Supported `derive:` options are `ConstantTimeEq` and `Deserialize`. See
+/// *Cloning and serialization* below for the two that are deliberately absent.
+///
+/// # Examples
+///
+/// All three visibility forms:
+///
+/// ```rust
+/// use secure_gate::{fixed_newtype, SecretLen};
+///
+/// fixed_newtype!(pub EncKey, 32);          // public
+/// fixed_newtype!(pub(crate) HmacKey, 32);  // crate-visible
+/// fixed_newtype!(local_nonce, 12);         // private
+///
+/// let key = EncKey::new([42u8; 32]);
+/// assert_eq!(key.len(), 32);
+/// ```
+///
+/// Distinct roles do not mix — this is the point:
+///
+/// ```rust,compile_fail
+/// use secure_gate::fixed_newtype;
+///
+/// fixed_newtype!(pub EncKey, 32);
+/// fixed_newtype!(pub MacKey, 32);
+///
+/// fn seal(_enc: &EncKey, _mac: &MacKey) {}
+///
+/// let enc = EncKey::new([1u8; 32]);
+/// let mac = MacKey::new([2u8; 32]);
+/// seal(&mac, &enc); // E0308: roles swapped
+/// ```
+///
+/// Zero-size is a **compile error**, exactly as with
+/// [`fixed_alias!`](crate::fixed_alias):
+///
+/// ```rust,compile_fail
+/// use secure_gate::fixed_newtype;
+/// fixed_newtype!(pub Bad, 0); // compile-time error: index out of bounds
+/// ```
 ///
 /// # Cloning and serialization are not generated
 ///
@@ -46,15 +100,62 @@
 /// The same applies to `Serialize`, with a higher bar: serialization exposes
 /// the full secret, so treat a hand-written impl as a security decision and
 /// see [`SerializableSecret`](crate::SerializableSecret) for the risk notes.
+///
+/// # Implementation Notes
+///
+/// The generated type is `#[repr(transparent)]` over the wrapper, so
+/// `size_of::<EncKey>() == N` and delegation is `#[inline]` throughout — the
+/// newtype costs nothing at runtime.
+///
+/// Each expansion emits `const _: () = { let _ = [(); N][0]; };`, the same
+/// zero-size guard [`fixed_alias!`](crate::fixed_alias) uses, so `N = 0`
+/// produces the identical const-evaluation diagnostic.
+///
+/// **Do not add your own `Drop` impl.** None is needed: the wrapped
+/// [`Fixed`](crate::Fixed) still runs its own, so zeroization is unaffected.
+/// Adding one makes the inner field unmovable (**E0509**) and silently costs
+/// you [`into_inner`](crate::RevealSecret::into_inner).
+///
+/// # Security
+///
+/// Generated types inherit every [`Fixed`](crate::Fixed) guarantee: zeroize on
+/// drop, `Debug` that always prints `[REDACTED]`, and access only through
+/// [`RevealSecret`](crate::RevealSecret) /
+/// [`RevealSecretMut`](crate::RevealSecretMut). There is no `Deref` — a
+/// generated newtype is not coercible to its wrapper, which is what keeps the
+/// nominal separation total rather than by-value-only.
+///
+/// **Nominal separation guards against mistakes, not intent.** The escape
+/// hatches are deliberate and named: `as_wrapper()`, `into_wrapper()`, and
+/// `from_wrapper()` will happily move a secret from one role to another —
+/// `MacKey::from_wrapper(enc.into_wrapper())` compiles. They exist so the full
+/// wrapper API stays reachable; audit them the way you audit
+/// `expose_secret()`. Both names are greppable.
+///
+/// # See also
+///
+/// - [`fixed_alias!`](crate::fixed_alias) — a `type` alias instead, when
+///   readability rather than role separation is the goal
+/// - [`dynamic_newtype!`](crate::dynamic_newtype) — heap-allocated counterpart
+/// - [`fixed_generic_alias!`](crate::fixed_generic_alias) — one name across
+///   several sizes
 #[macro_export]
 macro_rules! fixed_newtype {
+    ($(#[$attr:meta])* $vis:vis $name:ident, $size:literal, $doc:literal, derive: [$($opt:ident),* $(,)?]) => {
+        $crate::fixed_newtype!($(#[$attr])* #[doc = $doc] $vis $name, $size, derive: [$($opt),*]);
+    };
     ($(#[$attr:meta])* $vis:vis $name:ident, $size:literal, $doc:literal) => {
-        $crate::fixed_newtype!($(#[$attr])* #[doc = $doc] $vis $name, $size);
+        $crate::fixed_newtype!($(#[$attr])* #[doc = $doc] $vis $name, $size, derive: []);
     };
     ($(#[$attr:meta])* $vis:vis $name:ident, $size:literal) => {
+        $crate::fixed_newtype!($(#[$attr])* $vis $name, $size, derive: []);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, $size:literal, derive: [$($opt:ident),* $(,)?]) => {
         const _: () = { let _ = [(); $size][0]; };
 
-        $crate::__sg_newtype_base!($(#[$attr])* $vis $name($crate::Fixed<[u8; $size]>));
+        $crate::__sg_newtype_base!(
+            $(#[$attr])* $vis $name($crate::Fixed<[u8; $size]>), derive: [$($opt),*]
+        );
         $crate::__sg_newtype_len!($name);
 
         impl $name {
@@ -91,6 +192,15 @@ macro_rules! fixed_newtype {
                 /// Generates the secret from the system RNG.
                 #[inline]
                 pub fn from_random() -> Self { Self($crate::Fixed::from_random()) }
+
+                /// Generates the secret from a caller-supplied CSPRNG.
+                #[inline]
+                pub fn from_rng<R>(rng: &mut R) -> ::core::result::Result<Self, R::Error>
+                where
+                    R: $crate::__private::TryRng + $crate::__private::TryCryptoRng,
+                {
+                    ::core::result::Result::Ok(Self($crate::Fixed::from_rng(rng)?))
+                }
             }
         }
 
@@ -124,6 +234,63 @@ macro_rules! fixed_newtype {
             }
         }
 
+        $crate::__sg_if_base64! {
+            impl $name {
+                /// Constant-time Base64url decode into this secret type.
+                #[inline]
+                pub fn try_from_base64url(s: &str) -> ::core::result::Result<Self, $crate::Base64Error> {
+                    ::core::result::Result::Ok(Self($crate::Fixed::try_from_base64url(s)?))
+                }
+            }
+            $crate::__sg_if_alloc! {
+                impl $crate::ToBase64Url for $name {
+                    #[inline]
+                    fn to_base64url(&self) -> $crate::__private::String {
+                        $crate::ToBase64Url::to_base64url(&self.0)
+                    }
+                    #[inline]
+                    fn to_base64url_zeroizing(&self) -> $crate::EncodedSecret {
+                        $crate::ToBase64Url::to_base64url_zeroizing(&self.0)
+                    }
+                }
+            }
+        }
+
+        $crate::__sg_if_bech32m! {
+            impl $name {
+                /// HRP-validated Bech32m decode into this secret type.
+                #[inline]
+                pub fn try_from_bech32m(s: &str, expected_hrp: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self($crate::Fixed::try_from_bech32m(s, expected_hrp)?))
+                }
+                /// Bech32m decode without HRP validation.
+                #[inline]
+                pub fn try_from_bech32m_unchecked(s: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self($crate::Fixed::try_from_bech32m_unchecked(s)?))
+                }
+            }
+            $crate::__sg_if_alloc! {
+                impl $crate::ToBech32m for $name {
+                    #[inline]
+                    fn try_to_bech32m(
+                        &self,
+                        hrp: &str,
+                    ) -> ::core::result::Result<$crate::__private::String, $crate::Bech32Error> {
+                        $crate::ToBech32m::try_to_bech32m(&self.0, hrp)
+                    }
+                    #[inline]
+                    fn try_to_bech32m_zeroizing(
+                        &self,
+                        hrp: &str,
+                    ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
+                        $crate::ToBech32m::try_to_bech32m_zeroizing(&self.0, hrp)
+                    }
+                }
+            }
+        }
+
         $crate::__sg_if_bech32! {
             $crate::__sg_if_alloc! {
                 impl $crate::ToBech32 for $name {
@@ -148,6 +315,12 @@ macro_rules! fixed_newtype {
                     pub fn try_from_bech32(s: &str, expected_hrp: &str)
                         -> ::core::result::Result<Self, $crate::Bech32Error> {
                         ::core::result::Result::Ok(Self($crate::Fixed::try_from_bech32(s, expected_hrp)?))
+                    }
+                    /// Bech32 decode without HRP validation.
+                    #[inline]
+                    pub fn try_from_bech32_unchecked(s: &str)
+                        -> ::core::result::Result<Self, $crate::Bech32Error> {
+                        ::core::result::Result::Ok(Self($crate::Fixed::try_from_bech32_unchecked(s)?))
                     }
                 }
             }

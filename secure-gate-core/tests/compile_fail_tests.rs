@@ -109,3 +109,31 @@ fn dynamic_newtype_alias_rejected_compile_fail() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/dynamic_newtype_alias_rejected.rs");
 }
+
+// Compile-fail test: nominal separation actually holds. Two `fixed_newtype!` types
+// of the same `N` are distinct types, so swapping key roles at a call site is
+// E0308 — the defect class the macros exist to catch, which `fixed_alias!` cannot.
+#[cfg(not(miri))]
+#[test]
+fn newtype_cross_role_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/newtype_cross_role.rs");
+}
+
+// Compile-fail test: `fixed_newtype!` rejects `N = 0`, matching `fixed_alias!`.
+#[cfg(not(miri))]
+#[test]
+fn newtype_zero_size_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/newtype_zero_size.rs");
+}
+
+// Compile-fail test: a user-added `Drop` on a generated newtype makes the wrapped
+// field unmovable (E0509), costing `into_inner`. No `Drop` is needed — the wrapper
+// runs its own — so this pins the diagnostic for a documented trap.
+#[cfg(not(miri))]
+#[test]
+fn newtype_manual_drop_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/newtype_manual_drop.rs");
+}

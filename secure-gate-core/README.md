@@ -101,9 +101,11 @@ let owned: secure_gate::InnerSecret<[u8; 32]> = key.into_inner();
 assert_eq!(format!("{:?}", owned), "[REDACTED]");
 ```
 
-### Macros for typed aliases
+### Macros for named secret types
 
-`fixed_alias!`, `dynamic_alias!`, `fixed_generic_alias!`, and `dynamic_generic_alias!` create named type aliases over `Fixed<T>` / `Dynamic<T>` with full visibility control, optional doc strings, and (for `fixed_alias!`) a compile-time zero-size guard. They expand to plain `pub type` aliases, **not** newtypes — two aliases over the same underlying type are the same nominal type and assignable to each other. Use them for readability and audit grep targets, not for nominal separation between cryptographic roles:
+Two families, differing in exactly one respect — whether the compiler can tell two same-shaped secrets apart.
+
+**Aliases** (`fixed_alias!`, `dynamic_alias!`, `fixed_generic_alias!`, `dynamic_generic_alias!`) expand to plain `pub type` aliases with full visibility control, optional doc strings, and (for `fixed_alias!`) a compile-time zero-size guard. Two aliases over the same underlying type are the **same** nominal type and assignable to each other — use them for readability and audit grep targets:
 
 ```rust
 use secure_gate::{fixed_alias, dynamic_alias};
@@ -114,7 +116,22 @@ fixed_alias!(pub Aes256Key, 32, "32-byte AES-256 key");
 dynamic_alias!(pub Password, String, "variable-length password");
 ```
 
-See [`fixed_alias!`], [`dynamic_alias!`], [`fixed_generic_alias!`], and [`dynamic_generic_alias!`] in the [API docs](https://docs.rs/secure-gate).
+**Newtypes** (`fixed_newtype!`, `dynamic_newtype!`) expand to `struct`s instead, so two of the same shape are **distinct** types. Reach for these when distinct cryptographic roles share a shape — an encryption key and a MAC key are both `Fixed<[u8; 32]>`, and under an alias the compiler cannot tell them apart:
+
+```rust
+use secure_gate::fixed_newtype;
+
+fixed_newtype!(pub EncKey, 32, "AES-256 key. Never used for authentication.");
+fixed_newtype!(pub MacKey, 32, "HMAC-SHA256 key. Never used for encryption.");
+
+fn seal(enc: &EncKey, mac: &MacKey) { /* … */ }
+
+// seal(&mac, &enc) does not compile — the roles cannot be swapped by accident.
+```
+
+Generated newtypes carry the same guarantees as the wrapper (zeroize on drop, redacted `Debug`, access only via `RevealSecret`), are `#[repr(transparent)]` so they cost nothing at runtime, and have no `Deref` — the separation is total, not by-value-only. They guard against *mistakes*, not *intent*: the named escape hatches (`as_wrapper`, `into_wrapper`, `from_wrapper`) can move a secret between roles deliberately, and should be audited like `expose_secret()`.
+
+See [`fixed_alias!`], [`dynamic_alias!`], [`fixed_generic_alias!`], [`dynamic_generic_alias!`], [`fixed_newtype!`], and [`dynamic_newtype!`] in the [API docs](https://docs.rs/secure-gate).
 
 **Zero-size behavior note**  
 `fixed_alias!(Name, N)` rejects `N = 0` at compile time (via a const-eval index-out-of-bounds guard).  
@@ -136,7 +153,7 @@ fn log_length<S: RevealSecret>(secret: &S) {
 
 - **Zero-cost safety** — mandatory zeroization on drop; `no_std` / `no_alloc` support.
 - **Audit-first API** — a held secret cannot leak via `Deref`: `Fixed`/`Dynamic` implement none. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch. Extraction (`into_inner`, `to_*_zeroizing`) hands ownership to the caller and returns output wrappers that *do* deref — see [Where accident-prevention ends](SECURITY.md#where-accident-prevention-ends).
-- **Named aliases** — macros create `type` aliases over `Fixed` / `Dynamic` that inherit redacted `Debug` and zeroize-on-drop. These are plain type aliases, not newtypes: same-shape aliases (e.g. two `Fixed<[u8; 32]>` aliases) are interchangeable at the type level — wrap in a `struct` newtype yourself if you need nominal separation.
+- **Named secret types** — `*_alias!` macros create `type` aliases over `Fixed` / `Dynamic` that inherit redacted `Debug` and zeroize-on-drop; same-shape aliases (e.g. two `Fixed<[u8; 32]>` aliases) are interchangeable at the type level. When distinct cryptographic roles share a shape, `fixed_newtype!` / `dynamic_newtype!` generate `struct`s instead, so the compiler rejects a swapped key role at the call site.
 - **Batteries included** — optional, zero-overhead support for serde, constant-time comparison (`subtle`), and secure encoding (hex, base64url, bech32/m).
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`.
 

@@ -1,7 +1,6 @@
-//! Spike: `fixed_newtype!` / `dynamic_newtype!` — see `docs/nominal_newtypes.md`.
-#![cfg(feature = "alloc")]
+//! macros_suite/newtype.rs — fixed_newtype! / dynamic_newtype! macro tests
 
-use secure_gate::{RevealSecret, SecretLen, ToHex, dynamic_newtype, fixed_newtype};
+use secure_gate::{RevealSecret, SecretLen, dynamic_newtype, fixed_newtype};
 
 // Compare directly with the existing alias macros:
 //   fixed_alias!(pub Aes256Key, 32);         -> type alias, structural
@@ -37,6 +36,8 @@ fn rand_returns_self() {
 #[cfg(feature = "encoding-hex")]
 #[test]
 fn hex_roundtrips_through_the_newtype() {
+    use secure_gate::ToHex;
+
     let k: EncKey = EncKey::try_from_hex(&"ab".repeat(32)).unwrap();
     assert!(k.to_hex().starts_with("abab")); // no as_wrapper()
     assert_eq!(k.to_hex_upper_zeroizing().len(), 64);
@@ -57,6 +58,7 @@ fn dynamic_arms_pick_the_right_api() {
 #[cfg(all(feature = "encoding-hex", feature = "std"))]
 #[test]
 fn vec_arm_gets_bytes_only_api() {
+    use secure_gate::ToHex;
     use std::io::Write;
     let mut tok = SessionToken::new(vec![]);
     tok.write_all(b"\xde\xad").unwrap(); // io::Write forwarded

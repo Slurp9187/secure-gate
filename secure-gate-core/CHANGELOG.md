@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`fixed_newtype!` / `dynamic_newtype!` — nominal newtypes over `Fixed` / `Dynamic`
+  (#155).** The `*_alias!` macros emit `type` aliases, so two aliases of the same shape
+  are the *same* type: an encryption key and a MAC key are both `Fixed<[u8; 32]>`, and
+  swapping them at a call site compiles silently. The new macros emit `struct`s instead,
+  so the compiler rejects a swapped key role. This is the one class of secret-handling
+  defect the alias design cannot see.
+
+  ```rust
+  fixed_newtype!(pub EncKey, 32);
+  fixed_newtype!(pub MacKey, 32, "HMAC-SHA256 key. Never used for encryption.");
+
+  fn seal(enc: &EncKey, mac: &MacKey) { /* … */ }
+  // seal(&mac, &enc) does not compile.
+  ```
+
+  Syntax mirrors the alias macros (visibility forms, optional doc string), plus an
+  opt-in `derive: [ConstantTimeEq, Deserialize]` list. Generated types are
+  `#[repr(transparent)]` with `#[inline]` delegation — `tests/asm_dse_check.rs` now
+  asserts against a newtype symbol and finds LLVM folds it into the plain-wrapper
+  symbol (`.set`), i.e. byte-identical machine code. They carry every wrapper
+  guarantee: zeroize on drop, `[REDACTED]` `Debug`, access only via `RevealSecret` /
+  `RevealSecretMut`, and no `Deref` (so separation is total, not by-value-only).
+
+  **`Clone` and `Serialize` are deliberately not generated.** Neither can be forwarded:
+  `Fixed<[u8; N]>: Clone` needs `[u8; N]: CloneableSecret`, which the orphan rule makes
+  permanently unimplementable downstream. A generated impl would have to route through
+  `with_secret` and rebuild — opting the secret into cloning with no marker impl
+  anywhere, spelled in one word inside a macro expansion. Since a generated newtype is
+  local to the caller's crate, callers who want it write the impl by hand, where the
+  decision is visible and greppable. Asking for either is a compile error carrying the
+  reasoning; the hand-written pattern is a doctest on `fixed_newtype!`.
+
+  **Inner types are matched as literal tokens.** `dynamic_newtype!(pub P, String)` and
+  `(pub P, Vec<u8>)` get the full API for their shape; anything else requires an
+  explicit `generic` marker (`dynamic_newtype!(pub P, generic MyStr)`) and gets the
+  reduced surface — no `SecretLen`, no encoders. A bare unrecognised type is a compile
+  error naming both options, rather than silently degrading. Macros match tokens, not
+  resolved types, and this is true of procedural macros too (they run before type
+  resolution), so the fix is to remove the silent path rather than to see through the
+  alias.
+
+  Design record: `docs/nominal_newtypes.md`. Pinned by 13 `trybuild` compile-fail cases
+  including cross-role assignment (E0308), `N = 0`, a user-added `Drop` (E0509), and the
+  rejected `derive:` options.
+
+
 ### Changed
 
 - **BREAKING (pre-release): `len`/`byte_len`/`is_empty` moved from `RevealSecret`
