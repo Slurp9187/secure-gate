@@ -10,13 +10,23 @@
 >
 > **Superseded in part by `docs/composability_restructure.md`** (same branch,
 > 0.9.0 candidate): §3.3 is now implemented (wrapper encoders are trait
-> impls), trap 7 is fixed (`RevealSecret` covers custom inner types), §5.3 is
-> largely dissolved (forwarding is trait-shaped and mechanical), and §5.1's
-> resolution for the macro is local `Clone`/`Serialize` impls on the newtype
-> rather than a `with_secret` back door around the marker system. The spike
-> macros in `src/macros/` have been updated to match. What remains open for
-> 0.10 is the macro-rules-vs-proc-macro question (§5.2) and finishing the
-> macro polish (§6).
+> impls), trap 7 is fixed (`RevealSecret` now covers custom inner types, which
+> previously had no access impl at all), and **§5.1's blocker is resolved** —
+> a generated newtype is a local type, so `Clone`/`Serialize` become honest
+> local impls rather than a `with_secret` back door around the marker system.
+> The spike macros in `src/macros/` have been updated to match.
+>
+> The restructure did **not** make these macros unnecessary, and an earlier
+> draft of this note overstated that. Measured: `src/macros/` went from 427 to
+> **522 lines** (encoder forwarding became trait impls), and a hand-rolled
+> newtype at parity with `fixed_newtype!(pub EncKey, 32)` still costs **40
+> lines** per secret role. Encoders cannot be inherited via a blanket impl
+> keyed on `Inner: AsRef<[u8]>`, because `String: AsRef<[u8]>` holds and such
+> a blanket would give `Dynamic<String>` hex encoding — the exclusion pinned
+> by `tests/compile-fail/dynamic_string_no_hex.rs`. §5.3 is therefore
+> **narrowed and made mechanical** (bounded by the trait set) rather than
+> dissolved. What remains open for 0.10 is the macro-rules-vs-proc-macro
+> question (§5.2) and finishing the macro polish (§6).
 
 ## Summary
 

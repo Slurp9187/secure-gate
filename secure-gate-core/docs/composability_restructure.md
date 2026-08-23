@@ -31,9 +31,12 @@ trait impls, which produced three concrete defects:
    duplicated per wrapper family, unreachable from generic code
    (`fn f<S: ?>(s: &S)` had no bound to name), and unforwardable by newtypes
    without copying every signature.
-3. **Nominal newtypes were expensive.** The #155 spike needed 427 lines
-   largely to re-forward the inherent surface; the trait gap was the cost
-   driver.
+3. **Nominal newtypes were expensive to write.** The #155 spike needed 427
+   lines, much of it transcribing ~47 inherent signatures per wrapper family.
+   Note the scope of what this restructure fixes: it makes that forwarding
+   *uniform and mechanical* (all trait impls, identical in shape across
+   families), not unnecessary. See "Effect on the #155 newtype spike" for
+   measured before/after.
 
 ## The fix — two mechanical moves
 
@@ -129,9 +132,41 @@ newtypes**. So:
   delegation) instead of generated inherent methods — the macro-generated
   newtypes now satisfy the same bounds as the wrappers.
 - Trap 7 of `docs/nominal_newtypes.md` (custom inner types cannot be newtyped)
-  is fixed by Move 1. §3.3 of that document is now implemented. §5.3 (scope of
-  forwarded surface) is largely dissolved: the surface to forward is traits,
-  which is mechanical and small.
+  is fixed by Move 1 — previously they had no `RevealSecret` impl at all.
+  §3.3 of that document is now implemented. §5.1's blocker is resolved: a
+  generated newtype is a **local** type, so `Clone`/`Serialize` become honest
+  local impls rather than a `with_secret` back door around the marker system.
+
+### What this did *not* do: shrink the macros
+
+An earlier draft of this document claimed the forwarding surface was "largely
+dissolved". Measured, that is wrong, and the correction matters for planning:
+
+| | Before restructure | After |
+|---|---|---|
+| `src/macros/` total | 427 lines | **522 lines** |
+| Hand-rolled newtype at parity with `fixed_newtype!(pub EncKey, 32)` | — | **40 lines** |
+
+The macros grew slightly, because encoder forwarding became trait impls with
+UFCS delegation rather than generated inherent methods. A hand-rolled newtype
+still needs, per secret role: the struct, `#[repr(transparent)]`, constructors,
+`From`, a redacted `Debug` (deriving it prints `EncKey([REDACTED])` — a real
+trap), `RevealSecret` ×3, `RevealSecretMut` ×2, `SecretLen` ×2, `ToHex` ×4,
+`Zeroize`, and `ZeroizeOnDrop`. The `Dynamic<Vec<u8>>` case adds `io::Write`
+and `as_reader` on top.
+
+**Why encoders cannot be inherited by newtypes.** The obvious shortcut — a
+blanket `impl<S: RevealSecret> ToHex for S where S::Inner: AsRef<[u8]>` — is
+wrong here, because `String: AsRef<[u8]>` holds. That blanket would give
+`Dynamic<String>` hex encoding, defeating the deliberate exclusion pinned by
+`tests/compile-fail/dynamic_string_no_hex.rs`. Hence the concrete per-wrapper
+impls, and hence explicit forwarding by newtypes.
+
+So the restructure changed the *nature* of the per-type cost (uniform trait
+forwarding instead of ~47 transcribed inherent signatures) rather than its
+size. §5.3 (scope of the forwarded surface) is **narrowed and made
+mechanical**, not dissolved — the list is now bounded by the trait set instead
+of open-ended, which is what makes the macros tractable to finish.
 
 ## Migration (for anyone tracking pre-release 0.9 RCs)
 
