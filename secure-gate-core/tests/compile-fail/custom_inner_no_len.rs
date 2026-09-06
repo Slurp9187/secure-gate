@@ -1,7 +1,3 @@
-// The import is the point: `len()` must be absent even with `SecretLen` in scope.
-// rustc reports it unused once the call fails to resolve; allow that so the
-// snapshot is identical whether or not CI turns warnings into errors.
-#[allow(unused_imports)]
 use secure_gate::{Fixed, SecretLen};
 use zeroize::Zeroize;
 
@@ -13,8 +9,10 @@ impl Zeroize for SessionKey {
 }
 
 fn main() {
+    // The trait is in scope and works for a shaped inner type...
+    let _ = Fixed::new([0u8; 4]).len();
+    // ...but SecretLen is deliberately narrow: a custom inner type has no
+    // meaningful length, so `len()` must not compile even with the trait in scope.
     let key = Fixed::new(SessionKey([0u8; 32]));
-    // SecretLen is deliberately narrow: a custom inner type has no meaningful
-    // length, so `len()` must not compile even with the trait in scope.
     let _ = key.len();
 }
