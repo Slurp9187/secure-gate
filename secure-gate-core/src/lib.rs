@@ -90,7 +90,7 @@
 //! │   ├── SerializableSecret← serde-serialize feature
 //! │   ├── encoding/         ← ToHex, ToBase64Url, ToBech32, ToBech32m
 //! │   └── decoding/         ← FromHexStr, FromBase64UrlStr, FromBech32Str, FromBech32mStr
-//! ├── macros/               ← fixed_alias!, dynamic_alias!, etc.
+//! ├── macros/               ← fixed_alias!, fixed_newtype!, dynamic_alias!, dynamic_newtype!, etc.
 //! └── error                 ← FromSliceError, HexError, Base64Error, Bech32Error, DecodingError
 //! ```
 //!
@@ -191,12 +191,14 @@
 //! - [`Fixed::try_from_hex`](Fixed::try_from_hex), [`Fixed::try_from_base64url`](Fixed::try_from_base64url),
 //!   [`Fixed::try_from_bech32`](Fixed::try_from_bech32), [`Fixed::try_from_bech32m`](Fixed::try_from_bech32m)
 //!   (no-alloc stack-based decoding)
-//! - [`fixed_alias!`], [`fixed_generic_alias!`]
+//! - [`fixed_alias!`], [`fixed_generic_alias!`] (type aliases), and
+//!   [`fixed_newtype!`] (distinct nominal types — two keys of the same size that
+//!   the compiler keeps apart)
 //! - [`FromSliceError`]
 //!
 //! **Not** available without `alloc`: [`Dynamic<T>`], [`EncodedSecret`],
 //! encoding traits ([`ToHex`], etc.), decoding traits ([`FromHexStr`], etc.),
-//! [`dynamic_alias!`], [`dynamic_generic_alias!`], serde support.
+//! [`dynamic_alias!`], [`dynamic_generic_alias!`], [`dynamic_newtype!`], serde support.
 //!
 //! # `no_std`
 //!
@@ -383,12 +385,22 @@ pub use traits::ConstantTimeEq;
 ///   `&T` reference for FFI / third-party APIs.
 /// - **Tier 3** (consumption): [`into_inner()`](RevealSecret::into_inner) — returns
 ///   [`InnerSecret<T>`] with zeroization transferred to caller.
-/// - **Metadata**: [`len()`](SecretLen::len) / [`is_empty()`](SecretLen::is_empty) —
-///   does not expose contents, but length itself can be sensitive for
-///   variable-length secrets; see [`SecretLen`].
 ///
-/// See [`RevealSecretMut`] for the mutable counterpart.
-pub use traits::{RevealSecret, SecretLen};
+/// Length metadata lives in the separate [`SecretLen`] trait. See
+/// [`RevealSecretMut`] for the mutable counterpart.
+// Kept as a separate `use` from `SecretLen` on purpose: rustdoc 1.70 (the 0.8
+// line's MSRV toolchain) ICEs resolving intra-doc links on a grouped
+// `pub use a::{B, C};` re-export, and the two lines share this file.
+pub use traits::RevealSecret;
+
+/// Length metadata for secrets whose inner type has a meaningful length.
+///
+/// [`len()`](SecretLen::len) / [`byte_len()`](SecretLen::byte_len) /
+/// [`is_empty()`](SecretLen::is_empty) do not expose contents, but length itself
+/// can be sensitive for variable-length secrets — see the trait's Security
+/// section. Implemented for `Fixed<[T; N]>`, `Dynamic<String>`, and
+/// `Dynamic<Vec<T>>`; deliberately not for custom inner types.
+pub use traits::SecretLen;
 
 /// Explicit mutable access to secret contents.
 ///

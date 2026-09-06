@@ -1,6 +1,7 @@
 //! Shared machinery for `fixed_newtype!` / `dynamic_newtype!`.
 //!
-//! Ships in 0.9.0. Design record: `docs/nominal_newtypes.md`.
+//! Ships in 0.9.0; backported to the 0.8 line in 0.8.0-rc.11. Design record:
+//! `docs/nominal_newtypes.md` (describes `main`).
 
 // ---- cfg relays -------------------------------------------------------------
 // `#[cfg(feature = "...")]` inside an exported macro is evaluated in the CALLER's

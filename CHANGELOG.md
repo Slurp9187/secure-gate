@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`secure-gate-core`:** `dynamic_no_deref` compile-fail snapshot is feature-invariant
   (#157); stable test jobs skip compile-fail cases by the `_compile_fail` name suffix.
 
+### Documentation
+
+- **`secure-gate-core`:** the crate page lists `fixed_newtype!` / `dynamic_newtype!`
+  alongside the alias macros; the `RevealSecret`/`SecretLen` re-export is split so
+  rustdoc 1.70 (this line's MSRV toolchain) no longer ICEs on `cargo doc` — docs.rs
+  (nightly) was never affected.
+
 `secure-gate-compat`: one test import (`SecretLen`); no code changes.
 
 See the per-crate changelogs for full detail:

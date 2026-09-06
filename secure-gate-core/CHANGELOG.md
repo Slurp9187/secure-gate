@@ -318,6 +318,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **The crate page now lists the newtype macros.** The `lib.rs` overview ("What's
+  available without `alloc`" and the module tree) named only the alias macros;
+  `fixed_newtype!` and `dynamic_newtype!` are listed with a one-line contrast.
+- **`SecretLen` has its own crate-level re-export doc, and rustdoc 1.70 builds again.**
+  `pub use traits::{RevealSecret, SecretLen};` carried one doc comment for both; rustdoc
+  1.70 — this line's MSRV toolchain — ICEs resolving intra-doc links on a grouped `use`
+  re-export ("no resolution for `RevealSecret::expose_secret` MacroNS"), so `cargo doc`
+  on 1.70 has been broken since the backport. docs.rs builds on nightly and was never
+  affected. The re-export is split in two; the tier list stays on `RevealSecret` and
+  `SecretLen` gets a short doc of its own.
+- The three newtype macro modules said "Ships in 0.9.0"; they now say the macros were
+  backported to this line in 0.8.0-rc.11.
 - **`SecretLen` no longer describes length as safe metadata.** Its `# Security` section
   now distinguishes contents from sensitivity: for variable-length secrets the length can
   narrow a brute-force search or fingerprint an issuer, so it is metadata *about* a secret
