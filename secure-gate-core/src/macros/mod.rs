@@ -39,9 +39,11 @@
 //! compile-time zero-size guard (`N = 0` is a compile error). The others allow
 //! zero-sized inner types — validate expected sizes in tests.
 //!
-//! Newtypes guard against *mistakes*, not *intent*: the named escape hatches
-//! (`as_wrapper`, `into_wrapper`, `from_wrapper`) can move a secret between
-//! roles deliberately. Audit them as you would `expose_secret()`.
+//! Newtypes generate no `From<Wrapper>` and no `Deref`, so an alias-typed value
+//! cannot become a newtype through `.into()` and a newtype never coerces back to
+//! its base. Base-wrapper access (`from_wrapper`, `as_wrapper`, `into_wrapper`)
+//! exists only with `derive: [WrapperAccess]`, per newtype — it can move a secret
+//! between roles deliberately, so audit it as you would `expose_secret()`.
 //!
 //! # Example
 //!

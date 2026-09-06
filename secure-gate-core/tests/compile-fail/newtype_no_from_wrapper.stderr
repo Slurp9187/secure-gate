@@ -1,0 +1,21 @@
+error[E0277]: the trait bound `PublicId: From<Dynamic<String>>` is not satisfied
+  --> tests/compile-fail/newtype_no_from_wrapper.rs:16:37
+   |
+16 |     let _leaked: PublicId = file_id.into();
+   |                                     ^^^^ the trait `From<Dynamic<String>>` is not implemented for `PublicId`
+   |
+   = help: the trait `From<Dynamic<String>>` is not implemented for `PublicId`
+           but trait `From<&str>` is implemented for it
+   = help: for that trait implementation, expected `&str`, found `Dynamic<String>`
+   = note: required for `Dynamic<String>` to implement `Into<PublicId>`
+
+error[E0277]: the trait bound `FileKey32: From<Fixed<[u8; 32]>>` is not satisfied
+  --> tests/compile-fail/newtype_no_from_wrapper.rs:19:38
+   |
+19 |     let _per_file: FileKey32 = vault.into();
+   |                                      ^^^^ the trait `From<Fixed<[u8; 32]>>` is not implemented for `FileKey32`
+   |
+   = help: the trait `From<Fixed<[u8; 32]>>` is not implemented for `FileKey32`
+           but trait `From<[u8; 32]>` is implemented for it
+   = help: for that trait implementation, expected `[u8; 32]`, found `Fixed<[u8; 32]>`
+   = note: required for `Fixed<[u8; 32]>` to implement `Into<FileKey32>`

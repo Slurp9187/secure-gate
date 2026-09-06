@@ -50,9 +50,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolution), so the fix is to remove the silent path rather than to see through the
   alias.
 
-  Design record: `docs/nominal_newtypes.md`. Pinned by 13 `trybuild` compile-fail cases
-  including cross-role assignment (E0308), `N = 0`, a user-added `Drop` (E0509), and the
-  rejected `derive:` options.
+  **No implicit conversion to or from the base wrapper.** Nothing generates
+  `From<Fixed<[u8; N]>>` / `From<Dynamic<T>>` or `Deref`, so an alias-typed value (a
+  `dynamic_alias!` that stayed a synonym) cannot flow into a newtype through `.into()`,
+  and `&Newtype` never coerces to `&Wrapper`. By default the only path in or out is the
+  3-tier access API — a `with_secret` round trip. The named base-access methods
+  (`from_wrapper`, `as_wrapper`, `as_wrapper_mut`, `into_wrapper`) exist only with
+  `derive: [WrapperAccess]`, per newtype. Shaped `dynamic_newtype!` constructors take
+  `impl Into<String>` / `impl Into<Vec<u8>>`, so `Name::new("literal")` works and a
+  hand-written newtype's call sites need not move.
+
+  Design record: `docs/nominal_newtypes.md`; downstream cross-check against
+  `docs/secure-gate-requested-newtyping-requirements.md` in its §8. Pinned by 16
+  `trybuild` compile-fail cases including cross-role assignment (E0308), `N = 0`, a
+  user-added `Drop` (E0509), the rejected `derive:` options, the absent `.into()` path
+  from a base wrapper, the absent `Deref`, and per-newtype `Serialize` not leaking to
+  siblings.
 
 
 ### Changed

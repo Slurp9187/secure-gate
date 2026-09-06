@@ -23,7 +23,7 @@
 /// dynamic_newtype!(pub Name, String, "doc", derive: [ConstantTimeEq]);
 /// ```
 ///
-/// Supported `derive:` options are `ConstantTimeEq` and `Deserialize`;
+/// Supported `derive:` options are `ConstantTimeEq`, `Deserialize`, and `WrapperAccess`;
 /// `Clone` and `Serialize` are deliberately absent — see
 /// [`fixed_newtype!`](crate::fixed_newtype) for the reasoning and the
 /// hand-written pattern, which applies identically here.
@@ -95,10 +95,16 @@
 /// generated newtype is not coercible to its wrapper — which is what keeps the
 /// nominal separation total rather than by-value-only.
 ///
-/// **Nominal separation guards against mistakes, not intent.** `as_wrapper()`,
-/// `into_wrapper()`, and `from_wrapper()` will move a secret from one role to
-/// another; they exist so the full wrapper API stays reachable. Audit them the
-/// way you audit `expose_secret()` — all three names are greppable.
+/// **Nominal separation guards against mistakes, not intent** — but nothing is
+/// generated that would undo it by accident. There is no `From<Wrapper>` and
+/// no `Deref`, so an alias-typed value cannot flow into a newtype through
+/// `.into()`, and `&Newtype` never coerces to `&Wrapper` at a call site. By
+/// default the only way material enters or leaves is the 3-tier access API —
+/// a `with_secret` round trip — which is explicit and shows up in the audit
+/// sweep. The named base-access methods (`from_wrapper`, `as_wrapper`,
+/// `as_wrapper_mut`, `into_wrapper`) exist only when you opt in with
+/// `derive: [WrapperAccess]`, per newtype; they will move a secret between
+/// roles deliberately, so audit them the way you audit `expose_secret()`.
 ///
 /// The heap caveats of [`Dynamic`](crate::Dynamic) carry over unchanged: see
 /// `SECURITY.md` on realloc residue for `Vec`/`String` growth after wrapping.
@@ -149,7 +155,7 @@ macro_rules! dynamic_newtype {
             $(#[$attr])* $vis $name($crate::Dynamic<$crate::__private::String>), derive: [$($opt),*]
         );
         $crate::__sg_newtype_len!($name);
-        $crate::__sg_dynamic_ctor!($name, $crate::__private::String);
+        $crate::__sg_dynamic_ctor!(@into $name, $crate::__private::String);
 
         impl ::core::convert::From<&str> for $name {
             #[inline]
@@ -174,7 +180,7 @@ macro_rules! dynamic_newtype {
             $(#[$attr])* $vis $name($crate::Dynamic<$crate::__private::Vec<u8>>), derive: [$($opt),*]
         );
         $crate::__sg_newtype_len!($name);
-        $crate::__sg_dynamic_ctor!($name, $crate::__private::Vec<u8>);
+        $crate::__sg_dynamic_ctor!(@into $name, $crate::__private::Vec<u8>);
 
         impl ::core::convert::From<&[u8]> for $name {
             #[inline]
@@ -362,6 +368,18 @@ macro_rules! dynamic_newtype {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __sg_dynamic_ctor {
+    // Shaped arms: accept anything convertible to the inner value, so
+    // `Name::new("literal")` and `Name::new(string)` both work — the shape a
+    // hand-written `new(impl Into<String>)` has, so call sites need not move.
+    (@into $name:ident, $inner:ty) => {
+        impl $name {
+            /// Creates the secret from any value convertible into the inner type.
+            #[inline(always)]
+            pub fn new(value: impl ::core::convert::Into<$inner>) -> Self {
+                Self(<$crate::Dynamic<$inner>>::new(value.into()))
+            }
+        }
+    };
     ($name:ident, $inner:ty) => {
         impl $name {
             /// Moves a value onto the heap as this secret type.

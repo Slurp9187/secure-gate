@@ -23,7 +23,7 @@
 /// fixed_newtype!(pub Name, N, "doc", derive: [ConstantTimeEq]);
 /// ```
 ///
-/// Supported `derive:` options are `ConstantTimeEq` and `Deserialize`. See
+/// Supported `derive:` options are `ConstantTimeEq`, `Deserialize`, and `WrapperAccess`. See
 /// *Cloning and serialization* below for the two that are deliberately absent.
 ///
 /// # Examples
@@ -125,12 +125,16 @@
 /// generated newtype is not coercible to its wrapper, which is what keeps the
 /// nominal separation total rather than by-value-only.
 ///
-/// **Nominal separation guards against mistakes, not intent.** The escape
-/// hatches are deliberate and named: `as_wrapper()`, `into_wrapper()`, and
-/// `from_wrapper()` will happily move a secret from one role to another —
-/// `MacKey::from_wrapper(enc.into_wrapper())` compiles. They exist so the full
-/// wrapper API stays reachable; audit them the way you audit
-/// `expose_secret()`. Both names are greppable.
+/// **Nominal separation guards against mistakes, not intent** — but nothing is
+/// generated that would undo it by accident. There is no `From<Wrapper>` and
+/// no `Deref`, so an alias-typed value cannot flow into a newtype through
+/// `.into()`, and `&Newtype` never coerces to `&Wrapper` at a call site. By
+/// default the only way material enters or leaves is the 3-tier access API —
+/// a `with_secret` round trip — which is explicit and shows up in the audit
+/// sweep. The named base-access methods (`from_wrapper`, `as_wrapper`,
+/// `as_wrapper_mut`, `into_wrapper`) exist only when you opt in with
+/// `derive: [WrapperAccess]`, per newtype; they will move a secret between
+/// roles deliberately, so audit them the way you audit `expose_secret()`.
 ///
 /// # See also
 ///

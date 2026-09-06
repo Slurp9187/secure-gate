@@ -87,15 +87,13 @@ Separation is at the **front end only**. Both macros delegate to one shared
 surface; the per-family macros add only what needs concrete type knowledge.
 There is no duplicated trait forwarding.
 
-`__sg_newtype_base!` emits: the `#[repr(transparent)]` struct, `from_wrapper` /
-`as_wrapper` / `as_wrapper_mut` / `into_wrapper`, `Debug` (always
-`[REDACTED]`), `From<Wrapper>`, `RevealSecret`, `RevealSecretMut`, `Zeroize`,
-`ZeroizeOnDrop`, and the opt-in `derive:` impls (`ConstantTimeEq`,
-`Deserialize` — `Clone`/`Serialize` are rejected, see §5.1).
-
-**Known gap (§6):** the front-end macros do not yet pass `derive:` through to
-`__sg_newtype_base!`, so the option list is currently reachable only by calling
-the base macro directly. Wiring it through is part of the remaining polish.
+`__sg_newtype_base!` emits: the `#[repr(transparent)]` struct, `Debug` (always
+`[REDACTED]`), `RevealSecret`, `RevealSecretMut`, `Zeroize`, `ZeroizeOnDrop`,
+and the opt-in `derive:` impls (`ConstantTimeEq`, `Deserialize`,
+`WrapperAccess` — `Clone`/`Serialize` are rejected, see §5.1). It emits **no**
+`From<Wrapper>` and **no** `Deref` (§8, R2/R3): base-wrapper access
+(`from_wrapper` / `as_wrapper` / `as_wrapper_mut` / `into_wrapper`) exists only
+under `derive: [WrapperAccess]`, per newtype.
 
 `fixed_newtype!` adds: the `N = 0` guard, `const fn new`, `new_with`,
 `From<[u8; N]>`, `TryFrom<&[u8]>`, `from_random`, `try_from_hex`, `to_hex`,
@@ -253,10 +251,14 @@ Each was hit during development; the fix (where applicable) is in the code.
    no `RevealSecret` impl, so it cannot be newtyped: `Fixed<Sess>: RevealSecret
    is not satisfied`, reported from inside the expansion. Needs a doc note, or
    an opt-out flag for the reveal impls.
-8. **Laundering compiles.** `MacKey::from_wrapper(enc.into_wrapper())` is legal.
-   Nominal separation guards against mistakes, not intent, and closing this
-   would also close legitimate access to the wrapper API. Both hatch names are
-   greppable. Document it; do not try to prevent it.
+8. **Laundering requires opt-in on both sides.** Originally
+   `MacKey::from_wrapper(enc.into_wrapper())` compiled unconditionally, and the
+   base macro also generated `From<Wrapper>`, so an alias-typed value could
+   become a newtype through a one-line `.into()`. Both are gone (§8, R2): no
+   `From<Wrapper>` is generated, and the named base-access methods exist only
+   with `derive: [WrapperAccess]`. By default the only path between roles is a
+   `with_secret` round trip — explicit, and visible in the audit sweep. Pinned
+   by `tests/compile-fail/newtype_no_from_wrapper.rs`.
 
 ## 5. Open questions (§5.1 and §5.2 decided; §5.3–§5.4 open)
 
@@ -414,6 +416,53 @@ mismatches its expected stderr (one of the two expected errors is absent).
 Confirmed identical on the pre-restructure baseline, so it is unrelated to this
 work — but the CI matrix includes a "std explicit" job, so that job is presumably
 already red. Worth a separate issue.
+
+## 8. Downstream cross-check: `encrypted-file-vault` requirements
+
+`docs/secure-gate-requested-newtyping-requirements.md` (a consumer with 34
+aliases collapsing to 8 real types, and an IPC-boundary design that alias
+synonymy defeated) states requirements R1–R7 and questions Q1–Q7. Status on
+this branch, verified by tests unless noted:
+
+| Req | Requirement | Status |
+|---|---|---|
+| R1 | Distinct identity for both `Dynamic` and `Fixed` | ✅ `fixed_newtype!` / `dynamic_newtype!`; `newtype_cross_role.rs` |
+| R2 | Controlled conversion; no blanket `From`/unwrap-rewrap | ✅ **Was violated** — the base macro generated `From<Wrapper>`. Removed; base access is now `derive: [WrapperAccess]` per newtype; default path is a `with_secret` round trip. `newtype_no_from_wrapper.rs` |
+| R3 | No `Deref` to the base | ✅ never generated; now pinned by `newtype_no_deref.rs` |
+| R4 | Preserve zeroize, `[REDACTED]` `Debug`, no `Display`, 3-tier access | ✅ struct holds the wrapper (its `Drop` runs); no `Display` is generated; `RevealSecret`/`RevealSecretMut` forwarded; `asm_dse_check` proves byte-identical codegen |
+| R5 | Opt-in `Serialize` per newtype, not per base | ✅ by §5.1 (c): hand-write `impl Serialize for PublicId` routing through `with_secret`. Siblings and the base gain nothing — `newtype_sibling_not_serializable.rs` |
+| R6 | Coexist with alias macros in one file | ✅ `newtype_conversion.rs` mixes both families; R2 is what makes the mix safe |
+| R7 | Match the hand-written shape: `new(impl Into<String>)`, private field, `RevealSecret`, `[REDACTED]` | ✅ **Was mismatched** — `new` took `Into<Box<String>>`, so `new("literal")` failed. Shaped arms now take `impl Into<String>` / `impl Into<Vec<u8>>`. Note the hand-written `RevealSecret` impl in the requirements includes `len()`, which moved to `SecretLen` in #156 — adopting the macro absorbs that |
+
+Answers to Q1–Q7:
+
+1. **Names and syntax.** `fixed_newtype!(vis Name, N [, "doc"] [, derive: [..]])`
+   and `dynamic_newtype!(vis Name, String | Vec<u8> | generic T [, "doc"]
+   [, derive: [..]])` — the alias macros' `(vis, name, inner)` / `(vis, name,
+   size)` shape, plus an optional `derive:` list.
+2. **Conversion.** None by default. No `From`/`Into` between a newtype and its
+   base, nor between newtypes. `derive: [WrapperAccess]` adds the four named,
+   greppable methods. Raw-material constructors remain (`From<[u8; N]>`,
+   `From<&str>`, `From<&[u8]>`, `TryFrom<&[u8]>`) — they build from
+   non-secret input, not from another secret type.
+3. **`Deref`.** No. Pinned.
+4. **Per-newtype `Serialize`.** Yes — hand-written, ~6 lines, through
+   `with_secret`. The base can never implement it (`String:
+   SerializableSecret` is orphan-blocked), so a sibling cannot inherit it.
+5. **`Fixed` coverage.** Yes, first-class; the key-confusion case is the
+   headline example.
+6. **Migration from `pub type X = SecureString`.** Replace the alias with
+   `dynamic_newtype!(pub X, String)`. Call sites using `X::new(..)`,
+   `with_secret`, `expose_secret`, `into_inner`, or `"…".into()` compile
+   unchanged. Call sites that assigned a base value to `X`, or passed `&X`
+   where `&SecureString` was expected, stop compiling — those are exactly the
+   substitutions the newtype exists to catch. `len()` calls need
+   `use secure_gate::SecretLen;` (from #156, independent of newtypes).
+7. **Generic contexts.** `fn f<T: RevealSecret<Inner = String>>` accepts
+   `PublicId`, `FileId`, and the base, and that is intended: nominal identity
+   is a property of the type; trait bounds are structural. To exclude
+   siblings, bound on the concrete type, or define a local marker trait and
+   implement it for the newtypes you mean.
 
 ## 7. Verification
 

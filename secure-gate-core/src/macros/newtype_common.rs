@@ -66,20 +66,6 @@ macro_rules! __sg_newtype_base {
         $vis struct $name($wrapper);
 
 
-        impl $name {
-            /// Wraps an existing secure wrapper in this nominal type.
-            #[inline(always)]
-            pub fn from_wrapper(wrapper: $wrapper) -> Self { Self(wrapper) }
-            /// Borrows the underlying wrapper (drops nominal separation).
-            #[inline(always)]
-            pub fn as_wrapper(&self) -> &$wrapper { &self.0 }
-            /// Mutably borrows the underlying wrapper (drops nominal separation).
-            #[inline(always)]
-            pub fn as_wrapper_mut(&mut self) -> &mut $wrapper { &mut self.0 }
-            /// Unwraps to the underlying wrapper (drops nominal separation).
-            #[inline(always)]
-            pub fn into_wrapper(self) -> $wrapper { self.0 }
-        }
 
         impl ::core::fmt::Debug for $name {
             #[inline]
@@ -88,10 +74,6 @@ macro_rules! __sg_newtype_base {
             }
         }
 
-        impl ::core::convert::From<$wrapper> for $name {
-            #[inline(always)]
-            fn from(wrapper: $wrapper) -> Self { Self(wrapper) }
-        }
 
         impl $crate::RevealSecret for $name {
             type Inner = <$wrapper as $crate::RevealSecret>::Inner;
@@ -202,12 +184,40 @@ macro_rules! __sg_newtype_opt {
             }
         }
     };
+    // Base-wrapper access is opt-in (R2 of the downstream requirements): with it
+    // absent, the only way material leaves or enters a newtype is through the
+    // 3-tier access API — a `with_secret` round trip — which is explicit and
+    // shows up in the audit sweep. No `From<Wrapper>` is ever generated.
+    (WrapperAccess, $name:ident, $wrapper:ty) => {
+        impl $name {
+            /// Wraps an existing secure wrapper in this nominal type.
+            #[inline(always)]
+            pub fn from_wrapper(wrapper: $wrapper) -> Self {
+                Self(wrapper)
+            }
+            /// Borrows the underlying wrapper (drops nominal separation).
+            #[inline(always)]
+            pub fn as_wrapper(&self) -> &$wrapper {
+                &self.0
+            }
+            /// Mutably borrows the underlying wrapper (drops nominal separation).
+            #[inline(always)]
+            pub fn as_wrapper_mut(&mut self) -> &mut $wrapper {
+                &mut self.0
+            }
+            /// Unwraps to the underlying wrapper (drops nominal separation).
+            #[inline(always)]
+            pub fn into_wrapper(self) -> $wrapper {
+                self.0
+            }
+        }
+    };
     ($other:ident, $name:ident, $wrapper:ty) => {
         ::core::compile_error!(::core::concat!(
             "secure_newtype: unknown `derive:` option `",
             ::core::stringify!($other),
-            "`. Supported: ConstantTimeEq, Deserialize. `Clone` and `Serialize` are \
-             deliberately unsupported — write them by hand."
+            "`. Supported: ConstantTimeEq, Deserialize, WrapperAccess. `Clone` and \
+             `Serialize` are deliberately unsupported — write them by hand."
         ));
     };
 }

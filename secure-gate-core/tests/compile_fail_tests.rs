@@ -137,3 +137,33 @@ fn newtype_manual_drop_compile_fail() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/newtype_manual_drop.rs");
 }
+
+// Compile-fail test (R2): no `From<Wrapper>` is generated, so an alias-typed value
+// cannot flow into a newtype through `.into()`. Base access is opt-in via
+// `derive: [WrapperAccess]`; without it the only path is a `with_secret` round trip.
+#[cfg(feature = "alloc")]
+#[cfg(not(miri))]
+#[test]
+fn newtype_no_from_wrapper_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/newtype_no_from_wrapper.rs");
+}
+
+// Compile-fail test (R3): generated newtypes do not `Deref` to their base wrapper.
+#[cfg(feature = "alloc")]
+#[cfg(not(miri))]
+#[test]
+fn newtype_no_deref_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/newtype_no_deref.rs");
+}
+
+// Compile-fail test (R5): a hand-written `Serialize` on one newtype does not make a
+// sibling newtype over the same base serializable.
+#[cfg(all(feature = "alloc", feature = "serde-serialize"))]
+#[cfg(not(miri))]
+#[test]
+fn newtype_sibling_not_serializable_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/newtype_sibling_not_serializable.rs");
+}

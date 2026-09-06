@@ -129,7 +129,7 @@ fn seal(enc: &EncKey, mac: &MacKey) { /* … */ }
 // seal(&mac, &enc) does not compile — the roles cannot be swapped by accident.
 ```
 
-Generated newtypes carry the same guarantees as the wrapper (zeroize on drop, redacted `Debug`, access only via `RevealSecret`), are `#[repr(transparent)]` so they cost nothing at runtime, and have no `Deref` — the separation is total, not by-value-only. They guard against *mistakes*, not *intent*: the named escape hatches (`as_wrapper`, `into_wrapper`, `from_wrapper`) can move a secret between roles deliberately, and should be audited like `expose_secret()`.
+Generated newtypes carry the same guarantees as the wrapper (zeroize on drop, redacted `Debug`, access only via `RevealSecret`), are `#[repr(transparent)]` so they cost nothing at runtime, and have no `Deref` — the separation is total, not by-value-only. No `From<Wrapper>` or `Deref` is generated, so an alias-typed value cannot become a newtype through `.into()` and a newtype never coerces back to its base; base-wrapper access (`from_wrapper`, `as_wrapper`, `into_wrapper`) is opt-in per newtype via `derive: [WrapperAccess]` and should be audited like `expose_secret()`.
 
 See [`fixed_alias!`], [`dynamic_alias!`], [`fixed_generic_alias!`], [`dynamic_generic_alias!`], [`fixed_newtype!`], and [`dynamic_newtype!`] in the [API docs](https://docs.rs/secure-gate).
 
