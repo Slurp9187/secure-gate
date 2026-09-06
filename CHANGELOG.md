@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0-rc.11] - 2026-09-06
+
 ### Added
 
 - **Backport of `main`'s 0.9.0-rc.8 newtype macros — `fixed_newtype!` /
@@ -24,7 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`secure-gate-core`:** `dynamic_no_deref` compile-fail snapshot is feature-invariant
-  (#157); stable test jobs skip compile-fail cases by the `_compile_fail` name suffix.
+  (#157); the DSE zeroization guard follows both spellings of LLVM's identical-code-folding
+  alias (`.set a, b` on 1.85, `a = b` on current stable); stable and MSRV test jobs skip
+  compile-fail cases by the `_compile_fail` name suffix.
+- **`cargo audit` is clean** (#161): `crossbeam-epoch` 0.9.18 → 0.9.21 (RUSTSEC-2026-0204),
+  `rand` 0.9.2 → 0.9.5 and 0.8.5 → 0.8.8 (RUSTSEC-2026-0097); the `bincode`
+  dev-dependency is removed (RUSTSEC-2025-0141 — no patched version exists, so removal is
+  the only fix). Two informational `atty` warnings remain, blocked by MSRV 1.70; see the
+  core changelog.
+
+### Testing / CI
+
+- Core `--all-features` added to the stable test and lint matrices: `full` excludes `std`,
+  so tests gated on `std` plus another feature previously compiled only in the MSRV job.
 
 ### Documentation
 
@@ -33,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rustdoc 1.70 (this line's MSRV toolchain) no longer ICEs on `cargo doc` — docs.rs
   (nightly) was never affected.
 
-`secure-gate-compat`: one test import (`SecretLen`); no code changes.
+`secure-gate-compat`: version bump only; one test import (`SecretLen`); no code changes.
 
 See the per-crate changelogs for full detail:
 
