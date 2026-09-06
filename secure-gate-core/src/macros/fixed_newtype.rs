@@ -1,6 +1,7 @@
 //! `fixed_newtype!` — nominal newtype over `Fixed<[u8; N]>`.
 //!
-//! Ships in 0.9.0. Design record: `docs/nominal_newtypes.md`.
+//! Ships in 0.9.0; backported to the 0.8 line in 0.8.0-rc.11. Design record:
+//! `docs/nominal_newtypes.md` (describes `main`).
 
 /// Creates a distinct nominal type wrapping [`Fixed<[u8; N]>`](crate::Fixed).
 ///
