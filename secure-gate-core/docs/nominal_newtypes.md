@@ -91,10 +91,11 @@ There is no duplicated trait forwarding.
 `__sg_newtype_base!` emits: the `#[repr(transparent)]` struct, `Debug` (always
 `[REDACTED]`), `RevealSecret`, `RevealSecretMut`, `Zeroize`, `ZeroizeOnDrop`,
 and the opt-in `derive:` impls (`ConstantTimeEq`, `Deserialize`,
-`WrapperAccess` — `Clone`/`Serialize` are rejected, see §5.1). It emits **no**
-`From<Wrapper>` and **no** `Deref` (§8, R2/R3): base-wrapper access
-(`from_wrapper` / `as_wrapper` / `as_wrapper_mut` / `into_wrapper`) exists only
-under `derive: [WrapperAccess]`, per newtype.
+`FromWrapper`, `IntoWrapper`, `WrapperAccess` — `Clone`/`Serialize` are
+rejected, see §5.1). It emits **no** `From<Wrapper>` and **no** `Deref` (§8,
+R2/R3): base-wrapper access is opt-in per newtype and split by direction —
+`FromWrapper` adds `from_wrapper` (inbound), `IntoWrapper` adds `as_wrapper` /
+`as_wrapper_mut` / `into_wrapper` (outbound), `WrapperAccess` is both.
 
 `fixed_newtype!` adds: the `N = 0` guard, `const fn new`, `new_with`,
 `From<[u8; N]>`, `TryFrom<&[u8]>`, `from_random`, `try_from_hex`, `to_hex`,
@@ -257,7 +258,8 @@ Each was hit during development; the fix (where applicable) is in the code.
    base macro also generated `From<Wrapper>`, so an alias-typed value could
    become a newtype through a one-line `.into()`. Both are gone (§8, R2): no
    `From<Wrapper>` is generated, and the named base-access methods exist only
-   with `derive: [WrapperAccess]`. By default the only path between roles is a
+   with `derive: [FromWrapper]` / `[IntoWrapper]` (`WrapperAccess` = both), so
+   relabelling needs `FromWrapper` on the *receiving* type. By default the only path between roles is a
    `with_secret` round trip — explicit, and visible in the audit sweep. Pinned
    by `tests/compile-fail/newtype_no_from_wrapper.rs`.
 
@@ -427,7 +429,7 @@ this branch, verified by tests unless noted:
 | Req | Requirement | Status |
 |---|---|---|
 | R1 | Distinct identity for both `Dynamic` and `Fixed` | ✅ `fixed_newtype!` / `dynamic_newtype!`; `newtype_cross_role.rs` |
-| R2 | Controlled conversion; no blanket `From`/unwrap-rewrap | ✅ **Was violated** — the base macro generated `From<Wrapper>`. Removed; base access is now `derive: [WrapperAccess]` per newtype; default path is a `with_secret` round trip. `newtype_no_from_wrapper.rs` |
+| R2 | Controlled conversion; no blanket `From`/unwrap-rewrap | ✅ **Was violated** — the base macro generated `From<Wrapper>`. Removed; base access is now opt-in per newtype **and per direction** (`FromWrapper` / `IntoWrapper`; `WrapperAccess` = both); default path is a `with_secret` round trip. `newtype_no_from_wrapper.rs` |
 | R3 | No `Deref` to the base | ✅ never generated; now pinned by `newtype_no_deref.rs` |
 | R4 | Preserve zeroize, `[REDACTED]` `Debug`, no `Display`, 3-tier access | ✅ struct holds the wrapper (its `Drop` runs); no `Display` is generated; `RevealSecret`/`RevealSecretMut` forwarded; `asm_dse_check` proves byte-identical codegen |
 | R5 | Opt-in `Serialize` per newtype, not per base | ✅ by §5.1 (c): hand-write `impl Serialize for PublicId` routing through `with_secret`. Siblings and the base gain nothing — `newtype_sibling_not_serializable.rs` |
@@ -463,6 +465,31 @@ Answers to Q1–Q7:
    is a property of the type; trait bounds are structural. To exclude
    siblings, bound on the concrete type, or define a local marker trait and
    implement it for the newtypes you mean.
+
+### Direction matters
+
+The two directions of base access carry different risk, which is why the
+opt-in is split rather than a single switch.
+
+- **Inbound** (`FromWrapper` → `from_wrapper(base) -> Self`) is the
+  *relabelling* path. In a mixed tree every plain alias of the same base is
+  already that base type — `FileId` *is* a `Dynamic<String>` — so
+  `PublicId::from_wrapper(file_id)` needs no opt-in on the source side at all.
+  A type whose whole purpose is to guard a boundary must never take
+  `FromWrapper`; doing so reopens exactly the substitution the newtype exists
+  to refuse, one named call instead of one `.into()`.
+- **Outbound** (`IntoWrapper` → `as_wrapper`, `as_wrapper_mut`, `into_wrapper`)
+  lets material leave the role toward the base type — needed to reach base API
+  that is not forwarded, or to hand a value to legacy code that still takes the
+  alias. It cannot relabel anything by itself: the result is the base type, not
+  another role.
+- `WrapperAccess` is both, for types where neither direction is a boundary
+  concern. Do not combine it with a directional token — the methods would be
+  defined twice (E0592).
+
+Pinned by `tests/compile-fail/newtype_directional_access.rs`: a type with only
+`IntoWrapper` has no `from_wrapper`, and one with only `FromWrapper` has no
+`into_wrapper`.
 
 ## 7. Verification
 

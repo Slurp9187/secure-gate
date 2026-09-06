@@ -41,9 +41,11 @@
 //!
 //! Newtypes generate no `From<Wrapper>` and no `Deref`, so an alias-typed value
 //! cannot become a newtype through `.into()` and a newtype never coerces back to
-//! its base. Base-wrapper access (`from_wrapper`, `as_wrapper`, `into_wrapper`)
-//! exists only with `derive: [WrapperAccess]`, per newtype — it can move a secret
-//! between roles deliberately, so audit it as you would `expose_secret()`.
+//! its base. Base-wrapper access is opt-in per newtype and split by direction:
+//! `derive: [FromWrapper]` lets a base value enter the role, `derive:
+//! [IntoWrapper]` lets material leave toward the base; `WrapperAccess` is both.
+//! Never give a boundary type `FromWrapper`. Audit these as you would
+//! `expose_secret()`.
 //!
 //! # Example
 //!

@@ -167,3 +167,14 @@ fn newtype_sibling_not_serializable_compile_fail() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/newtype_sibling_not_serializable.rs");
 }
+
+// Compile-fail test (R2, direction): `FromWrapper` and `IntoWrapper` are independent.
+// A type with only the outbound token has no `from_wrapper`; one with only the
+// inbound token has no `into_wrapper`. Boundary types take `IntoWrapper` at most.
+#[cfg(feature = "alloc")]
+#[cfg(not(miri))]
+#[test]
+fn newtype_directional_access_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/newtype_directional_access.rs");
+}

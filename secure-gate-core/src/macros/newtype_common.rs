@@ -183,17 +183,33 @@ macro_rules! __sg_newtype_opt {
             }
         }
     };
-    // Base-wrapper access is opt-in (R2 of the downstream requirements): with it
-    // absent, the only way material leaves or enters a newtype is through the
-    // 3-tier access API — a `with_secret` round trip — which is explicit and
-    // shows up in the audit sweep. No `From<Wrapper>` is ever generated.
-    (WrapperAccess, $name:ident, $wrapper:ty) => {
+    // Base-wrapper access is opt-in (R2 of the downstream requirements) and
+    // split by direction, because the two directions carry different risk.
+    //
+    //   FromWrapper — INBOUND: `from_wrapper(base) -> Self`. A base-typed value
+    //                 becomes this role. Every plain alias of the same base is
+    //                 already that base type, so this is the relabelling path;
+    //                 a type that guards a boundary should never take it.
+    //   IntoWrapper — OUTBOUND: `as_wrapper`, `as_wrapper_mut`, `into_wrapper`.
+    //                 Material leaves this role toward the base type. Needed to
+    //                 reach base API that is not forwarded.
+    //   WrapperAccess — shorthand for both. Do not combine it with either
+    //                 directional token (duplicate method definitions).
+    //
+    // With none of these, the only way material enters or leaves a newtype is
+    // the 3-tier access API — a `with_secret` round trip. No `From<Wrapper>` is
+    // ever generated.
+    (FromWrapper, $name:ident, $wrapper:ty) => {
         impl $name {
             /// Wraps an existing secure wrapper in this nominal type.
             #[inline(always)]
             pub fn from_wrapper(wrapper: $wrapper) -> Self {
                 Self(wrapper)
             }
+        }
+    };
+    (IntoWrapper, $name:ident, $wrapper:ty) => {
+        impl $name {
             /// Borrows the underlying wrapper (drops nominal separation).
             #[inline(always)]
             pub fn as_wrapper(&self) -> &$wrapper {
@@ -211,11 +227,15 @@ macro_rules! __sg_newtype_opt {
             }
         }
     };
+    (WrapperAccess, $name:ident, $wrapper:ty) => {
+        $crate::__sg_newtype_opt!(FromWrapper, $name, $wrapper);
+        $crate::__sg_newtype_opt!(IntoWrapper, $name, $wrapper);
+    };
     ($other:ident, $name:ident, $wrapper:ty) => {
         ::core::compile_error!(::core::concat!(
             "secure_newtype: unknown `derive:` option `",
             ::core::stringify!($other),
-            "`. Supported: ConstantTimeEq, Deserialize, WrapperAccess. `Clone` and \
+            "`. Supported: ConstantTimeEq, Deserialize, FromWrapper, IntoWrapper, WrapperAccess. `Clone` and \
              `Serialize` are deliberately unsupported — write them by hand."
         ));
     };

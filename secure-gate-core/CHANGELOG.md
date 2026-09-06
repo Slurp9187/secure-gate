@@ -54,9 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `From<Fixed<[u8; N]>>` / `From<Dynamic<T>>` or `Deref`, so an alias-typed value (a
   `dynamic_alias!` that stayed a synonym) cannot flow into a newtype through `.into()`,
   and `&Newtype` never coerces to `&Wrapper`. By default the only path in or out is the
-  3-tier access API — a `with_secret` round trip. The named base-access methods
-  (`from_wrapper`, `as_wrapper`, `as_wrapper_mut`, `into_wrapper`) exist only with
-  `derive: [WrapperAccess]`, per newtype. Shaped `dynamic_newtype!` constructors take
+  3-tier access API — a `with_secret` round trip. Base-wrapper access is opt-in per
+  newtype and split by direction: `derive: [FromWrapper]` adds `from_wrapper` (a base
+  value enters the role), `derive: [IntoWrapper]` adds `as_wrapper`, `as_wrapper_mut`,
+  and `into_wrapper` (material leaves toward the base), and `WrapperAccess` is both. A
+  boundary type should never take `FromWrapper`: every plain alias of the same base is
+  already that base type and could be relabelled through it. Shaped `dynamic_newtype!` constructors take
   `impl Into<String>` / `impl Into<Vec<u8>>`, so `Name::new("literal")` works and a
   hand-written newtype's call sites need not move.
 

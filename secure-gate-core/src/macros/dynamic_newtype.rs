@@ -21,7 +21,7 @@
 /// dynamic_newtype!(pub Name, String, "doc", derive: [ConstantTimeEq]);
 /// ```
 ///
-/// Supported `derive:` options are `ConstantTimeEq`, `Deserialize`, and `WrapperAccess`;
+/// Supported `derive:` options are `ConstantTimeEq`, `Deserialize`, `FromWrapper`, `IntoWrapper`, and `WrapperAccess` (= both directions);
 /// `Clone` and `Serialize` are deliberately absent — see
 /// [`fixed_newtype!`](crate::fixed_newtype) for the reasoning and the
 /// hand-written pattern, which applies identically here.
@@ -99,10 +99,16 @@
 /// `.into()`, and `&Newtype` never coerces to `&Wrapper` at a call site. By
 /// default the only way material enters or leaves is the 3-tier access API —
 /// a `with_secret` round trip — which is explicit and shows up in the audit
-/// sweep. The named base-access methods (`from_wrapper`, `as_wrapper`,
-/// `as_wrapper_mut`, `into_wrapper`) exist only when you opt in with
-/// `derive: [WrapperAccess]`, per newtype; they will move a secret between
-/// roles deliberately, so audit them the way you audit `expose_secret()`.
+/// sweep. Base-wrapper access is opt-in, per newtype, and **split by
+/// direction**: `derive: [FromWrapper]` adds `from_wrapper` (a base value
+/// *enters* this role), `derive: [IntoWrapper]` adds `as_wrapper`,
+/// `as_wrapper_mut`, and `into_wrapper` (material *leaves* this role toward
+/// the base type), and `derive: [WrapperAccess]` is shorthand for both. The
+/// direction matters: a type that guards a boundary — an ID that is safe to
+/// expose, say — should never take `FromWrapper`, because every plain alias
+/// of the same base is already that base type and could be relabelled
+/// through it. These methods move a secret between roles deliberately; audit
+/// them the way you audit `expose_secret()`.
 ///
 /// The heap caveats of [`Dynamic`](crate::Dynamic) carry over unchanged: see
 /// `SECURITY.md` on realloc residue for `Vec`/`String` growth after wrapping.

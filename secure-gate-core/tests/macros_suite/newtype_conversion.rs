@@ -6,6 +6,8 @@ use secure_gate::{Dynamic, RevealSecret, dynamic_alias, dynamic_newtype, fixed_n
 dynamic_alias!(pub FileId, String);
 dynamic_newtype!(pub PublicId, String);
 dynamic_newtype!(pub Opened, String, derive: [WrapperAccess]);
+dynamic_newtype!(pub Outbound, String, derive: [IntoWrapper]);
+dynamic_newtype!(pub Inbound, String, derive: [FromWrapper]);
 fixed_newtype!(pub FileKey32, 32);
 
 #[test]
@@ -34,6 +36,24 @@ fn r2_wrapper_access_is_opt_in_per_newtype() {
     assert_eq!(o.as_wrapper().expose_secret(), "x");
     let _back: Dynamic<String> = o.into_wrapper();
     // `PublicId::from_wrapper` does not exist — pinned by the compile-fail case.
+}
+
+#[test]
+fn r2_directional_opt_in() {
+    // Outbound only: can reach / leave toward the base, cannot be built from it.
+    let o = Outbound::new("out");
+    assert_eq!(o.as_wrapper().expose_secret(), "out");
+    let _base: Dynamic<String> = o.into_wrapper();
+    // `Outbound::from_wrapper` does not exist — pinned by the compile-fail case.
+
+    // Inbound only: can be built from the base, cannot leave toward it.
+    let i = Inbound::from_wrapper(Dynamic::from("in"));
+    assert_eq!(i.expose_secret(), "in");
+    // `i.into_wrapper()` does not exist — pinned by the compile-fail case.
+
+    // WrapperAccess is exactly both.
+    let w = Opened::from_wrapper(Dynamic::from("both"));
+    let _: Dynamic<String> = w.into_wrapper();
 }
 
 fn generic_over_inner<T: RevealSecret<Inner = String>>(t: &T) -> usize {
