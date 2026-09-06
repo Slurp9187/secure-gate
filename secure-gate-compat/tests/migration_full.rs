@@ -145,7 +145,7 @@ fn stage2_v10_compat() {
 
 #[cfg(feature = "secrecy-compat")]
 fn stage3_native() {
-    use secure_gate::{Dynamic, Fixed, RevealSecret, RevealSecretMut};
+    use secure_gate::{Dynamic, Fixed, RevealSecret, RevealSecretMut, SecretLen};
 
     // Fixed for stack-allocated keys (replaces Secret<[T; N]>)
     let mut encryption_key: Fixed<[u8; 32]> = Fixed::new([0xABu8; 32]);
@@ -182,6 +182,7 @@ fn stage3_native() {
 
 #[cfg(feature = "secrecy-compat")]
 fn stage4_cross_version_migration() {
+    use secure_gate::SecretLen;
     use secure_gate_compat::compat::v08::Secret as V08Secret;
     use secure_gate_compat::compat::v10::SecretBox as V10SecretBox;
     use secure_gate_compat::compat::ExposeSecret;
@@ -228,6 +229,7 @@ fn stage4_cross_version_migration() {
 
 #[cfg(feature = "secrecy-compat")]
 fn stage5_realistic_application_struct() {
+    use secure_gate::SecretLen;
     use secure_gate_compat::{Dynamic, Fixed, RevealSecret};
 
     // Fully migrated application config — no compat types remain.

@@ -1,0 +1,7 @@
+error: dynamic_newtype!: `MyStr` is not one of the shaped inner types. `String` and `Vec<u8>` are matched as literal tokens, so a type alias (e.g. `type MyStr = String`) or a fully-qualified path (e.g. `std::string::String`) does NOT match them. Write `String` or `Vec<u8>` literally to get the full API for that shape, or write `generic <type>` to accept the reduced API (RevealSecret, RevealSecretMut, Debug, Zeroize, and `new`) on purpose.
+  --> tests/compile-fail/dynamic_newtype_alias_rejected.rs:11:1
+   |
+11 | dynamic_newtype!(pub Password, MyStr);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `dynamic_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,0 +1,21 @@
+error[E0614]: type `PublicId` cannot be dereferenced
+  --> tests/compile-fail/newtype_no_deref.rs:14:41
+   |
+14 |     let _via_deref: &Dynamic<String> = &*p;
+   |                                         ^^
+
+error[E0308]: mismatched types
+  --> tests/compile-fail/newtype_no_deref.rs:15:16
+   |
+15 |     takes_base(&p);
+   |     ---------- ^^ expected `&Dynamic<String>`, found `&PublicId`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&Dynamic<String>`
+              found reference `&PublicId`
+note: function defined here
+  --> tests/compile-fail/newtype_no_deref.rs:10:4
+   |
+10 | fn takes_base(_: &Dynamic<String>) {}
+   |    ^^^^^^^^^^ -------------------

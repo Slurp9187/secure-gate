@@ -151,12 +151,15 @@
 //!
 //! | Call style | Example | Appears in audit sweep? |
 //! |-----------|---------|------------------------|
-//! | **Wrapper inherent** (ergonomic) | `key.to_hex()` | No — grep for `to_hex` directly |
+//! | **Wrapper trait impl** (ergonomic) | `key.to_hex()` (needs `use secure_gate::ToHex`) | No — grep for `to_hex` directly |
 //! | **Trait via scoped access** (audit-friendly) | `key.with_secret(\|b\| b.to_hex())` | Yes — `with_secret` is grep-able |
 //!
-//! The wrapper methods ([`Fixed::to_hex`], [`Dynamic::to_hex`](Dynamic::to_hex)) internally call
-//! `self.with_secret(|s| s.to_hex())` — they are convenience shorthands, not
-//! separate implementations.
+//! Both levels are impls of the **same** trait ([`ToHex`], [`ToBase64Url`],
+//! [`ToBech32`], [`ToBech32m`]): a blanket impl covers the raw bytes inside
+//! `with_secret`, and per-wrapper impls on `Fixed<[u8; N]>` / `Dynamic<Vec<u8>>`
+//! delegate through `with_secret` internally. One trait also means one bound:
+//! `fn fingerprint<S: ToHex>(s: &S)` accepts wrappers and forwarding newtypes
+//! alike.
 //!
 //! # Feature flags
 //!
@@ -257,6 +260,27 @@ mod error;
 
 /// Core traits for wrapper polymorphism - always available.
 pub mod traits;
+
+/// Implementation detail of the `*_newtype!` macros — not a public API.
+///
+/// Generated code needs to name `Zeroize`, `serde` traits, and `alloc` types
+/// without requiring the caller to depend on those crates directly, and
+/// `::alloc::…` paths do not resolve in an ordinary `std` crate. Re-exporting
+/// them here keeps expansions self-contained via `$crate::__private::…`.
+///
+/// Semver-exempt: items here may change or disappear in any release.
+#[doc(hidden)]
+pub mod __private {
+    #[cfg(feature = "alloc")]
+    pub use alloc::{boxed::Box, string::String, vec::Vec};
+    #[cfg(feature = "rand")]
+    pub use rand::{TryCryptoRng, TryRngCore};
+    #[cfg(feature = "serde-deserialize")]
+    pub use serde::{Deserialize, Deserializer};
+    #[cfg(feature = "serde-serialize")]
+    pub use serde::{Serialize, Serializer};
+    pub use zeroize::{Zeroize, ZeroizeOnDrop};
+}
 
 /// Heap-allocated secret wrapper with explicit access and automatic zeroization on drop.
 ///
@@ -359,11 +383,12 @@ pub use traits::ConstantTimeEq;
 ///   `&T` reference for FFI / third-party APIs.
 /// - **Tier 3** (consumption): [`into_inner()`](RevealSecret::into_inner) — returns
 ///   [`InnerSecret<T>`] with zeroization transferred to caller.
-/// - **Metadata**: [`len()`](RevealSecret::len) / [`is_empty()`](RevealSecret::is_empty) —
-///   no secret exposure.
+/// - **Metadata**: [`len()`](SecretLen::len) / [`is_empty()`](SecretLen::is_empty) —
+///   does not expose contents, but length itself can be sensitive for
+///   variable-length secrets; see [`SecretLen`].
 ///
 /// See [`RevealSecretMut`] for the mutable counterpart.
-pub use traits::RevealSecret;
+pub use traits::{RevealSecret, SecretLen};
 
 /// Explicit mutable access to secret contents.
 ///

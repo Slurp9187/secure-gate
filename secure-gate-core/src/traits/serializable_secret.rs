@@ -82,6 +82,16 @@
 //!
 //! This trait is a **marker only** — it has no methods and adds no runtime behavior.
 //! It exists solely to gate `Serialize` (and optionally `Deserialize`) on wrapper types.
+//!
+//! The pattern is fully supported: [`RevealSecret`](crate::RevealSecret) is
+//! implemented for **every** inner type, so a secret built this way remains
+//! readable after opting into serialization — the opt-in does not cost you
+//! the access API.
+
+/// Marker trait that opts a secret type into serialization.
+///
+/// No methods — its only purpose is to gate the `Serialize` impl on
+/// [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic).
+/// Requires the `serde-serialize` feature.
 #[cfg(feature = "serde-serialize")]
-/// Marker trait: inner types that opt in to serializing secret wrappers (requires `serde-serialize`).
 pub trait SerializableSecret: serde::Serialize {}

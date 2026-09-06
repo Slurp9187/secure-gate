@@ -1,0 +1,13 @@
+error[E0599]: no method named `len` found for struct `Fixed` in the current scope
+  --> tests/compile-fail/custom_inner_no_len.rs:15:17
+   |
+15 |     let _ = key.len();
+   |                 ^^^ method not found in `Fixed<SessionKey>`
+
+warning: unused import: `SecretLen`
+ --> tests/compile-fail/custom_inner_no_len.rs:1:26
+  |
+1 | use secure_gate::{Fixed, SecretLen};
+  |                          ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default

@@ -26,7 +26,7 @@
 //!
 //! ```rust
 //! # #[cfg(all(feature = "encoding-hex", feature = "alloc"))] {
-//! use secure_gate::Fixed;
+//! use secure_gate::{Fixed, ToHex};
 //!
 //! let encoded = Fixed::new([0xABu8; 4]).to_hex_zeroizing();
 //!
@@ -50,7 +50,7 @@
 /// (e.g. full PEM keys, long-lived Bech32 private keys, tokens).
 ///
 /// See the zeroizing encoding methods on [`Fixed`] and [`Dynamic`] (e.g.
-/// [`to_hex_zeroizing`](crate::Fixed::to_hex_zeroizing)).
+/// [`ToHex::to_hex_zeroizing`](crate::ToHex::to_hex_zeroizing)).
 #[must_use = "dropping EncodedSecret may immediately zeroize encoded output"]
 pub struct EncodedSecret(zeroize::Zeroizing<alloc::string::String>);
 

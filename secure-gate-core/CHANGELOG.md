@@ -11,6 +11,130 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > `compile-fail` CI job is pinned to 1.70 rather than 1.85, `docs/security_hash_eq.md`
 > does not exist here so its claim-scoping edit is omitted, and there is no
 > `dynamic_string_no_hex` compile-fail test on this branch to reference.
+>
+> The `Added` and `Changed` entries below, the #157 fix, and the compile-fail skip
+> pattern are backported from `main`'s 0.9.0-rc.8 (#155, #156, #157). Adaptations for
+> this branch: `rand` 0.9 names (`TryRngCore` rather than `TryRng`) in the generated
+> `from_rng`, compile-fail snapshots re-blessed on 1.70, no `dynamic_string_no_hex`
+> fixture here (so the `Dynamic<String>`-has-no-hex claim stays unpinned on this
+> branch), and `secure-gate-compat`'s `migration_full` test gains the `SecretLen`
+> import the split requires. The design records (`docs/nominal_newtypes.md`,
+> `docs/composability_restructure.md`) are carried over verbatim and describe `main`.
+
+### Added
+
+- **`fixed_newtype!` / `dynamic_newtype!` — nominal newtypes over `Fixed` / `Dynamic`
+  (#155).** The `*_alias!` macros emit `type` aliases, so two aliases of the same shape
+  are the *same* type: an encryption key and a MAC key are both `Fixed<[u8; 32]>`, and
+  swapping them at a call site compiles silently. The new macros emit `struct`s instead,
+  so the compiler rejects a swapped key role. This is the one class of secret-handling
+  defect the alias design cannot see.
+
+  ```rust
+  fixed_newtype!(pub EncKey, 32);
+  fixed_newtype!(pub MacKey, 32, "HMAC-SHA256 key. Never used for encryption.");
+
+  fn seal(enc: &EncKey, mac: &MacKey) { /* … */ }
+  // seal(&mac, &enc) does not compile.
+  ```
+
+  Syntax mirrors the alias macros (visibility forms, optional doc string), plus an
+  opt-in `derive:` list — `ConstantTimeEq`, `Deserialize`, and the base-access tokens
+  described below. Generated types are
+  `#[repr(transparent)]` with `#[inline]` delegation — `tests/asm_dse_check.rs` now
+  asserts against a newtype symbol and finds LLVM folds it into the plain-wrapper
+  symbol (`.set`), i.e. byte-identical machine code. They carry every wrapper
+  guarantee: zeroize on drop, `[REDACTED]` `Debug`, access only via `RevealSecret` /
+  `RevealSecretMut`, and no `Deref` (so separation is total, not by-value-only).
+
+  **`Clone` and `Serialize` are deliberately not generated.** Neither can be forwarded:
+  `Fixed<[u8; N]>: Clone` needs `[u8; N]: CloneableSecret`, which the orphan rule makes
+  permanently unimplementable downstream. A generated impl would have to route through
+  `with_secret` and rebuild — opting the secret into cloning with no marker impl
+  anywhere, spelled in one word inside a macro expansion. Since a generated newtype is
+  local to the caller's crate, callers who want it write the impl by hand, where the
+  decision is visible and greppable. Asking for either is a compile error carrying the
+  reasoning; the hand-written pattern is a doctest on `fixed_newtype!`.
+
+  **Inner types are matched as literal tokens.** `dynamic_newtype!(pub P, String)` and
+  `(pub P, Vec<u8>)` get the full API for their shape; anything else requires an
+  explicit `generic` marker (`dynamic_newtype!(pub P, generic MyStr)`) and gets the
+  reduced surface — no `SecretLen`, no encoders. A bare unrecognised type is a compile
+  error naming both options, rather than silently degrading. Macros match tokens, not
+  resolved types, and this is true of procedural macros too (they run before type
+  resolution), so the fix is to remove the silent path rather than to see through the
+  alias.
+
+  **No implicit conversion to or from the base wrapper.** Nothing generates
+  `From<Fixed<[u8; N]>>` / `From<Dynamic<T>>` or `Deref`, so an alias-typed value (a
+  `dynamic_alias!` that stayed a synonym) cannot flow into a newtype through `.into()`,
+  and `&Newtype` never coerces to `&Wrapper`. By default the only path in or out is the
+  3-tier access API — a `with_secret` round trip. Base-wrapper access is opt-in per
+  newtype and split by direction: `derive: [FromWrapper]` adds `from_wrapper` (a base
+  value enters the role), `derive: [IntoWrapper]` adds `as_wrapper`, `as_wrapper_mut`,
+  and `into_wrapper` (material leaves toward the base), and `WrapperAccess` is both. In a
+  mixed tree the base type is the pool every plain alias lives in, so `FromWrapper` on a
+  boundary type accepts all of them (the source never opts in — it is just the base
+  type), and `IntoWrapper` on a secret role downgrades it to the least-sensitive alias
+  sharing its base. Neither token is the sufficient default more often than it looks.
+
+  Shaped `dynamic_newtype!` constructors take `impl Into<String>` / `impl Into<Vec<u8>>`,
+  so `Name::new("literal")` works and a hand-written newtype's call sites need not move.
+
+  Design record: `docs/nominal_newtypes.md`; downstream cross-check against
+  `docs/secure-gate-requested-newtyping-requirements.md` in its §8. Pinned by 17
+  `trybuild` compile-fail cases including cross-role assignment (E0308), `N = 0`, a
+  user-added `Drop` (E0509), the rejected `derive:` options, the absent `.into()` path
+  from a base wrapper, the absent `Deref`, directional base access, and per-newtype
+  `Serialize` not leaking to siblings.
+
+### Changed
+
+- **BREAKING (pre-release): `len`/`byte_len`/`is_empty` moved from `RevealSecret`
+  to a new `SecretLen` trait; `RevealSecret`/`RevealSecretMut` widened to every
+  inner type (#156).** `RevealSecret` was implemented only for `Fixed<[T; N]>`,
+  `Dynamic<String>`, and `Dynamic<Vec<T>>` — because it carried `len()`, which a
+  generic inner type cannot answer. That narrowness broke the crate's own
+  recommended opt-in pattern: the local inner newtype that
+  `CloneableSecret`/`SerializableSecret` docs instruct users to define produced a
+  secret that could be cloned, serialized, and zeroized but **never read** —
+  `Fixed<SessionKey>` had no `with_secret`, no `expose_secret`, nothing.
+
+  `RevealSecret` (access) and `RevealSecretMut` are now implemented for **all**
+  `Fixed<T>` / `Dynamic<T>`; length metadata lives in `SecretLen`, implemented
+  exactly where a length is meaningful (`Fixed<[T; N]>`, `Dynamic<String>`,
+  `Dynamic<Vec<T>>`). The custom-inner-type pattern is now fully usable —
+  pinned by `tests/composability.rs`; `SecretLen` staying narrow is pinned by
+  `tests/compile-fail/custom_inner_no_len.rs`.
+
+  **Migration:** call sites using `len()`/`byte_len()`/`is_empty()` on a wrapper
+  add `use secure_gate::SecretLen;`. No call-site rewrites; on this repo's own
+  suite every migration edit was an import line.
+
+- **BREAKING (pre-release): wrapper encoding methods are now trait impls, not
+  inherent methods (#156).** `to_hex`, `to_hex_upper`, `to_base64url`,
+  `try_to_bech32`, `try_to_bech32m`, and their `_zeroizing` variants on
+  `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` are now impls of the existing `ToHex`,
+  `ToBase64Url`, `ToBech32`, `ToBech32m` traits (delegating through
+  `with_secret`, unchanged behavior and gating). There is no coherence conflict
+  with the `AsRef<[u8]>` blanket impls — the wrappers are local and deliberately
+  never implement `AsRef<[u8]>`.
+
+  This makes the encoding surface generic: `fn fingerprint<S: ToHex>(s: &S)`
+  accepts `Fixed`, `Dynamic`, and any forwarding newtype — impossible with
+  inherent methods, which cannot be named as a bound or forwarded generically.
+  Decode constructors (`try_from_hex`, `try_from_base64url`,
+  `try_from_bech32*`) remain inherent: construction needs `Self`.
+  `Dynamic<String>` still has no hex encoding — the
+  `dynamic_string_no_hex` compile-fail now imports `ToHex` and proves the impl
+  genuinely does not exist, not merely that an import was missing.
+
+  **Migration:** add the format trait import at call sites
+  (`use secure_gate::ToHex;` etc.); call syntax is unchanged.
+
+  Design record for both changes: `docs/composability_restructure.md`.
+  Backported from `main` (#156) as that document planned, so both lines expose
+  the same trait shape.
 
 ### Removed
 
@@ -119,6 +243,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   builds only `asm_check`'s real dependencies rather than the workspace dev-dependencies,
   cutting the test from a full release build to roughly 10 s. Verified on nightly,
   stable, and the pinned 1.70, including back-to-back runs with identical flags.
+- **`dynamic_no_deref` compile-fail snapshot mismatched under `--features=std` (#157).**
+  Root cause was diagnostic, not semantic: with `std` enabled `Dynamic<Vec<u8>>`
+  implements `io::Write`, so rustc appended a ``help: there is a method `by_ref` with a
+  similar name`` note to the E0599 for `secret.as_ref()`, and the snapshot (blessed
+  without `std`) no longer matched. The `AsRef` probe is now written through the trait
+  (`AsRef::<Vec<u8>>::as_ref(&secret)`), which yields E0277 with no similar-name lookup
+  — a sharper assertion of the actual property (no `AsRef` impl) and byte-identical
+  output across `alloc`, `std`, and `full` on the blessing toolchain.
 
 ### Testing
 
@@ -142,9 +274,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on 1.70 and every one of them mismatches on stable. Skip lists in the stable and MSRV
   jobs are updated to include the new test names, and the MSRV job's stale claim that
   compile-fail tests run in the stable job is corrected.
+- **Stable test jobs now skip compile-fail cases by name pattern** (`--skip compile_fail`,
+  plus the one legacy name `serializable_secret_misuse`) instead of an enumerated list.
+  The enumerated list silently fell out of sync: the eleven compile-fail cases added for
+  #155/#156 would have run on stable in every matrix entry and the release-profile job,
+  and eight of them mismatch on current stable (diagnostic drift only). Every core
+  compile-fail test is named `*_compile_fail`, so new cases are excluded automatically;
+  the 1.70 `compile-fail` job remains the enforcing run.
 
 ### Documentation
 
+- **`SecretLen` no longer describes length as safe metadata.** Its `# Security` section
+  now distinguishes contents from sensitivity: for variable-length secrets the length can
+  narrow a brute-force search or fingerprint an issuer, so it is metadata *about* a secret
+  — validate against it, never log or persist it next to an identifier. Also notes that
+  `ConstantTimeEq` on variable-length secrets is not length-hiding (`subtle`'s slice
+  comparison short-circuits on length mismatch), and that the separate trait import is an
+  audit marker rather than a barrier.
 - **Scoped every crate-level "no `Deref`" claim to `Fixed`/`Dynamic` (#147).** The slogan had
   drifted across `lib.rs`, `SECURITY.md` (TL;DR bullet and Core Security Model table),
   `traits/mod.rs`, `traits/reveal_secret.rs`, and both READMEs, where it read as a

@@ -4,16 +4,18 @@ error[E0614]: type `Dynamic<Vec<u8>>` cannot be dereferenced
 14 |     let _via_deref: &Vec<u8> = &*secret;
    |                                 ^^^^^^^
 
-error[E0599]: no method named `as_ref` found for struct `Dynamic` in the current scope
-  --> tests/compile-fail/dynamic_no_deref.rs:17:40
+error[E0277]: the trait bound `Dynamic<Vec<u8>>: AsRef<Vec<u8>>` is not satisfied
+  --> tests/compile-fail/dynamic_no_deref.rs:20:58
    |
-17 |     let _via_as_ref: &Vec<u8> = secret.as_ref();
-   |                                        ^^^^^^ method not found in `Dynamic<Vec<u8>>`
+20 |     let _via_as_ref: &Vec<u8> = AsRef::<Vec<u8>>::as_ref(&secret);
+   |                                 ------------------------ ^^^^^^^ the trait `AsRef<Vec<u8>>` is not implemented for `Dynamic<Vec<u8>>`
+   |                                 |
+   |                                 required by a bound introduced by this call
 
 error[E0308]: mismatched types
-  --> tests/compile-fail/dynamic_no_deref.rs:20:21
+  --> tests/compile-fail/dynamic_no_deref.rs:23:21
    |
-20 |     takes_inner_ref(&secret);
+23 |     takes_inner_ref(&secret);
    |     --------------- ^^^^^^^ expected `&Vec<u8>`, found `&Dynamic<Vec<u8>>`
    |     |
    |     arguments to this function are incorrect

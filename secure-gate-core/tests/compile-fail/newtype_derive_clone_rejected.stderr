@@ -1,0 +1,7 @@
+error: secure_newtype: `derive: [Clone]` is not supported. Cloning a secret cannot be forwarded (the wrapper's `Clone` needs `CloneableSecret` on the inner type, which downstream crates cannot implement), so a generated impl would have to route around the opt-in marker system. Write `impl Clone for YourType` by hand if you mean it — the newtype is local to your crate, so the decision stays visible in your code.
+ --> tests/compile-fail/newtype_derive_clone_rejected.rs:9:1
+  |
+9 | __sg_newtype_base!(pub EncKey(Fixed<[u8; 32]>), derive: [Clone]);
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `$crate::__sg_newtype_opt` which comes from the expansion of the macro `__sg_newtype_base` (in Nightly builds, run with -Z macro-backtrace for more info)
