@@ -469,23 +469,63 @@ Answers to Q1–Q7:
 ### Direction matters
 
 The two directions of base access carry different risk, which is why the
-opt-in is split rather than a single switch.
+opt-in is split rather than a single switch. Both risks come from the same
+fact: in a mixed tree the base type is not raw material, it is a **pool**.
+Every plain alias sharing `Dynamic<String>` *is* `Dynamic<String>`, so a
+directional token connects one role to every alias in the pool at once.
 
-- **Inbound** (`FromWrapper` → `from_wrapper(base) -> Self`) is the
-  *relabelling* path. In a mixed tree every plain alias of the same base is
-  already that base type — `FileId` *is* a `Dynamic<String>` — so
-  `PublicId::from_wrapper(file_id)` needs no opt-in on the source side at all.
-  A type whose whole purpose is to guard a boundary must never take
-  `FromWrapper`; doing so reopens exactly the substitution the newtype exists
-  to refuse, one named call instead of one `.into()`.
+- **Inbound** (`FromWrapper` → `from_wrapper(base) -> Self`) lets anything in
+  the pool become this role. `PublicId::from_wrapper(file_id)` compiles with no
+  opt-in on the source side at all — the source never opts in, because the
+  source is just the base type. A type whose purpose is to guard a boundary
+  must never take `FromWrapper`; doing so reopens exactly the substitution the
+  newtype exists to refuse, one named call instead of one `.into()`.
 - **Outbound** (`IntoWrapper` → `as_wrapper`, `as_wrapper_mut`, `into_wrapper`)
-  lets material leave the role toward the base type — needed to reach base API
-  that is not forwarded, or to hand a value to legacy code that still takes the
-  alias. It cannot relabel anything by itself: the result is the base type, not
-  another role.
-- `WrapperAccess` is both, for types where neither direction is a boundary
-  concern. Do not combine it with a directional token — the methods would be
-  defined twice (E0592).
+  lets this role become anything in the pool. It cannot forge a label — the
+  result is the base type, and reaching another role still needs that role's
+  `FromWrapper` — but it can drop a label into a pool where the label never
+  existed. `mp.into_wrapper()` on a `MasterPassword` yields a `Dynamic<String>`
+  assignable to `Status`, and `Status` is the sort of thing that gets formatted
+  into a log. So `IntoWrapper` is safe only when the role is **no more
+  sensitive than the least-sensitive plain alias sharing its base**; on a secret
+  role it is an explicit, greppable downgrade, not a neutral operation. (For
+  `PublicId` the same move is benign: public → internal is over-restriction,
+  not leakage.) It remains far better than `From`, because it is a call site an
+  audit can find; it is not "safe".
+- `WrapperAccess` is both, for internal roles at the same level as their pool
+  in both directions. Do not combine it with a directional token — the methods
+  would be defined twice (E0592, verified).
+
+**The default is sufficient more often than it looks.** The downstream
+consumer's headline boundary type, `PublicId`, needs zero tokens: a census of
+every operation on one found 17 `PublicId::new`, 3 `.expose_secret()`, and 5
+struct-field shorthands — all available by default — and nothing that hands a
+`PublicId` to base-typed code. The most restrictive setting is also the
+sufficient one, which is the right place for the default to sit.
+
+**This matters most during a partial migration**, which is where any real
+consumer lives for a long time (that consumer newtyped 1 of 34 aliases,
+deliberately). While most aliases stay plain, the base type is a universal
+donor and both rules above are load-bearing. Once every alias is a newtype the
+pool holds only anonymous base values from constructors, and the exposure
+collapses to "base-typed code" — the regime the rules were written for is the
+mixed one, not the endgame.
+
+The two directional tokens cross a different wall from `into_inner`. A newtype
+has two walls, and every method sits in one cell:
+
+| Wall | Going in | Going out |
+|---|---|---|
+| Contents (the wrapper's protection) | `new`, `From<raw>` | `with_secret`, `expose_secret`, `into_inner` |
+| Role (the nominal label) | `from_wrapper` | `as_wrapper`, `as_wrapper_mut`, `into_wrapper` |
+
+`into_inner` leaves the protection: the `InnerSecret` it returns derefs, so the
+contents are in the caller's hands (tier 3, audited). `into_wrapper` only
+removes the label: the result is still a `Dynamic`, still unreadable without
+`with_secret`, and nothing is revealed. The role row exists so that dropping a
+label never forces opening the contents — without it, handing a value to
+base-typed code costs an `into_inner` plus a rebuild: a reveal the job never
+needed, an extra copy to zeroize, and a false positive in the reveal audit.
 
 Pinned by `tests/compile-fail/newtype_directional_access.rs`: a type with only
 `IntoWrapper` has no `from_wrapper`, and one with only `FromWrapper` has no

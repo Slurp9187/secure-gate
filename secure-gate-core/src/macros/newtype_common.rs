@@ -192,7 +192,9 @@ macro_rules! __sg_newtype_opt {
     //                 a type that guards a boundary should never take it.
     //   IntoWrapper — OUTBOUND: `as_wrapper`, `as_wrapper_mut`, `into_wrapper`.
     //                 Material leaves this role toward the base type. Needed to
-    //                 reach base API that is not forwarded.
+    //                 reach base API that is not forwarded. In a mixed tree the
+    //                 base type is every plain alias too, so on a secret role
+    //                 this is a downgrade to the pool's least-sensitive alias.
     //   WrapperAccess — shorthand for both. Do not combine it with either
     //                 directional token (duplicate method definitions).
     //

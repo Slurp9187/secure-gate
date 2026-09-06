@@ -103,12 +103,36 @@
 /// direction**: `derive: [FromWrapper]` adds `from_wrapper` (a base value
 /// *enters* this role), `derive: [IntoWrapper]` adds `as_wrapper`,
 /// `as_wrapper_mut`, and `into_wrapper` (material *leaves* this role toward
-/// the base type), and `derive: [WrapperAccess]` is shorthand for both. The
-/// direction matters: a type that guards a boundary — an ID that is safe to
-/// expose, say — should never take `FromWrapper`, because every plain alias
-/// of the same base is already that base type and could be relabelled
-/// through it. These methods move a secret between roles deliberately; audit
-/// them the way you audit `expose_secret()`.
+/// the base type), and `derive: [WrapperAccess]` is shorthand for both.
+///
+/// These cross a different wall from `into_inner`. A newtype has two:
+///
+/// | Wall | Going in | Going out |
+/// |---|---|---|
+/// | Contents (the wrapper's protection) | `new`, `From<&str>` / `From<&[u8]>` | `with_secret`, `expose_secret`, `into_inner` |
+/// | Role (the nominal label) | `from_wrapper` | `as_wrapper`, `as_wrapper_mut`, `into_wrapper` |
+///
+/// `into_inner` leaves the protection: the [`InnerSecret`](crate::InnerSecret)
+/// it returns derefs, so the contents are in the caller's hands (tier 3 of
+/// the access model, audited). `into_wrapper` only removes the label: the
+/// result is still a `Dynamic`, still unreadable without `with_secret`. The
+/// role row exists so that dropping a label never forces opening the
+/// contents — without it, reaching base-typed code costs an `into_inner` plus
+/// a rebuild, a reveal the job never needed.
+///
+/// **Which direction is safe depends on the pool.** In a mixed tree the base
+/// type is not raw material: every plain alias sharing it *is* that type, so
+/// a directional token connects this role to all of them at once.
+/// `FromWrapper` lets anything in the pool become this role — the source never
+/// opts in, because the source is just the base type — so a type that guards
+/// a boundary must never take it. `IntoWrapper` lets this role become anything
+/// in the pool, which is safe only when the role is no more sensitive than
+/// the least-sensitive alias sharing its base; on a secret role it is an
+/// explicit, greppable downgrade, not a neutral operation. The default,
+/// neither token, is sufficient more often than it looks. The exposure is
+/// largest during a partial migration — the regime real consumers live in —
+/// because while most aliases stay plain the base type is a universal donor.
+/// Audit these methods the way you audit `expose_secret()`.
 ///
 /// The heap caveats of [`Dynamic`](crate::Dynamic) carry over unchanged: see
 /// `SECURITY.md` on realloc residue for `Vec`/`String` growth after wrapping.

@@ -57,17 +57,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   3-tier access API — a `with_secret` round trip. Base-wrapper access is opt-in per
   newtype and split by direction: `derive: [FromWrapper]` adds `from_wrapper` (a base
   value enters the role), `derive: [IntoWrapper]` adds `as_wrapper`, `as_wrapper_mut`,
-  and `into_wrapper` (material leaves toward the base), and `WrapperAccess` is both. A
-  boundary type should never take `FromWrapper`: every plain alias of the same base is
-  already that base type and could be relabelled through it. Shaped `dynamic_newtype!` constructors take
+  and `into_wrapper` (material leaves toward the base), and `WrapperAccess` is both. In a
+  mixed tree the base type is the pool every plain alias lives in, so `FromWrapper` on a
+  boundary type accepts all of them (the source never opts in — it is just the base
+  type), and `IntoWrapper` on a secret role downgrades it to the least-sensitive alias
+  sharing its base. Neither token is the sufficient default more often than it looks.
+  Shaped `dynamic_newtype!` constructors take
   `impl Into<String>` / `impl Into<Vec<u8>>`, so `Name::new("literal")` works and a
   hand-written newtype's call sites need not move.
 
   Design record: `docs/nominal_newtypes.md`; downstream cross-check against
-  `docs/secure-gate-requested-newtyping-requirements.md` in its §8. Pinned by 16
+  `docs/secure-gate-requested-newtyping-requirements.md` in its §8. Pinned by 17
   `trybuild` compile-fail cases including cross-role assignment (E0308), `N = 0`, a
   user-added `Drop` (E0509), the rejected `derive:` options, the absent `.into()` path
-  from a base wrapper, the absent `Deref`, and per-newtype `Serialize` not leaking to
+  from a base wrapper, the absent `Deref`, directional base access, and per-newtype `Serialize` not leaking to
   siblings.
 
 

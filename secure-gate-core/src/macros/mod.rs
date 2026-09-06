@@ -44,8 +44,11 @@
 //! its base. Base-wrapper access is opt-in per newtype and split by direction:
 //! `derive: [FromWrapper]` lets a base value enter the role, `derive:
 //! [IntoWrapper]` lets material leave toward the base; `WrapperAccess` is both.
-//! Never give a boundary type `FromWrapper`. Audit these as you would
-//! `expose_secret()`.
+//! In a mixed tree the base type is the pool every plain alias lives in, so
+//! `FromWrapper` on a boundary type accepts all of them, and `IntoWrapper` on
+//! a secret role downgrades it to the least-sensitive alias sharing its base.
+//! Neither token is the sufficient default more often than it looks. Audit
+//! these as you would `expose_secret()`.
 //!
 //! # Example
 //!

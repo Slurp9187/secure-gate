@@ -170,7 +170,8 @@ fn newtype_sibling_not_serializable_compile_fail() {
 
 // Compile-fail test (R2, direction): `FromWrapper` and `IntoWrapper` are independent.
 // A type with only the outbound token has no `from_wrapper`; one with only the
-// inbound token has no `into_wrapper`. Boundary types take `IntoWrapper` at most.
+// inbound token has no `into_wrapper`. A boundary type needs neither; `IntoWrapper`
+// on a secret role is a downgrade into the pool of plain aliases sharing its base.
 #[cfg(feature = "alloc")]
 #[cfg(not(miri))]
 #[test]
