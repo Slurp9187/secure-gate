@@ -1,0 +1,17 @@
+error[E0308]: arguments to this function are incorrect
+  --> tests/compile-fail/newtype_cross_role.rs:16:5
+   |
+16 |     seal(&mac, &enc); // roles swapped
+   |     ^^^^ ----  ---- expected `&MacKey`, found `&EncKey`
+   |          |
+   |          expected `&EncKey`, found `&MacKey`
+   |
+note: function defined here
+  --> tests/compile-fail/newtype_cross_role.rs:11:4
+   |
+11 | fn seal(_enc: &EncKey, _mac: &MacKey) {}
+   |    ^^^^ -------------  -------------
+help: swap these arguments
+   |
+16 |     seal(&enc, &mac); // roles swapped
+   |         ~~~~~~~~~~~~

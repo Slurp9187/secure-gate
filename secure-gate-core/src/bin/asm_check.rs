@@ -6,7 +6,9 @@
 //!
 //! It is NOT a user-facing tool.
 
-use secure_gate::Fixed;
+use secure_gate::{fixed_newtype, Fixed};
+
+fixed_newtype!(pub NewtypeKey, 32);
 
 /// Creates a `Fixed<[u8; 32]>` initialized with non-zero data, then drops it.
 ///
@@ -23,6 +25,21 @@ pub fn make_and_drop_fixed() {
     drop(secret);
 }
 
+/// Same shape, but through a `fixed_newtype!`-generated wrapper.
+///
+/// The newtype is `#[repr(transparent)]` over `Fixed<[u8; 32]>` and adds no
+/// `Drop` of its own, so the zeroization guarantee must survive the extra
+/// layer unchanged — `tests/asm_dse_check.rs` asserts the same store patterns
+/// against this symbol as against `make_and_drop_fixed`.
+#[inline(never)]
+#[no_mangle]
+pub fn make_and_drop_newtype() {
+    let secret = NewtypeKey::new([0xAAu8; 32]);
+    std::hint::black_box(&secret);
+    drop(secret);
+}
+
 fn main() {
     make_and_drop_fixed();
+    make_and_drop_newtype();
 }

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Testing
+
+- `tests/migration_full.rs` imports `secure_gate::SecretLen` for the `len()` /
+  `is_empty()` calls on wrappers, following the `SecretLen` split in `secure-gate`
+  (#156 backport). No code changes in this crate.
+
 ## [0.8.0-rc.10] - 2026-07-06
 
 ### Fixed

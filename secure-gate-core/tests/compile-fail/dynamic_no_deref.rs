@@ -13,8 +13,11 @@ fn main() {
     // 1. No `Deref`: `*secret` must not reach the inner `Vec`.
     let _via_deref: &Vec<u8> = &*secret;
 
-    // 2. No `AsRef`: `.as_ref()` must not reach the inner `Vec`.
-    let _via_as_ref: &Vec<u8> = secret.as_ref();
+    // 2. No `AsRef`: the trait must not be implemented. Named through the trait
+    //    rather than as `secret.as_ref()` so the diagnostic does not depend on
+    //    which other methods exist — under `std`, `io::Write::by_ref` made rustc
+    //    append a "similar name" hint and the snapshot diverged by feature set.
+    let _via_as_ref: &Vec<u8> = AsRef::<Vec<u8>>::as_ref(&secret);
 
     // 3. No deref coercion at a call site that wants `&Vec<u8>`.
     takes_inner_ref(&secret);

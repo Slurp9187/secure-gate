@@ -29,6 +29,9 @@ fn encoded_secret_debug_is_redacted() {
 // tests/compile-fail/encoded_secret_no_display.rs.
 #[cfg(feature = "encoding-hex")]
 #[test]
+// `format!("{}", &*encoded)` is the documented migration from the removed `Display`;
+// clippy's `to_string()` suggestion is a different path and not what this asserts.
+#[allow(clippy::useless_format)]
 fn encoded_secret_content_requires_explicit_deref() {
     let encoded = sample_hex_secret();
     assert_eq!(format!("{}", &*encoded), "deadbeef");
@@ -78,6 +81,9 @@ fn encoded_secret_into_zeroizing_returns_zeroizing() {
 
 #[cfg(feature = "encoding-hex")]
 #[test]
+// `format!("{}", &*encoded)` is the documented migration from the removed `Display`;
+// clippy's `to_string()` suggestion is a different path and not what this asserts.
+#[allow(clippy::useless_format)]
 fn encoded_secret_empty_string() {
     let empty: [u8; 0] = [];
     let encoded = empty.to_hex_zeroizing();

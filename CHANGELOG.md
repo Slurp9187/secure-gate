@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Backport of `main`'s 0.9.0-rc.8 newtype macros — `fixed_newtype!` /
+  `dynamic_newtype!`** in `secure-gate-core` (#155). `struct` wrappers over
+  `Fixed`/`Dynamic` so same-shaped secret roles are distinct types; no `From<Wrapper>`
+  and no `Deref`; base-wrapper access opt-in per newtype and per direction.
+
+### Changed
+
+- **BREAKING (pre-release), `secure-gate-core` (#156, backport):** `len`/`byte_len`/
+  `is_empty` moved from `RevealSecret` to `SecretLen`; `RevealSecret`/`RevealSecretMut`
+  now cover every inner type; wrapper encoders are `ToHex`/`ToBase64Url`/`ToBech32`/
+  `ToBech32m` trait impls. Migration is import lines only.
+
+### Fixed
+
+- **`secure-gate-core`:** `dynamic_no_deref` compile-fail snapshot is feature-invariant
+  (#157); stable test jobs skip compile-fail cases by the `_compile_fail` name suffix.
+
+`secure-gate-compat`: one test import (`SecretLen`); no code changes.
+
+See the per-crate changelogs for full detail:
+
+- [`secure-gate-core/CHANGELOG.md`](secure-gate-core/CHANGELOG.md)
+- [`secure-gate-compat/CHANGELOG.md`](secure-gate-compat/CHANGELOG.md)
+
 ## [0.8.0-rc.10] - 2026-07-06
 
 ### Security

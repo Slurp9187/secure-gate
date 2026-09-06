@@ -57,6 +57,9 @@ jobs:
           - name: full
             package: secure-gate
             features: "--features=full"
+          - name: all features
+            package: secure-gate
+            features: "--all-features"
           - name: no features
             package: secure-gate-compat
             features: "--no-default-features"
@@ -158,6 +161,13 @@ jobs:
           - name: full
             features: "--features=full"
 
+          # `full` deliberately excludes `std`, so tests gated on `std` together
+          # with another feature (e.g. the reader/writer forwarding on a
+          # `dynamic_newtype!` over `Vec<u8>`, which needs `std` + `encoding-hex`)
+          # compile in no other matrix entry. This one compiles all of them.
+          - name: all features (full + std)
+            features: "--all-features"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -174,9 +184,12 @@ jobs:
         # The trybuild snapshots are blessed against this branch's pinned
         # toolchain (rust-toolchain.toml, 1.70). Stable rustc diagnostics drift
         # over time (dynamic_string_no_hex broke when stable switched E0599's
-        # candidate note to a single-line form), so skip those cases here and
-        # keep them covered by local/toolchain-pinned runs.
-        run: cargo test -p secure-gate --tests ${{ matrix.features }} -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip dynamic_string_no_hex_compile_fail --skip fixed_no_deref_compile_fail --skip dynamic_no_deref_compile_fail --skip encoded_secret_no_display_compile_fail
+        # candidate note to a single-line form), so skip those cases here; the
+        # `compile-fail` job below runs them on 1.70. `--skip` matches
+        # substrings, and every compile-fail test is named `*_compile_fail`, so
+        # new cases are excluded automatically. The one legacy name without the
+        # suffix is listed explicitly.
+        run: cargo test -p secure-gate --tests ${{ matrix.features }} -- --skip compile_fail --skip serializable_secret_misuse
 
   # ---------------------------------------------------------------------------
   # Release-profile test job — build-invariance oracle
@@ -189,8 +202,9 @@ jobs:
   # trybuild compile-fail tests are skipped in both crates: they assert compiler
   # diagnostics (blessed against the pinned toolchain) which drift on stable and
   # are independent of the build profile — the property this job guards is
-  # runtime behavior. Keep these skip lists in sync with the compile-fail test
-  # names in each crate's tests/compile_fail_tests.rs.
+  # runtime behavior. Core cases are skipped by the `compile_fail` name suffix
+  # (plus the one legacy name); keep the compat list in sync with the test
+  # names in secure-gate-compat/tests/compile_fail_tests.rs.
   # ---------------------------------------------------------------------------
   test-release:
     name: Test – release profile
@@ -209,7 +223,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run core tests (release, full features)
-        run: cargo test -p secure-gate --tests --release --features=full -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip dynamic_string_no_hex_compile_fail --skip fixed_no_deref_compile_fail --skip dynamic_no_deref_compile_fail --skip encoded_secret_no_display_compile_fail
+        run: cargo test -p secure-gate --tests --release --features=full -- --skip compile_fail --skip serializable_secret_misuse
 
       - name: Run compat tests (release, all features)
         run: cargo test -p secure-gate-compat --release --all-features -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip compat_no_deref --skip compat_no_asref --skip compat_no_debug_without_marker
@@ -307,7 +321,7 @@ jobs:
         # compatibility. They are covered by the dedicated `compile-fail` job, which
         # runs the whole suite on 1.70. (They do not run in the stable `test` job —
         # that job skips them too, because the snapshots mismatch on stable.)
-        run: cargo +1.70 test -p secure-gate --locked --all-features -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip fixed_no_deref_compile_fail --skip dynamic_no_deref_compile_fail --skip encoded_secret_no_display_compile_fail
+        run: cargo +1.70 test -p secure-gate --locked --all-features -- --skip compile_fail --skip serializable_secret_misuse
 
       - name: cargo test – all features (compat, MSRV compatibility)
         run: cargo +1.70 test -p secure-gate-compat --locked --all-features

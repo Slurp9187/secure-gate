@@ -8,7 +8,7 @@
 //! Note the scope: this closes format strings, not extraction. `Deref<Target = str>`
 //! still provides `str::to_string()`, by design.
 
-use secure_gate::Fixed;
+use secure_gate::{Fixed, ToHex};
 
 fn main() {
     let encoded = Fixed::new([0xABu8; 4]).to_hex_zeroizing();

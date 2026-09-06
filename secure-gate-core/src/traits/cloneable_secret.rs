@@ -34,6 +34,14 @@
 //! local newtype (as in the example below) keeps each cloneable secret type
 //! defined — and auditable — in your own code.
 //!
+//! The pattern is fully supported: [`RevealSecret`](crate::RevealSecret) and
+//! [`RevealSecretMut`](crate::RevealSecretMut) are implemented for **every**
+//! inner type, so a `Fixed<SessionKey>` built this way is readable, mutable,
+//! and (with a [`ConstantTimeEq`](crate::ConstantTimeEq) impl on the inner
+//! type) comparable — not just cloneable. Only
+//! [`SecretLen`](crate::SecretLen) stays narrow, since a custom inner type has
+//! no meaningful length.
+//!
 //! # Example
 //!
 //! ```rust
