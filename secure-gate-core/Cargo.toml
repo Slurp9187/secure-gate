@@ -44,7 +44,6 @@ zeroize = { version = "1.7", default-features = false, features = [
 ] }
 
 [dev-dependencies]
-bincode = "1.0"
 # criterion >=0.5 pulls transitive deps that break 1.70 (e.g. clap >=4.5/rayon-core >=1.13).
 criterion = { version = "=0.4.0", features = ["html_reports"] }
 # proptest >=1.10 requires newer rustc (1.84+); keep 1.70-compatible line.

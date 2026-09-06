@@ -260,6 +260,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   — a sharper assertion of the actual property (no `AsRef` impl) and byte-identical
   output across `alloc`, `std`, and `full` on the blessing toolchain.
 
+### Dependencies
+
+- **`cargo audit` is clean again.** The scheduled audit had been red on this branch since
+  2026-08-10. One vulnerability and three warnings, none in code this crate ships:
+  `crossbeam-epoch` 0.9.18 -> 0.9.21 (RUSTSEC-2026-0204, via `criterion`, dev-only);
+  `rand` 0.9.2 -> 0.9.5 and `rand` 0.8.5 -> 0.8.8 (RUSTSEC-2026-0097, unsound - patched
+  at >= 0.9.3 and >= 0.8.6 respectively; the 0.9 line is a real dependency under the
+  `rand` feature, the 0.8 line arrives through `proptest` and is dev-only). The
+  `bincode` dev-dependency is **removed** (RUSTSEC-2025-0141, unmaintained): its only
+  use was one binary-format round-trip of an inner newtype that the `serde_json`
+  round-trips in the same suite already cover through the same `deserialize_seq` path.
+  Docs no longer name `bincode` as the example format. Upgrading was not an option -
+  the advisory lists no patched version, so `bincode` 2 carries it too.
+
+  Lockfile regenerated with `cargo +1.70 update` per the MSRV rule in the README.
+
+- **Two `atty` warnings remain, known and blocked by MSRV 1.70.** RUSTSEC-2024-0375
+  (unmaintained) and RUSTSEC-2021-0145 (unsound) reach the graph through `criterion`
+  0.4, which is dev-only and never built by consumers of this crate. `criterion` 0.5
+  drops `atty`, but it needs `clap` 4, whose `anstream` stack requires `windows-sys`
+  >= 0.60.2 - and every version in that range requires rustc 1.71 or newer, so it
+  cannot be taken on this branch. Both findings are informational, so `cargo audit`
+  exits 0 and the workflow is green. They are recorded here rather than suppressed
+  with an `audit.toml` ignore; the 0.9 line, on MSRV 1.85, does not have this
+  constraint.
+
 ### Testing
 
 - **Compile-fail enforcement that the secret wrappers have no `Deref`/`AsRef`**
