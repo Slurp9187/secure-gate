@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0-rc.11] - 2026-09-06
+
+### Changed
+
+- Version bump only, tracking the workspace release; depends on `secure-gate`
+  0.8.0-rc.11. No code changes in this crate.
+
 ### Testing
 
 - `tests/migration_full.rs` imports `secure_gate::SecretLen` for the `len()` /
