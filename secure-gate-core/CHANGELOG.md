@@ -18,8 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > `from_rng`, compile-fail snapshots re-blessed on 1.70, no `dynamic_string_no_hex`
 > fixture here (so the `Dynamic<String>`-has-no-hex claim stays unpinned on this
 > branch), and `secure-gate-compat`'s `migration_full` test gains the `SecretLen`
-> import the split requires. The design records (`docs/nominal_newtypes.md`,
-> `docs/composability_restructure.md`) are carried over verbatim and describe `main`.
+> import the split requires (as do the fuzz targets). `asm_dse_check` follows both LLVM
+> alias spellings for the folded newtype symbol — 1.70 emits a separate function, 1.85
+> `.set`, current stable `=`. `macros_suite/newtype.rs` imports `io::Read` for
+> `as_reader().bytes()` (this branch's `--all-features` MSRV step is the only CI entry
+> that compiles it). `custom_inner_no_len` exercises `SecretLen` on a shaped type first
+> so `-D warnings` cannot turn its import into a snapshot mismatch, and current stable
+> clippy's `useless_format` is allowed on the two `EncodedSecret` tests that exercise
+> the documented `format!("{}", &*encoded)` migration form. The design records
+> (`docs/nominal_newtypes.md`, `docs/composability_restructure.md`) are carried over
+> verbatim and describe `main`.
 
 ### Added
 

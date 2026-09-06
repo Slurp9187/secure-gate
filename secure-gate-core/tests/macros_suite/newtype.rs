@@ -59,7 +59,7 @@ fn dynamic_arms_pick_the_right_api() {
 #[test]
 fn vec_arm_gets_bytes_only_api() {
     use secure_gate::ToHex;
-    use std::io::Write;
+    use std::io::{Read, Write};
     let mut tok = SessionToken::new(vec![]);
     tok.write_all(b"\xde\xad").unwrap(); // io::Write forwarded
     assert_eq!(tok.to_hex(), "dead"); // hex on Vec<u8> arm only
