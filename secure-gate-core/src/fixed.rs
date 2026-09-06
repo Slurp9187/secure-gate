@@ -873,7 +873,7 @@ impl<T: zeroize::Zeroize + crate::SerializableSecret> serde::Serialize for Fixed
 /// buffer — which would already hold `N` secret bytes — without zeroizing it.
 ///
 /// The entry point is `deserialize_seq` (unchanged wire format for non-self-describing
-/// formats such as bincode), but the visitor also accepts byte strings via
+/// formats such as postcard), but the visitor also accepts byte strings via
 /// `visit_bytes` / `visit_byte_buf`, so self-describing formats that encode byte
 /// arrays as byte strings (e.g. CBOR) round-trip too. Owned buffers handed over
 /// through `visit_byte_buf` are zeroized after the copy.

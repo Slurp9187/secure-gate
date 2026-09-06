@@ -37,7 +37,6 @@ thiserror = { version = "2.0", default-features = false }
 zeroize = { version = "1.8", default-features = false, features = ["zeroize_derive"] }
 
 [dev-dependencies]
-bincode = { version = "2", features = ["serde"] }
 criterion = { version = "0.7", features = ["html_reports"] }
 proptest = "1.10"
 # `std_rng` adds `rngs::StdRng` for deterministic tests and doctests without

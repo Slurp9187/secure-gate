@@ -247,7 +247,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   find 'make_and_drop_newtype' label". Both forms are recognised now; verified on 1.85
   (`.set`) and 1.98 (`=`), ELF and COFF.
 
+### Dependencies
+
+- **`cargo audit` is clean again.** The scheduled audit had been red since 2026-08-10.
+  One vulnerability and three warnings, none in code this crate ships:
+  `crossbeam-epoch` 0.9.18 → 0.9.21 (RUSTSEC-2026-0204, via `criterion`, dev-only);
+  `anyhow` 1.0.102 → 1.0.104 (RUSTSEC-2026-0190, lockfile-only — not in the resolved
+  graph); `chacha20` 0.10.0 → 0.10.2 (0.10.0 yanked; via `rand` under the `rand`
+  feature). The `bincode` dev-dependency is **removed** (RUSTSEC-2025-0141,
+  unmaintained): its only use was one binary-format round-trip of an inner newtype
+  that the `serde_json` round-trips in the same suite already cover through the same
+  `deserialize_seq` path. Docs no longer name `bincode` as the example format.
+
 ### Testing
+
+- **Core `--all-features` added to the test and lint matrices.** `full` deliberately
+  excludes `std`, so a test gated on `std` together with another feature compiled in
+  no CI entry at all. One such test (`newtype.rs::vec_arm_gets_bytes_only_api`,
+  `std` + `encoding-hex`) had a missing `io::Read` import that only the 0.8 backport's
+  MSRV job — which does run `--all-features` — caught. The new entries compile
+  everything, and immediately found a clippy 1.98 `unbuffered_bytes` lint in the
+  same test (now reads through `read_to_end`).
 
 - **Compile-fail enforcement that the secret wrappers have no `Deref`/`AsRef`**
   (`tests/compile-fail/fixed_no_deref.rs`, `tests/compile-fail/dynamic_no_deref.rs`, #148).

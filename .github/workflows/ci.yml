@@ -55,6 +55,9 @@ jobs:
           - name: full
             package: secure-gate
             features: "--features=full"
+          - name: all features
+            package: secure-gate
+            features: "--all-features"
           - name: no features
             package: secure-gate-compat
             features: "--no-default-features"
@@ -155,6 +158,13 @@ jobs:
           # ── Full ──────────────────────────────────────────────────────────────
           - name: full
             features: "--features=full"
+
+          # `full` deliberately excludes `std`, so tests gated on `std` together
+          # with another feature (e.g. the reader/writer forwarding on a
+          # `dynamic_newtype!` over `Vec<u8>`, which needs `std` + `encoding-hex`)
+          # compile in no other matrix entry. This one compiles all of them.
+          - name: all features (full + std)
+            features: "--all-features"
 
     steps:
       - name: Checkout repository

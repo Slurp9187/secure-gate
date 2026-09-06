@@ -68,7 +68,7 @@
 //!
 //! let key = Fixed::new(BackupKey(vec![0u8; 32]));
 //! // Serialization exposes the secret — encrypt/authenticate output before storage.
-//! // let bytes = bincode::serialize(&key).unwrap();
+//! // let bytes = serde_json::to_vec(&key).unwrap();
 //! let _ = key;
 //! ```
 //!
