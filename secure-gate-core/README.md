@@ -323,6 +323,10 @@ Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing
 ## What changed in 0.9.0
 
 Edition 2024, MSRV 1.85, `rand` 0.10 (`OsRng` → `SysRng`), dep bumps.  
+Across the release candidates: `SecretLen` split out of `RevealSecret` (which now covers
+every inner type); wrapper encoders are `ToHex` / `ToBase64Url` / `ToBech32` / `ToBech32m`
+trait impls; `fixed_newtype!` / `dynamic_newtype!` for nominal secret roles; no `Display`
+on `EncodedSecret`.  
 Full details in [CHANGELOG.md](CHANGELOG.md). Users on Rust < 1.85: pin `secure-gate = "0.8"`.
 
 ## Branch support

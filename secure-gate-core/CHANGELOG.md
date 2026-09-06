@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.8] - 2026-09-06
+
 ### Added
 
 - **`fixed_newtype!` / `dynamic_newtype!` — nominal newtypes over `Fixed` / `Dynamic`
@@ -25,7 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```
 
   Syntax mirrors the alias macros (visibility forms, optional doc string), plus an
-  opt-in `derive: [ConstantTimeEq, Deserialize]` list. Generated types are
+  opt-in `derive:` list — `ConstantTimeEq`, `Deserialize`, and the base-access tokens
+  described below. Generated types are
   `#[repr(transparent)]` with `#[inline]` delegation — `tests/asm_dse_check.rs` now
   asserts against a newtype symbol and finds LLVM folds it into the plain-wrapper
   symbol (`.set`), i.e. byte-identical machine code. They carry every wrapper
@@ -62,17 +65,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   boundary type accepts all of them (the source never opts in — it is just the base
   type), and `IntoWrapper` on a secret role downgrades it to the least-sensitive alias
   sharing its base. Neither token is the sufficient default more often than it looks.
-  Shaped `dynamic_newtype!` constructors take
-  `impl Into<String>` / `impl Into<Vec<u8>>`, so `Name::new("literal")` works and a
-  hand-written newtype's call sites need not move.
+
+  Shaped `dynamic_newtype!` constructors take `impl Into<String>` / `impl Into<Vec<u8>>`,
+  so `Name::new("literal")` works and a hand-written newtype's call sites need not move.
 
   Design record: `docs/nominal_newtypes.md`; downstream cross-check against
   `docs/secure-gate-requested-newtyping-requirements.md` in its §8. Pinned by 17
   `trybuild` compile-fail cases including cross-role assignment (E0308), `N = 0`, a
   user-added `Drop` (E0509), the rejected `derive:` options, the absent `.into()` path
-  from a base wrapper, the absent `Deref`, directional base access, and per-newtype `Serialize` not leaking to
-  siblings.
-
+  from a base wrapper, the absent `Deref`, directional base access, and per-newtype
+  `Serialize` not leaking to siblings.
 
 ### Changed
 
@@ -178,8 +180,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`byte at offset 0 was not zeroed before dealloc`) and pass after, in the
   `--no-default-features --features=std` configuration CI runs.
 
-### Security
-
 - **`InnerSecret<T>` did not implement `Clone`, so `inner.clone()` silently returned a
   bare `T` (#146).** With no inherent `Clone`, method resolution autoderefed through
   `Deref<Target = T>` and selected `T::clone`, producing an unprotected `String` /
@@ -231,6 +231,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   builds only `asm_check`'s real dependencies rather than the workspace dev-dependencies,
   cutting the test from a full release build to roughly 10 s. Verified on nightly,
   stable, and the pinned 1.85, including back-to-back runs with identical flags.
+- **`dynamic_no_deref` compile-fail snapshot mismatched under `--features=std` (#157).**
+  Root cause was diagnostic, not semantic: with `std` enabled `Dynamic<Vec<u8>>`
+  implements `io::Write`, so rustc appended a ``help: there is a method `by_ref` with a
+  similar name`` note to the E0599 for `secret.as_ref()`, and the snapshot (blessed
+  without `std`) no longer matched. The `AsRef` probe is now written through the trait
+  (`AsRef::<Vec<u8>>::as_ref(&secret)`), which yields E0277 with no similar-name lookup
+  — a sharper assertion of the actual property (no `AsRef` impl) and byte-identical
+  output across `alloc`, `std`, and `full` on the blessing toolchain.
 
 ### Testing
 
@@ -249,9 +257,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--test compile_fail_tests` on 1.85, the toolchain the `.stderr` files are blessed
   against, so diagnostics are stable by construction. Skip lists in the stable jobs are
   updated to include the two new test names, per the existing convention.
+- **Stable test jobs now skip compile-fail cases by name pattern** (`--skip compile_fail`,
+  plus the one legacy name `serializable_secret_misuse`) instead of an enumerated list.
+  The enumerated list silently fell out of sync: the eleven compile-fail cases added for
+  #155/#156 would have run on stable in every matrix entry and the release-profile job,
+  and eight of them mismatch on stable 1.94 (diagnostic drift only). Every core
+  compile-fail test is named `*_compile_fail`, so new cases are excluded automatically;
+  the 1.85 `compile-fail` job remains the enforcing run.
 
 ### Documentation
 
+- **`SecretLen` no longer describes length as safe metadata.** Its `# Security` section
+  now distinguishes contents from sensitivity: for variable-length secrets the length can
+  narrow a brute-force search or fingerprint an issuer, so it is metadata *about* a secret
+  — validate against it, never log or persist it next to an identifier. Also notes that
+  `ConstantTimeEq` on variable-length secrets is not length-hiding (`subtle`'s slice
+  comparison short-circuits on length mismatch), and that the separate trait import is an
+  audit marker rather than a barrier.
 - **Scoped every crate-level "no `Deref`" claim to `Fixed`/`Dynamic` (#147).** The slogan had
   drifted across `lib.rs`, `SECURITY.md` (TL;DR bullet and Core Security Model table),
   `traits/mod.rs`, `traits/reveal_secret.rs`, both READMEs, and

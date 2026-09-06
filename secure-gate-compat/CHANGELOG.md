@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.8] - 2026-09-06
+
+### Changed
+
+- Version bump only, tracking the workspace release; depends on `secure-gate`
+  0.9.0-rc.8. No code changes in this crate.
+
 ## [0.9.0-rc.7] - 2026-07-06
 
 ### Fixed
