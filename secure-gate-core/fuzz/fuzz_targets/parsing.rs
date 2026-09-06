@@ -6,7 +6,7 @@
 use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
-use secure_gate::{Dynamic, RevealSecret, RevealSecretMut, Fixed};
+use secure_gate::{Dynamic, Fixed, RevealSecret, RevealSecretMut, SecretLen};
 use secure_gate_fuzz::arbitrary::{FuzzDynamicString, FuzzDynamicVec};
 
 // 256 KB cap — large enough for allocation stress, small enough for CI

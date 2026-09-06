@@ -221,16 +221,28 @@ fn assert_zero_stores_present(asm: &str, asm_path: &std::path::Path, symbol: &st
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Follows a `.set <symbol>, <target>` alias directive, if present.
+/// Follows an assembler alias for `symbol`, if present.
 ///
-/// LLVM's identical-code folding emits these when two functions compile to the
+/// LLVM's identical-code folding emits one when two functions compile to the
 /// same machine code — which is exactly what happens for a
-/// `#[repr(transparent)]` newtype that adds no `Drop` of its own.
+/// `#[repr(transparent)]` newtype that adds no `Drop` of its own. The directive
+/// has two spellings, and the toolchain picks one:
+///
+/// - `.set <symbol>, <target>` — rustc 1.85 and earlier LLVMs, on ELF and COFF
+/// - `<symbol> = <target>`      — rustc 1.98 (LLVM 22), on ELF and COFF alike
+///
+/// Both are followed. Missing either one makes the fold look like a missing
+/// symbol, which is how the 1.98 upgrade first showed up: every DSE job failed
+/// with "could not find 'make_and_drop_newtype' label".
 fn resolve_symbol_alias(asm: &str, symbol: &str) -> String {
-    let needle = format!(".set {symbol},");
+    let set_form = format!(".set {symbol},");
+    let eq_form = format!("{symbol} =");
     for line in asm.lines() {
         let line = line.trim();
-        if let Some(rest) = line.strip_prefix(&needle) {
+        if let Some(rest) = line.strip_prefix(&set_form) {
+            return rest.trim().to_string();
+        }
+        if let Some(rest) = line.strip_prefix(&eq_form) {
             return rest.trim().to_string();
         }
     }

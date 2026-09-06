@@ -239,6 +239,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`AsRef::<Vec<u8>>::as_ref(&secret)`), which yields E0277 with no similar-name lookup
   — a sharper assertion of the actual property (no `AsRef` impl) and byte-identical
   output across `alloc`, `std`, and `full` on the blessing toolchain.
+- **The DSE guard follows both spellings of LLVM's identical-code-folding alias.**
+  `tests/asm_dse_check.rs` resolves the `fixed_newtype!` symbol through the alias LLVM
+  emits when it folds the newtype into the plain wrapper, but only knew the
+  `.set a, b` form. rustc 1.98 (LLVM 22) writes `a = b` instead, so on that toolchain
+  the fold looked like a missing symbol and all four DSE jobs failed with "could not
+  find 'make_and_drop_newtype' label". Both forms are recognised now; verified on 1.85
+  (`.set`) and 1.98 (`=`), ELF and COFF.
 
 ### Testing
 

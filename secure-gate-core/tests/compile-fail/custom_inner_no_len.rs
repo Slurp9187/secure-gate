@@ -1,3 +1,7 @@
+// The import is the point: `len()` must be absent even with `SecretLen` in scope.
+// rustc reports it unused once the call fails to resolve; allow that so the
+// snapshot is identical whether or not CI turns warnings into errors.
+#[allow(unused_imports)]
 use secure_gate::{Fixed, SecretLen};
 use zeroize::Zeroize;
 
