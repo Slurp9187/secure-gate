@@ -412,12 +412,21 @@ All items done; feature-complete. Ships in 0.9.0 (see the status header).
    runs them — no workflow change needed. Verified locally across the 17 core
    combinations the matrix uses; all green.
 
-**Pre-existing failure noted, not fixed:** under
+**Pre-existing failure, found here and fixed in the rc.8 bump (#157):** under
 `--no-default-features --features=std`, `tests/compile-fail/dynamic_no_deref.rs`
-mismatches its expected stderr (one of the two expected errors is absent).
-Confirmed identical on the pre-restructure baseline, so it is unrelated to this
-work — but the CI matrix includes a "std explicit" job, so that job is presumably
-already red. Worth a separate issue.
+mismatched its expected stderr. Confirmed identical on the pre-restructure
+baseline, so it was unrelated to this work. Root cause was diagnostic, not
+semantic: with `std` enabled `Dynamic<Vec<u8>>` implements `io::Write`, and rustc
+appended a ``help: there is a method `by_ref` with a similar name`` note to the
+E0599 for `secret.as_ref()`. (CI's "std explicit" job was not red — it skips the
+compile-fail cases by name; only the local matrix hit it.) The probe now goes
+through the trait, `AsRef::<Vec<u8>>::as_ref(&secret)`, which yields E0277 with
+no similar-name lookup and is byte-identical across `alloc`, `std`, and `full`.
+
+**CI skip lists, found while preparing the PR:** the stable test jobs skipped
+compile-fail cases by an enumerated list of six names, so the eleven cases added
+on this branch would have run on stable — eight mismatch on stable 1.94 through
+diagnostic drift alone. The jobs now skip by the `*_compile_fail` name suffix.
 
 ## 8. Downstream cross-check: `encrypted-file-vault` requirements
 
