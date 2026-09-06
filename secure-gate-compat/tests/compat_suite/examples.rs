@@ -6,7 +6,7 @@
 //!
 //! These examples are referenced from `MIGRATING_FROM_SECRECY.md`.
 
-use secure_gate::{Dynamic, Fixed, RevealSecret};
+use secure_gate::{Dynamic, Fixed, RevealSecret, SecretLen};
 use secure_gate_compat::compat::v08::{
     DebugSecret, Secret as V08Secret, SecretString as V08SecretString,
 };

@@ -50,11 +50,12 @@ use base64ct::{Base64UrlUnpadded, Encoding};
 ///
 /// *Requires feature `encoding-base64`.*
 ///
-/// Blanket-implemented for all `AsRef<[u8]>` types. Uses the RFC 4648 URL-safe
-/// alphabet without `=` padding. To encode a secret wrapper, call the inherent
-/// `to_base64url()` method directly (ergonomically safest for single operations), or
-/// use `with_secret(|b| b.to_base64url())` for multi-step operations or when
-/// audit-greppability matters.
+/// Blanket-implemented for all `AsRef<[u8]>` types, and implemented directly on the
+/// byte-shaped wrappers (`Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`). Uses the RFC 4648
+/// URL-safe alphabet without `=` padding. To encode a secret wrapper, call
+/// `key.to_base64url()` with this trait in scope (ergonomically safest for single
+/// operations), or use `with_secret(|b| b.to_base64url())` for multi-step operations
+/// or when audit-greppability matters.
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub trait ToBase64Url {
     /// Encode bytes as URL-safe base64 (no padding).

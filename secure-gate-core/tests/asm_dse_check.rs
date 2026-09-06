@@ -139,11 +139,34 @@ fn fixed_drop_emits_volatile_zero_stores() {
     let asm = std::fs::read_to_string(&asm_path)
         .unwrap_or_else(|e| panic!("failed to read {}: {e}", asm_path.display()));
 
-    // Extract just the make_and_drop_fixed function body so we don't match
-    // unrelated zeroing code elsewhere in the binary.
-    let body = extract_function_body(&asm, "make_and_drop_fixed").unwrap_or_else(|| {
+    // Both symbols must keep their stores: the plain wrapper, and the
+    // `fixed_newtype!`-generated newtype over it. The newtype is
+    // `#[repr(transparent)]` and adds no `Drop` of its own, so an extra
+    // nominal layer must not cost the zeroization guarantee.
+    for symbol in ["make_and_drop_fixed", "make_and_drop_newtype"] {
+        assert_zero_stores_present(&asm, &asm_path, symbol);
+    }
+}
+
+/// Asserts that `symbol`'s body in `asm` still contains zero-store instructions.
+///
+/// If the symbol was folded into another by identical-code folding — LLVM emits
+/// `.set <symbol>, <target>` — the assertion runs against the target instead.
+/// For the newtype that outcome is the *strongest* possible result: it proves
+/// the generated wrapper compiles to byte-identical code, not merely to
+/// equivalent code.
+fn assert_zero_stores_present(asm: &str, asm_path: &std::path::Path, symbol: &str) {
+    let resolved = resolve_symbol_alias(asm, symbol);
+    if resolved != symbol {
+        println!(
+            "note: `{symbol}` was folded into `{resolved}` (identical codegen) — \
+             asserting against the fold target"
+        );
+    }
+    let symbol: &str = &resolved;
+    let body = extract_function_body(asm, symbol).unwrap_or_else(|| {
         panic!(
-            "could not find 'make_and_drop_fixed' label in {}\n\
+            "could not find '{symbol}' label in {}\n\
              First 40 lines of assembly:\n{}",
             asm_path.display(),
             asm.lines().take(40).collect::<Vec<_>>().join("\n")
@@ -183,7 +206,7 @@ fn fixed_drop_emits_volatile_zero_stores() {
     assert!(
         has_sse_zero || has_scalar_zero || has_rep_stos,
         "ZEROIZATION REGRESSION DETECTED\n\n\
-         No volatile zero-store instructions were found in make_and_drop_fixed.\n\
+         No volatile zero-store instructions were found in {symbol}.\n\
          LLVM may have eliminated the zeroization writes via dead-store elimination.\n\n\
          Assembly file : {}\n\n\
          Extracted function body:\n\
@@ -197,6 +220,34 @@ fn fixed_drop_emits_volatile_zero_stores() {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/// Follows an assembler alias for `symbol`, if present.
+///
+/// LLVM's identical-code folding emits one when two functions compile to the
+/// same machine code — which is exactly what happens for a
+/// `#[repr(transparent)]` newtype that adds no `Drop` of its own. The directive
+/// has two spellings, and the toolchain picks one:
+///
+/// - `.set <symbol>, <target>` — rustc 1.85 and earlier LLVMs, on ELF and COFF
+/// - `<symbol> = <target>`      — rustc 1.98 (LLVM 22), on ELF and COFF alike
+///
+/// Both are followed. Missing either one makes the fold look like a missing
+/// symbol, which is how the 1.98 upgrade first showed up: every DSE job failed
+/// with "could not find 'make_and_drop_newtype' label".
+fn resolve_symbol_alias(asm: &str, symbol: &str) -> String {
+    let set_form = format!(".set {symbol},");
+    let eq_form = format!("{symbol} =");
+    for line in asm.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix(&set_form) {
+            return rest.trim().to_string();
+        }
+        if let Some(rest) = line.strip_prefix(&eq_form) {
+            return rest.trim().to_string();
+        }
+    }
+    symbol.to_string()
+}
 
 /// Extracts the lines of `name:` up to (but not including) `.cfi_endproc`,
 /// `.size`, or the next non-local, non-directive label.

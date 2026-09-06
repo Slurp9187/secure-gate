@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.8] - 2026-09-06
+
+### Changed
+
+- Version bump only, tracking the workspace release; depends on `secure-gate`
+  0.9.0-rc.8. No code changes in this crate.
+
+### Testing
+
+- Three test files (`tests/migration_full.rs`, `tests/compat_suite/edge_cases.rs`,
+  `tests/compat_suite/examples.rs`) import `secure_gate::SecretLen` for their
+  `len()` / `is_empty()` calls on `Fixed`/`Dynamic`, following the `SecretLen` split
+  in `secure-gate` (#156). This is the same one-line migration the core changelog
+  describes for downstream code.
+
 ## [0.9.0-rc.7] - 2026-07-06
 
 ### Fixed

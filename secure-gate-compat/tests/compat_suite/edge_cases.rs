@@ -11,7 +11,7 @@
 //!   - SecretVec of non-u8 element type (e.g. u32)
 //!   - Multiple independent clones remain independent after mutation on native side
 
-use secure_gate::{Dynamic, Fixed, RevealSecret};
+use secure_gate::{Dynamic, Fixed, SecretLen};
 use secure_gate_compat::compat::v08::{DebugSecret, Secret, SecretString, SecretVec};
 use secure_gate_compat::compat::v10::{SecretBox, SecretSlice};
 use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};

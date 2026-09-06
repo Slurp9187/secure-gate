@@ -51,7 +51,7 @@
 //! ```rust
 //! # #[cfg(feature = "alloc")]
 //! # {
-//! use secure_gate::{Dynamic, RevealSecret, RevealSecretMut};
+//! use secure_gate::{Dynamic, RevealSecret, RevealSecretMut, SecretLen};
 //!
 //! let mut pw: Dynamic<String> = Dynamic::new(String::from("hunter2"));
 //!
@@ -148,7 +148,7 @@ use crate::traits::decoding::hex::FromHexStr;
 /// ```rust
 /// # #[cfg(feature = "alloc")]
 /// # {
-/// use secure_gate::{Dynamic, RevealSecret};
+/// use secure_gate::{Dynamic, RevealSecret, SecretLen};
 ///
 /// let pw: Dynamic<String> = Dynamic::new(String::from("hunter2"));
 /// assert_eq!(pw.with_secret(|s: &String| s.len()), 7);
@@ -239,32 +239,6 @@ impl<T: 'static + zeroize::Zeroize> From<T> for Dynamic<T> {
 // Dynamic is always heap-allocated, so no no-alloc split is needed.
 #[cfg(feature = "encoding-hex")]
 impl Dynamic<Vec<u8>> {
-    /// Encodes the secret bytes as a lowercase hex string.
-    #[inline]
-    pub fn to_hex(&self) -> alloc::string::String {
-        self.with_secret(|s: &Vec<u8>| s.to_hex())
-    }
-
-    /// Encodes the secret bytes as an uppercase hex string.
-    #[inline]
-    pub fn to_hex_upper(&self) -> alloc::string::String {
-        self.with_secret(|s: &Vec<u8>| s.to_hex_upper())
-    }
-
-    /// Encodes the secret bytes as a lowercase hex string, returning
-    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
-    #[inline]
-    pub fn to_hex_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s: &Vec<u8>| s.to_hex_zeroizing())
-    }
-
-    /// Encodes the secret bytes as an uppercase hex string, returning
-    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
-    #[inline]
-    pub fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s: &Vec<u8>| s.to_hex_upper_zeroizing())
-    }
-
     /// Decodes a hex string (lowercase, uppercase, or mixed) into `Dynamic<Vec<u8>>`.
     ///
     /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
@@ -279,19 +253,6 @@ impl Dynamic<Vec<u8>> {
 // Base64url encoding and decoding for Dynamic<Vec<u8>>.
 #[cfg(feature = "encoding-base64")]
 impl Dynamic<Vec<u8>> {
-    /// Encodes the secret bytes as an unpadded Base64url string (RFC 4648, URL-safe alphabet).
-    #[inline]
-    pub fn to_base64url(&self) -> alloc::string::String {
-        self.with_secret(|s: &Vec<u8>| s.to_base64url())
-    }
-
-    /// Encodes the secret bytes as an unpadded Base64url string, returning
-    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
-    #[inline]
-    pub fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s: &Vec<u8>| s.to_base64url_zeroizing())
-    }
-
     /// Decodes a Base64url (unpadded) string into `Dynamic<Vec<u8>>`.
     ///
     /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
@@ -306,25 +267,6 @@ impl Dynamic<Vec<u8>> {
 // Bech32 (BIP-173) encoding and decoding for Dynamic<Vec<u8>>.
 #[cfg(feature = "encoding-bech32")]
 impl Dynamic<Vec<u8>> {
-    /// Encodes the secret bytes as a Bech32 (BIP-173) string with the given HRP.
-    #[inline]
-    pub fn try_to_bech32(
-        &self,
-        hrp: &str,
-    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
-        self.with_secret(|s: &Vec<u8>| s.try_to_bech32(hrp))
-    }
-
-    /// Encodes the secret bytes as a Bech32 string, returning
-    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
-    #[inline]
-    pub fn try_to_bech32_zeroizing(
-        &self,
-        hrp: &str,
-    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s: &Vec<u8>| s.try_to_bech32_zeroizing(hrp))
-    }
-
     /// Decodes a Bech32 (BIP-173) string into `Dynamic<Vec<u8>>`, validating the HRP
     /// (case-insensitive).
     ///
@@ -352,25 +294,6 @@ impl Dynamic<Vec<u8>> {
 // Bech32m (BIP-350) encoding and decoding for Dynamic<Vec<u8>>.
 #[cfg(feature = "encoding-bech32m")]
 impl Dynamic<Vec<u8>> {
-    /// Encodes the secret bytes as a Bech32m (BIP-350) string with the given HRP.
-    #[inline]
-    pub fn try_to_bech32m(
-        &self,
-        hrp: &str,
-    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
-        self.with_secret(|s: &Vec<u8>| s.try_to_bech32m(hrp))
-    }
-
-    /// Encodes the secret bytes as a Bech32m string, returning
-    /// [`EncodedSecret`](crate::EncodedSecret) to preserve zeroization.
-    #[inline]
-    pub fn try_to_bech32m_zeroizing(
-        &self,
-        hrp: &str,
-    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s: &Vec<u8>| s.try_to_bech32m_zeroizing(hrp))
-    }
-
     /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>`, validating the HRP
     /// (case-insensitive).
     ///
@@ -467,52 +390,153 @@ impl Dynamic<alloc::string::String> {
     }
 }
 
-// RevealSecret
-impl crate::RevealSecret for Dynamic<String> {
-    type Inner = String;
+/// Hex encoding for `Dynamic<Vec<u8>>`; delegates via `with_secret`.
+///
+/// Deliberately **not** implemented for `Dynamic<String>` — hex-encoding
+/// textual secrets is a design smell; convert explicitly inside `with_secret`
+/// if genuinely needed. Bring the trait into scope: `use secure_gate::ToHex;`.
+///
+/// ```rust
+/// # #[cfg(feature = "encoding-hex")] {
+/// use secure_gate::{Dynamic, ToHex};
+///
+/// let token: Dynamic<Vec<u8>> = Dynamic::from(&[0xDEu8, 0xAD][..]);
+/// assert_eq!(token.to_hex(), "dead");
+/// # }
+/// ```
+#[cfg(feature = "encoding-hex")]
+impl ToHex for Dynamic<Vec<u8>> {
+    #[inline]
+    fn to_hex(&self) -> alloc::string::String {
+        self.with_secret(|s| s.to_hex())
+    }
+
+    #[inline]
+    fn to_hex_upper(&self) -> alloc::string::String {
+        self.with_secret(|s| s.to_hex_upper())
+    }
+
+    #[inline]
+    fn to_hex_zeroizing(&self) -> crate::EncodedSecret {
+        self.with_secret(|s| s.to_hex_zeroizing())
+    }
+
+    #[inline]
+    fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
+        self.with_secret(|s| s.to_hex_upper_zeroizing())
+    }
+}
+
+/// Base64url encoding for `Dynamic<Vec<u8>>`; delegates via `with_secret`.
+///
+/// Bring the trait into scope: `use secure_gate::ToBase64Url;`.
+///
+/// ```rust
+/// # #[cfg(feature = "encoding-base64")] {
+/// use secure_gate::{Dynamic, ToBase64Url};
+///
+/// let token: Dynamic<Vec<u8>> = Dynamic::from(&[0xABu8; 4][..]);
+/// assert_eq!(token.to_base64url(), "q6urqw");
+/// # }
+/// ```
+#[cfg(feature = "encoding-base64")]
+impl ToBase64Url for Dynamic<Vec<u8>> {
+    #[inline]
+    fn to_base64url(&self) -> alloc::string::String {
+        self.with_secret(|s| s.to_base64url())
+    }
+
+    #[inline]
+    fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
+        self.with_secret(|s| s.to_base64url_zeroizing())
+    }
+}
+
+/// Bech32 encoding for `Dynamic<Vec<u8>>`; delegates via `with_secret`.
+///
+/// Bring the trait into scope: `use secure_gate::ToBech32;`.
+#[cfg(feature = "encoding-bech32")]
+impl ToBech32 for Dynamic<Vec<u8>> {
+    #[inline]
+    fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32(hrp))
+    }
+
+    #[inline]
+    fn try_to_bech32_zeroizing(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32_zeroizing(hrp))
+    }
+}
+
+/// Bech32m encoding for `Dynamic<Vec<u8>>`; delegates via `with_secret`.
+///
+/// Bring the trait into scope: `use secure_gate::ToBech32m;`.
+#[cfg(feature = "encoding-bech32m")]
+impl ToBech32m for Dynamic<Vec<u8>> {
+    #[inline]
+    fn try_to_bech32m(
+        &self,
+        hrp: &str,
+    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32m(hrp))
+    }
+
+    #[inline]
+    fn try_to_bech32m_zeroizing(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32m_zeroizing(hrp))
+    }
+}
+
+// RevealSecret — one generic impl covers every inner type, including local
+// user-defined ones. Length reporting lives in the narrower `SecretLen`
+// (implemented for `Dynamic<String>` and `Dynamic<Vec<T>>`), because a generic
+// `T` has no meaningful length.
+impl<T: ?Sized + zeroize::Zeroize> crate::RevealSecret for Dynamic<T> {
+    type Inner = T;
 
     #[inline(always)]
     fn with_secret<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&String) -> R,
+        F: FnOnce(&T) -> R,
     {
         f(&self.inner)
     }
 
     #[inline(always)]
-    fn expose_secret(&self) -> &String {
+    fn expose_secret(&self) -> &T {
         &self.inner
     }
 
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-
-    /// Consumes `self` and returns the inner `String` wrapped in [`crate::InnerSecret`].
+    /// Consumes `self` and returns the inner value wrapped in [`crate::InnerSecret`].
     ///
-    /// **Allocation note:** allocates one small `Box<String>` sentinel (24 bytes on
-    /// 64-bit) before the swap. If that allocation panics (OOM), `self.inner` is
-    /// unchanged and `Dynamic::drop` zeroizes the real secret during unwind —
-    /// confidentiality is preserved. This is the same OOM-safety pattern used by
-    /// `from_protected_bytes` and `deserialize_with_limit`.
+    /// **Allocation note:** allocates one small `Box<T>` sentinel (24 bytes for
+    /// `String`/`Vec` on 64-bit) before the swap. If that allocation panics (OOM),
+    /// `self.inner` is unchanged and `Dynamic::drop` zeroizes the real secret during
+    /// unwind — confidentiality is preserved. This is the same OOM-safety pattern
+    /// used by `from_protected_bytes` and `deserialize_with_limit`.
     ///
     /// After ownership transfer, capacity-changing mutations on the returned
-    /// `InnerSecret<String>` have the same realloc-residue caveats as mutating
-    /// `Dynamic<String>` in place; see `SECURITY.md`.
+    /// `InnerSecret<T>` have the same realloc-residue caveats as mutating
+    /// `Dynamic<T>` in place; see `SECURITY.md`.
     ///
-    /// See [`RevealSecret::into_inner`] for full documentation including the
-    /// redacted `Debug` behavior.
+    /// See [`RevealSecret::into_inner`](crate::RevealSecret::into_inner) for full
+    /// documentation including the redacted `Debug` behavior.
     #[inline(always)]
-    fn into_inner(mut self) -> crate::InnerSecret<String>
+    fn into_inner(mut self) -> crate::InnerSecret<T>
     where
         Self: Sized,
         Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize,
     {
-        // Swap in an empty-String sentinel. If Box::new panics (OOM) before the
-        // swap, self.inner still holds the real secret and Dynamic::drop zeroizes
-        // it on unwind. After the swap, self.inner is an empty sentinel — zeroized
-        // on Dynamic::drop as a no-op. `*boxed` deref-moves the String out of the Box.
+        // Swap in a sentinel. If Box::new panics (OOM) before the swap, self.inner
+        // still holds the real secret and Dynamic::drop zeroizes it on unwind.
+        // After the swap, self.inner is an inert sentinel — zeroized on
+        // Dynamic::drop as a no-op. `*boxed` deref-moves the value out of the Box.
         let boxed = core::mem::replace(
             &mut self.inner,
             Box::new(crate::SentinelValue::sentinel_value()),
@@ -521,91 +545,18 @@ impl crate::RevealSecret for Dynamic<String> {
     }
 }
 
-impl<T: zeroize::Zeroize> crate::RevealSecret for Dynamic<Vec<T>> {
-    type Inner = Vec<T>;
-
-    #[inline(always)]
-    fn with_secret<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&Vec<T>) -> R,
-    {
-        f(&self.inner)
-    }
-
-    #[inline(always)]
-    fn expose_secret(&self) -> &Vec<T> {
-        &self.inner
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-
-    #[inline(always)]
-    fn byte_len(&self) -> usize {
-        self.inner.len() * core::mem::size_of::<T>()
-    }
-
-    /// Consumes `self` and returns the inner `Vec<T>` wrapped in [`crate::InnerSecret`].
-    ///
-    /// **Allocation note:** allocates one small `Box<Vec<T>>` sentinel (24 bytes on
-    /// 64-bit) before the swap. If that allocation panics (OOM), `self.inner` is
-    /// unchanged and `Dynamic::drop` zeroizes the real secret during unwind —
-    /// confidentiality is preserved. This is the same OOM-safety pattern used by
-    /// `from_protected_bytes` and `deserialize_with_limit`.
-    ///
-    /// After ownership transfer, capacity-changing mutations on the returned
-    /// `InnerSecret<Vec<T>>` have the same realloc-residue caveats as mutating
-    /// `Dynamic<Vec<T>>` in place; see `SECURITY.md`.
-    ///
-    /// See [`RevealSecret::into_inner`] for full documentation including the
-    /// redacted `Debug` behavior.
-    #[inline(always)]
-    fn into_inner(mut self) -> crate::InnerSecret<Vec<T>>
-    where
-        Self: Sized,
-        Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize,
-    {
-        // Swap in an empty-Vec sentinel. If Box::new panics (OOM) before the swap,
-        // self.inner still holds the real secret and Dynamic::drop zeroizes it on
-        // unwind. After the swap, self.inner is an empty sentinel — zeroized on
-        // Dynamic::drop as a no-op. `*boxed` deref-moves the Vec out of the Box.
-        let boxed = core::mem::replace(
-            &mut self.inner,
-            Box::new(crate::SentinelValue::sentinel_value()),
-        );
-        crate::InnerSecret::new(*boxed)
-    }
-}
-
-// RevealSecretMut
-impl crate::RevealSecretMut for Dynamic<String> {
+// RevealSecretMut — same generic coverage as RevealSecret.
+impl<T: ?Sized + zeroize::Zeroize> crate::RevealSecretMut for Dynamic<T> {
     #[inline(always)]
     fn with_secret_mut<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut String) -> R,
+        F: FnOnce(&mut T) -> R,
     {
         f(&mut self.inner)
     }
 
     #[inline(always)]
-    fn expose_secret_mut(&mut self) -> &mut String {
-        &mut self.inner
-    }
-}
-
-impl<T: zeroize::Zeroize> crate::RevealSecretMut for Dynamic<Vec<T>> {
-    #[inline(always)]
-    fn with_secret_mut<F, R>(&mut self, f: F) -> R
-    where
-        F: FnOnce(&mut Vec<T>) -> R,
-    {
-        f(&mut self.inner)
-    }
-
-    #[inline(always)]
-    fn expose_secret_mut(&mut self) -> &mut Vec<T> {
+    fn expose_secret_mut(&mut self) -> &mut T {
         &mut self.inner
     }
 }
@@ -627,7 +578,7 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     ///
     /// ```rust
     /// # #[cfg(all(feature = "alloc", feature = "rand"))]
-    /// use secure_gate::{Dynamic, RevealSecret};
+    /// use secure_gate::{Dynamic, RevealSecret, SecretLen};
     ///
     /// # #[cfg(all(feature = "alloc", feature = "rand"))]
     /// # {
@@ -1014,3 +965,22 @@ impl<T: ?Sized + zeroize::Zeroize> Drop for Dynamic<T> {
 
 /// Marker confirming that `Dynamic<T>` always zeroizes on drop.
 impl<T: ?Sized + zeroize::Zeroize> zeroize::ZeroizeOnDrop for Dynamic<T> {}
+
+impl crate::SecretLen for Dynamic<String> {
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+
+impl<T: zeroize::Zeroize> crate::SecretLen for Dynamic<Vec<T>> {
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    #[inline(always)]
+    fn byte_len(&self) -> usize {
+        self.inner.len() * core::mem::size_of::<T>()
+    }
+}
