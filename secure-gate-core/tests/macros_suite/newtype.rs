@@ -63,7 +63,9 @@ fn vec_arm_gets_bytes_only_api() {
     let mut tok = SessionToken::new(vec![]);
     tok.write_all(b"\xde\xad").unwrap(); // io::Write forwarded
     assert_eq!(tok.to_hex(), "dead"); // hex on Vec<u8> arm only
-    assert_eq!(tok.as_reader().bytes().count(), 2);
+    let mut read_back = Vec::new(); // as_reader forwarded (io::Read)
+    tok.as_reader().read_to_end(&mut read_back).unwrap();
+    assert_eq!(read_back, b"\xde\xad");
 }
 
 #[test]
