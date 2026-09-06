@@ -40,21 +40,6 @@ fn dynamic_roundtrip() {
     assert_eq!(original.0, deserialized.0);
 }
 
-#[cfg(all(feature = "serde-deserialize", feature = "serde-serialize"))]
-#[test]
-fn fixed_binary_roundtrip_bincode() {
-    #[derive(serde::Serialize, serde::Deserialize)]
-    struct SerializableArray32([u8; 32]);
-    impl SerializableSecret for SerializableArray32 {}
-
-    let original = SerializableArray32([0xab; 32]);
-    let config = bincode::config::standard();
-    let bytes = bincode::serde::encode_to_vec(&original, config).expect("serialize");
-    let (round, _): (SerializableArray32, _) =
-        bincode::serde::decode_from_slice(&bytes, config).expect("deserialize");
-    assert_eq!(original.0, round.0);
-}
-
 // ---------------------------------------------------------------------------
 // Wrapper types — test Fixed<T> / Dynamic<T> with the serde contract.
 //

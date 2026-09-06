@@ -1,0 +1,5 @@
+error[E0599]: no method named `len` found for struct `Fixed` in the current scope
+  --> tests/compile-fail/custom_inner_no_len.rs:17:17
+   |
+17 |     let _ = key.len();
+   |                 ^^^ method not found in `Fixed<SessionKey>`

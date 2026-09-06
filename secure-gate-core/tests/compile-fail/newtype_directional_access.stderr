@@ -1,0 +1,36 @@
+error[E0599]: no function or associated item named `from_wrapper` found for struct `PublicId` in the current scope
+  --> tests/compile-fail/newtype_directional_access.rs:11:24
+   |
+6  | dynamic_newtype!(pub PublicId, String, derive: [IntoWrapper]);
+   | ------------------------------------------------------------- function or associated item `from_wrapper` not found for this struct
+...
+11 |     let _p = PublicId::from_wrapper(base); // not opted in
+   |                        ^^^^^^^^^^^^ function or associated item not found in `PublicId`
+   |
+note: if you're trying to build a new `PublicId` consider using one of the following associated functions:
+      PublicId::new
+      PublicId::new_with
+  --> tests/compile-fail/newtype_directional_access.rs:6:1
+   |
+6  | dynamic_newtype!(pub PublicId, String, derive: [IntoWrapper]);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: there is a method `as_wrapper` with a similar name, but with different arguments
+  --> tests/compile-fail/newtype_directional_access.rs:6:1
+   |
+6  | dynamic_newtype!(pub PublicId, String, derive: [IntoWrapper]);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: this error originates in the macro `dynamic_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: no method named `into_wrapper` found for struct `FileId` in the current scope
+  --> tests/compile-fail/newtype_directional_access.rs:14:33
+   |
+7  | dynamic_newtype!(pub FileId, String, derive: [FromWrapper]);
+   | ----------------------------------------------------------- method `into_wrapper` not found for this struct
+...
+14 |     let _b: Dynamic<String> = f.into_wrapper(); // not opted in
+   |                                 ^^^^^^^^^^^^
+   |
+help: there is a method `into_inner` with a similar name
+   |
+14 |     let _b: Dynamic<String> = f.into_inner(); // not opted in
+   |                                 ~~~~~~~~~~

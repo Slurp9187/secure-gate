@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.8] - 2026-09-06
+
+### Added
+
+- **Nominal newtypes — `fixed_newtype!` / `dynamic_newtype!`** in `secure-gate-core`
+  (#155). `struct` wrappers over `Fixed`/`Dynamic` so same-shaped secret roles (an
+  encryption key and a MAC key, an API key and a webhook secret) are distinct types
+  and a swapped argument is a compile error. No `From<Wrapper>` and no `Deref`;
+  base-wrapper access is opt-in per newtype and per direction (`FromWrapper` /
+  `IntoWrapper` / `WrapperAccess`). Design record: `secure-gate-core/docs/nominal_newtypes.md`.
+
+### Changed
+
+- **BREAKING (pre-release), `secure-gate-core` (#156):** `len`/`byte_len`/`is_empty`
+  moved from `RevealSecret` to a new `SecretLen` trait, and `RevealSecret` /
+  `RevealSecretMut` now cover every inner type (custom inner newtypes are finally
+  readable). Wrapper encoding methods (`to_hex`, `to_base64url`, `try_to_bech32*`,
+  `_zeroizing` variants) are now impls of the `ToHex` / `ToBase64Url` / `ToBech32` /
+  `ToBech32m` traits. Migration from earlier RCs is import lines only; call syntax is
+  unchanged. Design record: `secure-gate-core/docs/composability_restructure.md`.
+
+### Removed
+
+- **BREAKING, `secure-gate-core` (#149):** `Display` on `EncodedSecret`. Write
+  `&*encoded` where `Display` was relied on.
+
+### Security
+
+- **`secure-gate-core`:** `std::io::Write` on `Dynamic<Vec<u8>>` no longer leaves a
+  copy of the secret in the outgoing buffer when it grows (#152); `InnerSecret<T>`
+  now implements `Clone`, so `inner.clone()` can no longer fall through `Deref` to an
+  unprotected `T` (#146).
+
+### Fixed
+
+- **`cargo audit` is clean again** — it had been red on `main`'s scheduled runs since
+  2026-08-10. `Cargo.lock`: `crossbeam-epoch` 0.9.18 → 0.9.21 (RUSTSEC-2026-0204, the
+  one vulnerability; dev-only via `criterion`), `anyhow` 1.0.102 → 1.0.104
+  (RUSTSEC-2026-0190), `chacha20` 0.10.0 → 0.10.2 (yanked). The `bincode`
+  dev-dependency is removed (RUSTSEC-2025-0141, unmaintained) along with its single
+  test; see the core changelog.
+- **`secure-gate-core`:** the DSE zeroization guard emits assembly to an explicit
+  path and can no longer pass on stale output or silently skip on nightly (#150), and
+  follows both spellings of LLVM's identical-code-folding alias (`.set a, b` on 1.85,
+  `a = b` on rustc 1.98); the `dynamic_no_deref` compile-fail snapshot is now
+  feature-invariant (#157).
+
+### Testing / CI
+
+- Compile-fail enforcement that `Fixed`/`Dynamic` have no `Deref`/`AsRef`, and a
+  `compile-fail` job pinned to Rust 1.85 that actually runs the trybuild suite (#148).
+  Stable test jobs skip compile-fail cases by the `_compile_fail` name suffix, so new
+  cases cannot leak onto a drifting toolchain.
+- Core `--all-features` added to the test and lint matrices: `full` excludes `std`, so
+  tests gated on `std` plus another feature previously compiled in no CI entry.
+
+`secure-gate-compat`: version bump only; three test files gain the `SecretLen` import
+the #156 split requires. No code changes.
+
+See the per-crate changelogs for full detail:
+
+- [`secure-gate-core/CHANGELOG.md`](secure-gate-core/CHANGELOG.md)
+- [`secure-gate-compat/CHANGELOG.md`](secure-gate-compat/CHANGELOG.md)
+
 ## [0.9.0-rc.7] - 2026-07-06
 
 ### Security

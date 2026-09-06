@@ -1,0 +1,7 @@
+error: secure_newtype: `derive: [Serialize]` is not supported. Serializing a secret cannot be forwarded (the wrapper's `Serialize` needs `SerializableSecret` on the inner type, which downstream crates cannot implement), so a generated impl would have to route around the opt-in marker system. Write `impl Serialize for YourType` by hand if you mean it — serialization exposes the full secret, so make it a visible, audited decision in your own code.
+ --> tests/compile-fail/newtype_derive_serialize_rejected.rs:7:1
+  |
+7 | __sg_newtype_base!(pub BackupKey(Fixed<[u8; 32]>), derive: [Serialize]);
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `$crate::__sg_newtype_opt` which comes from the expansion of the macro `__sg_newtype_base` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -49,10 +49,12 @@ use base16ct;
 ///
 /// *Requires feature `encoding-hex`.*
 ///
-/// Blanket-implemented for all `AsRef<[u8]>` types (byte slices, arrays, `Vec<u8>`).
-/// To encode a secret wrapper, call the inherent `to_hex()` method directly (ergonomically
-/// safest for single operations — no reference in the caller's hands), or use
-/// `with_secret(|b| b.to_hex())` for multi-step operations or when audit-greppability matters.
+/// Blanket-implemented for all `AsRef<[u8]>` types (byte slices, arrays, `Vec<u8>`),
+/// and implemented directly on the byte-shaped wrappers (`Fixed<[u8; N]>`,
+/// `Dynamic<Vec<u8>>`). To encode a secret wrapper, call `key.to_hex()` with this
+/// trait in scope (ergonomically safest for single operations — no reference in the
+/// caller's hands), or use `with_secret(|b| b.to_hex())` for multi-step operations
+/// or when audit-greppability matters.
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub trait ToHex {
     /// Encode bytes as lowercase hexadecimal.
