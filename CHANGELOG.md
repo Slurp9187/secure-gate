@@ -42,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `Cargo.lock`: `crossbeam-epoch` 0.9.18 → 0.9.21 (RUSTSEC-2026-0204; a dev-dependency
+  via `criterion`), clearing the `cargo audit` check that had been red on `main`'s
+  scheduled runs since 2026-08-10.
 - **`secure-gate-core`:** the DSE zeroization guard emits assembly to an explicit
   path and can no longer pass on stale output or silently skip on nightly (#150);
   the `dynamic_no_deref` compile-fail snapshot is now feature-invariant (#157).
