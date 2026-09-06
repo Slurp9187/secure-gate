@@ -42,12 +42,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `Cargo.lock`: `crossbeam-epoch` 0.9.18 → 0.9.21 (RUSTSEC-2026-0204; a dev-dependency
-  via `criterion`), clearing the `cargo audit` check that had been red on `main`'s
-  scheduled runs since 2026-08-10.
+- **`cargo audit` is clean again** — it had been red on `main`'s scheduled runs since
+  2026-08-10. `Cargo.lock`: `crossbeam-epoch` 0.9.18 → 0.9.21 (RUSTSEC-2026-0204, the
+  one vulnerability; dev-only via `criterion`), `anyhow` 1.0.102 → 1.0.104
+  (RUSTSEC-2026-0190), `chacha20` 0.10.0 → 0.10.2 (yanked). The `bincode`
+  dev-dependency is removed (RUSTSEC-2025-0141, unmaintained) along with its single
+  test; see the core changelog.
 - **`secure-gate-core`:** the DSE zeroization guard emits assembly to an explicit
-  path and can no longer pass on stale output or silently skip on nightly (#150);
-  the `dynamic_no_deref` compile-fail snapshot is now feature-invariant (#157).
+  path and can no longer pass on stale output or silently skip on nightly (#150), and
+  follows both spellings of LLVM's identical-code-folding alias (`.set a, b` on 1.85,
+  `a = b` on rustc 1.98); the `dynamic_no_deref` compile-fail snapshot is now
+  feature-invariant (#157).
 
 ### Testing / CI
 
@@ -55,8 +60,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `compile-fail` job pinned to Rust 1.85 that actually runs the trybuild suite (#148).
   Stable test jobs skip compile-fail cases by the `_compile_fail` name suffix, so new
   cases cannot leak onto a drifting toolchain.
+- Core `--all-features` added to the test and lint matrices: `full` excludes `std`, so
+  tests gated on `std` plus another feature previously compiled in no CI entry.
 
-`secure-gate-compat`: version bump only, no changes.
+`secure-gate-compat`: version bump only; three test files gain the `SecretLen` import
+the #156 split requires. No code changes.
 
 See the per-crate changelogs for full detail:
 
