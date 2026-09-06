@@ -21,6 +21,9 @@ include = [
 
 [dependencies]
 base16ct = { version = "0.2", optional = true, default-features = false }
+# base64ct >=1.7 declares rust-version 1.81 and >=1.8 requires 1.85; pin for MSRV 1.70.
+# Exact, not a range: Cargo 1.70 predates `incompatible-rust-versions` and would
+# otherwise resolve to a version it cannot build. The only pinned shipped dependency.
 base64ct = { version = "=1.6.0", optional = true, default-features = false }
 bech32 = { version = "0.11", default-features = false, optional = true }
 # `os_rng` provides `rngs::OsRng` without pulling `std`; the `TryRngCore` /
