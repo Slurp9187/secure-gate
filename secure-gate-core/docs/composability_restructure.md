@@ -140,8 +140,11 @@ newtypes**. So:
 - Trap 7 of `docs/nominal_newtypes.md` (custom inner types cannot be newtyped)
   is fixed by Move 1 — previously they had no `RevealSecret` impl at all.
   §3.3 of that document is now implemented. §5.1 is **decided** (option (c),
-  see Move 3 above) and §5.2 is **decided** (stay with `macro_rules!`); the
-  only remaining gate on merging the macros is §6 polish.
+  see Move 3 above), §5.2 is **decided** (stay with `macro_rules!`), §6 polish
+  is complete, and the downstream cross-check (§8 there) is done. The macros
+  ship in 0.9.0 alongside this restructure — deliberately, since this
+  restructure breaks any hand-rolled `RevealSecret` impl (`len` moved to
+  `SecretLen`) and the macros are the landing spot for those consumers.
 
 ### What this did *not* do: shrink the macros
 
