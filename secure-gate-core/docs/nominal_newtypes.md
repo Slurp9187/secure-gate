@@ -1,13 +1,14 @@
 # Nominal Newtypes over `Fixed` and `Dynamic` (`fixed_newtype!` / `dynamic_newtype!`)
 
-> **Status: unmerged spike. Targets 0.10 — deliberately NOT part of 0.9.0.**
-> The code on this branch compiles and its tests pass. **§5.1 is now decided
-> and implemented** (option (c): `Clone`/`Serialize` dropped from `derive:`,
-> callers write them by hand), **§5.2 is decided** (stay with `macro_rules!`;
-> trap 6 fixed by the explicit `generic` marker), and **§6 polish is
-> complete**. No design or engineering gates remain — only the release
-> decision: these macros are purely additive and were deliberately scheduled
-> for 0.10 rather than 0.9.0.
+> **Status: ships in 0.9.0 — in the next release candidate, alongside the
+> composability restructure (`docs/composability_restructure.md`, #156).**
+> §5.1 is decided and implemented (option (c): `Clone`/`Serialize` dropped
+> from `derive:`, callers write them by hand), §5.2 is decided (stay with
+> `macro_rules!`; trap 6 fixed by the explicit `generic` marker), §6 polish is
+> complete, and the downstream cross-check (§8) is done. Shipping in the same
+> release as #156 matters: #156 breaks any hand-rolled `RevealSecret` impl
+> (`len` moved to `SecretLen`), and these macros are the landing spot for
+> exactly those consumers.
 >
 > Tracking issue: #155. Branch: `claude/fixed-dynamic-newtype-hl7e19`.
 > Not a candidate for `release/0.8` — that branch is security patches only.
@@ -374,8 +375,7 @@ also what makes trap 6 hurt.
 
 ## 6. Polish — COMPLETE
 
-All items done; the spike is feature-complete and ready to merge whenever the
-release decision (see the status header) says so.
+All items done; feature-complete. Ships in 0.9.0 (see the status header).
 
 1. ✅ §5.1 decided (option (c)); §5.2 decided (stay with `macro_rules!`);
    §5.3 narrowed and completed.

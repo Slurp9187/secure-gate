@@ -1,8 +1,6 @@
 //! `fixed_newtype!` — nominal newtype over `Fixed<[u8; N]>`.
 //!
-//! **UNMERGED SPIKE — targets 0.10, not 0.9.0.** See
-//! `docs/nominal_newtypes.md` for the design record and remaining work
-//! (§5.2 macro_rules-vs-proc-macro, §6 polish) before merging.
+//! Ships in 0.9.0. Design record: `docs/nominal_newtypes.md`.
 
 /// Creates a distinct nominal type wrapping [`Fixed<[u8; N]>`](crate::Fixed).
 ///

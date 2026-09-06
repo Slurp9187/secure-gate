@@ -1,8 +1,6 @@
 //! `dynamic_newtype!` — nominal newtype over `Dynamic<T>`.
 //!
-//! **UNMERGED SPIKE — targets 0.10, not 0.9.0.** See
-//! `docs/nominal_newtypes.md` for the design record and remaining work (§6
-//! polish) before merging.
+//! Ships in 0.9.0. Design record: `docs/nominal_newtypes.md`.
 
 /// Creates a distinct nominal type wrapping [`Dynamic<T>`](crate::Dynamic).
 ///

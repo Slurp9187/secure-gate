@@ -1,7 +1,6 @@
 //! Shared machinery for `fixed_newtype!` / `dynamic_newtype!`.
 //!
-//! **UNMERGED SPIKE — targets 0.10, not 0.9.0.** One design decision is
-//! unresolved; see `docs/nominal_newtypes.md` §5.1 before merging.
+//! Ships in 0.9.0. Design record: `docs/nominal_newtypes.md`.
 
 // ---- cfg relays -------------------------------------------------------------
 // `#[cfg(feature = "...")]` inside an exported macro is evaluated in the CALLER's
