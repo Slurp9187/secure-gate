@@ -257,7 +257,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   feature). The `bincode` dev-dependency is **removed** (RUSTSEC-2025-0141,
   unmaintained): its only use was one binary-format round-trip of an inner newtype
   that the `serde_json` round-trips in the same suite already cover through the same
-  `deserialize_seq` path. Docs no longer name `bincode` as the example format.
+  `deserialize_seq` path. Removal is the only fix, not merely the tidier one — the
+  advisory has `patched = []` and covers the whole package, so re-adding `bincode`
+  at 2.x would trip it again. Docs no longer name `bincode` as the example format.
 
 ### Testing
 

@@ -46,8 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2026-08-10. `Cargo.lock`: `crossbeam-epoch` 0.9.18 → 0.9.21 (RUSTSEC-2026-0204, the
   one vulnerability; dev-only via `criterion`), `anyhow` 1.0.102 → 1.0.104
   (RUSTSEC-2026-0190), `chacha20` 0.10.0 → 0.10.2 (yanked). The `bincode`
-  dev-dependency is removed (RUSTSEC-2025-0141, unmaintained) along with its single
-  test; see the core changelog.
+  dev-dependency is removed (RUSTSEC-2025-0141, unmaintained — the advisory has no
+  patched version and covers 2.x too, so removal is the only fix) along with its
+  single test; see the core changelog.
 - **`secure-gate-core`:** the DSE zeroization guard emits assembly to an explicit
   path and can no longer pass on stale output or silently skip on nightly (#150), and
   follows both spellings of LLVM's identical-code-folding alias (`.set a, b` on 1.85,
