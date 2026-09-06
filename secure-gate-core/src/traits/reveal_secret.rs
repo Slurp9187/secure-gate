@@ -13,7 +13,8 @@
 //! - Scoped access is preferred (minimizes lifetime of exposed references)
 //! - Direct exposure is possible but clearly marked as an escape hatch
 //! - Owned consumption is available for FFI hand-off and type migration
-//! - Metadata (`len`, `is_empty` via [`SecretLen`]) is available without full exposure
+//! - Length metadata (`len`, `is_empty` via [`SecretLen`]) is available without
+//!   exposing contents — though length itself can be sensitive; see [`SecretLen`]
 //!
 //! # Three-Tier Access Model
 //!
@@ -263,7 +264,34 @@ pub trait RevealSecret {
 /// meaningful `len()`. Implemented for `Fixed<[T; N]>`, `Dynamic<String>`, and
 /// `Dynamic<Vec<T>>`.
 ///
-/// All methods are always safe to call — they do not expose secret contents.
+/// # Security
+///
+/// These methods do not expose secret **contents** — but that is not the same
+/// as length being harmless, and the distinction matters:
+///
+/// - For `Fixed<[u8; N]>`, `len()` is `N`: a compile-time constant already
+///   visible in the type. Nothing is revealed.
+/// - For variable-length secrets (`Dynamic<String>`, `Dynamic<Vec<u8>>`),
+///   length **can be sensitive**. A password's length narrows a brute-force
+///   search; a token's length can fingerprint its issuer. Treat it as metadata
+///   *about* a secret, not as public data: validate against it (minimum-length
+///   checks, buffer sizing) but never log it, put it in an error message that
+///   leaves the process, or persist it next to an identifier.
+///
+/// This trait is deliberately separate from [`RevealSecret`] so that measuring
+/// a secret is a visible choice. `use secure_gate::SecretLen;` is an audit
+/// marker — `grep SecretLen` finds every module that measures secrets — and
+/// generic code bounded only on `RevealSecret` cannot call `len()`. The other
+/// route, `with_secret(|s| s.len())`, needs no trait but surfaces in the
+/// `with_secret` audit sweep instead. Neither is prevented; both are greppable.
+/// This is accident-prevention, not a barrier.
+///
+/// Constant-time comparison is **not** length-hiding: `ConstantTimeEq` on
+/// variable-length secrets delegates to `subtle`, whose slice comparison
+/// short-circuits when lengths differ, so length *inequality* is observable
+/// through timing whether or not `len()` is ever called. Lengths are usually
+/// public in the protocols where that matters; for password verification, be
+/// aware of it.
 ///
 /// # Examples
 ///

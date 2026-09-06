@@ -36,7 +36,7 @@ let pw: Password = "hunter2".into();
 let mut key: Aes256Key = Aes256Key::new([42u8; 32]);
 
 // Scoped access — the borrow cannot outlive the closure
-pw.with_secret(|s| println!("length: {}", s.len()));
+let long_enough = pw.with_secret(|s| s.len() >= 8); // validate in-closure; never log a secret's length
 
 // Mutable scoped access
 key.with_secret_mut(|bytes| bytes[0] = 0);

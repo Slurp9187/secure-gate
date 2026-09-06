@@ -384,7 +384,8 @@ pub use traits::ConstantTimeEq;
 /// - **Tier 3** (consumption): [`into_inner()`](RevealSecret::into_inner) — returns
 ///   [`InnerSecret<T>`] with zeroization transferred to caller.
 /// - **Metadata**: [`len()`](SecretLen::len) / [`is_empty()`](SecretLen::is_empty) —
-///   no secret exposure.
+///   does not expose contents, but length itself can be sensitive for
+///   variable-length secrets; see [`SecretLen`].
 ///
 /// See [`RevealSecretMut`] for the mutable counterpart.
 pub use traits::{RevealSecret, SecretLen};

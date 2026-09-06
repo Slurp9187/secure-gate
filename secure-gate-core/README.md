@@ -24,7 +24,7 @@ let mut pw: Password = "hunter2".into();
 let mut key: Aes256Key = Aes256Key::new([42u8; 32]);
 
 // Scoped access — preferred; the borrow cannot outlive the closure
-pw.with_secret(|s| println!("length: {}", s.len()));
+let long_enough = pw.with_secret(|s| s.len() >= 8); // validate in-closure; never log a secret's length
 
 // Mutable scoped access. For Dynamic<String> / Dynamic<Vec<u8>>, prefer
 // capacity-stable mutations or pre-allocate before wrapping; see SECURITY.md.
@@ -61,7 +61,7 @@ pw.expose_secret_mut().clear();
 `Fixed<T>` (stack-allocated) and `Dynamic<T>` (heap, requires `alloc`) share the same access interface:
 
 - `Debug` output → `[REDACTED]`
-- `.len()` / `.is_empty()` without exposure
+- `.len()` / `.is_empty()` via `SecretLen` — without exposing contents (length itself can still be sensitive)
 - Zeroize on drop (always)
 - Access via `.with_secret(|s| ...)` (preferred) or `.expose_secret()` (auditable escape hatch)
 - Owned extraction via `.into_inner()` → `InnerSecret<T>` (wraps `Zeroizing<T>`, transfers zeroization to caller)
@@ -142,10 +142,12 @@ See also the Best Practices section in [SECURITY.md](https://github.com/Slurp918
 ### Polymorphic / generic code
 
 ```rust
-use secure_gate::RevealSecret;
+use secure_gate::SecretLen;
 
-fn log_length<S: RevealSecret>(secret: &S) {
-    println!("length = {}", secret.len());
+// Length is metadata, not contents — but for variable-length secrets it can
+// still be sensitive. Validate against it; don't log it.
+fn require_min_len<S: SecretLen>(secret: &S, min: usize) -> bool {
+    secret.len() >= min
 }
 ```
 
