@@ -7,49 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- **Base32 encoding — `ToBase32` / `FromBase32Str` behind `encoding-base32` (#158).**
-  The fifth format beside hex, base64url, bech32 and bech32m: `to_base32()` /
-  `to_base32_zeroizing()` and `try_from_base32()`, blanket-implemented for
-  `AsRef<[u8]>` and `AsRef<str>`, with `ToBase32` impls on `Fixed<[u8; N]>` and
-  `Dynamic<Vec<u8>>`, inherent `Fixed::try_from_base32` / `Dynamic::try_from_base32`
-  constructors, and a new `Base32Error` (`InvalidBase32`, `InvalidLength { expected,
-  got }`, also reachable as `DecodingError::InvalidBase32`). `fixed_newtype!` and
-  `dynamic_newtype!` forward both directions for their byte-shaped arms. The backend
-  is the constant-time `base32ct` crate — the RustCrypto sibling of the `base16ct`
-  and `base64ct` backends already in the tree.
-
-  **One canonical form: RFC 4648 §6, uppercase, unpadded.** That is the shape
-  `otpauth://` key URIs carry TOTP/HOTP shared secrets in (RFC 6238 / RFC 4226), and
-  the densest encoding that fits QR alphanumeric mode — a 20-byte seed is 32
-  characters where hex needs 40. Decoding is strict: lowercase, mixed case, `=`
-  padding, whitespace, and lengths that no unpadded Base32 string can have are
-  rejected rather than normalized. There is deliberately no `to_base32_lower()` twin
-  of `to_hex_upper()` — `base32ct` has no mixed-case decoder, so a lowercase encoder
-  would emit strings this crate could not read back; if lowercase is ever wanted it
-  arrives in both directions at once. The one leniency `base32ct` keeps is
-  non-canonical trailing bits (`"MZ"` decodes to the same byte as `"MY"`), so
-  decoding is not injective and `encode(decode(s)) == s` holds only for
-  encoder-produced `s`. That is documented on `FromBase32Str` and pinned by
-  `base32_accepts_non_canonical_trailing_bits`, so a future backend change is noticed.
-
-  Included in the `encoding` and `full` meta-features. The traits require `alloc`
-  (they return `String` / `Vec<u8>`), but `Fixed::try_from_base32` decodes into a
-  `Zeroizing<[u8; N]>` stack buffer and works without it, like every other
-  `Fixed::try_from_*`.
-
-### Documentation
-
-- **The crate page now lists the newtype macros.** The `lib.rs` overview ("What's
-  available without `alloc`" and the module tree) named only the alias macros;
-  `fixed_newtype!` and `dynamic_newtype!` are listed with a one-line contrast.
-- **`SecretLen` has its own crate-level re-export doc.** `pub use traits::{RevealSecret,
-  SecretLen};` carried one doc comment for both. Split in two — the tier list stays on
-  `RevealSecret`, `SecretLen` gets a short doc of its own — and kept that way because
-  rustdoc 1.70, the 0.8 line's MSRV toolchain, ICEs on intra-doc links in a grouped
-  `use` re-export; the two lines share this file.
-
 ## [0.9.0-rc.8] - 2026-09-06
 
 ### Added
@@ -118,6 +75,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   user-added `Drop` (E0509), the rejected `derive:` options, the absent `.into()` path
   from a base wrapper, the absent `Deref`, directional base access, and per-newtype
   `Serialize` not leaking to siblings.
+
+- **Base32 encoding — `ToBase32` / `FromBase32Str` behind `encoding-base32` (#158).**
+  The fifth format beside hex, base64url, bech32 and bech32m: `to_base32()` /
+  `to_base32_zeroizing()` and `try_from_base32()`, blanket-implemented for
+  `AsRef<[u8]>` and `AsRef<str>`, with `ToBase32` impls on `Fixed<[u8; N]>` and
+  `Dynamic<Vec<u8>>`, inherent `Fixed::try_from_base32` / `Dynamic::try_from_base32`
+  constructors, and a new `Base32Error` (`InvalidBase32`, `InvalidLength { expected,
+  got }`, also reachable as `DecodingError::InvalidBase32`). `fixed_newtype!` and
+  `dynamic_newtype!` forward both directions for their byte-shaped arms. The backend
+  is the constant-time `base32ct` crate — the RustCrypto sibling of the `base16ct`
+  and `base64ct` backends already in the tree.
+
+  **One canonical form: RFC 4648 §6, uppercase, unpadded.** That is the shape
+  `otpauth://` key URIs carry TOTP/HOTP shared secrets in (RFC 6238 / RFC 4226), and
+  the densest encoding that fits QR alphanumeric mode — a 20-byte seed is 32
+  characters where hex needs 40. Decoding is strict: lowercase, mixed case, `=`
+  padding, whitespace, and lengths that no unpadded Base32 string can have are
+  rejected rather than normalized. There is deliberately no `to_base32_lower()` twin
+  of `to_hex_upper()` — `base32ct` has no mixed-case decoder, so a lowercase encoder
+  would emit strings this crate could not read back; if lowercase is ever wanted it
+  arrives in both directions at once. The one leniency `base32ct` keeps is
+  non-canonical trailing bits (`"MZ"` decodes to the same byte as `"MY"`), so
+  decoding is not injective and `encode(decode(s)) == s` holds only for
+  encoder-produced `s`. That is documented on `FromBase32Str` and pinned by
+  `base32_accepts_non_canonical_trailing_bits`, so a future backend change is noticed.
+
+  Included in the `encoding` and `full` meta-features. The traits require `alloc`
+  (they return `String` / `Vec<u8>`), but `Fixed::try_from_base32` decodes into a
+  `Zeroizing<[u8; N]>` stack buffer and works without it, like every other
+  `Fixed::try_from_*`.
 
 ### Changed
 
@@ -371,6 +358,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   derive `Debug` on `Zeroizing<T>`, so `{:?}` on the returned value can print the
   secret. Also noted that this crate does not re-export `zeroize`, so naming the return
   type requires taking a compatible `zeroize` dependency directly.
+
+- **RustCrypto integration example on `Fixed` (#144).** The `Fixed` rustdoc and the
+  crate README now show how to run a block cipher *inside* the wrapper —
+  `block.with_secret_mut(|b| cipher.decrypt_block(GenericArray::from_mut_slice(b)))` —
+  alongside the copy-out shape (`aes::Block::from(*b)`) that type inference nudges you
+  toward and that leaves plaintext-equivalent bytes in an unzeroized stack value. The
+  mechanism always worked; nothing pointed integrators at it. Both examples are compiled
+  doctests rather than `ignore` fences (`aes` joins `[dev-dependencies]`, pinned to the
+  0.8 line for the `cipher` 0.4 / `GenericArray` API they use); no library API changed.
+  They sit on the `Fixed` struct rather than the `fixed` module header, because `mod
+  fixed` is private — its `//!` docs are doctested but never rendered on docs.rs. The
+  `with_block_mut` sugar also floated in #144 was deliberately not added: an optional
+  `generic-array` dependency and a const-generic-to-typenum mapping to buy what the
+  documented pattern already gives.
+- **`RevealSecretMut` no longer advertises `len()`/`is_empty()` as coming from
+  `RevealSecret`.** They moved to `SecretLen` in the split above; the trait's own rustdoc
+  had been left behind.
+- **`docs/composability_restructure.md` records the shipped state** — 0.9.0-rc.8 on
+  `main` (PR #159, `f2a8f1c`) and 0.8.0-rc.11 on `release/0.8` (PR #160, `a029bb7`) —
+  instead of describing in-progress branch work with the backport still pending.
+
+- **The crate page now lists the newtype macros.** The `lib.rs` overview ("What's
+  available without `alloc`" and the module tree) named only the alias macros;
+  `fixed_newtype!` and `dynamic_newtype!` are listed with a one-line contrast.
+- **`SecretLen` has its own crate-level re-export doc.** `pub use traits::{RevealSecret,
+  SecretLen};` carried one doc comment for both. Split in two — the tier list stays on
+  `RevealSecret`, `SecretLen` gets a short doc of its own — and kept that way because
+  rustdoc 1.70, the 0.8 line's MSRV toolchain, ICEs on intra-doc links in a grouped
+  `use` re-export; the two lines share this file.
 
 ## [0.9.0-rc.7] - 2026-07-06
 

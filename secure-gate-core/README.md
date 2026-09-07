@@ -81,6 +81,28 @@ let sum: u32 = key.with_secret(|bytes| bytes.iter().map(|&b| b as u32).sum());
 key.with_secret_mut(|bytes: &mut [u8; 32]| bytes[0] = 0);
 ```
 
+### RustCrypto in-place cipher ops
+
+`BlockEncrypt`/`BlockDecrypt` take `&mut GenericArray<u8, U16>`, and
+`GenericArray::from_mut_slice` *borrows* rather than copies — so the cipher can run
+inside the wrapper and the plaintext never leaves it:
+
+```rust
+use aes::cipher::{generic_array::GenericArray, BlockDecrypt, KeyInit};
+use aes::Aes128;
+use secure_gate::{Fixed, RevealSecretMut};
+
+let cipher = Aes128::new(GenericArray::from_slice(&[0x42u8; 16]));
+let mut block: Fixed<[u8; 16]> = Fixed::new([0u8; 16]);
+
+block.with_secret_mut(|b| cipher.decrypt_block(GenericArray::from_mut_slice(b)));
+```
+
+Copying out instead — `block.with_secret(|b| aes::Block::from(*b))` — is the footgun:
+the resulting `Block` is an ordinary stack value that nothing wipes on drop. See the
+[`Fixed` rustdoc](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html)
+for both shapes side by side.
+
 ### Direct reference — auditable escape hatch
 
 ```rust

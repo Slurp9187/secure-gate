@@ -40,6 +40,10 @@ thiserror = { version = "2.0", default-features = false }
 zeroize = { version = "1.8", default-features = false, features = ["zeroize_derive"] }
 
 [dev-dependencies]
+# `aes` backs the RustCrypto in-place cipher doctest in `src/fixed.rs` (#144).
+# Pinned to the 0.8 line because that is the `cipher` 0.4 / `GenericArray` API the
+# example demonstrates; `aes` 0.9 moves to `hybrid-array` and a different shape.
+aes = "0.8"
 criterion = { version = "0.7", features = ["html_reports"] }
 proptest = "1.10"
 # `std_rng` adds `rngs::StdRng` for deterministic tests and doctests without
