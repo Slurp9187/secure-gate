@@ -176,6 +176,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   work unchanged; `AsRef<str>` and `AsRef<[u8]>` are untouched. Enforced by
   `tests/compile-fail/encoded_secret_no_display.rs`.
 
+- **BREAKING: `SecureEncoding` / `SecureDecoding` marker traits.** Both were empty
+  markers with blanket impls over `AsRef<[u8]>` / `AsRef<str>`, and nothing in the crate
+  ever bounded on them. The per-format traits (`ToHex`, `ToBase32`, `ToBase64Url`,
+  `ToBech32`, `ToBech32m`, `FromHexStr`, `FromBase32Str`, …) are implemented directly
+  against `AsRef<[u8]>` / `AsRef<str>`, so the markers gated nothing and enabled nothing
+  — despite trait-module docs that claimed they were what "enables" the per-format
+  impls. Their only consumer anywhere in the workspace was a single test asserting the
+  marker existed.
+
+  **Migration:** delete them from any `use` list; delete any `T: SecureEncoding` /
+  `T: SecureDecoding` bound and rely on `AsRef<[u8]>` / `AsRef<str>` (or on the
+  per-format trait itself) instead. No encoding or decoding behaviour changes.
+
 ### Security
 
 - **`std::io::Write` on `Dynamic<Vec<u8>>` left the secret in the outgoing buffer when
@@ -276,6 +289,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the fold looked like a missing symbol and all four DSE jobs failed with "could not
   find 'make_and_drop_newtype' label". Both forms are recognised now; verified on 1.85
   (`.set`) and 1.98 (`=`), ELF and COFF.
+- **`secure-gate-compat`'s `serde-serialize` / `serde-deserialize` features could not
+  build on their own.** Each enabled only the corresponding `secure-gate` feature, never
+  this crate's `dep:serde`, while the `#[cfg(feature = "serde-serialize")]` /
+  `#[cfg(feature = "serde-deserialize")]` blocks in `src/compat/` name `serde` types
+  directly. `cargo check -p secure-gate-compat --no-default-features --features
+  serde-serialize` failed with `E0220: associated type 'Ok' not found for 'S'`, and the
+  `serde-deserialize` half with `E0433: cannot find module or crate 'serde'`. The
+  combinations shipped in CI all passed because `secrecy-compat` happens to pull `serde`
+  in alongside them, so nothing exercised either feature alone. Both now list `serde`.
+  Cargo's `secure-gate/serde-serialize` names the *dependency's* feature and never the
+  same-named one in this crate — the two are independent, which is what the gap was.
 
 ### Dependencies
 
@@ -387,6 +411,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `RevealSecret`, `SecretLen` gets a short doc of its own — and kept that way because
   rustdoc 1.70, the 0.8 line's MSRV toolchain, ICEs on intra-doc links in a grouped
   `use` re-export; the two lines share this file.
+- **`ROADMAP.md` removed; its release-branch table salvaged into `README.md`.** The file
+  was stamped "Last updated: March 2026", still listed memory pinning (`mlock` /
+  `VirtualLock`) and HSM/TPM escape hatches as "Planned for 0.9.x", and was therefore
+  wrong about the release it shipped alongside. The one part worth keeping — the
+  `main` (0.9.x / edition 2024 / MSRV 1.85) vs `release/0.8` (LTS / edition 2021 / MSRV
+  1.70) table and the backport policy — replaces the two prose lines under
+  `README.md` § *Branch support*, where install-time information belongs. The two
+  workspace-`README.md` references were dropped with it.
+- **`docs/plans/base32_encoding.md` annotated as a historical record.** The plan is kept
+  for the reasoning it carries — why Base32 belongs in the crate, the constant-time
+  backend survey, the rejected alternatives — but it was written before #158 landed and
+  read as live instructions. It now states up front that it shipped in `cf43e69` (PR
+  #164), that its line numbers are a snapshot, and that it is not a guide to the current
+  tree. The two steps it prescribes for wiring a new format into the `SecureEncoding` /
+  `SecureDecoding` `cfg(any(...))` lists are flagged inline as superseded, since those
+  markers no longer exist.
+- **The `secrecy-compat` feature comment describes what the feature actually does.** It
+  claimed to "enable" the `v08` / `v10` shim modules; those carry no `cfg` on it and
+  always compile. What it really does is turn on the core features the shims need
+  (`alloc`, `cloneable`, `serde-serialize`) plus this crate's `serde` dependency, and gate
+  the whole compat test surface — `tests/compat_suite/`, `finding5_regression`,
+  `migration_full`, the trybuild cases, and via `dual-compat-test` the side-by-side parity
+  tests in `tests/compat_dual/`. The comment now says so, names the crate path correctly
+  (`secure_gate_compat::compat::…`, not `secure_gate::compat::…`), and records that the
+  feature does *not* switch on this crate's own serde features.
 
 ## [0.9.0-rc.7] - 2026-07-06
 
