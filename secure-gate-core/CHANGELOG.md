@@ -316,6 +316,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Pinned by `bech32_encode_allocates_exactly_once` and its bech32m twin, which assert
   `capacity() == len()` across nine payload sizes; both fail against the old code.
 
+  **And the stack.** Adversarial review then pointed out that `encode_lower_to_fmt`
+  itself stages every output character through a 1 KiB stack array
+  (`let mut buf = [0u8; BUF_LENGTH]`) that it never clears, so after the call returned
+  the encoded secret was still sitting in that frame. The refuters were right that this
+  is `bech32`'s code and outside the crate's heap guarantee — and it was still not
+  something to leave a footnote about. Both encoders now bypass `encode_lower_to_fmt`
+  and drive the same iterator chain upstream uses (`bytes_to_fes` →
+  `with_checksum::<Ck>` → `chars`) directly into the pre-sized `String`. The chain's
+  entire state is one pending byte, a bit offset, a borrowed HRP and a `u32` checksum
+  midstate — under 96 bytes, pinned by `encoder_chain_carries_no_staging_buffer` so a
+  reintroduced buffer fails the test — and each character goes into `out` as it is
+  produced. The `CODE_LENGTH` gate upstream applied through `encoded_length` is
+  replicated with `bech32_code_length`, which the tests already prove exact.
+  `direct_chain_matches_upstream_encode_lower` (one per checksum) asserts byte-for-byte
+  equality with upstream across eight payload sizes, so nothing observable changed
+  except what is left on the stack. Upstream's function is still used in unit tests,
+  as the equivalence oracle only.
+
 - **`std::io::Write` on `Dynamic<Vec<u8>>` left the secret in the outgoing buffer when
   it grew (#152).** Writing past the current capacity delegated to `Vec::write`, so the
   standard library reallocated: it copied the plaintext into the new allocation and

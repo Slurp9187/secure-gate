@@ -51,7 +51,7 @@
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use bech32::Hrp;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-use bech32::encode_lower_to_fmt;
+use bech32::primitives::iter::{ByteIterExt, Fe32IterExt};
 #[cfg(feature = "encoding-bech32")]
 use bech32::primitives::checksum::Checksum;
 
@@ -206,18 +206,33 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
     ) -> Result<alloc::string::String, Bech32Error> {
         let hrp_parsed = Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
         let data = self.as_ref();
-        // Pre-size the buffer exactly. `bech32::encode_lower` starts from
-        // `String::new()` and grows by reallocation, and every intermediate buffer
-        // holds a partial copy of the encoded secret and is freed **unwiped** --
-        // `zeroize` documents that it "cannot ensure that previous reallocations did
-        // not leave values on the heap". Measured before this: a 1568-byte payload
-        // produced len 2519 / capacity 4096, so at least one such copy was left
-        // behind. `encoded_length` is computed and discarded upstream; we compute it
-        // ourselves and reserve once. Same output, one allocation.
-        let mut out =
-            alloc::string::String::with_capacity(bech32_code_length(hrp.len(), data.len()));
-        encode_lower_to_fmt::<Bech32mSized<N>, alloc::string::String>(&mut out, hrp_parsed, data)
-            .map_err(|_| Bech32Error::OperationFailed)?;
+        let len = bech32_code_length(hrp.len(), data.len());
+        if len > N {
+            return Err(Bech32Error::OperationFailed);
+        }
+        // Drive `bech32`'s iterator primitives straight into a buffer reserved to the
+        // exact final length. This is what `bech32::encode_lower_to_fmt` does too,
+        // except that it stages every output character through a 1 KiB stack array
+        // (`[0u8; BUF_LENGTH]`) it never wipes, so the encoded secret survived in that
+        // frame after the call returned. Adversarial review found it; the crate's own
+        // guarantee is about the heap, but "wiped on drop" should not have a stack
+        // footnote. The chain below holds one pending byte, a bit offset and a `u32`
+        // checksum midstate -- a unit test pins its size -- and each char goes into
+        // `out` as it is produced. One allocation, no intermediate copy anywhere.
+        //
+        // The CODE_LENGTH gate that `encode_lower_to_fmt` applied via `encoded_length`
+        // is replicated exactly: refuse when the whole string would exceed N.
+        let mut out = alloc::string::String::with_capacity(len);
+        let chain = data
+            .iter()
+            .copied()
+            .bytes_to_fes()
+            .with_checksum::<Bech32mSized<N>>(&hrp_parsed)
+            .chars();
+        for c in chain {
+            out.push(c);
+        }
+        debug_assert_eq!(out.len(), len, "bech32_code_length disagreed with the encoder");
         Ok(out)
     }
 
@@ -236,6 +251,19 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
 mod tests {
     use super::*;
     use alloc::vec;
+
+    /// Byte-for-byte equivalence with upstream's encoder for the bech32m chain.
+    #[test]
+    fn direct_chain_matches_upstream_encode_lower() {
+        use bech32::{Hrp, encode_lower};
+        for (hrp, len) in [("a", 0usize), ("kem", 32), ("kem", 633), ("kem", 1568), ("x", 4096)] {
+            let data: alloc::vec::Vec<u8> = (0..len).map(|i| (i * 131 + 7) as u8).collect();
+            let ours = data.try_to_bech32m_sized::<65535>(hrp).expect("ours");
+            let theirs = encode_lower::<Bech32mSized<65535>>(Hrp::parse(hrp).unwrap(), &data)
+                .expect("upstream");
+            assert_eq!(ours, theirs, "hrp={hrp} len={len}");
+        }
+    }
 
     #[test]
     fn default_code_length_rejects_oversized_payload() {
