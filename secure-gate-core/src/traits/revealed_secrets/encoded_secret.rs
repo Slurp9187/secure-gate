@@ -4,7 +4,7 @@
 //!
 //! [`EncodedSecret`] wraps `Zeroizing<String>` with `Debug` → `[REDACTED]`. It is
 //! returned by all `*_zeroizing` encoding methods (`to_hex_zeroizing`,
-//! `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.).
+//! `to_base32_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.).
 //!
 //! Prefer zeroizing variants when the encoded form is sensitive (private keys, tokens).
 //! Use plain `String` variants for public encodings (addresses, transaction IDs).
@@ -58,6 +58,7 @@ pub struct EncodedSecret(zeroize::Zeroizing<alloc::string::String>);
 impl EncodedSecret {
     #[cfg(any(
         feature = "encoding-hex",
+        feature = "encoding-base32",
         feature = "encoding-base64",
         feature = "encoding-bech32",
         feature = "encoding-bech32m",

@@ -22,6 +22,12 @@ pub struct FuzzHexString(pub String);
 #[derive(Debug)]
 pub struct FuzzBase64String(pub String);
 
+/// Generates valid base32-encoded strings (RFC 4648 §6: uppercase, unpadded)
+/// from fuzzer bytes. The generator uses the independent `base32` crate, not the
+/// `base32ct` backend under test, so the round-trip check has a real oracle.
+#[derive(Debug)]
+pub struct FuzzBase32String(pub String);
+
 /// Generates bech32-encoded strings using secure-gate's ToBech32 trait
 /// so they round-trip with `try_from_bech32(_, &hrp)` or `try_from_bech32_unchecked`.
 #[derive(Debug)]
@@ -90,6 +96,16 @@ impl<'a> Arbitrary<'a> for FuzzBase64String {
         let bytes: Vec<u8> = Arbitrary::arbitrary(u)?;
         let capped = if bytes.len() > 512 { &bytes[..512] } else { &bytes[..] };
         Ok(FuzzBase64String(URL_SAFE_NO_PAD.encode(capped)))
+    }
+}
+
+impl<'a> Arbitrary<'a> for FuzzBase32String {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let bytes: Vec<u8> = Arbitrary::arbitrary(u)?;
+        let capped = if bytes.len() > 512 { &bytes[..512] } else { &bytes[..] };
+        // Rfc4648 with padding disabled is `Base32UpperUnpadded`'s alphabet.
+        let alphabet = base32::Alphabet::Rfc4648 { padding: false };
+        Ok(FuzzBase32String(base32::encode(alphabet, capped)))
     }
 }
 

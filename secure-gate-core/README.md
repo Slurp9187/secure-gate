@@ -189,7 +189,7 @@ fn require_min_len<S: SecretLen>(secret: &S, min: usize) -> bool {
 - **Zero-cost safety** — mandatory zeroization on drop; `no_std` / `no_alloc` support.
 - **Audit-first API** — a held secret cannot leak via `Deref`: `Fixed`/`Dynamic` implement none. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch. Extraction (`into_inner`, `to_*_zeroizing`) hands ownership to the caller and returns output wrappers that *do* deref — see [Where accident-prevention ends](SECURITY.md#where-accident-prevention-ends).
 - **Named secret types** — `*_alias!` macros create `type` aliases over `Fixed` / `Dynamic` that inherit redacted `Debug` and zeroize-on-drop; same-shape aliases (e.g. two `Fixed<[u8; 32]>` aliases) are interchangeable at the type level. When distinct cryptographic roles share a shape, `fixed_newtype!` / `dynamic_newtype!` generate `struct`s instead, so the compiler rejects a swapped key role at the call site.
-- **Batteries included** — optional, zero-overhead support for serde, constant-time comparison (`subtle`), and secure encoding (hex, base64url, bech32/m).
+- **Batteries included** — optional, zero-overhead support for serde, constant-time comparison (`subtle`), and secure encoding (hex, base32, base64url, bech32/m).
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`.
 
 ## Installation
@@ -215,27 +215,33 @@ secure-gate = { version = "0.8", features = ["full"] }
 
 ## Encoding & Decoding
 
-`secure-gate` provides symmetric, zero-overhead encoding and decoding for four formats: hex, base64url, bech32 (BIP-173), and bech32m (BIP-350). All operations are explicit and return `Result` on failure.
+`secure-gate` provides symmetric, zero-overhead encoding and decoding for five formats: hex, base32 (RFC 4648 §6), base64url, bech32 (BIP-173), and bech32m (BIP-350). All operations are explicit and return `Result` on failure.
 
 ### Available traits
 
-| Format            | Encode        | Decode             | Feature            |
-| ----------------- | ------------- | ------------------ | ------------------ |
-| Hex               | `ToHex`       | `FromHexStr`       | `encoding-hex`     |
-| Base64URL         | `ToBase64Url` | `FromBase64UrlStr` | `encoding-base64`  |
-| Bech32 (BIP-173)  | `ToBech32`    | `FromBech32Str`    | `encoding-bech32`  |
-| Bech32m (BIP-350) | `ToBech32m`   | `FromBech32mStr`   | `encoding-bech32m` |
+| Format               | Encode        | Decode             | Feature            |
+| -------------------- | ------------- | ------------------ | ------------------ |
+| Hex                  | `ToHex`       | `FromHexStr`       | `encoding-hex`     |
+| Base32 (RFC 4648 §6) | `ToBase32`    | `FromBase32Str`    | `encoding-base32`  |
+| Base64URL            | `ToBase64Url` | `FromBase64UrlStr` | `encoding-base64`  |
+| Bech32 (BIP-173)     | `ToBech32`    | `FromBech32Str`    | `encoding-bech32`  |
+| Bech32m (BIP-350)    | `ToBech32m`   | `FromBech32mStr`   | `encoding-bech32m` |
+
+Base32 is here for TOTP/HOTP interop: `otpauth://` key URIs (RFC 6238 / RFC 4226) carry the shared secret as uppercase, unpadded Base32, and Base32 is the densest encoding that fits QR alphanumeric mode.
 
 ### Encoding (to string)
 
-Use trait methods or inherent convenience methods on the wrappers. Plain methods return `String` (for public values). Use the zeroizing variants (returning [`EncodedSecret`]) when the encoded form should remain sensitive.
+The wrapper encoding methods are trait impls, so the trait must be in scope — `use secure_gate::{ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};` — before `key.to_base32()` resolves. Plain methods return `String` (for public values). Use the zeroizing variants (returning [`EncodedSecret`]) when the encoded form should remain sensitive.
 
 ```rust
+use secure_gate::{Fixed, RevealSecret, ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};
+
 let key: Fixed<[u8; 32]> = ...;
 
 // Plain — returns String (suitable for public encodings)
 let hex    = key.to_hex();
 let hex_u  = key.to_hex_upper();
+let b32    = key.to_base32();
 let b64    = key.to_base64url();
 let bech32 = key.try_to_bech32("bc")?;
 let bech32m = key.try_to_bech32m("bc")?;
@@ -243,35 +249,39 @@ let bech32m = key.try_to_bech32m("bc")?;
 // Zeroizing — returns EncodedSecret (preserves zeroization for sensitive encodings)
 let hex_z     = key.to_hex_zeroizing();
 let hex_u_z   = key.to_hex_upper_zeroizing();
+let b32_z     = key.to_base32_zeroizing();
 let b64_z     = key.to_base64url_zeroizing();
 let bech32_z  = key.try_to_bech32_zeroizing("bc")?;
 let bech32m_z = key.try_to_bech32m_zeroizing("bc")?;
 
 // Scoped on the inner bytes (preferred when you want `with_secret` in audit sweeps)
 let hex_scoped = key.with_secret(|s| s.to_hex());
+let b32_scoped = key.with_secret(|s| s.to_base32());
 let b64_scoped = key.with_secret(|s| s.to_base64url());
 let bech32_scoped  = key.with_secret(|s| s.try_to_bech32("bc"))?;
 let bech32m_scoped = key.with_secret(|s| s.try_to_bech32m("bc"))?;
 
 // Trait-level zeroizing APIs are also available on byte-like values:
 let hex_trait_z = key.with_secret(|s| s.to_hex_zeroizing());
+let b32_trait_z = key.with_secret(|s| s.to_base32_zeroizing());
 let b64_trait_z = key.with_secret(|s| s.to_base64url_zeroizing());
 ```
 
-Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`) to maintain the zeroization guarantee for sensitive encoded output. These APIs are available both on wrapper conveniences (`Fixed` / `Dynamic`) and on encoding traits (`ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
+Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`) to maintain the zeroization guarantee for sensitive encoded output. These APIs are available both on wrapper conveniences (`Fixed` / `Dynamic`) and on encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
 
 ### Direct Constructors (Recommended)
 
 Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from strings. Both use panic-safe `Zeroizing`-wrapped decode buffers internally. `Fixed` also supports a no-alloc path that decodes directly into stack storage when `alloc` is disabled.
 
-| Format              | Method                          | Notes                                       |
-| ------------------- | ------------------------------- | ------------------------------------------- |
-| Hex                 | `try_from_hex(s)`               | `HexError`                                  |
-| Base64URL           | `try_from_base64url(s)`         | `Base64Error` (unpadded, URL-safe)          |
-| Bech32 (BIP-173)    | `try_from_bech32(s, hrp)`       | HRP validated; `Bech32Error::UnexpectedHrp` |
-| Bech32 (unchecked)  | `try_from_bech32_unchecked(s)`  | No HRP; `Bech32Error`                       |
-| Bech32m (BIP-350)   | `try_from_bech32m(s, hrp)`      | HRP validated; `Bech32Error::UnexpectedHrp` |
-| Bech32m (unchecked) | `try_from_bech32m_unchecked(s)` | No HRP; `Bech32Error`                       |
+| Format              | Method                          | Notes                                            |
+| ------------------- | ------------------------------- | ------------------------------------------------ |
+| Hex                 | `try_from_hex(s)`               | `HexError`                                       |
+| Base32              | `try_from_base32(s)`            | `Base32Error` (RFC 4648 §6, uppercase, unpadded) |
+| Base64URL           | `try_from_base64url(s)`         | `Base64Error` (unpadded, URL-safe)               |
+| Bech32 (BIP-173)    | `try_from_bech32(s, hrp)`       | HRP validated; `Bech32Error::UnexpectedHrp`      |
+| Bech32 (unchecked)  | `try_from_bech32_unchecked(s)`  | No HRP; `Bech32Error`                            |
+| Bech32m (BIP-350)   | `try_from_bech32m(s, hrp)`      | HRP validated; `Bech32Error::UnexpectedHrp`      |
+| Bech32m (unchecked) | `try_from_bech32m_unchecked(s)` | No HRP; `Bech32Error`                            |
 
 **Security notes**:
 
@@ -348,8 +358,8 @@ Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing
 **Audit every exposure point** by searching your codebase for:
 
 - **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
-- **Encode:** `to_hex`, `to_hex_upper`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, `to_*_zeroizing`, `try_to_bech32*_zeroizing`
-- **Decode:** `try_from_hex`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
+- **Encode:** `to_hex`, `to_hex_upper`, `to_base32`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, `to_*_zeroizing`, `try_to_bech32*_zeroizing`
+- **Decode:** `try_from_hex`, `try_from_base32`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
 
 **Best practice**: Prefer scoped methods (`with_secret` / `with_secret_mut`) when possible — they keep exposure minimal.
 
@@ -387,8 +397,9 @@ Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = 
 | `std`               | Full `std` support (implies `alloc`). Enables `std::io::Read`/`Write` for `Dynamic<Vec<u8>>` via `as_reader()` and direct `Write` impl. Use `default-features = false` for no-heap builds. |
 | `rand`              | `from_random()` (system `OsRng`) and fallible `from_rng()` for any `CryptoRng + RngCore`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` / `from_rng()` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
 | `ct-eq`             | `ConstantTimeEq` — timing-safe comparison via `expose_secret()` (`subtle`)                                                                                                                                                                                |
-| `encoding`          | Meta: all encoding sub-features (hex, base64url, bech32, bech32m). Encoding traits require `alloc`; `Fixed::try_from_*` decoding is no-alloc.                                                                                                             |
+| `encoding`          | Meta: all encoding sub-features (hex, base32, base64url, bech32, bech32m). Encoding traits require `alloc`; `Fixed::try_from_*` decoding is no-alloc.                                                                                                     |
 | `encoding-hex`      | `ToHex` / `FromHexStr` — constant-time via `base16ct`                                                                                                                                                                                                     |
+| `encoding-base32`   | `ToBase32` / `FromBase32Str` — constant-time via `base32ct`; RFC 4648 §6, uppercase and unpadded                                                                                                                                                          |
 | `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr` — constant-time via `base64ct`                                                                                                                                                                                         |
 | `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                                                                                                                                                                                    |
 | `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                                                                                                                                                                                  |

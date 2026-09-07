@@ -1,14 +1,19 @@
 // Encoding/decoding round-trip fuzz target for secure-gate v0.8.0.
-// Tests hex, base64url, bech32, and bech32m formats with both valid and arbitrary inputs.
+// Tests hex, base32, base64url, bech32, and bech32m formats with both valid and arbitrary inputs.
 //
 // Invariants:
 //   - decode(encode(raw)) == raw          (lossless round-trip)
 //   - encode(decode(encode(raw))) == encode(raw)  (stable re-encoding)
 //   - decode(arbitrary) never panics       (graceful error handling)
 //
+// "Stable re-encoding" is asserted only on encoder-produced strings. Base32
+// decoding accepts non-canonical trailing bits ("MZ" decodes to the same byte as
+// "MY"), so re-encoding an arbitrary *valid* string need not reproduce it.
+//
 // Corpus seed hints (paste into fuzz/corpus/encoding/):
 //   "deadbeef"                     (valid hex, 4 bytes)
 //   "QkJCQg"                       (base64url of [0x42; 4])
+//   "NBSWY3DP"                     (base32 of b"hello")
 //   "test1vehk7cnpwgry9h76"        (bech32 with payload)
 //   "fuzz1dpjkcmr0ypmk7unvvsh4u4u" (bech32m with payload)
 #![no_main]
@@ -18,10 +23,11 @@ use libfuzzer_sys::fuzz_target;
 use secure_gate::{
     Dynamic, RevealSecret, Fixed,
     FromBech32Str,
-    ToBech32, ToBech32m, ToBase64Url, ToHex,
+    ToBech32, ToBech32m, ToBase32, ToBase64Url, ToHex,
 };
 use secure_gate_fuzz::arbitrary::{
-    FuzzBase64String, FuzzBech32String, FuzzDynamicVec, FuzzFixed16, FuzzFixed32, FuzzHexString,
+    FuzzBase32String, FuzzBase64String, FuzzBech32String, FuzzDynamicVec, FuzzFixed16, FuzzFixed32,
+    FuzzHexString,
 };
 
 fuzz_target!(|data: &[u8]| {
@@ -108,16 +114,60 @@ fuzz_target!(|data: &[u8]| {
         let _ = Dynamic::<Vec<u8>>::try_from_base64url("AAAA"); // valid 3-byte
     }
 
+    // === BASE32 (RFC 4648 §6 — uppercase, unpadded) ===
+
+    // 3a. Arbitrary strings to try_from_base32 — no panic
+    {
+        let arbitrary_str: String = Arbitrary::arbitrary(&mut u).unwrap_or_default();
+        let _ = Fixed::<[u8; 32]>::try_from_base32(&arbitrary_str);
+        let _ = Dynamic::<Vec<u8>>::try_from_base32(&arbitrary_str);
+    }
+
+    // 3b. Valid base32 round-trip. `FuzzBase32String` is produced by the
+    // independent `base32` crate, so this compares two implementations and the
+    // input is canonical — the precondition for the stable re-encoding check.
+    {
+        let b32_str = match FuzzBase32String::arbitrary(&mut u) {
+            Ok(b) => b.0,
+            Err(_) => return,
+        };
+        if let Ok(decoded) = Dynamic::<Vec<u8>>::try_from_base32(&b32_str) {
+            let re_encoded = decoded.expose_secret().to_base32();
+            assert_eq!(b32_str, re_encoded, "Base32 round-trip not stable");
+        }
+    }
+
+    // 3c. Fixed<[u8; 16]> base32 round-trip (16 bytes ↔ 26 chars)
+    {
+        if let Ok(fixed16) = FuzzFixed16::arbitrary(&mut u) {
+            let b32 = fixed16.0.expose_secret().to_base32();
+            assert_eq!(b32.len(), 26, "16 bytes must encode to 26 base32 chars");
+            let recovered = Fixed::<[u8; 16]>::try_from_base32(&b32)
+                .expect("base32 from valid encode");
+            assert_eq!(recovered.expose_secret(), fixed16.0.expose_secret(), "Fixed base32 RT");
+        }
+    }
+
+    // 3d. Base32 edge cases
+    {
+        let _ = Dynamic::<Vec<u8>>::try_from_base32("");          // empty is valid
+        let _ = Dynamic::<Vec<u8>>::try_from_base32("MY======");  // padding = invalid
+        let _ = Dynamic::<Vec<u8>>::try_from_base32("nbswy3dp");  // lowercase = invalid
+        let _ = Dynamic::<Vec<u8>>::try_from_base32("AAAAA");     // valid 3-byte
+        let _ = Dynamic::<Vec<u8>>::try_from_base32("M");         // length ≡ 1 (mod 8) = invalid
+        let _ = Dynamic::<Vec<u8>>::try_from_base32("MZ");        // non-canonical trailing bits
+    }
+
     // === BECH32 (Bech32Large — extended capacity) ===
 
-    // 3a. Arbitrary strings to try_from_bech32_unchecked — no panic
+    // 4a. Arbitrary strings to try_from_bech32_unchecked — no panic
     {
         let arbitrary_str: String = Arbitrary::arbitrary(&mut u).unwrap_or_default();
         let _ = Dynamic::<Vec<u8>>::try_from_bech32_unchecked(&arbitrary_str);
         let _ = Fixed::<[u8; 4]>::try_from_bech32_unchecked(&arbitrary_str);
     }
 
-    // 3b. Valid bech32 round-trip via ToBech32 blanket impl on &[u8]
+    // 4b. Valid bech32 round-trip via ToBech32 blanket impl on &[u8]
     {
         let dyn_vec = match FuzzDynamicVec::arbitrary(&mut u) {
             Ok(d) => d.0,
@@ -134,7 +184,7 @@ fuzz_target!(|data: &[u8]| {
         }
     }
 
-    // 3c. Pre-generated valid bech32 strings — should decode without panic
+    // 4c. Pre-generated valid bech32 strings — should decode without panic
     {
         let bech32_str = match FuzzBech32String::arbitrary(&mut u) {
             Ok(b) => b.0,
@@ -143,7 +193,7 @@ fuzz_target!(|data: &[u8]| {
         let _ = Dynamic::<Vec<u8>>::try_from_bech32_unchecked(&bech32_str);
     }
 
-    // 3d. HRP round-trip: encode with hrp, decode, verify hrp preserved
+    // 4d. HRP round-trip: encode with hrp, decode, verify hrp preserved
     {
         if let Ok(encoded) = b"hello".try_to_bech32("mykey") {
             let (hrp, payload) = encoded
@@ -155,7 +205,7 @@ fuzz_target!(|data: &[u8]| {
         }
     }
 
-    // 3e. Bech32 edge cases
+    // 4e. Bech32 edge cases
     {
         let _ = Dynamic::<Vec<u8>>::try_from_bech32_unchecked("not-bech32");
         let _ = Dynamic::<Vec<u8>>::try_from_bech32_unchecked("1"); // no HRP
@@ -164,13 +214,13 @@ fuzz_target!(|data: &[u8]| {
 
     // === BECH32M (BIP-350, 90-byte payload limit) ===
 
-    // 4a. Arbitrary strings to try_from_bech32m — no panic
+    // 5a. Arbitrary strings to try_from_bech32m — no panic
     {
         let arbitrary_str: String = Arbitrary::arbitrary(&mut u).unwrap_or_default();
         let _ = Dynamic::<Vec<u8>>::try_from_bech32m_unchecked(&arbitrary_str);
     }
 
-    // 4b. Valid bech32m round-trip (cap to 32 bytes for BIP-350 compliance)
+    // 5b. Valid bech32m round-trip (cap to 32 bytes for BIP-350 compliance)
     {
         let dyn_vec2 = match FuzzDynamicVec::arbitrary(&mut u) {
             Ok(d) => d.0,
@@ -186,7 +236,7 @@ fuzz_target!(|data: &[u8]| {
         }
     }
 
-    // 4c. Bech32m edge cases
+    // 5c. Bech32m edge cases
     {
         let _ = Dynamic::<Vec<u8>>::try_from_bech32m_unchecked("not-bech32m");
         let _ = Dynamic::<Vec<u8>>::try_from_bech32m_unchecked("");

@@ -131,6 +131,9 @@ jobs:
           - name: encoding-hex only
             features: "--no-default-features --features=alloc,encoding-hex"
 
+          - name: encoding-base32 only
+            features: "--no-default-features --features=alloc,encoding-base32"
+
           - name: encoding-base64 only
             features: "--no-default-features --features=alloc,encoding-base64"
 
@@ -260,12 +263,13 @@ jobs:
           for features in \
             "" \
             "encoding-hex" \
+            "encoding-base32" \
             "encoding-base64" \
             "encoding-bech32" \
             "encoding-bech32m" \
-            "encoding-hex,encoding-base64,encoding-bech32,encoding-bech32m" \
+            "encoding-hex,encoding-base32,encoding-base64,encoding-bech32,encoding-bech32m" \
             "ct-eq" \
-            "ct-eq,encoding-hex,encoding-base64,encoding-bech32,encoding-bech32m"
+            "ct-eq,encoding-hex,encoding-base32,encoding-base64,encoding-bech32,encoding-bech32m"
           do
             cargo build -p secure-gate --lib \
               --target thumbv7em-none-eabihf \

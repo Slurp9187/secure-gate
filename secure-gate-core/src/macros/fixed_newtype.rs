@@ -267,6 +267,28 @@ macro_rules! fixed_newtype {
             }
         }
 
+        $crate::__sg_if_base32! {
+            impl $name {
+                /// Constant-time Base32 decode into this secret type.
+                #[inline]
+                pub fn try_from_base32(s: &str) -> ::core::result::Result<Self, $crate::Base32Error> {
+                    ::core::result::Result::Ok(Self($crate::Fixed::try_from_base32(s)?))
+                }
+            }
+            $crate::__sg_if_alloc! {
+                impl $crate::ToBase32 for $name {
+                    #[inline]
+                    fn to_base32(&self) -> $crate::__private::String {
+                        $crate::ToBase32::to_base32(&self.0)
+                    }
+                    #[inline]
+                    fn to_base32_zeroizing(&self) -> $crate::EncodedSecret {
+                        $crate::ToBase32::to_base32_zeroizing(&self.0)
+                    }
+                }
+            }
+        }
+
         $crate::__sg_if_base64! {
             impl $name {
                 /// Constant-time Base64url decode into this secret type.

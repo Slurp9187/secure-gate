@@ -101,6 +101,7 @@ use zeroize::Zeroize;
 
 #[cfg(any(
     feature = "encoding-hex",
+    feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
     feature = "encoding-bech32m",
@@ -110,6 +111,8 @@ use zeroize::Zeroize;
 use crate::RevealSecret;
 
 // Encoding traits
+#[cfg(feature = "encoding-base32")]
+use crate::traits::encoding::base32::ToBase32;
 #[cfg(feature = "encoding-base64")]
 use crate::traits::encoding::base64_url::ToBase64Url;
 #[cfg(feature = "encoding-bech32")]
@@ -124,6 +127,8 @@ use rand::{rngs::OsRng, TryCryptoRng, TryRngCore};
 
 // Dynamic<Vec<u8>> is always alloc-dependent, so the alloc-gated blanket traits
 // are always available when encoding features are enabled for this type.
+#[cfg(feature = "encoding-base32")]
+use crate::traits::decoding::base32::FromBase32Str;
 #[cfg(feature = "encoding-base64")]
 use crate::traits::decoding::base64_url::FromBase64UrlStr;
 #[cfg(feature = "encoding-bech32")]
@@ -163,6 +168,7 @@ use crate::traits::decoding::hex::FromHexStr;
 /// | [`new(value)`](Self::new) | — | Accepts `Vec<u8>`, `&[u8]`, `Box<Vec<u8>>` |
 /// | [`new_with(f)`](Self::new_with) | — | Scoped closure construction |
 /// | [`try_from_hex(s)`](Self::try_from_hex) | `encoding-hex` | Constant-time hex decoding |
+/// | [`try_from_base32(s)`](Self::try_from_base32) | `encoding-base32` | Constant-time Base32 decoding |
 /// | [`try_from_base64url(s)`](Self::try_from_base64url) | `encoding-base64` | Constant-time Base64url decoding |
 /// | [`try_from_bech32(s, hrp)`](Self::try_from_bech32) | `encoding-bech32` | HRP-validated Bech32 |
 /// | [`try_from_bech32_unchecked(s)`](Self::try_from_bech32_unchecked) | `encoding-bech32` | Bech32 without HRP check |
@@ -246,6 +252,27 @@ impl Dynamic<Vec<u8>> {
     pub fn try_from_hex(s: &str) -> Result<Self, crate::error::HexError> {
         Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
             s.try_from_hex()?,
+        )))
+    }
+}
+
+// Base32 encoding and decoding for Dynamic<Vec<u8>>.
+#[cfg(feature = "encoding-base32")]
+impl Dynamic<Vec<u8>> {
+    /// Decodes an uppercase, unpadded Base32 (RFC 4648 §6) string into `Dynamic<Vec<u8>>`.
+    ///
+    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
+    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
+    ///
+    /// Decoding is strict about the alphabet, case, padding and length, but lenient
+    /// about non-canonical trailing bits: unused bits in the final group are ignored
+    /// rather than rejected, so `"MZ"` and `"MY"` both decode to `[0x66]`. Decoding is
+    /// therefore not injective — two distinct strings can yield the same bytes, and
+    /// only encoder-produced strings are canonical. Do not use the decoded value to
+    /// decide that two encoded strings were equal.
+    pub fn try_from_base32(s: &str) -> Result<Self, crate::error::Base32Error> {
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
+            s.try_from_base32()?,
         )))
     }
 }
@@ -424,6 +451,31 @@ impl ToHex for Dynamic<Vec<u8>> {
     #[inline]
     fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
         self.with_secret(|s| s.to_hex_upper_zeroizing())
+    }
+}
+
+/// Base32 encoding for `Dynamic<Vec<u8>>`; delegates via `with_secret`.
+///
+/// Bring the trait into scope: `use secure_gate::ToBase32;`.
+///
+/// ```rust
+/// # #[cfg(feature = "encoding-base32")] {
+/// use secure_gate::{Dynamic, ToBase32};
+///
+/// let token: Dynamic<Vec<u8>> = Dynamic::from(&[0xABu8; 4][..]);
+/// assert_eq!(token.to_base32(), "VOV2XKY");
+/// # }
+/// ```
+#[cfg(feature = "encoding-base32")]
+impl ToBase32 for Dynamic<Vec<u8>> {
+    #[inline]
+    fn to_base32(&self) -> alloc::string::String {
+        self.with_secret(|s| s.to_base32())
+    }
+
+    #[inline]
+    fn to_base32_zeroizing(&self) -> crate::EncodedSecret {
+        self.with_secret(|s| s.to_base32_zeroizing())
     }
 }
 
