@@ -47,6 +47,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Core `--all-features` added to the stable test and lint matrices: `full` excludes `std`,
   so tests gated on `std` plus another feature previously compiled only in the MSRV job.
 
+- **0.8-only workflow files renamed so their runs are identifiable** (`ci.yml` ->
+  `ci-0.8.yml`, `fuzz-miri.yml` -> `fuzz-miri-0.8.yml`, `fuzz-quick.yml` ->
+  `fuzz-quick-0.8.yml`). GitHub derives a workflow's display name from the *default
+  branch's* copy of that file path, so this branch's `ci.yml` — correctly named
+  `CI release/0.8` in the file — surfaced in the Actions list as `CI main/0.9`, main's
+  name for the same path. Distinct paths give these three their own workflow entities
+  and their real names. `audit.yml` (genuinely shared, branch-neutral name) and
+  `dse-check.yml` are unchanged. CI badges in both READMEs and the path filters inside
+  the renamed workflow were updated to match.
+
 ### Documentation
 
 - **`secure-gate-core`:** the crate page lists `fixed_newtype!` / `dynamic_newtype!`

@@ -9,7 +9,7 @@ on:
       - "secure-gate-compat/**"
       - "Cargo.toml"
       - "Cargo.lock"
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/ci-0.8.yml"
   pull_request:
     branches: [release/0.8]
     paths:
@@ -17,7 +17,7 @@ on:
       - "secure-gate-compat/**"
       - "Cargo.toml"
       - "Cargo.lock"
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/ci-0.8.yml"
 
 permissions:
   contents: read
