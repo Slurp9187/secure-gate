@@ -90,7 +90,20 @@ pub const BECH32_CODE_LENGTH: usize = 1023;
 #[must_use]
 pub const fn bech32_code_length(hrp_len: usize, payload_bytes: usize) -> usize {
     // ceil(payload_bytes * 8 / 5) base32 characters, plus HRP, separator, checksum.
-    hrp_len + 1 + (payload_bytes * 8).div_ceil(5) + 6
+    //
+    // Saturating rather than wrapping: for a payload whose encoding cannot fit in a
+    // `usize` at all the result is `usize::MAX`, which every encoder then refuses. It
+    // never panics and never returns a value smaller than the truth. (Adversarial
+    // review: the plain `payload_bytes * 8` panicked in debug and wrapped in release.)
+    // ceil(8b / 5) computed as 8·(b/5) + ceil(8·(b%5) / 5), which cannot overflow
+    // until the true answer itself no longer fits in a usize.
+    let payload_chars = (payload_bytes / 5)
+        .saturating_mul(8)
+        .saturating_add(((payload_bytes % 5) * 8).div_ceil(5));
+    hrp_len
+        .saturating_add(1)
+        .saturating_add(payload_chars)
+        .saturating_add(6)
 }
 
 /// Bech32 (BIP-173) checksum with a caller-chosen code length.

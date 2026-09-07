@@ -326,6 +326,30 @@ macro_rules! dynamic_newtype {
                         <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32(s, expected_hrp)?,
                     ))
                 }
+                /// Bech32 decode without HRP validation.
+                #[inline]
+                pub fn try_from_bech32_unchecked(s: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32_unchecked(s)?,
+                    ))
+                }
+                /// HRP-validated Bech32 decode accepting strings up to `C` characters.
+                #[inline]
+                pub fn try_from_bech32_sized<const C: usize>(s: &str, expected_hrp: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32_sized::<C>(s, expected_hrp)?,
+                    ))
+                }
+                /// Bech32 decode without HRP validation, accepting strings up to `C` characters.
+                #[inline]
+                pub fn try_from_bech32_unchecked_sized<const C: usize>(s: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32_unchecked_sized::<C>(s)?,
+                    ))
+                }
             }
             impl $crate::ToBech32 for $name {
                 #[inline]
@@ -360,6 +384,40 @@ macro_rules! dynamic_newtype {
         }
 
         $crate::__sg_if_bech32m! {
+            impl $name {
+                /// HRP-validated Bech32m decode into this secret type.
+                #[inline]
+                pub fn try_from_bech32m(s: &str, expected_hrp: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32m(s, expected_hrp)?,
+                    ))
+                }
+                /// Bech32m decode without HRP validation.
+                #[inline]
+                pub fn try_from_bech32m_unchecked(s: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32m_unchecked(s)?,
+                    ))
+                }
+                /// HRP-validated Bech32m decode accepting strings up to `C` characters.
+                #[inline]
+                pub fn try_from_bech32m_sized<const C: usize>(s: &str, expected_hrp: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32m_sized::<C>(s, expected_hrp)?,
+                    ))
+                }
+                /// Bech32m decode without HRP validation, accepting strings up to `C` characters.
+                #[inline]
+                pub fn try_from_bech32m_unchecked_sized<const C: usize>(s: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32m_unchecked_sized::<C>(s)?,
+                    ))
+                }
+            }
             impl $crate::ToBech32m for $name {
                 #[inline]
                 fn try_to_bech32m(

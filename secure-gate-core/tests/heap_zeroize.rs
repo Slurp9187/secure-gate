@@ -61,6 +61,16 @@ static PANIC_CHECK_PTR: AtomicUsize = AtomicUsize::new(0);
 static PANIC_CHECK_ZEROED: AtomicBool = AtomicBool::new(false);
 
 // ---------------------------------------------------------------------------
+// Counting mode — used to prove a code path allocates nothing at all
+// ---------------------------------------------------------------------------
+
+/// Set to `true` while `count_allocs` runs its closure; `alloc` bumps `ALLOC_COUNT`.
+static COUNTING: AtomicBool = AtomicBool::new(false);
+
+/// Number of `alloc` calls observed while `COUNTING` was set.
+static ALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+// ---------------------------------------------------------------------------
 // ProxyAllocator — adapted from upstream zeroize/tests/alloc.rs
 // ---------------------------------------------------------------------------
 
@@ -75,6 +85,9 @@ struct ProxyAllocator;
 
 unsafe impl GlobalAlloc for ProxyAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        if COUNTING.load(Ordering::SeqCst) {
+            ALLOC_COUNT.fetch_add(1, Ordering::SeqCst);
+        }
         unsafe { System.alloc(layout) }
     }
 
@@ -140,6 +153,102 @@ fn with_proxy_check<F: FnOnce()>(size: usize, f: F) {
     CHECKING.store(true, Ordering::SeqCst);
     let _guard = CheckGuard; // cleared on return OR on unwind
     f();
+}
+
+/// RAII guard that clears the counting gate on drop (normal return or unwind).
+#[cfg(feature = "encoding-bech32")]
+struct CountGuard;
+
+#[cfg(feature = "encoding-bech32")]
+impl Drop for CountGuard {
+    fn drop(&mut self) {
+        COUNTING.store(false, Ordering::SeqCst);
+    }
+}
+
+/// Runs `f` and returns how many heap allocations it performed.
+///
+/// Same sequential-only caveat as `with_proxy_check`: the counter is process-global,
+/// so this must only be called from the single aggregate test.
+#[cfg(feature = "encoding-bech32")]
+fn count_allocs<F: FnOnce()>(f: F) -> usize {
+    ALLOC_COUNT.store(0, Ordering::SeqCst);
+    COUNTING.store(true, Ordering::SeqCst);
+    let _guard = CountGuard;
+    f();
+    ALLOC_COUNT.load(Ordering::SeqCst)
+}
+
+// ---------------------------------------------------------------------------
+// bech32 decode: the HRP is checked BEFORE the payload is materialized
+//
+// This is a claim about internal ordering, and adversarial review showed every
+// existing test was black-box: swapping the two statements (materialize the Vec,
+// then compare the HRP and discard it) left all of them passing, because the
+// only observable was still `Err(UnexpectedHrp)`. Allocation count is the
+// observable that distinguishes the two orderings: with the HRP compared first,
+// a mismatch never allocates the payload `Vec`.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "encoding-bech32")]
+fn check_bech32_hrp_mismatch_materializes_nothing() {
+    use secure_gate::{
+        Bech32Error, Fixed, FromBech32Str, FromBech32mStr, ToBech32, ToBech32m, bech32_code_length,
+    };
+
+    const N: usize = bech32_code_length(3, 900);
+    let secret = vec![0x5Au8; 900];
+    let b32 = secret.try_to_bech32_sized::<N>("age").expect("encode");
+    let b32m = secret.try_to_bech32m_sized::<N>("age").expect("encode");
+
+    // Every HRP-checked decode path, sized, on both checksums and all three surfaces.
+    let wrong = count_allocs(|| {
+        assert!(matches!(
+            b32.try_from_bech32_sized::<N>("kem"),
+            Err(Bech32Error::UnexpectedHrp)
+        ));
+        assert!(matches!(
+            b32m.try_from_bech32m_sized::<N>("kem"),
+            Err(Bech32Error::UnexpectedHrp)
+        ));
+        assert!(matches!(
+            Dynamic::<Vec<u8>>::try_from_bech32_sized::<N>(&b32, "kem"),
+            Err(Bech32Error::UnexpectedHrp)
+        ));
+        assert!(matches!(
+            Dynamic::<Vec<u8>>::try_from_bech32m_sized::<N>(&b32m, "kem"),
+            Err(Bech32Error::UnexpectedHrp)
+        ));
+        assert!(matches!(
+            Fixed::<[u8; 900]>::try_from_bech32_sized::<N>(&b32, "kem"),
+            Err(Bech32Error::UnexpectedHrp)
+        ));
+        assert!(matches!(
+            Fixed::<[u8; 900]>::try_from_bech32m_sized::<N>(&b32m, "kem"),
+            Err(Bech32Error::UnexpectedHrp)
+        ));
+    });
+    assert_eq!(
+        wrong, 0,
+        "an HRP mismatch performed {wrong} heap allocation(s): \
+         the payload was materialized before the HRP was compared"
+    );
+
+    // Positive control: a correct decode into a Vec must allocate, or the counter
+    // above proved nothing.
+    let right = count_allocs(|| {
+        let v = b32.try_from_bech32_sized::<N>("age").expect("decode");
+        core::hint::black_box(&v);
+    });
+    assert!(right >= 1, "positive control: a successful Vec decode must allocate");
+
+    // And Fixed decodes onto the stack: zero allocations even on success (the
+    // no-alloc path is the same code on every target).
+    let fixed_ok = count_allocs(|| {
+        let f = Fixed::<[u8; 900]>::try_from_bech32_sized::<N>(&b32, "age").expect("decode");
+        core::hint::black_box(&f);
+    });
+    assert_eq!(fixed_ok, 0, "Fixed::try_from_bech32_sized allocated {fixed_ok} time(s)");
 }
 
 // ---------------------------------------------------------------------------
@@ -626,6 +735,9 @@ fn check_new_with_panic_zeroed_string(size: usize) {
 /// with the global ProxyAllocator state.
 #[test]
 fn all_heap_zeroed() {
+    #[cfg(feature = "encoding-bech32")]
+    check_bech32_hrp_mismatch_materializes_nothing();
+
     // Dynamic<[u8; N]> — boxed arrays
     check_array_zeroed::<16>();
     check_array_zeroed::<32>();

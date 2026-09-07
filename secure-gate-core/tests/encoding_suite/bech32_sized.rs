@@ -34,6 +34,27 @@ fn code_length_helper_matches_the_real_encoded_length() {
     assert_eq!(BECH32_CODE_LENGTH, 1023);
 }
 
+/// The helper is total: it never panics and never wraps to a too-small value.
+/// Adversarial review found the original `payload_bytes * 8` panicked in debug and
+/// wrapped in release for payloads above `usize::MAX / 8`.
+#[test]
+fn code_length_saturates_instead_of_wrapping() {
+    // Results that cannot fit in a usize saturate to usize::MAX, which every encoder
+    // then refuses — never a small, wrong number that would under-size a buffer.
+    assert_eq!(bech32_code_length(3, usize::MAX), usize::MAX);
+    assert_eq!(bech32_code_length(usize::MAX, 0), usize::MAX);
+    assert_eq!(bech32_code_length(usize::MAX, usize::MAX), usize::MAX);
+    // Just past the old overflow point the true answer still fits, and is returned
+    // exactly rather than wrapped: 8·(b/5) + ceil(8·(b%5)/5) + 10.
+    let b = usize::MAX / 8 + 1;
+    let expected = (b / 5) * 8 + ((b % 5) * 8).div_ceil(5) + 10;
+    assert_eq!(bech32_code_length(3, b), expected);
+    assert!(expected > usize::MAX / 8, "sanity: the exact answer is large, not wrapped");
+    // Ordinary inputs are unaffected.
+    assert_eq!(bech32_code_length(3, 32), 62);
+    assert_eq!(bech32_code_length(3, 633), 1023);
+}
+
 #[cfg(feature = "encoding-bech32")]
 #[test]
 fn helper_is_exact_not_approximate() {
@@ -507,82 +528,99 @@ impl Lcg {
 
 /// Every invariant at once, across a ladder of code lengths and many random payloads.
 ///
-/// For each `N` and each payload: encode; confirm the encoding is independent of `N`;
-/// confirm a decoder at `N` recovers the bytes; confirm a decoder too small refuses;
-/// confirm the HRP is checked; and confirm bech32m never decodes it.
+/// Each rung is defined by a payload byte count `B`; its code length is
+/// `bech32_code_length(3, B)`, so the rung is *achievable* — a string of exactly that
+/// length exists — and case 0 of every rung encodes exactly `B` bytes to produce it.
+/// That is what makes invariant 3 (a decoder one character too small refuses) a real
+/// assertion on every rung: the previous version of this test used power-of-two rungs,
+/// and because `gcd(8, 5) = 1` a 3-character-HRP code length can only ever be
+/// `≡ {1, 2, 4, 6, 7} (mod 8)`, so no string was ever exactly 64, 128, 256, 1024, 2048
+/// or 4096 long and the boundary assertion was vacuous on six of seven rungs. Caught
+/// by adversarial review; the counter at the end pins that it cannot regress.
 #[cfg(feature = "encoding-bech32")]
 #[test]
 fn randomized_stress_across_code_lengths() {
     macro_rules! ladder {
-        ($($n:literal),+ $(,)?) => {
+        ($($b:literal),+ $(,)?) => {
             let mut rng = Lcg(0x5EC0_DE5E_C0DE_5EC0);
             let mut checked = 0usize;
+            let mut boundary_hits = 0usize;
+            let rungs = [$($b),+].len();
             $(
-                for case in 0..64u32 {
-                    // Payload sizes that straddle the ladder rung: some fit, some do not.
-                    let max_bytes = (($n - 4 - 6) * 5) / 8;
-                    let len = (rng.next() as usize) % (max_bytes + 16);
-                    let data = rng.bytes(len);
-                    let seed_note = format!("N={} case={} len={}", $n, case, len);
+                {
+                    const N: usize = bech32_code_length(3, $b);
+                    for case in 0..64u32 {
+                        // Case 0 lands exactly on the rung; the rest straddle it.
+                        let len = if case == 0 { $b } else { (rng.next() as usize) % ($b + 16) };
+                        let data = rng.bytes(len);
+                        let seed_note = format!("N={} B={} case={} len={}", N, $b, case, len);
 
-                    let encoded = match data.try_to_bech32_sized::<$n>("age") {
-                        Ok(e) => e,
-                        Err(Bech32Error::OperationFailed) => {
-                            // Only legitimate when the string would exceed N.
-                            assert!(
-                                bech32_code_length(3, len) > $n,
-                                "refused a payload that fits: {seed_note}"
+                        let encoded = match data.try_to_bech32_sized::<N>("age") {
+                            Ok(e) => e,
+                            Err(Bech32Error::OperationFailed) => {
+                                // Only legitimate when the string would exceed N.
+                                assert!(
+                                    bech32_code_length(3, len) > N,
+                                    "refused a payload that fits: {seed_note}"
+                                );
+                                continue;
+                            }
+                            Err(other) => panic!("unexpected encode error {other:?}: {seed_note}"),
+                        };
+                        checked += 1;
+
+                        assert_eq!(encoded.len(), bech32_code_length(3, len), "{seed_note}");
+
+                        // 1. Round-trips at its own code length.
+                        assert_eq!(
+                            encoded.try_from_bech32_sized::<N>("age").expect(&seed_note),
+                            data,
+                            "{seed_note}"
+                        );
+
+                        // 2. The encoding does not depend on N: a bigger N gives the same bytes.
+                        assert_eq!(
+                            data.try_to_bech32_sized::<65535>("age").expect(&seed_note),
+                            encoded,
+                            "code length changed the encoding: {seed_note}"
+                        );
+
+                        // 3. Exactly at the boundary, a decoder one character too small
+                        //    refuses. Reached on every rung via case 0 (counted below).
+                        if encoded.len() == N {
+                            boundary_hits += 1;
+                            assert_eq!(
+                                encoded.try_from_bech32_sized::<{ N - 1 }>("age"),
+                                Err(Bech32Error::OperationFailed),
+                                "a decoder one short of the string accepted it: {seed_note}"
                             );
-                            continue;
                         }
-                        Err(other) => panic!("unexpected encode error {other:?}: {seed_note}"),
-                    };
-                    checked += 1;
 
-                    assert_eq!(encoded.len(), bech32_code_length(3, len), "{seed_note}");
+                        // 4. The HRP is still validated.
+                        assert_eq!(
+                            encoded.try_from_bech32_sized::<N>("kem"),
+                            Err(Bech32Error::UnexpectedHrp),
+                            "{seed_note}"
+                        );
 
-                    // 1. Round-trips at its own code length.
-                    assert_eq!(
-                        encoded.try_from_bech32_sized::<$n>("age").expect(&seed_note),
-                        data,
-                        "{seed_note}"
-                    );
-
-                    // 2. The encoding does not depend on N: a bigger N gives the same bytes.
-                    assert_eq!(
-                        data.try_to_bech32_sized::<65535>("age").expect(&seed_note),
-                        encoded,
-                        "code length changed the encoding: {seed_note}"
-                    );
-
-                    // 3. A decoder one character too small refuses it.
-                    assert!(
-                        encoded
-                            .try_from_bech32_sized::<{ $n - 1 }>("age")
-                            .is_err()
-                            || encoded.len() < $n,
-                        "a too-small decoder accepted the string: {seed_note}"
-                    );
-
-                    // 4. The HRP is still validated.
-                    assert_eq!(
-                        encoded.try_from_bech32_sized::<$n>("kem"),
-                        Err(Bech32Error::UnexpectedHrp),
-                        "{seed_note}"
-                    );
-
-                    // 5. Bech32m never decodes a bech32 string, at any code length.
-                    assert!(
-                        encoded.try_from_bech32m_sized::<65535>("age").is_err(),
-                        "bech32 string decoded as bech32m: {seed_note}"
-                    );
+                        // 5. Bech32m never decodes a bech32 string, at any code length.
+                        assert!(
+                            encoded.try_from_bech32m_sized::<65535>("age").is_err(),
+                            "bech32 string decoded as bech32m: {seed_note}"
+                        );
+                    }
                 }
             )+
             assert!(checked > 200, "stress test exercised only {checked} encodings");
+            assert!(
+                boundary_hits >= rungs,
+                "the exact-length boundary was exercised on only {boundary_hits} of {rungs} rungs"
+            );
         };
     }
 
-    ladder!(64, 128, 256, 1023, 1024, 2048, 4096);
+    // Payload byte counts; code lengths are 62, 113, 215, 1023, 1034, 2058, 4106.
+    ladder!(32, 64, 128, 633, 640, 1280, 2560);
 }
 
 // ─────────────────── the encode buffer is allocated once, exactly ───────────────────
