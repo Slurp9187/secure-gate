@@ -172,6 +172,46 @@ fn drain_bech32_payload<const N: usize>(
 /// | [`from_random()`](Self::from_random) | `rand` | System RNG |
 /// | [`from_rng(rng)`](Self::from_rng) | `rand` | Custom RNG |
 ///
+/// # RustCrypto integration
+///
+/// RustCrypto's `BlockEncrypt`/`BlockDecrypt` take `&mut GenericArray<u8, U16>`, and
+/// `GenericArray::from_mut_slice` **borrows** its argument instead of copying it. That
+/// is what lets a block cipher run *inside* the wrapper, so the plaintext never
+/// materializes in memory nothing is obliged to wipe:
+///
+/// ```rust
+/// use aes::cipher::{generic_array::GenericArray, BlockDecrypt, KeyInit};
+/// use aes::Aes128;
+/// use secure_gate::{Fixed, RevealSecretMut};
+///
+/// let cipher = Aes128::new(GenericArray::from_slice(&[0x42u8; 16]));
+/// let mut block: Fixed<[u8; 16]> = Fixed::new([0u8; 16]);
+///
+/// // `from_mut_slice` reborrows the wrapper's own storage, so zeroize-on-drop still
+/// // covers every path out of this scope — early returns and panics included.
+/// block.with_secret_mut(|b| cipher.decrypt_block(GenericArray::from_mut_slice(b)));
+/// ```
+///
+/// The shape type inference nudges you toward is the footgun. It compiles, it is the
+/// easy thing to reach for, and it defeats the wrapper:
+///
+/// ```rust
+/// # use aes::cipher::{generic_array::GenericArray, BlockDecrypt, KeyInit};
+/// # use aes::Aes128;
+/// # use secure_gate::{Fixed, RevealSecret};
+/// # let cipher = Aes128::new(GenericArray::from_slice(&[0x42u8; 16]));
+/// # let block: Fixed<[u8; 16]> = Fixed::new([0u8; 16]);
+/// // Copies the secret OUT. `copy` is an ordinary stack value: no zeroization on
+/// // drop, and it holds plaintext-equivalent bytes for the rest of the scope.
+/// let mut copy = block.with_secret(|b| aes::Block::from(*b));
+/// cipher.decrypt_block(&mut copy);
+/// ```
+///
+/// The same reasoning applies to [`Dynamic`](crate::Dynamic)`<Vec<u8>>` through
+/// [`with_secret_mut`](crate::RevealSecretMut::with_secret_mut), and to the
+/// slice-at-a-time APIs (`decrypt_blocks`, `apply_keystream`), which take
+/// `&mut [Block]` and `&mut [u8]` and so borrow just as well.
+///
 /// # See also
 ///
 /// - [`RevealSecret`] / [`RevealSecretMut`] — the 3-tier access traits.
