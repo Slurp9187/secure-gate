@@ -21,14 +21,18 @@ dynamic_alias!(pub Password, String);    // Dynamic<String>
 fixed_alias!(pub Aes256Key, 32);         // Fixed<[u8; 32]>
 
 let mut pw: Password = "hunter2".into();
-let mut key: Aes256Key = Aes256Key::new([42u8; 32]);
+
+// Generate key material from the system RNG rather than a literal (needs `rand`).
+let mut key: Aes256Key = Aes256Key::from_random();
 
 // Scoped access — preferred; the borrow cannot outlive the closure
 let long_enough = pw.with_secret(|s| s.len() >= 8); // validate in-closure; never log a secret's length
 
-// Mutable scoped access. For Dynamic<String> / Dynamic<Vec<u8>>, prefer
+// Mutable scoped access — rotate in fresh material. The old key is overwritten in
+// place and never leaves the wrapper. For Dynamic<String> / Dynamic<Vec<u8>>, prefer
 // capacity-stable mutations or pre-allocate before wrapping; see SECURITY.md.
-key.with_secret_mut(|bytes| bytes[0] = 0);
+let next: Aes256Key = Aes256Key::from_random();
+next.with_secret(|fresh| key.with_secret_mut(|old| old.copy_from_slice(fresh)));
 
 // Direct reference — auditable escape hatch (e.g. FFI, third-party APIs)
 assert_eq!(pw.expose_secret(), "hunter2");
@@ -74,11 +78,13 @@ use secure_gate::{Fixed, RevealSecret, RevealSecretMut};
 
 let mut key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
 
-// Read — closure borrow cannot outlive the call
-let sum: u32 = key.with_secret(|bytes| bytes.iter().map(|&b| b as u32).sum());
+// Read — the closure borrow cannot outlive the call, so validate inside it and
+// return only the verdict, never the bytes.
+let looks_degenerate = key.with_secret(|bytes| bytes.iter().all(|&b| b == bytes[0]));
+assert!(looks_degenerate); // every byte is 0xAB
 
-// Mutate
-key.with_secret_mut(|bytes: &mut [u8; 32]| bytes[0] = 0);
+// Mutate in place — the secret is never copied out to be modified.
+key.with_secret_mut(|bytes: &mut [u8; 32]| bytes.copy_from_slice(&[0xCD; 32]));
 ```
 
 ### RustCrypto in-place cipher ops
@@ -159,7 +165,7 @@ See [`fixed_alias!`], [`dynamic_alias!`], [`fixed_generic_alias!`], [`dynamic_ge
 `fixed_alias!(Name, N)` rejects `N = 0` at compile time (via a const-eval index-out-of-bounds guard).  
 However, `fixed_generic_alias!`, `dynamic_alias!`, and `dynamic_generic_alias!` **allow** zero-sized types (`SecretBuffer<0>`, `Dynamic<[u8; 0]>`, `Dynamic<()>` etc.). These compile successfully but have no cryptographic value and should never be used in production. Always validate that the effective size is > 0 in your unit tests when using the generic or dynamic alias macros.
 
-See also the Best Practices section in [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for the equivalent guidance.
+See also the Best Practices section in [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for the equivalent guidance.
 
 ### Polymorphic / generic code
 
@@ -187,19 +193,19 @@ fn require_min_len<S: SecretLen>(secret: &S, min: usize) -> bool {
 
 ```toml
 [dependencies]
-secure-gate = "0.9"
+secure-gate = "0.9.0-rc.8"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.9", default-features = false }
+secure-gate = { version = "0.9.0-rc.8", default-features = false }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.9", features = ["full"] }
+secure-gate = { version = "0.9.0-rc.8", features = ["full"] }
 ```
 
 ## Encoding & Decoding
@@ -224,15 +230,15 @@ The wrapper encoding methods are trait impls, so the trait must be in scope — 
 
 ```rust
 use secure_gate::{Fixed, RevealSecret, ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};
-
-let key: Fixed<[u8; 32]> = ...;
+# fn main() -> Result<(), secure_gate::Bech32Error> {
+let key: Fixed<[u8; 32]> = Fixed::new([0x42u8; 32]);
 
 // Plain — returns String (suitable for public encodings)
-let hex    = key.to_hex();
-let hex_u  = key.to_hex_upper();
-let b32    = key.to_base32();
-let b64    = key.to_base64url();
-let bech32 = key.try_to_bech32("bc")?;
+let hex     = key.to_hex();
+let hex_u   = key.to_hex_upper();
+let b32     = key.to_base32();
+let b64     = key.to_base64url();
+let bech32  = key.try_to_bech32("bc")?;
 let bech32m = key.try_to_bech32m("bc")?;
 
 // Zeroizing — returns EncodedSecret (preserves zeroization for sensitive encodings)
@@ -244,9 +250,9 @@ let bech32_z  = key.try_to_bech32_zeroizing("bc")?;
 let bech32m_z = key.try_to_bech32m_zeroizing("bc")?;
 
 // Scoped on the inner bytes (preferred when you want `with_secret` in audit sweeps)
-let hex_scoped = key.with_secret(|s| s.to_hex());
-let b32_scoped = key.with_secret(|s| s.to_base32());
-let b64_scoped = key.with_secret(|s| s.to_base64url());
+let hex_scoped     = key.with_secret(|s| s.to_hex());
+let b32_scoped     = key.with_secret(|s| s.to_base32());
+let b64_scoped     = key.with_secret(|s| s.to_base64url());
 let bech32_scoped  = key.with_secret(|s| s.try_to_bech32("bc"))?;
 let bech32m_scoped = key.with_secret(|s| s.try_to_bech32m("bc"))?;
 
@@ -254,6 +260,8 @@ let bech32m_scoped = key.with_secret(|s| s.try_to_bech32m("bc"))?;
 let hex_trait_z = key.with_secret(|s| s.to_hex_zeroizing());
 let b32_trait_z = key.with_secret(|s| s.to_base32_zeroizing());
 let b64_trait_z = key.with_secret(|s| s.to_base64url_zeroizing());
+# Ok(())
+# }
 ```
 
 Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`) to maintain the zeroization guarantee for sensitive encoded output. These APIs are available both on wrapper conveniences (`Fixed` / `Dynamic`) and on encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
@@ -347,6 +355,7 @@ Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing
 **Audit every exposure point** by searching your codebase for:
 
 - **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
+- **Extract:** `into_inner` (hands the secret to the caller as `InnerSecret<T>`), `as_reader` (yields a reader over the secret bytes)
 - **Encode:** `to_hex`, `to_hex_upper`, `to_base32`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, `to_*_zeroizing`, `try_to_bech32*_zeroizing`
 - **Decode:** `try_from_hex`, `try_from_base32`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
 
@@ -356,8 +365,8 @@ Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing
 
 Edition 2024, MSRV 1.85, `rand` 0.10 (`OsRng` → `SysRng`), dep bumps.  
 Across the release candidates: `SecretLen` split out of `RevealSecret` (which now covers
-every inner type); wrapper encoders are `ToHex` / `ToBase64Url` / `ToBech32` / `ToBech32m`
-trait impls; `fixed_newtype!` / `dynamic_newtype!` for nominal secret roles; no `Display`
+every inner type); Base32 (RFC 4648 §6) added behind `encoding-base32`; wrapper encoders
+are `ToHex` / `ToBase32` / `ToBase64Url` / `ToBech32` / `ToBech32m` trait impls; `fixed_newtype!` / `dynamic_newtype!` for nominal secret roles; no `Display`
 on `EncodedSecret`.  
 Full details in [CHANGELOG.md](CHANGELOG.md). Users on Rust < 1.85: pin `secure-gate = "0.8"`.
 
