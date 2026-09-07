@@ -372,8 +372,17 @@ Full details in [CHANGELOG.md](CHANGELOG.md). Users on Rust < 1.85: pin `secure-
 
 ## Branch support
 
-Version **0.9.x** (`main`) targets Rust Edition 2024 and MSRV 1.85.  
-For Rust < 1.85, pin `secure-gate = "0.8"` — the `release/0.8` branch (Edition 2021, MSRV 1.70) receives security patches and important backports.
+| Branch | Version | Rust edition | MSRV | Status |
+|---|---|---|---|---|
+| `main` | 0.9.x | 2024 | 1.85 | Active development |
+| `release/0.8` | 0.8.x | 2021 | 1.70 | LTS — security patches only |
+
+**Rust ≥ 1.85**: use `secure-gate = "0.9"`.  
+**Rust < 1.85**: pin `secure-gate = "0.8"`.
+
+Security fixes and important bug fixes may be backported from `main` to `release/0.8` as
+patch releases. The 0.8 line will receive patches for as long as the dependencies it
+relies on remain compatible with Rust 1.70.
 
 ## Migrating from secrecy
 
