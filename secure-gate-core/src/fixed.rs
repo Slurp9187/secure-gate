@@ -91,6 +91,8 @@
 use crate::RevealSecret;
 use crate::RevealSecretMut;
 
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
+use crate::traits::encoding::base32::ToBase32;
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 use crate::traits::encoding::base64_url::ToBase64Url;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
@@ -164,6 +166,7 @@ fn drain_bech32_payload<const N: usize>(
 /// | [`From<[u8; N]>`](#impl-From<%5Bu8;+N%5D>-for-Fixed<%5Bu8;+N%5D>) | — | Equivalent to `new` |
 /// | [`TryFrom<&[u8]>`](#impl-TryFrom<%26%5Bu8%5D>-for-Fixed<%5Bu8;+N%5D>) | — | Length-checked slice conversion |
 /// | [`try_from_hex`](Self::try_from_hex) | `encoding-hex` | Constant-time hex decoding |
+/// | [`try_from_base32`](Self::try_from_base32) | `encoding-base32` | Constant-time Base32 decoding |
 /// | [`try_from_base64url`](Self::try_from_base64url) | `encoding-base64` | Constant-time Base64url decoding |
 /// | [`try_from_bech32`](Self::try_from_bech32) | `encoding-bech32` | HRP-validated Bech32 decoding |
 /// | [`try_from_bech32_unchecked`](Self::try_from_bech32_unchecked) | `encoding-bech32` | Bech32 without HRP check |
@@ -394,6 +397,91 @@ impl<const N: usize> Fixed<[u8; N]> {
     }
 }
 
+/// Base32 encoding and decoding for `Fixed<[u8; N]>` (RFC 4648 §6, uppercase, unpadded).
+///
+/// Encoding uses a constant-time backend (`base32ct`). Decoding works with or without
+/// the `alloc` feature — on no-alloc targets the bytes are decoded directly into a
+/// `Zeroizing<[u8; N]>` stack buffer.
+#[cfg(feature = "encoding-base32")]
+impl<const N: usize> Fixed<[u8; N]> {
+    /// Decodes an uppercase, unpadded Base32 string (RFC 4648 §6 alphabet) into
+    /// `Fixed<[u8; N]>`.
+    ///
+    /// Uses a constant-time backend (`base32ct`) on both paths.
+    ///
+    /// - **With `alloc`**: decodes into a `Zeroizing<Vec<u8>>` then copies onto the stack.
+    /// - **Without `alloc`**: decodes directly into a `Zeroizing<[u8; N]>` stack buffer.
+    ///
+    /// Decoding is strict about the alphabet, case, padding and length, but lenient
+    /// about non-canonical trailing bits: unused bits in the final group are ignored
+    /// rather than rejected, so `"MZ"` and `"MY"` both decode to `[0x66]`. Decoding is
+    /// therefore not injective — two distinct strings can yield the same bytes, and
+    /// only encoder-produced strings are canonical. Do not use the decoded value to
+    /// decide that two encoded strings were equal.
+    ///
+    /// # Errors
+    ///
+    /// - [`Base32Error::InvalidBase32`](crate::Base32Error::InvalidBase32) — wrong alphabet
+    ///   or case, `=` padding, or a length that is impossible for unpadded Base32. Without
+    ///   `alloc` an input that decodes to *more* than `N` bytes also lands here rather than in
+    ///   `InvalidLength`, because the fixed stack buffer cannot hold the overflow to measure it.
+    /// - [`Base32Error::InvalidLength`](crate::Base32Error::InvalidLength) — decoded byte
+    ///   count does not equal `N`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "encoding-base32")]
+    /// # {
+    /// use secure_gate::{Fixed, RevealSecret, ToBase32};
+    ///
+    /// # #[cfg(feature = "alloc")]
+    /// # {
+    /// // Round-trip.
+    /// let original = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
+    /// let encoded = original.to_base32();
+    /// assert_eq!(encoded, "32W353Y");
+    /// let decoded = Fixed::<[u8; 4]>::try_from_base32(&encoded).unwrap();
+    /// assert_eq!(decoded.expose_secret(), &[0xDE, 0xAD, 0xBE, 0xEF]);
+    /// # }
+    /// # }
+    /// ```
+    pub fn try_from_base32(s: &str) -> Result<Self, crate::error::Base32Error> {
+        #[cfg(feature = "alloc")]
+        {
+            use base32ct::{Base32UpperUnpadded, Encoding};
+            use zeroize::Zeroizing;
+            let bytes = Zeroizing::new(
+                Base32UpperUnpadded::decode_vec(s)
+                    .map_err(|_| crate::error::Base32Error::InvalidBase32)?,
+            );
+            if bytes.len() != N {
+                return Err(crate::error::Base32Error::InvalidLength {
+                    expected: N,
+                    got: bytes.len(),
+                });
+            }
+            Ok(Self::new_with(|arr| arr.copy_from_slice(&bytes)))
+        }
+        #[cfg(not(feature = "alloc"))]
+        {
+            use base32ct::{Base32UpperUnpadded, Encoding};
+            use zeroize::Zeroizing;
+            let mut buf = Zeroizing::new([0u8; N]);
+            let decoded = Base32UpperUnpadded::decode(s, &mut *buf)
+                .map_err(|_| crate::error::Base32Error::InvalidBase32)?;
+            if decoded.len() != N {
+                return Err(crate::error::Base32Error::InvalidLength {
+                    expected: N,
+                    got: decoded.len(),
+                });
+            }
+            Ok(Self::new_with(|arr| arr.copy_from_slice(decoded)))
+            // buf is zeroized on drop (both success and error paths)
+        }
+    }
+}
+
 /// Base64url encoding and decoding for `Fixed<[u8; N]>`.
 ///
 /// Encoding uses a constant-time backend (`base64ct`). Decoding works with or without
@@ -600,6 +688,29 @@ impl<const N: usize> ToHex for Fixed<[u8; N]> {
     #[inline]
     fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
         self.with_secret(|s| s.to_hex_upper_zeroizing())
+    }
+}
+
+/// Base32 encoding for `Fixed<[u8; N]>`; delegates via `with_secret`.
+///
+/// Bring the trait into scope to call these: `use secure_gate::ToBase32;`.
+///
+/// ```rust
+/// use secure_gate::{Fixed, ToBase32};
+///
+/// let key = Fixed::new([0xABu8; 4]);
+/// assert_eq!(key.to_base32(), "VOV2XKY");
+/// ```
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
+impl<const N: usize> ToBase32 for Fixed<[u8; N]> {
+    #[inline]
+    fn to_base32(&self) -> alloc::string::String {
+        self.with_secret(|s| s.to_base32())
+    }
+
+    #[inline]
+    fn to_base32_zeroizing(&self) -> crate::EncodedSecret {
+        self.with_secret(|s| s.to_base32_zeroizing())
     }
 }
 

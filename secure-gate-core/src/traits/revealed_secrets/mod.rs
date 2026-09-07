@@ -7,8 +7,8 @@
 //!
 //! - [`InnerSecret<T>`] — returned by [`RevealSecret::into_inner`] for raw secret values.
 //! - [`EncodedSecret`] — returned by zeroizing encoding methods (`to_hex_zeroizing`,
-//!   `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.) when the encoded form
-//!   itself must remain sensitive.
+//!   `to_base32_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.)
+//!   when the encoded form itself must remain sensitive.
 //!
 //! Both types wrap [`zeroize::Zeroizing`] internally, provide redacted `Debug`
 //! (`[REDACTED]`), and offer an `into_zeroizing()` escape hatch. They are the

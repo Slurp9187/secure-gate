@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Base32 encoding in `secure-gate-core`** (#158). `ToBase32` / `FromBase32Str`
+  behind `encoding-base32`, with wrapper and newtype forwarding and a `Base32Error`
+  — RFC 4648 §6, uppercase and unpadded (the `otpauth://` TOTP/HOTP form) via the
+  constant-time `base32ct` crate. Lowercase and `=` padding are rejected. See the
+  core changelog.
+
 ### Documentation
 
 - **`secure-gate-core`:** the crate page lists `fixed_newtype!` / `dynamic_newtype!`

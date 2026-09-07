@@ -6,6 +6,7 @@
 //! |------|------------|---------|
 //! | [`FromSliceError`] | [`Fixed::try_from(&[u8])`](crate::Fixed) | Always |
 //! | [`HexError`] | [`Fixed::try_from_hex`](crate::Fixed::try_from_hex), [`FromHexStr`](crate::FromHexStr) | `encoding-hex` |
+//! | [`Base32Error`] | [`Fixed::try_from_base32`](crate::Fixed::try_from_base32), [`FromBase32Str`](crate::FromBase32Str) | `encoding-base32` |
 //! | [`Base64Error`] | [`Fixed::try_from_base64url`](crate::Fixed::try_from_base64url), [`FromBase64UrlStr`](crate::FromBase64UrlStr) | `encoding-base64` |
 //! | [`Bech32Error`] | `try_from_bech32*`, [`FromBech32Str`](crate::FromBech32Str), [`FromBech32mStr`](crate::FromBech32mStr) | `encoding-bech32` / `encoding-bech32m` |
 //! | [`DecodingError`] | Unified wrapper for all above | Always |
@@ -95,6 +96,31 @@ pub enum Bech32Error {
     },
 }
 
+/// Errors produced when decoding Base32 (RFC 4648 §6, uppercase, unpadded) strings.
+///
+/// *Requires feature `encoding-base32`.*
+///
+/// Variant shapes are identical in debug and release builds; only numeric
+/// length metadata is carried.
+#[cfg(feature = "encoding-base32")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum Base32Error {
+    /// The string is not valid Base32 (wrong alphabet, wrong case, padding, or
+    /// an impossible length).
+    #[error("invalid base32 string")]
+    InvalidBase32,
+    /// The decoded payload length does not match the target type's length.
+    #[error("decoded length mismatch: expected {expected}, got {got}")]
+    #[non_exhaustive]
+    InvalidLength {
+        /// Number of bytes the target type requires.
+        expected: usize,
+        /// Number of bytes actually decoded.
+        got: usize,
+    },
+}
+
 /// Errors produced when decoding base64url strings.
 ///
 /// *Requires feature `encoding-base64`.*
@@ -145,7 +171,7 @@ pub enum HexError {
 
 /// Unified error type for multi-format decoding operations.
 ///
-/// Wraps format-specific errors from hex, base64url, bech32, and bech32m decoders.
+/// Wraps format-specific errors from hex, base32, base64url, bech32, and bech32m decoders.
 /// Always available; variants depend on enabled features. Like the format-specific
 /// errors it wraps, this type is heap-free, `Copy`, and build-invariant.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
@@ -155,6 +181,10 @@ pub enum DecodingError {
     #[cfg(feature = "encoding-bech32")]
     #[error("invalid bech32 string")]
     InvalidBech32(#[source] Bech32Error),
+    /// The input is not valid Base32.
+    #[cfg(feature = "encoding-base32")]
+    #[error("invalid base32 string")]
+    InvalidBase32(#[source] Base32Error),
     /// The input is not valid Base64url.
     #[cfg(feature = "encoding-base64")]
     #[error("invalid base64 string")]

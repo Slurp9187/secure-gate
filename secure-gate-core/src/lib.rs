@@ -88,10 +88,10 @@
 //! │   ├── ConstantTimeEq    ← ct-eq feature
 //! │   ├── CloneableSecret   ← cloneable feature
 //! │   ├── SerializableSecret← serde-serialize feature
-//! │   ├── encoding/         ← ToHex, ToBase64Url, ToBech32, ToBech32m
-//! │   └── decoding/         ← FromHexStr, FromBase64UrlStr, FromBech32Str, FromBech32mStr
+//! │   ├── encoding/         ← ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m
+//! │   └── decoding/         ← FromHexStr, FromBase32Str, FromBase64UrlStr, FromBech32Str, FromBech32mStr
 //! ├── macros/               ← fixed_alias!, fixed_newtype!, dynamic_alias!, dynamic_newtype!, etc.
-//! └── error                 ← FromSliceError, HexError, Base64Error, Bech32Error, DecodingError
+//! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error, DecodingError
 //! ```
 //!
 //! All public items are re-exported at the crate root. Use `secure_gate::Fixed`,
@@ -154,7 +154,7 @@
 //! | **Wrapper trait impl** (ergonomic) | `key.to_hex()` (needs `use secure_gate::ToHex`) | No — grep for `to_hex` directly |
 //! | **Trait via scoped access** (audit-friendly) | `key.with_secret(\|b\| b.to_hex())` | Yes — `with_secret` is grep-able |
 //!
-//! Both levels are impls of the **same** trait ([`ToHex`], [`ToBase64Url`],
+//! Both levels are impls of the **same** trait ([`ToHex`], [`ToBase32`], [`ToBase64Url`],
 //! [`ToBech32`], [`ToBech32m`]): a blanket impl covers the raw bytes inside
 //! `with_secret`, and per-wrapper impls on `Fixed<[u8; N]>` / `Dynamic<Vec<u8>>`
 //! delegate through `with_secret` internally. One trait also means one bound:
@@ -176,6 +176,7 @@
 //! | `serde` | no | Both directions |
 //! | | | **Encoding** |
 //! | `encoding-hex` | no | [`ToHex`] / [`FromHexStr`] via `base16ct` (constant-time) |
+//! | `encoding-base32` | no | [`ToBase32`] / [`FromBase32Str`] via `base32ct` (constant-time) |
 //! | `encoding-base64` | no | [`ToBase64Url`] / [`FromBase64UrlStr`] via `base64ct` (constant-time) |
 //! | `encoding-bech32` | no | [`ToBech32`] / [`FromBech32Str`] — BIP-173, extended ~5 KB limit |
 //! | `encoding-bech32m` | no | [`ToBech32m`] / [`FromBech32mStr`] — BIP-350, standard 90-byte limit |
@@ -188,7 +189,8 @@
 //!
 //! With `default-features = false`:
 //! - [`Fixed<T>`], [`RevealSecret`], [`RevealSecretMut`], [`InnerSecret`]
-//! - [`Fixed::try_from_hex`](Fixed::try_from_hex), [`Fixed::try_from_base64url`](Fixed::try_from_base64url),
+//! - [`Fixed::try_from_hex`](Fixed::try_from_hex), [`Fixed::try_from_base32`](Fixed::try_from_base32),
+//!   [`Fixed::try_from_base64url`](Fixed::try_from_base64url),
 //!   [`Fixed::try_from_bech32`](Fixed::try_from_bech32), [`Fixed::try_from_bech32m`](Fixed::try_from_bech32m)
 //!   (no-alloc stack-based decoding)
 //! - [`fixed_alias!`], [`fixed_generic_alias!`] (type aliases), and
@@ -442,8 +444,8 @@ pub use traits::SentinelValue;
 /// [`InnerSecret`] (the other output wrapper, for owned secret extraction).
 ///
 /// Returned by all `*_zeroizing` encoding methods (`to_hex_zeroizing`,
-/// `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.). Wraps
-/// `Zeroizing<String>` with `Debug` → `[REDACTED]`. Implements `Deref<Target = str>`,
+/// `to_base32_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.).
+/// Wraps `Zeroizing<String>` with `Debug` → `[REDACTED]`. Implements `Deref<Target = str>`,
 /// `AsRef<str>`, and `AsRef<[u8]>`. Deliberately **no** `Display`: `{}` on this type is
 /// a compile error, so `Debug` redaction cannot mislead a caller into logging the
 /// encoded secret. Write it out with `&*encoded`.
@@ -485,6 +487,11 @@ pub use traits::SerializableSecret;
 // Type alias macros (always available)
 mod macros;
 
+/// Decodes Base32 strings (`&str`) to `Vec<u8>`. Blanket impl for `AsRef<str>`.
+/// Requires `encoding-base32` + `alloc`. See [`ToBase32`] for the encoding counterpart.
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
+pub use traits::FromBase32Str;
+
 /// Decodes Base64url strings (`&str`) to `Vec<u8>`. Blanket impl for `AsRef<str>`.
 /// Requires `encoding-base64` + `alloc`. See [`ToBase64Url`] for the encoding counterpart.
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
@@ -504,6 +511,12 @@ pub use traits::FromBech32mStr;
 /// Requires `encoding-hex` + `alloc`. See [`ToHex`] for the encoding counterpart.
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub use traits::FromHexStr;
+
+/// Encodes byte data as Base32 strings (RFC 4648 §6, uppercase, no padding).
+/// Blanket impl for `AsRef<[u8]>`. Requires `encoding-base32` + `alloc`.
+/// See [`FromBase32Str`] for the decoding counterpart.
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
+pub use traits::ToBase32;
 
 /// Encodes byte data as Base64url strings (RFC 4648, URL-safe, no padding).
 /// Blanket impl for `AsRef<[u8]>`. Requires `encoding-base64` + `alloc`.
@@ -531,9 +544,10 @@ pub use traits::ToBech32m;
 pub use traits::ToHex;
 
 /// Marker trait for types that support secure decoding (`AsRef<str>`). No methods —
-/// enables blanket impls of [`FromHexStr`], [`FromBase64UrlStr`], etc.
+/// enables blanket impls of [`FromHexStr`], [`FromBase32Str`], [`FromBase64UrlStr`], etc.
 #[cfg(any(
     feature = "encoding-hex",
+    feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
     feature = "encoding-bech32m",
@@ -541,9 +555,10 @@ pub use traits::ToHex;
 pub use traits::SecureDecoding;
 
 /// Marker trait for types that support secure encoding (`AsRef<[u8]>`). No methods —
-/// enables blanket impls of [`ToHex`], [`ToBase64Url`], etc.
+/// enables blanket impls of [`ToHex`], [`ToBase32`], [`ToBase64Url`], etc.
 #[cfg(any(
     feature = "encoding-hex",
+    feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
     feature = "encoding-bech32m",
@@ -556,6 +571,11 @@ pub use traits::SecureEncoding;
 #[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
 pub use error::Bech32Error;
 
+/// Errors from Base32 (RFC 4648 §6, uppercase, unpadded) decoding. Variant shapes are
+/// identical in debug and release builds; only numeric length metadata is carried.
+#[cfg(feature = "encoding-base32")]
+pub use error::Base32Error;
+
 /// Errors from Base64url decoding. Variant shapes are identical in debug and
 /// release builds; only numeric length metadata is carried.
 #[cfg(feature = "encoding-base64")]
@@ -567,7 +587,8 @@ pub use error::Base64Error;
 pub use error::HexError;
 
 /// Unified error type wrapping format-specific decoding errors ([`HexError`],
-/// [`Base64Error`], [`Bech32Error`]). Always available; variants depend on enabled features.
+/// [`Base32Error`], [`Base64Error`], [`Bech32Error`]). Always available; variants depend
+/// on enabled features.
 pub use error::DecodingError;
 
 /// Error returned when a byte slice cannot be converted to `Fixed<[u8; N]>` due to
