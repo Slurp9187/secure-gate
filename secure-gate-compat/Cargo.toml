@@ -34,11 +34,25 @@ proptest = "1.10"
 
 [features]
 # secrecy compatibility shims — drop-in replacements for secrecy v0.8.0 and v0.10.1.
-# Enables `secure_gate::compat::v10` (SecretBox/SecretString/SecretSlice) and
-# `secure_gate::compat::v08` (Secret/SecretString/SecretVec/DebugSecret).
+#
+# The shim modules themselves always compile: `secure_gate_compat::compat::v10`
+# (SecretBox/SecretString/SecretSlice) and `::v08` (Secret/SecretString/SecretVec/
+# DebugSecret) carry no `cfg` on this feature. What the feature does is turn on what
+# those shims need in order to be complete and exercised — `secure-gate`'s `alloc`,
+# `cloneable`, and `serde-serialize`, plus this crate's `serde` dependency — and gate
+# the entire test surface: `tests/compat_suite/` (one `#![cfg]` at the suite root),
+# `tests/finding5_regression.rs`, `tests/migration_full.rs`, the compat trybuild cases,
+# and, through `dual-compat-test`, the side-by-side parity tests in `tests/compat_dual/`.
+# Building without it type-checks the shims and runs none of their tests, which is what
+# the `no features` CI row is for.
+#
+# Note: this does NOT enable this crate's own `serde-serialize` / `serde-deserialize`
+# features, so the shims' `Serialize` / `Deserialize` impls stay off unless you ask for
+# them (`--features secrecy-compat,serde-serialize`). Cargo's `secure-gate/serde-serialize`
+# names the dependency's feature, not the same-named one below.
+#
 # Shared traits (ExposeSecret, CloneableSecret, zeroize re-export) live in compat root.
-# See `src/compat/` for the full migration guides and
-# `tests/compat_suite/` for the exhaustive migration test suite.
+# See `src/compat/` for the full migration guides.
 secrecy-compat = ["secure-gate/alloc", "secure-gate/cloneable", "secure-gate/serde-serialize", "serde"]
 
 # Enables side-by-side parity tests in tests/compat_dual/ that run the exact same
@@ -49,8 +63,11 @@ dual-compat-test = ["secrecy-compat"]
 
 alloc = ["secure-gate/alloc"]
 ct-eq = ["secure-gate/ct-eq"]
-serde-deserialize = ["secure-gate/serde-deserialize"]
-serde-serialize = ["secure-gate/serde-serialize"]
+# Each pulls in `dep:serde` as well as the core feature: the `#[cfg(feature = ...)]`
+# blocks in `src/compat/` name `serde` types directly, so without it these features
+# do not compile on their own.
+serde-deserialize = ["secure-gate/serde-deserialize", "serde"]
+serde-serialize = ["secure-gate/serde-serialize", "serde"]
 serde = ["dep:serde"]
 
 [[test]]
