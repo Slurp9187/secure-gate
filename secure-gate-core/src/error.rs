@@ -9,7 +9,10 @@
 //! | [`Base32Error`] | [`Fixed::try_from_base32`](crate::Fixed::try_from_base32), [`FromBase32Str`](crate::FromBase32Str) | `encoding-base32` |
 //! | [`Base64Error`] | [`Fixed::try_from_base64url`](crate::Fixed::try_from_base64url), [`FromBase64UrlStr`](crate::FromBase64UrlStr) | `encoding-base64` |
 //! | [`Bech32Error`] | `try_from_bech32*`, [`FromBech32Str`](crate::FromBech32Str), [`FromBech32mStr`](crate::FromBech32mStr) | `encoding-bech32` / `encoding-bech32m` |
-//! | [`DecodingError`] | Unified wrapper for all above | Always |
+//!
+//! Every type in this module is produced by a function in this crate. There is no
+//! unified wrapper enum: a caller decoding several formats owns the union it needs,
+//! and nothing here would help it build one.
 //!
 //! # Design: build-invariant, heap-free, forward-compatible
 //!
@@ -21,7 +24,13 @@
 //!   types are `Copy` and work without `alloc`.
 //! - **`#[non_exhaustive]`.** Variants (and fields of struct variants) may be
 //!   added in future releases without a semver-major bump; downstream matches
-//!   need a wildcard arm.
+//!   need a wildcard arm. This is also what lets the crate ship a variant only
+//!   once something produces it, rather than reserving one in advance.
+//! - **No derive macros.** [`Display`](core::fmt::Display) and
+//!   [`Error`](core::error::Error) are written out by hand below. The messages are
+//!   fixed strings and two `usize` fields, which is not enough work to justify
+//!   putting a proc-macro (and `syn`, `quote`, `proc-macro2`) in the dependency
+//!   graph of every downstream build.
 //!
 //! # Security: what errors may reveal
 //!
@@ -33,17 +42,16 @@
 //! hints) are **never** captured, in any build. If even coarse error categories
 //! are sensitive in your deployment, redact errors at the logging boundary.
 
-use thiserror::Error;
+use core::fmt;
 
 /// Error returned when a byte slice cannot be converted to a fixed-size array.
 ///
 /// Carries the expected and actual lengths in all build profiles. Lengths are
 /// public protocol parameters, not secret material.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FromSliceError {
     /// The slice length does not match the target array length.
-    #[error("slice length mismatch: expected {expected}, got {got}")]
     #[non_exhaustive]
     InvalidLength {
         /// Number of bytes the target array requires.
@@ -53,6 +61,18 @@ pub enum FromSliceError {
     },
 }
 
+impl fmt::Display for FromSliceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Self::InvalidLength { expected, got } => {
+                write!(f, "slice length mismatch: expected {expected}, got {got}")
+            }
+        }
+    }
+}
+
+impl core::error::Error for FromSliceError {}
+
 /// Errors produced when decoding Bech32 (BIP-173) or Bech32m (BIP-350) strings.
 ///
 /// *Requires feature `encoding-bech32` or `encoding-bech32m`.*
@@ -61,32 +81,23 @@ pub enum FromSliceError {
 /// strings (such as the received HRP) are ever captured — the caller already
 /// holds the input and the expected HRP.
 #[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Bech32Error {
     /// The Human-Readable Part (HRP) is invalid.
-    #[error("invalid Human-Readable Part (HRP)")]
     InvalidHrp,
-    /// Bit conversion during encoding/decoding failed.
-    ///
-    /// **Currently unreachable.** After `CheckedHrpstring::new()` succeeds, the
-    /// `.byte_iter()` iterator is infallible — all bit-conversion happens during
-    /// the `new()` call and any failure surfaces as `OperationFailed` instead.
-    /// This variant is preserved as public API for forward compatibility should a
-    /// fallible conversion path be introduced in a future release of the `bech32` crate.
-    #[error("bit conversion failed")]
-    ConversionFailed,
     /// General bech32 operation failure (malformed string or checksum mismatch).
-    #[error("bech32 operation failed")]
+    ///
+    /// This is where bit-conversion failures surface too: all bit conversion
+    /// happens inside `CheckedHrpstring::new()`, and the `.byte_iter()` that
+    /// follows a successful `new()` is infallible.
     OperationFailed,
     /// The decoded HRP does not match the HRP the caller required.
     ///
     /// The received HRP is deliberately not captured — it is input-derived text.
     /// The caller passed the expected HRP and holds the input string.
-    #[error("unexpected HRP")]
     UnexpectedHrp,
     /// The decoded payload length does not match the target type's length.
-    #[error("decoded length mismatch: expected {expected}, got {got}")]
     #[non_exhaustive]
     InvalidLength {
         /// Number of bytes the target type requires.
@@ -95,6 +106,23 @@ pub enum Bech32Error {
         got: usize,
     },
 }
+
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+impl fmt::Display for Bech32Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Self::InvalidHrp => f.write_str("invalid Human-Readable Part (HRP)"),
+            Self::OperationFailed => f.write_str("bech32 operation failed"),
+            Self::UnexpectedHrp => f.write_str("unexpected HRP"),
+            Self::InvalidLength { expected, got } => {
+                write!(f, "decoded length mismatch: expected {expected}, got {got}")
+            }
+        }
+    }
+}
+
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+impl core::error::Error for Bech32Error {}
 
 /// Errors produced when decoding Base32 (RFC 4648 §6, uppercase, unpadded) strings.
 ///
@@ -103,15 +131,13 @@ pub enum Bech32Error {
 /// Variant shapes are identical in debug and release builds; only numeric
 /// length metadata is carried.
 #[cfg(feature = "encoding-base32")]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Base32Error {
     /// The string is not valid Base32 (wrong alphabet, wrong case, padding, or
     /// an impossible length).
-    #[error("invalid base32 string")]
     InvalidBase32,
     /// The decoded payload length does not match the target type's length.
-    #[error("decoded length mismatch: expected {expected}, got {got}")]
     #[non_exhaustive]
     InvalidLength {
         /// Number of bytes the target type requires.
@@ -120,6 +146,21 @@ pub enum Base32Error {
         got: usize,
     },
 }
+
+#[cfg(feature = "encoding-base32")]
+impl fmt::Display for Base32Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Self::InvalidBase32 => f.write_str("invalid base32 string"),
+            Self::InvalidLength { expected, got } => {
+                write!(f, "decoded length mismatch: expected {expected}, got {got}")
+            }
+        }
+    }
+}
+
+#[cfg(feature = "encoding-base32")]
+impl core::error::Error for Base32Error {}
 
 /// Errors produced when decoding base64url strings.
 ///
@@ -128,14 +169,12 @@ pub enum Base32Error {
 /// Variant shapes are identical in debug and release builds; only numeric
 /// length metadata is carried.
 #[cfg(feature = "encoding-base64")]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Base64Error {
     /// The string is not valid base64url.
-    #[error("invalid base64 string")]
     InvalidBase64,
     /// The decoded payload length does not match the target type's length.
-    #[error("decoded length mismatch: expected {expected}, got {got}")]
     #[non_exhaustive]
     InvalidLength {
         /// Number of bytes the target type requires.
@@ -144,6 +183,21 @@ pub enum Base64Error {
         got: usize,
     },
 }
+
+#[cfg(feature = "encoding-base64")]
+impl fmt::Display for Base64Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Self::InvalidBase64 => f.write_str("invalid base64 string"),
+            Self::InvalidLength { expected, got } => {
+                write!(f, "decoded length mismatch: expected {expected}, got {got}")
+            }
+        }
+    }
+}
+
+#[cfg(feature = "encoding-base64")]
+impl core::error::Error for Base64Error {}
 
 /// Errors produced when decoding hexadecimal strings.
 ///
@@ -152,14 +206,12 @@ pub enum Base64Error {
 /// Variant shapes are identical in debug and release builds; only numeric
 /// length metadata is carried.
 #[cfg(feature = "encoding-hex")]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum HexError {
     /// The string is not valid hexadecimal.
-    #[error("invalid hex string")]
     InvalidHex,
     /// The decoded payload length does not match the target type's length.
-    #[error("decoded length mismatch: expected {expected}, got {got}")]
     #[non_exhaustive]
     InvalidLength {
         /// Number of bytes the target type requires.
@@ -169,34 +221,17 @@ pub enum HexError {
     },
 }
 
-/// Unified error type for multi-format decoding operations.
-///
-/// Wraps format-specific errors from hex, base32, base64url, bech32, and bech32m decoders.
-/// Always available; variants depend on enabled features. Like the format-specific
-/// errors it wraps, this type is heap-free, `Copy`, and build-invariant.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
-#[non_exhaustive]
-pub enum DecodingError {
-    /// The input is not valid Bech32.
-    #[cfg(feature = "encoding-bech32")]
-    #[error("invalid bech32 string")]
-    InvalidBech32(#[source] Bech32Error),
-    /// The input is not valid Base32.
-    #[cfg(feature = "encoding-base32")]
-    #[error("invalid base32 string")]
-    InvalidBase32(#[source] Base32Error),
-    /// The input is not valid Base64url.
-    #[cfg(feature = "encoding-base64")]
-    #[error("invalid base64 string")]
-    InvalidBase64(#[source] Base64Error),
-    /// The input is not valid hexadecimal.
-    #[cfg(feature = "encoding-hex")]
-    #[error("invalid hex string")]
-    InvalidHex(#[source] HexError),
-    /// The encoding could not be identified.
-    ///
-    /// Deliberately carries no hint text — free-form diagnostics derived from
-    /// the input would embed input data in the error value.
-    #[error("invalid encoding")]
-    InvalidEncoding,
+#[cfg(feature = "encoding-hex")]
+impl fmt::Display for HexError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Self::InvalidHex => f.write_str("invalid hex string"),
+            Self::InvalidLength { expected, got } => {
+                write!(f, "decoded length mismatch: expected {expected}, got {got}")
+            }
+        }
+    }
 }
+
+#[cfg(feature = "encoding-hex")]
+impl core::error::Error for HexError {}

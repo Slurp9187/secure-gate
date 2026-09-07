@@ -15,8 +15,10 @@ libfuzzer-sys = "0.4"
 
 secure-gate = { path = "..", default-features = false, features = ["alloc"] }
 
-# Required for zeroize::Zeroize usage in fuzz targets
-zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
+# Required for zeroize::Zeroize usage in fuzz targets. `zeroize_derive` is requested
+# explicitly: `expose.rs` and `serde.rs` use `#[derive(Zeroize)]`, and the parent
+# `secure-gate` no longer enables that feature for its dependents.
+zeroize = { version = "1.8", default-features = false, features = ["alloc", "zeroize_derive"] }
 
 serde_json = "1.0"
 serde = "1.0"

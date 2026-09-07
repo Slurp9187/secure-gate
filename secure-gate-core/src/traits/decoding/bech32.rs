@@ -105,8 +105,8 @@ pub trait FromBech32Str {
     ///
     /// # Errors
     ///
-    /// - [`Bech32Error::OperationFailed`] — invalid checksum or malformed string.
-    /// - [`Bech32Error::ConversionFailed`] — bit-conversion failure.
+    /// - [`Bech32Error::OperationFailed`] — invalid checksum, malformed string, or
+    ///   bit-conversion failure.
     ///
     /// # Examples
     ///

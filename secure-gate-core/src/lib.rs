@@ -90,7 +90,7 @@
 //! │   ├── encoding/         ← ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m
 //! │   └── decoding/         ← FromHexStr, FromBase32Str, FromBase64UrlStr, FromBech32Str, FromBech32mStr
 //! ├── macros/               ← fixed_alias!, fixed_newtype!, dynamic_alias!, dynamic_newtype!, etc.
-//! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error, DecodingError
+//! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error
 //! ```
 //!
 //! All public items are re-exported at the crate root. Use `secure_gate::Fixed`,
@@ -562,11 +562,6 @@ pub use error::Base64Error;
 /// release builds; only numeric length metadata is carried.
 #[cfg(feature = "encoding-hex")]
 pub use error::HexError;
-
-/// Unified error type wrapping format-specific decoding errors ([`HexError`],
-/// [`Base32Error`], [`Base64Error`], [`Bech32Error`]). Always available; variants depend
-/// on enabled features.
-pub use error::DecodingError;
 
 /// Error returned when a byte slice cannot be converted to `Fixed<[u8; N]>` due to
 /// length mismatch. Produced by `Fixed::try_from(&[u8])`.

@@ -107,9 +107,13 @@ itself.
 
 `secure-gate` has **not** undergone an independent security audit.
 
-The crate is intentionally small and relies on well-vetted dependencies:
+The crate is intentionally small and relies on well-vetted dependencies. `zeroize` is
+the **only** unconditional one — with default features a full `cargo tree` is two lines
+— and every other entry below arrives solely with the feature that names it. No
+proc-macro crate is pulled in unless you enable `serde`; `Display` and `Error` for the
+types in `src/error.rs` are hand-written rather than derived.
 
-- `zeroize` — memory wiping
+- `zeroize` — memory wiping (always)
 - `subtle` — constant-time comparison primitives
 - `rand_core` + `getrandom` — secure randomness (via `rand` feature)
 - `base16ct` — constant-time hex encoding/decoding (RustCrypto)

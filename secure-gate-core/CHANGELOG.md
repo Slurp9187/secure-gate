@@ -189,6 +189,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `T: SecureDecoding` bound and rely on `AsRef<[u8]>` / `AsRef<str>` (or on the
   per-format trait itself) instead. No encoding or decoding behaviour changes.
 
+- **BREAKING: `DecodingError`.** A public enum that no function in the crate ever
+  produced. There was no `From<HexError>`, no constructor, and no signature returning
+  it — its only appearances were the definition, the crate-root re-export, and a block
+  of tests that hand-built values to assert the shape of a type nothing emitted. Code
+  decoding several formats can define the union it actually wants in the same number of
+  lines this removed.
+
+  **Migration:** match the per-format error (`HexError`, `Base32Error`, `Base64Error`,
+  `Bech32Error`) each decode call already returns, or declare your own wrapper enum.
+
+- **BREAKING: `Bech32Error::ConversionFailed`.** Unreachable, and documented as such in
+  its own rustdoc. All bit conversion happens inside `CheckedHrpstring::new()`; the
+  `.byte_iter()` that follows a successful `new()` is infallible, so every call site in
+  the crate maps failure to `OperationFailed`. The variant was retained "for forward
+  compatibility should a fallible conversion path be introduced" — but every error enum
+  here is `#[non_exhaustive]`, which already permits adding a variant in a patch release
+  without breaking downstream matches. It was pre-paying a cost the attribute had
+  covered. The two `# Errors` doc lists that advertised it (`FromBech32Str`,
+  `FromBech32mStr`) named an error those functions could not return; they now fold
+  bit-conversion failure into `OperationFailed`, which is where it actually surfaces.
+
+  **Migration:** delete the arm. `#[non_exhaustive]` means your match already has a
+  wildcard.
+
 ### Security
 
 - **`std::io::Write` on `Dynamic<Vec<u8>>` left the secret in the outgoing buffer when
@@ -302,6 +326,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same-named one in this crate — the two are independent, which is what the gap was.
 
 ### Dependencies
+
+- **`thiserror` removed; `zeroize_derive` moved to `[dev-dependencies]`.** With default
+  features the dependency tree was nine crates, seven of which existed only to serve two
+  proc macros — it is now two:
+
+  ```
+  secure-gate                              secure-gate
+  ├── thiserror                     →      └── zeroize
+  │   └── thiserror-impl (proc-macro)
+  │       ├── proc-macro2 → unicode-ident
+  │       ├── quote
+  │       └── syn
+  └── zeroize
+      └── zeroize_derive (proc-macro)
+          └── proc-macro2, quote, syn (*)
+  ```
+
+  `thiserror` was generating `Display` for 6 enums — 14 fixed strings and 4 messages
+  interpolating two `usize` fields — plus 6 `Error` impls, 5 of them empty. Its one
+  non-trivial job, the `#[source]` chain, existed only on `DecodingError`, removed
+  above. `src/error.rs` now writes both out by hand against `core::error::Error`
+  (stable since 1.81, comfortably below the 1.85 MSRV), so `no_std` is unaffected.
+
+  `#[derive(Zeroize)]` appears nowhere in either crate's `src/` — the wrappers use
+  `Zeroize` and `ZeroizeOnDrop` as *traits* — and every real use is a bench, test, or
+  fuzz target. Enabling the derive feature on the library dependency put a proc macro in
+  every downstream build for something no shipped code used. Neither `secrecy` 0.8.0 nor
+  0.10.1 enables it either, so `secure-gate-compat`'s `pub use zeroize;` now mirrors
+  secrecy's re-export more faithfully than it did; the compat test suite had been
+  receiving the derive through feature unification and now asks for it directly.
+
+  A downstream crate that wants `#[derive(Zeroize)]` adds
+  `zeroize = { version = "1.8", features = ["zeroize_derive"] }` to its own manifest,
+  which it needs anyway to name the macro. Verified across seven core feature
+  combinations, clippy `--all-targets` on both crates, the full test and doctest suites,
+  and the `thumbv7em-none-eabihf` `no_std` cross-build.
 
 - **`cargo audit` is clean again.** The scheduled audit had been red since 2026-08-10.
   One vulnerability and three warnings, none in code this crate ships:
