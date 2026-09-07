@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Proposed — revision 2, rebased on `0.9.0-rc.8` (the #155 newtype macros and the #156 `SecretLen` / trait-impl-encoder restructure) |
 | **Tracking issue** | [#158](https://github.com/Slurp9187/secure-gate/issues/158) |
 | **Target** | 0.9.0 or any later 0.9.x — additive, no breaking change |
 | **Feature flag** | `encoding-base32` (folded into `encoding` → `full`) |
@@ -12,13 +12,17 @@
 ## 1. Goal
 
 Add a fifth encoding format to `secure-gate-core`, Base32 per RFC 4648 §6, with exactly the
-shape the four existing formats have:
+shape the four existing formats have after the #156 restructure:
 
-- an encoding trait (`ToBase32`) with plain and `_zeroizing` methods, blanket-implemented for
-  `AsRef<[u8]>`;
+- an encoding trait (`ToBase32`) with plain and `_zeroizing` methods — a blanket impl for
+  `AsRef<[u8]>` **and** direct impls on the byte-shaped wrappers `Fixed<[u8; N]>` and
+  `Dynamic<Vec<u8>>` that delegate through `with_secret` (one trait, one bound:
+  `fn export<S: ToBase32>(s: &S)` accepts wrappers and forwarding newtypes alike);
 - a decoding trait (`FromBase32Str`) blanket-implemented for `AsRef<str>`;
-- inherent conveniences on `Fixed<[u8; N]>` (including the no-alloc stack decode path) and
-  `Dynamic<Vec<u8>>`;
+- inherent decode constructors `Fixed::try_from_base32` (with the no-alloc stack path) and
+  `Dynamic::try_from_base32` — decoding stays inherent because construction needs `Self`;
+- forwarding from the `fixed_newtype!` / `dynamic_newtype!` macros, so a shaped newtype gets
+  `ToBase32` and `try_from_base32` like it gets the other four formats today;
 - a heap-free, `Copy`, `#[non_exhaustive]`, build-invariant `Base32Error`, plus a
   `DecodingError::InvalidBase32` variant;
 - the same test, fuzz, CI, and documentation coverage the base64 path has.
@@ -103,14 +107,15 @@ RFC 4648 §10 vectors plus the values the existing base64 tests use, all reprodu
 | `"hello"` | `NBSWY3DP` | `NBSWY3DP` |
 | `[0xDE, 0xAD, 0xBE, 0xEF]` | `32W353Y` | `32W353Y=` |
 | `[0x42; 4]` | `IJBEEQQ` | `IJBEEQQ=` |
+| `[0xAB; 4]` (the wrapper doctest vector since #156) | `VOV2XKY` | `VOV2XKY=` |
 | `[0x00; 1]` | `AA` | `AA======` |
 | `[0x00; 3]` | `AAAAA` | `AAAAA===` |
 | `[0x07; 32]` | `A4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQ` (52 chars) | `…A4DQ====` |
 | `[0xAA; 20]` (TOTP seed size) | `VKVKVKVKVKVKVKVKVKVKVKVKVKVKVKVK` (32 chars) | same (20 ≡ 0 mod 5) |
 
-Encoded lengths for comparison: 20 bytes → 32 chars (hex 40, base64url 27);
-32 bytes → 52 chars (hex 64, base64url 43). `encoded_len::<Base32UpperUnpadded>(n)` is a
-`const fn` if a stack buffer size is ever needed.
+Encoded lengths for comparison: 16 bytes → 26 chars; 20 bytes → 32 chars (hex 40,
+base64url 27); 32 bytes → 52 chars (hex 64, base64url 43).
+`encoded_len::<Base32UpperUnpadded>(n)` is a `const fn` if a stack buffer size is ever needed.
 
 ### 3.4 Decode behaviour (`Base32UpperUnpadded::decode_vec`)
 
@@ -183,20 +188,25 @@ Callers who receive lowercase from a third party can `s.to_ascii_uppercase()` be
 document that this makes an ordinary `String` copy of the encoded secret (wrap it in
 `zeroize::Zeroizing<String>` if that matters).
 
-### D3 — Naming
+### D3 — Naming and placement
 
-| Item | Name | Precedent |
+| Item | Name / shape | Precedent |
 |---|---|---|
 | Feature | `encoding-base32` | `encoding-base64` |
-| Encode trait / methods | `ToBase32` — `to_base32()`, `to_base32_zeroizing()` | `ToBase64Url` — `to_base64url()`, `to_base64url_zeroizing()` |
-| Decode trait / method | `FromBase32Str` — `try_from_base32()` | `FromBase64UrlStr` — `try_from_base64url()` |
-| Inherent on `Fixed` / `Dynamic` | `to_base32`, `to_base32_zeroizing`, `try_from_base32` | same shape as base64 |
+| Encode trait / methods | `ToBase32` — `to_base32()`, `to_base32_zeroizing()` | `ToBase64Url` |
+| Decode trait / method | `FromBase32Str` — `try_from_base32()` | `FromBase64UrlStr` |
+| Wrapper encoders | `impl ToBase32 for Fixed<[u8; N]>` and `for Dynamic<Vec<u8>>`, delegating via `with_secret`; **not** inherent (#156) | `impl ToBase64Url for …` |
+| Wrapper decoders | inherent `Fixed::try_from_base32`, `Dynamic::try_from_base32` | `try_from_base64url` |
+| Newtype forwarding | `__sg_if_base32!` helper; `impl ToBase32 for $name` + inherent `try_from_base32` in both front-end macros | `__sg_if_base64!` |
 | Error | `Base32Error::{InvalidBase32, InvalidLength { expected, got }}` | `Base64Error` |
 | Unified error variant | `DecodingError::InvalidBase32(#[source] Base32Error)` | `InvalidBase64` |
 | Modules | `traits/encoding/base32.rs`, `traits/decoding/base32.rs` | `base64_url.rs` |
 
 No "url"/"upper" qualifier in the name: there is one form (D1), and a qualifier would invite a
 second. If D1 is ever relaxed, the *new* variants get the qualifier.
+
+Call sites need `use secure_gate::ToBase32;` to call `key.to_base32()` on a wrapper — the same
+import rule the other four formats acquired in #156.
 
 ### D4 — Error mapping mirrors base64 exactly
 
@@ -232,8 +242,8 @@ lenient decoders). Consequences:
 
 ## 5. Phases
 
-Each phase leaves the tree compiling and green. Line numbers refer to the tree at the time of
-writing and are there to make the touch points easy to find, not as targets to preserve.
+Each phase leaves the tree compiling and green. Line numbers refer to `0.9.0-rc.8`
+(`6ebd15c`) and are there to make the touch points easy to find, not as targets to preserve.
 
 ### Phase 0 — Dependency and features (`secure-gate-core/Cargo.toml`, `Cargo.lock`)
 
@@ -266,13 +276,14 @@ encoding-base64 = ["dep:base64ct"]
 
 - `default-features = false` is a no-op for `base32ct` (it has no default features) but keeps
   the three `*ct` lines uniform.
-- `full` already includes `encoding`; no change.
+- `full` already includes `encoding`; no change. The `--all-features` CI entries added in rc.8
+  pick the feature up automatically.
 - Regenerate `Cargo.lock` with the pinned toolchain (`cargo update -p base32ct` or a plain
   build). The workspace `.cargo/config.toml` MSRV-aware resolver will refuse a future
   `base32ct` release whose `rust-version` exceeds 1.85.
 - `secure-gate-compat` forwards no encoding features; nothing to do there.
 
-### Phase 1 — Error types (`src/error.rs`)
+### Phase 1 — Error types (`src/error.rs`, unchanged by rc.8)
 
 - Add `Base32Error` between `Bech32Error` and `Base64Error`, a copy of `Base64Error` with the
   names swapped:
@@ -318,7 +329,7 @@ encoding-base64 = ["dep:base64ct"]
 
 ### Phase 2 — Traits
 
-**`src/traits/encoding/base32.rs` (new)** — mirror `base64_url.rs`:
+**`src/traits/encoding/base32.rs` (new)** — mirror `base64_url.rs` as it reads after #156:
 
 ```rust
 //! Base32 encoding trait (RFC 4648 §6, uppercase, unpadded).
@@ -349,13 +360,21 @@ encoding-base64 = ["dep:base64ct"]
 //! let secret = Fixed::new([0x42u8; 4]);
 //! let b32 = secret.with_secret(|s| s.to_base32());
 //! assert_eq!(b32, "IJBEEQQ");
-//! assert_eq!(secret.to_base32(), "IJBEEQQ");
-//! let b32z = secret.to_base32_zeroizing(); // EncodedSecret — zeroized on drop, redacted Debug
+//! assert_eq!(secret.to_base32(), "IJBEEQQ");   // wrapper impl of the same trait
+//! let b32z = secret.to_base32_zeroizing();     // EncodedSecret — zeroized on drop, redacted Debug
 //! }
 //! ```
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 use base32ct::{Base32UpperUnpadded, Encoding};
 
+/// Extension trait for encoding byte data as Base32 strings (RFC 4648 §6, uppercase, unpadded).
+///
+/// *Requires feature `encoding-base32`.*
+///
+/// Blanket-implemented for all `AsRef<[u8]>` types, and implemented directly on the
+/// byte-shaped wrappers (`Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`). To encode a secret wrapper,
+/// call `key.to_base32()` with this trait in scope, or use `with_secret(|b| b.to_base32())`
+/// for multi-step operations or when audit-greppability matters.
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 pub trait ToBase32 {
     /// Encode bytes as Base32 (RFC 4648 §6 alphabet, uppercase, no padding).
@@ -376,6 +395,10 @@ impl<T: AsRef<[u8]> + ?Sized> ToBase32 for T {
     }
 }
 ```
+
+There is no coherence conflict between this blanket impl and the wrapper impls in Phase 3:
+`Fixed` and `Dynamic` are local and deliberately never implement `AsRef<[u8]>` (the #156
+argument, unchanged).
 
 **`src/traits/decoding/base32.rs` (new)** — mirror `decoding/base64_url.rs`:
 
@@ -431,43 +454,40 @@ impl<T: AsRef<str> + ?Sized> FromBase32Str for T {
   `cfg(all(feature = "encoding-base32", feature = "alloc"))`, table row.
 - `src/traits/decoding/mod.rs`: same for `FromBase32Str`; also add `Fixed::try_from_base32` to
   the "no-alloc targets" sentence.
-- `src/traits/mod.rs`: re-exports (lines 72–99); add `encoding-base32` to **all four**
-  `cfg(any(...))` lists on `SecureEncoding` / `SecureDecoding` and their impls (lines 111–151);
-  update the doc table rows for those two markers (lines 22–23).
+- `src/traits/mod.rs`: re-exports (lines 73–100); add `encoding-base32` to **all four**
+  `cfg(any(...))` lists on `SecureEncoding` / `SecureDecoding` and their impls (lines 112–152);
+  update the doc table rows for those two markers (lines 23–24).
 - `src/traits/revealed_secrets/encoded_secret.rs`: add the feature to the `cfg(any(...))` on
   `EncodedSecret::new` (lines 59–64). Mention `to_base32_zeroizing` in the module docs of
   `encoded_secret.rs` (line 7) and `revealed_secrets/mod.rs` (line 10).
 
-### Phase 3 — Inherent methods
+### Phase 3 — Wrapper impls (`src/fixed.rs`, `src/dynamic.rs`)
+
+Since #156 the wrappers carry **two** things per format: an inherent decode constructor and a
+trait impl for the encoder. Both are copied from the base64 twins with names swapped.
 
 **`src/fixed.rs`**
 
-- Import next to the others (line 94):
+- Import next to the others (lines 94–95):
   `#[cfg(all(feature = "encoding-base32", feature = "alloc"))] use crate::traits::encoding::base32::ToBase32;`
-- Constructor table (line 166): `| [`try_from_base32`](Self::try_from_base32) | `encoding-base32` | Constant-time Base32 decoding |`
-- New impl block directly after the base64 block (after line 611), a copy of lines 490–611 with
-  names swapped and `[0xDE, 0xAD, 0xBE, 0xEF]` ↔ `"32W353Y"` as the doctest vector:
+- Constructor table (line 167): `| [`try_from_base32`](Self::try_from_base32) | `encoding-base32` | Constant-time Base32 decoding |`
+- **Inherent decode constructor**, a copy of the base64 block at lines 397–470 placed directly
+  after it. Doctest vector: `[0xDE, 0xAD, 0xBE, 0xEF]` ↔ `"32W353Y"`, with
+  `use secure_gate::{Fixed, RevealSecret, ToBase32};` in the doctest (the round-trip calls the
+  wrapper's `to_base32`, which needs the trait in scope).
 
   ```rust
-  /// Base32 encoding and decoding for `Fixed<[u8; N]>`.
+  /// Base32 decoding for `Fixed<[u8; N]>` (RFC 4648 §6, uppercase, unpadded).
   ///
-  /// Encoding uses a constant-time backend (`base32ct`). Decoding works with or without
-  /// the `alloc` feature — on no-alloc targets the bytes are decoded directly into a
-  /// `Zeroizing<[u8; N]>` stack buffer.
+  /// Uses a constant-time backend (`base32ct`). Works with or without the `alloc`
+  /// feature — on no-alloc targets the bytes are decoded directly into a
+  /// `Zeroizing<[u8; N]>` stack buffer. Encoding lives on the [`ToBase32`] impl.
   #[cfg(feature = "encoding-base32")]
   impl<const N: usize> Fixed<[u8; N]> {
-      #[cfg(feature = "alloc")]
-      #[inline]
-      pub fn to_base32(&self) -> alloc::string::String {
-          self.with_secret(|s: &[u8; N]| s.to_base32())
-      }
-
-      #[cfg(feature = "alloc")]
-      #[inline]
-      pub fn to_base32_zeroizing(&self) -> crate::EncodedSecret {
-          self.with_secret(|s: &[u8; N]| s.to_base32_zeroizing())
-      }
-
+      /// # Errors
+      ///
+      /// - [`Base32Error::InvalidBase32`] — wrong alphabet or case, padding, or impossible length.
+      /// - [`Base32Error::InvalidLength`] — decoded byte count does not equal `N`.
       pub fn try_from_base32(s: &str) -> Result<Self, crate::error::Base32Error> {
           #[cfg(feature = "alloc")]
           {
@@ -499,8 +519,26 @@ impl<T: AsRef<str> + ?Sized> FromBase32Str for T {
   }
   ```
 
-  Doc comments (omitted above for brevity) copy the base64 ones verbatim with names swapped,
-  including the `# Errors` list and the feature-gated doctests.
+- **Encoder trait impl**, a copy of the `ToBase64Url` impl at lines 606–627 placed directly
+  after it (doctest: `Fixed::new([0xABu8; 4]).to_base32() == "VOV2XKY"`):
+
+  ```rust
+  /// Base32 encoding for `Fixed<[u8; N]>`; delegates via `with_secret`.
+  ///
+  /// Bring the trait into scope to call these: `use secure_gate::ToBase32;`.
+  #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
+  impl<const N: usize> ToBase32 for Fixed<[u8; N]> {
+      #[inline]
+      fn to_base32(&self) -> alloc::string::String {
+          self.with_secret(|s| s.to_base32())
+      }
+
+      #[inline]
+      fn to_base32_zeroizing(&self) -> crate::EncodedSecret {
+          self.with_secret(|s| s.to_base32_zeroizing())
+      }
+  }
+  ```
 
 **`src/dynamic.rs`**
 
@@ -509,24 +547,12 @@ impl<T: AsRef<str> + ?Sized> FromBase32Str for T {
 - Imports: `ToBase32` next to line 113, `FromBase32Str` next to line 127 (both gated on
   `encoding-base32` only — `Dynamic` is always `alloc`).
 - Constructor table (line 166): `| [`try_from_base32(s)`](Self::try_from_base32) | `encoding-base32` | Constant-time Base32 decoding |`
-- New impl block after the base64 block (after line 304):
+- Inherent decode constructor after the base64 one (lines 253–265):
 
   ```rust
-  // Base32 encoding and decoding for Dynamic<Vec<u8>>.
+  // Base32 decoding for Dynamic<Vec<u8>>. Encoding lives on the ToBase32 impl below.
   #[cfg(feature = "encoding-base32")]
   impl Dynamic<Vec<u8>> {
-      /// Encodes the secret bytes as an uppercase, unpadded Base32 string (RFC 4648 §6).
-      #[inline]
-      pub fn to_base32(&self) -> alloc::string::String {
-          self.with_secret(|s: &Vec<u8>| s.to_base32())
-      }
-
-      /// Encodes the secret bytes as Base32, returning [`EncodedSecret`](crate::EncodedSecret).
-      #[inline]
-      pub fn to_base32_zeroizing(&self) -> crate::EncodedSecret {
-          self.with_secret(|s: &Vec<u8>| s.to_base32_zeroizing())
-      }
-
       /// Decodes an uppercase, unpadded Base32 string into `Dynamic<Vec<u8>>`.
       ///
       /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
@@ -537,29 +563,118 @@ impl<T: AsRef<str> + ?Sized> FromBase32Str for T {
   }
   ```
 
-The compile-fail probe `tests/compile-fail/dynamic_string_no_hex.rs` already proves the
-"no encoding methods on `Dynamic<String>`" property generically (E0599 on `to_hex`); adding a
-`to_base32` line would only change the blessed `.stderr`. Leave it.
+- Encoder trait impl after the `ToBase64Url` one (lines 430–453):
+
+  ```rust
+  /// Base32 encoding for `Dynamic<Vec<u8>>`; delegates via `with_secret`.
+  ///
+  /// Bring the trait into scope: `use secure_gate::ToBase32;`.
+  #[cfg(feature = "encoding-base32")]
+  impl ToBase32 for Dynamic<Vec<u8>> {
+      #[inline]
+      fn to_base32(&self) -> alloc::string::String {
+          self.with_secret(|s| s.to_base32())
+      }
+
+      #[inline]
+      fn to_base32_zeroizing(&self) -> crate::EncodedSecret {
+          self.with_secret(|s| s.to_base32_zeroizing())
+      }
+  }
+  ```
+
+`Dynamic<String>` gets nothing, as with the other formats. The existing compile-fail probe
+`tests/compile-fail/dynamic_string_no_hex.rs` (which now imports `ToHex` and proves the impl
+genuinely does not exist) already pins that property generically; a base32 twin would only add
+a `.stderr` to bless. Leave it.
+
+### Phase 3b — Newtype macro forwarding (`src/macros/`)
+
+Shaped newtypes (`fixed_newtype!(Name, N)`, `dynamic_newtype!(Name, Vec<u8>)`) forward every
+encoding format; the `String` and `generic` arms deliberately forward none. Base32 joins the
+list the same way base64 is in it.
+
+- `src/macros/newtype_common.rs`: add a `__sg_if_base32!` pair beside `__sg_if_base64!`
+  (lines 322–331):
+
+  ```rust
+  #[doc(hidden)]
+  #[macro_export]
+  #[cfg(feature = "encoding-base32")]
+  macro_rules! __sg_if_base32 { ($($t:tt)*) => { $($t)* }; }
+  #[doc(hidden)]
+  #[macro_export]
+  #[cfg(not(feature = "encoding-base32"))]
+  macro_rules! __sg_if_base32 {
+      ($($t:tt)*) => {};
+  }
+  ```
+
+- `src/macros/fixed_newtype.rs`: a block after the base64 one (lines 269–289). The decode
+  constructor is outside `__sg_if_alloc!` (it works no-alloc); the encoder impl is inside it:
+
+  ```rust
+  $crate::__sg_if_base32! {
+      impl $name {
+          /// Constant-time Base32 decode into this secret type.
+          #[inline]
+          pub fn try_from_base32(s: &str) -> ::core::result::Result<Self, $crate::Base32Error> {
+              ::core::result::Result::Ok(Self($crate::Fixed::try_from_base32(s)?))
+          }
+      }
+      $crate::__sg_if_alloc! {
+          impl $crate::ToBase32 for $name {
+              #[inline]
+              fn to_base32(&self) -> $crate::__private::String {
+                  $crate::ToBase32::to_base32(&self.0)
+              }
+              #[inline]
+              fn to_base32_zeroizing(&self) -> $crate::EncodedSecret {
+                  $crate::ToBase32::to_base32_zeroizing(&self.0)
+              }
+          }
+      }
+  }
+  ```
+
+- `src/macros/dynamic_newtype.rs`: same block after lines 275–295, without the `__sg_if_alloc!`
+  layer and delegating to `<$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_base32`.
+- Macro rustdoc: wherever the front-end macros enumerate the forwarded encoders (search the
+  three macro files and `src/macros/mod.rs` for `ToBech32m`), add `ToBase32` /
+  `try_from_base32`. `secure-gate-core/docs/composability_restructure.md` line 185 and
+  `docs/nominal_newtypes.md` list the four traits as a historical record; a one-word update is
+  fine but not required.
+- `tests/macros_suite/newtype_surface.rs`: import `ToBase32`; in `fixed_full_surface` and
+  `dynamic_vec_full_surface` add the base32 round trip beside the base64 one
+  (`let b32 = h.to_base32(); assert_eq!(EncKey::try_from_base32(&b32).unwrap().to_hex(), h.to_hex());`
+  — rename the existing bech32 local `b32` to avoid the clash) and a
+  `to_base32_zeroizing().len()` line beside line 41.
+- `tests/newtype_nostd.rs` (optional): a `#[cfg(feature = "encoding-base32")]` assertion that
+  `NoStdKey::try_from_base32` is callable, pinning the no-alloc forwarding path.
 
 ### Phase 4 — Crate root (`src/lib.rs`)
 
 - Module tree comment (lines 91–94): add `ToBase32`, `FromBase32Str`, `Base32Error`.
-- Feature table (after line 175):
+- Audit-sweep paragraph (line 157) lists the encoder traits — add `ToBase32`.
+- Feature table (after line 179):
   `| `encoding-base32` | no | [`ToBase32`] / [`FromBase32Str`] via `base32ct` (constant-time) |`
-- "What's available without `alloc`" (line 188): add `Fixed::try_from_base32`.
-- Re-exports, alphabetical with the existing ones (lines 451–494), each with the same
+- "What's available without `alloc`" (≈ line 191): add `Fixed::try_from_base32`.
+- Re-exports, alphabetical with the existing ones (lines 477–519), each with the same
   two-line doc style:
   `pub use traits::FromBase32Str;` / `pub use traits::ToBase32;` under
   `cfg(all(feature = "encoding-base32", feature = "alloc"))`, and
   `pub use error::Base32Error;` under `cfg(feature = "encoding-base32")`.
 - Add the feature to both `cfg(any(...))` lists on the `SecureDecoding` / `SecureEncoding`
-  re-exports (lines 498–514); mention `Base32Error` in the `DecodingError` doc (line 533).
+  re-exports (lines 522–539); mention `Base32Error` in the `DecodingError` doc (line 558).
 
 ### Phase 5 — Tests
 
 **`tests/encoding_suite/base32.rs` (new) + `mod base32;` in `encoding_suite/mod.rs`.**
 Mirror `base64.rs` test-for-test with the §3.3/§3.4 vectors, then add the base32-specific
-cases. Every test carries the same `cfg` gates as its base64 twin.
+cases. Imports mirror the base64 file's post-#156 form
+(`use secure_gate::{Fixed, FromBase32Str, RevealSecret, ToBase32};` — the trait import is
+what makes `secret.to_base32()` resolve). Every test carries the same `cfg` gates as its
+base64 twin.
 
 | Test | Asserts |
 |---|---|
@@ -586,10 +701,11 @@ cases. Every test carries the same `cfg` gates as its base64 twin.
 | `base32_accepts_non_canonical_trailing_bits` | `"MZ".try_from_base32() == Ok(vec![0x66])` (pins D5) |
 | `fixed_try_from_base32_totp_seed_size` | `[0xAAu8; 20]` → 32 chars → back |
 | `fixed_try_from_base32_large_n` | `[0x42u8; 128]` |
+| `to_base32_is_generic_over_wrappers` | `fn export<S: ToBase32>(s: &S) -> String` accepts a `Fixed`, a `Dynamic`, and a `fixed_newtype!` (pins the #156 property for the new trait) |
 
 **`tests/proptest_suite/encoding.rs`:** add a `b32_roundtrip` module identical to
-`b64_roundtrip` (256 cases, same length distribution) using `to_base32` /
-`Dynamic::try_from_base32`.
+`b64_roundtrip` (256 cases, same length distribution, `use secure_gate::{Dynamic, RevealSecret, ToBase32}`)
+using `to_base32` / `Dynamic::try_from_base32`.
 
 **`tests/error_tests.rs`:**
 
@@ -600,9 +716,12 @@ cases. Every test carries the same `cfg` gates as its base64 twin.
   has a `source()` whose Display contains `"invalid base32"`.
 
 **`tests/heap_zeroize.rs`:** add `check_decode_base32_zeroed(data: &[u8])` next to the base64
-one (lines 316–334, same `shrink_to_fit` + proxy-window pattern) and call it with
-`[0xAAu8; 16]` and `[0xBBu8; 32]` beside the base64 calls (line 632). Update the comment at
-line 294 ("hex, base32, base64url, bech32, bech32m").
+one (lines 316–334, same `shrink_to_fit` + proxy-window pattern; it encodes a plain slice via
+the blanket impl) and call it with `[0xAAu8; 16]` and `[0xBBu8; 32]` beside the base64 calls
+(line 632). Update the comment at line 294 ("hex, base32, base64url, bech32, bech32m").
+
+**Compile-fail naming:** CI now skips compile-fail tests by the `_compile_fail` name suffix.
+None are planned here, but any that is added must follow that suffix.
 
 ### Phase 6 — Fuzz (`secure-gate-core/fuzz/`)
 
@@ -614,8 +733,8 @@ line 294 ("hex, base32, base64url, bech32, bech32m").
   `base32::encode(base32::Alphabet::Rfc4648 { padding: false }, capped)` (cap 512 bytes like
   the others). Because the oracle produces canonical uppercase unpadded strings, the
   "stable re-encoding" check below is valid (D5).
-- `fuzz_targets/encoding.rs`: a `=== BASE32 ===` section between base64 and bech32 with the
-  four sub-blocks the base64 section has: (a) arbitrary strings into
+- `fuzz_targets/encoding.rs`: import `ToBase32`; a `=== BASE32 ===` section between base64 and
+  bech32 with the four sub-blocks the base64 section has: (a) arbitrary strings into
   `Fixed::<[u8; 32]>::try_from_base32` and `Dynamic::<Vec<u8>>::try_from_base32` must never
   panic; (b) `FuzzBase32String` → decode → `to_base32` equals the input; (c)
   `FuzzFixed16` round-trip (16 bytes ↔ 26 chars); (d) edge cases `""`, `"MY======"`,
@@ -628,19 +747,20 @@ line 294 ("hex, base32, base64url, bech32, bech32m").
 
 ### Phase 7 — CI and local matrix
 
-- `.github/workflows/ci.yml` `test` matrix, after `encoding-base64 only`:
+- `.github/workflows/ci.yml` `test` matrix, after `encoding-base64 only` (lines 132–133):
 
   ```yaml
           - name: encoding-base32 only
             features: "--no-default-features --features=alloc,encoding-base32"
   ```
 
-- `.github/workflows/ci.yml` `no-std` job feature list (lines 244–252): add
+- `.github/workflows/ci.yml` `no-std` job feature list (lines 259–265): add
   `"encoding-base32" \` and extend both combined lines to
   `"encoding-hex,encoding-base32,encoding-base64,encoding-bech32,encoding-bech32m"` (and the
-  `ct-eq,…` twin). This is the only job that compiles the no-alloc `try_from_base32` path.
-- `lint`, `test-release`, `msrv`, `compile-fail` already run with `full` and pick the feature
-  up automatically.
+  `ct-eq,…` twin). This is the only job that compiles the no-alloc `try_from_base32` path,
+  including the `fixed_newtype!` forwarding of it.
+- `lint`, `test`, `test-release`, `msrv`, `compile-fail` run with `full` or `--all-features`
+  and pick the feature up automatically.
 - `secure-gate-core/test_all.sh`: add
   `run_tests "encoding-base32 only" "--no-default-features --features=encoding-base32"`
   beside the base64 line. (The script's encoding entries predate CI's `alloc,` prefix; follow
@@ -648,24 +768,28 @@ line 294 ("hex, base32, base64url, bech32, bech32m").
 
 ### Phase 8 — Documentation
 
-- **`secure-gate-core/README.md`**: line 140 (feature bullet), line 166 ("four formats" →
-  "five formats: hex, base32, base64url, bech32, bech32m"), trait table (172–175), the
-  encode/zeroizing/scoped examples (185–206: add `to_base32` lines), the sentence at 209,
-  decode constructor table (218: `| Base32 | `try_from_base32(s)` | `Base32Error` (RFC 4648 §6,
-  uppercase, unpadded) |`), method lists at 299–300, feature table (331–334). One sentence on
-  TOTP/`otpauth://` under the format table earns its place; keep it to one.
-- **`secure-gate-core/SECURITY.md`**: line 23 (zeroizing variants list), line 116 (dependency
-  list: `base32ct` — constant-time Base32 encoding/decoding (RustCrypto)), feature table
-  rows 208–210, method lists at 231, 249, 379, the grep list at 391–392 (`to_base32`,
-  `to_base32_zeroizing`), and the two-flavour table at 418–423.
-- **`secure-gate-core/CHANGELOG.md`** `[Unreleased]` → `### Added`:
+- **`secure-gate-core/README.md`** (rc.8 line numbers): line 159 (feature bullet), line 185
+  ("four formats" → "five formats: hex, base32, base64url, bech32, bech32m"), trait table
+  (191–194), the encode/zeroizing/scoped examples (204–225: add `to_base32` lines and note the
+  trait import), the sentence at 228, decode constructor table (237: `| Base32 |
+  `try_from_base32(s)` | `Base32Error` (RFC 4648 §6, uppercase, unpadded) |`), method lists at
+  318–319, feature table (353–357). One sentence on TOTP/`otpauth://` under the format table
+  earns its place; keep it to one. The newtype paragraph (≈ line 119) says generated newtypes
+  carry "every wrapper guarantee"; no change needed there.
+- **`secure-gate-core/SECURITY.md`** (unchanged by rc.8): line 23 (zeroizing variants list),
+  line 116 (dependency list: `base32ct` — constant-time Base32 encoding/decoding (RustCrypto)),
+  feature table rows 208–210, method lists at 231, 249, 379, the grep list at 391–392
+  (`to_base32`, `to_base32_zeroizing`), and the two-flavour table at 418–423.
+- **`secure-gate-core/CHANGELOG.md`** — `[Unreleased]` is empty above `[0.9.0-rc.8]`; add
+  `### Added`:
 
-  > **Base32 encoding (`encoding-base32`, #158).** `ToBase32` / `FromBase32Str`, inherent
-  > `to_base32` / `to_base32_zeroizing` / `try_from_base32` on `Fixed<[u8; N]>` and
-  > `Dynamic<Vec<u8>>`, and `Base32Error`. RFC 4648 §6 alphabet, uppercase, unpadded — the
-  > `otpauth://` TOTP/HOTP form — via the constant-time `base32ct` crate. Strict decoding:
-  > lowercase and `=` padding are rejected. Included in the `encoding` and `full`
-  > meta-features; `Fixed::try_from_base32` works without `alloc`.
+  > **Base32 encoding (`encoding-base32`, #158).** `ToBase32` / `FromBase32Str`, `ToBase32`
+  > impls on `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>`, inherent `try_from_base32` on both, and
+  > `Base32Error`; `fixed_newtype!` / `dynamic_newtype!` forward all of it for byte-shaped
+  > newtypes. RFC 4648 §6 alphabet, uppercase, unpadded — the `otpauth://` TOTP/HOTP form —
+  > via the constant-time `base32ct` crate. Strict decoding: lowercase and `=` padding are
+  > rejected. Included in the `encoding` and `full` meta-features; `Fixed::try_from_base32`
+  > works without `alloc`.
 
 - **Root `CHANGELOG.md`** `[Unreleased]`: one pointer line to the core entry, as the existing
   entries do.
@@ -675,12 +799,15 @@ line 294 ("hex, base32, base64url, bech32, bech32m").
 ```sh
 cargo fmt --all --check
 cargo clippy -p secure-gate --tests --benches --features=full -- -D warnings
+cargo clippy -p secure-gate --tests --benches --all-features -- -D warnings
 cargo clippy -p secure-gate --tests --benches --no-default-features --features=alloc,encoding-base32 -- -D warnings
-cargo test  -p secure-gate --tests --no-default-features --features=alloc,encoding-base32
-cargo test  -p secure-gate --tests --no-default-features --features=alloc,encoding
-cargo test  -p secure-gate --tests --features=full
+cargo test  -p secure-gate --tests --no-default-features --features=alloc,encoding-base32 -- --skip compile_fail --skip serializable_secret_misuse
+cargo test  -p secure-gate --tests --no-default-features --features=alloc,encoding         -- --skip compile_fail --skip serializable_secret_misuse
+cargo test  -p secure-gate --tests --features=full                                          -- --skip compile_fail --skip serializable_secret_misuse
+cargo test  -p secure-gate --tests --all-features                                           -- --skip compile_fail --skip serializable_secret_misuse
 cargo test  -p secure-gate --doc   --features=full
-cargo test  -p secure-gate --tests --release --features=full            # build-invariance oracle
+cargo test  -p secure-gate --doc   --all-features
+cargo test  -p secure-gate --tests --release --features=full -- --skip compile_fail --skip serializable_secret_misuse   # build-invariance oracle
 cargo build -p secure-gate --lib --target thumbv7em-none-eabihf --no-default-features --features encoding-base32
 cargo +1.85 check --features=full                                        # MSRV
 cargo +1.85 test  -p secure-gate --features=full --test compile_fail_tests
@@ -696,7 +823,11 @@ invocation, and `--no-default-features --features=std`).
 - [ ] `encoding-base32` exists, is in `encoding` and `full`, and enabling it alone (with
       `alloc`) builds, lints clean, and passes tests.
 - [ ] `--no-default-features --features encoding-base32` cross-builds for
-      `thumbv7em-none-eabihf`; `Fixed::try_from_base32` is available there.
+      `thumbv7em-none-eabihf`; `Fixed::try_from_base32` and the `fixed_newtype!` forwarding of
+      it are available there.
+- [ ] `key.to_base32()` works on `Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`, and shaped newtypes with
+      `use secure_gate::ToBase32;` in scope, and a `S: ToBase32` bound accepts all three.
+- [ ] `Dynamic<String>` and `generic` newtypes get no base32 surface.
 - [ ] Every vector in §3.3 round-trips; every rejection in §3.4 is a test.
 - [ ] `Base32Error` and `DecodingError::InvalidBase32` match the shape/derive/`non_exhaustive`
       contract of the existing errors; `error_tests.rs` covers Display and `source()`.
@@ -704,36 +835,39 @@ invocation, and `--no-default-features --features=std`).
 - [ ] Fuzz `encoding` target exercises base32 with the `base32` crate as oracle and survives
       the 90 s quick run.
 - [ ] CI test matrix and no-std feature lists include the feature; `test_all.sh` updated.
-- [ ] README, SECURITY.md (dependency list, feature table, grep list), both CHANGELOGs, and
-      every `cfg(any(...))` feature list in `src/` mention the feature — grep for
-      `encoding-base64` and confirm each hit has a base32 twin where one makes sense.
-- [ ] `cargo doc --all-features` has no broken intra-doc links.
+- [ ] README, SECURITY.md (dependency list, feature table, grep list), both CHANGELOGs, macro
+      rustdoc, and every `cfg(any(...))` feature list in `src/` mention the feature — grep for
+      `encoding-base64` and `__sg_if_base64` and confirm each hit has a base32 twin where one
+      makes sense.
+- [ ] `cargo doc --all-features` has no new broken intra-doc links (baseline: 17 pre-existing).
 
 ## 7. Estimated effort
 
 | Phase | Estimate |
 |---|---|
 | 0–1 Dependency, features, errors | 20 min |
-| 2–3 Traits + inherent methods (mostly transcription) | 45 min |
+| 2–3 Traits + wrapper impls (mostly transcription) | 45 min |
+| 3b Newtype macro forwarding + surface tests | 30 min |
 | 4 Crate-root docs and re-exports | 20 min |
 | 5 Tests | 60 min |
 | 6 Fuzz | 30 min |
 | 7 CI / matrix | 15 min |
 | 8 Docs / changelogs | 40 min |
 | 9 Verification (build time dominated) | 45 min |
-| **Total** | **≈ 4.5 h** |
+| **Total** | **≈ 5 h** |
 
 ## 8. Non-goals and follow-up candidates
 
 | Item | Mechanism if wanted | Why not now |
 |---|---|---|
-| Lowercase Base32 (`to_base32_lower`, `try_from_base32_lower`) | `base32ct::Base32Unpadded`, added in both directions together | No mixed decoder in `base32ct`; adding encode-only breaks round-trip symmetry (D1) |
+| Lowercase Base32 (`to_base32_lower`, `try_from_base32_lower`) | `base32ct::Base32Unpadded`, added in both directions together, plus macro forwarding | No mixed decoder in `base32ct`; adding encode-only breaks round-trip symmetry (D1) |
 | Accept `=`-padded input | `s.trim_end_matches('=')` (zero-copy) before the unpadded decoder; flip `rejects_padding` test | Strict single-form policy, same as base64url (D2) |
 | Accept either case on decode | Dispatch on first alphabetic char, or try Upper then Lower | Second audit path; prefer explicit `_lower` methods |
 | base32hex (RFC 4648 §7), Crockford, z-base-32 | Not in `base32ct`; would need another backend | Out of scope; no constant-time backend available |
 | Consistent too-long-input error across alloc/no-alloc paths (`InvalidLength` vs `InvalidBase32`) | Map `base32ct::Error::InvalidLength` on the no-alloc path to `InvalidLength { expected: N, got: s.len() * 5 / 8 }` | Pre-existing divergence in base64 too; fix all formats in one change (D4) |
 | Error-path partial-decode residue in `*ct::decode_vec` | Decode into a caller-owned `Zeroizing<Vec<u8>>` via `decode` instead of `decode_vec` so a failed decode's partial output is wiped | Applies equally to hex/base64 today; separate issue |
 | `otpauth://` URI builder / TOTP helpers | Out of scope for an encoding crate | — |
+| Backport to `release/0.8` | Same change against the 0.8 tree once #156 is backported there (the changelog says that is planned) | Land on 0.9 first |
 
 ## 9. Risks
 
@@ -752,3 +886,15 @@ invocation, and `--no-default-features --features=std`).
 - **Case strictness surprises users** who paste lowercase from a third-party UI. The error is
   immediate and the docs say how to normalise; if it becomes a recurring complaint, the
   explicit `_lower` methods in §8 are the answer, not silent tolerance.
+- **Macro drift.** The newtype macros duplicate the per-format wiring by hand (`__sg_if_*`
+  helper plus a block in each front end). Forgetting one front end compiles fine and silently
+  leaves that newtype shape without base32; the `newtype_surface.rs` additions in Phase 3b are
+  what catch it.
+
+## 10. Revision history
+
+- **r2 (post `0.9.0-rc.8`)** — rebased on the #156 restructure: wrapper encoders are trait
+  impls, decode constructors stay inherent; added Phase 3b for the #155 newtype macros; added
+  the generic-bound test and acceptance criteria; refreshed every line reference; verification
+  commands use the new `--skip compile_fail` convention and the `--all-features` matrix entries.
+- **r1** — initial plan against `8e980b7`.

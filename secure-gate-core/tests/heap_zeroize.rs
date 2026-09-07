@@ -291,13 +291,17 @@ fn check_string_zeroed(size: usize) {
 //
 // Verifies that decoding into a `Dynamic<Vec<u8>>` and then dropping the
 // result correctly zeroizes the backing buffer. Each function exercises a
-// different decode path (hex, base64url, bech32, bech32m) to confirm that
-// all six constructors using `from_protected_bytes` produce a correctly
+// different decode path (hex, base32, base64url, bech32, bech32m) to confirm
+// that all seven constructors using `from_protected_bytes` produce a correctly
 // zeroized result on the happy path.
 //
-// Note: on the error path (invalid input) no `Vec` is returned by the decoder,
-// so there is no intermediate buffer — the `?` propagates before our code ever
-// holds bytes.
+// Note: on the error path (invalid input) no `Vec` reaches our code — the `?`
+// propagates before we ever hold bytes, so there is no buffer of ours to zeroize.
+// The decoders' own scratch buffers are a separate matter and outside this crate's
+// control: base16ct/base32ct/base64ct decode into a plain `Vec` and only check the
+// accumulated error flag at the end, so a near-miss input leaves decoded plaintext
+// in a buffer they drop un-zeroized. That is an upstream property, identical across
+// all three formats, and these checks deliberately cover only our own buffers.
 //
 // The decode is performed OUTSIDE the proxy window to avoid false positives
 // from decoder-internal allocations of the same size. Only the final drop of
@@ -310,6 +314,26 @@ fn check_decode_hex_zeroed(hex: &str, expected_len: usize) {
         let secret = Dynamic::<Vec<u8>>::try_from_hex(hex).expect("valid hex");
         core::hint::black_box(&secret);
         drop(secret); // explicit: must occur while CHECKING is true
+    });
+}
+
+#[cfg(feature = "encoding-base32")]
+fn check_decode_base32_zeroed(data: &[u8]) {
+    use secure_gate::ToBase32;
+    let encoded = data.to_base32();
+    let mut secret = Dynamic::<Vec<u8>>::try_from_base32(&encoded).expect("valid base32");
+    // Shrink to exact len so TARGET_SIZE matches layout.size() on dealloc.
+    secret.with_secret_mut(|v| {
+        v.shrink_to_fit();
+        assert_eq!(
+            v.capacity(),
+            data.len(),
+            "allocator rounded up capacity after shrink_to_fit — proxy check would be skipped"
+        );
+    });
+    with_proxy_check(data.len(), move || {
+        core::hint::black_box(&secret);
+        drop(secret);
     });
 }
 
@@ -627,6 +651,12 @@ fn all_heap_zeroed() {
     {
         check_decode_hex_zeroed("deadbeef", 4);
         check_decode_hex_zeroed("0102030405060708090a0b0c0d0e0f10", 16);
+    }
+
+    #[cfg(feature = "encoding-base32")]
+    {
+        check_decode_base32_zeroed(&[0xAAu8; 16]);
+        check_decode_base32_zeroed(&[0xBBu8; 32]);
     }
 
     #[cfg(feature = "encoding-base64")]

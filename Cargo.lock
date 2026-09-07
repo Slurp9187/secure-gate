@@ -42,6 +42,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd307490d624467aa6f74b0eabb77633d1f758a7b25f12bceb0b22e08d9726f6"
 
 [[package]]
+name = "base32ct"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e27957ac55e90ce032f6736755cd74cea202e97e19f22e8ba2d0bc0413f99ec9"
+
+[[package]]
 name = "base64ct"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -727,6 +733,7 @@ name = "secure-gate"
 version = "0.9.0-rc.8"
 dependencies = [
  "base16ct",
+ "base32ct",
  "base64ct",
  "bech32",
  "criterion",

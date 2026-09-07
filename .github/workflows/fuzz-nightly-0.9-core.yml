@@ -103,21 +103,13 @@ jobs:
             printf 'deadbeef' > "$dir/seed_hex"
             printf 'DEADBEEF' > "$dir/seed_hex_upper"
             printf 'QkJCQg' > "$dir/seed_base64"
+            printf 'NBSWY3DP' > "$dir/seed_base32"
             printf 'test1abcdef' > "$dir/seed_bech32"
+            printf 'fuzz1vehk7cnpwgry9h76' > "$dir/seed_bech32_payload"
             printf '{}' > "$dir/seed_empty_object"
             printf '[]' > "$dir/seed_empty_array"
             printf 'null' > "$dir/seed_null"
             printf 'invalid json' > "$dir/seed_invalid"
-          fi
-
-          # Encoding-specific seeds
-          dir="secure-gate-core/fuzz/corpus/encoding"
-          if [ -d "$dir" ]; then
-            printf 'deadbeef' > "$dir/seed_hex"
-            printf 'DEADBEEF' > "$dir/seed_hex_upper"
-            printf 'QkJCQg' > "$dir/seed_base64"
-            printf 'test1abcdef' > "$dir/seed_bech32"
-            printf 'fuzz1vehk7cnpwgry9h76' > "$dir/seed_bech32_payload"
           fi
 
       - name: Fuzz – ${{ matrix.target }} (${{ matrix.mode }})

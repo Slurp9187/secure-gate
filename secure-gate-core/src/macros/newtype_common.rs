@@ -321,6 +321,17 @@ macro_rules! __sg_newtype_len {
 
 #[doc(hidden)]
 #[macro_export]
+#[cfg(feature = "encoding-base32")]
+macro_rules! __sg_if_base32 { ($($t:tt)*) => { $($t)* }; }
+#[doc(hidden)]
+#[macro_export]
+#[cfg(not(feature = "encoding-base32"))]
+macro_rules! __sg_if_base32 {
+    ($($t:tt)*) => {};
+}
+
+#[doc(hidden)]
+#[macro_export]
 #[cfg(feature = "encoding-base64")]
 macro_rules! __sg_if_base64 { ($($t:tt)*) => { $($t)* }; }
 #[doc(hidden)]

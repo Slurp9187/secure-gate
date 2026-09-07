@@ -20,6 +20,9 @@ include = [
 
 [dependencies]
 base16ct = { version = "1", optional = true, default-features = false }
+# `default-features = false` is a no-op for base32ct (it has none), but keeps the
+# three `*ct` lines uniform.
+base32ct = { version = "0.3", optional = true, default-features = false }
 base64ct = { version = "1", optional = true, default-features = false }
 bech32 = { version = "0.11", default-features = false, optional = true }
 # `sys_rng` provides `rngs::SysRng` without pulling `std`; the `TryRng` /
@@ -59,6 +62,7 @@ default = ["alloc"]
 alloc = [
     "zeroize/alloc",
     "base16ct?/alloc",
+    "base32ct?/alloc",
     "base64ct?/alloc",
     "bech32?/alloc",
 ]
@@ -75,11 +79,13 @@ ct-eq = ["dep:subtle"]
 # Encoding features
 encoding = [
   "encoding-hex",
+  "encoding-base32",
   "encoding-base64",
   "encoding-bech32",
   "encoding-bech32m",
 ]
 encoding-hex = ["dep:base16ct"]
+encoding-base32 = ["dep:base32ct"]
 encoding-base64 = ["dep:base64ct"]
 encoding-bech32 = ["dep:bech32"]
 encoding-bech32m = ["dep:bech32"]

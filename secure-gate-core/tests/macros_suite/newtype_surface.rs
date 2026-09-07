@@ -1,7 +1,7 @@
 //! macros_suite/newtype_surface.rs — full forwarded surface + derive passthrough
 use rand::SeedableRng;
 use secure_gate::{
-    ConstantTimeEq, RevealSecret, SecretLen, ToBase64Url, ToBech32, ToBech32m, ToHex,
+    ConstantTimeEq, RevealSecret, SecretLen, ToBase32, ToBase64Url, ToBech32, ToBech32m, ToHex,
     dynamic_newtype, fixed_newtype,
 };
 
@@ -21,23 +21,31 @@ fn fixed_full_surface() {
     let h = EncKey::try_from_hex(&"ab".repeat(32)).unwrap();
     assert!(h.to_hex().starts_with("abab"));
     assert!(h.to_hex_upper().starts_with("ABAB"));
+    let base32_str = h.to_base32();
+    assert_eq!(
+        EncKey::try_from_base32(&base32_str).unwrap().to_hex(),
+        h.to_hex()
+    );
     let b64 = h.to_base64url();
     assert_eq!(
         EncKey::try_from_base64url(&b64).unwrap().to_hex(),
         h.to_hex()
     );
-    let b32 = h.try_to_bech32("sg").unwrap();
+    let bech32_str = h.try_to_bech32("sg").unwrap();
     assert_eq!(
-        EncKey::try_from_bech32(&b32, "sg").unwrap().to_hex(),
+        EncKey::try_from_bech32(&bech32_str, "sg").unwrap().to_hex(),
         h.to_hex()
     );
-    assert!(EncKey::try_from_bech32_unchecked(&b32).is_ok());
-    let b32m = h.try_to_bech32m("sg").unwrap();
+    assert!(EncKey::try_from_bech32_unchecked(&bech32_str).is_ok());
+    let bech32m_str = h.try_to_bech32m("sg").unwrap();
     assert_eq!(
-        EncKey::try_from_bech32m(&b32m, "sg").unwrap().to_hex(),
+        EncKey::try_from_bech32m(&bech32m_str, "sg")
+            .unwrap()
+            .to_hex(),
         h.to_hex()
     );
-    assert!(EncKey::try_from_bech32m_unchecked(&b32m).is_ok());
+    assert!(EncKey::try_from_bech32m_unchecked(&bech32m_str).is_ok());
+    assert_eq!(h.to_base32_zeroizing().len(), base32_str.len());
     assert_eq!(h.to_base64url_zeroizing().len(), b64.len());
     assert!(h.try_to_bech32_zeroizing("sg").is_ok());
     assert!(h.try_to_bech32m_zeroizing("sg").is_ok());
@@ -52,14 +60,21 @@ fn dynamic_vec_full_surface() {
 
     let h = Token::try_from_hex("deadbeef").unwrap();
     assert_eq!(h.to_hex(), "deadbeef");
+    let base32_str = h.to_base32();
+    assert_eq!(base32_str, "32W353Y");
+    assert_eq!(
+        Token::try_from_base32(&base32_str).unwrap().to_hex(),
+        "deadbeef"
+    );
+    assert_eq!(h.to_base32_zeroizing().len(), base32_str.len());
     let b64 = h.to_base64url();
     assert_eq!(
         Token::try_from_base64url(&b64).unwrap().to_hex(),
         "deadbeef"
     );
-    let b32 = h.try_to_bech32("sg").unwrap();
+    let bech32_str = h.try_to_bech32("sg").unwrap();
     assert_eq!(
-        Token::try_from_bech32(&b32, "sg").unwrap().to_hex(),
+        Token::try_from_bech32(&bech32_str, "sg").unwrap().to_hex(),
         "deadbeef"
     );
     assert!(h.try_to_bech32m("sg").is_ok());
