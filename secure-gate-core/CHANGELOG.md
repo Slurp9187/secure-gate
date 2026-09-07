@@ -347,6 +347,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and eight of them mismatch on stable 1.94 (diagnostic drift only). Every core
   compile-fail test is named `*_compile_fail`, so new cases are excluded automatically;
   the 1.85 `compile-fail` job remains the enforcing run.
+- **`dse-check.yml` gained path filters and a job timeout.** It was the only push/PR
+  workflow in the repo with neither. Unfiltered, any commit touching `main` — a
+  changelog line, a README fix — spent four release builds (2 OS × 2 toolchains)
+  re-proving assembly that had not changed. It now triggers on the inputs the guard
+  actually depends on: `secure-gate-core/src/**` (the zeroize-on-drop paths and
+  `src/bin/asm_check.rs`, which the test compiles), `tests/asm_dse_check.rs`, the two
+  manifests, `Cargo.lock`, and the workflow file. The weekly cron and
+  `workflow_dispatch` are unchanged, so the guard still runs against toolchain drift
+  even in a quiet week — which is how the rustc 1.98 `.set` → `=` alias change above
+  would have been caught regardless. `timeout-minutes: 30` replaces GitHub's
+  360-minute default.
 
 ### Documentation
 
