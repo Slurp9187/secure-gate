@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.0-rc.11] - 2026-09-06
+## [0.8.0-rc.11] - 2026-09-07
 
 > Backported from `main` (PRs #145 and #153). Same defects, adapted to this branch: the
 > `compile-fail` CI job is pinned to 1.70 rather than 1.85, `docs/security_hash_eq.md`
