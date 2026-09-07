@@ -3,7 +3,7 @@
 # =============================================================================
 # test_all.sh — full feature-matrix test runner for secure-gate
 #
-# Mirrors the GitHub CI matrix from .github/workflows/ci.yml (as of 2026-03)
+# Mirrors the GitHub CI matrix from .github/workflows/ci-0.8.yml (as of 2026-03)
 # Run this locally to reproduce CI coverage before pushing.
 #
 # Every cargo invocation below is scoped with `-p secure-gate`, exactly as the CI
