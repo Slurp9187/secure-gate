@@ -2,12 +2,29 @@
 
 | | |
 |---|---|
-| **Status** | Proposed — revision 2, rebased on `0.9.0-rc.8` (the #155 newtype macros and the #156 `SecretLen` / trait-impl-encoder restructure) |
+| **Status** | **Shipped** in 0.9.0-rc.8 — PR [#164](https://github.com/Slurp9187/secure-gate/pull/164), commit `cf43e69`. Retained as a historical record; see the note below. |
+| **Written as** | Proposed — revision 2, rebased on `0.9.0-rc.8` (the #155 newtype macros and the #156 `SecretLen` / trait-impl-encoder restructure) |
 | **Tracking issue** | [#158](https://github.com/Slurp9187/secure-gate/issues/158) |
 | **Target** | 0.9.0 or any later 0.9.x — additive, no breaking change |
 | **Feature flag** | `encoding-base32` (folded into `encoding` → `full`) |
 | **Backend** | [`base32ct`](https://github.com/RustCrypto/formats/tree/master/base32ct) 0.3.x (RustCrypto/formats) |
 | **Sibling precedent** | `encoding-base64` / `base64ct` — this plan mirrors it file-for-file |
+
+> **Historical record — not current documentation.**
+>
+> This document is kept for the reasoning it captures: why Base32 belongs in the crate
+> (§2), the constant-time backend survey, the rejected alternatives, and the shape the
+> implementation was held to. It is **not** a guide to the current tree.
+>
+> It was written against `0.9.0-rc.8` *before* the feature landed. Every line number in it
+> is a snapshot of that moment and has since drifted. More importantly, one wiring step it
+> prescribes was carried out and then deliberately undone in the same release cycle.
+>
+> Divergences identified so far are flagged inline as **\[Superseded]**. Nothing else in
+> the text has been re-verified against the shipped code. For what the crate actually does
+> today, read `secure-gate-core/src/traits/encoding/base32.rs`,
+> `secure-gate-core/src/traits/decoding/base32.rs`, and the `encoding-base32` entries in
+> `secure-gate-core/CHANGELOG.md`.
 
 ## 1. Goal
 
@@ -457,6 +474,14 @@ impl<T: AsRef<str> + ?Sized> FromBase32Str for T {
 - `src/traits/mod.rs`: re-exports (lines 73–100); add `encoding-base32` to **all four**
   `cfg(any(...))` lists on `SecureEncoding` / `SecureDecoding` and their impls (lines 112–152);
   update the doc table rows for those two markers (lines 23–24).
+
+  > **\[Superseded]** This step was performed as written when Base32 landed, then reverted:
+  > `SecureEncoding` and `SecureDecoding` were **removed from the crate** later in
+  > 0.9.0-rc.8. They were empty marker traits with blanket impls over `AsRef<[u8]>` /
+  > `AsRef<str>`, and nothing — including the per-format encoding traits this plan adds —
+  > ever bounded on them. A future format needs no marker wiring: there are no `cfg(any(...))`
+  > lists and no doc-table rows left to update. Only the re-export half of this bullet
+  > (lines 73–100) still applies.
 - `src/traits/revealed_secrets/encoded_secret.rs`: add the feature to the `cfg(any(...))` on
   `EncodedSecret::new` (lines 59–64). Mention `to_base32_zeroizing` in the module docs of
   `encoded_secret.rs` (line 7) and `revealed_secrets/mod.rs` (line 10).
@@ -666,6 +691,9 @@ list the same way base64 is in it.
   `pub use error::Base32Error;` under `cfg(feature = "encoding-base32")`.
 - Add the feature to both `cfg(any(...))` lists on the `SecureDecoding` / `SecureEncoding`
   re-exports (lines 522–539); mention `Base32Error` in the `DecodingError` doc (line 558).
+
+  > **\[Superseded]** The marker re-exports are gone — see the note in Phase 2. The
+  > `DecodingError` doc half of this bullet still applies.
 
 ### Phase 5 — Tests
 
