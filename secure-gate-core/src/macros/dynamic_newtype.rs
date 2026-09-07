@@ -342,6 +342,20 @@ macro_rules! dynamic_newtype {
                 ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
                     $crate::ToBech32::try_to_bech32_zeroizing(&self.0, hrp)
                 }
+                #[inline]
+                fn try_to_bech32_sized<const C: usize>(
+                    &self,
+                    hrp: &str,
+                ) -> ::core::result::Result<$crate::__private::String, $crate::Bech32Error> {
+                    $crate::ToBech32::try_to_bech32_sized::<C>(&self.0, hrp)
+                }
+                #[inline]
+                fn try_to_bech32_sized_zeroizing<const C: usize>(
+                    &self,
+                    hrp: &str,
+                ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
+                    $crate::ToBech32::try_to_bech32_sized_zeroizing::<C>(&self.0, hrp)
+                }
             }
         }
 
@@ -360,6 +374,20 @@ macro_rules! dynamic_newtype {
                     hrp: &str,
                 ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
                     $crate::ToBech32m::try_to_bech32m_zeroizing(&self.0, hrp)
+                }
+                #[inline]
+                fn try_to_bech32m_sized<const C: usize>(
+                    &self,
+                    hrp: &str,
+                ) -> ::core::result::Result<$crate::__private::String, $crate::Bech32Error> {
+                    $crate::ToBech32m::try_to_bech32m_sized::<C>(&self.0, hrp)
+                }
+                #[inline]
+                fn try_to_bech32m_sized_zeroizing<const C: usize>(
+                    &self,
+                    hrp: &str,
+                ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
+                    $crate::ToBech32m::try_to_bech32m_sized_zeroizing::<C>(&self.0, hrp)
                 }
             }
         }

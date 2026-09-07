@@ -93,3 +93,36 @@ fn derive_passthrough_reaches_front_ends() {
     assert!(a.ct_eq(&ApiKey::new(String::from("x"))));
     assert_eq!(Wide::new(vec![1u32]).with_secret(|v| v.len()), 1);
 }
+
+/// The `_sized` bech32 / bech32m methods forwarded by the newtype macros.
+///
+/// The macros expand a `ToBech32` / `ToBech32m` impl per newtype; a const-generic
+/// method is easy to omit from one of the four expansion sites, and the omission
+/// only shows up at a call site like this one.
+#[test]
+fn newtype_forwards_sized_bech32_methods() {
+    use secure_gate::bech32_code_length;
+
+    let k = EncKey::try_from_hex(&"cd".repeat(32)).unwrap();
+
+    // Fixed newtype, both variants, plain and zeroizing.
+    const N: usize = bech32_code_length(2, 32);
+    let b32 = k.try_to_bech32_sized::<N>("sg").unwrap();
+    assert_eq!(b32, k.try_to_bech32("sg").unwrap());
+    assert_eq!(b32.len(), N);
+    assert!(k.try_to_bech32_sized_zeroizing::<N>("sg").is_ok());
+
+    let b32m = k.try_to_bech32m_sized::<N>("sg").unwrap();
+    assert_eq!(b32m, k.try_to_bech32m("sg").unwrap());
+    assert!(k.try_to_bech32m_sized_zeroizing::<N>("sg").is_ok());
+    assert_ne!(b32, b32m);
+
+    // Dynamic newtype, with a payload past the default code length.
+    let big = Token::from_random(900);
+    assert!(big.try_to_bech32("sg").is_err(), "900 bytes exceeds 1023 chars");
+    let wide = big.try_to_bech32_sized::<2048>("sg").unwrap();
+    assert!(wide.starts_with("sg1"));
+    assert!(big.try_to_bech32_sized_zeroizing::<2048>("sg").is_ok());
+    assert!(big.try_to_bech32m_sized::<2048>("sg").is_ok());
+    assert!(big.try_to_bech32m_sized_zeroizing::<2048>("sg").is_ok());
+}

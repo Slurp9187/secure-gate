@@ -303,8 +303,22 @@ impl Dynamic<Vec<u8>> {
     /// HRP comparison is non-constant-time — this is intentional, as the HRP is public
     /// metadata, not secret material.
     pub fn try_from_bech32(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+        Self::try_from_bech32_sized::<{ crate::BECH32_CODE_LENGTH }>(s, expected_hrp)
+    }
+
+    /// Like [`try_from_bech32`](Self::try_from_bech32), accepting strings up to `C`
+    /// characters.
+    ///
+    /// `C` is the bech32 code length: the cap on the whole encoded string. Pass the `C`
+    /// the string was encoded with, or any larger value. See
+    /// [`Bech32Sized`](crate::Bech32Sized) for what `C` above
+    /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
+    pub fn try_from_bech32_sized<const C: usize>(
+        s: &str,
+        expected_hrp: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
         Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
-            s.try_from_bech32(expected_hrp)?,
+            s.try_from_bech32_sized::<C>(expected_hrp)?,
         )))
     }
 
@@ -313,7 +327,15 @@ impl Dynamic<Vec<u8>> {
     /// Use [`try_from_bech32`](Self::try_from_bech32) in security-critical code to prevent
     /// cross-protocol confusion attacks.
     pub fn try_from_bech32_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes) = s.try_from_bech32_unchecked()?;
+        Self::try_from_bech32_unchecked_sized::<{ crate::BECH32_CODE_LENGTH }>(s)
+    }
+
+    /// Like [`try_from_bech32_unchecked`](Self::try_from_bech32_unchecked), accepting
+    /// strings up to `C` characters.
+    pub fn try_from_bech32_unchecked_sized<const C: usize>(
+        s: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes) = s.try_from_bech32_unchecked_sized::<C>()?;
         Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(bytes)))
     }
 }
@@ -330,8 +352,18 @@ impl Dynamic<Vec<u8>> {
         s: &str,
         expected_hrp: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
+        Self::try_from_bech32m_sized::<{ crate::BECH32_CODE_LENGTH }>(s, expected_hrp)
+    }
+
+    /// Like [`try_from_bech32m`](Self::try_from_bech32m), accepting strings up to `C`
+    /// characters. See [`Bech32mSized`](crate::Bech32mSized) for what `C` above
+    /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
+    pub fn try_from_bech32m_sized<const C: usize>(
+        s: &str,
+        expected_hrp: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
         Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
-            s.try_from_bech32m(expected_hrp)?,
+            s.try_from_bech32m_sized::<C>(expected_hrp)?,
         )))
     }
 
@@ -339,7 +371,15 @@ impl Dynamic<Vec<u8>> {
     ///
     /// Use [`try_from_bech32m`](Self::try_from_bech32m) in security-critical code.
     pub fn try_from_bech32m_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes) = s.try_from_bech32m_unchecked()?;
+        Self::try_from_bech32m_unchecked_sized::<{ crate::BECH32_CODE_LENGTH }>(s)
+    }
+
+    /// Like [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked), accepting
+    /// strings up to `C` characters.
+    pub fn try_from_bech32m_unchecked_sized<const C: usize>(
+        s: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes) = s.try_from_bech32m_unchecked_sized::<C>()?;
         Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(bytes)))
     }
 }
@@ -521,6 +561,22 @@ impl ToBech32 for Dynamic<Vec<u8>> {
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
         self.with_secret(|s| s.try_to_bech32_zeroizing(hrp))
     }
+
+    #[inline]
+    fn try_to_bech32_sized<const C: usize>(
+        &self,
+        hrp: &str,
+    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32_sized::<C>(hrp))
+    }
+
+    #[inline]
+    fn try_to_bech32_sized_zeroizing<const C: usize>(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32_sized_zeroizing::<C>(hrp))
+    }
 }
 
 /// Bech32m encoding for `Dynamic<Vec<u8>>`; delegates via `with_secret`.
@@ -542,6 +598,22 @@ impl ToBech32m for Dynamic<Vec<u8>> {
         hrp: &str,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
         self.with_secret(|s| s.try_to_bech32m_zeroizing(hrp))
+    }
+
+    #[inline]
+    fn try_to_bech32m_sized<const C: usize>(
+        &self,
+        hrp: &str,
+    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32m_sized::<C>(hrp))
+    }
+
+    #[inline]
+    fn try_to_bech32m_sized_zeroizing<const C: usize>(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32m_sized_zeroizing::<C>(hrp))
     }
 }
 

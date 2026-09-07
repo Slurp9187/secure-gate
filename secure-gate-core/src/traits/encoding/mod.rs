@@ -29,7 +29,13 @@ pub use base32::ToBase32;
 pub use base64_url::ToBase64Url;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use bech32::ToBech32;
+#[cfg(feature = "encoding-bech32")]
+pub use bech32::{BECH32_CODE_LENGTH, Bech32Sized, Bech32Standard, bech32_code_length};
 #[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 pub use bech32m::ToBech32m;
+#[cfg(feature = "encoding-bech32m")]
+pub use bech32m::{Bech32mSized, Bech32mStandard};
+#[cfg(all(feature = "encoding-bech32m", not(feature = "encoding-bech32")))]
+pub use bech32m::{BECH32_CODE_LENGTH, bech32_code_length};
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub use hex::ToHex;

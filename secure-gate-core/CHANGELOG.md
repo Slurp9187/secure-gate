@@ -106,6 +106,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Zeroizing<[u8; N]>` stack buffer and works without it, like every other
   `Fixed::try_from_*`.
 
+- **Caller-chosen bech32 / bech32m code length.** `Bech32Sized<N>` and `Bech32mSized<N>`
+  are const-generic `Checksum` implementations, and every bech32 and bech32m entry point
+  gained a `_sized::<N>` twin:
+
+  ```rust
+  use secure_gate::{ToBech32, bech32_code_length};
+
+  const N: usize = bech32_code_length(3, 1568);   // hrp "kem", ML-KEM-1024 ciphertext
+  let encoded = ct.try_to_bech32_sized::<N>("kem")?;
+  ```
+
+  Sized twins exist on `ToBech32` / `ToBech32m` (plain and `_zeroizing`), on
+  `FromBech32Str` / `FromBech32mStr` (HRP-checked and `_unchecked`), on
+  `Fixed::try_from_bech32*` and `Dynamic::try_from_bech32*`, and on the surface the
+  `fixed_newtype!` / `dynamic_newtype!` macros forward. `bech32_code_length(hrp_len,
+  payload_bytes)` is a `const fn` that sizes `N` exactly: HRP + separator + base32
+  payload + checksum, all four of which the previous "maximum payload" figures omitted.
+
+  **`N` is a length gate, not part of the encoding.** It never enters the checksum, so
+  the same bytes and HRP encode byte-identically at every `N` that admits them, a string
+  decodes under any `N` at least as large as itself, and a stored value stays valid
+  whatever `N` a later caller picks. Above `BECH32_CODE_LENGTH` the BCH error-detection
+  guarantee lapses — the type docs say so, and the choice is now spelled at the call
+  site rather than baked into a default.
+
 ### Changed
 
 - **BREAKING (pre-release): `len`/`byte_len`/`is_empty` moved from `RevealSecret`
@@ -153,6 +178,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Design record for both changes: `docs/composability_restructure.md`.
   The same restructure is planned as a backport to the 0.8 line before its
   first stable release, so both lines expose the same trait shape.
+
+- **BREAKING: the default bech32 code length is 1023, not 8191, and `Bech32Large` is
+  gone.** `ToBech32` / `FromBech32Str` used a custom checksum whose `CODE_LENGTH` was
+  8191 — eight times the length of the bech32 BCH code, which is 1023 in the `bech32`
+  crate for both `Bech32` and `Bech32m`. That constant is documented upstream as "how
+  long a coded message can be ... for the code to retain its error-correcting
+  properties", so 8191 silently gave every caller a checksum stretched past the point
+  where it detects anything in particular, while the rustdoc claimed it preserved "full
+  checksum validation". The plain methods now use `BECH32_CODE_LENGTH` (1023) on both
+  the bech32 and bech32m paths, and anything longer is an explicit
+  `_sized::<N>` call. `Bech32Large` is removed; write `Bech32Sized<8191>` if you want
+  the old constant, and read that type's guarantee note first.
+
+  **Migration:** a payload over ~630 bytes (3-character HRP) that used to encode now
+  returns `Bech32Error::OperationFailed`. Replace `try_to_bech32(hrp)` with
+  `try_to_bech32_sized::<N>(hrp)`, and the matching decode with
+  `try_from_bech32_sized::<N>(hrp)`, sizing `N` with `bech32_code_length`. Already-encoded
+  strings are unaffected: `N` was never part of the encoding, so they decode unchanged
+  under any `N` at least as large as the string.
+
+- **Three documented bech32 payload limits were wrong and are corrected.** The bech32
+  path advertised "~5 KB (5,115 bytes maximum payload)"; 5,115 bytes does not in fact
+  encode at 8191, because the figure counted only the checksum and forgot the HRP and
+  the `1` separator. The bech32m path advertised a "standard 90-byte payload limit" and
+  "decodes only spec-compliant Bech32m strings", but the stock `Bech32m` code length is
+  1023 characters (~630 bytes) and nothing enforced 90 — that cap is a BIP-173 address
+  convention which neither the `bech32` crate nor this one imposes. The docs now state
+  the real bound, name `bech32_code_length` for computing it, and say plainly that
+  staying inside 90 characters for address-shaped data is the caller's responsibility.
 
 ### Removed
 
@@ -407,6 +461,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and eight of them mismatch on stable 1.94 (diagnostic drift only). Every core
   compile-fail test is named `*_compile_fail`, so new cases are excluded automatically;
   the 1.85 `compile-fail` job remains the enforcing run.
+- **`tests/encoding_suite/bech32_sized.rs`** covers the code-length API against the
+  four invariants it has to hold: `N` never changes the encoding; a string decodes
+  under any `N` at least as large as itself and no smaller; bech32 and bech32m stay
+  mutually undecodable at every `N` (they differ only in target residue, which a shared
+  const-generic checksum could have blurred); and HRP validation, exact length
+  reporting, zeroizing output and the BIP-173/350 vectors behave identically on the
+  `_sized` path. Includes the exact 633/634-byte boundary at `BECH32_CODE_LENGTH`,
+  single-character corruption, truncation and extension, and a deterministic randomized
+  stress run over a ladder of seven code lengths. Property tests in
+  `proptest_suite/encoding.rs` and the `encoding` fuzz target assert the same
+  invariants; `tests/macros_suite/newtype_surface.rs` covers the macro-forwarded sized
+  methods, which are the easiest of the expansion sites to leave out.
+- **The bech32 test module no longer breaks `--all-targets` without `alloc`.** Its trait
+  imports and 38 test `cfg`s named only `encoding-bech32*`, but `ToBech32` and friends
+  require `alloc`, so `--no-default-features --features encoding-bech32 --all-targets`
+  failed to compile with 32 errors. CI never caught it because every encoding row pairs
+  the feature with `alloc` and the no_std job builds `--lib` only.
 - **`dse-check.yml` gained path filters and a job timeout.** It was the only push/PR
   workflow in the repo with neither. Unfiltered, any commit touching `main` — a
   changelog line, a README fix — spent four release builds (2 OS × 2 toolchains)

@@ -597,8 +597,10 @@ impl<const N: usize> Fixed<[u8; N]> {
 
 /// Bech32 (BIP-173) encoding and decoding for `Fixed<[u8; N]>`.
 ///
-/// Uses the extended `Bech32Large` checksum variant (~5 KB payload limit) rather than
-/// the 90-character standard limit. For Bitcoin address formats use `ToBech32m`.
+/// The plain constructors accept strings up to
+/// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH); the `_sized::<C>` constructors
+/// take the code length as a parameter for larger payloads. For Bitcoin address formats
+/// use `ToBech32m` and stay within BIP-173's 90-character convention.
 #[cfg(feature = "encoding-bech32")]
 impl<const N: usize> Fixed<[u8; N]> {
     /// Decodes a Bech32 (BIP-173) string into `Fixed<[u8; N]>`, validating that the HRP
@@ -612,9 +614,26 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// Works without `alloc` — decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
     pub fn try_from_bech32(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
-        use crate::traits::encoding::bech32::Bech32Large;
+        Self::try_from_bech32_sized::<{ crate::BECH32_CODE_LENGTH }>(s, expected_hrp)
+    }
+
+    /// Like [`try_from_bech32`](Self::try_from_bech32), accepting strings up to `C`
+    /// characters.
+    ///
+    /// `C` is the bech32 *code length* -- the cap on the whole encoded string -- and is
+    /// independent of `N`, the decoded byte count this wrapper holds. Pass the `C` the
+    /// string was encoded with, or any larger value. See
+    /// [`Bech32Sized`](crate::Bech32Sized) for what `C` above
+    /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
+    ///
+    /// Works without `alloc` -- decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
+    pub fn try_from_bech32_sized<const C: usize>(
+        s: &str,
+        expected_hrp: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
+        use crate::traits::encoding::bech32::Bech32Sized;
         use bech32::primitives::decode::CheckedHrpstring;
-        let checked = CheckedHrpstring::new::<Bech32Large>(s)
+        let checked = CheckedHrpstring::new::<Bech32Sized<C>>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         // HRP check before any payload byte is materialized (case-insensitive
         // comparison — timing leak is acceptable since HRP is public metadata)
@@ -634,9 +653,17 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// Works without `alloc` — decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
     pub fn try_from_bech32_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        use crate::traits::encoding::bech32::Bech32Large;
+        Self::try_from_bech32_unchecked_sized::<{ crate::BECH32_CODE_LENGTH }>(s)
+    }
+
+    /// Like [`try_from_bech32_unchecked`](Self::try_from_bech32_unchecked), accepting
+    /// strings up to `C` characters.
+    pub fn try_from_bech32_unchecked_sized<const C: usize>(
+        s: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
+        use crate::traits::encoding::bech32::Bech32Sized;
         use bech32::primitives::decode::CheckedHrpstring;
-        let checked = CheckedHrpstring::new::<Bech32Large>(s)
+        let checked = CheckedHrpstring::new::<Bech32Sized<C>>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         let buf = drain_bech32_payload::<N>(&checked)?;
         Ok(Self::new_with(|arr| arr.copy_from_slice(&*buf)))
@@ -646,8 +673,10 @@ impl<const N: usize> Fixed<[u8; N]> {
 
 /// Bech32m (BIP-350) encoding and decoding for `Fixed<[u8; N]>`.
 ///
-/// Uses the standard BIP-350 payload limit (~90 bytes). For large secrets
-/// (ciphertexts, recipients) use `ToBech32` / `Bech32Large` instead.
+/// The plain constructors accept strings up to
+/// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH); the `_sized::<C>` constructors
+/// take the code length as a parameter. Bitcoin address tooling expects BIP-173's
+/// 90-character cap, which is narrower than either and is the caller's to respect.
 #[cfg(feature = "encoding-bech32m")]
 impl<const N: usize> Fixed<[u8; N]> {
     /// Decodes a Bech32m (BIP-350) string into `Fixed<[u8; N]>`, validating that the HRP
@@ -664,8 +693,24 @@ impl<const N: usize> Fixed<[u8; N]> {
         s: &str,
         expected_hrp: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
-        use bech32::{Bech32m, primitives::decode::CheckedHrpstring};
-        let checked = CheckedHrpstring::new::<Bech32m>(s)
+        Self::try_from_bech32m_sized::<{ crate::BECH32_CODE_LENGTH }>(s, expected_hrp)
+    }
+
+    /// Like [`try_from_bech32m`](Self::try_from_bech32m), accepting strings up to `C`
+    /// characters.
+    ///
+    /// `C` is the bech32m *code length*, independent of `N`, the decoded byte count.
+    /// See [`Bech32mSized`](crate::Bech32mSized) for what `C` above
+    /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
+    ///
+    /// Works without `alloc` -- decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
+    pub fn try_from_bech32m_sized<const C: usize>(
+        s: &str,
+        expected_hrp: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
+        use crate::traits::encoding::bech32m::Bech32mSized;
+        use bech32::primitives::decode::CheckedHrpstring;
+        let checked = CheckedHrpstring::new::<Bech32mSized<C>>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         // HRP check before any payload byte is materialized (case-insensitive
         // comparison — timing leak is acceptable since HRP is public metadata)
@@ -685,8 +730,17 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// Works without `alloc` — decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
     pub fn try_from_bech32m_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        use bech32::{Bech32m, primitives::decode::CheckedHrpstring};
-        let checked = CheckedHrpstring::new::<Bech32m>(s)
+        Self::try_from_bech32m_unchecked_sized::<{ crate::BECH32_CODE_LENGTH }>(s)
+    }
+
+    /// Like [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked), accepting
+    /// strings up to `C` characters.
+    pub fn try_from_bech32m_unchecked_sized<const C: usize>(
+        s: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
+        use crate::traits::encoding::bech32m::Bech32mSized;
+        use bech32::primitives::decode::CheckedHrpstring;
+        let checked = CheckedHrpstring::new::<Bech32mSized<C>>(s)
             .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         let buf = drain_bech32_payload::<N>(&checked)?;
         Ok(Self::new_with(|arr| arr.copy_from_slice(&*buf)))
@@ -794,6 +848,22 @@ impl<const N: usize> ToBech32 for Fixed<[u8; N]> {
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
         self.with_secret(|s| s.try_to_bech32_zeroizing(hrp))
     }
+
+    #[inline]
+    fn try_to_bech32_sized<const C: usize>(
+        &self,
+        hrp: &str,
+    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32_sized::<C>(hrp))
+    }
+
+    #[inline]
+    fn try_to_bech32_sized_zeroizing<const C: usize>(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32_sized_zeroizing::<C>(hrp))
+    }
 }
 
 /// Bech32m encoding for `Fixed<[u8; N]>`; delegates via `with_secret`.
@@ -815,6 +885,22 @@ impl<const N: usize> ToBech32m for Fixed<[u8; N]> {
         hrp: &str,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
         self.with_secret(|s| s.try_to_bech32m_zeroizing(hrp))
+    }
+
+    #[inline]
+    fn try_to_bech32m_sized<const C: usize>(
+        &self,
+        hrp: &str,
+    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32m_sized::<C>(hrp))
+    }
+
+    #[inline]
+    fn try_to_bech32m_sized_zeroizing<const C: usize>(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32m_sized_zeroizing::<C>(hrp))
     }
 }
 

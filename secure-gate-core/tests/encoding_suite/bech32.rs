@@ -1,22 +1,31 @@
 //! encoding_suite/bech32.rs — bech32/bech32m encoding/decoding tests
 
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(all(
+    any(feature = "encoding-bech32", feature = "encoding-bech32m"),
+    feature = "alloc"
+))]
 use secure_gate::Bech32Error;
 #[cfg(all(
     any(feature = "encoding-bech32", feature = "encoding-bech32m"),
     feature = "alloc"
 ))]
 use secure_gate::Dynamic;
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(all(
+    any(feature = "encoding-bech32", feature = "encoding-bech32m"),
+    feature = "alloc"
+))]
 use secure_gate::Fixed;
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(all(
+    any(feature = "encoding-bech32", feature = "encoding-bech32m"),
+    feature = "alloc"
+))]
 use secure_gate::RevealSecret;
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use secure_gate::{FromBech32Str, ToBech32};
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 use secure_gate::{FromBech32mStr, ToBech32m};
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn bech32_unchecked_roundtrip_preserves_hrp() {
     let data = b"hello world";
@@ -27,7 +36,7 @@ fn bech32_unchecked_roundtrip_preserves_hrp() {
     assert_eq!(decoded, data);
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn fixed_try_to_bech32_zeroizing_matches_plain() {
     let fixed = Fixed::new([1u8, 2, 3, 4]);
@@ -55,7 +64,7 @@ fn dynamic_try_to_bech32_zeroizing_roundtrip() {
     assert_eq!(decoded, vec![9, 8, 7, 6]);
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn fixed_try_to_bech32_zeroizing_debug_is_redacted() {
     let fixed = Fixed::new([1u8, 2, 3, 4]);
@@ -65,7 +74,7 @@ fn fixed_try_to_bech32_zeroizing_debug_is_redacted() {
     assert_eq!(format!("{encoded:?}"), "[REDACTED]");
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn slice_try_to_bech32_zeroizing() {
     let encoded = b"hello"
@@ -78,21 +87,21 @@ fn slice_try_to_bech32_zeroizing() {
     );
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn bech32_invalid_hrp_encode_fails() {
     let err = b"data".try_to_bech32("");
     assert_eq!(err, Err(Bech32Error::InvalidHrp));
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn try_to_bech32_zeroizing_invalid_hrp_returns_err() {
     let err = b"data".try_to_bech32_zeroizing("");
     assert!(matches!(err, Err(Bech32Error::InvalidHrp)));
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn try_to_bech32_zeroizing_empty_bytes() {
     let encoded = b""
@@ -102,14 +111,14 @@ fn try_to_bech32_zeroizing_empty_bytes() {
     assert!(encoded.starts_with("fuzz1"));
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn bech32_decode_malformed_fails() {
     let err = "notabech32string".try_from_bech32("fuzz");
     assert!(err.is_err());
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn bech32_try_from_bech32_accepts_matching_hrp() {
     let data = b"hello world";
@@ -120,7 +129,7 @@ fn bech32_try_from_bech32_accepts_matching_hrp() {
     assert_eq!(decoded, data);
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn bech32_try_from_bech32_rejects_mismatched_hrp() {
     let data = b"hello world";
@@ -129,7 +138,7 @@ fn bech32_try_from_bech32_rejects_mismatched_hrp() {
     assert!(err.is_err());
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn bech32m_roundtrip() {
     let data = b"payload";
@@ -139,7 +148,7 @@ fn bech32m_roundtrip() {
     assert_eq!(decoded, data);
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn fixed_try_to_bech32m_zeroizing_matches_plain() {
     let fixed = Fixed::new([1u8, 2, 3, 4]);
@@ -167,7 +176,7 @@ fn dynamic_try_to_bech32m_zeroizing_roundtrip() {
     assert_eq!(decoded, vec![1, 3, 3, 7]);
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn fixed_try_to_bech32m_zeroizing_debug_is_redacted() {
     let fixed = Fixed::new([1u8, 2, 3, 4]);
@@ -177,7 +186,7 @@ fn fixed_try_to_bech32m_zeroizing_debug_is_redacted() {
     assert_eq!(format!("{encoded:?}"), "[REDACTED]");
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn slice_try_to_bech32m_zeroizing() {
     let encoded = b"hello"
@@ -190,35 +199,35 @@ fn slice_try_to_bech32m_zeroizing() {
     );
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn bech32m_invalid_hrp_encode_fails() {
     let err = b"data".try_to_bech32m("");
     assert_eq!(err, Err(Bech32Error::InvalidHrp));
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn try_to_bech32m_zeroizing_invalid_hrp_returns_err() {
     let err = b"data".try_to_bech32m_zeroizing("");
     assert!(matches!(err, Err(Bech32Error::InvalidHrp)));
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn try_to_bech32m_zeroizing_data_too_large_returns_err() {
     let err = vec![0u8; 800].try_to_bech32m_zeroizing("fuzzm");
     assert!(matches!(err, Err(Bech32Error::OperationFailed)));
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn bech32m_decode_malformed_fails() {
     let err = "notabech32mstring".try_from_bech32m("fuzzm");
     assert!(err.is_err());
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn bech32m_try_from_bech32m_accepts_matching_hrp() {
     let data = b"hello world";
@@ -229,7 +238,7 @@ fn bech32m_try_from_bech32m_accepts_matching_hrp() {
     assert_eq!(decoded, data);
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn bech32m_try_from_bech32m_rejects_mismatched_hrp() {
     let data = b"hello world";
@@ -262,7 +271,7 @@ fn dynamic_try_from_bech32m_invalid_input_returns_err() {
 }
 
 // No-alloc decode path tests: Fixed::try_from_bech32 / try_from_bech32m work without alloc feature
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32_roundtrip() {
     use secure_gate::ToBech32;
@@ -272,7 +281,7 @@ fn fixed_try_from_bech32_roundtrip() {
     decoded.with_secret(|b| assert_eq!(b, &[1u8, 2, 3, 4]));
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32_hrp_mismatch_fails() {
     use secure_gate::ToBech32;
@@ -281,7 +290,7 @@ fn fixed_try_from_bech32_hrp_mismatch_fails() {
     assert!(Fixed::<[u8; 4]>::try_from_bech32(&encoded, "other").is_err());
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32_unchecked_roundtrip() {
     use secure_gate::ToBech32;
@@ -291,7 +300,7 @@ fn fixed_try_from_bech32_unchecked_roundtrip() {
     decoded.with_secret(|b| assert_eq!(b, &[5u8, 6, 7, 8]));
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32_wrong_length_fails() {
     use secure_gate::ToBech32;
@@ -301,7 +310,7 @@ fn fixed_try_from_bech32_wrong_length_fails() {
     assert!(Fixed::<[u8; 4]>::try_from_bech32(&encoded, "test").is_err());
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32m_roundtrip() {
     use secure_gate::ToBech32m;
@@ -311,7 +320,7 @@ fn fixed_try_from_bech32m_roundtrip() {
     decoded.with_secret(|b| assert_eq!(b, &[0xAAu8, 0xBB, 0xCC, 0xDD]));
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32m_hrp_mismatch_fails() {
     use secure_gate::ToBech32m;
@@ -322,7 +331,7 @@ fn fixed_try_from_bech32m_hrp_mismatch_fails() {
 
 // --- Additional no-alloc Bech32 decode path tests ---
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32_single_byte() {
     use secure_gate::ToBech32;
@@ -332,7 +341,7 @@ fn fixed_try_from_bech32_single_byte() {
     decoded.with_secret(|b| assert_eq!(b, &[0xABu8]));
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32_hrp_case_insensitive() {
     use secure_gate::ToBech32;
@@ -343,7 +352,7 @@ fn fixed_try_from_bech32_hrp_case_insensitive() {
     decoded.with_secret(|b| assert_eq!(b, &[1u8, 2, 3, 4]));
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32_invalid_checksum() {
     use secure_gate::ToBech32;
@@ -359,7 +368,7 @@ fn fixed_try_from_bech32_invalid_checksum() {
     assert!(Fixed::<[u8; 4]>::try_from_bech32(&encoded, "test").is_err());
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32_too_short() {
     use secure_gate::ToBech32;
@@ -379,7 +388,7 @@ fn fixed_try_from_bech32_rejects_bech32m_checksum() {
     assert!(Fixed::<[u8; 4]>::try_from_bech32(&encoded, "test").is_err());
 }
 
-#[cfg(feature = "encoding-bech32")]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32_unchecked_wrong_length() {
     use secure_gate::ToBech32;
@@ -390,7 +399,7 @@ fn fixed_try_from_bech32_unchecked_wrong_length() {
 
 // --- Additional no-alloc Bech32m decode path tests ---
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32m_single_byte() {
     use secure_gate::ToBech32m;
@@ -400,7 +409,7 @@ fn fixed_try_from_bech32m_single_byte() {
     decoded.with_secret(|b| assert_eq!(b, &[0xCDu8]));
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32m_hrp_case_insensitive() {
     use secure_gate::ToBech32m;
@@ -410,7 +419,7 @@ fn fixed_try_from_bech32m_hrp_case_insensitive() {
     decoded.with_secret(|b| assert_eq!(b, &[1u8, 2, 3, 4]));
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32m_invalid_checksum() {
     use secure_gate::ToBech32m;
@@ -425,7 +434,7 @@ fn fixed_try_from_bech32m_invalid_checksum() {
     assert!(Fixed::<[u8; 4]>::try_from_bech32m(&encoded, "key").is_err());
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32m_too_long() {
     use secure_gate::ToBech32m;
@@ -434,7 +443,7 @@ fn fixed_try_from_bech32m_too_long() {
     assert!(Fixed::<[u8; 4]>::try_from_bech32m(&encoded, "key").is_err());
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32m_too_short() {
     use secure_gate::ToBech32m;
@@ -453,7 +462,7 @@ fn fixed_try_from_bech32m_rejects_bech32_checksum() {
     assert!(Fixed::<[u8; 4]>::try_from_bech32m(&encoded, "test").is_err());
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32m_unchecked_roundtrip() {
     use secure_gate::ToBech32m;
@@ -463,7 +472,7 @@ fn fixed_try_from_bech32m_unchecked_roundtrip() {
     decoded.with_secret(|b| assert_eq!(b, &[5u8, 6, 7, 8]));
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 #[test]
 fn fixed_try_from_bech32m_unchecked_wrong_length() {
     use secure_gate::ToBech32m;

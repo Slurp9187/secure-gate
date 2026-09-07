@@ -97,6 +97,15 @@ pub use encoding::ToBase64Url;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use encoding::ToBech32;
 
+#[cfg(feature = "encoding-bech32")]
+pub use encoding::{Bech32Sized, Bech32Standard};
+
+#[cfg(feature = "encoding-bech32m")]
+pub use encoding::{Bech32mSized, Bech32mStandard};
+
+#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+pub use encoding::{BECH32_CODE_LENGTH, bech32_code_length};
+
 #[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
 pub use encoding::ToBech32m;
 
