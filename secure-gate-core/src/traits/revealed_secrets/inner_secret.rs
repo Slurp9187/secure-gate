@@ -52,6 +52,39 @@ impl<T: zeroize::Zeroize> InnerSecret<T> {
         Self(zeroize::Zeroizing::new(inner))
     }
 
+    /// Consumes self and returns the plain inner value.
+    ///
+    /// This is the owned handoff: protection is maximal right up to this call, and this
+    /// call ends it. The returned `T` is an ordinary value with no zeroize-on-drop and
+    /// no redacted `Debug` — you now own the secret and its lifetime.
+    ///
+    /// # Why this exists
+    ///
+    /// Without it `InnerSecret` is a dead end. [`into_zeroizing`](Self::into_zeroizing)
+    /// hands back a [`zeroize::Zeroizing<T>`], which by design exposes no way to move
+    /// its contents out, so the only route to an owned `T` was to clone through the
+    /// deref — a second full copy of the secret, and a wasted allocation for anything
+    /// large. Mirrors [`EncodedSecret::into_inner`](crate::EncodedSecret::into_inner).
+    ///
+    /// No copy is made: the value is moved out and an inert
+    /// [`SentinelValue`](crate::SentinelValue) is left behind to be zeroized in its
+    /// place, the same mechanism `Fixed` and `Dynamic` use for their own `into_inner`.
+    ///
+    /// ```rust
+    /// use secure_gate::{Dynamic, RevealSecret};
+    ///
+    /// let secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3]);
+    /// let v: Vec<u8> = secret.into_inner().into_inner();
+    /// assert_eq!(v, vec![1, 2, 3]);
+    /// ```
+    #[inline(always)]
+    pub fn into_inner(mut self) -> T
+    where
+        T: crate::SentinelValue,
+    {
+        core::mem::replace(&mut *self.0, T::sentinel_value())
+    }
+
     /// Unwraps and returns the underlying [`zeroize::Zeroizing<T>`].
     ///
     /// This is an explicit escape hatch for interoperability with APIs that accept

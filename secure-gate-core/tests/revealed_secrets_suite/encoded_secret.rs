@@ -48,20 +48,20 @@ fn encoded_secret_deref_to_str() {
     assert!(!encoded.is_empty());
 }
 
+/// `Deref<Target = str>` is the single door out; the `AsRef<str>` / `AsRef<[u8]>`
+/// impls were removed because they reached nothing `Deref` does not.
 #[cfg(feature = "encoding-hex")]
 #[test]
-fn encoded_secret_asref_str() {
+fn encoded_secret_deref_is_the_only_door() {
     let encoded = sample_hex_secret();
-    let as_str: &str = encoded.as_ref();
-    assert_eq!(as_str, "deadbeef");
-}
 
-#[cfg(feature = "encoding-hex")]
-#[test]
-fn encoded_secret_asref_bytes() {
-    let encoded = sample_hex_secret();
-    let as_bytes: &[u8] = encoded.as_ref();
-    assert_eq!(as_bytes, b"deadbeef");
+    // Coercion, explicit reborrow, and inherent `str` methods all still work.
+    let as_str: &str = &encoded;
+    assert_eq!(as_str, "deadbeef");
+    assert_eq!(&*encoded, "deadbeef");
+    assert_eq!(encoded.len(), 8);
+    assert!(encoded.starts_with("dead"));
+    assert_eq!(encoded.as_bytes(), b"deadbeef");
 }
 
 #[cfg(feature = "encoding-hex")]
@@ -93,12 +93,9 @@ fn encoded_secret_empty_string() {
     assert_eq!(&*encoded, "");
     assert!(encoded.is_empty());
 
-    let as_str: &str = encoded.as_ref();
+    let as_str: &str = &encoded;
     assert_eq!(as_str, "");
-
-    let encoded = empty.to_hex_zeroizing();
-    let as_bytes: &[u8] = encoded.as_ref();
-    assert!(as_bytes.is_empty());
+    assert_eq!(encoded.as_bytes(), b"");
 
     let encoded = empty.to_hex_zeroizing();
     let plain = encoded.into_inner();

@@ -536,6 +536,18 @@ pub use traits::ToBech32;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use traits::ToBech32m;
 
+/// Opt-in marker for byte-shaped encoding inputs. Every `To*` trait is blanket
+/// implemented for `AsRef<[u8]> + EncodableBytes`; the second bound keeps string-shaped
+/// types out, so an already-encoded value cannot be silently encoded again. Implement it
+/// for your own byte newtype to make it encodable.
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base32",
+    feature = "encoding-base64",
+    feature = "encoding-bech32",
+))]
+pub use traits::EncodableBytes;
+
 /// Bech32 (BIP-173) checksum with a caller-chosen code length. `N` caps the length of
 /// the whole encoded string and never enters the checksum. Above [`BECH32_CODE_LENGTH`]
 /// the BCH error-detection guarantee no longer holds - see the type docs.

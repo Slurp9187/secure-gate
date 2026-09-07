@@ -66,6 +66,25 @@ fn encoded_secret_no_display_compile_fail() {
     t.compile_fail("tests/compile-fail/encoded_secret_no_display.rs");
 }
 
+// Compile-fail tests: the `EncodableBytes` bound keeps string-shaped types out of the
+// encoder blanket impls, so an already-encoded value cannot be re-encoded and a `str`
+// is not silently an encoding input.
+#[cfg(all(feature = "alloc", feature = "encoding-hex"))]
+#[cfg(not(miri))]
+#[test]
+fn encoded_secret_no_reencode_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/encoded_secret_no_reencode.rs");
+}
+
+#[cfg(all(feature = "alloc", feature = "encoding-hex"))]
+#[cfg(not(miri))]
+#[test]
+fn str_not_encodable_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/str_not_encodable.rs");
+}
+
 // Compile-fail test: `SecretLen` must stay narrow. `RevealSecret` covers every
 // inner type (including local user-defined ones), but a custom inner type has
 // no meaningful length — `len()` on it must not compile even with `SecretLen`

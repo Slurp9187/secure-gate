@@ -131,6 +131,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guarantee lapses — the type docs say so, and the choice is now spelled at the call
   site rather than baked into a default.
 
+- **`InnerSecret::into_inner()` — the owned handoff.** `InnerSecret` was a dead end.
+  [`into_zeroizing`] hands back a `Zeroizing<T>`, and `zeroize` deliberately exposes no
+  way to move a value out of that wrapper, so the only route from a `Dynamic<Vec<u8>>`
+  to an owned `Vec<u8>` was to clone through the deref: three calls and a second full
+  copy of the secret, plus a wasted allocation for anything large. `EncodedSecret` has
+  had the equivalent escape hatch all along; the value wrapper did not.
+
+  ```rust
+  let v: Vec<u8> = secret.into_inner().into_inner();
+  ```
+
+  No copy is made. The value is moved out with `mem::replace` and an inert
+  `SentinelValue` is left to be zeroized in its place — the same mechanism `Fixed` and
+  `Dynamic` already use for their own `into_inner`, so the bound (`T: SentinelValue`)
+  excludes nothing that could reach an `InnerSecret` in the first place. The returned
+  `T` is an ordinary value: protection is maximal right up to the call, and the call
+  ends it. Pinned by a test asserting pointer identity, so a future refactor that turns
+  the move back into a copy fails.
+
+- **The encoding traits no longer accept string-shaped inputs.** Every `To*` trait is
+  now blanket-implemented for `AsRef<[u8]> + EncodableBytes` rather than `AsRef<[u8]>`
+  alone. `EncodableBytes` is a public opt-in marker in the same family as
+  `CloneableSecret` and `SerializableSecret`, implemented here for `[u8]`, `[u8; N]` and
+  `Vec<u8>`; implement it for your own byte newtype to make it encodable.
+
+  It exists because `str: AsRef<[u8]>` made every string an encoding *input* even though
+  strings are this crate's decoding input, which produced two silent wrong answers:
+  `encoded.to_hex()` compiled for an `EncodedSecret` (which derefs to `str`) and
+  hex-encoded the *encoded text* — a 32-byte key returning 124 characters — and
+  `"text".to_hex()` encoded a string's UTF-8 by accident. Both are compile errors now,
+  pinned by `encoded_secret_no_reencode` and `str_not_encodable`. Write `.as_bytes()`
+  when the UTF-8 is what you meant.
+
+  Unlike the `SecureEncoding` marker removed earlier in this release, this one is
+  load-bearing: deleting the bound changes which calls compile. Nothing in the byte-side
+  API moved — `[u8; N]`, `Vec<u8>`, `&[u8]` and `b"..."` all encode exactly as before,
+  and `Deref` on `EncodedSecret` is untouched.
+
 ### Changed
 
 - **BREAKING (pre-release): `len`/`byte_len`/`is_empty` moved from `RevealSecret`
@@ -209,6 +247,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   staying inside 90 characters for address-shaped data is the caller's responsibility.
 
 ### Removed
+
+- **BREAKING: `AsRef<str>` and `AsRef<[u8]>` on `EncodedSecret`.** The type now has one
+  accessor, `Deref<Target = str>`, plus the two named consumers `into_inner` (ends
+  zeroization) and `into_zeroizing` (keeps it). The `AsRef` impls reached nothing
+  `Deref` does not: `&str` coercion, `&*encoded`, every inherent `str` method, and
+  method resolution through the deref all still work. For a type whose purpose is
+  making extraction visible, four doors onto the same room was three too many.
+
+  **This does not close the accidental re-encode.** `encoded.to_hex()` still compiles,
+  because method resolution derefs to `str` and `str: AsRef<[u8]>` satisfies the
+  encoder blanket impls — so an already-encoded secret can be encoded a second time,
+  taking the encoded text as input (a 32-byte key comes back as 124 hex characters).
+  A compile-fail test written to pin the fix proved it: *"Expected test case to fail to
+  compile, but it succeeded."* The reachability comes from `Deref`, not from the
+  `AsRef` impls, and removing `Deref` would take the type's primary accessor with it.
+  Recorded in the type's source next to the documented boundary at *Where
+  accident-prevention ends* rather than papered over.
 
 - **BREAKING: `Display` on `EncodedSecret` (#149).** `{}` on an `EncodedSecret` is now a
   compile error. The type printed `[REDACTED]` for `Debug` and the full encoded secret

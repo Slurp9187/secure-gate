@@ -10,8 +10,9 @@
 //! Use plain `String` variants for public encodings (addresses, transaction IDs).
 //!
 //! This is **not** a secret wrapper like [`Fixed`](crate::Fixed) / [`Dynamic`](crate::Dynamic)
-//! — it is a zeroizing `String` wrapper for encoded output. It implements
-//! `Deref<Target = str>` and `AsRef<str>` / `AsRef<[u8]>`.
+//! — it is a zeroizing `String` wrapper for encoded output. Its only accessor is
+//! `Deref<Target = str>`, plus the two named consumers [`into_inner`](EncodedSecret::into_inner)
+//! and [`into_zeroizing`](EncodedSecret::into_zeroizing).
 //!
 //! # No `Display`
 //!
@@ -109,16 +110,14 @@ impl core::fmt::Debug for EncodedSecret {
     }
 }
 
-#[cfg(feature = "alloc")]
-impl core::convert::AsRef<str> for EncodedSecret {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl core::convert::AsRef<[u8]> for EncodedSecret {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
-    }
-}
+// No `AsRef<str>` / `AsRef<[u8]>`: `Deref<Target = str>` already yields `&str` by
+// coercion, by `&*encoded`, and through method resolution, so both impls were doors
+// onto a room `Deref` already opens.
+//
+// Note what this does *not* fix. `encoded.to_hex()` still compiles, because method
+// resolution derefs to `str` and `str: AsRef<[u8]>` satisfies the encoder blanket
+// impls — so an already-encoded secret can still be encoded a second time, taking the
+// encoded text as input. That reachability comes from `Deref`, not from these impls;
+// removing it would mean dropping `Deref`, which is the type's primary accessor.
+// Filed here rather than papered over: it belongs with the documented boundary at
+// [Where accident-prevention ends](crate#where-accident-prevention-ends).

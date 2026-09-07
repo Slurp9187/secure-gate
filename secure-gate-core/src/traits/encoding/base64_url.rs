@@ -67,7 +67,7 @@ pub trait ToBase64Url {
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
-impl<T: AsRef<[u8]> + ?Sized> ToBase64Url for T {
+impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBase64Url for T {
     #[inline(always)]
     fn to_base64url(&self) -> alloc::string::String {
         Base64UrlUnpadded::encode_string(self.as_ref())

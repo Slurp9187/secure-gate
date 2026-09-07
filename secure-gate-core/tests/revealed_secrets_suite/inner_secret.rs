@@ -124,3 +124,44 @@ fn inner_secret_clone_is_not_gated_on_cloneable_secret() {
     let inner: InnerSecret<String> = Dynamic::<String>::new("hunter2".to_string()).into_inner();
     let _cloned: InnerSecret<String> = inner.clone();
 }
+
+/// The owned handoff: one call from `InnerSecret` to the plain value, no clone.
+///
+/// Before this existed, `InnerSecret` was a dead end — `into_zeroizing()` returns a
+/// `Zeroizing<T>`, which deliberately exposes no way to move its contents out, so the
+/// only route to an owned value was cloning through the deref.
+#[cfg(feature = "alloc")]
+#[test]
+fn inner_secret_into_inner_moves_the_value_out() {
+    use secure_gate::{Dynamic, Fixed, RevealSecret};
+
+    // Heap value: the returned Vec must be the same allocation, not a copy.
+    let original = vec![1u8, 2, 3, 4];
+    let ptr = original.as_ptr();
+    let secret: Dynamic<Vec<u8>> = Dynamic::new(original);
+    let v: Vec<u8> = secret.into_inner().into_inner();
+    assert_eq!(v, vec![1, 2, 3, 4]);
+    assert_eq!(v.as_ptr(), ptr, "value was copied instead of moved");
+
+    // Stack value, including an array size past `Default`'s 32-element limit.
+    let key: [u8; 64] = Fixed::new([0xABu8; 64]).into_inner().into_inner();
+    assert_eq!(key, [0xABu8; 64]);
+
+    // String inner type.
+    let s: String = Dynamic::<String>::new(String::from("hunter2"))
+        .into_inner()
+        .into_inner();
+    assert_eq!(s, "hunter2");
+}
+
+/// `into_zeroizing` still works and still protects — the new escape hatch is additive.
+#[cfg(feature = "alloc")]
+#[test]
+fn inner_secret_into_zeroizing_still_available() {
+    use secure_gate::{Dynamic, RevealSecret};
+
+    let z = Dynamic::<Vec<u8>>::new(vec![9u8; 8])
+        .into_inner()
+        .into_zeroizing();
+    assert_eq!(&*z, &vec![9u8; 8]);
+}

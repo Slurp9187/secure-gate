@@ -218,7 +218,7 @@ pub trait ToBech32 {
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
 // encode_lower returns String — requires alloc.
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
+impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBech32 for T {
     #[inline(always)]
     fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error> {
         self.try_to_bech32_sized::<BECH32_CODE_LENGTH>(hrp)

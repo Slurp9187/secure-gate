@@ -73,7 +73,7 @@ pub trait ToHex {
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
 // encode_string requires alloc — the trait itself is alloc-gated.
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
-impl<T: AsRef<[u8]> + ?Sized> ToHex for T {
+impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToHex for T {
     #[inline(always)]
     fn to_hex(&self) -> alloc::string::String {
         base16ct::lower::encode_string(self.as_ref())

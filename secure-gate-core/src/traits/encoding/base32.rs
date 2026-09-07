@@ -72,7 +72,7 @@ pub trait ToBase32 {
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
-impl<T: AsRef<[u8]> + ?Sized> ToBase32 for T {
+impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBase32 for T {
     #[inline(always)]
     fn to_base32(&self) -> alloc::string::String {
         Base32UpperUnpadded::encode_string(self.as_ref())
