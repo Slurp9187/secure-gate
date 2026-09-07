@@ -20,7 +20,7 @@ This document outlines the security model, design choices, strengths, limitation
 - **`panic = "abort"` / SIGKILL / hard crash** — `Drop` impls do not run; secrets are not cleared.
 - **`static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized.
 - **Copies made by caller code** — after `expose_secret()`, encoding, or serialization, the caller holds ordinary non-zeroized memory.
-- **Encoded/serialized output** — `to_hex()`, `to_base64url()`, and serde `Serialize` produce full secrets in ordinary, non-zeroizing `String`s. Prefer the zeroizing variants (`to_*_zeroizing`, `try_to_bech32*_zeroizing`) that return `EncodedSecret` (wrapping `Zeroizing<String>` with redacted `Debug`) when the encoded form must remain sensitive. These zeroizing methods are available both as wrapper conveniences (`Fixed` / `Dynamic`) and on the encoding traits (`ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
+- **Encoded/serialized output** — `to_hex()`, `to_base32()`, `to_base64url()`, and serde `Serialize` produce full secrets in ordinary, non-zeroizing `String`s. Prefer the zeroizing variants (`to_*_zeroizing`, `try_to_bech32*_zeroizing`) that return `EncodedSecret` (wrapping `Zeroizing<String>` with redacted `Debug`) when the encoded form must remain sensitive. These zeroizing methods are available both as wrapper conveniences (`Fixed` / `Dynamic`) and on the encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
 - **All side channels beyond equality timing** — cache, power, EM, and branch-predictor attacks are out of scope.
 - **Allocation-based DoS from deserialization** — `MAX_DESERIALIZE_BYTES` is a post-materialization bound only; the upstream deserializer may allocate arbitrarily first.
 - **Stack/register residue** — temporaries, FFI boundaries, and compiler spills are outside wrapper control.
@@ -113,6 +113,7 @@ The crate is intentionally small and relies on well-vetted dependencies:
 - `subtle` — constant-time comparison primitives
 - `rand_core` + `getrandom` — secure randomness (via `rand` feature)
 - `base16ct` — constant-time hex encoding/decoding (RustCrypto)
+- `base32ct` — constant-time Base32 encoding/decoding (RustCrypto)
 - `base64ct` — constant-time base64url encoding/decoding (RustCrypto)
 - `bech32` — Bech32 / Bech32m checksum encoding
 
@@ -205,8 +206,9 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 | `rand`              | `from_random()` uses system `OsRng` (`rand` 0.9) and panics on failure; `from_rng()` accepts caller-supplied `TryCryptoRng + TryRngCore` and returns `Result`            | Use trusted entropy sources; prefer `from_rng()` where RNG failure should be handled explicitly                                 |
 | `serde-deserialize` | Decodes to inner type; temporary buffers use `zeroize::Zeroizing` (zeroized on rejection too). `Fixed<[u8; N]>` rejects over-length sequences before its buffer can grow, so no unzeroized realloc residue is left behind. 1 MiB default limit (`MAX_DESERIALIZE_BYTES`). See allocation notes below. | Enable for trusted deserialization sources; set a tight limit for untrusted input and enforce transport-level size caps upstream |
 | `serde-serialize`   | Opt-in export via marker trait; audit all implementations                                                                                                                 | Enable sparingly; monitor exfiltration risk                                                                                      |
-| `encoding`          | Meta: enables all encoding sub-features (hex, base64url, bech32, bech32m). Encoding traits require `alloc` (return `String`); `Fixed::try_from_*` decoding works without `alloc`. | Enable per-format instead for minimal surface                                                                                    |
+| `encoding`          | Meta: enables all encoding sub-features (hex, base32, base64url, bech32, bech32m). Encoding traits require `alloc` (return `String`); `Fixed::try_from_*` decoding works without `alloc`. | Enable per-format instead for minimal surface                                                                                    |
 | `encoding-hex`      | Hex encoding/decoding via `base16ct` (constant-time). `ToHex`/`FromHexStr` require `alloc`; `Fixed::try_from_hex` is no-alloc. | Validate inputs upstream; prefer `try_from_hex`                                                                                  |
+| `encoding-base32`   | Base32 encoding/decoding via `base32ct` (constant-time), RFC 4648 §6 — uppercase and unpadded; lowercase and `=` padding are rejected. `ToBase32`/`FromBase32Str` require `alloc`; `Fixed::try_from_base32` is no-alloc. | Validate inputs upstream; prefer `try_from_base32`                                                                               |
 | `encoding-base64`   | Base64url encoding/decoding via `base64ct` (constant-time). `ToBase64Url`/`FromBase64UrlStr` require `alloc`; `Fixed::try_from_base64url` is no-alloc. | Validate inputs upstream; prefer `try_from_base64url`                                                                            |
 | `encoding-bech32`   | Bech32/BIP-173 encoding/decoding. `ToBech32`/`FromBech32Str` require `alloc`; `Fixed::try_from_bech32` is no-alloc via `byte_iter()` drain. HRP-checked decode paths validate the HRP *before* materializing any payload bytes, so a mismatch never leaves decoded secret material in unzeroized memory. HRP comparison is non-constant-time (HRP is public metadata — timing leak is acceptable). | Validate inputs upstream; test empty/invalid HRP                                                                                 |
 | `encoding-bech32m`  | Bech32m/BIP-350 encoding/decoding. `ToBech32m`/`FromBech32mStr` require `alloc`; `Fixed::try_from_bech32m` is no-alloc via `byte_iter()` drain. HRP-checked decode paths validate the HRP *before* materializing any payload bytes, so a mismatch never leaves decoded secret material in unzeroized memory. HRP comparison is non-constant-time (HRP is public metadata — timing leak is acceptable). | Validate inputs upstream; test empty/invalid HRP                                                                                 |
@@ -228,7 +230,7 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 - Use `.ct_eq()` (`ct-eq` feature) for comparisons; avoid `==`. Bound untrusted input size at the transport/parser layer.
 - Audit all `CloneableSecret`/`SerializableSecret` implementations.
 - Validate inputs before encoding/decoding or using format-specific traits.
-- For encoding: prefer zeroizing methods (`to_hex_zeroizing`, `to_hex_upper_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, `try_to_bech32m_zeroizing`) that return `EncodedSecret` when the encoded value should remain protected.
+- For encoding: prefer zeroizing methods (`to_hex_zeroizing`, `to_hex_upper_zeroizing`, `to_base32_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, `try_to_bech32m_zeroizing`) that return `EncodedSecret` when the encoded value should remain protected.
 - Monitor dependencies for CVEs.
 - Treat secrets as radioactive — minimize exposure surface.
 
@@ -246,13 +248,13 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   In most real-world usage (logging, API responses), length is already public metadata anyway (e.g. key length in JWT headers, signature length). Still, contextualize or redact errors when possible.
 - `Fixed<T>` decode constructors previously used `copy_from_slice` into a separate
   stack-allocated `[0u8; N]` before wrapping. **This has been mitigated**: all
-  library-internal decode paths (`try_from_hex`, `try_from_base64url`, `try_from_bech32*`,
-  `TryFrom<&[u8]>`) and the RNG constructors (`from_random`, `from_rng`) now use
-  `Fixed::new_with`, which writes directly into the wrapper's storage and avoids the
-  intermediate slot. The `new(value)` constructor still accepts a pre-constructed array
-  and may produce a brief stack temporary (compiler often eliminates it at opt-level ≥ 1
-  with `#[inline(always)]`). `Dynamic<T>` avoids all stack involvement via
-  `from_protected_bytes` + `mem::swap` (heap-only path).
+  library-internal decode paths (`try_from_hex`, `try_from_base32`,
+  `try_from_base64url`, `try_from_bech32*`, `TryFrom<&[u8]>`) and the RNG constructors
+  (`from_random`, `from_rng`) now use `Fixed::new_with`, which writes directly into the
+  wrapper's storage and avoids the intermediate slot. The `new(value)` constructor still
+  accepts a pre-constructed array and may produce a brief stack temporary (compiler often
+  eliminates it at opt-level ≥ 1 with `#[inline(always)]`). `Dynamic<T>` avoids all stack
+  involvement via `from_protected_bytes` + `mem::swap` (heap-only path).
 - **`static` secrets are never zeroized.** `Fixed::new` is `const fn`, so
   `static SECRET: Fixed<[u8; 32]> = Fixed::new([...]);` compiles without warning.
   Rust does not invoke `Drop` on program-scope statics during the lifetime of the
@@ -376,7 +378,7 @@ Zero-cost claim: performance is indistinguishable from raw arrays (see benchmark
 #### Untrusted Input & Format Enforcement
 
 - Validate and sanitize all inputs before any decoding operation
-- Use specific traits (`FromBech32Str`, `FromHexStr`, `FromBase64UrlStr`) when the expected format is known — they enforce strict parsing rules
+- Use specific traits (`FromBech32Str`, `FromHexStr`, `FromBase32Str`, `FromBase64UrlStr`) when the expected format is known — they enforce strict parsing rules. `FromBase32Str` accepts only the RFC 4648 §6 uppercase, unpadded form; lowercase and `=` padding are rejected rather than normalized. Note that Base32 decoding is **not injective**: non-canonical trailing bits are ignored rather than rejected, so distinct strings (`"MZ"` and `"MY"`) decode to identical bytes — never treat a successful decode as proof that two encoded strings were equal
 - Fuzz parsers and boundary cases in CI; treat all decoding input as untrusted
 - Temporary decode buffers for `Dynamic<Vec<u8>>` and `Dynamic<String>` constructors and `Deserialize` impls are wrapped in `zeroize::Zeroizing` — buffers are zeroized even if a panic occurs between a successful decode and wrapper construction (#96, #97)
 - `Dynamic<Vec<u8>>` and `Dynamic<String>` deserialization rejects payloads exceeding `MAX_DESERIALIZE_BYTES` (1 MiB); oversized buffers are zeroized before deallocation. Use `deserialize_with_limit` for custom ceilings. (#99)
@@ -388,9 +390,9 @@ All secret materialization requires an explicit call. Use `rg`, `grep -rn`, or y
 ```
 expose_secret  expose_secret_mut  with_secret  with_secret_mut
 into_inner
-to_hex  to_base64url  try_to_bech32  try_to_bech32m
-to_hex_zeroizing  to_hex_upper_zeroizing  to_base64url_zeroizing
-try_to_bech32_zeroizing  try_to_bech32m_zeroizing
+to_hex  to_base32  to_base64url  try_to_bech32  try_to_bech32m
+to_hex_zeroizing  to_hex_upper_zeroizing  to_base32_zeroizing
+to_base64url_zeroizing  try_to_bech32_zeroizing  try_to_bech32m_zeroizing
 ```
 
 **Note:** `into_inner` does not appear in an `expose_secret*`-only sweep — audit it
@@ -416,12 +418,12 @@ If even coarse error categories or length metadata are sensitive in your deploym
 
 ## Encoding: Sensitive vs. Public Output
 
-Encoding methods on `Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`, and the encoding traits (`ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`) come in two flavors:
+Encoding methods on `Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`, and the encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`) come in two flavors:
 
 | Variant | Return type | Zeroized? | When to use |
 | ------- | ----------- | --------- | ----------- |
-| `to_hex()`, `to_hex_upper()`, `to_base64url()`, `try_to_bech32()`, `try_to_bech32m()` | `String` / `Result<String, _>` | No | Public encodings — transaction IDs, addresses, non-sensitive identifiers |
-| `to_hex_zeroizing()`, `to_hex_upper_zeroizing()`, `to_base64url_zeroizing()`, `try_to_bech32_zeroizing()`, `try_to_bech32m_zeroizing()` | `EncodedSecret` / `Result<EncodedSecret, _>` | Yes (on drop) | Sensitive encodings — private keys, long-lived tokens, full secret exports |
+| `to_hex()`, `to_hex_upper()`, `to_base32()`, `to_base64url()`, `try_to_bech32()`, `try_to_bech32m()` | `String` / `Result<String, _>` | No | Public encodings — transaction IDs, addresses, non-sensitive identifiers |
+| `to_hex_zeroizing()`, `to_hex_upper_zeroizing()`, `to_base32_zeroizing()`, `to_base64url_zeroizing()`, `try_to_bech32_zeroizing()`, `try_to_bech32m_zeroizing()` | `EncodedSecret` / `Result<EncodedSecret, _>` | Yes (on drop) | Sensitive encodings — private keys, long-lived tokens, full secret exports |
 
 `EncodedSecret` wraps `Zeroizing<String>`, redacts `Debug` as `[REDACTED]`, and zeroizes the string buffer on drop. Keep values in this form as long as possible.
 

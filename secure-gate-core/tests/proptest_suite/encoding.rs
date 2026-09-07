@@ -23,6 +23,33 @@ mod hex_roundtrip {
     }
 }
 
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
+mod b32_roundtrip {
+    use proptest::prelude::*;
+    use secure_gate::{Dynamic, RevealSecret, ToBase32};
+
+    // Base32 decoding is lenient about non-canonical trailing bits (D5): distinct
+    // strings can decode to the same bytes, so the property must run
+    // encode-then-decode. Starting from arbitrary "valid-looking" strings and
+    // re-encoding them would not be a round-trip.
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+        #[test]
+        fn dynamic_b32_roundtrip(data in prop_oneof![
+            Just(vec![]),
+            prop::collection::vec(any::<u8>(), 1..=1),
+            Just(vec![0xAAu8; 127]),
+            prop::collection::vec(any::<u8>(), 0usize..128),
+        ]) {
+            let secret: Dynamic<Vec<u8>> = data.clone().into();
+            let encoded = secret.to_base32();
+            let decoded = Dynamic::<Vec<u8>>::try_from_base32(&encoded).expect("decode");
+            let decoded_vec = decoded.expose_secret();
+            prop_assert_eq!(decoded_vec, data.as_slice());
+        }
+    }
+}
+
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 mod b64_roundtrip {
     use proptest::prelude::*;

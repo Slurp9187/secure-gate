@@ -21,6 +21,12 @@ include = [
 
 [dependencies]
 base16ct = { version = "0.2", optional = true, default-features = false }
+# base32ct 0.3 is edition 2024 / rust-version 1.85; the 0.2 line is edition 2021 /
+# MSRV 1.60 and exposes the same `Base32UpperUnpadded` + `Encoding` API this crate
+# uses. A caret on 0.2 cannot resolve across the 0.2 -> 0.3 semver break, so unlike
+# `base64ct` this needs no exact pin. Unlike 0.3, base32ct 0.2 does have an `alloc`
+# feature, so `default-features = false` is load-bearing here.
+base32ct = { version = "0.2", optional = true, default-features = false }
 # base64ct >=1.7 declares rust-version 1.81 and >=1.8 requires 1.85; pin for MSRV 1.70.
 # Exact, not a range: Cargo 1.70 predates `incompatible-rust-versions` and would
 # otherwise resolve to a version it cannot build. The only pinned shipped dependency.
@@ -82,7 +88,13 @@ default = ["alloc"]
 # Enables heap allocation (Dynamic<T>, Box, Vec, String) + full zeroization of spare capacity.
 # Also activates the alloc-dependent APIs of optional encoding crates (encode_string,
 # decode_vec, encode_lower) when those crates are already in the dependency graph.
-alloc = ["zeroize/alloc", "base16ct?/alloc", "base64ct?/alloc", "bech32?/alloc"]
+alloc = [
+    "zeroize/alloc",
+    "base16ct?/alloc",
+    "base32ct?/alloc",
+    "base64ct?/alloc",
+    "bech32?/alloc",
+]
 
 # Full std support (implies alloc). Enables std::io::Read/Write for Dynamic<Vec<u8>>.
 std = ["alloc"]
@@ -96,11 +108,13 @@ ct-eq = ["dep:subtle"]
 # Encoding features
 encoding = [
     "encoding-hex",
+    "encoding-base32",
     "encoding-base64",
     "encoding-bech32",
     "encoding-bech32m",
 ]
 encoding-hex = ["dep:base16ct"]
+encoding-base32 = ["dep:base32ct"]
 encoding-base64 = ["dep:base64ct"]
 encoding-bech32 = ["dep:bech32"]
 encoding-bech32m = ["dep:bech32"]

@@ -20,8 +20,8 @@
 //! | [`ConstantTimeEq`]     | Deterministic constant-time equality         | `ct-eq`                  | Timing-attack resistant byte comparison                               |
 //! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for opt-in risk details. |
 //! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for opt-in risk details. |
-//! | [`SecureEncoding`]     | Marker + blanket impl for encoding traits    | Any `encoding-*`         | Enables `ToHex`, `ToBase64Url`, `ToBech32`, `ToBech32m`               |
-//! | [`SecureDecoding`]     | Marker + blanket impl for decoding traits    | Any `encoding-*`         | Enables `FromHexStr`, `FromBase64UrlStr`, `FromBech32Str`, etc.       |
+//! | [`SecureEncoding`]     | Marker + blanket impl for encoding traits    | Any `encoding-*`         | Enables `ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`   |
+//! | [`SecureDecoding`]     | Marker + blanket impl for decoding traits    | Any `encoding-*`         | Enables `FromHexStr`, `FromBase32Str`, `FromBase64UrlStr`, etc.       |
 //!
 //! # Security Guarantees
 //!
@@ -71,6 +71,9 @@ pub mod decoding;
 pub mod encoding;
 
 // Re-export per-format decoding traits (feature-gated; blanket impls return Vec<u8> — alloc required)
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
+pub use decoding::FromBase32Str;
+
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use decoding::FromBase64UrlStr;
 
@@ -84,9 +87,12 @@ pub use decoding::FromBech32mStr;
 pub use decoding::FromHexStr;
 
 // Re-export per-format encoding traits (feature-gated)
-// Note: blanket impls of ToBase64Url, ToBech32, ToBech32m require alloc (String output).
+// Note: blanket impls of ToBase32, ToBase64Url, ToBech32, ToBech32m require alloc (String output).
 // The traits themselves are exported unconditionally so inherent methods on Fixed/Dynamic
 // can call them; the blanket impls gate the alloc dependency.
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
+pub use encoding::ToBase32;
+
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use encoding::ToBase64Url;
 
@@ -103,7 +109,7 @@ pub use encoding::ToHex;
 ///
 /// Automatically implemented for any type that implements `AsRef<[u8]>`,
 /// such as `&[u8]`, `Vec<u8>`, `[u8; N]`, etc. This enables blanket impls
-/// of the individual encoding traits (`ToHex`, `ToBase64Url`, `ToBech32`, etc.).
+/// of the individual encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, etc.).
 ///
 /// Since this is a marker trait (no methods), it exists only to allow trait
 /// bounds and extension methods to be available where appropriate.
@@ -111,6 +117,7 @@ pub use encoding::ToHex;
 /// Requires at least one `encoding-*` feature to be enabled.
 #[cfg(any(
     feature = "encoding-hex",
+    feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
     feature = "encoding-bech32m",
@@ -119,6 +126,7 @@ pub trait SecureEncoding {}
 
 #[cfg(any(
     feature = "encoding-hex",
+    feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
     feature = "encoding-bech32m",
@@ -129,7 +137,7 @@ impl<T: AsRef<[u8]> + ?Sized> SecureEncoding for T {}
 ///
 /// Automatically implemented for any type that implements `AsRef<str>`,
 /// such as `&str`, `String`, etc. This enables blanket impls of the
-/// individual decoding traits (`FromHexStr`, `FromBase64UrlStr`, etc.).
+/// individual decoding traits (`FromHexStr`, `FromBase32Str`, `FromBase64UrlStr`, etc.).
 ///
 /// Like `SecureEncoding`, this is a marker trait with no methods — it exists
 /// to allow trait bounds and extension methods where relevant.
@@ -137,6 +145,7 @@ impl<T: AsRef<[u8]> + ?Sized> SecureEncoding for T {}
 /// Requires at least one `encoding-*` feature to be enabled.
 #[cfg(any(
     feature = "encoding-hex",
+    feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
     feature = "encoding-bech32m",
@@ -145,6 +154,7 @@ pub trait SecureDecoding {}
 
 #[cfg(any(
     feature = "encoding-hex",
+    feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
     feature = "encoding-bech32m",

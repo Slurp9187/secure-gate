@@ -5,6 +5,13 @@
 #
 # Mirrors the GitHub CI matrix from .github/workflows/ci.yml (as of 2026-03)
 # Run this locally to reproduce CI coverage before pushing.
+#
+# Every cargo invocation below is scoped with `-p secure-gate`, exactly as the CI
+# `test` job is. Without the scope the feature flags apply workspace-wide, which
+# (a) breaks `secure-gate-compat` on the `--no-default-features` rows, since it
+# needs secure-gate's default features, and (b) lets workspace feature unification
+# silently re-enable features a row is meant to exclude, turning real failures into
+# false passes. The script is therefore runnable from any directory in the repo.
 # =============================================================================
 
 set -euo pipefail  # fail fast on errors / undefined vars
@@ -26,31 +33,31 @@ run_tests() {
 
   # ── Clippy ───────────────────────────────────────────────────────────────
   printf "\033[1;36m[CLIPPY]\033[0m "
-  if cargo clippy --tests --benches $features -- -D warnings >/dev/null 2>&1; then
+  if cargo clippy -p secure-gate --tests --benches $features -- -D warnings >/dev/null 2>&1; then
     printf "\033[1;32mPASS\033[0m\n"
   else
     printf "\033[1;31mFAIL\033[0m\n"
-    cargo clippy --tests --benches $features -- -D warnings
+    cargo clippy -p secure-gate --tests --benches $features -- -D warnings
     status=1
   fi
 
   # ── Tests ────────────────────────────────────────────────────────────────
   printf "\033[1;36m[TESTS]\033[0m  "
-  if cargo test --tests $features >/dev/null 2>&1; then
+  if cargo test -p secure-gate --tests $features >/dev/null 2>&1; then
     printf "\033[1;32mPASS\033[0m\n"
   else
     printf "\033[1;31mFAIL\033[0m\n"
-    cargo test --tests $features
+    cargo test -p secure-gate --tests $features
     status=1
   fi
 
   # ── Doctests ─────────────────────────────────────────────────────────────
   printf "\033[1;36m[DOCTESTS]\033[0m "
-  if cargo test --doc $features >/dev/null 2>&1; then
+  if cargo test -p secure-gate --doc $features >/dev/null 2>&1; then
     printf "\033[1;32mPASS\033[0m\n"
   else
     printf "\033[1;31mFAIL\033[0m\n"
-    cargo test --doc $features
+    cargo test -p secure-gate --doc $features
     status=1
   fi
 
@@ -86,12 +93,16 @@ run_tests "alloc + rand"                   "--no-default-features --features=all
 run_tests "ct-eq + alloc"                  "--no-default-features --features=ct-eq,alloc"
 
 # ── Encoding ────────────────────────────────────────────────────────────────
-run_tests "encoding (all formats)"         "--no-default-features --features=encoding"
-run_tests "encoding-hex only"              "--no-default-features --features=encoding-hex"
-run_tests "encoding-base64 only"           "--no-default-features --features=encoding-base64"
-run_tests "encoding-bech32 only"           "--no-default-features --features=encoding-bech32"
-run_tests "encoding-bech32m only"          "--no-default-features --features=encoding-bech32m"
-run_tests "encoding-bech32 + bech32m"      "--no-default-features --features=encoding-bech32,encoding-bech32m"
+# Encoding traits return String and require alloc; the integration tests
+# import the traits, so alloc is needed to compile the test binaries
+# (mirrors the same note on the encoding rows of the CI matrix).
+run_tests "encoding (all formats)"         "--no-default-features --features=alloc,encoding"
+run_tests "encoding-hex only"              "--no-default-features --features=alloc,encoding-hex"
+run_tests "encoding-base32 only"           "--no-default-features --features=alloc,encoding-base32"
+run_tests "encoding-base64 only"           "--no-default-features --features=alloc,encoding-base64"
+run_tests "encoding-bech32 only"           "--no-default-features --features=alloc,encoding-bech32"
+run_tests "encoding-bech32m only"          "--no-default-features --features=alloc,encoding-bech32m"
+run_tests "encoding-bech32 + bech32m"      "--no-default-features --features=alloc,encoding-bech32,encoding-bech32m"
 
 # ── Serde ───────────────────────────────────────────────────────────────────
 run_tests "serde (serialize + deserialize)" "--no-default-features --features=serde"

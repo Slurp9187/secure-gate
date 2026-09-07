@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Fixed`/`Dynamic` so same-shaped secret roles are distinct types; no `From<Wrapper>`
   and no `Deref`; base-wrapper access opt-in per newtype and per direction.
 
+- **Base32 encoding in `secure-gate-core`** (#158). Backported from `main`'s 0.9.0-rc.8.
+  `ToBase32` / `FromBase32Str` behind `encoding-base32`, with wrapper and newtype
+  forwarding and a `Base32Error` — RFC 4648 §6, uppercase and unpadded (the
+  `otpauth://` TOTP/HOTP form). Lowercase and `=` padding are rejected. Uses `base32ct`
+  **0.2** rather than `main`'s 0.3, which is edition 2024 / MSRV 1.85 and cannot build
+  on this line; the 0.2 API is identical. See the core changelog.
+
 ### Changed
 
 - **BREAKING (pre-release), `secure-gate-core` (#156, backport):** `len`/`byte_len`/

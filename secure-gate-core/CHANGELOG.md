@@ -98,6 +98,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from a base wrapper, the absent `Deref`, directional base access, and per-newtype
   `Serialize` not leaking to siblings.
 
+- **Base32 encoding — `ToBase32` / `FromBase32Str` behind `encoding-base32` (#158).**
+  Backported from `main`'s 0.9.0-rc.8. The fifth format beside hex, base64url, bech32
+  and bech32m: `to_base32()` / `to_base32_zeroizing()` and `try_from_base32()`,
+  blanket-implemented for `AsRef<[u8]>` and `AsRef<str>`, with `ToBase32` impls on
+  `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>`, inherent `Fixed::try_from_base32` /
+  `Dynamic::try_from_base32` constructors, and a new `Base32Error` (`InvalidBase32`,
+  `InvalidLength { expected, got }`, also reachable as `DecodingError::InvalidBase32`).
+  `fixed_newtype!` and `dynamic_newtype!` forward both directions for their byte-shaped
+  arms. Included in the `encoding` and `full` meta-features.
+
+  **One canonical form: RFC 4648 §6, uppercase, unpadded** — the shape `otpauth://` key
+  URIs carry TOTP/HOTP shared secrets in, and the densest encoding that fits QR
+  alphanumeric mode. Decoding is strict: lowercase, mixed case, `=` padding, whitespace,
+  and impossible lengths are rejected rather than normalized. There is deliberately no
+  `to_base32_lower()`. The one leniency the backend keeps is non-canonical trailing bits
+  (`"MZ"` decodes to the same byte as `"MY"`), so decoding is not injective; that is
+  documented on `FromBase32Str` and pinned by
+  `base32_accepts_non_canonical_trailing_bits`.
+
+  **Backend differs from `main`: `base32ct` 0.2, not 0.3.** base32ct 0.3 is edition 2024
+  with `rust-version = "1.85"` and cannot build on this line's MSRV 1.70. The 0.2 line is
+  edition 2021 / MSRV 1.60 and exposes the same `Base32UpperUnpadded` + `Encoding` API,
+  so the port is source-identical; only the version requirement differs. A caret on
+  `"0.2"` cannot resolve across the 0.2 → 0.3 semver break, so unlike `base64ct` this
+  needs no exact pin. Unlike 0.3, base32ct 0.2 *does* have an `alloc` feature, which
+  `alloc` now forwards via `base32ct?/alloc`.
+
+  The traits require `alloc` (they return `String` / `Vec<u8>`), but
+  `Fixed::try_from_base32` decodes into a `Zeroizing<[u8; N]>` stack buffer and works
+  without it, like every other `Fixed::try_from_*`.
+
 ### Changed
 
 - **BREAKING (pre-release): `len`/`byte_len`/`is_empty` moved from `RevealSecret`

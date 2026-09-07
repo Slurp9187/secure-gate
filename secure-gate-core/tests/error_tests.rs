@@ -15,6 +15,7 @@ use secure_gate::Bech32Error;
 
 #[cfg(any(
     feature = "encoding-hex",
+    feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
@@ -89,6 +90,7 @@ fn bech32_error_display() {
 /// Test DecodingError variants and behavior
 #[cfg(any(
     feature = "encoding-hex",
+    feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32"
 ))]
@@ -124,6 +126,32 @@ fn hex_error_invalid_length() {
         format!("{}", err),
         "decoded length mismatch: expected 2, got 4"
     );
+}
+
+/// Base32Error::InvalidLength carries expected/got in every build profile.
+#[cfg(feature = "encoding-base32")]
+#[test]
+fn base32_error_invalid_length() {
+    // "32W353Y" decodes to 4 bytes; target is 2.
+    let err = secure_gate::Fixed::<[u8; 2]>::try_from_base32("32W353Y")
+        .expect_err("length mismatch must fail");
+    match err {
+        secure_gate::Base32Error::InvalidLength { expected, got, .. } => {
+            assert_eq!(expected, 2);
+            assert_eq!(got, 4);
+        }
+        _ => panic!("expected InvalidLength"),
+    }
+    assert_eq!(
+        format!("{}", err),
+        "decoded length mismatch: expected 2, got 4"
+    );
+
+    // Copy like its siblings — usable after being passed by value. `Copy` also
+    // pins the heap-free shape: the variant carries only numeric metadata, so it
+    // can never own an allocation derived from the rejected input.
+    let copied = err;
+    assert_eq!(copied, err);
 }
 
 /// Base64Error::InvalidLength carries expected/got in every build profile.
@@ -208,6 +236,18 @@ fn decoding_error_source_hex() {
         .source()
         .expect("DecodingError::InvalidHex must have a source");
     assert!(source.to_string().contains("invalid hex"));
+}
+
+#[cfg(all(feature = "std", feature = "encoding-base32"))]
+#[test]
+fn decoding_error_source_base32() {
+    use std::error::Error;
+    let inner = secure_gate::Base32Error::InvalidBase32;
+    let outer = DecodingError::InvalidBase32(inner);
+    let source = outer
+        .source()
+        .expect("DecodingError::InvalidBase32 must have a source");
+    assert!(source.to_string().contains("invalid base32"));
 }
 
 #[cfg(all(feature = "std", feature = "encoding-base64"))]
