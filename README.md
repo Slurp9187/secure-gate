@@ -83,8 +83,7 @@ secure-gate-workspace/
 │   ├── fuzz/
 │   ├── README.md
 │   ├── SECURITY.md
-│   ├── CHANGELOG.md
-│   └── ROADMAP.md
+│   └── CHANGELOG.md
 └── secure-gate-compat/     secrecy migration shims
     ├── src/
     ├── tests/
@@ -102,7 +101,6 @@ secure-gate-workspace/
 - [secure-gate-compat/MIGRATING_FROM_SECRECY.md](secure-gate-compat/MIGRATING_FROM_SECRECY.md) — full migration guide for secrecy v0.8 and v0.10
 - [secure-gate-core/SECURITY.md](secure-gate-core/SECURITY.md) — threat model, audit surface, best practices
 - [secure-gate-core/CHANGELOG.md](secure-gate-core/CHANGELOG.md) — detailed version history
-- [secure-gate-core/ROADMAP.md](secure-gate-core/ROADMAP.md) — planned features and release branches
 
 ## CI
 
