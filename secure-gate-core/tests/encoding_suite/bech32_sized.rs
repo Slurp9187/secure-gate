@@ -584,3 +584,68 @@ fn randomized_stress_across_code_lengths() {
 
     ladder!(64, 128, 256, 1023, 1024, 2048, 4096);
 }
+
+// ─────────────────── the encode buffer is allocated once, exactly ───────────────────
+
+/// Encoding must not reallocate.
+///
+/// `bech32::encode_lower` starts from `String::new()` and grows; each intermediate
+/// buffer holds a partial copy of the encoded secret and is freed unwiped, which
+/// `Zeroizing` explicitly cannot reach ("cannot ensure that previous reallocations did
+/// not leave values on the heap"). Before the fix, a 1568-byte payload produced a
+/// string of len 2519 with capacity 4096 — proof that a copy had been left behind.
+///
+/// `capacity() == len()` is the observable signature of a single exact allocation.
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bech32_encode_allocates_exactly_once() {
+    for len in [0usize, 1, 32, 128, 633, 634, 900, 1568, 4096] {
+        let data = vec![0x5Au8; len];
+        const BIG: usize = 65535;
+
+        let encoded = data.try_to_bech32_sized::<BIG>("age").expect("encodes");
+        assert_eq!(
+            encoded.capacity(),
+            encoded.len(),
+            "bech32 encode reallocated for a {len}-byte payload: \
+             len {} but capacity {} — an unwiped partial copy was left on the heap",
+            encoded.len(),
+            encoded.capacity()
+        );
+        assert_eq!(encoded.len(), bech32_code_length(3, len));
+    }
+}
+
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn bech32m_encode_allocates_exactly_once() {
+    for len in [0usize, 1, 32, 633, 1568, 4096] {
+        let data = vec![0x6Bu8; len];
+        const BIG: usize = 65535;
+
+        let encoded = data.try_to_bech32m_sized::<BIG>("age").expect("encodes");
+        assert_eq!(
+            encoded.capacity(),
+            encoded.len(),
+            "bech32m encode reallocated for a {len}-byte payload"
+        );
+        assert_eq!(encoded.len(), bech32_code_length(3, len));
+    }
+}
+
+/// The zeroizing path inherits the same property: `EncodedSecret` wraps the string the
+/// encoder built, so if that string had been grown, the wrapper could not have wiped
+/// what was already freed.
+#[cfg(feature = "encoding-bech32")]
+#[test]
+fn zeroizing_encode_wraps_an_exactly_sized_buffer() {
+    let data = vec![0x77u8; 1568];
+    const N: usize = bech32_code_length(3, 1568);
+    let enc = data
+        .try_to_bech32_sized_zeroizing::<N>("age")
+        .expect("encodes");
+    assert_eq!(enc.len(), N);
+    let plain = data.try_to_bech32_sized::<N>("age").expect("encodes");
+    assert_eq!(plain.capacity(), plain.len());
+    assert_eq!(&*enc, plain.as_str());
+}

@@ -45,7 +45,7 @@
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use bech32::Hrp;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-use bech32::encode_lower;
+use bech32::encode_lower_to_fmt;
 
 #[cfg(feature = "encoding-bech32")]
 use bech32::primitives::checksum::Checksum;
@@ -235,8 +235,20 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
         hrp: &str,
     ) -> Result<alloc::string::String, Bech32Error> {
         let hrp_parsed = Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
-        encode_lower::<Bech32Sized<N>>(hrp_parsed, self.as_ref())
-            .map_err(|_| Bech32Error::OperationFailed)
+        let data = self.as_ref();
+        // Pre-size the buffer exactly. `bech32::encode_lower` starts from
+        // `String::new()` and grows by reallocation, and every intermediate buffer
+        // holds a partial copy of the encoded secret and is freed **unwiped** --
+        // `zeroize` documents that it "cannot ensure that previous reallocations did
+        // not leave values on the heap". Measured before this: a 1568-byte payload
+        // produced len 2519 / capacity 4096, so at least one such copy was left
+        // behind. `encoded_length` is computed and discarded upstream; we compute it
+        // ourselves and reserve once. Same output, one allocation.
+        let mut out =
+            alloc::string::String::with_capacity(bech32_code_length(hrp.len(), data.len()));
+        encode_lower_to_fmt::<Bech32Sized<N>, alloc::string::String>(&mut out, hrp_parsed, data)
+            .map_err(|_| Bech32Error::OperationFailed)?;
+        Ok(out)
     }
 
     #[inline(always)]

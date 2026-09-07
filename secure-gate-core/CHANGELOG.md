@@ -291,6 +291,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Bech32 encoding left unwiped partial copies of the secret on the heap.**
+  `bech32::encode_lower` builds its output from `String::new()` and grows it by
+  reallocation. Each intermediate buffer holds a prefix of the encoded secret and is
+  freed **without being wiped**, and no wrapper can reach it afterwards — `zeroize`
+  says so itself: *"Ensures the entire capacity of the `Vec` is zeroed. Cannot ensure
+  that previous reallocations did not leave values on the heap."* So
+  `EncodedSecret`'s `Zeroizing` wiped the final buffer while earlier copies survived.
+
+  Measured on the old code: a 634-byte payload produced a string of len 1025 with
+  capacity 2048, and a 1568-byte ML-KEM ciphertext len 2519 with capacity 4096 — each
+  a reallocation, each leaving a copy behind. Payloads small enough to land on a
+  single allocation were unaffected, which is why this went unnoticed: it appears
+  exactly at the age- and KEM-sized inputs the `_sized` methods exist for.
+
+  Both encoders now reserve the exact length up front with `bech32_code_length` and
+  write through `encode_lower_to_fmt`, giving one allocation and no intermediate
+  copies. Output is byte-identical. Upstream computes the same length at the top of
+  `encode_lower_to_fmt` and discards it (`let _ = encoded_length::<Ck>(...)`), so
+  there was nothing to reuse.
+
+  This is the same defect class the crate already fixed for `Dynamic`'s `io::Write`
+  growth path in this release — the pattern was understood, just not applied here.
+  Pinned by `bech32_encode_allocates_exactly_once` and its bech32m twin, which assert
+  `capacity() == len()` across nine payload sizes; both fail against the old code.
+
 - **`std::io::Write` on `Dynamic<Vec<u8>>` left the secret in the outgoing buffer when
   it grew (#152).** Writing past the current capacity delegated to `Vec::write`, so the
   standard library reallocated: it copied the plaintext into the new allocation and
