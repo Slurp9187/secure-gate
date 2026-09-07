@@ -139,18 +139,20 @@ fn inner_secret_into_inner_moves_the_value_out() {
     let original = vec![1u8, 2, 3, 4];
     let ptr = original.as_ptr();
     let secret: Dynamic<Vec<u8>> = Dynamic::new(original);
-    let v: Vec<u8> = secret.into_inner().into_inner();
+    // One call from the wrapper — the handoff people actually reach for.
+    let v: Vec<u8> = secret.into_plain();
     assert_eq!(v, vec![1, 2, 3, 4]);
     assert_eq!(v.as_ptr(), ptr, "value was copied instead of moved");
 
     // Stack value, including an array size past `Default`'s 32-element limit.
-    let key: [u8; 64] = Fixed::new([0xABu8; 64]).into_inner().into_inner();
+    let key: [u8; 64] = Fixed::new([0xABu8; 64]).into_plain();
     assert_eq!(key, [0xABu8; 64]);
 
     // String inner type.
+    // The two-step form still works when you already hold an InnerSecret.
     let s: String = Dynamic::<String>::new(String::from("hunter2"))
         .into_inner()
-        .into_inner();
+        .into_plain();
     assert_eq!(s, "hunter2");
 }
 

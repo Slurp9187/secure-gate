@@ -254,6 +254,37 @@ pub trait RevealSecret {
     where
         Self: Sized,
         Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize;
+
+    /// Consumes the wrapper and returns the plain value. **The handoff.**
+    ///
+    /// Protection is total right up to this call and ends with it: the returned value
+    /// is an ordinary `Vec<u8>` / `String` / `[u8; N]` with no zeroize-on-drop and no
+    /// redacted `Debug`. You own the secret and its lifetime from here.
+    ///
+    /// Nothing is copied — the value is moved out and an inert
+    /// [`SentinelValue`](crate::SentinelValue) is left to be zeroized in its place.
+    ///
+    /// Use [`into_inner`](Self::into_inner) instead when you want to keep the
+    /// protection and hand off an [`InnerSecret`](crate::InnerSecret).
+    ///
+    /// ```rust
+    /// use secure_gate::{Dynamic, RevealSecret};
+    ///
+    /// let secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3]);
+    /// let v: Vec<u8> = secret.into_plain();
+    /// assert_eq!(v, vec![1, 2, 3]);
+    /// ```
+    ///
+    /// Like `expose_secret`, this is a named exit and shows up in an audit sweep:
+    /// `grep into_plain` finds every place a secret left the crate's protection.
+    #[inline(always)]
+    fn into_plain(self) -> Self::Inner
+    where
+        Self: Sized,
+        Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize,
+    {
+        self.into_inner().into_plain()
+    }
 }
 
 /// Length metadata for secrets whose inner type has a meaningful length.

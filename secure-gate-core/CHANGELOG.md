@@ -131,7 +131,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guarantee lapses — the type docs say so, and the choice is now spelled at the call
   site rather than baked into a default.
 
-- **`InnerSecret::into_inner()` — the owned handoff.** `InnerSecret` was a dead end.
+- **`RevealSecret::into_plain()` — the owned handoff, in one call.** `InnerSecret` was a dead end.
   [`into_zeroizing`] hands back a `Zeroizing<T>`, and `zeroize` deliberately exposes no
   way to move a value out of that wrapper, so the only route from a `Dynamic<Vec<u8>>`
   to an owned `Vec<u8>` was to clone through the deref: three calls and a second full
@@ -139,8 +139,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   had the equivalent escape hatch all along; the value wrapper did not.
 
   ```rust
-  let v: Vec<u8> = secret.into_inner().into_inner();
+  let v: Vec<u8> = secret.into_plain();
   ```
+
+  `InnerSecret::into_plain()` is the same escape one level down, for code that already
+  holds one. It is deliberately *not* named `into_inner`: `secret.into_inner().into_inner()`
+  reads as noise, and the type is already called `InnerSecret`.
 
   No copy is made. The value is moved out with `mem::replace` and an inert
   `SentinelValue` is left to be zeroized in its place — the same mechanism `Fixed` and

@@ -52,7 +52,7 @@ impl<T: zeroize::Zeroize> InnerSecret<T> {
         Self(zeroize::Zeroizing::new(inner))
     }
 
-    /// Consumes self and returns the plain inner value.
+    /// Consumes self and returns the plain value, ending protection.
     ///
     /// This is the owned handoff: protection is maximal right up to this call, and this
     /// call ends it. The returned `T` is an ordinary value with no zeroize-on-drop and
@@ -70,15 +70,19 @@ impl<T: zeroize::Zeroize> InnerSecret<T> {
     /// [`SentinelValue`](crate::SentinelValue) is left behind to be zeroized in its
     /// place, the same mechanism `Fixed` and `Dynamic` use for their own `into_inner`.
     ///
+    /// Most callers want [`RevealSecret::into_plain`](crate::RevealSecret::into_plain),
+    /// which is the same thing in one call. Use this when you already hold an
+    /// `InnerSecret`.
+    ///
     /// ```rust
     /// use secure_gate::{Dynamic, RevealSecret};
     ///
     /// let secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3]);
-    /// let v: Vec<u8> = secret.into_inner().into_inner();
+    /// let v: Vec<u8> = secret.into_inner().into_plain();
     /// assert_eq!(v, vec![1, 2, 3]);
     /// ```
     #[inline(always)]
-    pub fn into_inner(mut self) -> T
+    pub fn into_plain(mut self) -> T
     where
         T: crate::SentinelValue,
     {
