@@ -1,4 +1,3 @@
-// #![doc = include_str!("../README.md")] //uncomment for doctest runs
 
 // no_std by default; the `std` feature opts back into the standard library.
 // Verified in CI by cross-building for a bare-metal target.
@@ -247,7 +246,7 @@
 //! [SECURITY.md § Inherent Rust Limitations](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#inherent-rust-limitations).
 //!
 //! See the [README](https://github.com/Slurp9187/secure-gate/blob/main/README.md) and
-//! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for full details.
+//! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md) for full details.
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -594,3 +593,19 @@ pub use error::DecodingError;
 /// Error returned when a byte slice cannot be converted to `Fixed<[u8; N]>` due to
 /// length mismatch. Produced by `Fixed::try_from(&[u8])`.
 pub use error::FromSliceError;
+
+// The README's examples are compiled and run by `cargo test --doc`, so they cannot
+// silently rot. `cfg(doctest)` is set only while rustdoc *collects doctests* — never
+// while it *builds documentation* — so this item never reaches docs.rs or `cargo doc`
+// output, and the README is not duplicated onto the crate page.
+//
+// Gated on `full` as well: the README documents the fully-featured crate, so its
+// examples use `alloc` and the encoding traits unconditionally. Without this gate the
+// `--no-default-features` doctest job in CI would fail on imports the README does not
+// feature-gate. CI's `--features full` and `--all-features` entries do run them.
+//
+// It must live at the end of the file: an item here would otherwise sit ahead of the
+// `//!` crate docs above, which is not allowed.
+#[cfg(all(doctest, feature = "full"))]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeDoctests;
