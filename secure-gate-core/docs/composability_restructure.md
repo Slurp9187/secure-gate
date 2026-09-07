@@ -1,16 +1,19 @@
 # Composability Restructure: `SecretLen` Split + Trait-Based Encoders
 
-> **Status: implemented on this branch as a 0.9.0 candidate.**
-> Branch: `claude/fixed-dynamic-newtype-hl7e19`, layered on top of the
-> `fixed_newtype!`/`dynamic_newtype!` spike (#155, `docs/nominal_newtypes.md`).
-> Breaking relative to earlier 0.9.0 release candidates; no stable release has
-> shipped, so now is the cheapest possible moment.
+> **Status: shipped.** Merged to `main` in PR #159 (`f2a8f1c`) and released in
+> **0.9.0-rc.8**; layered on the `fixed_newtype!`/`dynamic_newtype!` work
+> (#155, `docs/nominal_newtypes.md`), which ships in the same release.
+> Breaking relative to earlier 0.9.0 release candidates; no stable release had
+> shipped, so it was the cheapest possible moment.
 >
-> **`release/0.8` backport intent:** once 0.9.0 is solidly implemented, the
-> same restructure is to be backported to the 0.8 line (Rust 2021, MSRV 1.70)
-> before its first stable release, so the two lines expose the same trait
-> shape. Nothing here uses post-1.70 language features; the backport is
-> mechanical.
+> **`release/0.8` backport: done.** Landed via PR #160 (`a029bb7`) and released
+> as **0.8.0-rc.11**, so both lines expose the same trait shape. Nothing here
+> uses post-1.70 language features, and the backport was mechanical — with one
+> deliberate omission recorded in that branch's changelog: the
+> `dynamic_string_no_hex` compile-fail fixture is not carried over, so the
+> `Dynamic<String>`-has-no-hex claim is unpinned on 0.8.
+>
+> Tracking issue #156 is closed. This document is kept as the design record.
 
 ## The diagnosis
 

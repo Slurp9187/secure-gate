@@ -7,21 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- **Base32 encoding in `secure-gate-core`** (#158). `ToBase32` / `FromBase32Str`
-  behind `encoding-base32`, with wrapper and newtype forwarding and a `Base32Error`
-  — RFC 4648 §6, uppercase and unpadded (the `otpauth://` TOTP/HOTP form) via the
-  constant-time `base32ct` crate. Lowercase and `=` padding are rejected. See the
-  core changelog.
-
-### Documentation
-
-- **`secure-gate-core`:** the crate page lists `fixed_newtype!` / `dynamic_newtype!`
-  alongside the alias macros, and `SecretLen` gets its own crate-level re-export doc
-  (the `RevealSecret`/`SecretLen` re-export is split so the 0.8 line's rustdoc 1.70,
-  which ICEs on grouped re-exports, can keep sharing this file).
-
 ## [0.9.0-rc.8] - 2026-09-06
 
 ### Added
@@ -32,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a swapped argument is a compile error. No `From<Wrapper>` and no `Deref`;
   base-wrapper access is opt-in per newtype and per direction (`FromWrapper` /
   `IntoWrapper` / `WrapperAccess`). Design record: `secure-gate-core/docs/nominal_newtypes.md`.
+
+- **Base32 encoding in `secure-gate-core`** (#158). `ToBase32` / `FromBase32Str`
+  behind `encoding-base32`, with wrapper and newtype forwarding and a `Base32Error`
+  — RFC 4648 §6, uppercase and unpadded (the `otpauth://` TOTP/HOTP form) via the
+  constant-time `base32ct` crate. Lowercase and `=` padding are rejected. See the
+  core changelog.
 
 ### Changed
 
@@ -81,6 +72,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 `secure-gate-compat`: version bump only; three test files gain the `SecretLen` import
 the #156 split requires. No code changes.
+
+### Documentation
+
+- **RustCrypto integration example on `Fixed` (#144).** `secure-gate-core`'s `Fixed`
+  rustdoc and README now document scoped in-place block-cipher ops via
+  `GenericArray::from_mut_slice` inside `with_secret_mut`, contrasted with the
+  copy-out shape that leaves plaintext in an unzeroized stack value. Compiled
+  doctests; no API change. Also corrected two docs left stale by the #156 restructure:
+  the `RevealSecretMut` `len()`/`is_empty()` claim, and the status header on
+  `docs/composability_restructure.md`.
+
+- **`secure-gate-core`:** the crate page lists `fixed_newtype!` / `dynamic_newtype!`
+  alongside the alias macros, and `SecretLen` gets its own crate-level re-export doc
+  (the `RevealSecret`/`SecretLen` re-export is split so the 0.8 line's rustdoc 1.70,
+  which ICEs on grouped re-exports, can keep sharing this file).
 
 See the per-crate changelogs for full detail:
 
