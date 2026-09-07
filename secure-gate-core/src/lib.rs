@@ -542,28 +542,6 @@ pub use traits::ToBech32m;
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub use traits::ToHex;
 
-/// Marker trait for types that support secure decoding (`AsRef<str>`). No methods —
-/// enables blanket impls of [`FromHexStr`], [`FromBase32Str`], [`FromBase64UrlStr`], etc.
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base32",
-    feature = "encoding-base64",
-    feature = "encoding-bech32",
-    feature = "encoding-bech32m",
-))]
-pub use traits::SecureDecoding;
-
-/// Marker trait for types that support secure encoding (`AsRef<[u8]>`). No methods —
-/// enables blanket impls of [`ToHex`], [`ToBase32`], [`ToBase64Url`], etc.
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base32",
-    feature = "encoding-base64",
-    feature = "encoding-bech32",
-    feature = "encoding-bech32m",
-))]
-pub use traits::SecureEncoding;
-
 /// Errors from Bech32 (BIP-173) and Bech32m (BIP-350) decoding.
 /// Variant shapes are identical in debug and release builds; no secret material
 /// (payload bytes, HRP strings) is ever carried in an error.
