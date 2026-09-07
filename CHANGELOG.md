@@ -54,6 +54,15 @@ See the per-crate changelogs for full detail:
 - [`secure-gate-core/CHANGELOG.md`](secure-gate-core/CHANGELOG.md)
 - [`secure-gate-compat/CHANGELOG.md`](secure-gate-compat/CHANGELOG.md)
 
+- **RustCrypto integration example on `Fixed` (#144).** Backported from `main`.
+  `secure-gate-core`'s `Fixed` rustdoc and README now document scoped in-place
+  block-cipher ops via `GenericArray::from_mut_slice` inside `with_secret_mut`,
+  contrasted with the copy-out shape that leaves plaintext in an unzeroized stack
+  value. Compiled doctests; no API change. Also corrected docs left stale by the #156
+  backport: the `RevealSecretMut` `len()`/`is_empty()` claim, the `dynamic_string_no_hex`
+  sentence that contradicted this release's own preamble, and the status header on
+  `docs/composability_restructure.md`.
+
 ## [0.8.0-rc.10] - 2026-07-06
 
 ### Security

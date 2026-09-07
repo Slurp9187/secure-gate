@@ -135,9 +135,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inherent methods, which cannot be named as a bound or forwarded generically.
   Decode constructors (`try_from_hex`, `try_from_base64url`,
   `try_from_bech32*`) remain inherent: construction needs `Self`.
-  `Dynamic<String>` still has no hex encoding — the
-  `dynamic_string_no_hex` compile-fail now imports `ToHex` and proves the impl
-  genuinely does not exist, not merely that an import was missing.
+  `Dynamic<String>` still has no hex encoding. On `main` that exclusion is pinned
+  by the `dynamic_string_no_hex` compile-fail fixture; **this branch does not carry
+  that fixture**, so the exclusion holds by construction here but is not
+  regression-tested. See the note in the 0.8.0-rc.11 preamble above.
 
   **Migration:** add the format trait import at call sites
   (`use secure_gate::ToHex;` etc.); call syntax is unchanged.
@@ -364,6 +365,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   derive `Debug` on `Zeroizing<T>`, so `{:?}` on the returned value can print the
   secret. Also noted that this crate does not re-export `zeroize`, so naming the return
   type requires taking a compatible `zeroize` dependency directly.
+
+- **RustCrypto integration example on `Fixed` (#144).** Backported from `main`. The
+  `Fixed` rustdoc and the crate README now show how to run a block cipher *inside* the
+  wrapper —
+  `block.with_secret_mut(|b| cipher.decrypt_block(GenericArray::from_mut_slice(b)))` —
+  alongside the copy-out shape (`aes::Block::from(*b)`) that type inference nudges you
+  toward and that leaves plaintext-equivalent bytes in an unzeroized stack value. The
+  mechanism always worked; nothing pointed integrators at it. Both examples are compiled
+  doctests; `aes` joins `[dev-dependencies]` pinned `=0.8.4`, matching this branch's
+  exact-pin convention and the `cipher` 0.4 / `GenericArray` API they use. They sit on
+  the `Fixed` struct rather than the `fixed` module header, because `mod fixed` is
+  private — its `//!` docs are doctested but never rendered on docs.rs. No library API
+  changed, and the `with_block_mut` sugar also floated in #144 was deliberately not
+  added.
+- **`RevealSecretMut` no longer advertises `len()`/`is_empty()` as coming from
+  `RevealSecret`.** They moved to `SecretLen` in the backported #156 split; the trait's
+  own rustdoc had been left behind.
+- **Removed a self-contradiction in the backported #156 entry above.** It claimed the
+  `dynamic_string_no_hex` compile-fail "now imports `ToHex` and proves the impl
+  genuinely does not exist" — a sentence carried over verbatim from `main`, on a branch
+  that does not carry that fixture, directly contradicting this release's own preamble.
+  The entry now states that the `Dynamic<String>`-has-no-hex exclusion holds by
+  construction here but is regression-tested only on `main`.
+- **`docs/composability_restructure.md` records the shipped state on both lines** —
+  0.9.0-rc.8 on `main` (PR #159, `f2a8f1c`) and 0.8.0-rc.11 here (PR #160, `a029bb7`) —
+  instead of describing in-progress branch work.
 
 ## [0.8.0-rc.10] - 2026-07-06
 

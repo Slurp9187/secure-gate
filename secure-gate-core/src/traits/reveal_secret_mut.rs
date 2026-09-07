@@ -68,7 +68,11 @@ use crate::RevealSecret;
 
 /// Trait for mutable access to secrets.
 ///
-/// Extends [`RevealSecret`] (so you get read-only access, `len()`, `is_empty()`, etc.).
+/// Extends [`RevealSecret`], so you also get read-only access (`with_secret`,
+/// `expose_secret`, `into_inner`). Length accessors live on
+/// [`SecretLen`](crate::SecretLen), a separate trait implemented only where a
+/// length is meaningful.
+///
 /// Only core wrappers (`Fixed<T>`, `Dynamic<T>`) implement this trait.
 pub trait RevealSecretMut: RevealSecret {
     /// Provides scoped (recommended) mutable access to the secret.
