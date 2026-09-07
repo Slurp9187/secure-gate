@@ -376,7 +376,7 @@ fn check_decode_bech32_zeroed(data: &[u8]) {
     });
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 fn check_decode_bech32m_zeroed(data: &[u8]) {
     use secure_gate::ToBech32m;
     let encoded = data.try_to_bech32m("testm").expect("valid hrp");
@@ -671,7 +671,7 @@ fn all_heap_zeroed() {
         check_decode_bech32_zeroed(&[0xBBu8; 32]);
     }
 
-    #[cfg(feature = "encoding-bech32m")]
+    #[cfg(feature = "encoding-bech32")]
     {
         check_decode_bech32m_zeroed(&[0xAAu8; 16]);
         check_decode_bech32m_zeroed(&[0xBBu8; 32]);

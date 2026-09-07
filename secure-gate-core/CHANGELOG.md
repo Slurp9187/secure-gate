@@ -267,6 +267,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Migration:** delete the arm. `#[non_exhaustive]` means your match already has a
   wildcard.
 
+- **BREAKING: the `encoding-bech32m` feature.** Removed outright, not aliased. BIP-173
+  and BIP-350 now ship together under `encoding-bech32`.
+
+  The split existed in case the `bech32` crate ever separated the two algorithms. It
+  will not: they are two seven-line `impl Checksum` blocks in one file, differing in a
+  single constant, under upstream's own comment `// Same as Bech32 except TARGET_RESIDUE
+  is different`. `bech32` 0.11 has exactly three features — `alloc`, `std`, `default` —
+  and nothing algorithm-level to split along. Both of this crate's features already
+  enabled the same `dep:bech32`, so turning one off never removed a line of dependency
+  code; it gated only this crate's own module.
+
+  What decided it was the code-length work above making the two genuinely symmetric.
+  Before, `encoding-bech32` meant a large non-standard variant and `encoding-bech32m`
+  meant the spec — an asymmetry that was a real argument for keeping them apart. They
+  are now twins: same shape, same `_sized::<N>` knob, same guarantee boundary, same
+  error type, differing in one constant no caller ever sets. Two features that are
+  provably parallel, over one dependency, are one feature.
+
+  Cost removed: two CI matrix rows and two entries in the `no_std` feature sweep, on
+  every push. `ToBech32m`, `FromBech32mStr`, `try_from_bech32m*` and the `Bech32mSized`
+  types are unchanged in every respect except the feature that turns them on.
+
 ### Security
 
 - **`std::io::Write` on `Dynamic<Vec<u8>>` left the secret in the outgoing buffer when

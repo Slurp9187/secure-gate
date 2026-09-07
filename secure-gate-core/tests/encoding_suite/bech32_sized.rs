@@ -11,18 +11,15 @@
 //! 4. Everything the default methods guarantee (HRP validation, exact length reporting,
 //!    zeroizing output, BIP test vectors) holds identically on the `_sized` path.
 
-#![cfg(all(
-    any(feature = "encoding-bech32", feature = "encoding-bech32m"),
-    feature = "alloc"
-))]
+#![cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 
 use secure_gate::{BECH32_CODE_LENGTH, Bech32Error, bech32_code_length};
 
 #[cfg(feature = "encoding-bech32")]
 use secure_gate::{FromBech32Str, ToBech32};
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 use secure_gate::{FromBech32mStr, ToBech32m};
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32")]
 use secure_gate::{Dynamic, Fixed, RevealSecret};
 
 // ─────────────────────────── the helper ───────────────────────────
@@ -89,7 +86,7 @@ fn bech32_output_is_byte_identical_across_code_lengths() {
     assert_eq!(c, d, "the plain method must equal the default code length");
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 #[test]
 fn bech32m_output_is_byte_identical_across_code_lengths() {
     let data = [0xABu8; 32];
@@ -139,7 +136,7 @@ fn bech32_long_string_needs_a_large_n_at_both_ends() {
     );
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 #[test]
 fn bech32m_long_string_needs_a_large_n_at_both_ends() {
     let data = vec![0x22u8; 900];
@@ -175,7 +172,7 @@ fn boundary_exactly_at_and_one_past_the_code_length() {
 
 // ─────────────────── invariant 3: the two checksums never cross ───────────────────
 
-#[cfg(all(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32")]
 #[test]
 fn bech32_and_bech32m_never_cross_decode_at_any_code_length() {
     let data = [0x44u8; 32];
@@ -199,7 +196,7 @@ fn bech32_and_bech32m_never_cross_decode_at_any_code_length() {
     );
 }
 
-#[cfg(all(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32")]
 #[test]
 fn long_payloads_also_never_cross_decode() {
     let data = vec![0x55u8; 900];
@@ -262,7 +259,7 @@ fn sized_zeroizing_variant_returns_an_encoded_secret() {
     assert_eq!(&*enc, plain.as_str());
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 #[test]
 fn sized_zeroizing_variant_bech32m() {
     let data = vec![0x99u8; 900];
@@ -289,7 +286,7 @@ fn bip173_test_vectors_still_pass_on_both_paths() {
     assert!(data.is_empty());
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 #[test]
 fn bip350_test_vectors_still_pass_on_both_paths() {
     let data = "A1LQFN3A".try_from_bech32m("A").expect("BIP-350 vector");
@@ -365,7 +362,7 @@ fn fixed_sized_round_trip_and_length_mismatch() {
         .with_secret(|b| assert_eq!(b, &[0xBBu8; 32]));
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 #[test]
 fn fixed_sized_round_trip_bech32m() {
     let secret = Fixed::new([0xCCu8; 32]);
@@ -415,7 +412,7 @@ fn dynamic_sized_round_trip_for_a_kem_sized_payload() {
         .with_secret(|b| assert_eq!(b, &ct));
 }
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 #[test]
 fn dynamic_sized_round_trip_bech32m() {
     let ct = vec![0x6Bu8; 1568];
@@ -513,7 +510,7 @@ impl Lcg {
 /// For each `N` and each payload: encode; confirm the encoding is independent of `N`;
 /// confirm a decoder at `N` recovers the bytes; confirm a decoder too small refuses;
 /// confirm the HRP is checked; and confirm bech32m never decodes it.
-#[cfg(all(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32")]
 #[test]
 fn randomized_stress_across_code_lengths() {
     macro_rules! ladder {

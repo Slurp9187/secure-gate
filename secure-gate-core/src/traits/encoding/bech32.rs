@@ -52,7 +52,7 @@ use bech32::primitives::checksum::Checksum;
 
 /// Bech32/Bech32m generator coefficients (BIP-173 § Checksum, Bitcoin Core `bech32.cpp`).
 /// Identical for both checksums; only `TARGET_RESIDUE` differs.
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32")]
 pub(crate) const GENERATOR_SH: [u32; 5] =
     [0x3b6a_57b2, 0x2650_8e6d, 0x1ea1_19fa, 0x3d42_33dd, 0x2a14_62b3];
 
@@ -65,7 +65,7 @@ pub(crate) const GENERATOR_SH: [u32; 5] =
 /// It is *not* BIP-173's 90-character limit: that is a convention for Bitcoin addresses
 /// which the `bech32` crate deliberately does not enforce. 1023 characters is roughly
 /// 630 payload bytes, depending on HRP length — see [`bech32_code_length`].
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32")]
 pub const BECH32_CODE_LENGTH: usize = 1023;
 
 /// The code length required to encode `payload_bytes` under an HRP of `hrp_len` characters.
@@ -86,7 +86,7 @@ pub const BECH32_CODE_LENGTH: usize = 1023;
 ///
 /// Values above [`BECH32_CODE_LENGTH`] forfeit the checksum's error-detection guarantee
 /// — see [`Bech32Sized`].
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32")]
 #[must_use]
 pub const fn bech32_code_length(hrp_len: usize, payload_bytes: usize) -> usize {
     // ceil(payload_bytes * 8 / 5) base32 characters, plus HRP, separator, checksum.

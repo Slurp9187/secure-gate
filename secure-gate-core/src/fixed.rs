@@ -97,7 +97,7 @@ use crate::traits::encoding::base32::ToBase32;
 use crate::traits::encoding::base64_url::ToBase64Url;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use crate::traits::encoding::bech32::ToBech32;
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use crate::traits::encoding::bech32m::ToBech32m;
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 use crate::traits::encoding::hex::ToHex;
@@ -113,7 +113,7 @@ use zeroize::Zeroize;
 /// past `N` so the length-mismatch error reports the exact decoded length.
 /// The iteration count is bounded by the checksum-validated input string, so
 /// oversized inputs cost at most one bounded pass. Works without `alloc`.
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32")]
 fn drain_bech32_payload<const N: usize>(
     checked: &bech32::primitives::decode::CheckedHrpstring<'_>,
 ) -> Result<zeroize::Zeroizing<[u8; N]>, crate::error::Bech32Error> {
@@ -170,8 +170,8 @@ fn drain_bech32_payload<const N: usize>(
 /// | [`try_from_base64url`](Self::try_from_base64url) | `encoding-base64` | Constant-time Base64url decoding |
 /// | [`try_from_bech32`](Self::try_from_bech32) | `encoding-bech32` | HRP-validated Bech32 decoding |
 /// | [`try_from_bech32_unchecked`](Self::try_from_bech32_unchecked) | `encoding-bech32` | Bech32 without HRP check |
-/// | [`try_from_bech32m`](Self::try_from_bech32m) | `encoding-bech32m` | HRP-validated Bech32m decoding |
-/// | [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked) | `encoding-bech32m` | Bech32m without HRP check |
+/// | [`try_from_bech32m`](Self::try_from_bech32m) | `encoding-bech32` | HRP-validated Bech32m decoding |
+/// | [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked) | `encoding-bech32` | Bech32m without HRP check |
 /// | [`from_random()`](Self::from_random) | `rand` | System RNG |
 /// | [`from_rng(rng)`](Self::from_rng) | `rand` | Custom RNG |
 ///
@@ -677,7 +677,7 @@ impl<const N: usize> Fixed<[u8; N]> {
 /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH); the `_sized::<C>` constructors
 /// take the code length as a parameter. Bitcoin address tooling expects BIP-173's
 /// 90-character cap, which is narrower than either and is the caller's to respect.
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 impl<const N: usize> Fixed<[u8; N]> {
     /// Decodes a Bech32m (BIP-350) string into `Fixed<[u8; N]>`, validating that the HRP
     /// matches `expected_hrp` (case-insensitive).
@@ -869,7 +869,7 @@ impl<const N: usize> ToBech32 for Fixed<[u8; N]> {
 /// Bech32m encoding for `Fixed<[u8; N]>`; delegates via `with_secret`.
 ///
 /// Bring the trait into scope to call these: `use secure_gate::ToBech32m;`.
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<const N: usize> ToBech32m for Fixed<[u8; N]> {
     #[inline]
     fn try_to_bech32m(

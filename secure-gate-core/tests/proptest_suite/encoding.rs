@@ -94,7 +94,7 @@ mod bech32_roundtrip {
     }
 }
 
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 mod bech32m_roundtrip {
     use proptest::prelude::*;
     use secure_gate::{Dynamic, RevealSecret, ToBech32m};
@@ -184,7 +184,7 @@ mod bech32_sized_roundtrip {
     }
 }
 
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 mod bech32m_sized_roundtrip {
     use proptest::prelude::*;
     use secure_gate::{FromBech32mStr, ToBech32m};
@@ -207,11 +207,7 @@ mod bech32m_sized_roundtrip {
     }
 }
 
-#[cfg(all(
-    feature = "encoding-bech32",
-    feature = "encoding-bech32m",
-    feature = "alloc"
-))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 mod bech32_variants_never_cross {
     use proptest::prelude::*;
     use secure_gate::{FromBech32Str, FromBech32mStr, ToBech32, ToBech32m};

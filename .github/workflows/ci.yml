@@ -135,14 +135,8 @@ jobs:
           - name: encoding-base64 only
             features: "--no-default-features --features=alloc,encoding-base64"
 
-          - name: encoding-bech32 only
+          - name: encoding-bech32 only (BIP-173 + BIP-350)
             features: "--no-default-features --features=alloc,encoding-bech32"
-
-          - name: encoding-bech32m only
-            features: "--no-default-features --features=alloc,encoding-bech32m"
-
-          - name: encoding-bech32 + bech32m
-            features: "--no-default-features --features=alloc,encoding-bech32,encoding-bech32m"
 
           # ── Serde ─────────────────────────────────────────────────────────────
           - name: serde (serialize + deserialize)
@@ -263,10 +257,9 @@ jobs:
             "encoding-base32" \
             "encoding-base64" \
             "encoding-bech32" \
-            "encoding-bech32m" \
-            "encoding-hex,encoding-base32,encoding-base64,encoding-bech32,encoding-bech32m" \
+            "encoding-hex,encoding-base32,encoding-base64,encoding-bech32" \
             "ct-eq" \
-            "ct-eq,encoding-hex,encoding-base32,encoding-base64,encoding-bech32,encoding-bech32m"
+            "ct-eq,encoding-hex,encoding-base32,encoding-base64,encoding-bech32"
           do
             cargo build -p secure-gate --lib \
               --target thumbv7em-none-eabihf \

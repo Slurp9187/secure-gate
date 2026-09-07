@@ -90,13 +90,13 @@ encoding = [
   "encoding-base32",
   "encoding-base64",
   "encoding-bech32",
-  "encoding-bech32m",
 ]
 encoding-hex = ["dep:base16ct"]
 encoding-base32 = ["dep:base32ct"]
 encoding-base64 = ["dep:base64ct"]
+# Covers BIP-173 (bech32) and BIP-350 (bech32m) together: they are one dependency,
+# one error type, and one code-length knob, differing only in a checksum constant.
 encoding-bech32 = ["dep:bech32"]
-encoding-bech32m = ["dep:bech32"]
 
 # Cloneable: opt-in cloning
 cloneable = []

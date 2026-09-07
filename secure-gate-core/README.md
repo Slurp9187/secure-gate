@@ -220,7 +220,7 @@ secure-gate = { version = "0.9.0-rc.8", features = ["full"] }
 | Base32 (RFC 4648 §6) | `ToBase32`    | `FromBase32Str`    | `encoding-base32`  |
 | Base64URL            | `ToBase64Url` | `FromBase64UrlStr` | `encoding-base64`  |
 | Bech32 (BIP-173)     | `ToBech32`    | `FromBech32Str`    | `encoding-bech32`  |
-| Bech32m (BIP-350)    | `ToBech32m`   | `FromBech32mStr`   | `encoding-bech32m` |
+| Bech32m (BIP-350)    | `ToBech32m`   | `FromBech32mStr`   | `encoding-bech32`  |
 
 Base32 is here for TOTP/HOTP interop: `otpauth://` key URIs (RFC 6238 / RFC 4226) carry the shared secret as uppercase, unpadded Base32, and Base32 is the densest encoding that fits QR alphanumeric mode.
 
@@ -400,12 +400,11 @@ Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = 
 | `std`               | Full `std` support (implies `alloc`). Enables `std::io::Read`/`Write` for `Dynamic<Vec<u8>>` via `as_reader()` and direct `Write` impl. Use `default-features = false` for no-heap builds. |
 | `rand`              | `from_random()` (system `SysRng`) and fallible `from_rng()` for any `TryRng + TryCryptoRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` / `from_rng()` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
 | `ct-eq`             | `ConstantTimeEq` — timing-safe comparison via `expose_secret()` (`subtle`)                                                                                                                                                                                |
-| `encoding`          | Meta: all encoding sub-features (hex, base32, base64url, bech32, bech32m). Encoding traits require `alloc`; `Fixed::try_from_*` decoding is no-alloc.                                                                                                     |
+| `encoding`          | Meta: all encoding sub-features (hex, base32, base64url, bech32). Encoding traits require `alloc`; `Fixed::try_from_*` decoding is no-alloc.                                                                                                     |
 | `encoding-hex`      | `ToHex` / `FromHexStr` — constant-time via `base16ct`                                                                                                                                                                                                     |
 | `encoding-base32`   | `ToBase32` / `FromBase32Str` — constant-time via `base32ct`; RFC 4648 §6, uppercase and unpadded                                                                                                                                                          |
 | `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr` — constant-time via `base64ct`                                                                                                                                                                                         |
-| `encoding-bech32`   | `ToBech32` / `FromBech32Str` — BIP-173                                                                                                                                                                                                                    |
-| `encoding-bech32m`  | `ToBech32m` / `FromBech32mStr` — BIP-350                                                                                                                                                                                                                  |
+| `encoding-bech32`   | BIP-173 (`ToBech32` / `FromBech32Str`) **and** BIP-350 (`ToBech32m` / `FromBech32mStr`). One feature: the two are the same code, one checksum constant apart. `_sized::<N>` on every method sets the code length.                                          |
 | `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                                                                                                                                                                             |
 | `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                                                                                                      |
 | `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                                                                                                    |

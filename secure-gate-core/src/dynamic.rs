@@ -104,7 +104,6 @@ use zeroize::Zeroize;
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
     feature = "ct-eq",
     feature = "std",
 ))]
@@ -117,7 +116,7 @@ use crate::traits::encoding::base32::ToBase32;
 use crate::traits::encoding::base64_url::ToBase64Url;
 #[cfg(feature = "encoding-bech32")]
 use crate::traits::encoding::bech32::ToBech32;
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 use crate::traits::encoding::bech32m::ToBech32m;
 #[cfg(feature = "encoding-hex")]
 use crate::traits::encoding::hex::ToHex;
@@ -133,7 +132,7 @@ use crate::traits::decoding::base32::FromBase32Str;
 use crate::traits::decoding::base64_url::FromBase64UrlStr;
 #[cfg(feature = "encoding-bech32")]
 use crate::traits::decoding::bech32::FromBech32Str;
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 use crate::traits::decoding::bech32m::FromBech32mStr;
 #[cfg(feature = "encoding-hex")]
 use crate::traits::decoding::hex::FromHexStr;
@@ -172,8 +171,8 @@ use crate::traits::decoding::hex::FromHexStr;
 /// | [`try_from_base64url(s)`](Self::try_from_base64url) | `encoding-base64` | Constant-time Base64url decoding |
 /// | [`try_from_bech32(s, hrp)`](Self::try_from_bech32) | `encoding-bech32` | HRP-validated Bech32 |
 /// | [`try_from_bech32_unchecked(s)`](Self::try_from_bech32_unchecked) | `encoding-bech32` | Bech32 without HRP check |
-/// | [`try_from_bech32m(s, hrp)`](Self::try_from_bech32m) | `encoding-bech32m` | HRP-validated Bech32m |
-/// | [`try_from_bech32m_unchecked(s)`](Self::try_from_bech32m_unchecked) | `encoding-bech32m` | Bech32m without HRP check |
+/// | [`try_from_bech32m(s, hrp)`](Self::try_from_bech32m) | `encoding-bech32` | HRP-validated Bech32m |
+/// | [`try_from_bech32m_unchecked(s)`](Self::try_from_bech32m_unchecked) | `encoding-bech32` | Bech32m without HRP check |
 /// | [`from_random(len)`](Self::from_random) | `rand` | System RNG |
 /// | [`from_rng(len, rng)`](Self::from_rng) | `rand` | Custom RNG |
 ///
@@ -341,7 +340,7 @@ impl Dynamic<Vec<u8>> {
 }
 
 // Bech32m (BIP-350) encoding and decoding for Dynamic<Vec<u8>>.
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 impl Dynamic<Vec<u8>> {
     /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>`, validating the HRP
     /// (case-insensitive).
@@ -582,7 +581,7 @@ impl ToBech32 for Dynamic<Vec<u8>> {
 /// Bech32m encoding for `Dynamic<Vec<u8>>`; delegates via `with_secret`.
 ///
 /// Bring the trait into scope: `use secure_gate::ToBech32m;`.
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 impl ToBech32m for Dynamic<Vec<u8>> {
     #[inline]
     fn try_to_bech32m(

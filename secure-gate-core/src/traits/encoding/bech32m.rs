@@ -5,7 +5,7 @@
 //! This trait provides secure, explicit encoding of byte data to Bech32m strings
 //! (BIP-350 checksum) with a specified HRP. Designed for intentional export.
 //!
-//! Requires the `encoding-bech32m` feature.
+//! Requires the `encoding-bech32` feature, which covers both BIP-173 and BIP-350.
 //!
 //! # Security Notes
 //!
@@ -48,16 +48,16 @@
 //! // encoded_z is EncodedSecret — zeroized on drop, redacted Debug
 //! # Ok::<(), secure_gate::Bech32Error>(())
 //! ```
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use bech32::Hrp;
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use bech32::encode_lower;
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 use bech32::primitives::checksum::Checksum;
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 use super::bech32::GENERATOR_SH;
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 pub use super::bech32::{BECH32_CODE_LENGTH, bech32_code_length};
 
 /// Bech32m (BIP-350) checksum with a caller-chosen code length.
@@ -86,11 +86,11 @@ pub use super::bech32::{BECH32_CODE_LENGTH, bech32_code_length};
 /// assert!(encoded.starts_with("kem1"));
 /// # Ok::<(), secure_gate::Bech32Error>(())
 /// ```
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Bech32mSized<const CODE_LENGTH: usize> {}
 
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 impl<const N: usize> Checksum for Bech32mSized<N> {
     type MidstateRepr = u32;
 
@@ -105,15 +105,15 @@ impl<const N: usize> Checksum for Bech32mSized<N> {
 ///
 /// The checksum's error-detection guarantee holds throughout. This is what every
 /// non-`_sized` bech32m method uses, and it matches [`bech32::Bech32m`] exactly.
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 pub type Bech32mStandard = Bech32mSized<BECH32_CODE_LENGTH>;
 
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use crate::error::Bech32Error;
 
 /// Extension trait for encoding byte data as Bech32m (BIP-350) strings.
 ///
-/// *Requires feature `encoding-bech32m`.*
+/// *Requires feature `encoding-bech32`.*
 ///
 /// Blanket-implemented for all `AsRef<[u8]>` types. Use [`try_to_bech32m`](Self::try_to_bech32m)
 /// with the protocol's HRP. Test empty and invalid HRP inputs in security-critical code.
@@ -125,7 +125,7 @@ use crate::error::Bech32Error;
 /// accepts whatever `N` you name. Oversized Bech32m strings are still valid bech32m and
 /// still break wallets and address parsers — staying inside 90 characters for anything
 /// address-shaped is your responsibility, not the type's.
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub trait ToBech32m {
     /// Fallibly encodes bytes as a Bech32m (BIP-350) string with the given HRP.
     ///
@@ -187,7 +187,7 @@ pub trait ToBech32m {
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
 // encode_lower returns String — requires alloc.
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
     #[inline(always)]
     fn try_to_bech32m(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error> {
@@ -219,7 +219,7 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
     }
 }
 
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[cfg(test)]
 mod tests {
     use super::*;

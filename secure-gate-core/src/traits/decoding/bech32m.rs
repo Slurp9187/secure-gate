@@ -6,7 +6,8 @@
 //! to byte vectors, with HRP validation as the primary path. It is designed for handling
 //! untrusted input in cryptographic contexts, such as decoding encoded addresses or keys.
 //!
-//! **Requires the `encoding-bech32m` feature** (distinct from classic Bech32).
+//! **Requires the `encoding-bech32` feature**, which covers both BIP-173 and BIP-350.
+//! The two are distinct checksums; one feature ships both.
 //!
 //! # Security Notes
 //!
@@ -31,7 +32,7 @@
 //!
 //! ```rust
 //! use secure_gate::FromBech32mStr;
-//! # #[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+//! # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 //! # {
 //!
 //! // BIP-350 minimal valid Bech32m test vector
@@ -48,20 +49,20 @@
 //! assert!("not-bech32m".try_from_bech32m("a").is_err());
 //! # }
 //! ```
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use crate::error::Bech32Error;
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use alloc::string::{String, ToString};
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use alloc::vec::Vec;
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use super::super::encoding::bech32m::{BECH32_CODE_LENGTH, Bech32mSized};
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use bech32::primitives::decode::CheckedHrpstring;
 
 /// Extension trait for decoding Bech32m (BIP-350) strings into byte vectors.
 ///
-/// *Requires feature `encoding-bech32m`.*
+/// *Requires feature `encoding-bech32`.*
 ///
 /// Blanket-implemented for all `AsRef<str>` types. Treat all input as untrusted;
 /// HRP validation prevents injection attacks and cross-protocol confusion.
@@ -76,7 +77,7 @@ use bech32::primitives::decode::CheckedHrpstring;
 /// (or in [`zeroize::Zeroizing`]) if the decoded bytes are sensitive. Prefer
 /// `Fixed::try_from_bech32m` / `Dynamic::try_from_bech32m`, which perform the
 /// wrapping for you and zeroize their internal temporaries.
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub trait FromBech32mStr {
     /// Decodes a Bech32m (BIP-350) string, validating that the HRP matches `expected_hrp`.
     ///
@@ -165,7 +166,7 @@ pub trait FromBech32mStr {
 }
 
 // Blanket impl to cover any AsRef<str> (e.g., &str, String, etc.)
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<T: AsRef<str> + ?Sized> FromBech32mStr for T {
     #[inline(always)]
     fn try_from_bech32m_unchecked(&self) -> Result<(String, Vec<u8>), Bech32Error> {

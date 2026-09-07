@@ -8,7 +8,7 @@
 //! | [`HexError`] | [`Fixed::try_from_hex`](crate::Fixed::try_from_hex), [`FromHexStr`](crate::FromHexStr) | `encoding-hex` |
 //! | [`Base32Error`] | [`Fixed::try_from_base32`](crate::Fixed::try_from_base32), [`FromBase32Str`](crate::FromBase32Str) | `encoding-base32` |
 //! | [`Base64Error`] | [`Fixed::try_from_base64url`](crate::Fixed::try_from_base64url), [`FromBase64UrlStr`](crate::FromBase64UrlStr) | `encoding-base64` |
-//! | [`Bech32Error`] | `try_from_bech32*`, [`FromBech32Str`](crate::FromBech32Str), [`FromBech32mStr`](crate::FromBech32mStr) | `encoding-bech32` / `encoding-bech32m` |
+//! | [`Bech32Error`] | `try_from_bech32*`, [`FromBech32Str`](crate::FromBech32Str), [`FromBech32mStr`](crate::FromBech32mStr) | `encoding-bech32` |
 //!
 //! Every type in this module is produced by a function in this crate. There is no
 //! unified wrapper enum: a caller decoding several formats owns the union it needs,
@@ -75,12 +75,12 @@ impl core::error::Error for FromSliceError {}
 
 /// Errors produced when decoding Bech32 (BIP-173) or Bech32m (BIP-350) strings.
 ///
-/// *Requires feature `encoding-bech32` or `encoding-bech32m`.*
+/// *Requires feature `encoding-bech32`.*
 ///
 /// Variant shapes are identical in debug and release builds. No input-derived
 /// strings (such as the received HRP) are ever captured — the caller already
 /// holds the input and the expected HRP.
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Bech32Error {
@@ -107,7 +107,7 @@ pub enum Bech32Error {
     },
 }
 
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32")]
 impl fmt::Display for Bech32Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
@@ -121,7 +121,7 @@ impl fmt::Display for Bech32Error {
     }
 }
 
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32")]
 impl core::error::Error for Bech32Error {}
 
 /// Errors produced when decoding Base32 (RFC 4648 §6, uppercase, unpadded) strings.
