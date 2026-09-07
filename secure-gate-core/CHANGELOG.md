@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **The crate page now lists the newtype macros.** The `lib.rs` overview ("What's
+  available without `alloc`" and the module tree) named only the alias macros;
+  `fixed_newtype!` and `dynamic_newtype!` are listed with a one-line contrast.
+- **`SecretLen` has its own crate-level re-export doc.** `pub use traits::{RevealSecret,
+  SecretLen};` carried one doc comment for both. Split in two — the tier list stays on
+  `RevealSecret`, `SecretLen` gets a short doc of its own — and kept that way because
+  rustdoc 1.70, the 0.8 line's MSRV toolchain, ICEs on intra-doc links in a grouped
+  `use` re-export; the two lines share this file.
+
 ## [0.9.0-rc.8] - 2026-09-06
 
 ### Added

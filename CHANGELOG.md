@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **`secure-gate-core`:** the crate page lists `fixed_newtype!` / `dynamic_newtype!`
+  alongside the alias macros, and `SecretLen` gets its own crate-level re-export doc
+  (the `RevealSecret`/`SecretLen` re-export is split so the 0.8 line's rustdoc 1.70,
+  which ICEs on grouped re-exports, can keep sharing this file).
+
 ## [0.9.0-rc.8] - 2026-09-06
 
 ### Added
