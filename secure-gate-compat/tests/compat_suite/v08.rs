@@ -17,9 +17,9 @@
 //  14.  Serde Deserialize/Serialize (feature-gated)
 //  15.  zeroize re-export accessible via compat::zeroize
 
-use secure_gate::compat::v08::{DebugSecret, Secret, SecretBox, SecretString, SecretVec};
-use secure_gate::compat::{CloneableSecret, ExposeSecret};
 use secure_gate::{Dynamic, Fixed};
+use secure_gate_compat::compat::v08::{DebugSecret, Secret, SecretBox, SecretString, SecretVec};
+use secure_gate_compat::compat::{CloneableSecret, ExposeSecret};
 
 // ── 1. Secret<S> construction ────────────────────────────────────────────────
 
@@ -66,9 +66,18 @@ fn debug_does_not_leak_value() {
 
     let s = Secret::new(Password(String::from("hunter2")));
     let dbg = format!("{:?}", s);
-    assert!(dbg.contains("[REDACTED"), "Debug must contain [REDACTED: {dbg}");
-    assert!(!dbg.contains("hunter2"), "Debug must not leak the value: {dbg}");
-    assert!(dbg.starts_with("Secret("), "Debug must wrap with Secret(): {dbg}");
+    assert!(
+        dbg.contains("[REDACTED"),
+        "Debug must contain [REDACTED: {dbg}"
+    );
+    assert!(
+        !dbg.contains("hunter2"),
+        "Debug must not leak the value: {dbg}"
+    );
+    assert!(
+        dbg.starts_with("Secret("),
+        "Debug must wrap with Secret(): {dbg}"
+    );
 }
 
 // ── 4. DebugSecret — default impl ────────────────────────────────────────────
@@ -290,7 +299,7 @@ fn secret_string_deserialize() {
 #[cfg(all(feature = "serde-serialize", feature = "serde-deserialize"))]
 #[test]
 fn secret_serialize_requires_marker() {
-    use secure_gate::compat::SerializableSecret;
+    use secure_gate_compat::compat::SerializableSecret;
     use zeroize::Zeroize;
 
     #[derive(Clone, Zeroize, serde::Serialize, serde::Deserialize)]
@@ -308,7 +317,7 @@ fn secret_serialize_requires_marker() {
 
 #[test]
 fn zeroize_reexport_accessible() {
-    use secure_gate::compat::zeroize::Zeroize;
+    use secure_gate_compat::compat::zeroize::Zeroize;
     let mut val = vec![1u8, 2, 3];
     val.zeroize();
     assert!(val.iter().all(|&b| b == 0));

@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> Backported from `main`, adapted to this branch. The substance is
+> `tests/integration.rs`, an aggregator this branch never had: without it cargo compiled
+> none of `tests/compat_suite/`, `tests/compat_dual/` or `tests/proptest_suite/`, so 248
+> of this crate's 258 tests were dead code.
+>
+> Deliberately not taken from `main`: its `src/lib.rs` drops `#![forbid(unsafe_code)]`
+> and `#![warn(missing_docs)]` and ungates the `compat` module from `secrecy-compat`,
+> which this branch's no-default-features build relies on; its `Cargo.toml` removes the
+> MSRV 1.70 pins (`proptest` 1.10 needs 1.84, `serde_json` and `trybuild` pull
+> edition-2024 dependencies); and its compat `fuzz/` subcrate has no CI job here. This
+> branch's `.gitignore`, this CHANGELOG, and the three 0.8-only proptest modules
+> (`ct_eq`, `encoding`, `serde` — never present on `main`) are kept.
+
+### Fixed
+
+- **248 tests were never compiled.** `tests/integration.rs` declares the suite modules,
+  so `compat_suite/`, `compat_dual/` and `proptest_suite/` now build and run. Before
+  this, only the four flat test files at `tests/` root were compiled at all: the whole
+  secrecy shim suite, the side-by-side parity tests against real `secrecy`, and every
+  property test were silently dead.
+- **`proptest_suite/encoding.rs` did not compile.** Its hex and base64 modules call
+  `to_hex()` / `to_base64url()` without importing `ToHex` / `ToBase64Url`. The encoders
+  became trait impls in #156 and nothing has compiled this file since; the bech32
+  modules in the same file already imported theirs.
+
+### Changed
+
+- Test modules brought up to `main`'s state: `compat_suite/`, `compat_dual/`,
+  `migration_full.rs`, `proptest_suite/proptest_compat.rs`.
+- `README.md` and `MIGRATING_FROM_SECRECY.md` use `secure_gate_compat::` import paths
+  (compat is its own crate), keeping this branch's `0.8` version strings.
+
 ## [0.8.0-rc.11] - 2026-09-06
 
 ### Changed

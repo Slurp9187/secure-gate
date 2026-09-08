@@ -14,8 +14,6 @@
 //!
 //! - `parity_v08` / `parity_v10`: shared-API dual tests + shim-extension tests
 //! - `divergence`: zeroization parity assertions + shim-only stricter behaviors
-#![cfg(feature = "dual-compat-test")]
-
 #[macro_use]
 mod macros;
 

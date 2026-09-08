@@ -6,7 +6,7 @@
 Compatibility shims for migrating from the [`secrecy`](https://crates.io/crates/secrecy) crate (v0.8.0 and v0.10.1). Targets Rust 2021 + MSRV 1.70.
 
 > [!WARNING]
->**This crate is intended for migration only.** New code should use the native types from the [`secure-gate`](https://crates.io/crates/secure-gate) crate directly.
+> **This crate is intended for migration only.** New code should use the native types from the [`secure-gate`](https://crates.io/crates/secure-gate) crate directly.
 
 ## Installation
 
@@ -37,6 +37,7 @@ Your existing code should compile with only import changes. See the full guide f
 ## Further Reading
 
 - **[MIGRATING_FROM_SECRECY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-compat/MIGRATING_FROM_SECRECY.md)** — complete migration guide, parity test suite, and security notes
+- **[SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-compat/SECURITY.md)** — security considerations for the compatibility layer (including migration-specific risks)
 - [Core `secure-gate` documentation](https://docs.rs/secure-gate) — preferred API for new code
 
 The compat layer is a thin, zero-overhead shim. Once migration is complete, remove the `secrecy-compat` feature and the `secure-gate-compat` dependency.
