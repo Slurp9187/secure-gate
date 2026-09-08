@@ -80,9 +80,12 @@ The remaining sting is real but narrow: `.to_string()` is *quieter* than
 sweep `.to_string()` / `.to_owned()` alongside the encoding audit, not to make the
 type inconvenient.
 
-That sweep is not a grep for `to_string` — these are ordinary `str` methods and a
-project-wide search for them is almost all noise, which is exactly why they are not
-in the token list under **Audit Surfaces** in `SECURITY.md`. It is a second pass over
+That sweep is not a grep for `to_string` — these are ordinary `str` methods, reached
+through the `Deref` above and not through anything this crate defines, and a
+project-wide search for them is almost all noise. That is exactly why they are not in
+the token list under **Audit Surfaces** in `SECURITY.md`. It is also why the problem
+is specific to this type: on `Fixed`/`Dynamic` there is no `Deref`, so the same copy
+must be spelled `expose_secret().to_string()`, and that already trips a listed token. It is a second pass over
 the call sites that list already finds: for every encoder hit, look at what happens
 to the returned `EncodedSecret`. `SECURITY.md` carries that instruction directly
 beneath the token list, and separately classifies the result of `enc.to_string()` as

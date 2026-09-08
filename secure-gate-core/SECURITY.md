@@ -437,8 +437,11 @@ buffer the caller owns and must wipe. The `try_from_*` constructors are the reve
 direction, and belong in the sweep because they are where untrusted input enters.
 
 **`.to_string()` / `.to_owned()` on an `EncodedSecret` are the quiet ones.** They are
-deliberately *not* in the token list above, because they are ordinary `str` methods and a
-project-wide grep for them is nearly all noise. They still produce an untracked plain
+deliberately *not* in the token list above, because they are ordinary `str` methods, reached
+through `EncodedSecret`'s `Deref<Target = str>` rather than through anything this crate
+defines, and a project-wide grep for them is nearly all noise. They are reachable that way on
+`EncodedSecret` **only**: `Fixed` and `Dynamic` have no `Deref`, so there the same copy has to
+be written `expose_secret().to_string()`, which already trips a listed token. They still produce an untracked plain
 `String` (see "Where accident-prevention ends"), so sweep them at the call sites the list
 above already found: for every `to_hex` / `to_base32` / `to_base64url` / `try_to_bech32*`
 hit, check what happens to the returned `EncodedSecret`. `into_inner` on it is a move and
