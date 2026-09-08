@@ -210,7 +210,7 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 | `rand`              | `from_random()` uses system `SysRng` (`rand` 0.10) and panics on failure; `from_rng()` accepts caller-supplied `TryRng + TryCryptoRng` and returns `Result`            | Use trusted entropy sources; prefer `from_rng()` where RNG failure should be handled explicitly                                 |
 | `serde-deserialize` | Decodes to inner type; temporary buffers use `zeroize::Zeroizing` (zeroized on rejection too). `Fixed<[u8; N]>` rejects over-length sequences before its buffer can grow, so no unzeroized realloc residue is left behind. 1 MiB default limit (`MAX_DESERIALIZE_BYTES`). See allocation notes below. | Enable for trusted deserialization sources; set a tight limit for untrusted input and enforce transport-level size caps upstream |
 | `serde-serialize`   | Opt-in export via marker trait; audit all implementations                                                                                                                 | Enable sparingly; monitor exfiltration risk                                                                                      |
-| `encoding`          | Meta: enables all encoding sub-features (hex, base32, base64url, bech32, bech32m). Encoding traits require `alloc` (return `String`); `Fixed::try_from_*` decoding works without `alloc`. | Enable per-format instead for minimal surface                                                                                    |
+| `encoding`          | Meta: enables all encoding sub-features (hex, base32, base64url, bech32, bech32m). Encoding traits require `alloc` (they return `EncodedSecret`, which owns a `String`); `Fixed::try_from_*` decoding works without `alloc`. | Enable per-format instead for minimal surface                                                                                    |
 | `encoding-hex`      | Hex encoding/decoding via `base16ct` (constant-time). `ToHex`/`FromHexStr` require `alloc`; `Fixed::try_from_hex` is no-alloc. | Validate inputs upstream; prefer `try_from_hex`                                                                                  |
 | `encoding-base32`   | Base32 encoding/decoding via `base32ct` (constant-time), RFC 4648 §6 — uppercase and unpadded; lowercase and `=` padding are rejected. `ToBase32`/`FromBase32Str` require `alloc`; `Fixed::try_from_base32` is no-alloc. | Validate inputs upstream; prefer `try_from_base32`                                                                               |
 | `encoding-base64`   | Base64url encoding/decoding via `base64ct` (constant-time). `ToBase64Url`/`FromBase64UrlStr` require `alloc`; `Fixed::try_from_base64url` is no-alloc. | Validate inputs upstream; prefer `try_from_base64url`                                                                            |
@@ -278,7 +278,7 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   <!-- historical: InnerSecret<T> restored the wrapper-level `[REDACTED]` invariant after ownership
   transfer by implementing `Debug` as constant redaction. Use
   `InnerSecret::into_zeroizing()` only when interoperability required the raw
-  `Zeroizing<T>` wrapper.
+  `Zeroizing<T>` wrapper. -->
 - **`panic = "abort"` builds disable zeroization on panic.** When `panic = "abort"`
   is set in a profile, Rust aborts the process immediately on panic without running
   any `Drop` implementations. Secrets held in `Fixed<T>` or `Dynamic<T>` at the
@@ -295,7 +295,7 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   copy the data, and free the old one through the standard allocator — *without
   zeroizing the old buffer first*. The freed bytes remain readable in the heap
   until the allocator reuses or unmaps the page, and they survive into core
-  dumps and swap. -->
+  dumps and swap.
 
   **If your threat model includes process-memory disclosure (heap scrape, swap,
   core dump) of secrets that have been mutated in place after construction,

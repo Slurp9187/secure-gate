@@ -13,8 +13,10 @@
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
 //! - **Always wiped**: `to_hex()` / `to_hex_upper()` return
-//!   [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`). Prefer these
-//!   when the encoded form itself is sensitive.
+//!   [`EncodedSecret`](crate::EncodedSecret), which wraps `Zeroizing<String>`, redacts
+//!   its `Debug`, and wipes on drop.
+//!   There is no unprotected variant. `.into_inner()` is the named point where that
+//!   protection ends.
 //! - **Audit visibility**: Direct calls (`key.to_hex()` / `key.to_hex_upper()`) do **not** appear in
 //!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
 //!   multi-step operations, prefer `with_secret(|b| b.to_hex())` — the borrow checker
@@ -49,7 +51,7 @@ use base16ct;
 ///
 /// *Requires feature `encoding-hex`.*
 ///
-/// Blanket-implemented for all `AsRef<[u8]>` types (byte slices, arrays, `Vec<u8>`),
+/// Blanket-implemented for `AsRef<[u8]> + [`EncodableBytes`](super::EncodableBytes)` (byte slices, arrays, `Vec<u8>`),
 /// and implemented directly on the byte-shaped wrappers (`Fixed<[u8; N]>`,
 /// `Dynamic<Vec<u8>>`). To encode a secret wrapper, call `key.to_hex()` with this
 /// trait in scope (ergonomically safest for single operations — no reference in the

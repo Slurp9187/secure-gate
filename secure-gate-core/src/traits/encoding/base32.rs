@@ -16,9 +16,10 @@
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
 //! - **Always wiped**: `to_base32()` returns
-//!   [`EncodedSecret`](crate::EncodedSecret)
-//!   (wrapping `Zeroizing<String>` with redacted `Debug`). Use plain `to_base32()`
-//!   only for public values.
+//!   [`EncodedSecret`](crate::EncodedSecret), which wraps `Zeroizing<String>`, redacts
+//!   its `Debug`, and wipes on drop.
+//!   Public values come back in the same wrapper. `.into_inner()` is the named point where that
+//!   protection ends.
 //! - **Explicit exposure**: `to_base32()` (and the other encoding methods) perform deliberate full-secret exposure —
 //!   the same security contract as `with_secret` or `expose_secret`. Direct calls do not
 //!   appear in `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams
@@ -52,7 +53,7 @@ use base32ct::{Base32UpperUnpadded, Encoding};
 ///
 /// *Requires feature `encoding-base32`.*
 ///
-/// Blanket-implemented for all `AsRef<[u8]>` types, and implemented directly on the
+/// Blanket-implemented for `AsRef<[u8]> + [`EncodableBytes`](super::EncodableBytes)`, and implemented directly on the
 /// byte-shaped wrappers (`Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`). Uses the RFC 4648 §6
 /// alphabet (`A`–`Z`, `2`–`7`) without `=` padding. To encode a secret wrapper, call
 /// `key.to_base32()` with this trait in scope (ergonomically safest for single

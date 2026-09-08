@@ -2,9 +2,9 @@
 //!
 //! > **Import paths:** `use secure_gate::ToHex;` etc. (not `secure_gate::traits::encoding::hex::ToHex`)
 //!
-//! All encoding traits require `alloc` (they return `String` or [`EncodedSecret`](crate::EncodedSecret)).
-//! Every encoder returns [`EncodedSecret`](crate::EncodedSecret): the encoded form is a
-//! second full copy of the secret, and it stays wiped until it drops.
+//! All encoding traits require `alloc`. Every encoder returns
+//! [`EncodedSecret`](crate::EncodedSecret): the encoded form is a second full copy of
+//! the secret, and it stays wiped until it drops.
 //! See the [`decoding`](super::decoding) module for the reverse direction.
 //!
 //! Each encoding trait has its own feature gate:

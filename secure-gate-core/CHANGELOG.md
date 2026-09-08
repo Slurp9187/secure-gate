@@ -164,15 +164,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING: `SecureEncoding` / `SecureDecoding` marker traits.** Both were empty
   markers with blanket impls over `AsRef<[u8]>` / `AsRef<str>`, and nothing in the crate
   ever bounded on them. The per-format traits (`ToHex`, `ToBase32`, `ToBase64Url`,
-  `ToBech32`, `ToBech32m`, `FromHexStr`, `FromBase32Str`, …) are implemented directly
+  `ToBech32`, `ToBech32m`, `FromHexStr`, `FromBase32Str`, …) were implemented directly
   against `AsRef<[u8]>` / `AsRef<str>`, so the markers gated nothing and enabled nothing
   — despite trait-module docs that claimed they were what "enables" the per-format
   impls. Their only consumer anywhere in the workspace was a single test asserting the
   marker existed.
 
+  Contrast `EncodableBytes` above, which replaced the encoder side of that `AsRef<[u8]>`
+  blanket later in this release: it looks like the same shape and is the opposite case,
+  because deleting it changes which calls compile.
+
   **Migration:** delete them from any `use` list; delete any `T: SecureEncoding` /
-  `T: SecureDecoding` bound and rely on `AsRef<[u8]>` / `AsRef<str>` (or on the
-  per-format trait itself) instead. No encoding or decoding behaviour changes.
+  `T: SecureDecoding` bound and rely on the per-format trait itself, or on
+  `AsRef<[u8]> + EncodableBytes` for encoding and `AsRef<str>` for decoding. No encoding
+  or decoding behaviour changes from this removal.
 
 - **BREAKING: `DecodingError`.** A public enum that no function in the crate ever
   produced. There was no `From<HexError>`, no constructor, and no signature returning

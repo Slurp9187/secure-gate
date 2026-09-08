@@ -13,8 +13,11 @@
 //!   for Taproot, SegWit v1+, and modern address formats.
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive.
-//! - **Always wiped**: `try_to_bech32m` returns [`EncodedSecret`]
-//!   (wrapping `Zeroizing<String>` with redacted `Debug`) when the encoded form remains sensitive.
+//! - **Always wiped**: `try_to_bech32m` returns
+//!   [`EncodedSecret`](crate::EncodedSecret), which wraps `Zeroizing<String>`, redacts
+//!   its `Debug`, and wipes on drop.
+//!   Addresses and other public values come back in the same wrapper. `.into_inner()` is the named point where that
+//!   protection ends.
 //! - **Audit visibility**: Direct wrapper calls (`key.try_to_bech32m(...)`) do **not** appear in
 //!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
 //!   multi-step operations, prefer `with_secret(|b| b.try_to_bech32m(...))` — the borrow
@@ -110,7 +113,7 @@ use crate::error::Bech32Error;
 ///
 /// *Requires feature `encoding-bech32`.*
 ///
-/// Blanket-implemented for all `AsRef<[u8]>` types. Use [`try_to_bech32m`](Self::try_to_bech32m)
+/// Blanket-implemented for `AsRef<[u8]> + [`EncodableBytes`](super::EncodableBytes)`. Use [`try_to_bech32m`](Self::try_to_bech32m)
 /// with the protocol's HRP. Test empty and invalid HRP inputs in security-critical code.
 ///
 /// **Design note — wallet interoperability**: `ToBech32m` targets BIP-350 (Bitcoin

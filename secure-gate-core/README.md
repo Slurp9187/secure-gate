@@ -227,14 +227,14 @@ Base32 is here for TOTP/HOTP interop: `otpauth://` key URIs (RFC 6238 / RFC 4226
 
 ### Encoding (to string)
 
-The wrapper encoding methods are trait impls, so the trait must be in scope — `use secure_gate::{ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};` — before `key.to_base32()` resolves. Plain methods return `String` (for public values). Use the zeroizing variants (returning [`EncodedSecret`]) when the encoded form should remain sensitive.
+The wrapper encoding methods are trait impls, so the trait must be in scope — `use secure_gate::{ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};` — before `key.to_base32()` resolves. Every one of them returns [`EncodedSecret`], which wipes itself on drop and prints `[REDACTED]`. Read it through the deref (`&*encoded` is a `&str`) and call `.into_inner()` only when an API demands an owned `String`.
 
 ```rust
 use secure_gate::{Fixed, RevealSecret, ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};
 # fn main() -> Result<(), secure_gate::Bech32Error> {
 let key: Fixed<[u8; 32]> = Fixed::new([0x42u8; 32]);
 
-// Plain — returns String (suitable for public encodings)
+// Direct on the wrapper
 let hex     = key.to_hex();
 let hex_u   = key.to_hex_upper();
 let b32     = key.to_base32();
@@ -277,7 +277,7 @@ Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from st
 - Prefer HRP-validated constructors to prevent cross-protocol confusion attacks.
 - Use `_unchecked` only when HRP is validated upstream.
 - All constructors guarantee zeroization even on OOM panic via `Zeroizing`.
-- For encoding _output_, prefer zeroizing methods when the encoded string itself is sensitive (see `EncodedSecret` and `SECURITY.md`).
+- Encoded output is protected by default: every encoder returns [`EncodedSecret`], wiped on drop. `.into_inner()` is the named point where that ends (see `SECURITY.md`).
 
 ## Serde
 

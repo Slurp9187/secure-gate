@@ -499,25 +499,29 @@ pub use traits::FromBech32mStr;
 pub use traits::FromHexStr;
 
 /// Encodes byte data as Base32 strings (RFC 4648 §6, uppercase, no padding).
-/// Blanket impl for `AsRef<[u8]>`. Requires `encoding-base32` + `alloc`.
+/// Blanket impl for `AsRef<[u8]> + `[`EncodableBytes`]. Returns [`EncodedSecret`].
+/// Requires `encoding-base32` + `alloc`.
 /// See [`FromBase32Str`] for the decoding counterpart.
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 pub use traits::ToBase32;
 
 /// Encodes byte data as Base64url strings (RFC 4648, URL-safe, no padding).
-/// Blanket impl for `AsRef<[u8]>`. Requires `encoding-base64` + `alloc`.
+/// Blanket impl for `AsRef<[u8]> + `[`EncodableBytes`]. Returns [`EncodedSecret`].
+/// Requires `encoding-base64` + `alloc`.
 /// See [`FromBase64UrlStr`] for the decoding counterpart.
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use traits::ToBase64Url;
 
-/// Encodes byte data as Bech32 (BIP-173) strings. Blanket impl for `AsRef<[u8]>`.
+/// Encodes byte data as Bech32 (BIP-173) strings. Blanket impl for
+/// `AsRef<[u8]> + `[`EncodableBytes`]; returns `Result<`[`EncodedSecret`]`, _>`.
 /// The plain methods use [`BECH32_CODE_LENGTH`]; `try_to_bech32_sized::<N>` takes the
 /// code length as a parameter. Requires `encoding-bech32` + `alloc`.
 /// See [`FromBech32Str`] for the decoding counterpart.
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use traits::ToBech32;
 
-/// Encodes byte data as Bech32m (BIP-350) strings. Blanket impl for `AsRef<[u8]>`.
+/// Encodes byte data as Bech32m (BIP-350) strings. Blanket impl for
+/// `AsRef<[u8]> + `[`EncodableBytes`]; returns `Result<`[`EncodedSecret`]`, _>`.
 /// The plain methods use [`BECH32_CODE_LENGTH`]; `try_to_bech32m_sized::<N>` takes the
 /// code length as a parameter. Requires `encoding-bech32` + `alloc`.
 /// See [`FromBech32mStr`] for the decoding counterpart.
@@ -553,8 +557,9 @@ pub use traits::{Bech32mSized, Bech32mStandard};
 pub use traits::{BECH32_CODE_LENGTH, bech32_code_length};
 
 /// Encodes byte data as hexadecimal strings (constant-time via `base16ct`).
-/// Blanket impl for `AsRef<[u8]>`. Provides `to_hex()`, `to_hex_upper()`, and
-/// zeroizing variants. Requires `encoding-hex` + `alloc`.
+/// Blanket impl for `AsRef<[u8]> + `[`EncodableBytes`]. Provides `to_hex()` and
+/// `to_hex_upper()`, both returning [`EncodedSecret`].
+/// Requires `encoding-hex` + `alloc`.
 /// See [`FromHexStr`] for the decoding counterpart.
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub use traits::ToHex;
