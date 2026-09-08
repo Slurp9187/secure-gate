@@ -436,6 +436,16 @@ the first hands off an unredacted `Zeroizing<String>`, the second copies into a
 buffer the caller owns and must wipe. The `try_from_*` constructors are the reverse
 direction, and belong in the sweep because they are where untrusted input enters.
 
+**`.to_string()` / `.to_owned()` on an `EncodedSecret` are the quiet ones.** They are
+deliberately *not* in the token list above, because they are ordinary `str` methods and a
+project-wide grep for them is nearly all noise. They still produce an untracked plain
+`String` (see "Where accident-prevention ends"), so sweep them at the call sites the list
+above already found: for every `to_hex` / `to_base32` / `to_base64url` / `try_to_bech32*`
+hit, check what happens to the returned `EncodedSecret`. `into_inner` on it is a move and
+is already listed; `.to_string()` / `.to_owned()` copy and leave a second live plaintext.
+Rationale for keeping `Deref`, and why this residual is accepted rather than closed:
+`docs/encoded_secret_deref.md`.
+
 **Note:** `into_inner` does not appear in an `expose_secret*`-only sweep — audit it
 separately. It consumes the wrapper and transfers ownership of the **plain** value:
 protection ends at the call, and the caller owns the secret's lifetime from there.

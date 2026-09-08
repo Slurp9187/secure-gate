@@ -28,6 +28,11 @@
 //! Size 8192 is used to avoid collision with small Rust panic-machinery allocations (message
 //! formatting, backtrace, TLS) that may occur during unwind.
 
+// NOTE ON MIRI: the `not(miri)` gate below compiles this entire file away under `cargo miri
+// test`, which `.github/workflows/fuzz-miri.yml` is the only job to run. The gate is necessary --
+// a `#[global_allocator]` that inspects freed memory is not something Miri can execute -- but it
+// means the thread-local reasoning below is checked by review and by the suite passing on a real
+// allocator, never by Miri. Weigh that when editing the TLS path.
 #![cfg(all(feature = "alloc", not(miri)))]
 #![allow(clippy::undocumented_unsafe_blocks)]
 
@@ -87,9 +92,18 @@ thread_local! {
     /// hide a real allocation, but it can invent one, and it did -- one CI run reported 4
     /// allocations for an HRP mismatch whose decode path was byte-identical to four green runs.
     ///
-    /// Both cells are `const`-initialized and hold `Copy` types with no destructor, so they
-    /// register no TLS destructor, allocate nothing on first touch, and cannot be observed in a
-    /// torn-down state from inside `alloc`.
+    /// Both cells are `const`-initialized and hold `Copy` types with no destructor, so no TLS
+    /// destructor is registered and there is no lazily-initialized state that could be observed
+    /// torn down from inside `alloc`.
+    ///
+    /// First touch is a separate question, and the ordering in `count_allocs` is what settles it
+    /// rather than any promise about `thread_local!`. On some targets the first access to a
+    /// thread's TLS block does allocate -- Mach-O resolves `#[thread_local]` through
+    /// `tlv_get_addr`, which materializes the block lazily. That is harmless here only because
+    /// `count_allocs` writes both cells *before* raising the global `COUNTING` gate, and
+    /// `CountGuard::drop` clears them *before* lowering it. By the time `alloc` can reach a TLS
+    /// read, this thread's block already exists; and a thread that never counts never touches TLS
+    /// from inside the allocator at all. Preserve that ordering if you edit either function.
     static THREAD_COUNTING: Cell<bool> = const { Cell::new(false) };
 
     /// Number of `alloc` calls observed on this thread while `THREAD_COUNTING` was set.
@@ -199,9 +213,11 @@ impl Drop for CountGuard {
 /// Runs `f` on the calling thread and returns how many heap allocations *that thread* performed.
 ///
 /// Allocations made concurrently by the libtest harness or any other thread are not counted, so a
-/// zero-allocation assertion cannot be broken by unrelated activity. What the count still includes
-/// is everything `f` itself does, including any thread it spawns and then joins -- no such closure
-/// exists here, and none should be added.
+/// zero-allocation assertion cannot be broken by unrelated activity. The flip side, and the reason
+/// `f` must stay single-threaded: allocations made by a thread `f` spawns are *also* not counted,
+/// because that thread's cells start at their const-initialized defaults. That would undercount,
+/// which is the direction that hides a regression. No closure here spawns a thread, and none
+/// should be added.
 ///
 /// The sequential-only caveat on `with_proxy_check` is unaffected: asserting mode is still
 /// process-global, so this file still runs as one aggregate test.

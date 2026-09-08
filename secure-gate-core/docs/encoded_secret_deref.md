@@ -77,9 +77,16 @@ copies, and the crate should keep offering the one that does not duplicate.
 
 The remaining sting is real but narrow: `.to_string()` is *quieter* than
 `into_inner()`. It reads as a `str` method, not as a named exit. The answer is to
-sweep `.to_string()` / `.to_owned()` alongside the encoding audit — they are on
-the audit surface list in `SECURITY.md` for that reason — not to make the type
-inconvenient.
+sweep `.to_string()` / `.to_owned()` alongside the encoding audit, not to make the
+type inconvenient.
+
+That sweep is not a grep for `to_string` — these are ordinary `str` methods and a
+project-wide search for them is almost all noise, which is exactly why they are not
+in the token list under **Audit Surfaces** in `SECURITY.md`. It is a second pass over
+the call sites that list already finds: for every encoder hit, look at what happens
+to the returned `EncodedSecret`. `SECURITY.md` carries that instruction directly
+beneath the token list, and separately classifies the result of `enc.to_string()` as
+untracked plaintext under "Where accident-prevention ends".
 
 ## What did get a compile error instead
 

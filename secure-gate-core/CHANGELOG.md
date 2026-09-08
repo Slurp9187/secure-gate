@@ -501,8 +501,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   because `.to_string()` is a *copy* while `into_inner` is a *move* — the wrapper survives
   the first, still wiping. The residual (a `str` method is quieter than a named exit) is
   handled by sweeping `.to_string()` / `.to_owned()` with the encoding audit, which
-  `SECURITY.md` already lists. Linked from the `EncodedSecret` module docs; deliberately
-  not added to `SECURITY.md`, which stays threat model and audit surfaces.
+  `SECURITY.md` lists. Linked from the `EncodedSecret` module docs; deliberately not added
+  to `SECURITY.md`, which stays threat model and audit surfaces.
+
+- **`SECURITY.md` now says how to sweep `.to_string()` / `.to_owned()`.** An adversarial
+  review of the note above caught it asserting that both were already on the Audit Surfaces
+  token list. They were not, and they should not be — they are ordinary `str` methods, so a
+  project-wide grep is almost all noise, which is precisely why the claim was wrong in a way
+  worth fixing rather than deleting. `SECURITY.md` gains the instruction the note was
+  reaching for: sweep them as a second pass over the encoder call sites the token list
+  already finds, checking what happens to each returned `EncodedSecret`.
 
 - **Four stale statements corrected after the feature fold and the encoder rewrite.**
   `decoding/bech32.rs` described `encoding-bech32` as "distinct from Bech32m" — false

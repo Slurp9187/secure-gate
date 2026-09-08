@@ -19,7 +19,9 @@
 //!
 //! `Deref` here is a deliberate exception to the crate's no-`Deref` rule, and the
 //! alternative (drop it, add `as_str()`, and close `.to_string()`) was considered and
-//! rejected. Design record: `docs/encoded_secret_deref.md`.
+//! rejected. Design record:
+//! [`docs/encoded_secret_deref.md`](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/docs/encoded_secret_deref.md)
+//! — a repository file, not part of the published crate, so this is a link and not a path.
 //!
 //! # No `Display`
 //!
