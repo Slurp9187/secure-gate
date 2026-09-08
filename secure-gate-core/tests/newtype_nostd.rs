@@ -21,3 +21,17 @@ fn base32_decode_constructor_is_forwarded() {
     // Strictness still holds on the no-alloc path: lowercase is rejected.
     assert!(NoStdKey::try_from_base32("vov2xk5lvov2xk5lvov2xk5lvm").is_err());
 }
+
+// Audit finding 1: `Fixed::try_from_bech32*` is alloc-free, and `fixed_newtype!`
+// forwards the bech32m decoders outside `__sg_if_alloc!` — but the bech32 ones were
+// inside it. A no-alloc newtype could decode BIP-350 and not BIP-173.
+#[cfg(all(feature = "encoding-bech32", not(feature = "alloc")))]
+#[test]
+fn nostd_newtype_decodes_both_checksums() {
+    secure_gate::fixed_newtype!(pub NoAllocKey, 4);
+    // Both must exist without `alloc`; the payload is irrelevant, resolution is the test.
+    let _ = NoAllocKey::try_from_bech32("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "bc");
+    let _ = NoAllocKey::try_from_bech32_unchecked("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
+    let _ = NoAllocKey::try_from_bech32m("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "bc");
+    let _ = NoAllocKey::try_from_bech32m_unchecked("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
+}
