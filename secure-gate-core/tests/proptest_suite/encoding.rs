@@ -103,7 +103,7 @@ mod bech32m_roundtrip {
         #![proptest_config(ProptestConfig::with_cases(512))]
         #[test]
         fn dynamic_bech32m_roundtrip(
-            data in prop::collection::vec(any::<u8>(), 0..=90),
+            data in prop::collection::vec(any::<u8>(), 0..=255),
             hrp in "[a-z0-9]{1,10}"
         ) {
             let secret: Dynamic<Vec<u8>> = data.clone().into();

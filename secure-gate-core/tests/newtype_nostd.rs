@@ -30,8 +30,16 @@ fn base32_decode_constructor_is_forwarded() {
 fn nostd_newtype_decodes_both_checksums() {
     secure_gate::fixed_newtype!(pub NoAllocKey, 4);
     // Both must exist without `alloc`; the payload is irrelevant, resolution is the test.
-    let _ = NoAllocKey::try_from_bech32("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "bc");
-    let _ = NoAllocKey::try_from_bech32_unchecked("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
-    let _ = NoAllocKey::try_from_bech32m("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "bc");
-    let _ = NoAllocKey::try_from_bech32m_unchecked("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
+    const S: &str = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
+    // All EIGHT are named on purpose. The `_sized` four are the ones #171 dropped, and
+    // they live in the same `impl` block as the plain four -- so naming only the plain
+    // ones would let a future split re-introduce exactly the bug this test exists for.
+    let _ = NoAllocKey::try_from_bech32(S, "bc");
+    let _ = NoAllocKey::try_from_bech32_unchecked(S);
+    let _ = NoAllocKey::try_from_bech32_sized::<2048>(S, "bc");
+    let _ = NoAllocKey::try_from_bech32_unchecked_sized::<2048>(S);
+    let _ = NoAllocKey::try_from_bech32m(S, "bc");
+    let _ = NoAllocKey::try_from_bech32m_unchecked(S);
+    let _ = NoAllocKey::try_from_bech32m_sized::<2048>(S, "bc");
+    let _ = NoAllocKey::try_from_bech32m_unchecked_sized::<2048>(S);
 }

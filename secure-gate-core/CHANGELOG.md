@@ -19,7 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it: no host job runs `encoding-bech32` without `alloc`, which this release already
   recorded as a known gap. The four constructors now sit outside the gate, matching
   bech32m, and `tests/newtype_nostd.rs::nostd_newtype_decodes_both_checksums` pins all
-  eight under `--no-default-features --features encoding-bech32`.
+  eight by name under `--no-default-features --features encoding-bech32` -- including
+  the four `_sized` constructors, which are the ones #171 actually dropped and which a
+  first version of this test did not name. CI gained a matching matrix row, without
+  which the pin only ever ran locally.
 
 - **The ASan job did not instrument the bech32 heap oracles.** It ran
   `--features alloc`, but `check_bech32_hrp_mismatch_materializes_nothing` and the

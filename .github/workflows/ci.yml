@@ -138,6 +138,12 @@ jobs:
           - name: encoding-bech32 only (BIP-173 + BIP-350)
             features: "--no-default-features --features=alloc,encoding-bech32"
 
+          # No `alloc`: the only row that expands a consumer `fixed_newtype!` on the
+          # no-alloc path. Its absence is what let the BIP-173 decode constructors sit
+          # inside `__sg_if_alloc!` undetected.
+          - name: encoding-bech32, no alloc
+            features: "--no-default-features --features=encoding-bech32"
+
           # ── Serde ─────────────────────────────────────────────────────────────
           - name: serde (serialize + deserialize)
             features: "--no-default-features --features=serde"
