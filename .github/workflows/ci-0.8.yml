@@ -335,6 +335,44 @@ jobs:
         run: cargo +1.70 test -p secure-gate-compat --locked --all-features
 
   # ---------------------------------------------------------------------------
+  # Rustdoc job — docs must build on the pinned toolchain
+  #
+  # Pinned to 1.70 deliberately, not nightly. rustdoc 1.70 ICEs resolving an
+  # intra-doc link out of a *grouped* `pub use` (`no resolution for "X" MacroNS`).
+  # It has bitten this branch twice: once on `pub use traits::{RevealSecret,
+  # SecretLen}`, and again on the three bech32 re-exports the #171 backport added.
+  # docs.rs builds on nightly and was never affected either time, so a nightly-only
+  # job would not have caught it — what breaks is `cargo doc` on this branch's own
+  # MSRV, which is what a contributor runs. `-D warnings` also catches broken
+  # intra-doc links, which nothing else here does.
+  #
+  # Core only. `secure-gate-compat` is experimental and never published, so release
+  # checks are scoped to core; it also has 11 pre-existing broken intra-doc links
+  # (same count on 3c2c127, before this job existed), and gating on them here would
+  # land this job red. Worth fixing separately, then widening this job.
+  # ---------------------------------------------------------------------------
+  rustdoc:
+    name: Rustdoc – builds on MSRV (1.70)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust 1.70
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: "1.70"
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo doc – core (full features)
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo +1.70 doc -p secure-gate --features=full --no-deps
+
+  # ---------------------------------------------------------------------------
   # Compile-fail job — API-surface enforcement on the blessing toolchain
   #
   # The trybuild snapshots assert compiler diagnostics, which drift on stable, so

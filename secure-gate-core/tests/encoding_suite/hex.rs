@@ -3,7 +3,7 @@
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 use secure_gate::Dynamic;
 #[cfg(feature = "encoding-hex")]
-use secure_gate::{Fixed, FromHexStr, RevealSecret, ToHex};
+use secure_gate::{Fixed, FromHexStr, RevealSecret, SecureDecoding, SecureEncoding, ToHex};
 
 #[cfg(feature = "encoding-hex")]
 #[test]
@@ -43,6 +43,26 @@ fn str_receiver_try_from_hex_decodes_via_blanket_impl() {
     let input = "00ff";
     let bytes = input.try_from_hex().expect("hex");
     assert_eq!(bytes, vec![0x00, 0xFF]);
+}
+
+/// Existence pin for the two marker traits this branch still carries.
+///
+/// `main` removed `SecureEncoding` / `SecureDecoding` in 44232a8 and deleted this pin
+/// with them; 0.8 kept the traits, so the pin has to stay too. They are public, are
+/// re-exported at the crate root, and are the only items of their kind unique to this
+/// branch — an empty marker with no methods still needs a compile pin.
+///
+/// Deliberately alloc-free so it runs in every `encoding-*` row, not just the alloc ones.
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn secure_encoding_and_decoding_markers_are_available() {
+    fn assert_decoding<T: SecureDecoding + ?Sized>(_value: &T) {}
+    fn assert_encoding<T: SecureEncoding + ?Sized>(_value: &T) {}
+
+    // `SecureDecoding` is blanket-implemented for `AsRef<str>`, `SecureEncoding` for
+    // `AsRef<[u8]>`. Neither gates the `From*Str` / `To*` blankets — see their rustdoc.
+    assert_decoding("00ff");
+    assert_encoding(&[0x00u8, 0xFF]);
 }
 
 // No-alloc decode path tests: Fixed::try_from_hex works with only encoding-hex (no alloc feature)
