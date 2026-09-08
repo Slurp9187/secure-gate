@@ -506,8 +506,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Four design-record references pointed at paths that do not exist on docs.rs.** `Cargo.toml`'s
   `include` list ships `src/`, `CHANGELOG.md`, `LICENSE*`, `README.md` and `SECURITY.md` — not
-  `docs/` — so `//! Design record: \`docs/…\`` renders in the published documentation as a path
-  to a file that is not in the crate. The three `docs/nominal_newtypes.md` references in
+  `docs/`, so a `//! Design record:` header naming a bare `docs/…` path renders in the published
+  documentation as a pointer to a file that is not in the crate. The three `docs/nominal_newtypes.md` references in
   `src/macros/` and the new `docs/encoded_secret_deref.md` one are now links to the repository,
   matching how `src/traits/mod.rs` already links `SECURITY.md`. Shipping `docs/` in the crate was
   the alternative and was not taken: it would add ten design records to the package for the
