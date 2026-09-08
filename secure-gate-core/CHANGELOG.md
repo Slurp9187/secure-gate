@@ -379,6 +379,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Testing
 
+- **The allocation oracle is thread-scoped, so harness activity can no longer invent an
+  allocation.** `tests/heap_zeroize.rs` counted allocations in a process-global
+  `AtomicUsize` gated by a process-global flag, which charged every allocation made by the
+  libtest harness thread to the closure under test. For a zero-allocation assertion that
+  over-count is *fail-closed*, not fail-open: it cannot hide a real allocation, only invent
+  one, so it produces a spurious red rather than a silent pass. It still had to go — one CI
+  run reported 4 allocations for `check_bech32_hrp_mismatch_materializes_nothing` against a
+  decode path byte-identical to four green runs, and an oracle that fails at random teaches
+  people to re-run until green, which retires it as surely as deleting it. Thread-scoping is
+  what introduces a real fail-open edge — a thread spawned inside the closure is silently
+  uncounted — and `count_allocs` now forbids spawning and nesting for that reason. The counter is now a `const`-initialized `thread_local!` `Cell` pair, so
+  only the counting thread's own allocations are attributed; the global flag is kept as an
+  outer gate so non-counting threads never touch TLS from inside the allocator. No size
+  threshold was added — a threshold would hide real small-allocation regressions. Asserting
+  mode (`CHECKING` + `TARGET_SIZE`) is still process-global, so the file still runs as one
+  aggregate test.
+
+- **Coverage inventory over the 43 encoder tests deleted by the encoder merge — no
+  restoration needed.** The deletions were plain-vs-`*_zeroizing` pairs, and the concern was
+  that a real assertion had been deleted alongside the tautologies. Five formats were
+  checked against four axes (round-trip encode/decode, redacted `Debug`, `into_inner` yields
+  the plain encoding, and a compile-fail pin against re-encoding), then each result was
+  handed to an independent agent instructed to refute it. All 20 axes hold and no citation
+  was found vacuous, so none of the 43 were restored.
+
+  Two axes are covered *once for the type* rather than five times, which is correct and
+  worth stating plainly: every encoder now returns the same `EncodedSecret`, and
+  `into_inner` is a `mem::take` on its `String`, so
+  `encoded_secret_into_inner_returns_string` covers all five formats through a hex fixture.
+  `Debug` redaction is likewise type-level, with bech32 additionally asserting it on its own
+  encoder output in `tests/encoding_suite/bech32_sized.rs`. Round-trip and the re-encode pin
+  are genuinely per-format: `tests/encoding_suite/{hex,base32,base64,bech32}.rs` and
+  `tests/compile-fail/encoded_secret_no_reencode{,_all_formats}.rs`.
+
+- **`into_zeroizing` was only ever tested on the empty string.** The single assertion,
+  `assert_eq!(&*protected, "")`, would have passed unchanged if the method had discarded
+  the buffer and returned `Zeroizing::default()`. Two tests replace that vacuum:
+  `encoded_secret_into_zeroizing_carries_the_content` pins that the returned value holds
+  the actual encoding (and that `Zeroizing`'s derived `Debug` still prints it in the clear,
+  which is what the method's own docs promise), and `check_into_zeroizing_string_zeroed` in
+  `tests/heap_zeroize.rs` observes the buffer being zeroed at deallocation. The second was
+  falsified before being kept: swapping `into_zeroizing` for `into_inner` makes it fail at
+  byte offset 0, so it distinguishes the two exits rather than passing on both.
+
 - **`tests/encoding_suite/bech32_sized.rs`** covers the code-length API against the
   four invariants it has to hold: `N` never changes the encoding; a string decodes
   under any `N` at least as large as itself and no smaller; bech32 and bech32m stay
@@ -451,6 +495,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   360-minute default.
 
 ### Documentation
+
+- **`docs/encoded_secret_deref.md` records why the output wrapper derefs.** `EncodedSecret`
+  is the one type in this crate that implements `Deref`, which is the exact thing
+  `Fixed`/`Dynamic` refuse to do, and the note states the rejected alternative in full:
+  drop `Deref`, add `as_str()`, and `encoded.to_string()` stops compiling. It was rejected
+  because feeding an encoded copy to APIs that speak `&str` is the type's whole job, and
+  because `.to_string()` is a *copy* while `into_inner` is a *move* — the wrapper survives
+  the first, still wiping. The residual (a `str` method is quieter than a named exit) is
+  handled by sweeping `.to_string()` / `.to_owned()` with the encoding audit, which
+  `SECURITY.md` lists. Linked from the `EncodedSecret` module docs; deliberately not added
+  to `SECURITY.md`, which stays threat model and audit surfaces.
+
+- **The `into_zeroizing` content test now pins the move, not just the content.** Its message
+  claimed the method "must hand over the same bytes, not a fresh String" while asserting only
+  string equality, which a cloning implementation would satisfy. It now captures the buffer
+  pointer before the call and asserts it is unchanged after, the same way
+  `dynamic_into_inner_moves_without_copying` does. Falsified: rewriting `into_zeroizing` to
+  clone fails the assertion.
+
+- **Four design-record references pointed at paths that do not exist on docs.rs.** `Cargo.toml`'s
+  `include` list ships `src/`, `CHANGELOG.md`, `LICENSE*`, `README.md` and `SECURITY.md` — not
+  `docs/`, so a `//! Design record:` header naming a bare `docs/…` path renders in the published
+  documentation as a pointer to a file that is not in the crate. The three `docs/nominal_newtypes.md` references in
+  `src/macros/` and the new `docs/encoded_secret_deref.md` one are now links to the repository,
+  matching how `src/traits/mod.rs` already links `SECURITY.md`. Shipping `docs/` in the crate was
+  the alternative and was not taken: it would add ten design records to the package for the
+  benefit of four one-line references.
+
+- **`SECURITY.md` now says how to sweep `.to_string()` / `.to_owned()`.** An adversarial
+  review of the note above caught it asserting that both were already on the Audit Surfaces
+  token list. They were not, and they should not be — they are ordinary `str` methods, so a
+  project-wide grep is almost all noise, which is precisely why the claim was wrong in a way
+  worth fixing rather than deleting. `SECURITY.md` gains the instruction the note was
+  reaching for: sweep them as a second pass over the encoder call sites the token list
+  already finds, checking what happens to each returned `EncodedSecret`.
 
 - **Four stale statements corrected after the feature fold and the encoder rewrite.**
   `decoding/bech32.rs` described `encoding-bech32` as "distinct from Bech32m" — false

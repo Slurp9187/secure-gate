@@ -13,8 +13,14 @@
 //!
 //! IMPORTANT: this file intentionally uses one aggregate `#[test]` (`all_heap_zeroed`) that runs
 //! all size checks sequentially. Avoid splitting this into multiple `#[test]` functions:
-//! `ProxyAllocator` is global process state and parallel tests can interleave allocator activity,
-//! causing false positives in CI.
+//! the *asserting* mode (`CHECKING` + `TARGET_SIZE`) is global process state, and parallel tests
+//! can interleave allocator activity, causing false positives in CI.
+//!
+//! The *counting* mode is the exception: its counter is thread-local, so allocations made by the
+//! libtest harness thread or any other thread are not attributed to the closure under test. That
+//! removes a source of false failures; it is not a licence to parallelize -- an over-count made
+//! `check_bech32_hrp_mismatch_materializes_nothing` fail once in CI against code that was
+//! byte-identical to the passing runs.
 //!
 //! The panic-path positive-control test (`check_panic_path_bytes_zeroed`) uses a separate
 //! recording mode (PANIC_CHECK_*) that records without asserting inside `dealloc`, then checks
@@ -22,11 +28,17 @@
 //! Size 8192 is used to avoid collision with small Rust panic-machinery allocations (message
 //! formatting, backtrace, TLS) that may occur during unwind.
 
+// NOTE ON MIRI: the `not(miri)` gate below compiles this entire file away under `cargo miri
+// test`, which `.github/workflows/fuzz-miri.yml` is the only job to run. The gate is necessary --
+// a `#[global_allocator]` that inspects freed memory is not something Miri can execute -- but it
+// means the thread-local reasoning below is checked by review and by the suite passing on a real
+// allocator, never by Miri. Weigh that when editing the TLS path.
 #![cfg(all(feature = "alloc", not(miri)))]
 #![allow(clippy::undocumented_unsafe_blocks)]
 
 use secure_gate::{Dynamic, RevealSecretMut};
 use std::alloc::{GlobalAlloc, Layout, System};
+use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 // ---------------------------------------------------------------------------
@@ -64,11 +76,46 @@ static PANIC_CHECK_ZEROED: AtomicBool = AtomicBool::new(false);
 // Counting mode — used to prove a code path allocates nothing at all
 // ---------------------------------------------------------------------------
 
-/// Set to `true` while `count_allocs` runs its closure; `alloc` bumps `ALLOC_COUNT`.
+/// Coarse gate: `true` while any thread is inside `count_allocs`.
+///
+/// This exists so that threads which are *not* counting take a single atomic load and never touch
+/// thread-local storage from inside the global allocator. It says a count is in progress;
+/// `THREAD_COUNTING` says whether it is *this* thread's.
 static COUNTING: AtomicBool = AtomicBool::new(false);
 
-/// Number of `alloc` calls observed while `COUNTING` was set.
-static ALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    /// `true` only on the thread currently inside `count_allocs`.
+    ///
+    /// The counter used to be a process-global `AtomicUsize`, which meant every allocation made by
+    /// the libtest harness thread while the gate was open was charged to the closure under test.
+    /// For a zero-allocation assertion that over-count is *fail-closed*, not fail-open: it cannot
+    /// hide a real allocation, only invent one, so the failure mode is a spurious red rather than
+    /// a silent pass. It still had to go. One CI run reported 4 allocations for an HRP mismatch
+    /// whose decode path was byte-identical to four green runs, and an oracle that fails at random
+    /// teaches people to re-run it until it is green, which retires it as surely as deleting it.
+    ///
+    /// Thread-scoping is what introduces a genuine *fail-open* edge, and it is the one the
+    /// `count_allocs` docs guard: a thread spawned inside `f` starts at these const-initialized
+    /// defaults, so its allocations are silently uncounted. Undercounting is the direction that
+    /// hides a regression. Hence the prohibition there on spawning and on nesting.
+    ///
+    /// Both cells are `const`-initialized and hold `Copy` types with no destructor, so no TLS
+    /// destructor is registered and there is no lazily-initialized state that could be observed
+    /// torn down from inside `alloc`.
+    ///
+    /// First touch is a separate question, and the ordering in `count_allocs` is what settles it
+    /// rather than any promise about `thread_local!`. On some targets the first access to a
+    /// thread's TLS block does allocate -- Mach-O resolves `#[thread_local]` through
+    /// `tlv_get_addr`, which materializes the block lazily. That is harmless here only because
+    /// `count_allocs` writes both cells *before* raising the global `COUNTING` gate, and
+    /// `CountGuard::drop` clears them *before* lowering it. By the time `alloc` can reach a TLS
+    /// read, this thread's block already exists; and a thread that never counts never touches TLS
+    /// from inside the allocator at all. Preserve that ordering if you edit either function.
+    static THREAD_COUNTING: Cell<bool> = const { Cell::new(false) };
+
+    /// Number of `alloc` calls observed on this thread while `THREAD_COUNTING` was set.
+    static THREAD_ALLOC_COUNT: Cell<usize> = const { Cell::new(0) };
+}
 
 // ---------------------------------------------------------------------------
 // ProxyAllocator — adapted from upstream zeroize/tests/alloc.rs
@@ -83,10 +130,30 @@ static ALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
 ///     allocations made by panic infrastructure (backtrace, symbol resolution).
 struct ProxyAllocator;
 
+// `realloc` and `alloc_zeroed` are deliberately NOT overridden. Both `GlobalAlloc` defaults are
+// written in terms of `self.alloc` / `self.dealloc`, so a resize still flows through the two
+// hooks below and nothing escapes observation. The consequence for counting is that a growth
+// reads as one `alloc` rather than as a native in-place resize -- an over-count relative to what
+// `System.realloc` might do, which is the conservative direction for a zero-allocation assertion:
+// it can add a phantom allocation, never erase a real one.
+//
+// No check in this file depends on that choice. `check_write_growth_orphan_zeroed` looks like it
+// would -- it watches for the orphaned buffer released while a `Dynamic<Vec<u8>>` grows -- but
+// the `Write` impl in src/dynamic.rs grows by hand (`Vec::with_capacity`, `extend_from_slice`,
+// `zeroize` the old buffer, replace) rather than through `Vec`'s own reallocation, so the orphan
+// is dropped explicitly and reaches `dealloc` either way. Measured, not assumed: instrumenting
+// the asserting gate with a hit counter and forwarding `realloc` to `System.realloc` leaves the
+// hit count at 1 per call, unchanged from the default.
+//
+// Revisit only if an assertion is added that needs "zero new heap blocks, including in-place
+// resizes", or one that relies on `Vec`'s own growth path -- both are different properties from
+// the ones measured here.
 unsafe impl GlobalAlloc for ProxyAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        if COUNTING.load(Ordering::SeqCst) {
-            ALLOC_COUNT.fetch_add(1, Ordering::SeqCst);
+        // Two gates: the global one keeps non-counting threads out of TLS entirely, the
+        // thread-local one is what actually attributes the allocation.
+        if COUNTING.load(Ordering::SeqCst) && THREAD_COUNTING.with(Cell::get) {
+            THREAD_ALLOC_COUNT.with(|c| c.set(c.get() + 1));
         }
         unsafe { System.alloc(layout) }
     }
@@ -162,21 +229,40 @@ struct CountGuard;
 #[cfg(feature = "encoding-bech32")]
 impl Drop for CountGuard {
     fn drop(&mut self) {
+        // Thread-local first: once the global gate is down, `alloc` stops reading TLS at all.
+        THREAD_COUNTING.with(|c| c.set(false));
         COUNTING.store(false, Ordering::SeqCst);
     }
 }
 
-/// Runs `f` and returns how many heap allocations it performed.
+/// Runs `f` on the calling thread and returns how many heap allocations *that thread* performed.
 ///
-/// Same sequential-only caveat as `with_proxy_check`: the counter is process-global,
-/// so this must only be called from the single aggregate test.
+/// Allocations made concurrently by the libtest harness or any other thread are not counted, so a
+/// zero-allocation assertion cannot be broken by unrelated activity. The flip side, and the reason
+/// `f` must stay single-threaded: allocations made by a thread `f` spawns are *also* not counted,
+/// because that thread's cells start at their const-initialized defaults. That would undercount,
+/// which is the direction that hides a regression. No closure here spawns a thread, and none
+/// should be added.
+///
+/// Two ways to break it, both undercounting and therefore silent:
+///
+/// - **Do not nest.** An inner `count_allocs` resets this thread's counter to zero and its
+///   `CountGuard` lowers both gates on the way out, so the outer call loses its tally and stops
+///   counting for the rest of its closure.
+/// - **Do not call it from two threads at once.** `COUNTING` is a plain flag, not a refcount;
+///   whichever call finishes first lowers it and mutes the other.
+///
+/// The file's single aggregate test is what keeps both true today. The sequential-only caveat on
+/// `with_proxy_check` is unaffected: asserting mode is still process-global.
 #[cfg(feature = "encoding-bech32")]
 fn count_allocs<F: FnOnce()>(f: F) -> usize {
-    ALLOC_COUNT.store(0, Ordering::SeqCst);
+    THREAD_ALLOC_COUNT.with(|c| c.set(0));
+    THREAD_COUNTING.with(|c| c.set(true));
     COUNTING.store(true, Ordering::SeqCst);
     let _guard = CountGuard;
     f();
-    ALLOC_COUNT.load(Ordering::SeqCst)
+    // Read before `_guard` runs; neither `with` nor `get` allocates, so this cannot self-count.
+    THREAD_ALLOC_COUNT.with(Cell::get)
 }
 
 // ---------------------------------------------------------------------------
@@ -702,6 +788,51 @@ fn check_new_with_panic_zeroed_string(size: usize) {
 }
 
 // ---------------------------------------------------------------------------
+// EncodedSecret::into_zeroizing — the buffer keeps wiping after the hand-off
+//
+// `into_zeroizing` moves the inner `Zeroizing<String>` out of the wrapper. The
+// claim is that zeroize-on-drop survives the move (only the redacted `Debug` is
+// lost). Nothing observed that: the single existing test called it on an empty
+// string, where a buffer that was never wiped and a buffer that never existed
+// look identical. This encodes a known-nonzero secret, checks the text really is
+// in the buffer, then lets it drop under the asserting allocator.
+//
+// Hex is two chars per byte, so a 24-byte secret gives a 48-byte String -- off the
+// 16/32/64/128 size classes the checks above use, so nothing else in this file can be
+// mistaken for it.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "encoding-hex")]
+fn check_into_zeroizing_string_zeroed<const N: usize>() {
+    use secure_gate::ToHex;
+
+    let size = N * 2;
+
+    with_proxy_check(size, || {
+        // The subject is `EncodedSecret`, not the wrapper that produced it, so this
+        // encodes a bare array: the String under test is then the only heap allocation
+        // inside the gate.
+        let protected = [0xC4u8; N].to_hex().into_zeroizing();
+
+        // Test realism guard: the allocator matches on layout size, so a String that
+        // over-allocated would slip past the check entirely.
+        assert_eq!(
+            protected.capacity(),
+            size,
+            "hex String capacity {} != {size}; the dealloc check would not match it",
+            protected.capacity()
+        );
+        // Positive control: prove there was something to wipe. Hex is ASCII, never NUL.
+        assert!(
+            protected.bytes().all(|b| b != 0),
+            "the encoded buffer was already zero before the drop under test"
+        );
+
+        drop(protected);
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Aggregate test
 // ---------------------------------------------------------------------------
 
@@ -715,6 +846,13 @@ fn check_new_with_panic_zeroed_string(size: usize) {
 fn all_heap_zeroed() {
     #[cfg(feature = "encoding-bech32")]
     check_bech32_hrp_mismatch_materializes_nothing();
+
+    // EncodedSecret::into_zeroizing keeps wiping after the hand-off
+    #[cfg(feature = "encoding-hex")]
+    {
+        check_into_zeroizing_string_zeroed::<24>();
+        check_into_zeroizing_string_zeroed::<40>();
+    }
 
     // Dynamic<[u8; N]> — boxed arrays
     check_array_zeroed::<16>();
