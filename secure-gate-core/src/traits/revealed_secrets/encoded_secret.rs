@@ -17,6 +17,10 @@
 //! `Deref<Target = str>`, plus the two named consumers [`into_inner`](EncodedSecret::into_inner)
 //! and [`into_zeroizing`](EncodedSecret::into_zeroizing).
 //!
+//! `Deref` here is a deliberate exception to the crate's no-`Deref` rule, and the
+//! alternative (drop it, add `as_str()`, and close `.to_string()`) was considered and
+//! rejected. Design record: `docs/encoded_secret_deref.md`.
+//!
 //! # No `Display`
 //!
 //! `EncodedSecret` deliberately does **not** implement `Display`, so `{}` in a format

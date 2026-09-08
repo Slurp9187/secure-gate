@@ -493,6 +493,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`docs/encoded_secret_deref.md` records why the output wrapper derefs.** `EncodedSecret`
+  is the one type in this crate that implements `Deref`, which is the exact thing
+  `Fixed`/`Dynamic` refuse to do, and the note states the rejected alternative in full:
+  drop `Deref`, add `as_str()`, and `encoded.to_string()` stops compiling. It was rejected
+  because feeding an encoded copy to APIs that speak `&str` is the type's whole job, and
+  because `.to_string()` is a *copy* while `into_inner` is a *move* — the wrapper survives
+  the first, still wiping. The residual (a `str` method is quieter than a named exit) is
+  handled by sweeping `.to_string()` / `.to_owned()` with the encoding audit, which
+  `SECURITY.md` already lists. Linked from the `EncodedSecret` module docs; deliberately
+  not added to `SECURITY.md`, which stays threat model and audit surfaces.
+
 - **Four stale statements corrected after the feature fold and the encoder rewrite.**
   `decoding/bech32.rs` described `encoding-bech32` as "distinct from Bech32m" — false
   since the fold; both checksums ship under it. The `# Errors` lists on the unchecked
