@@ -18,6 +18,12 @@
 //! wrapper keeps ownership and keeps wiping. [`into_inner()`](RevealSecret::into_inner)
 //! transfers ownership: you get the plain value and the protection ends with the call.
 //!
+//! Those two shapes are what the **3-tier access model** in `SECURITY.md` counts in
+//! threes: `with_secret` (Tier 1) and `expose_secret` (Tier 2) are both the borrow
+//! shape, differing only in how tightly the lifetime is pinned, and `into_inner`
+//! (Tier 3) is the take. Two shapes, three volumes — the tiers say how loudly you
+//! have to announce which one you picked, not how many protections there are.
+//!
 //! Extraction is a hand-off, not a third layer of protection. Encoding output is the
 //! one case that keeps a wrapper — [`EncodedSecret`] **does** implement `Deref`, because
 //! its job is to keep an encoded *copy* of the secret wiped until it drops. Ordinary
@@ -101,7 +107,7 @@
 //! | Category | Types | `Deref` to secret? | Purpose |
 //! |----------|-------|-------------------|---------|
 //! | **Secret wrappers** | [`Fixed<T>`], [`Dynamic<T>`] | No — use [`RevealSecret`] | Hold live secrets; `Debug` → `[REDACTED]` |
-//! | **Output wrapper** | [`EncodedSecret`] | Yes — caller owns the data | Holds encoded output, wiped on drop |
+//! | **Output wrapper** | [`EncodedSecret`] | Yes — yields `&str`; copies you make are yours, the buffer stays the wrapper's | Holds encoded output, wiped on drop |
 //! | **Opt-in markers** | [`CloneableSecret`], [`SerializableSecret`] | — (no methods) | Implement on inner type `T` to unlock gated impls |
 //!
 //! `CloneableSecret` and `SerializableSecret` are implemented on the **inner type `T`**,
@@ -113,9 +119,12 @@
 //! This crate carries two separate obligations, and they end in different places.
 //!
 //! **Accidents must not compile.** This applies while the secret is held in
-//! [`Fixed`]/[`Dynamic`], and it ends at the named extraction. `into_inner`,
-//! `expose_secret`, and `EncodedSecret::into_inner` are the exits: you typed a name, the call site
-//! is grep-able, and ownership moves to you.
+//! [`Fixed`]/[`Dynamic`], and it ends at the named extraction. `into_inner` and
+//! `EncodedSecret::into_inner` are the exits that transfer ownership: you typed a
+//! name, the call site is grep-able, and the wrapper is consumed. `expose_secret` is
+//! a named *borrow* — the wrapper still owns the secret and still wipes it — but it
+//! hands out a reference with no lifetime bound to a call site, so it is audited
+//! alongside them.
 //!
 //! **Documented behavior must be accurate.** This never ends, and it is why the
 //! taxonomy table above says `Deref: Yes` for the output wrapper.
@@ -408,7 +417,8 @@ pub use traits::SecretLen;
 ///
 /// Extends [`RevealSecret`]. Prefer [`with_secret_mut()`](RevealSecretMut::with_secret_mut)
 /// (Tier 1) over [`expose_secret_mut()`](RevealSecretMut::expose_secret_mut) (Tier 2).
-/// Only [`Fixed`] and [`Dynamic`] implement this — read-only wrappers deliberately do not.
+/// Implemented by [`Fixed`], [`Dynamic`], and the generated newtypes. [`EncodedSecret`]
+/// implements neither this nor [`RevealSecret`] — it is an output wrapper, not a secret one.
 pub use traits::RevealSecretMut;
 
 /// Placeholder values left behind by [`RevealSecret::into_inner`] (Tier 3 access).
@@ -420,6 +430,11 @@ pub use traits::RevealSecretMut;
 ///
 /// Implement this for your own inner types to make `into_inner` available on wrappers
 /// around them. A sentinel must never contain secret material.
+///
+/// Leaving it unimplemented is a deliberate position, not a gap: `into_inner` is then
+/// uncallable for that inner type, so a secret with no safe inert placeholder simply
+/// cannot be extracted by ownership transfer. `with_secret` and `expose_secret` still
+/// work. That is the safe default rather than a missing feature.
 pub use traits::SentinelValue;
 
 /// Encoded string **output wrapper** for zeroizing encoded output.
@@ -429,7 +444,8 @@ pub use traits::SentinelValue;
 /// accept [`CloneableSecret`] or [`SerializableSecret`] markers.
 ///
 /// Returned by every encoding method (`to_hex`, `to_hex_upper`, `to_base32`,
-/// `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and their `_sized` forms).
+/// `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and the `_sized::<N>` forms of
+/// the last two — only bech32 and bech32m take a code length).
 /// Wraps `Zeroizing<String>` with `Debug` → `[REDACTED]`. Its one accessor is
 /// `Deref<Target = str>`; there are deliberately no `AsRef` impls, because `Deref`
 /// already opens that door. Deliberately **no** `Display` either: `{}` on this type is

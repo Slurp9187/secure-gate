@@ -4,7 +4,8 @@
 //!
 //! [`EncodedSecret`] wraps `Zeroizing<String>` with `Debug` → `[REDACTED]`. It is
 //! returned by every encoding method (`to_hex`, `to_base32`, `to_base64url`,
-//! `try_to_bech32`, `try_to_bech32m`, and their `_sized` forms).
+//! `try_to_bech32`, `try_to_bech32m`, and the `_sized::<N>` forms of the last two —
+//! only bech32 and bech32m take a code length).
 //!
 //! There is no unprotected encoder variant. An encoded secret is a second full copy of
 //! the secret in a longer, human-readable alphabet, so it is wiped by default; public
@@ -42,9 +43,22 @@
 //! # }
 //! ```
 //!
-//! This does **not** stop extraction by convenience. `Deref<Target = str>` still gives
-//! you `str::to_string()` and `.to_owned()`, both of which produce an ordinary
-//! unzeroized `String`. That is extraction, and it is what the type is for — see
+//! This does **not** stop copying by convenience. `Deref<Target = str>` still gives you
+//! `str::to_string()` and `.to_owned()`, both of which produce an ordinary unzeroized
+//! `String`. They are not, however, the hand-off, and the difference is worth knowing:
+//!
+//! |                       | `.to_string()` / `.to_owned()` | [`into_inner()`](EncodedSecret::into_inner) |
+//! |-----------------------|--------------------------------|---------------------------------------------|
+//! | What happens          | Copies into a new `String`     | Moves *this* `String` out (`mem::take`)     |
+//! | The wrapper afterwards| Still held, still wiped on drop| Consumed                                    |
+//! | Copies of the secret  | Two, until the wrapper drops   | One, and it is yours                        |
+//! | In an audit sweep     | Noisy — a `str` method         | A named exit                                |
+//!
+//! So reach for `into_inner()` when an API wants an owned `String`: it is the same
+//! ownership transfer as [`RevealSecret::into_inner`](crate::RevealSecret::into_inner),
+//! and it leaves one copy rather than two. Treat `.to_string()` as *I copied it on
+//! purpose*, and sweep for it during an encoding audit. What the type is actually for
+//! is `&*encoded` into the drivers that bind `&str`. See
 //! [Where accident-prevention ends](crate#where-accident-prevention-ends).
 
 #[cfg(feature = "alloc")]

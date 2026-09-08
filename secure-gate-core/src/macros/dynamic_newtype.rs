@@ -113,7 +113,9 @@
 /// | Role (the nominal label) | `from_wrapper` | `as_wrapper`, `as_wrapper_mut`, `into_wrapper` |
 ///
 /// `into_inner` leaves the protection: it hands back the plain value, so the
-/// contents are in the caller's hands (tier 3 of the access model, audited). `into_wrapper` only removes the label: the
+/// contents are in the caller's hands (tier 3 of the access model, audited).
+/// `into_wrapper` is a **label** drop; `into_inner` is a **protection** drop.
+/// Confusing those two names is the main way this model gets misread. `into_wrapper` only removes the label: the
 /// result is still a `Dynamic`, still unreadable without `with_secret`. The
 /// role row exists so that dropping a label never forces opening the
 /// contents — without it, reaching base-typed code costs an `into_inner` plus

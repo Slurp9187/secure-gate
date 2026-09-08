@@ -136,6 +136,12 @@ All secret access follows this explicit hierarchy (the table below expands on th
 
 - **Tier 1 — Scoped borrow (preferred)**: `with_secret` / `with_secret_mut` — borrow ends when closure returns, minimizing exposure.
 - **Tier 2 — Direct reference (escape hatch)**: `expose_secret` / `expose_secret_mut` — long-lived references; use only for FFI or third-party APIs requiring `&T`/`&mut T`.
+
+  Tier 1 is not a different capability from Tier 2. It is the same reference with its
+  lifetime nailed to the call site. `&T` is the dangerous shape precisely because, once
+  you hold one, the compiler cannot tell a one-line FFI call from a reference stashed in
+  a struct field; the closure is the contract that says *this reference dies here*. That
+  is why Tier 1 is preferred rather than required — you could write everything with Tier 2.
 - **Tier 3 — Owned consumption**: `into_inner` — returns the plain `T`; **protection ends at the call**. Nothing is copied (an inert sentinel is left for the wrapper's `Drop`), but the value you receive is not wiped for you. Audit separately: `grep into_inner`.
 
 - **Streaming I/O (via `as_reader()`)**: `DynamicReader` implements `std::io::Read` by copying secret bytes into caller-provided buffers through `with_secret` internally. The caller owns zeroization of the destination buffer. `std::io::Write` on `Dynamic<Vec<u8>>` flows data **into** the wrapper, so it is not a *read* surface — but writing past capacity used to leave the outgoing buffer unwiped (see [Heap-reallocation residue](#2-heap-reallocation-residue-dynamicvect--dynamicstring)). That path now grows by hand and zeroizes the old allocation before releasing it. Requires the `std` feature.
@@ -152,9 +158,12 @@ the crate makes two different promises on either side of it.
 | Accidents must not compile | While the secret is held in `Fixed`/`Dynamic`. Ends at the named extraction. |
 | Documented behavior must be accurate | Everywhere, forever. |
 
-`into_inner`, `expose_secret`, and `EncodedSecret::into_inner` are named exits. You typed the name,
-the call site is grep-able, and ownership transfers to you. Past that point the crate is
-not trying to follow the bytes — that would mean either another wrapper or a false claim.
+`into_inner` and `EncodedSecret::into_inner` are the named exits that transfer ownership:
+you typed the name, the call site is grep-able, and the wrapper is consumed. `expose_secret`
+is a named *borrow* — the wrapper keeps ownership and keeps wiping — but it hands out a
+reference the compiler will not confine to one call, so audit it alongside them. Past the
+ownership transfer the crate is not trying to follow the bytes; that would mean either
+another wrapper or a false claim.
 
 **What the output wrapper still does**: `EncodedSecret` zeroizes the buffer it owns on
 drop, and prints `[REDACTED]` for `Debug`.
@@ -270,6 +279,17 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   sentinel allocation can OOM. Confidentiality is preserved — if `Box::new` panics
   before the swap, `self.inner` still holds the real secret and `Dynamic::drop` zeroizes
   it during unwind. `Fixed::into_inner` is zero-cost (no allocation).
+
+  **Why this is not solved with `unsafe`.** What a `ManuallyDrop` would save is not
+  secret bytes; it is one ~24-byte `Box` holding an empty `Vec`/`String`. The secret's
+  own heap buffer moves by pointer either way. Meanwhile `into_inner` is exactly where
+  `unsafe` is easiest to get subtly wrong — skip the `Drop` and you wipe the caller's
+  value, or double-drop the box — and it is the single method that ends protection, so
+  an auditor would have to trust a safety comment on the crate's most security-relevant
+  line. `#![forbid(unsafe_code)]` is doing real work here. If the allocation ever
+  measures, the safe shape is `Option<Box<T>>` plus `take()`: still one pointer thanks
+  to the niche, a no-op `Drop` on `None`, at the cost of an `unwrap` in every
+  `with_secret`. Do not reach for it without a measurement.
 - **`into_inner` returns the plain value; protection ends there.**
   Earlier releases returned an `InnerSecret<T>` that kept wiping. That type is gone: it
   was a newtype over `Zeroizing<T>` whose only distinct behaviour was escaping this

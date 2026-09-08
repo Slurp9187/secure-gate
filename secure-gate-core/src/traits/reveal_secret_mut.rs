@@ -75,7 +75,9 @@ use crate::RevealSecret;
 /// [`SecretLen`](crate::SecretLen), a separate trait implemented only where a
 /// length is meaningful.
 ///
-/// Only core wrappers (`Fixed<T>`, `Dynamic<T>`) implement this trait.
+/// Implemented by `Fixed<T>`, `Dynamic<T>`, and the newtypes the macros generate
+/// over them. [`EncodedSecret`](crate::EncodedSecret) implements neither this trait
+/// nor [`RevealSecret`]: encoded output has no mutable path into it.
 pub trait RevealSecretMut: RevealSecret {
     /// Provides scoped (recommended) mutable access to the secret.
     ///

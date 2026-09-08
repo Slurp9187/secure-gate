@@ -2,9 +2,10 @@
 //!
 //! While a secret is held, the only way to it is `RevealSecret` / `RevealSecretMut`.
 //! This is the load-bearing "no implicit access" claim, so it is enforced here rather
-//! than only asserted in prose. Note that the *output* wrapper returned by
-//! `into_inner()` does deref, by design — see "Where accident-prevention ends" in the
-//! crate docs. This test pins the boundary, not a blanket ban on `Deref`.
+//! than only asserted in prose. `into_inner()` returns a plain `T`, which derefs only
+//! if `T` itself does. The one type in this crate that derefs by design is
+//! `EncodedSecret`, the wrapper the encoders return — see "Where accident-prevention
+//! ends" in the crate docs. This test pins the boundary, not a blanket ban on `Deref`.
 
 use secure_gate::Fixed;
 
