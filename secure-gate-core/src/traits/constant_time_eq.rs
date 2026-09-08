@@ -6,8 +6,10 @@
 //! resistant equality checks. Regular `==` operators can short-circuit on the first
 //! differing byte, leaking information about secret values through execution time.
 //!
-//! All implementations use the `subtle` crate's constant-time primitives to ensure
-//! comparisons take the same amount of time regardless of the data.
+//! All implementations use the `subtle` crate's constant-time primitives, so a
+//! comparison of two equal-length inputs takes the same time regardless of their
+//! contents. Length is the exception: comparing different lengths short-circuits, so
+//! the *length* of a secret can still leak through timing. See the note below.
 //!
 //! Requires the `ct-eq` feature to be enabled.
 //!

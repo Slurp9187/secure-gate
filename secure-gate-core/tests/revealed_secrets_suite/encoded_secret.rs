@@ -7,7 +7,7 @@ use secure_gate::{Fixed, ToHex};
 
 #[cfg(feature = "encoding-hex")]
 fn sample_hex_secret() -> EncodedSecret {
-    Fixed::new([0xDEu8, 0xAD, 0xBE, 0xEF]).to_hex_zeroizing()
+    Fixed::new([0xDEu8, 0xAD, 0xBE, 0xEF]).to_hex()
 }
 
 #[test]
@@ -47,20 +47,20 @@ fn encoded_secret_deref_to_str() {
     assert!(!encoded.is_empty());
 }
 
+/// `Deref<Target = str>` is the single door out; the `AsRef<str>` / `AsRef<[u8]>`
+/// impls were removed because they reached nothing `Deref` does not.
 #[cfg(feature = "encoding-hex")]
 #[test]
-fn encoded_secret_asref_str() {
+fn encoded_secret_deref_is_the_only_door() {
     let encoded = sample_hex_secret();
-    let as_str: &str = encoded.as_ref();
-    assert_eq!(as_str, "deadbeef");
-}
 
-#[cfg(feature = "encoding-hex")]
-#[test]
-fn encoded_secret_asref_bytes() {
-    let encoded = sample_hex_secret();
-    let as_bytes: &[u8] = encoded.as_ref();
-    assert_eq!(as_bytes, b"deadbeef");
+    // Coercion, explicit reborrow, and inherent `str` methods all still work.
+    let as_str: &str = &encoded;
+    assert_eq!(as_str, "deadbeef");
+    assert_eq!(&*encoded, "deadbeef");
+    assert_eq!(encoded.len(), 8);
+    assert!(encoded.starts_with("dead"));
+    assert_eq!(encoded.as_bytes(), b"deadbeef");
 }
 
 #[cfg(feature = "encoding-hex")]
@@ -73,38 +73,26 @@ fn encoded_secret_into_inner_returns_string() {
 
 #[cfg(feature = "encoding-hex")]
 #[test]
-fn encoded_secret_into_zeroizing_returns_zeroizing() {
-    let encoded = sample_hex_secret();
-    let protected = encoded.into_zeroizing();
-    assert_eq!(&*protected, "deadbeef");
-}
-
-#[cfg(feature = "encoding-hex")]
-#[test]
-// `format!("{}", &*encoded)` is the documented migration from the removed `Display`;
-// clippy's `to_string()` suggestion is a different path and not what this asserts.
+// See above: the `format!("{}", &*encoded)` form is the point of the assertion.
 #[allow(clippy::useless_format)]
 fn encoded_secret_empty_string() {
     let empty: [u8; 0] = [];
-    let encoded = empty.to_hex_zeroizing();
+    let encoded = empty.to_hex();
 
     assert_eq!(format!("{encoded:?}"), "[REDACTED]");
     assert_eq!(format!("{}", &*encoded), "");
     assert_eq!(&*encoded, "");
     assert!(encoded.is_empty());
 
-    let as_str: &str = encoded.as_ref();
+    let as_str: &str = &encoded;
     assert_eq!(as_str, "");
+    assert_eq!(encoded.as_bytes(), b"");
 
-    let encoded = empty.to_hex_zeroizing();
-    let as_bytes: &[u8] = encoded.as_ref();
-    assert!(as_bytes.is_empty());
-
-    let encoded = empty.to_hex_zeroizing();
+    let encoded = empty.to_hex();
     let plain = encoded.into_inner();
     assert_eq!(plain, "");
 
-    let encoded = empty.to_hex_zeroizing();
+    let encoded = empty.to_hex();
     let protected = encoded.into_zeroizing();
     assert_eq!(&*protected, "");
 }

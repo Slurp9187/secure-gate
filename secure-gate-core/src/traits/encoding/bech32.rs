@@ -12,8 +12,11 @@
 //!
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive.
-//! - **Zeroizing variants**: Prefer `try_to_bech32_zeroizing`, which returns [`EncodedSecret`]
-//!   (wrapping `Zeroizing<String>` with redacted `Debug`) when the encoded form remains sensitive.
+//! - **Always wiped**: `try_to_bech32` returns
+//!   [`EncodedSecret`](crate::EncodedSecret), which wraps `Zeroizing<String>`, redacts
+//!   its `Debug`, and wipes on drop.
+//!   Addresses and other public values come back in the same wrapper. `.into_inner()` is the named point where that
+//!   protection ends.
 //! - **Audit visibility**: Direct wrapper calls (`key.try_to_bech32(...)`) do **not** appear in
 //!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
 //!   multi-step operations, prefer `with_secret(|b| b.try_to_bech32(...))` — the borrow
@@ -171,7 +174,7 @@ use crate::error::Bech32Error;
 ///
 /// *Requires feature `encoding-bech32`.*
 ///
-/// Blanket-implemented for all `AsRef<[u8]>` types. Use [`try_to_bech32`](Self::try_to_bech32)
+/// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes). Use [`try_to_bech32`](Self::try_to_bech32)
 /// with the protocol's HRP. Test empty and invalid HRP inputs in security-critical code.
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub trait ToBech32 {
@@ -191,10 +194,7 @@ pub trait ToBech32 {
     /// assert!(encoded.starts_with("test1"));
     /// # Ok::<(), secure_gate::Bech32Error>(())
     /// ```
-    fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error>;
-
-    /// Fallibly encodes bytes as Bech32 and wraps the result in [`crate::EncodedSecret`].
-    fn try_to_bech32_zeroizing(&self, hrp: &str) -> Result<crate::EncodedSecret, Bech32Error>;
+    fn try_to_bech32(&self, hrp: &str) -> Result<crate::EncodedSecret, Bech32Error>;
 
     /// Like [`try_to_bech32`](Self::try_to_bech32), with a caller-chosen code length `N`.
     ///
@@ -226,35 +226,23 @@ pub trait ToBech32 {
     fn try_to_bech32_sized<const N: usize>(
         &self,
         hrp: &str,
-    ) -> Result<alloc::string::String, Bech32Error>;
-
-    /// Like [`try_to_bech32_sized`](Self::try_to_bech32_sized), wrapping the result in
-    /// [`crate::EncodedSecret`].
-    fn try_to_bech32_sized_zeroizing<const N: usize>(
-        &self,
-        hrp: &str,
     ) -> Result<crate::EncodedSecret, Bech32Error>;
 }
 
-// Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
+// Blanket impl over AsRef<[u8]> + EncodableBytes (e.g. &[u8], Vec<u8>, [u8; N]).
 // encode_lower returns String — requires alloc.
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
+impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBech32 for T {
     #[inline(always)]
-    fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error> {
+    fn try_to_bech32(&self, hrp: &str) -> Result<crate::EncodedSecret, Bech32Error> {
         self.try_to_bech32_sized::<BECH32_CODE_LENGTH>(hrp)
-    }
-
-    #[inline(always)]
-    fn try_to_bech32_zeroizing(&self, hrp: &str) -> Result<crate::EncodedSecret, Bech32Error> {
-        self.try_to_bech32(hrp).map(crate::EncodedSecret::new)
     }
 
     #[inline(always)]
     fn try_to_bech32_sized<const N: usize>(
         &self,
         hrp: &str,
-    ) -> Result<alloc::string::String, Bech32Error> {
+    ) -> Result<crate::EncodedSecret, Bech32Error> {
         let hrp_parsed = Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
         let data = self.as_ref();
         let len = bech32_code_length(hrp.len(), data.len());
@@ -288,16 +276,7 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
             len,
             "bech32_code_length disagreed with the encoder"
         );
-        Ok(out)
-    }
-
-    #[inline(always)]
-    fn try_to_bech32_sized_zeroizing<const N: usize>(
-        &self,
-        hrp: &str,
-    ) -> Result<crate::EncodedSecret, Bech32Error> {
-        self.try_to_bech32_sized::<N>(hrp)
-            .map(crate::EncodedSecret::new)
+        Ok(crate::EncodedSecret::new(out))
     }
 }
 
@@ -353,7 +332,7 @@ mod tests {
             let ours = data.try_to_bech32_sized::<65535>(hrp).expect("ours");
             let theirs = encode_lower::<Bech32Sized<65535>>(Hrp::parse(hrp).unwrap(), &data)
                 .expect("upstream");
-            assert_eq!(ours, theirs, "hrp={hrp} len={len}");
+            assert_eq!(&*ours, &*theirs, "hrp={hrp} len={len}");
         }
     }
 

@@ -10,9 +10,11 @@ fn t() {
 
 // The Base32 decode constructor is forwarded *outside* `__sg_if_alloc!`, so a
 // newtype exposes it whether or not `alloc` is on. This pins that forwarding.
-// It does NOT exercise the alloc-free code path: libtest needs `std`, so every
-// configuration that runs this file has `alloc`. The no-alloc body of
-// `try_from_base32` is compiled only by the `thumbv7em-none-eabihf` cross-build.
+// It does NOT exercise the alloc-free code path: libtest needs `std`, so this test
+// only ever runs with `alloc` present. The no-alloc body of `try_from_base32` is
+// compiled only by the `thumbv7em-none-eabihf` cross-build. (The bech32 test below
+// is different: CI runs it under `--no-default-features --features encoding-bech32`,
+// where the crate itself is built without `alloc`.)
 #[cfg(feature = "encoding-base32")]
 #[test]
 fn base32_decode_constructor_is_forwarded() {

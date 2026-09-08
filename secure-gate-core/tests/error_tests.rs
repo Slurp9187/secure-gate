@@ -170,7 +170,11 @@ fn bech32_error_invalid_length() {
 #[test]
 fn bech32_error_invalid_length_oversized_exact() {
     use secure_gate::ToBech32;
-    let encoded = [0u8; 8].as_slice().try_to_bech32("test").unwrap();
+    let encoded = [0u8; 8]
+        .as_slice()
+        .try_to_bech32("test")
+        .unwrap()
+        .into_inner();
     let err = secure_gate::Fixed::<[u8; 4]>::try_from_bech32(&encoded, "test")
         .expect_err("length mismatch must fail");
     match err {

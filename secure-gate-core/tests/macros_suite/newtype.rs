@@ -39,8 +39,8 @@ fn hex_roundtrips_through_the_newtype() {
     use secure_gate::ToHex;
 
     let k: EncKey = EncKey::try_from_hex(&"ab".repeat(32)).unwrap();
-    assert!(k.to_hex().starts_with("abab")); // no as_wrapper()
-    assert_eq!(k.to_hex_upper_zeroizing().len(), 64);
+    assert!(k.to_hex().into_inner().starts_with("abab")); // no as_wrapper()
+    assert_eq!(k.to_hex_upper().into_inner().len(), 64);
 }
 
 #[test]
@@ -62,7 +62,7 @@ fn vec_arm_gets_bytes_only_api() {
     use std::io::{Read, Write};
     let mut tok = SessionToken::new(vec![]);
     tok.write_all(b"\xde\xad").unwrap(); // io::Write forwarded
-    assert_eq!(tok.to_hex(), "dead"); // hex on Vec<u8> arm only
+    assert_eq!(tok.to_hex().into_inner(), "dead"); // hex on Vec<u8> arm only
     let mut read_back = Vec::new(); // as_reader forwarded (io::Read)
     tok.as_reader().read_to_end(&mut read_back).unwrap();
     assert_eq!(read_back, b"\xde\xad");
