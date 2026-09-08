@@ -1,7 +1,8 @@
 //! Shared machinery for `fixed_newtype!` / `dynamic_newtype!`.
 //!
 //! Ships in 0.9.0; backported to the 0.8 line in 0.8.0-rc.11. Design record:
-//! `docs/nominal_newtypes.md` (describes `main`).
+//! [`docs/nominal_newtypes.md`](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/docs/nominal_newtypes.md) — a repository file, not part of the
+//! published crate, so this is a link and not a path. It describes `main`.
 
 // ---- cfg relays -------------------------------------------------------------
 // `#[cfg(feature = "...")]` inside an exported macro is evaluated in the CALLER's

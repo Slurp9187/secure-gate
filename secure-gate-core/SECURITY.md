@@ -436,6 +436,27 @@ the first hands off an unredacted `Zeroizing<String>`, the second copies into a
 buffer the caller owns and must wipe. The `try_from_*` constructors are the reverse
 direction, and belong in the sweep because they are where untrusted input enters.
 
+**`.to_string()` / `.to_owned()` on an `EncodedSecret` are the quiet ones.** They are
+deliberately *not* in the token list above, because they are ordinary `str` methods, reached
+through `EncodedSecret`'s `Deref<Target = str>` rather than through anything this crate
+defines, and a project-wide grep for them is nearly all noise. They are reachable that way on
+`EncodedSecret` **only**: `Fixed` and `Dynamic` have no `Deref`, so there the same copy has to
+be written `expose_secret().to_string()`, which already trips a listed token. They still produce an untracked plain
+`String` (see "Where accident-prevention ends"), so sweep them at the call sites the list
+above already found: for every `to_hex` / `to_base32` / `to_base64url` / `try_to_bech32*`
+hit, check what happens to the returned `EncodedSecret`. `into_inner` on it is a move and
+is already listed; `.to_string()` / `.to_owned()` copy and leave a second live plaintext.
+
+`.to_string()` and `.to_owned()` are the common spellings, not the only ones. Once you hold
+the `&str`, **any** use of it that produces an owned `String` is the same event —
+`String::from(&*enc)`, `let s: String = (&*enc).into()`, `format!("{}", &*enc)`, pushing it
+onto another `String`. Judge the deref site, not the method name: `&*enc` reaching anything
+that keeps the bytes is a copy the crate no longer tracks. (`format!("{}", enc)` without the
+deref does not compile — `EncodedSecret` has no `Display` — which is the point of that
+omission.)
+Rationale for keeping `Deref`, and why this residual is accepted rather than closed:
+`docs/encoded_secret_deref.md`.
+
 **Note:** `into_inner` does not appear in an `expose_secret*`-only sweep — audit it
 separately. It consumes the wrapper and transfers ownership of the **plain** value:
 protection ends at the call, and the caller owns the secret's lifetime from there.

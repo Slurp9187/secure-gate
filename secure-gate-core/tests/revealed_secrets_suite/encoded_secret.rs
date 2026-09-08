@@ -96,3 +96,55 @@ fn encoded_secret_empty_string() {
     let protected = encoded.into_zeroizing();
     assert_eq!(&*protected, "");
 }
+
+// The empty case above is the degenerate one: `assert_eq!(&*protected, "")` would still
+// pass if `into_zeroizing` threw the buffer away and returned `Zeroizing::default()`.
+// This is the case that pins the content. The wipe-on-drop half of the contract needs an
+// allocator to observe, so it lives in tests/heap_zeroize.rs
+// (`check_into_zeroizing_string_zeroed`); the two together cover the method.
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn encoded_secret_into_zeroizing_carries_the_content() {
+    let expected = "deadbeef";
+
+    let encoded = sample_hex_secret();
+    assert_eq!(
+        &*encoded, expected,
+        "precondition: the wrapper holds the encoding"
+    );
+
+    // Content, and then the stronger claim: it is the *same* buffer, not a copy of it.
+    // Equality alone would pass for an implementation that cloned, so the pointer is what
+    // makes "hands over" true rather than merely plausible. Same pattern as
+    // `dynamic_into_inner_moves_without_copying` in tests/zeroize_tests.rs.
+    let encoded = sample_hex_secret();
+    let buffer_before = encoded.as_ptr();
+    let protected = encoded.into_zeroizing();
+    assert_eq!(
+        &**protected, expected,
+        "into_zeroizing must hand over the encoding, not an empty or default String"
+    );
+    assert_eq!(
+        protected.as_ptr(),
+        buffer_before,
+        "into_zeroizing copied the buffer instead of moving it"
+    );
+
+    // `into_zeroizing` is a *partial* downgrade, and this is the half that is lost:
+    // `Zeroizing<String>` derives `Debug`, so the encoded secret prints in the clear --
+    // emphatically not `[REDACTED]`. The type's own docs promise exactly that. If a
+    // future `zeroize` starts redacting, this assert fails and the claim in
+    // `EncodedSecret::into_zeroizing` needs rewriting; that is the point of pinning it,
+    // not an accident of the dependency version.
+    //
+    // The rendering is deliberately reduced to a bool before the assert, and never
+    // interpolated into the failure message. It is a plaintext copy derived from the
+    // wrapper, and formatting one into a panic is the precise pattern this crate tells
+    // callers to avoid; CodeQL's `rust/cleartext-logging` rule flags it, correctly, even
+    // though the fixture here is the literal `0xDEADBEEF`. Keep it out of the message.
+    let prints_in_clear = format!("{protected:?}").contains(expected);
+    assert!(
+        prints_in_clear,
+        "zeroize's Debug no longer prints the value in the clear; fix into_zeroizing's docs"
+    );
+}
