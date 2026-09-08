@@ -2,7 +2,8 @@
 //!
 //! > **Import path:** `use secure_gate::EncodedSecret;`
 //!
-//! [`RevealSecret::into_inner`] hands back the plain value and ends protection, because
+//! [`RevealSecret::into_inner`](crate::RevealSecret::into_inner) hands back the plain
+//! value and ends protection, because
 //! the caller has decided to own it. Encoding is the one case that still needs a wrapper:
 //! the encoded form is a *second full copy* of the secret in a different alphabet, and it
 //! is worth keeping wiped until it drops.
@@ -17,7 +18,7 @@
 //!
 //! See the [3-Tier Access Model](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#3-tier-access-model)
 //! and the [“What secure-gate does NOT protect against”](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#what-secure-gate-does-not-protect-against)
-//! section in `SECURITY.md` for full guidance on when and how to use these types.
+//! section in `SECURITY.md` for full guidance on when and how to use this type.
 
 #[cfg(feature = "alloc")]
 pub use self::encoded_secret::EncodedSecret;

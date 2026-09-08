@@ -171,7 +171,7 @@ use crate::error::Bech32Error;
 ///
 /// *Requires feature `encoding-bech32`.*
 ///
-/// Blanket-implemented for `AsRef<[u8]> + [`EncodableBytes`](super::EncodableBytes)`. Use [`try_to_bech32`](Self::try_to_bech32)
+/// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes). Use [`try_to_bech32`](Self::try_to_bech32)
 /// with the protocol's HRP. Test empty and invalid HRP inputs in security-critical code.
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub trait ToBech32 {
@@ -226,7 +226,7 @@ pub trait ToBech32 {
     ) -> Result<crate::EncodedSecret, Bech32Error>;
 }
 
-// Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
+// Blanket impl over AsRef<[u8]> + EncodableBytes (e.g. &[u8], Vec<u8>, [u8; N]).
 // encode_lower returns String — requires alloc.
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBech32 for T {

@@ -53,7 +53,7 @@ zero an out-of-scope stack slot.
 
 When a `Vec<T>` or `String` grows past its current capacity, the
 standard library allocates a new buffer, memcpys the contents, and frees
-the old buffer **without zeroing**. `ZeroizingOnDrop` only zeros the
+the old buffer **without zeroing**. `ZeroizeOnDrop` only zeros the
 *currently held* allocation. The freed bytes remain readable in heap
 memory until the allocator reuses or unmaps the page; they survive into
 core dumps and swap.
@@ -153,27 +153,28 @@ the crate makes two different promises on either side of it.
 
 `into_inner`, `expose_secret`, and `EncodedSecret::into_inner` are named exits. You typed the name,
 the call site is grep-able, and ownership transfers to you. Past that point the crate is
-not trying to follow the bytes — that would mean either a fourth wrapper or a false claim.
+not trying to follow the bytes — that would mean either another wrapper or a false claim.
 
-**What the output wrappers still do**: zeroize the buffer they own on drop, and print
-`[REDACTED]` for `Debug`.
+**What the output wrapper still does**: `EncodedSecret` zeroizes the buffer it owns on
+drop, and prints `[REDACTED]` for `Debug`.
 
-**What they do not do**: track copies. `EncodedSecret`
-derefs to `str`, so all of the following produce ordinary, untracked plaintext, by design:
+**What extraction does not do**: keep protecting. `into_inner` hands back a plain value,
+and `EncodedSecret` derefs to `str`, so all of the following produce ordinary, untracked
+plaintext, by design:
 
 ```rust,ignore
-let inner = key.into_inner();         // [u8; 32] — plain, no longer wiped
-let copy: [u8; 32] = *inner;          // arrays are Copy — untracked
-
-let enc = key.to_hex();               // EncodedSecret — wiped on drop
+let plain = key.into_inner();         // [u8; 32] — plain: not wiped, not redacted
+let enc = other_key.to_hex();         // EncodedSecret — wiped on drop, Debug redacted
 let s: String = enc.to_string();      // via Deref<Target = str> — untracked
 ```
 
 Two specific consequences:
 
-- **`Debug` redaction does not survive a deref.** `format!("{:?}", inner)` prints
-  `[REDACTED]`; `format!("{:?}", &*inner)` prints the secret. Redaction is a property of
-  the wrapper, not of `T`.
+- **`Debug` redaction survives neither extraction nor a deref.** `format!("{:?}", key)`
+  prints `[REDACTED]`, but `format!("{:?}", key.into_inner())` prints the secret:
+  redaction is a property of the wrapper, not of `T`. One level down it is the same
+  story — `format!("{:?}", enc)` prints `[REDACTED]`, `format!("{:?}", &*enc)` prints
+  the encoded secret.
 - **`EncodedSecret::into_zeroizing()` is a downgrade.** It returns `zeroize::Zeroizing<String>`, whose `Debug`
   is not redacted (`zeroize` 1.8/1.9 derive it; a future release may change the
   rendering). Zeroize-on-drop is preserved, redaction is not. It exists for APIs that

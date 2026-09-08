@@ -51,7 +51,7 @@ use base16ct;
 ///
 /// *Requires feature `encoding-hex`.*
 ///
-/// Blanket-implemented for `AsRef<[u8]> + [`EncodableBytes`](super::EncodableBytes)` (byte slices, arrays, `Vec<u8>`),
+/// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes) (byte slices, arrays, `Vec<u8>`),
 /// and implemented directly on the byte-shaped wrappers (`Fixed<[u8; N]>`,
 /// `Dynamic<Vec<u8>>`). To encode a secret wrapper, call `key.to_hex()` with this
 /// trait in scope (ergonomically safest for single operations — no reference in the
@@ -66,7 +66,7 @@ pub trait ToHex {
     fn to_hex_upper(&self) -> crate::EncodedSecret;
 }
 
-// Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
+// Blanket impl over AsRef<[u8]> + EncodableBytes (e.g. &[u8], Vec<u8>, [u8; N]).
 // encode_string requires alloc — the trait itself is alloc-gated.
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToHex for T {

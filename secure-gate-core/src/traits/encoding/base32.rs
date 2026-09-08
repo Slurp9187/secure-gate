@@ -53,7 +53,7 @@ use base32ct::{Base32UpperUnpadded, Encoding};
 ///
 /// *Requires feature `encoding-base32`.*
 ///
-/// Blanket-implemented for `AsRef<[u8]> + [`EncodableBytes`](super::EncodableBytes)`, and implemented directly on the
+/// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes), and implemented directly on the
 /// byte-shaped wrappers (`Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`). Uses the RFC 4648 §6
 /// alphabet (`A`–`Z`, `2`–`7`) without `=` padding. To encode a secret wrapper, call
 /// `key.to_base32()` with this trait in scope (ergonomically safest for single
@@ -65,7 +65,7 @@ pub trait ToBase32 {
     fn to_base32(&self) -> crate::EncodedSecret;
 }
 
-// Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
+// Blanket impl over AsRef<[u8]> + EncodableBytes (e.g. &[u8], Vec<u8>, [u8; N]).
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBase32 for T {
     #[inline(always)]

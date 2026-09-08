@@ -113,7 +113,7 @@ use crate::error::Bech32Error;
 ///
 /// *Requires feature `encoding-bech32`.*
 ///
-/// Blanket-implemented for `AsRef<[u8]> + [`EncodableBytes`](super::EncodableBytes)`. Use [`try_to_bech32m`](Self::try_to_bech32m)
+/// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes). Use [`try_to_bech32m`](Self::try_to_bech32m)
 /// with the protocol's HRP. Test empty and invalid HRP inputs in security-critical code.
 ///
 /// **Design note — wallet interoperability**: `ToBech32m` targets BIP-350 (Bitcoin
@@ -173,7 +173,7 @@ pub trait ToBech32m {
     ) -> Result<crate::EncodedSecret, Bech32Error>;
 }
 
-// Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
+// Blanket impl over AsRef<[u8]> + EncodableBytes (e.g. &[u8], Vec<u8>, [u8; N]).
 // encode_lower returns String — requires alloc.
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBech32m for T {

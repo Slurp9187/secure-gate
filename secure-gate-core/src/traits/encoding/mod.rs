@@ -102,7 +102,7 @@ impl<const N: usize> EncodableBytes for [u8; N] {}
 ))]
 impl EncodableBytes for alloc::vec::Vec<u8> {}
 
-// Encoding traits produce String / EncodedSecret — all require alloc
+// Every encoding trait produces EncodedSecret — all require alloc
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 pub use base32::ToBase32;
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]

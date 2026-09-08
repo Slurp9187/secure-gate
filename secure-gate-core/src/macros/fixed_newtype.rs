@@ -142,9 +142,8 @@
 /// | Contents (the wrapper's protection) | `new`, `From<[u8; N]>` | `with_secret`, `expose_secret`, `into_inner` |
 /// | Role (the nominal label) | `from_wrapper` | `as_wrapper`, `as_wrapper_mut`, `into_wrapper` |
 ///
-/// `into_inner` leaves the protection: the plain value it returns
-/// it returns derefs, so the contents are in the caller's hands (tier 3 of
-/// the access model, audited). `into_wrapper` only removes the label: the
+/// `into_inner` leaves the protection: it hands back the plain value, so the
+/// contents are in the caller's hands (tier 3 of the access model, audited). `into_wrapper` only removes the label: the
 /// result is still a `Fixed`, still unreadable without `with_secret`. The
 /// role row exists so that dropping a label never forces opening the
 /// contents — without it, reaching base-typed code costs an `into_inner` plus

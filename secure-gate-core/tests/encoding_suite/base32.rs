@@ -252,9 +252,10 @@ fn to_base32_is_generic_over_wrappers() {
     assert_eq!(export(&newtype), "VOV2XKY");
     assert_eq!(export(&[0xABu8; 4]), "VOV2XKY");
 
-    // The zeroizing half of the trait is reachable through the same bound.
-    fn export_zeroizing<S: ToBase32>(s: &S) -> secure_gate::EncodedSecret {
+    // The same bound also hands the wrapper back unopened, which is what a caller
+    // does when it never needs an owned `String`.
+    fn export_wrapped<S: ToBase32>(s: &S) -> secure_gate::EncodedSecret {
         s.to_base32()
     }
-    assert_eq!(&*export_zeroizing(&newtype), "VOV2XKY");
+    assert_eq!(&*export_wrapped(&newtype), "VOV2XKY");
 }

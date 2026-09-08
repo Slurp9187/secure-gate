@@ -290,11 +290,6 @@ fn dynamic_spare_capacity_vec_zeroized() {
     // element[1].0 == 0 (zeroed in the spare_capacity_mut pass above) ✓
 }
 
-/// `into_inner()` transfers the full zeroization contract — including spare capacity —
-/// to the returned `InnerSecret<Vec<T>>`.
-///
-/// This is the critical regression guard for the `into_inner` code path. It mirrors
-/// `dynamic_spare_capacity_vec_zeroized` exactly, but calls `secret.into_inner()`
 /// `into_inner()` transfers ownership: moved, never copied.
 ///
 /// This replaces a test of the *old* contract, where the extracted value kept wiping

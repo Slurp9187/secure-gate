@@ -578,7 +578,7 @@ fn check_string_deserialized_zeroed(size: usize) {
 // Panic-path positive-control test
 //
 // Verifies that `Zeroizing::drop` actually zeroes the backing buffer when a
-// panic fires while `InnerSecret<Vec<u8>>` is in scope — the exact guarantee
+// panic fires while a `Zeroizing<Vec<u8>>` is in scope — the exact guarantee
 // that `from_protected_bytes` relies on.
 //
 // Design:

@@ -38,7 +38,8 @@
 //! # Security Model
 //!
 //! - **Core wrappers** (`Fixed<T>`, `Dynamic<T>`) implement both traits → full access.
-//! - **Read-only wrappers** (encoding wrappers, random types) implement only `RevealSecret` → mutation prevented.
+//! - **Generated newtypes** (`fixed_newtype!` / `dynamic_newtype!`) implement both, forwarding to the wrapper they hold.
+//! - **`EncodedSecret` implements neither.** It is an output wrapper, not a secret wrapper: its contents are reached through `Deref<Target = str>` and its two named consumers.
 //! - **Zero-cost** — all methods are `#[inline(always)]` where possible.
 //! - **Scoped access preferred** — `with_secret` / `with_secret_mut` limit borrow lifetime, reducing leak risk.
 //! - **Direct exposure** (`expose_secret` / `expose_secret_mut`) is provided for legitimate needs (FFI, third-party APIs), but marked as an escape hatch.

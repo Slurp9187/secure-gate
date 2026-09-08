@@ -1,8 +1,10 @@
 //! Opt-in marker trait for safe, explicit Serde serialization of secrets.
 //!
-//! This trait acts as a deliberate security gate: it enables `Serialize` (and
-//! optionally `Deserialize`) implementations on secret wrapper types (`Fixed<T>`,
-//! `Dynamic<T>`, aliases) **only** when the inner type explicitly opts in.
+//! This trait acts as a deliberate security gate: it enables `Serialize` on secret
+//! wrapper types (`Fixed<T>`, `Dynamic<T>`, aliases) **only** when the inner type
+//! explicitly opts in. It gates `Serialize` and nothing else — the trait is declared
+//! `pub trait SerializableSecret: serde::Serialize {}`. `Deserialize` is independent
+//! of this marker; see the note below.
 //!
 //! Requires the `serde-serialize` feature.
 //!
@@ -13,10 +15,14 @@
 //! - **Explicit risk acceptance** — Cloning/serialization increases the chance of
 //!   secret leakage (e.g., via logs, network, disk). This marker forces developers
 //!   to acknowledge and accept that risk.
-//! - **Zeroization preserved** — Serialization does **not** bypass `ZeroizeOnDrop`;
-//!   all copies zeroize on drop.
-//! - **No deserialization by default** — `Deserialize` is **not** automatically
-//!   enabled; use `serde-deserialize` feature + manual impl if needed.
+//! - **Zeroization preserved in the wrapper** — serializing does not bypass
+//!   `ZeroizeOnDrop` for the wrapper itself. It says nothing about the output: the
+//!   bytes the serializer writes to a buffer, socket or file are ordinary
+//!   non-zeroizing memory this crate cannot reach.
+//! - **This marker does not gate `Deserialize`** — deserialization is enabled by the
+//!   `serde-deserialize` feature alone, and implementing `SerializableSecret` neither
+//!   enables nor restricts it. Implementing the marker is not a statement about
+//!   deserialization safety.
 //!
 //! # When to Use
 //!
@@ -77,11 +83,11 @@
 //! - **Serialization exposes the secret** — treat serialized output as sensitive.
 //!   Encrypt, authenticate, and protect transmission/storage.
 //! - **Audit every impl** — ensure the inner type correctly implements `Serialize`
-//!   (and `Deserialize` if needed) and `Zeroize`.
+//!   (and, independently, `Deserialize` if you need it) and `Zeroize`.
 //! - **Prefer ephemeral secrets** — avoid persisting raw secrets when possible.
 //!
 //! This trait is a **marker only** — it has no methods and adds no runtime behavior.
-//! It exists solely to gate `Serialize` (and optionally `Deserialize`) on wrapper types.
+//! It exists solely to gate `Serialize` on wrapper types.
 //!
 //! The pattern is fully supported: [`RevealSecret`](crate::RevealSecret) is
 //! implemented for **every** inner type, so a secret built this way remains

@@ -13,7 +13,7 @@
 //! - **Unconditional zeroization on drop** — the inner `T` is overwritten with
 //!   zeroes when the wrapper is dropped, even on error paths.
 //! - **Opt-in `Clone`** — requires `T: CloneableSecret` and the `cloneable` feature.
-//! - **Opt-in `Serialize`/`Deserialize`** — requires marker traits and the
+//! - **Opt-in `Serialize`** — requires the `SerializableSecret` marker and the
 //!   `serde-serialize`/`serde-deserialize` features.
 //! - **Avoid move-by-value for long-lived secrets.** Each move of a `Fixed<T>`
 //!   bitwise-copies the bytes to a new location and leaves the original stack
@@ -378,8 +378,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// # Errors
     ///
-    /// - [`HexError::InvalidHex`] — non-hex characters or odd-length input.
-    /// - [`HexError::InvalidLength`] — decoded byte count does not equal `N`.
+    /// - [`HexError::InvalidHex`](crate::HexError::InvalidHex) — non-hex characters or odd-length input.
+    /// - [`HexError::InvalidLength`](crate::HexError::InvalidLength) — decoded byte count does not equal `N`.
     ///
     /// # Examples
     ///
@@ -539,8 +539,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// # Errors
     ///
-    /// - [`Base64Error::InvalidBase64`] — non-base64 characters or invalid padding.
-    /// - [`Base64Error::InvalidLength`] — decoded byte count does not equal `N`.
+    /// - [`Base64Error::InvalidBase64`](crate::Base64Error::InvalidBase64) — non-base64 characters or invalid padding.
+    /// - [`Base64Error::InvalidLength`](crate::Base64Error::InvalidLength) — decoded byte count does not equal `N`.
     ///
     /// # Examples
     ///
@@ -872,8 +872,9 @@ impl<T: zeroize::Zeroize> RevealSecret for Fixed<T> {
     /// so `Fixed::drop` zeroizes an already-zero array — a harmless no-op.
     /// Works for **any** array length `N` (not limited to 32 like `Default`).
     ///
-    /// See [`RevealSecret::into_inner`] for full documentation including the
-    /// `SentinelValue` bound rationale and redacted `Debug` behavior.
+    /// See [`RevealSecret::into_inner`] for the full contract, including the
+    /// `SentinelValue` bound rationale. Protection ends at this call: the array you
+    /// get back is plain — not wiped on drop, and its `Debug` is not redacted.
     #[inline(always)]
     fn into_inner(mut self) -> T
     where
@@ -951,7 +952,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// Fills a new `[u8; N]` from `rng` and wraps it.
     ///
     /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRng`](rand::TryRng) — for example,
-    /// a seeded [`StdRng`](rand::rngs::StdRng) for deterministic tests. Requires the `rand`
+    /// a seeded `StdRng` for deterministic tests. Requires the `rand`
     /// feature. Heap-free.
     ///
     /// # Errors

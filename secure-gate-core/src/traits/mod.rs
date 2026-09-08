@@ -18,19 +18,20 @@
 //! | [`RevealSecretMut`]    | Mutable scoped / direct access               | Always available         | Same preference: `with_secret_mut` over `expose_secret_mut`           |
 //! | [`SentinelValue`]      | Inert placeholder left by `into_inner`       | Always available         | Implemented for `[T; N]` (any `N`), `String`, `Vec<T>`                |
 //! | [`ConstantTimeEq`]     | Deterministic constant-time equality         | `ct-eq`                  | Timing-attack resistant byte comparison                               |
-//! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for opt-in risk details. |
-//! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for opt-in risk details. |
+//! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for opt-in risk details. |
+//! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for opt-in risk details. |
 //!
 //! # Security Guarantees
 //!
 //! - **No implicit access while held** — Reaching a secret inside `Fixed`/`Dynamic`
-//!   requires an explicit trait method. The output wrappers returned by extraction
-//!   ([`EncodedSecret`]) derefs by design
+//!   requires an explicit trait method. `into_inner` ends that protection and hands
+//!   back the plain value; the encoders return [`EncodedSecret`], which derefs by design
 //! - **Scoped preference** — `with_secret` / `with_secret_mut` limit borrow lifetime
 //! - **Zero-cost** — All methods use `#[inline(always)]` where possible
 //! - **Timing safety** — `ConstantTimeEq` provides constant-time equality
 //! - **Opt-in risk** — Cloning and serialization require deliberate marker impls
-//! - **Read-only enforcement** — Encoding wrappers and random types only expose immutable access
+//! - **Read-only output** — [`EncodedSecret`] exposes its buffer only through `Deref`
+//!   and its two named consumers; there is no mutable access to encoded output
 //!
 //! # Feature Gates
 //!

@@ -185,7 +185,7 @@ fn newtype_forwards_sized_bech32_methods() {
 
     let k = EncKey::try_from_hex(&"cd".repeat(32)).unwrap();
 
-    // Fixed newtype, both variants, plain and zeroizing.
+    // Fixed newtype, both checksums, sized against the default.
     const N: usize = bech32_code_length(2, 32);
     let b32 = k.try_to_bech32_sized::<N>("sg").unwrap().into_inner();
     assert_eq!(b32, k.try_to_bech32("sg").unwrap().into_inner());

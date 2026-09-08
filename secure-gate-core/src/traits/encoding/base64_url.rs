@@ -49,7 +49,7 @@ use base64ct::{Base64UrlUnpadded, Encoding};
 ///
 /// *Requires feature `encoding-base64`.*
 ///
-/// Blanket-implemented for `AsRef<[u8]> + [`EncodableBytes`](super::EncodableBytes)`, and implemented directly on the
+/// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes), and implemented directly on the
 /// byte-shaped wrappers (`Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`). Uses the RFC 4648
 /// URL-safe alphabet without `=` padding. To encode a secret wrapper, call
 /// `key.to_base64url()` with this trait in scope (ergonomically safest for single
@@ -61,7 +61,7 @@ pub trait ToBase64Url {
     fn to_base64url(&self) -> crate::EncodedSecret;
 }
 
-// Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
+// Blanket impl over AsRef<[u8]> + EncodableBytes (e.g. &[u8], Vec<u8>, [u8; N]).
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBase64Url for T {
     #[inline(always)]

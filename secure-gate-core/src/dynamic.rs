@@ -15,7 +15,7 @@
 //! - **Unconditional zeroization on drop** — includes `Vec`/`String` spare capacity.
 //! - **Heap-only** — secret bytes never reside on the stack. Inner value stored in `Box<T>`.
 //! - **Opt-in `Clone`** — requires `T: CloneableSecret` and the `cloneable` feature.
-//! - **Opt-in `Serialize`/`Deserialize`** — requires marker traits and the
+//! - **Opt-in `Serialize`** — requires the `SerializableSecret` marker and the
 //!   `serde-serialize`/`serde-deserialize` features.
 //! - **Panic safety** — all decode constructors use the `from_protected_bytes` pattern:
 //!   a `Zeroizing` wrapper survives OOM panics from `Box::new`.
@@ -664,7 +664,7 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// Allocates a `Vec<u8>` of length `len`, fills it from `rng`, and wraps it.
     ///
     /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRng`](rand::TryRng) — for example,
-    /// a seeded [`StdRng`](rand::rngs::StdRng) for deterministic tests. Requires the `rand`
+    /// a seeded `StdRng` for deterministic tests. Requires the `rand`
     /// feature and `alloc` (implicit — [`Dynamic<T>`](crate::Dynamic) itself requires it).
     ///
     /// # Errors
@@ -801,7 +801,7 @@ impl std::io::Write for Dynamic<alloc::vec::Vec<u8>> {
 /// Cursor-like reader over a [`Dynamic<Vec<u8>>`].
 ///
 /// Created by [`Dynamic::<Vec<u8>>::as_reader`]. Borrows the `Dynamic`
-/// immutably and tracks the read position internally. Each [`Read::read`]
+/// immutably and tracks the read position internally. Each [`Read::read`](std::io::Read::read)
 /// call goes through [`with_secret`](crate::RevealSecret::with_secret),
 /// preserving the crate's auditable access model.
 ///
