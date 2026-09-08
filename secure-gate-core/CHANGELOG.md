@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> Backported from `main` (PRs #171, #172, #173, #174). Same changes, adapted to this
+> branch. MSRV stays 1.70 and the edition stays 2021, so: `usize::div_ceil` (1.73) is
+> written out in `bech32_code_length` and two assertions; the `thread_local!` cells in
+> `heap_zeroize.rs` drop their inline `const` blocks (1.79), which only elided lazy
+> initialization and so change nothing the ordering in `count_allocs` did not already
+> guarantee; and `error.rs` keeps this branch's `std`-gated `std::error::Error` instead
+> of 0.9's unconditional `core::error::Error` (1.81). Edition 2021 needs `self::bech32::`
+> to disambiguate the module from the crate of the same name in the encoding and decoding
+> re-exports. Dependency pins are untouched — `base16ct` 0.2, `base32ct` 0.2 (so the
+> `encoded_len_is_decodable` trailing-block guard stays, where 0.3 fixed it upstream),
+> `base64ct` =1.6.0, `rand` 0.9 (`OsRng` / `TryRngCore`, not 0.10's `SysRng` / `TryRng`),
+> so the `rand` doc links keep this branch's names. `SecureEncoding` / `SecureDecoding`
+> were removed on `main` *before* this range, so they still exist here and keep their doc
+> rows. Compile-fail snapshots are re-blessed on 1.70, and `str_not_encodable` exercises
+> `ToHex` on a byte array before the failing case so `-D warnings` cannot turn an
+> `unused_imports` line into a snapshot mismatch — the shape `custom_inner_no_len`
+> already uses on this branch. Dropping `thiserror` is a no-op here: this branch never
+> used it, because its `no_std` path needs `core::error::Error` too. `secure-gate-compat`
+> keeps its `encoding-bech32m` feature as an alias onto core's `encoding-bech32` so the
+> workspace resolves; compat is backported separately.
+
+### Added
+
+- **Caller-chosen bech32 code length (#171).** `try_to_bech32_sized::<N>` /
+  `try_to_bech32m_sized::<N>` and `Fixed::try_from_bech32_sized` /
+  `try_from_bech32m_sized`, plus `Bech32Sized` / `Bech32mSized`, `Bech32Standard` /
+  `Bech32mStandard`, the `bech32_code_length(hrp_len, payload_bytes)` const fn, and
+  `BECH32_CODE_LENGTH`. The default stays the BIP-173 bound; `N` above it is opt-in.
+- **`EncodableBytes` marker (#172).** Encoder blanket impls are now
+  `T: AsRef<[u8]> + EncodableBytes`, which keeps string-shaped types out.
+- **Compile-fail pins (#172).** An `EncodedSecret` cannot be re-encoded (hex, and a
+  second case covering all four formats so restoring a bare `AsRef<[u8]>` blanket on any
+  one of them is caught), `EncodedSecret` has no `PartialEq`, and a `str` is not an
+  encoding input.
+- **`docs/encoded_secret_deref.md` (#174).** Why `EncodedSecret` derefs to `str` when
+  `Fixed` and `Dynamic` refuse to, and what got a compile error instead.
+- **Allocation-oracle coverage for `EncodedSecret::into_zeroizing` (#174).**
+- **CI: a no-alloc `encoding-bech32` row (#173),** the row whose absence let the BIP-173
+  decode constructors sit inside `__sg_if_alloc!` undetected.
+
+### Changed
+
+- **BREAKING — every encoder returns `EncodedSecret` (#172).** The `*_zeroizing` twins
+  are gone, so the short name is the safe one. An encoded secret is a second full copy of
+  the secret in a longer alphabet; it is wiped by default now, and the unprotected form
+  costs a named call.
+- **BREAKING — `into_inner` returns the plain value (#172).** Protection ends at that
+  call rather than following the value into the caller.
+- **BREAKING — `encoding-bech32m` folded into `encoding-bech32` (#171).** BIP-173 and
+  BIP-350 are one dependency, one error type, and one code-length knob, differing only in
+  a checksum constant.
+- **The allocation oracle's counter is thread-scoped (#174),** so allocations made by
+  other threads are no longer charged to the closure under test.
+- **`zeroize_derive` moved to `[dev-dependencies]` (#171).** Nothing in `src/` derives
+  `Zeroize`, so it no longer forces `syn` + `quote` + `proc-macro2` into downstream builds.
+
+### Removed
+
+- **`InnerSecret<T>` (#172)** — `into_inner` hands back the plain value.
+- **The `*_zeroizing` encoder methods (#172)** — superseded by the above.
+- **`Bech32Error::ConversionFailed` and `DecodingError` (#171)** — the first was
+  unreachable, and the second was a wrapper nothing produced.
+- **The `encoding-bech32m` feature (#171)** — see the fold above.
+
 ## [0.8.0-rc.11] - 2026-09-07
 
 > Backported from `main` (PRs #145 and #153). Same defects, adapted to this branch: the
