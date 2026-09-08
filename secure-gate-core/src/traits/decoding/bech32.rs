@@ -41,7 +41,7 @@
 //! }
 //! ```
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-use super::super::encoding::bech32::Bech32Large;
+use super::super::encoding::bech32::{Bech32Sized, BECH32_CODE_LENGTH};
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use crate::error::Bech32Error;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
@@ -58,10 +58,11 @@ use bech32::primitives::decode::CheckedHrpstring;
 /// Blanket-implemented for all `AsRef<str>` types. Treat all input as untrusted;
 /// HRP validation prevents injection attacks and cross-protocol confusion.
 ///
-/// **Extended payload capacity**: Uses the custom `Bech32Large` variant (8191 Fe32
-/// values, ~5 KB (5,115 bytes maximum payload)) — significantly larger than Bech32m's standard 90-byte
-/// limit. Strings encoded via [`ToBech32`](crate::ToBech32) round-trip correctly here
-/// but will fail with [`FromBech32mStr`](crate::FromBech32mStr) when they exceed ~90 bytes.
+/// **Code length**: the plain methods accept strings up to [`BECH32_CODE_LENGTH`]
+/// (1023 characters, roughly 630 payload bytes). For longer strings use the
+/// `_sized::<N>` methods with the same `N` — or any larger one — that produced them;
+/// `N` is a length gate, not part of the encoding, so a short string written at a large
+/// `N` still decodes at the default.
 ///
 /// **The returned `Vec<u8>` is plain heap memory and is not zeroized on drop.** Wrap
 /// the result in [`Fixed`](crate::Fixed) or [`Dynamic`](crate::Dynamic) immediately
@@ -75,8 +76,7 @@ pub trait FromBech32Str {
     /// The HRP comparison is case-insensitive. Returns only the data bytes — the HRP
     /// is validated and discarded.
     ///
-    /// Validates the BIP-173 checksum using the extended `Bech32Large`
-    /// variant (8191 Fe32 limit) for large-payload compatibility.
+    /// Validates the BIP-173 checksum at [`BECH32_CODE_LENGTH`].
     ///
     /// # Errors
     ///
@@ -100,13 +100,12 @@ pub trait FromBech32Str {
 
     /// Decodes a Bech32 (BIP-173) string into `(HRP, data_bytes)` without validating the HRP.
     ///
-    /// Validates the BIP-173 checksum using the extended `Bech32Large`
-    /// variant (8191 Fe32 limit) for large-payload compatibility.
+    /// Validates the BIP-173 checksum at [`BECH32_CODE_LENGTH`].
     ///
     /// # Errors
     ///
-    /// - [`Bech32Error::OperationFailed`] — invalid checksum or malformed string.
-    /// - [`Bech32Error::ConversionFailed`] — bit-conversion failure.
+    /// - [`Bech32Error::OperationFailed`] — invalid checksum, malformed string, or
+    ///   bit-conversion failure.
     ///
     /// # Examples
     ///
@@ -120,16 +119,64 @@ pub trait FromBech32Str {
     /// # Ok::<(), secure_gate::Bech32Error>(())
     /// ```
     fn try_from_bech32_unchecked(&self) -> Result<(String, Vec<u8>), Bech32Error>;
+
+    /// Like [`try_from_bech32`](Self::try_from_bech32), accepting strings up to `N`
+    /// characters.
+    ///
+    /// Use the `N` the string was encoded with, or any larger value: `N` bounds the
+    /// input length and never enters the checksum. See [`Bech32Sized`] for what `N`
+    /// above [`BECH32_CODE_LENGTH`] costs.
+    ///
+    /// # Errors
+    ///
+    /// - [`Bech32Error::OperationFailed`] — invalid checksum, malformed string, or a
+    ///   string longer than `N`.
+    /// - [`Bech32Error::UnexpectedHrp`] — decoded HRP does not match `expected_hrp`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::{FromBech32Str, ToBech32};
+    ///
+    /// let secret = [0x11u8; 900];
+    /// let encoded = secret.try_to_bech32_sized::<2048>("age")?;
+    /// let decoded = encoded.try_from_bech32_sized::<2048>("age")?;
+    /// assert_eq!(decoded, secret);
+    /// // The default code length refuses it: the string is longer than 1023.
+    /// assert!(encoded.try_from_bech32("age").is_err());
+    /// # Ok::<(), secure_gate::Bech32Error>(())
+    /// ```
+    fn try_from_bech32_sized<const N: usize>(
+        &self,
+        expected_hrp: &str,
+    ) -> Result<Vec<u8>, Bech32Error>;
+
+    /// Like [`try_from_bech32_unchecked`](Self::try_from_bech32_unchecked), accepting
+    /// strings up to `N` characters.
+    fn try_from_bech32_unchecked_sized<const N: usize>(
+        &self,
+    ) -> Result<(String, Vec<u8>), Bech32Error>;
 }
 
 // Blanket impl to cover any AsRef<str> (e.g., &str, String, etc.)
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<T: AsRef<str> + ?Sized> FromBech32Str for T {
+    #[inline(always)]
     fn try_from_bech32_unchecked(&self) -> Result<(String, Vec<u8>), Bech32Error> {
+        self.try_from_bech32_unchecked_sized::<BECH32_CODE_LENGTH>()
+    }
+
+    #[inline(always)]
+    fn try_from_bech32(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error> {
+        self.try_from_bech32_sized::<BECH32_CODE_LENGTH>(expected_hrp)
+    }
+
+    fn try_from_bech32_unchecked_sized<const N: usize>(
+        &self,
+    ) -> Result<(String, Vec<u8>), Bech32Error> {
         let s = self.as_ref();
-        // Use CheckedHrpstring to validate Bech32 checksum (supports large via custom Bech32Large)
         let checked =
-            CheckedHrpstring::new::<Bech32Large>(s).map_err(|_| Bech32Error::OperationFailed)?;
+            CheckedHrpstring::new::<Bech32Sized<N>>(s).map_err(|_| Bech32Error::OperationFailed)?;
 
         // Get HRP (lowercase)
         let hrp = checked.hrp().to_string();
@@ -142,10 +189,13 @@ impl<T: AsRef<str> + ?Sized> FromBech32Str for T {
         Ok((hrp, data))
     }
 
-    fn try_from_bech32(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error> {
+    fn try_from_bech32_sized<const N: usize>(
+        &self,
+        expected_hrp: &str,
+    ) -> Result<Vec<u8>, Bech32Error> {
         let s = self.as_ref();
         let checked =
-            CheckedHrpstring::new::<Bech32Large>(s).map_err(|_| Bech32Error::OperationFailed)?;
+            CheckedHrpstring::new::<Bech32Sized<N>>(s).map_err(|_| Bech32Error::OperationFailed)?;
 
         // Validate the HRP *before* materializing any payload bytes, so an
         // HRP mismatch never leaves decoded secret material in unzeroized

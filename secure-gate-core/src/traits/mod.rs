@@ -80,7 +80,7 @@ pub use decoding::FromBase64UrlStr;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use decoding::FromBech32Str;
 
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use decoding::FromBech32mStr;
 
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
@@ -99,7 +99,16 @@ pub use encoding::ToBase64Url;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use encoding::ToBech32;
 
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(feature = "encoding-bech32")]
+pub use encoding::{Bech32Sized, Bech32Standard};
+
+#[cfg(feature = "encoding-bech32")]
+pub use encoding::{Bech32mSized, Bech32mStandard};
+
+#[cfg(feature = "encoding-bech32")]
+pub use encoding::{bech32_code_length, BECH32_CODE_LENGTH};
+
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use encoding::ToBech32m;
 
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]

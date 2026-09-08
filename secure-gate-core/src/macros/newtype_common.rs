@@ -344,11 +344,11 @@ macro_rules! __sg_if_base64 {
 
 #[doc(hidden)]
 #[macro_export]
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 macro_rules! __sg_if_bech32m { ($($t:tt)*) => { $($t)* }; }
 #[doc(hidden)]
 #[macro_export]
-#[cfg(not(feature = "encoding-bech32m"))]
+#[cfg(not(feature = "encoding-bech32"))]
 macro_rules! __sg_if_bech32m {
     ($($t:tt)*) => {};
 }
