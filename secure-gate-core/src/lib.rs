@@ -220,8 +220,8 @@
 //!
 //! This crate has **not** undergone an independent security audit. No unsafe code —
 //! enforced with `#![forbid(unsafe_code)]`. Prefer scoped access ([`RevealSecret::with_secret`])
-//! over direct references. Encoders return [`EncodedSecret`], which stays wiped until it drops;
-//! when the encoded form is sensitive. See
+//! over direct references. Encoders return [`EncodedSecret`], which stays wiped until it
+//! drops; `EncodedSecret::into_inner` is the named call that ends that. See
 //! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md)
 //! for the full threat model.
 //!

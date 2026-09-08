@@ -48,12 +48,15 @@
 //! [Where accident-prevention ends](crate#where-accident-prevention-ends).
 
 #[cfg(feature = "alloc")]
-/// Owned wrapper for encoded secret strings. Guarantees zeroization on drop
-/// while redacting `Debug` output. Use this when the encoded form remains sensitive
-/// (e.g. full PEM keys, long-lived Bech32 private keys, tokens).
+/// Owned wrapper for encoded secret strings: zeroizes on drop, redacts `Debug`, and
+/// has no `Display`.
 ///
-/// See the zeroizing encoding methods on [`Fixed`] and [`Dynamic`] (e.g.
-/// [`ToHex::to_hex`](crate::ToHex::to_hex)).
+/// Every encoding method returns this type — `to_hex`, `to_hex_upper`, `to_base32`,
+/// `to_base64url`, `try_to_bech32`, `try_to_bech32m` and their `_sized` forms — on
+/// [`Fixed`](crate::Fixed), [`Dynamic`](crate::Dynamic), and any byte-shaped input.
+/// There is no unprotected variant to choose between: an encoded secret is a second
+/// full copy of the secret, so it is wiped by default, and
+/// [`into_inner`](EncodedSecret::into_inner) is the named call that ends that.
 #[must_use = "dropping EncodedSecret may immediately zeroize encoded output"]
 pub struct EncodedSecret(zeroize::Zeroizing<alloc::string::String>);
 
