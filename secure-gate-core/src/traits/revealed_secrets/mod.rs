@@ -8,8 +8,9 @@
 //! the encoded form is a *second full copy* of the secret in a different alphabet, and it
 //! is worth keeping wiped until it drops.
 //!
-//! - [`EncodedSecret`] — returned by every encoding method (`to_hex`, `to_base32`,
-//!   `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and their `_sized` forms).
+//! - [`EncodedSecret`] — returned by every encoding method: `to_hex`, `to_hex_upper`,
+//!   `to_base32`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and the
+//!   `_sized::<N>` forms of the last two. Only bech32 and bech32m take a code length.
 //!
 //! It wraps [`zeroize::Zeroizing`] internally, provides redacted `Debug` (`[REDACTED]`),
 //! and offers an `into_zeroizing()` escape hatch that keeps the wiping but not the

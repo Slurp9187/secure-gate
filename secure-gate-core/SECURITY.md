@@ -450,6 +450,16 @@ There is no unprotected encoder. Earlier releases paired each method with a `*_z
 
 `EncodedSecret` wraps `Zeroizing<String>`, redacts `Debug` as `[REDACTED]`, and zeroizes the string buffer on drop. Keep values in this form as long as possible.
 
+**Encoding an already-encoded secret is a compile error.** The encoder traits are
+implemented for `AsRef<[u8]> + EncodableBytes`, and `str` does not implement
+`EncodableBytes`. Without that second bound `encoded.to_hex()` compiled — `EncodedSecret`
+derefs to `str`, and `str: AsRef<[u8]>` satisfied the old blanket — and it hex-encoded the
+*encoded text*, so a 32-byte key came back as 124 characters with nothing in the signature
+or the name to suggest anything was wrong. `"text".to_hex()` was the same accident from the
+other direction. Both are rejected at compile time now; write `.as_bytes()` when the UTF-8
+really is what you meant. `EncodableBytes` is a public opt-in marker, so your own
+byte-shaped newtype can implement it.
+
 **Escape hatches:**
 
 - `EncodedSecret::into_inner()` → returns a plain `String`, ends zeroization protection. Use only when an API requires ownership of `String`.

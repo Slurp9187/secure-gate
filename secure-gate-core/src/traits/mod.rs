@@ -86,8 +86,8 @@ pub use decoding::FromHexStr;
 
 // Re-export per-format encoding traits (feature-gated)
 // Note: blanket impls of ToBase32, ToBase64Url, ToBech32, ToBech32m require alloc (String output).
-// The traits themselves are exported unconditionally so inherent methods on Fixed/Dynamic
-// can call them; the blanket impls gate the alloc dependency.
+// Each trait is exported only with its own encoding feature *and* alloc, because every
+// encoder returns EncodedSecret and that type requires alloc.
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 pub use encoding::ToBase32;
 

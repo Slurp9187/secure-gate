@@ -359,7 +359,12 @@ Edition 2024, MSRV 1.85, `rand` 0.10 (`OsRng` → `SysRng`), dep bumps.
 Across the release candidates: `SecretLen` split out of `RevealSecret` (which now covers
 every inner type); Base32 (RFC 4648 §6) added behind `encoding-base32`; wrapper encoders
 are `ToHex` / `ToBase32` / `ToBase64Url` / `ToBech32` / `ToBech32m` trait impls; `fixed_newtype!` / `dynamic_newtype!` for nominal secret roles; no `Display`
-on `EncodedSecret`.  
+on `EncodedSecret`.
+
+Two breaking changes are worth reading before you upgrade. Every encoder now returns
+`EncodedSecret` and the `*_zeroizing` twins are gone, so the short name is the safe one.
+And `into_inner` returns the plain value rather than a wrapper that kept wiping —
+**protection now ends at that call**, where earlier release candidates continued it.  
 Full details in [CHANGELOG.md](CHANGELOG.md). Users on Rust < 1.85: pin `secure-gate = "0.8"`.
 
 ## Branch support

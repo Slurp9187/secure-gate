@@ -390,10 +390,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stress run over a ladder of seven code lengths. Property tests in
   `proptest_suite/encoding.rs` and the `encoding` fuzz target assert the same
   invariants; `tests/macros_suite/newtype_surface.rs` covers the macro-forwarded sized
-  methods, which are the easiest of the expansion sites to leave out.
-
-  methods in **both** directions — see the adversarial-review entry below for why the
-  decode half of that sentence was false when first written.
+  methods in **both** directions — the easiest of the expansion sites to leave out, and
+  see the adversarial-review entry below for why the decode half of that sentence was
+  false when first written.
 
 - **Adversarial review of the bech32 refactor (41 agents, seven lenses, three refuters
   per finding).** Nine findings survived; the three that were test defects are fixed

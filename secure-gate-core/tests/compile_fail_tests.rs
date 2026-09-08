@@ -85,6 +85,31 @@ fn str_not_encodable_compile_fail() {
     t.compile_fail("tests/compile-fail/str_not_encodable.rs");
 }
 
+// The hex case above would keep passing if a later edit restored the bare
+// `AsRef<[u8]>` blanket on any of the other four encoders. This covers them.
+#[cfg(all(
+    feature = "alloc",
+    feature = "encoding-hex",
+    feature = "encoding-base32",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
+#[cfg(not(miri))]
+#[test]
+fn encoded_secret_no_reencode_all_formats_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/encoded_secret_no_reencode_all_formats.rs");
+}
+
+// `EncodedSecret` has no `PartialEq`: `==` on secret material is variable-time.
+#[cfg(all(feature = "alloc", feature = "encoding-hex"))]
+#[cfg(not(miri))]
+#[test]
+fn encoded_secret_no_eq_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/encoded_secret_no_eq.rs");
+}
+
 // Compile-fail test: `SecretLen` must stay narrow. `RevealSecret` covers every
 // inner type (including local user-defined ones), but a custom inner type has
 // no meaningful length — `len()` on it must not compile even with `SecretLen`

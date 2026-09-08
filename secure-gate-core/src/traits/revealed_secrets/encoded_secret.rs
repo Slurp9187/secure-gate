@@ -52,7 +52,8 @@
 /// has no `Display`.
 ///
 /// Every encoding method returns this type — `to_hex`, `to_hex_upper`, `to_base32`,
-/// `to_base64url`, `try_to_bech32`, `try_to_bech32m` and their `_sized` forms — on
+/// `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and the `_sized::<N>` forms of
+/// the last two (only bech32 and bech32m take a code length) — on
 /// [`Fixed`](crate::Fixed), [`Dynamic`](crate::Dynamic), and any byte-shaped input.
 /// There is no unprotected variant to choose between: an encoded secret is a second
 /// full copy of the secret, so it is wiped by default, and
