@@ -114,12 +114,22 @@ fn encoded_secret_into_zeroizing_carries_the_content() {
         "precondition: the wrapper holds the encoding"
     );
 
-    let protected = sample_hex_secret().into_zeroizing();
+    // Content, and then the stronger claim: it is the *same* buffer, not a copy of it.
+    // Equality alone would pass for an implementation that cloned, so the pointer is what
+    // makes "hands over" true rather than merely plausible. Same pattern as
+    // `dynamic_into_inner_moves_without_copying` in tests/zeroize_tests.rs.
+    let encoded = sample_hex_secret();
+    let buffer_before = encoded.as_ptr();
+    let protected = encoded.into_zeroizing();
     assert_eq!(
         &**protected, expected,
-        "into_zeroizing must hand over the same bytes, not a fresh String"
+        "into_zeroizing must hand over the encoding, not an empty or default String"
     );
-    assert_eq!(protected.len(), expected.len());
+    assert_eq!(
+        protected.as_ptr(),
+        buffer_before,
+        "into_zeroizing copied the buffer instead of moving it"
+    );
 
     // `into_zeroizing` is a *partial* downgrade, and this is the half that is lost:
     // `Zeroizing<String>` derives `Debug`, so the encoded secret prints in the clear --

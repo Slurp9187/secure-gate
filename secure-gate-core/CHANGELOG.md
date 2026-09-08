@@ -382,11 +382,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The allocation oracle is thread-scoped, so harness activity can no longer invent an
   allocation.** `tests/heap_zeroize.rs` counted allocations in a process-global
   `AtomicUsize` gated by a process-global flag, which charged every allocation made by the
-  libtest harness thread to the closure under test. That is fail-open in the direction that
-  matters for a zero-allocation assertion: it cannot hide a real allocation, but it can
-  invent one, and it did — one CI run reported 4 allocations for
-  `check_bech32_hrp_mismatch_materializes_nothing` against a decode path byte-identical to
-  four green runs. The counter is now a `const`-initialized `thread_local!` `Cell` pair, so
+  libtest harness thread to the closure under test. For a zero-allocation assertion that
+  over-count is *fail-closed*, not fail-open: it cannot hide a real allocation, only invent
+  one, so it produces a spurious red rather than a silent pass. It still had to go — one CI
+  run reported 4 allocations for `check_bech32_hrp_mismatch_materializes_nothing` against a
+  decode path byte-identical to four green runs, and an oracle that fails at random teaches
+  people to re-run until green, which retires it as surely as deleting it. Thread-scoping is
+  what introduces a real fail-open edge — a thread spawned inside the closure is silently
+  uncounted — and `count_allocs` now forbids spawning and nesting for that reason. The counter is now a `const`-initialized `thread_local!` `Cell` pair, so
   only the counting thread's own allocations are attributed; the global flag is kept as an
   outer gate so non-counting threads never touch TLS from inside the allocator. No size
   threshold was added — a threshold would hide real small-allocation regressions. Asserting
@@ -503,6 +506,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handled by sweeping `.to_string()` / `.to_owned()` with the encoding audit, which
   `SECURITY.md` lists. Linked from the `EncodedSecret` module docs; deliberately not added
   to `SECURITY.md`, which stays threat model and audit surfaces.
+
+- **The `into_zeroizing` content test now pins the move, not just the content.** Its message
+  claimed the method "must hand over the same bytes, not a fresh String" while asserting only
+  string equality, which a cloning implementation would satisfy. It now captures the buffer
+  pointer before the call and asserts it is unchanged after, the same way
+  `dynamic_into_inner_moves_without_copying` does. Falsified: rewriting `into_zeroizing` to
+  clone fails the assertion.
 
 - **Four design-record references pointed at paths that do not exist on docs.rs.** `Cargo.toml`'s
   `include` list ships `src/`, `CHANGELOG.md`, `LICENSE*`, `README.md` and `SECURITY.md` — not

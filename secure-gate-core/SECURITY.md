@@ -446,6 +446,14 @@ be written `expose_secret().to_string()`, which already trips a listed token. Th
 above already found: for every `to_hex` / `to_base32` / `to_base64url` / `try_to_bech32*`
 hit, check what happens to the returned `EncodedSecret`. `into_inner` on it is a move and
 is already listed; `.to_string()` / `.to_owned()` copy and leave a second live plaintext.
+
+`.to_string()` and `.to_owned()` are the common spellings, not the only ones. Once you hold
+the `&str`, **any** use of it that produces an owned `String` is the same event —
+`String::from(&*enc)`, `let s: String = (&*enc).into()`, `format!("{}", &*enc)`, pushing it
+onto another `String`. Judge the deref site, not the method name: `&*enc` reaching anything
+that keeps the bytes is a copy the crate no longer tracks. (`format!("{}", enc)` without the
+deref does not compile — `EncodedSecret` has no `Display` — which is the point of that
+omission.)
 Rationale for keeping `Deref`, and why this residual is accepted rather than closed:
 `docs/encoded_secret_deref.md`.
 

@@ -18,7 +18,7 @@
 //!
 //! The *counting* mode is the exception: its counter is thread-local, so allocations made by the
 //! libtest harness thread or any other thread are not attributed to the closure under test. That
-//! is a fail-safe correction, not a licence to parallelize -- an over-count made
+//! removes a source of false failures; it is not a licence to parallelize -- an over-count made
 //! `check_bech32_hrp_mismatch_materializes_nothing` fail once in CI against code that was
 //! byte-identical to the passing runs.
 //!
@@ -88,9 +88,16 @@ thread_local! {
     ///
     /// The counter used to be a process-global `AtomicUsize`, which meant every allocation made by
     /// the libtest harness thread while the gate was open was charged to the closure under test.
-    /// That is fail-open in the dangerous direction for a zero-allocation assertion: it cannot
-    /// hide a real allocation, but it can invent one, and it did -- one CI run reported 4
-    /// allocations for an HRP mismatch whose decode path was byte-identical to four green runs.
+    /// For a zero-allocation assertion that over-count is *fail-closed*, not fail-open: it cannot
+    /// hide a real allocation, only invent one, so the failure mode is a spurious red rather than
+    /// a silent pass. It still had to go. One CI run reported 4 allocations for an HRP mismatch
+    /// whose decode path was byte-identical to four green runs, and an oracle that fails at random
+    /// teaches people to re-run it until it is green, which retires it as surely as deleting it.
+    ///
+    /// Thread-scoping is what introduces a genuine *fail-open* edge, and it is the one the
+    /// `count_allocs` docs guard: a thread spawned inside `f` starts at these const-initialized
+    /// defaults, so its allocations are silently uncounted. Undercounting is the direction that
+    /// hides a regression. Hence the prohibition there on spawning and on nesting.
     ///
     /// Both cells are `const`-initialized and hold `Copy` types with no destructor, so no TLS
     /// destructor is registered and there is no lazily-initialized state that could be observed
@@ -219,8 +226,16 @@ impl Drop for CountGuard {
 /// which is the direction that hides a regression. No closure here spawns a thread, and none
 /// should be added.
 ///
-/// The sequential-only caveat on `with_proxy_check` is unaffected: asserting mode is still
-/// process-global, so this file still runs as one aggregate test.
+/// Two ways to break it, both undercounting and therefore silent:
+///
+/// - **Do not nest.** An inner `count_allocs` resets this thread's counter to zero and its
+///   `CountGuard` lowers both gates on the way out, so the outer call loses its tally and stops
+///   counting for the rest of its closure.
+/// - **Do not call it from two threads at once.** `COUNTING` is a plain flag, not a refcount;
+///   whichever call finishes first lowers it and mutes the other.
+///
+/// The file's single aggregate test is what keeps both true today. The sequential-only caveat on
+/// `with_proxy_check` is unaffected: asserting mode is still process-global.
 #[cfg(feature = "encoding-bech32")]
 fn count_allocs<F: FnOnce()>(f: F) -> usize {
     THREAD_ALLOC_COUNT.with(|c| c.set(0));

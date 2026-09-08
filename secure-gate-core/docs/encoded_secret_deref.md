@@ -87,7 +87,10 @@ the token list under **Audit Surfaces** in `SECURITY.md`. It is also why the pro
 is specific to this type: on `Fixed`/`Dynamic` there is no `Deref`, so the same copy
 must be spelled `expose_secret().to_string()`, and that already trips a listed token. It is a second pass over
 the call sites that list already finds: for every encoder hit, look at what happens
-to the returned `EncodedSecret`. `SECURITY.md` carries that instruction directly
+to the returned `EncodedSecret`. And judge the deref site rather than the method
+name — `String::from(&*enc)`, `(&*enc).into()`, and `format!("{}", &*enc)` are the
+same event under different spellings, which is another reason a token list would
+have been the wrong instrument. `SECURITY.md` carries that instruction directly
 beneath the token list, and separately classifies the result of `enc.to_string()` as
 untracked plaintext under "Where accident-prevention ends".
 
