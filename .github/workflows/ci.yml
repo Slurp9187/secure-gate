@@ -123,6 +123,10 @@ jobs:
           # ── Encoding ──────────────────────────────────────────────────────────
           # Encoding traits return String and require alloc; integration tests
           # import the traits, so alloc is needed to compile the test binaries.
+          # True of every row here except the last. The bech32 no-alloc row builds
+          # because every item in encoding_suite/bech32*.rs is gated on
+          # all(encoding-bech32, alloc): the suite compiles out, and what that row
+          # actually exercises is tests/newtype_nostd.rs.
           - name: encoding (all formats)
             features: "--no-default-features --features=alloc,encoding"
 
