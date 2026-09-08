@@ -178,7 +178,12 @@ fuzz_target!(|data: &[u8]| {
         // Cap to avoid enormous strings
         let capped = if raw.len() > 90 { &raw[..90] } else { &raw[..] };
 
-        if let Ok(encoded) = capped.try_to_bech32("fuzz") {
+        // "fuzz" is a valid HRP and `capped` is far under the default code length,
+        // so an Err here can only be a regression -- do not skip it.
+        let encoded = capped
+            .try_to_bech32("fuzz")
+            .expect("default bech32 encode refused a valid HRP and a small payload");
+        {
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "fuzz")
                 .expect("bech32 from valid encode");
             assert_eq!(decoded.expose_secret(), capped, "Bech32 round-trip failed");
@@ -204,7 +209,8 @@ fuzz_target!(|data: &[u8]| {
         // here is a regression in the sized encode gate, not a legitimate refusal.
         let encoded = capped
             .try_to_bech32_sized::<BIG>("fuzz")
-            .expect("sized bech32 encode refused a payload that fits").into_inner();
+            .expect("sized bech32 encode refused a payload that fits")
+            .into_inner();
         {
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32_sized::<BIG>(&encoded, "fuzz")
                 .expect("sized bech32 from valid encode");
@@ -235,7 +241,8 @@ fuzz_target!(|data: &[u8]| {
         // must never decode as one another.
         let encoded_m = capped
             .try_to_bech32m_sized::<BIG>("fuzz")
-            .expect("sized bech32m encode refused a payload that fits").into_inner();
+            .expect("sized bech32m encode refused a payload that fits")
+            .into_inner();
         {
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32m_sized::<BIG>(&encoded_m, "fuzz")
                 .expect("sized bech32m from valid encode");
@@ -262,13 +269,14 @@ fuzz_target!(|data: &[u8]| {
 
     // 4d. HRP round-trip: encode with hrp, decode, verify hrp preserved
     {
-        if let Ok(encoded) = b"hello".try_to_bech32("mykey") {
-            let (hrp, payload) = (*encoded)
-                .try_from_bech32_unchecked()
-                .expect("valid bech32");
-            assert_eq!(hrp.to_ascii_lowercase(), "mykey");
-            assert_eq!(payload, b"hello");
-        }
+        let encoded = b"hello"
+            .try_to_bech32("mykey")
+            .expect("default bech32 encode refused a valid HRP and a 5-byte payload");
+        let (hrp, payload) = (*encoded)
+            .try_from_bech32_unchecked()
+            .expect("valid bech32");
+        assert_eq!(hrp.to_ascii_lowercase(), "mykey");
+        assert_eq!(payload, b"hello");
     }
 
     // 4e. Bech32 edge cases
@@ -295,7 +303,10 @@ fuzz_target!(|data: &[u8]| {
         let raw2 = dyn_vec2.expose_secret();
         let capped2 = if raw2.len() > 32 { &raw2[..32] } else { &raw2[..] };
 
-        if let Ok(encoded) = capped2.try_to_bech32m("fuzz") {
+        let encoded = capped2
+            .try_to_bech32m("fuzz")
+            .expect("default bech32m encode refused a valid HRP and a 32-byte payload");
+        {
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32m(&encoded, "fuzz")
                 .expect("bech32m from valid encode");
             assert_eq!(decoded.expose_secret(), capped2, "Bech32m round-trip failed");

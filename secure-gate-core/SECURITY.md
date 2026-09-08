@@ -440,7 +440,17 @@ There is no unprotected encoder. Earlier releases paired each method with a `*_z
 **Escape hatches:**
 
 - `EncodedSecret::into_inner()` → returns a plain `String`, ends zeroization protection. Use only when an API requires ownership of `String`.
+
 - `EncodedSecret::into_zeroizing()` → returns `Zeroizing<String>`, preserves zeroization. Prefer this when a downstream API accepts `Zeroizing<String>`.
+
+**Bech32 code length.** The plain `try_to_bech32` / `try_from_bech32` methods use
+`BECH32_CODE_LENGTH` (1023) — the length of the bech32 BCH code, within which the
+checksum's guaranteed detection of up to four character errors holds. The `_sized::<N>`
+methods take that bound as a parameter. **Choosing `N` above 1023 forfeits the
+guarantee**: the same 30-bit checksum is stretched over a longer message, leaving an
+integrity check with no proven detection bound. It is still computed and still verified.
+Size `N` with `bech32_code_length(hrp_len, payload_bytes)`; the choice is spelled at the
+call site, so `grep _sized` finds every place it was made.
 
 ## Vulnerability Reporting
 
