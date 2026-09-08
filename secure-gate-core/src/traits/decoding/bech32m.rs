@@ -113,7 +113,7 @@ pub trait FromBech32mStr {
     /// # Errors
     ///
     /// - [`Bech32Error::OperationFailed`] — invalid checksum, malformed string, or
-    ///   bit-conversion failure.
+    ///   string longer than the code length.
     ///
     /// # Examples
     ///

@@ -6,7 +6,8 @@
 //! to byte vectors, with HRP validation as the primary path. It is designed for handling
 //! untrusted input in cryptographic contexts, such as decoding encoded addresses or keys.
 //!
-//! **Requires the `encoding-bech32` feature** (distinct from Bech32m).
+//! **Requires the `encoding-bech32` feature**, which ships BIP-173 and BIP-350
+//! together. They are distinct checksums behind one feature.
 //!
 //! # Security Notes
 //!
@@ -105,7 +106,7 @@ pub trait FromBech32Str {
     /// # Errors
     ///
     /// - [`Bech32Error::OperationFailed`] — invalid checksum, malformed string, or
-    ///   bit-conversion failure.
+    ///   string longer than the code length.
     ///
     /// # Examples
     ///
