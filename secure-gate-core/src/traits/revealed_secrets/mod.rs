@@ -1,13 +1,14 @@
-//! Owned wrapper types that complete the reveal model (Tier 3 owned consumption).
+//! The output wrapper for encoded secret material.
 //!
-//! > **Import paths:** `use secure_gate::{InnerSecret, EncodedSecret};`
+//! > **Import path:** `use secure_gate::EncodedSecret;`
 //!
-//! These types provide strong zeroization guarantees for secrets that have been
-//! intentionally extracted from a [`RevealSecret`] wrapper:
+//! [`RevealSecret::into_inner`] hands back the plain value and ends protection, because
+//! the caller has decided to own it. Encoding is the one case that still needs a wrapper:
+//! the encoded form is a *second full copy* of the secret in a different alphabet, and it
+//! is worth keeping wiped until it drops.
 //!
-//! - [`InnerSecret<T>`] — returned by [`RevealSecret::into_inner`] for raw secret values.
-//! - [`EncodedSecret`] — returned by zeroizing encoding methods (`to_hex_zeroizing`,
-//!   `to_base32_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.)
+//! - [`EncodedSecret`] — returned by every encoding method (`to_hex`, `to_base32`,
+//!   `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and their `_sized` forms)
 //!   when the encoded form itself must remain sensitive.
 //!
 //! Both types wrap [`zeroize::Zeroizing`] internally, provide redacted `Debug`
@@ -22,7 +23,4 @@
 #[cfg(feature = "alloc")]
 pub use self::encoded_secret::EncodedSecret;
 
-pub use self::inner_secret::InnerSecret;
-
 mod encoded_secret;
-mod inner_secret;

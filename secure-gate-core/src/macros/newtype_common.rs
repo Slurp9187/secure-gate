@@ -87,7 +87,7 @@ macro_rules! __sg_newtype_base {
                 $crate::RevealSecret::expose_secret(&self.0)
             }
             #[inline(always)]
-            fn into_inner(self) -> $crate::InnerSecret<Self::Inner>
+            fn into_inner(self) -> Self::Inner
             where
                 Self: Sized,
                 Self::Inner: Sized + $crate::SentinelValue + $crate::__private::Zeroize,

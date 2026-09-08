@@ -12,7 +12,7 @@
 //!
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
-//! - **Zeroizing variants**: Prefer `to_base64url_zeroizing()`, which returns [`EncodedSecret`]
+//! - **Always wiped**: `to_base64url()` returns [`EncodedSecret`]
 //!   (wrapping `Zeroizing<String>` with redacted `Debug`). Use plain `to_base64url()`
 //!   only for public values.
 //! - **Explicit exposure**: `to_base64url()` (and the other encoding methods) perform deliberate full-secret exposure —
@@ -33,14 +33,11 @@
 //!
 //! // Blanket impl on the inner byte array (via with_secret):
 //! let b64 = secret.with_secret(|s| s.to_base64url());
-//! assert_eq!(b64, "QkJCQg");
+//! assert_eq!(&*b64, "QkJCQg");
 //!
 //! // Wrapper method (Direct Fixed<[u8; N]> API — same result):
-//! assert_eq!(secret.to_base64url(), "QkJCQg");
-//!
-//! // Zeroizing variant for sensitive encoded output:
-//! let b64z = secret.to_base64url_zeroizing();
-//! // b64z is EncodedSecret — zeroized on drop, redacted Debug
+//! assert_eq!(&*secret.to_base64url(), "QkJCQg");
+//! // Returns an `EncodedSecret`: wiped on drop, `Debug` redacted.
 //! }
 //! ```
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
@@ -59,22 +56,14 @@ use base64ct::{Base64UrlUnpadded, Encoding};
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub trait ToBase64Url {
     /// Encode bytes as URL-safe base64 (no padding).
-    fn to_base64url(&self) -> alloc::string::String;
-
-    /// Encode bytes as URL-safe base64 and wrap the result in [`crate::EncodedSecret`].
-    fn to_base64url_zeroizing(&self) -> crate::EncodedSecret;
+    fn to_base64url(&self) -> crate::EncodedSecret;
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBase64Url for T {
     #[inline(always)]
-    fn to_base64url(&self) -> alloc::string::String {
-        Base64UrlUnpadded::encode_string(self.as_ref())
-    }
-
-    #[inline(always)]
-    fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
-        crate::EncodedSecret::new(self.to_base64url())
+    fn to_base64url(&self) -> crate::EncodedSecret {
+        crate::EncodedSecret::new(Base64UrlUnpadded::encode_string(self.as_ref()))
     }
 }

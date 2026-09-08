@@ -3,8 +3,8 @@
 //! > **Import path:** `use secure_gate::EncodedSecret;`
 //!
 //! [`EncodedSecret`] wraps `Zeroizing<String>` with `Debug` → `[REDACTED]`. It is
-//! returned by all `*_zeroizing` encoding methods (`to_hex_zeroizing`,
-//! `to_base32_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.).
+//! returned by every encoding method (`to_hex`, `to_base32`, `to_base64url`,
+//! `try_to_bech32`, `try_to_bech32m`, and their `_sized` forms).
 //!
 //! Prefer zeroizing variants when the encoded form is sensitive (private keys, tokens).
 //! Use plain `String` variants for public encodings (addresses, transaction IDs).
@@ -29,7 +29,7 @@
 //! # #[cfg(all(feature = "encoding-hex", feature = "alloc"))] {
 //! use secure_gate::{Fixed, ToHex};
 //!
-//! let encoded = Fixed::new([0xABu8; 4]).to_hex_zeroizing();
+//! let encoded = Fixed::new([0xABu8; 4]).to_hex();
 //!
 //! // Intentional: name the deref.
 //! let line = format!("{}", &*encoded);
@@ -51,7 +51,7 @@
 /// (e.g. full PEM keys, long-lived Bech32 private keys, tokens).
 ///
 /// See the zeroizing encoding methods on [`Fixed`] and [`Dynamic`] (e.g.
-/// [`ToHex::to_hex_zeroizing`](crate::ToHex::to_hex_zeroizing)).
+/// [`ToHex::to_hex`](crate::ToHex::to_hex)).
 #[must_use = "dropping EncodedSecret may immediately zeroize encoded output"]
 pub struct EncodedSecret(zeroize::Zeroizing<alloc::string::String>);
 
@@ -78,7 +78,7 @@ impl EncodedSecret {
 
     /// Consumes self and returns the underlying `Zeroizing<String>`.
     ///
-    /// This is an explicit escape hatch consistent with `InnerSecret`.
+    /// This is an explicit escape hatch for APIs that name `Zeroizing<String>`.
     ///
     /// # This downgrades `Debug`
     ///

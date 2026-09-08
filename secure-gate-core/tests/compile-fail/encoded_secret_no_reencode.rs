@@ -12,7 +12,7 @@
 use secure_gate::{Fixed, ToHex};
 
 fn main() {
-    let encoded = Fixed::new([0xABu8; 32]).to_hex_zeroizing();
+    let encoded = Fixed::new([0xABu8; 32]).to_hex();
 
     // Must not compile: this would hex-encode the hex string.
     let _double = encoded.to_hex();

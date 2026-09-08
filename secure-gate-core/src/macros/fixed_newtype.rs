@@ -142,7 +142,7 @@
 /// | Contents (the wrapper's protection) | `new`, `From<[u8; N]>` | `with_secret`, `expose_secret`, `into_inner` |
 /// | Role (the nominal label) | `from_wrapper` | `as_wrapper`, `as_wrapper_mut`, `into_wrapper` |
 ///
-/// `into_inner` leaves the protection: the [`InnerSecret`](crate::InnerSecret)
+/// `into_inner` leaves the protection: the plain value it returns
 /// it returns derefs, so the contents are in the caller's hands (tier 3 of
 /// the access model, audited). `into_wrapper` only removes the label: the
 /// result is still a `Fixed`, still unreadable without `with_secret`. The
@@ -247,20 +247,12 @@ macro_rules! fixed_newtype {
             $crate::__sg_if_alloc! {
                 impl $crate::ToHex for $name {
                     #[inline]
-                    fn to_hex(&self) -> $crate::__private::String {
+                    fn to_hex(&self) -> $crate::EncodedSecret {
                         $crate::ToHex::to_hex(&self.0)
                     }
                     #[inline]
-                    fn to_hex_upper(&self) -> $crate::__private::String {
+                    fn to_hex_upper(&self) -> $crate::EncodedSecret {
                         $crate::ToHex::to_hex_upper(&self.0)
-                    }
-                    #[inline]
-                    fn to_hex_zeroizing(&self) -> $crate::EncodedSecret {
-                        $crate::ToHex::to_hex_zeroizing(&self.0)
-                    }
-                    #[inline]
-                    fn to_hex_upper_zeroizing(&self) -> $crate::EncodedSecret {
-                        $crate::ToHex::to_hex_upper_zeroizing(&self.0)
                     }
                 }
             }
@@ -277,12 +269,8 @@ macro_rules! fixed_newtype {
             $crate::__sg_if_alloc! {
                 impl $crate::ToBase32 for $name {
                     #[inline]
-                    fn to_base32(&self) -> $crate::__private::String {
+                    fn to_base32(&self) -> $crate::EncodedSecret {
                         $crate::ToBase32::to_base32(&self.0)
-                    }
-                    #[inline]
-                    fn to_base32_zeroizing(&self) -> $crate::EncodedSecret {
-                        $crate::ToBase32::to_base32_zeroizing(&self.0)
                     }
                 }
             }
@@ -299,12 +287,8 @@ macro_rules! fixed_newtype {
             $crate::__sg_if_alloc! {
                 impl $crate::ToBase64Url for $name {
                     #[inline]
-                    fn to_base64url(&self) -> $crate::__private::String {
+                    fn to_base64url(&self) -> $crate::EncodedSecret {
                         $crate::ToBase64Url::to_base64url(&self.0)
-                    }
-                    #[inline]
-                    fn to_base64url_zeroizing(&self) -> $crate::EncodedSecret {
-                        $crate::ToBase64Url::to_base64url_zeroizing(&self.0)
                     }
                 }
             }
@@ -347,29 +331,15 @@ macro_rules! fixed_newtype {
                     fn try_to_bech32m(
                         &self,
                         hrp: &str,
-                    ) -> ::core::result::Result<$crate::__private::String, $crate::Bech32Error> {
-                        $crate::ToBech32m::try_to_bech32m(&self.0, hrp)
-                    }
-                    #[inline]
-                    fn try_to_bech32m_zeroizing(
-                        &self,
-                        hrp: &str,
                     ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
-                        $crate::ToBech32m::try_to_bech32m_zeroizing(&self.0, hrp)
+                        $crate::ToBech32m::try_to_bech32m(&self.0, hrp)
                     }
                     #[inline]
                     fn try_to_bech32m_sized<const C: usize>(
                         &self,
                         hrp: &str,
-                    ) -> ::core::result::Result<$crate::__private::String, $crate::Bech32Error> {
-                        $crate::ToBech32m::try_to_bech32m_sized::<C>(&self.0, hrp)
-                    }
-                    #[inline]
-                    fn try_to_bech32m_sized_zeroizing<const C: usize>(
-                        &self,
-                        hrp: &str,
                     ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
-                        $crate::ToBech32m::try_to_bech32m_sized_zeroizing::<C>(&self.0, hrp)
+                        $crate::ToBech32m::try_to_bech32m_sized::<C>(&self.0, hrp)
                     }
                 }
             }
@@ -382,29 +352,15 @@ macro_rules! fixed_newtype {
                     fn try_to_bech32(
                         &self,
                         hrp: &str,
-                    ) -> ::core::result::Result<$crate::__private::String, $crate::Bech32Error> {
-                        $crate::ToBech32::try_to_bech32(&self.0, hrp)
-                    }
-                    #[inline]
-                    fn try_to_bech32_zeroizing(
-                        &self,
-                        hrp: &str,
                     ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
-                        $crate::ToBech32::try_to_bech32_zeroizing(&self.0, hrp)
+                        $crate::ToBech32::try_to_bech32(&self.0, hrp)
                     }
                     #[inline]
                     fn try_to_bech32_sized<const C: usize>(
                         &self,
                         hrp: &str,
-                    ) -> ::core::result::Result<$crate::__private::String, $crate::Bech32Error> {
-                        $crate::ToBech32::try_to_bech32_sized::<C>(&self.0, hrp)
-                    }
-                    #[inline]
-                    fn try_to_bech32_sized_zeroizing<const C: usize>(
-                        &self,
-                        hrp: &str,
                     ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
-                        $crate::ToBech32::try_to_bech32_sized_zeroizing::<C>(&self.0, hrp)
+                        $crate::ToBech32::try_to_bech32_sized::<C>(&self.0, hrp)
                     }
                 }
                 impl $name {

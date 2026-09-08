@@ -7,7 +7,7 @@ use secure_gate::{Fixed, ToHex};
 
 #[cfg(feature = "encoding-hex")]
 fn sample_hex_secret() -> EncodedSecret {
-    Fixed::new([0xDEu8, 0xAD, 0xBE, 0xEF]).to_hex_zeroizing()
+    Fixed::new([0xDEu8, 0xAD, 0xBE, 0xEF]).to_hex()
 }
 
 #[test]
@@ -74,19 +74,11 @@ fn encoded_secret_into_inner_returns_string() {
 
 #[cfg(feature = "encoding-hex")]
 #[test]
-fn encoded_secret_into_zeroizing_returns_zeroizing() {
-    let encoded = sample_hex_secret();
-    let protected = encoded.into_zeroizing();
-    assert_eq!(&*protected, "deadbeef");
-}
-
-#[cfg(feature = "encoding-hex")]
-#[test]
 // See above: the `format!("{}", &*encoded)` form is the point of the assertion.
 #[allow(clippy::useless_format)]
 fn encoded_secret_empty_string() {
     let empty: [u8; 0] = [];
-    let encoded = empty.to_hex_zeroizing();
+    let encoded = empty.to_hex();
 
     assert_eq!(format!("{encoded:?}"), "[REDACTED]");
     assert_eq!(format!("{}", &*encoded), "");
@@ -97,11 +89,11 @@ fn encoded_secret_empty_string() {
     assert_eq!(as_str, "");
     assert_eq!(encoded.as_bytes(), b"");
 
-    let encoded = empty.to_hex_zeroizing();
+    let encoded = empty.to_hex();
     let plain = encoded.into_inner();
     assert_eq!(plain, "");
 
-    let encoded = empty.to_hex_zeroizing();
+    let encoded = empty.to_hex();
     let protected = encoded.into_zeroizing();
     assert_eq!(&*protected, "");
 }

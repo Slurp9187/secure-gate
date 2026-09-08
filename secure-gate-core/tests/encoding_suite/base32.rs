@@ -9,66 +9,16 @@ use secure_gate::{Fixed, FromBase32Str, RevealSecret, ToBase32};
 #[test]
 fn test_slice_to_base32() {
     let input = b"hello";
-    let encoded = input.to_base32();
+    let encoded = input.to_base32().into_inner();
     let decoded = encoded.try_from_base32().expect("valid base32");
     assert_eq!(decoded, b"hello");
 }
 
 #[cfg(feature = "encoding-base32")]
 #[test]
-fn slice_to_base32_zeroizing() {
-    let encoded = b"hello".to_base32_zeroizing();
-    assert_eq!(&*encoded, "NBSWY3DP");
-}
-
-#[cfg(feature = "encoding-base32")]
-#[test]
-fn fixed_to_base32_zeroizing_matches_plain() {
-    let secret = Fixed::new([7u8; 32]);
-    let plain = secret.to_base32();
-    let zeroizing = secret.to_base32_zeroizing();
-    assert_eq!(&*zeroizing, plain.as_str());
-}
-
-#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
-#[test]
-fn dynamic_to_base32_zeroizing_matches_plain() {
-    let secret: Dynamic<Vec<u8>> = vec![10, 20, 30].into();
-    let plain = secret.to_base32();
-    let zeroizing = secret.to_base32_zeroizing();
-    assert_eq!(&*zeroizing, plain.as_str());
-}
-
-#[cfg(feature = "encoding-base32")]
-#[test]
-fn fixed_to_base32_zeroizing_debug_is_redacted() {
-    let secret = Fixed::new([0x42u8; 4]);
-    let encoded = secret.to_base32_zeroizing();
-    assert_eq!(format!("{encoded:?}"), "[REDACTED]");
-}
-
-#[cfg(feature = "encoding-base32")]
-#[test]
-fn fixed_to_base32_zeroizing_empty() {
-    let empty: [u8; 0] = [];
-    let encoded = empty.to_base32_zeroizing();
-    assert!(encoded.is_empty());
-    assert_eq!(&*encoded, "");
-}
-
-#[cfg(feature = "encoding-base32")]
-#[test]
-fn fixed_to_base32_zeroizing_all_zeros() {
-    let secret = Fixed::new([0u8; 3]);
-    let encoded = secret.to_base32_zeroizing();
-    assert_eq!(&*encoded, "AAAAA");
-}
-
-#[cfg(feature = "encoding-base32")]
-#[test]
 fn fixed_try_from_base32_roundtrip() {
     let fixed = Fixed::new([7u8; 32]);
-    let encoded = fixed.to_base32();
+    let encoded = fixed.to_base32().into_inner();
     let decoded = Fixed::<[u8; 32]>::try_from_base32(&encoded).expect("valid");
     decoded.with_secret(|d| assert_eq!(d, &[7u8; 32]));
 }
@@ -77,7 +27,7 @@ fn fixed_try_from_base32_roundtrip() {
 #[test]
 fn dynamic_try_from_base32_roundtrip() {
     let dynv: Dynamic<Vec<u8>> = vec![10, 20, 30].into();
-    let encoded = dynv.to_base32();
+    let encoded = dynv.to_base32().into_inner();
     let decoded = Dynamic::<Vec<u8>>::try_from_base32(&encoded).expect("valid");
     decoded.with_secret(|d| assert_eq!(d, &[10, 20, 30]));
 }
@@ -218,7 +168,11 @@ fn base32_rfc4648_section_10_vectors() {
 
     for (bytes, encoded) in VECTORS {
         let secret: Dynamic<Vec<u8>> = bytes.to_vec().into();
-        assert_eq!(secret.to_base32(), encoded, "encoding {bytes:?}");
+        assert_eq!(
+            secret.to_base32().into_inner(),
+            encoded,
+            "encoding {bytes:?}"
+        );
 
         let decoded = Dynamic::<Vec<u8>>::try_from_base32(encoded)
             .unwrap_or_else(|e| panic!("decoding {encoded}: {e}"));
@@ -237,7 +191,10 @@ fn base32_accepts_non_canonical_trailing_bits() {
     assert_eq!("MZ".try_from_base32().expect("non-canonical"), vec![0x66]);
     // Re-encoding normalises back to the canonical spelling.
     assert_eq!(
-        "MZ".try_from_base32().expect("non-canonical").to_base32(),
+        "MZ".try_from_base32()
+            .expect("non-canonical")
+            .to_base32()
+            .into_inner(),
         "MY"
     );
 }
@@ -248,7 +205,7 @@ fn fixed_try_from_base32_totp_seed_size() {
     // A 20-byte TOTP/HOTP shared secret is 32 base32 characters — the `otpauth://` form,
     // and 8 characters shorter than the same seed in hex.
     let seed = Fixed::new([0xAAu8; 20]);
-    let encoded = seed.to_base32();
+    let encoded = seed.to_base32().into_inner();
     assert_eq!(encoded.len(), 32);
     // Canonical output: uppercase letters and '2'..='7' only, no '=' padding.
     assert!(
@@ -265,7 +222,7 @@ fn fixed_try_from_base32_totp_seed_size() {
 #[test]
 fn fixed_try_from_base32_large_n() {
     let data = [0x42u8; 128];
-    let encoded = data.to_base32();
+    let encoded = data.to_base32().into_inner();
     let result = Fixed::<[u8; 128]>::try_from_base32(&encoded);
     assert!(result.is_ok());
     result
@@ -283,7 +240,7 @@ fn to_base32_is_generic_over_wrappers() {
     // wrappers, a generated newtype and a plain byte slice alike. A regression back to
     // inherent methods would fail to compile here rather than fail an assertion.
     fn export<S: ToBase32>(s: &S) -> String {
-        s.to_base32()
+        s.to_base32().into_inner()
     }
 
     let fixed = Fixed::new([0xABu8; 4]);
@@ -297,7 +254,7 @@ fn to_base32_is_generic_over_wrappers() {
 
     // The zeroizing half of the trait is reachable through the same bound.
     fn export_zeroizing<S: ToBase32>(s: &S) -> secure_gate::EncodedSecret {
-        s.to_base32_zeroizing()
+        s.to_base32()
     }
     assert_eq!(&*export_zeroizing(&newtype), "VOV2XKY");
 }

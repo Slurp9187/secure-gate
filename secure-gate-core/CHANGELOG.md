@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: every encoder returns `EncodedSecret`; the `*_zeroizing` variants are
+  gone.** `to_hex()`, `to_hex_upper()`, `to_base32()`, `to_base64url()`,
+  `try_to_bech32()`, `try_to_bech32m()` and both `_sized` forms now return
+  [`EncodedSecret`] instead of `String`. The eight `*_zeroizing` twins are removed: the
+  short name now *is* the safe one. **16 encode methods become 8.**
+
+  The old pairing put the leaky variant on the short, obvious name and charged nine
+  characters for the safe one — the opposite of every other decision in this crate. It
+  also meant the crate shipped a documented path that hands a full second copy of a
+  secret to an unwiped `String`, which is what repeated review passes kept flagging.
+  Adding `EncodedSecret` alongside it did not make that go away; only deleting it does.
+
+  **Migration:** drop the `_zeroizing` suffix — `to_hex_zeroizing()` becomes `to_hex()`.
+  Where you consumed a `String`, read through the deref instead: `&*encoded` is a `&str`,
+  which is what `serde_json`, `sqlx`, `rusqlite` and every other driver binds. Call
+  `.into_inner()` only when an API demands an owned `String`; that call is now the named,
+  greppable moment protection ends.
+
+  `EncodedSecret` has no `Display`, so `format!("{encoded}")` becomes
+  `format!("{}", &*encoded)`, and no `PartialEq`, because comparing secret material with
+  `==` is variable-time — that is what `ConstantTimeEq` is for.
+
 ### Added
 
 - **Caller-chosen bech32 / bech32m code length.** `Bech32Sized<N>` and `Bech32mSized<N>`

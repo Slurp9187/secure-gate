@@ -12,14 +12,16 @@
 //! [`Zeroize`](zeroize::Zeroize)). While a secret is held in [`Fixed`] or [`Dynamic`],
 //! there is no `Deref` and no `AsRef`: callers reach the inner secret only via
 //! [`RevealSecret`] / [`RevealSecretMut`], and `Debug` always prints `[REDACTED]`.
-//! All access follows a **3-tier model**: scoped closures (preferred), direct
-//! references (escape hatch), and owned extraction (consumption).
+//! Access has two shapes: **borrow** it, or **take** it.
+//! [`with_secret()`](RevealSecret::with_secret) and
+//! [`expose_secret()`](RevealSecret::expose_secret) lend you a reference while the
+//! wrapper keeps ownership and keeps wiping. [`into_inner()`](RevealSecret::into_inner)
+//! transfers ownership: you get the plain value and the protection ends with the call.
 //!
-//! Extraction is a hand-off, not a third layer of protection. The
-//! [output wrappers](#type-taxonomy) it returns ([`InnerSecret<T>`], [`EncodedSecret`])
-//! **do** implement `Deref` — that is their purpose. They keep zeroize-on-drop for the
-//! buffer they own and keep `Debug` redacted; ordinary copies you make of the derefed
-//! value (`*inner`, `.to_string()`) are not tracked. See
+//! Extraction is a hand-off, not a third layer of protection. Encoding output is the
+//! one case that keeps a wrapper — [`EncodedSecret`] **does** implement `Deref`, because
+//! its job is to keep an encoded *copy* of the secret wiped until it drops. Ordinary
+//! copies you make of the derefed value (`.to_string()`) are not tracked. See
 //! [Where accident-prevention ends](#where-accident-prevention-ends).
 //!
 //! # Which type should I use?
@@ -81,7 +83,6 @@
 //! │   ├── RevealSecret      ← immutable access (always available)
 //! │   ├── RevealSecretMut   ← mutable access (always available)
 //! │   ├── revealed_secrets/
-//! │   │   ├── InnerSecret<T>    ← owned extraction wrapper
 //! │   │   └── EncodedSecret     ← zeroizing encoded string wrapper (alloc)
 //! │   ├── ConstantTimeEq    ← ct-eq feature
 //! │   ├── CloneableSecret   ← cloneable feature
@@ -100,12 +101,12 @@
 //! | Category | Types | `Deref` to secret? | Purpose |
 //! |----------|-------|-------------------|---------|
 //! | **Secret wrappers** | [`Fixed<T>`], [`Dynamic<T>`] | No — use [`RevealSecret`] | Hold live secrets; `Debug` → `[REDACTED]` |
-//! | **Output wrappers** | [`InnerSecret<T>`], [`EncodedSecret`] | Yes — caller owns the data | Hold extracted or encoded results |
+//! | **Output wrapper** | [`EncodedSecret`] | Yes — caller owns the data | Holds encoded output, wiped on drop |
 //! | **Opt-in markers** | [`CloneableSecret`], [`SerializableSecret`] | — (no methods) | Implement on inner type `T` to unlock gated impls |
 //!
 //! `CloneableSecret` and `SerializableSecret` are implemented on the **inner type `T`**,
-//! not on `Fixed<T>` or `Dynamic<T>` directly. Output wrappers ([`InnerSecret`],
-//! [`EncodedSecret`]) are not secret wrappers and do not interact with these markers.
+//! not on `Fixed<T>` or `Dynamic<T>` directly. [`EncodedSecret`] is not a secret
+//! wrapper and does not interact with these markers.
 //!
 //! # Where accident-prevention ends
 //!
@@ -113,7 +114,7 @@
 //!
 //! **Accidents must not compile.** This applies while the secret is held in
 //! [`Fixed`]/[`Dynamic`], and it ends at the named extraction. `into_inner`,
-//! `expose_secret`, and `to_*_zeroizing` are the exits: you typed a name, the call site
+//! `expose_secret`, and `EncodedSecret::into_inner` are the exits: you typed a name, the call site
 //! is grep-able, and ownership moves to you.
 //!
 //! **Documented behavior must be accurate.** This never ends, and it is why the
@@ -185,7 +186,7 @@
 //! # What's available without `alloc`?
 //!
 //! With `default-features = false`:
-//! - [`Fixed<T>`], [`RevealSecret`], [`RevealSecretMut`], [`InnerSecret`]
+//! - [`Fixed<T>`], [`RevealSecret`], [`RevealSecretMut`]
 //! - [`Fixed::try_from_hex`](Fixed::try_from_hex), [`Fixed::try_from_base32`](Fixed::try_from_base32),
 //!   [`Fixed::try_from_base64url`](Fixed::try_from_base64url),
 //!   [`Fixed::try_from_bech32`](Fixed::try_from_bech32), [`Fixed::try_from_bech32m`](Fixed::try_from_bech32m)
@@ -217,7 +218,7 @@
 //!
 //! This crate has **not** undergone an independent security audit. No unsafe code —
 //! enforced with `#![forbid(unsafe_code)]`. Prefer scoped access ([`RevealSecret::with_secret`])
-//! over direct references. Prefer zeroizing encoding variants (`to_hex_zeroizing`, etc.)
+//! over direct references. Encoders return [`EncodedSecret`], which stays wiped until it drops;
 //! when the encoded form is sensitive. See
 //! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md)
 //! for the full threat model.
@@ -382,8 +383,8 @@ pub use traits::ConstantTimeEq;
 ///   borrow cannot escape.
 /// - **Tier 2** (escape hatch): [`expose_secret()`](RevealSecret::expose_secret) — direct
 ///   `&T` reference for FFI / third-party APIs.
-/// - **Tier 3** (consumption): [`into_inner()`](RevealSecret::into_inner) — returns
-///   [`InnerSecret<T>`] with zeroization transferred to caller.
+/// - **Tier 3** (consumption): [`into_inner()`](RevealSecret::into_inner) — transfers
+///   ownership of the plain value; protection ends with the call.
 ///
 /// Length metadata lives in the separate [`SecretLen`] trait. See
 /// [`RevealSecretMut`] for the mutable counterpart.
@@ -408,20 +409,6 @@ pub use traits::SecretLen;
 /// Only [`Fixed`] and [`Dynamic`] implement this — read-only wrappers deliberately do not.
 pub use traits::RevealSecretMut;
 
-/// Owned extraction **output wrapper** returned by [`RevealSecret::into_inner`] (Tier 3 access).
-///
-/// Wraps [`Zeroizing<T>`](zeroize::Zeroizing) with `Debug` → `[REDACTED]`. Implements
-/// `Deref<Target = T>` for ergonomic access. Both output wrappers deref
-/// ([`EncodedSecret`] derefs to `str`); the secret wrappers [`Fixed`] and [`Dynamic`]
-/// deliberately do not.
-///
-/// This is an **output wrapper**, not a secret wrapper like [`Fixed`]/[`Dynamic`] — it
-/// holds the owned result of Tier 3 extraction, with zeroization transferred to the
-/// caller. See also [`EncodedSecret`] (the other output wrapper, for encoded strings).
-/// Use [`into_zeroizing()`](InnerSecret::into_zeroizing) when an API requires
-/// `Zeroizing<T>` directly.
-pub use traits::InnerSecret;
-
 /// Placeholder values left behind by [`RevealSecret::into_inner`] (Tier 3 access).
 ///
 /// When `into_inner` moves the real secret out of a wrapper, it must leave *something*
@@ -438,10 +425,8 @@ pub use traits::SentinelValue;
 /// This is an **output wrapper** — it exists *only* to keep encoded data zeroized until
 /// it drops. It is **not** a secret wrapper like [`Fixed`]/[`Dynamic`] and does not
 /// accept [`CloneableSecret`] or [`SerializableSecret`] markers. See also
-/// [`InnerSecret`] (the other output wrapper, for owned secret extraction).
-///
-/// Returned by all `*_zeroizing` encoding methods (`to_hex_zeroizing`,
-/// `to_base32_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.).
+/// Returned by every encoding method (`to_hex`, `to_base32`, `to_base64url`,
+/// `try_to_bech32`, `try_to_bech32m`, and their `_sized` forms).
 /// Wraps `Zeroizing<String>` with `Debug` → `[REDACTED]`. Implements `Deref<Target = str>`,
 /// `AsRef<str>`, and `AsRef<[u8]>`. Deliberately **no** `Display`: `{}` on this type is
 /// a compile error, so `Debug` redaction cannot mislead a caller into logging the

@@ -45,10 +45,10 @@ pw.expose_secret_mut().clear();
     let key: Fixed<[u8; 32]> = Fixed::new([42u8; 32]);
 
     // Encode to hex (scoped borrow — no long-lived reference)
-    let hex: String = key.with_secret(|bytes| bytes.to_hex());
+    let hex = key.with_secret(|bytes| bytes.to_hex()); // EncodedSecret
 
     // Encode to Bech32 (BIP-173) with human-readable prefix "key"
-    let bech32: String = key.with_secret(|bytes| {
+    let bech32 = key.with_secret(|bytes| {
         bytes.try_to_bech32("key").expect("valid bech32")
     });
 
@@ -124,9 +124,10 @@ let raw: &[u8; 32] = key.expose_secret();
 // When you need to move the secret value out (FFI hand-off, type migration)
 use secure_gate::{Fixed, RevealSecret};
 let key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
-let owned: secure_gate::InnerSecret<[u8; 32]> = key.into_inner();
-// Zeroizes its 32 bytes when it drops — same guarantee as Fixed<[u8; 32]>.
-assert_eq!(format!("{:?}", owned), "[REDACTED]");
+let owned: [u8; 32] = key.into_inner();
+// Protection ends here: `owned` is a plain array and you own its lifetime.
+// Nothing was copied — the bytes were moved out and a sentinel left behind.
+assert_eq!(owned, [0xAB; 32]);
 ```
 
 ### Macros for named secret types
@@ -241,13 +242,8 @@ let b64     = key.to_base64url();
 let bech32  = key.try_to_bech32("bc")?;
 let bech32m = key.try_to_bech32m("bc")?;
 
-// Zeroizing — returns EncodedSecret (preserves zeroization for sensitive encodings)
-let hex_z     = key.to_hex_zeroizing();
-let hex_u_z   = key.to_hex_upper_zeroizing();
-let b32_z     = key.to_base32_zeroizing();
-let b64_z     = key.to_base64url_zeroizing();
-let bech32_z  = key.try_to_bech32_zeroizing("bc")?;
-let bech32m_z = key.try_to_bech32m_zeroizing("bc")?;
+// Every one of these returns an `EncodedSecret`: it wipes itself on drop and its
+// `Debug` is redacted. Call `.into_inner()` when an API needs an owned `String`.
 
 // Scoped on the inner bytes (preferred when you want `with_secret` in audit sweeps)
 let hex_scoped     = key.with_secret(|s| s.to_hex());
@@ -256,15 +252,11 @@ let b64_scoped     = key.with_secret(|s| s.to_base64url());
 let bech32_scoped  = key.with_secret(|s| s.try_to_bech32("bc"))?;
 let bech32m_scoped = key.with_secret(|s| s.try_to_bech32m("bc"))?;
 
-// Trait-level zeroizing APIs are also available on byte-like values:
-let hex_trait_z = key.with_secret(|s| s.to_hex_zeroizing());
-let b32_trait_z = key.with_secret(|s| s.to_base32_zeroizing());
-let b64_trait_z = key.with_secret(|s| s.to_base64url_zeroizing());
 # Ok(())
 # }
 ```
 
-Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`) to maintain the zeroization guarantee for sensitive encoded output. These APIs are available both on wrapper conveniences (`Fixed` / `Dynamic`) and on encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
+Every encoder returns [`EncodedSecret`] — `Zeroizing<String>` with a redacted `Debug` and no `Display` — because an encoded secret is a second full copy of the secret and deserves the same wiping as the first. Read it with `&*encoded` (it derefs to `str`), which is what `serde_json` and every database driver want; call `.into_inner()` for an owned `String`, which is the named moment protection ends. The same methods exist on the wrappers (`Fixed` / `Dynamic`) and on the encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
 
 ### Direct Constructors (Recommended)
 
