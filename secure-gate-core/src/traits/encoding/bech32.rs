@@ -20,9 +20,11 @@
 //!   checker enforces the reference cannot escape the closure.
 //! - **HRP**: pass the intended human-readable part to `try_to_bech32`; test empty and
 //!   invalid HRP inputs in security-critical code.
-//! - **Extended limit**: Uses [`Bech32Large`] (8191 Fe32 values, ~5 KB (5,115 bytes maximum payload)) instead
-//!   of the 90-character standard limit — suitable for large secrets such as
-//!   age-style encryption recipients, ciphertexts, and arbitrary binary payloads.
+//! - **Caller-chosen code length**: the plain methods use [`BECH32_CODE_LENGTH`]
+//!   (1023), the length at which the BCH checksum retains its error-detection
+//!   guarantee. For larger payloads — age-style recipients, KEM ciphertexts,
+//!   arbitrary binary blobs — use the `_sized::<N>` methods with an explicit `N`
+//!   and read the guarantee note on [`Bech32Sized`] first.
 //!   For Bitcoin address formats, use [`ToBech32m`](crate::ToBech32m) (BIP-350).
 //! - **Treat all input as untrusted**: validate data upstream before wrapping.
 //!
@@ -43,35 +45,121 @@
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use bech32::Hrp;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-use bech32::encode_lower;
+use bech32::primitives::iter::{ByteIterExt, Fe32IterExt};
 
 #[cfg(feature = "encoding-bech32")]
 use bech32::primitives::checksum::Checksum;
 
-/// Custom Bech32 (BIP-173) checksum variant with an extended payload capacity.
+/// Bech32/Bech32m generator coefficients (BIP-173 § Checksum, Bitcoin Core `bech32.cpp`).
+/// Identical for both checksums; only `TARGET_RESIDUE` differs.
+#[cfg(feature = "encoding-bech32")]
+pub(crate) const GENERATOR_SH: [u32; 5] = [
+    0x3b6a_57b2,
+    0x2650_8e6d,
+    0x1ea1_19fa,
+    0x3d42_33dd,
+    0x2a14_62b3,
+];
+
+/// The code length of the bech32 BCH code: **1023**.
 ///
-/// Matches classic Bech32 checksum behavior but raises the `CODE_LENGTH` limit to
-/// 8191 Fe32 values (~5 KB (5,115 bytes maximum payload)), well above the standard 90-character limit.
-/// Used by the [`ToBech32`] trait to support large secrets while preserving full
-/// checksum validation.
+/// This is the value the `bech32` crate itself uses for both [`bech32::Bech32`] and
+/// [`bech32::Bech32m`], and it is the length up to which the checksum's error-detection
+/// guarantee holds. Every non-`_sized` method in this crate uses it.
 ///
-/// Most users interact with this type indirectly via [`ToBech32`]. It is `pub`
-/// for use in `impl Checksum` and for advanced callers who construct their own
-/// `encode_lower::<Bech32Large>(...)` calls.
+/// It is *not* BIP-173's 90-character limit: that is a convention for Bitcoin addresses
+/// which the `bech32` crate deliberately does not enforce. 1023 characters is roughly
+/// 630 payload bytes, depending on HRP length — see [`bech32_code_length`].
+#[cfg(feature = "encoding-bech32")]
+pub const BECH32_CODE_LENGTH: usize = 1023;
+
+/// The code length required to encode `payload_bytes` under an HRP of `hrp_len` characters.
+///
+/// Accounts for every component of the string, which the payload figure alone does not:
+/// HRP + the `1` separator + the base32 payload (8 bits in, 5 bits out, rounded up) +
+/// the 6-character checksum. Use it to pick an `N` for the `_sized` methods:
+///
+/// ```rust
+/// use secure_gate::{ToBech32, bech32_code_length};
+///
+/// const N: usize = bech32_code_length(3, 4096); // hrp "age", 4 KiB payload
+/// let blob = [0xA5u8; 4096];
+/// let encoded = blob.try_to_bech32_sized::<N>("age")?;
+/// assert!(encoded.starts_with("age1"));
+/// # Ok::<(), secure_gate::Bech32Error>(())
+/// ```
+///
+/// Values above [`BECH32_CODE_LENGTH`] forfeit the checksum's error-detection guarantee
+/// — see [`Bech32Sized`].
+#[cfg(feature = "encoding-bech32")]
+#[must_use]
+pub const fn bech32_code_length(hrp_len: usize, payload_bytes: usize) -> usize {
+    // ceil(payload_bytes * 8 / 5) base32 characters, plus HRP, separator, checksum.
+    //
+    // Saturating rather than wrapping: for a payload whose encoding cannot fit in a
+    // `usize` at all the result is `usize::MAX`, which every encoder then refuses. It
+    // never panics and never returns a value smaller than the truth. (Adversarial
+    // review: the plain `payload_bytes * 8` panicked in debug and wrapped in release.)
+    // ceil(8b / 5) computed as 8·(b/5) + ceil(8·(b%5) / 5), which cannot overflow
+    // until the true answer itself no longer fits in a usize.
+    let payload_chars = (payload_bytes / 5)
+        .saturating_mul(8)
+        .saturating_add(((payload_bytes % 5) * 8).div_ceil(5));
+    hrp_len
+        .saturating_add(1)
+        .saturating_add(payload_chars)
+        .saturating_add(6)
+}
+
+/// Bech32 (BIP-173) checksum with a caller-chosen code length.
+///
+/// `N` is the maximum length of the whole encoded string — HRP, separator, payload and
+/// checksum together. It is a **length gate only**: `N` never enters the checksum
+/// computation, so the same bytes and HRP produce byte-identical output at every `N`,
+/// and a string is decodable by any `N` at least as large as the string.
+///
+/// # The guarantee, and where it ends
+///
+/// The bech32 checksum is a BCH code of length [`BECH32_CODE_LENGTH`] (1023). Within
+/// that length it is guaranteed to detect up to 4 character errors. **Above it, that
+/// guarantee does not hold** — the same 30-bit checksum is stretched over a longer
+/// message, and it degrades to an integrity check with no proven detection bound. It is
+/// still computed and verified; it simply stops promising what BIP-173 proves.
+///
+/// Choosing `N > 1023` is therefore a deliberate trade, which is why it is spelled at
+/// the call site rather than baked into a default. For payloads that fit, prefer
+/// [`Bech32Standard`].
+///
+/// ```rust
+/// use secure_gate::ToBech32;
+///
+/// // A 2 KiB KEM ciphertext needs a code length well past the BCH bound.
+/// let ct = [0x5Au8; 2048];
+/// let encoded = ct.try_to_bech32_sized::<4096>("kyber")?;
+/// assert!(encoded.starts_with("kyber1"));
+/// # Ok::<(), secure_gate::Bech32Error>(())
+/// ```
 #[cfg(feature = "encoding-bech32")]
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Bech32Large {}
+pub enum Bech32Sized<const CODE_LENGTH: usize> {}
 
 #[cfg(feature = "encoding-bech32")]
-impl Checksum for Bech32Large {
+impl<const N: usize> Checksum for Bech32Sized<N> {
     type MidstateRepr = u32;
 
-    const CODE_LENGTH: usize = 8191;
+    const CODE_LENGTH: usize = N;
     const CHECKSUM_LENGTH: usize = 6;
 
-    const GENERATOR_SH: [u32; 5] = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+    const GENERATOR_SH: [u32; 5] = GENERATOR_SH;
     const TARGET_RESIDUE: u32 = 1;
 }
+
+/// Bech32 (BIP-173) at the BCH code length, [`BECH32_CODE_LENGTH`].
+///
+/// The checksum's error-detection guarantee holds throughout. This is what every
+/// non-`_sized` bech32 method uses.
+#[cfg(feature = "encoding-bech32")]
+pub type Bech32Standard = Bech32Sized<BECH32_CODE_LENGTH>;
 
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use crate::error::Bech32Error;
@@ -104,6 +192,45 @@ pub trait ToBech32 {
 
     /// Fallibly encodes bytes as Bech32 and wraps the result in [`crate::EncodedSecret`].
     fn try_to_bech32_zeroizing(&self, hrp: &str) -> Result<crate::EncodedSecret, Bech32Error>;
+
+    /// Like [`try_to_bech32`](Self::try_to_bech32), with a caller-chosen code length `N`.
+    ///
+    /// `N` caps the length of the whole encoded string, not the payload; size it with
+    /// [`bech32_code_length`]. Output is byte-identical to `try_to_bech32` for any input
+    /// that fits both, because `N` is a length gate and never enters the checksum.
+    ///
+    /// Passing `N` greater than [`BECH32_CODE_LENGTH`] forfeits the checksum's
+    /// error-detection guarantee — see [`Bech32Sized`].
+    ///
+    /// # Errors
+    ///
+    /// - [`Bech32Error::InvalidHrp`] — `hrp` contains invalid characters.
+    /// - [`Bech32Error::OperationFailed`] — encoding failure, including a string longer
+    ///   than `N`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::ToBech32;
+    ///
+    /// let recipient = [0x11u8; 900];
+    /// // 900 bytes does not fit the default 1023-character code length.
+    /// assert!(recipient.try_to_bech32("age").is_err());
+    /// let encoded = recipient.try_to_bech32_sized::<2048>("age")?;
+    /// assert!(encoded.starts_with("age1"));
+    /// # Ok::<(), secure_gate::Bech32Error>(())
+    /// ```
+    fn try_to_bech32_sized<const N: usize>(
+        &self,
+        hrp: &str,
+    ) -> Result<alloc::string::String, Bech32Error>;
+
+    /// Like [`try_to_bech32_sized`](Self::try_to_bech32_sized), wrapping the result in
+    /// [`crate::EncodedSecret`].
+    fn try_to_bech32_sized_zeroizing<const N: usize>(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::EncodedSecret, Bech32Error>;
 }
 
 // Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
@@ -112,14 +239,62 @@ pub trait ToBech32 {
 impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
     #[inline(always)]
     fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, Bech32Error> {
-        let hrp_parsed = Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
-        encode_lower::<Bech32Large>(hrp_parsed, self.as_ref())
-            .map_err(|_| Bech32Error::OperationFailed)
+        self.try_to_bech32_sized::<BECH32_CODE_LENGTH>(hrp)
     }
 
     #[inline(always)]
     fn try_to_bech32_zeroizing(&self, hrp: &str) -> Result<crate::EncodedSecret, Bech32Error> {
         self.try_to_bech32(hrp).map(crate::EncodedSecret::new)
+    }
+
+    #[inline(always)]
+    fn try_to_bech32_sized<const N: usize>(
+        &self,
+        hrp: &str,
+    ) -> Result<alloc::string::String, Bech32Error> {
+        let hrp_parsed = Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
+        let data = self.as_ref();
+        let len = bech32_code_length(hrp.len(), data.len());
+        if len > N {
+            return Err(Bech32Error::OperationFailed);
+        }
+        // Drive `bech32`'s iterator primitives straight into a buffer reserved to the
+        // exact final length. This is what `bech32::encode_lower_to_fmt` does too,
+        // except that it stages every output character through a 1 KiB stack array
+        // (`[0u8; BUF_LENGTH]`) it never wipes, so the encoded secret survived in that
+        // frame after the call returned. Adversarial review found it; the crate's own
+        // guarantee is about the heap, but "wiped on drop" should not have a stack
+        // footnote. The chain below holds one pending byte, a bit offset and a `u32`
+        // checksum midstate -- a unit test pins its size -- and each char goes into
+        // `out` as it is produced. One allocation, no intermediate copy anywhere.
+        //
+        // The CODE_LENGTH gate that `encode_lower_to_fmt` applied via `encoded_length`
+        // is replicated exactly: refuse when the whole string would exceed N.
+        let mut out = alloc::string::String::with_capacity(len);
+        let chain = data
+            .iter()
+            .copied()
+            .bytes_to_fes()
+            .with_checksum::<Bech32Sized<N>>(&hrp_parsed)
+            .chars();
+        for c in chain {
+            out.push(c);
+        }
+        debug_assert_eq!(
+            out.len(),
+            len,
+            "bech32_code_length disagreed with the encoder"
+        );
+        Ok(out)
+    }
+
+    #[inline(always)]
+    fn try_to_bech32_sized_zeroizing<const N: usize>(
+        &self,
+        hrp: &str,
+    ) -> Result<crate::EncodedSecret, Bech32Error> {
+        self.try_to_bech32_sized::<N>(hrp)
+            .map(crate::EncodedSecret::new)
     }
 }
 
@@ -132,11 +307,58 @@ mod tests {
     use bech32::primitives::iter::ByteIterExt;
     use bech32::{Bech32, Fe32, Fe32IterExt, NoChecksum, decode, encode_lower};
 
+    /// The encoder chain holds no payload-sized state. `encode_lower_to_fmt` staged
+    /// output through a 1 KiB stack array; this crate now drives the chain directly,
+    /// and the chain itself is a pending byte, a bit offset, a borrowed HRP, and a
+    /// `u32` checksum midstate — 72 bytes on x86_64. If someone reintroduces a staging
+    /// buffer inside the chain, this number grows and the test says so. The bound is
+    /// 96 rather than 72 so that pointer-width and padding differences across targets
+    /// do not fail it; anything staging a payload would be orders of magnitude over.
     #[test]
-    fn test_bech32_large_with_checksum() {
+    fn encoder_chain_carries_no_staging_buffer() {
+        let data = [0xABu8; 1568];
+        let hrp = Hrp::parse("age").unwrap();
+        let chain = data
+            .iter()
+            .copied()
+            .bytes_to_fes()
+            .with_checksum::<Bech32Sized<4096>>(&hrp)
+            .chars();
+        let size = core::mem::size_of_val(&chain);
+        assert!(
+            size <= 96,
+            "encoder chain is {size} bytes -- something payload-sized is being staged"
+        );
+    }
+
+    /// Byte-for-byte equivalence with upstream's encoder, so bypassing its staging
+    /// buffer changed nothing observable except the stack.
+    #[test]
+    fn direct_chain_matches_upstream_encode_lower() {
+        use bech32::encode_lower;
+        for (hrp, len) in [
+            ("a", 0usize),
+            ("age", 1),
+            ("age", 4),
+            ("age", 32),
+            ("kem", 633),
+            ("age", 634),
+            ("kem", 1568),
+            ("x", 4096),
+        ] {
+            let data: Vec<u8> = (0..len).map(|i| (i * 131 + 7) as u8).collect();
+            let ours = data.try_to_bech32_sized::<65535>(hrp).expect("ours");
+            let theirs = encode_lower::<Bech32Sized<65535>>(Hrp::parse(hrp).unwrap(), &data)
+                .expect("upstream");
+            assert_eq!(ours, theirs, "hrp={hrp} len={len}");
+        }
+    }
+
+    #[test]
+    fn test_bech32_sized_with_checksum() {
         let large_data = vec![0u8; 1000];
         let hrp = Hrp::parse("test").unwrap();
-        let encoded = encode_lower::<Bech32Large>(hrp, &large_data).unwrap();
+        let encoded = encode_lower::<Bech32Sized<2048>>(hrp, &large_data).unwrap();
 
         let pos = encoded.rfind('1').unwrap();
         let hrp_str = &encoded[..pos];
@@ -152,7 +374,7 @@ mod tests {
         assert_eq!(decoded_hrp, hrp);
         assert_eq!(decoded_data, large_data);
 
-        let re_encoded = encode_lower::<Bech32Large>(decoded_hrp, &decoded_data).unwrap();
+        let re_encoded = encode_lower::<Bech32Sized<2048>>(decoded_hrp, &decoded_data).unwrap();
         assert_eq!(re_encoded, encoded);
     }
 

@@ -159,7 +159,7 @@ fuzz_target!(|data: &[u8]| {
         let _ = Dynamic::<Vec<u8>>::try_from_base32("MZ");        // non-canonical trailing bits
     }
 
-    // === BECH32 (Bech32Large — extended capacity) ===
+    // === BECH32 (BIP-173, default code length) ===
 
     // 4a. Arbitrary strings to try_from_bech32_unchecked — no panic
     {
@@ -182,6 +182,72 @@ fuzz_target!(|data: &[u8]| {
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "fuzz")
                 .expect("bech32 from valid encode");
             assert_eq!(decoded.expose_secret(), capped, "Bech32 round-trip failed");
+        }
+    }
+
+    // 4b-sized. Same round-trip at a caller-chosen code length, with payloads that
+    // exceed the default. The invariants: a large `N` encodes what the default
+    // refuses; the decoder needs an `N` at least as large; and `N` never changes the
+    // bytes, so a payload that fits both encodes identically at either.
+    {
+        const BIG: usize = 4096;
+
+        let dyn_vec = match FuzzDynamicVec::arbitrary(&mut u) {
+            Ok(d) => d.0,
+            Err(_) => return,
+        };
+        let raw = dyn_vec.expose_secret();
+        // 2 KiB of payload still fits BIG with room to spare for any HRP here.
+        let capped = if raw.len() > 2048 { &raw[..2048] } else { &raw[..] };
+
+        // Every capped payload fits BIG (2048 bytes -> 3288 chars < 4096), so an Err
+        // here is a regression in the sized encode gate, not a legitimate refusal.
+        let encoded = capped
+            .try_to_bech32_sized::<BIG>("fuzz")
+            .expect("sized bech32 encode refused a payload that fits");
+        {
+            let decoded = Dynamic::<Vec<u8>>::try_from_bech32_sized::<BIG>(&encoded, "fuzz")
+                .expect("sized bech32 from valid encode");
+            assert_eq!(
+                decoded.expose_secret(),
+                capped,
+                "sized Bech32 round-trip failed"
+            );
+
+            // The code length is a gate, not an input: whenever the default also
+            // admits this payload, the two encodings must be identical.
+            if let Ok(at_default) = capped.try_to_bech32("fuzz") {
+                assert_eq!(
+                    at_default, encoded,
+                    "code length must not change the encoding"
+                );
+            } else {
+                // Otherwise the default decoder must refuse the longer string
+                // rather than truncating it.
+                assert!(
+                    Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "fuzz").is_err(),
+                    "default decoder accepted an over-long string"
+                );
+            }
+        }
+
+        // Bech32m at the same code length: same properties, and the two checksums
+        // must never decode as one another.
+        let encoded_m = capped
+            .try_to_bech32m_sized::<BIG>("fuzz")
+            .expect("sized bech32m encode refused a payload that fits");
+        {
+            let decoded = Dynamic::<Vec<u8>>::try_from_bech32m_sized::<BIG>(&encoded_m, "fuzz")
+                .expect("sized bech32m from valid encode");
+            assert_eq!(
+                decoded.expose_secret(),
+                capped,
+                "sized Bech32m round-trip failed"
+            );
+            assert!(
+                Dynamic::<Vec<u8>>::try_from_bech32_sized::<BIG>(&encoded_m, "fuzz").is_err(),
+                "bech32m string decoded as bech32"
+            );
         }
     }
 
@@ -213,7 +279,7 @@ fuzz_target!(|data: &[u8]| {
         let _ = Dynamic::<Vec<u8>>::try_from_bech32_unchecked("");
     }
 
-    // === BECH32M (BIP-350, 90-byte payload limit) ===
+    // === BECH32M (BIP-350, default code length) ===
 
     // 5a. Arbitrary strings to try_from_bech32m — no panic
     {
@@ -221,7 +287,7 @@ fuzz_target!(|data: &[u8]| {
         let _ = Dynamic::<Vec<u8>>::try_from_bech32m_unchecked(&arbitrary_str);
     }
 
-    // 5b. Valid bech32m round-trip (cap to 32 bytes for BIP-350 compliance)
+    // 5b. Valid bech32m round-trip (32 bytes: an address-sized payload)
     {
         let dyn_vec2 = match FuzzDynamicVec::arbitrary(&mut u) {
             Ok(d) => d.0,

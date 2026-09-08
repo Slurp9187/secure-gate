@@ -1,4 +1,3 @@
-
 // no_std by default; the `std` feature opts back into the standard library.
 // Verified in CI by cross-building for a bare-metal target.
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -90,7 +89,7 @@
 //! │   ├── encoding/         ← ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m
 //! │   └── decoding/         ← FromHexStr, FromBase32Str, FromBase64UrlStr, FromBech32Str, FromBech32mStr
 //! ├── macros/               ← fixed_alias!, fixed_newtype!, dynamic_alias!, dynamic_newtype!, etc.
-//! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error, DecodingError
+//! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error
 //! ```
 //!
 //! All public items are re-exported at the crate root. Use `secure_gate::Fixed`,
@@ -177,8 +176,7 @@
 //! | `encoding-hex` | no | [`ToHex`] / [`FromHexStr`] via `base16ct` (constant-time) |
 //! | `encoding-base32` | no | [`ToBase32`] / [`FromBase32Str`] via `base32ct` (constant-time) |
 //! | `encoding-base64` | no | [`ToBase64Url`] / [`FromBase64UrlStr`] via `base64ct` (constant-time) |
-//! | `encoding-bech32` | no | [`ToBech32`] / [`FromBech32Str`] — BIP-173, extended ~5 KB limit |
-//! | `encoding-bech32m` | no | [`ToBech32m`] / [`FromBech32mStr`] — BIP-350, standard 90-byte limit |
+//! | `encoding-bech32` | no | [`ToBech32`] / [`FromBech32Str`] (BIP-173) **and** [`ToBech32m`] / [`FromBech32mStr`] (BIP-350); `_sized::<N>` for a caller-chosen code length |
 //! | `encoding` | no | All encoding features |
 //! | | | **Meta** |
 //! | `cloneable` | no | [`CloneableSecret`] opt-in cloning |
@@ -502,8 +500,8 @@ pub use traits::FromBase64UrlStr;
 pub use traits::FromBech32Str;
 
 /// Decodes Bech32m (BIP-350) strings to `Vec<u8>` with HRP validation.
-/// Requires `encoding-bech32m` + `alloc`. See [`ToBech32m`] for the encoding counterpart.
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+/// Requires `encoding-bech32` + `alloc`. See [`ToBech32m`] for the encoding counterpart.
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use traits::FromBech32mStr;
 
 /// Decodes hex strings (`&str`) to `Vec<u8>`. Blanket impl for `AsRef<str>`.
@@ -523,17 +521,35 @@ pub use traits::ToBase32;
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use traits::ToBase64Url;
 
-/// Encodes byte data as Bech32 (BIP-173) strings with extended ~5 KB payload limit.
-/// Blanket impl for `AsRef<[u8]>`. Requires `encoding-bech32` + `alloc`.
+/// Encodes byte data as Bech32 (BIP-173) strings. Blanket impl for `AsRef<[u8]>`.
+/// The plain methods use [`BECH32_CODE_LENGTH`]; `try_to_bech32_sized::<N>` takes the
+/// code length as a parameter. Requires `encoding-bech32` + `alloc`.
 /// See [`FromBech32Str`] for the decoding counterpart.
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use traits::ToBech32;
 
-/// Encodes byte data as Bech32m (BIP-350) strings with standard 90-byte payload limit.
-/// Blanket impl for `AsRef<[u8]>`. Requires `encoding-bech32m` + `alloc`.
+/// Encodes byte data as Bech32m (BIP-350) strings. Blanket impl for `AsRef<[u8]>`.
+/// The plain methods use [`BECH32_CODE_LENGTH`]; `try_to_bech32m_sized::<N>` takes the
+/// code length as a parameter. Requires `encoding-bech32` + `alloc`.
 /// See [`FromBech32mStr`] for the decoding counterpart.
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use traits::ToBech32m;
+
+/// Bech32 (BIP-173) checksum with a caller-chosen code length. `N` caps the length of
+/// the whole encoded string and never enters the checksum. Above [`BECH32_CODE_LENGTH`]
+/// the BCH error-detection guarantee no longer holds - see the type docs.
+#[cfg(feature = "encoding-bech32")]
+pub use traits::{Bech32Sized, Bech32Standard};
+
+/// Bech32m (BIP-350) checksum with a caller-chosen code length - the bech32m twin of
+/// [`Bech32Sized`], with the same rules and the same guarantee boundary.
+#[cfg(feature = "encoding-bech32")]
+pub use traits::{Bech32mSized, Bech32mStandard};
+
+/// The bech32 BCH code length (1023) used by every non-`_sized` method, and the helper
+/// that sizes an `N` from an HRP length and a payload byte count.
+#[cfg(feature = "encoding-bech32")]
+pub use traits::{BECH32_CODE_LENGTH, bech32_code_length};
 
 /// Encodes byte data as hexadecimal strings (constant-time via `base16ct`).
 /// Blanket impl for `AsRef<[u8]>`. Provides `to_hex()`, `to_hex_upper()`, and
@@ -545,7 +561,7 @@ pub use traits::ToHex;
 /// Errors from Bech32 (BIP-173) and Bech32m (BIP-350) decoding.
 /// Variant shapes are identical in debug and release builds; no secret material
 /// (payload bytes, HRP strings) is ever carried in an error.
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32")]
 pub use error::Bech32Error;
 
 /// Errors from Base32 (RFC 4648 §6, uppercase, unpadded) decoding. Variant shapes are
@@ -562,11 +578,6 @@ pub use error::Base64Error;
 /// release builds; only numeric length metadata is carried.
 #[cfg(feature = "encoding-hex")]
 pub use error::HexError;
-
-/// Unified error type wrapping format-specific decoding errors ([`HexError`],
-/// [`Base32Error`], [`Base64Error`], [`Bech32Error`]). Always available; variants depend
-/// on enabled features.
-pub use error::DecodingError;
 
 /// Error returned when a byte slice cannot be converted to `Fixed<[u8; N]>` due to
 /// length mismatch. Produced by `Fixed::try_from(&[u8])`.

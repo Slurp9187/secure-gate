@@ -6,7 +6,8 @@
 //! to byte vectors, with HRP validation as the primary path. It is designed for handling
 //! untrusted input in cryptographic contexts, such as decoding encoded addresses or keys.
 //!
-//! **Requires the `encoding-bech32m` feature** (distinct from classic Bech32).
+//! **Requires the `encoding-bech32` feature**, which covers both BIP-173 and BIP-350.
+//! The two are distinct checksums; one feature ships both.
 //!
 //! # Security Notes
 //!
@@ -19,16 +20,19 @@
 //! - **Heap allocation**: Returns `Vec<u8>` — wrap in [`Fixed`](crate::Fixed) or
 //!   [`Dynamic`](crate::Dynamic) to store as a secret.
 //! - **BIP-350 checksum**: Enhanced error detection over BIP-173 Bech32.
-//! - **Standard 90-byte payload limit (by design)**: decodes only spec-compliant
-//!   Bech32m strings intended for Bitcoin address formats. Strings produced by
-//!   the extended [`ToBech32`](crate::ToBech32) / `Bech32Large` variant are a
-//!   distinct format — decode those with [`FromBech32Str`](crate::FromBech32Str).
+//! - **Code length**: the plain methods accept strings up to
+//!   [`BECH32_CODE_LENGTH`] (1023 characters). Use
+//!   `try_from_bech32m_sized::<N>` for longer ones. Note that Bitcoin address tooling
+//!   expects BIP-173's much narrower 90-character convention.
+//! - **Bech32 and Bech32m are different checksums**, not different size classes:
+//!   a BIP-173 string never decodes here at any code length. Use
+//!   [`FromBech32Str`](crate::FromBech32Str) for those.
 //!
 //! # Example
 //!
 //! ```rust
 //! use secure_gate::FromBech32mStr;
-//! # #[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+//! # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 //! # {
 //!
 //! // BIP-350 minimal valid Bech32m test vector
@@ -45,33 +49,35 @@
 //! assert!("not-bech32m".try_from_bech32m("a").is_err());
 //! # }
 //! ```
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+use super::super::encoding::bech32m::{BECH32_CODE_LENGTH, Bech32mSized};
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use crate::error::Bech32Error;
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use alloc::string::{String, ToString};
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use alloc::vec::Vec;
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
-use bech32::{Bech32m, primitives::decode::CheckedHrpstring};
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+use bech32::primitives::decode::CheckedHrpstring;
 
 /// Extension trait for decoding Bech32m (BIP-350) strings into byte vectors.
 ///
-/// *Requires feature `encoding-bech32m`.*
+/// *Requires feature `encoding-bech32`.*
 ///
 /// Blanket-implemented for all `AsRef<str>` types. Treat all input as untrusted;
 /// HRP validation prevents injection attacks and cross-protocol confusion.
 ///
-/// **Design note — standard BIP-350 compliance**: decodes only standard-length
-/// Bech32m strings (Bitcoin Taproot/SegWit v1+ compatible). The `Bech32Large`
-/// variant used by [`ToBech32`](crate::ToBech32) is a distinct non-standard format
-/// for large payloads; decode those with [`FromBech32Str`](crate::FromBech32Str).
+/// **Design note**: this decodes the BIP-350 checksum. Strings written by
+/// [`ToBech32`](crate::ToBech32) carry the BIP-173 checksum and never decode here,
+/// whatever the code length — use [`FromBech32Str`](crate::FromBech32Str) for those.
+/// Length is a separate axis: see `try_from_bech32m_sized`.
 ///
 /// **The returned `Vec<u8>` is plain heap memory and is not zeroized on drop.** Wrap
 /// the result in [`Fixed`](crate::Fixed) or [`Dynamic`](crate::Dynamic) immediately
 /// (or in [`zeroize::Zeroizing`]) if the decoded bytes are sensitive. Prefer
 /// `Fixed::try_from_bech32m` / `Dynamic::try_from_bech32m`, which perform the
 /// wrapping for you and zeroize their internal temporaries.
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub trait FromBech32mStr {
     /// Decodes a Bech32m (BIP-350) string, validating that the HRP matches `expected_hrp`.
     ///
@@ -106,8 +112,8 @@ pub trait FromBech32mStr {
     ///
     /// # Errors
     ///
-    /// - [`Bech32Error::OperationFailed`] — invalid checksum or malformed string.
-    /// - [`Bech32Error::ConversionFailed`] — bit-conversion failure.
+    /// - [`Bech32Error::OperationFailed`] — invalid checksum, malformed string, or
+    ///   bit-conversion failure.
     ///
     /// # Examples
     ///
@@ -121,16 +127,63 @@ pub trait FromBech32mStr {
     /// # Ok::<(), secure_gate::Bech32Error>(())
     /// ```
     fn try_from_bech32m_unchecked(&self) -> Result<(String, Vec<u8>), Bech32Error>;
+
+    /// Like [`try_from_bech32m`](Self::try_from_bech32m), accepting strings up to `N`
+    /// characters.
+    ///
+    /// Use the `N` the string was encoded with, or any larger value: `N` bounds the
+    /// input length and never enters the checksum. See
+    /// [`Bech32mSized`] for what `N` above
+    /// [`BECH32_CODE_LENGTH`] costs.
+    ///
+    /// # Errors
+    ///
+    /// - [`Bech32Error::OperationFailed`] — invalid checksum, malformed string, or a
+    ///   string longer than `N`.
+    /// - [`Bech32Error::UnexpectedHrp`] — decoded HRP does not match `expected_hrp`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::{FromBech32mStr, ToBech32m};
+    ///
+    /// let ct = [0x5Au8; 1568];
+    /// let encoded = ct.try_to_bech32m_sized::<4096>("kem")?;
+    /// let decoded = encoded.try_from_bech32m_sized::<4096>("kem")?;
+    /// assert_eq!(decoded, ct);
+    /// # Ok::<(), secure_gate::Bech32Error>(())
+    /// ```
+    fn try_from_bech32m_sized<const N: usize>(
+        &self,
+        expected_hrp: &str,
+    ) -> Result<Vec<u8>, Bech32Error>;
+
+    /// Like [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked), accepting
+    /// strings up to `N` characters.
+    fn try_from_bech32m_unchecked_sized<const N: usize>(
+        &self,
+    ) -> Result<(String, Vec<u8>), Bech32Error>;
 }
 
 // Blanket impl to cover any AsRef<str> (e.g., &str, String, etc.)
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<T: AsRef<str> + ?Sized> FromBech32mStr for T {
+    #[inline(always)]
     fn try_from_bech32m_unchecked(&self) -> Result<(String, Vec<u8>), Bech32Error> {
+        self.try_from_bech32m_unchecked_sized::<BECH32_CODE_LENGTH>()
+    }
+
+    #[inline(always)]
+    fn try_from_bech32m(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error> {
+        self.try_from_bech32m_sized::<BECH32_CODE_LENGTH>(expected_hrp)
+    }
+
+    fn try_from_bech32m_unchecked_sized<const N: usize>(
+        &self,
+    ) -> Result<(String, Vec<u8>), Bech32Error> {
         let s = self.as_ref();
-        // Use CheckedHrpstring to validate Bech32m checksum (no-alloc)
-        let checked =
-            CheckedHrpstring::new::<Bech32m>(s).map_err(|_| Bech32Error::OperationFailed)?;
+        let checked = CheckedHrpstring::new::<Bech32mSized<N>>(s)
+            .map_err(|_| Bech32Error::OperationFailed)?;
 
         // Get HRP (lowercase)
         let hrp = checked.hrp().to_string();
@@ -143,10 +196,13 @@ impl<T: AsRef<str> + ?Sized> FromBech32mStr for T {
         Ok((hrp, data))
     }
 
-    fn try_from_bech32m(&self, expected_hrp: &str) -> Result<Vec<u8>, Bech32Error> {
+    fn try_from_bech32m_sized<const N: usize>(
+        &self,
+        expected_hrp: &str,
+    ) -> Result<Vec<u8>, Bech32Error> {
         let s = self.as_ref();
-        let checked =
-            CheckedHrpstring::new::<Bech32m>(s).map_err(|_| Bech32Error::OperationFailed)?;
+        let checked = CheckedHrpstring::new::<Bech32mSized<N>>(s)
+            .map_err(|_| Bech32Error::OperationFailed)?;
 
         // Validate the HRP *before* materializing any payload bytes, so an
         // HRP mismatch never leaves decoded secret material in unzeroized

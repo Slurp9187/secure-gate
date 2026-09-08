@@ -107,9 +107,13 @@ itself.
 
 `secure-gate` has **not** undergone an independent security audit.
 
-The crate is intentionally small and relies on well-vetted dependencies:
+The crate is intentionally small and relies on well-vetted dependencies. `zeroize` is
+the **only** unconditional one — with default features a full `cargo tree` is two lines
+— and every other entry below arrives solely with the feature that names it. No
+proc-macro crate is pulled in unless you enable `serde`; `Display` and `Error` for the
+types in `src/error.rs` are hand-written rather than derived.
 
-- `zeroize` — memory wiping
+- `zeroize` — memory wiping (always)
 - `subtle` — constant-time comparison primitives
 - `rand_core` + `getrandom` — secure randomness (via `rand` feature)
 - `base16ct` — constant-time hex encoding/decoding (RustCrypto)
@@ -210,8 +214,7 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 | `encoding-hex`      | Hex encoding/decoding via `base16ct` (constant-time). `ToHex`/`FromHexStr` require `alloc`; `Fixed::try_from_hex` is no-alloc. | Validate inputs upstream; prefer `try_from_hex`                                                                                  |
 | `encoding-base32`   | Base32 encoding/decoding via `base32ct` (constant-time), RFC 4648 §6 — uppercase and unpadded; lowercase and `=` padding are rejected. `ToBase32`/`FromBase32Str` require `alloc`; `Fixed::try_from_base32` is no-alloc. | Validate inputs upstream; prefer `try_from_base32`                                                                               |
 | `encoding-base64`   | Base64url encoding/decoding via `base64ct` (constant-time). `ToBase64Url`/`FromBase64UrlStr` require `alloc`; `Fixed::try_from_base64url` is no-alloc. | Validate inputs upstream; prefer `try_from_base64url`                                                                            |
-| `encoding-bech32`   | Bech32/BIP-173 encoding/decoding. `ToBech32`/`FromBech32Str` require `alloc`; `Fixed::try_from_bech32` is no-alloc via `byte_iter()` drain. HRP-checked decode paths validate the HRP *before* materializing any payload bytes, so a mismatch never leaves decoded secret material in unzeroized memory. HRP comparison is non-constant-time (HRP is public metadata — timing leak is acceptable). | Validate inputs upstream; test empty/invalid HRP                                                                                 |
-| `encoding-bech32m`  | Bech32m/BIP-350 encoding/decoding. `ToBech32m`/`FromBech32mStr` require `alloc`; `Fixed::try_from_bech32m` is no-alloc via `byte_iter()` drain. HRP-checked decode paths validate the HRP *before* materializing any payload bytes, so a mismatch never leaves decoded secret material in unzeroized memory. HRP comparison is non-constant-time (HRP is public metadata — timing leak is acceptable). | Validate inputs upstream; test empty/invalid HRP                                                                                 |
+| `encoding-bech32`   | Bech32/BIP-173 and Bech32m/BIP-350 encoding/decoding. `ToBech32`/`FromBech32Str` require `alloc`; `Fixed::try_from_bech32` is no-alloc via `byte_iter()` drain. HRP-checked decode paths validate the HRP *before* materializing any payload bytes, so a mismatch never leaves decoded secret material in unzeroized memory. HRP comparison is non-constant-time (HRP is public metadata — timing leak is acceptable). | Validate inputs upstream; test empty/invalid HRP                                                                                 |
 | `cloneable`         | Opt-in cloning via marker trait; increases exposure surface                                                                                                               | Use minimally; prefer move semantics                                                                                             |
 | `full`              | All features enabled — convenient but increases attack surface                                                                                                            | Development only; audit for production                                                                                           |
 

@@ -7,6 +7,347 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Caller-chosen bech32 / bech32m code length.** `Bech32Sized<N>` and `Bech32mSized<N>`
+  are const-generic `Checksum` implementations, and every bech32 and bech32m entry point
+  gained a `_sized::<N>` twin:
+
+  ```rust
+  use secure_gate::{ToBech32, bech32_code_length};
+
+  const N: usize = bech32_code_length(3, 1568);   // hrp "kem", ML-KEM-1024 ciphertext
+  let encoded = ct.try_to_bech32_sized::<N>("kem")?;
+  ```
+
+  Sized twins exist on `ToBech32` / `ToBech32m` (plain and `_zeroizing`), on
+  `FromBech32Str` / `FromBech32mStr` (HRP-checked and `_unchecked`), on
+  `Fixed::try_from_bech32*` and `Dynamic::try_from_bech32*`, and on the surface the
+  `fixed_newtype!` / `dynamic_newtype!` macros forward. `bech32_code_length(hrp_len,
+  payload_bytes)` is a `const fn` that sizes `N` exactly: HRP + separator + base32
+  payload + checksum, all four of which the previous "maximum payload" figures omitted.
+
+  **`N` is a length gate, not part of the encoding.** It never enters the checksum, so
+  the same bytes and HRP encode byte-identically at every `N` that admits them, a string
+  decodes under any `N` at least as large as itself, and a stored value stays valid
+  whatever `N` a later caller picks. Above `BECH32_CODE_LENGTH` the BCH error-detection
+  guarantee lapses — the type docs say so, and the choice is now spelled at the call
+  site rather than baked into a default.
+
+### Changed
+
+- **BREAKING: the default bech32 code length is 1023, not 8191, and `Bech32Large` is
+  gone.** `ToBech32` / `FromBech32Str` used a custom checksum whose `CODE_LENGTH` was
+  8191 — roughly eight times the length of the bech32 BCH code, which is 1023 in the `bech32`
+  crate for both `Bech32` and `Bech32m`. That constant is documented upstream as "how
+  long a coded message can be ... for the code to retain its error-correcting
+  properties", so 8191 silently gave every caller a checksum stretched past the point
+  where it detects anything in particular, while the rustdoc claimed it preserved "full
+  checksum validation". The plain methods now use `BECH32_CODE_LENGTH` (1023) on both
+  the bech32 and bech32m paths, and anything longer is an explicit
+  `_sized::<N>` call. `Bech32Large` is removed; write `Bech32Sized<8191>` if you want
+  the old constant, and read that type's guarantee note first.
+
+  **Migration:** a payload over ~630 bytes (3-character HRP) that used to encode now
+  returns `Bech32Error::OperationFailed`. Replace `try_to_bech32(hrp)` with
+  `try_to_bech32_sized::<N>(hrp)`, and the matching decode with
+  `try_from_bech32_sized::<N>(hrp)`, sizing `N` with `bech32_code_length`. Already-encoded
+  strings are unaffected: `N` was never part of the encoding, so they decode unchanged
+  under any `N` at least as large as the string.
+
+- **Three documented bech32 payload limits were wrong and are corrected.** The bech32
+  path advertised "~5 KB (5,115 bytes maximum payload)"; 5,115 bytes does not in fact
+  encode at 8191, because the figure counted only the checksum and forgot the HRP and
+  the `1` separator. The bech32m path advertised a "standard 90-byte payload limit" and
+  "decodes only spec-compliant Bech32m strings", but the stock `Bech32m` code length is
+  1023 characters (~630 bytes) and nothing enforced 90 — that cap is a BIP-173 address
+  convention which neither the `bech32` crate nor this one imposes. The docs now state
+  the real bound, name `bech32_code_length` for computing it, and say plainly that
+  staying inside 90 characters for address-shaped data is the caller's responsibility.
+
+### Removed
+
+- **BREAKING: `SecureEncoding` / `SecureDecoding` marker traits.** Both were empty
+  markers with blanket impls over `AsRef<[u8]>` / `AsRef<str>`, and nothing in the crate
+  ever bounded on them. The per-format traits (`ToHex`, `ToBase32`, `ToBase64Url`,
+  `ToBech32`, `ToBech32m`, `FromHexStr`, `FromBase32Str`, …) are implemented directly
+  against `AsRef<[u8]>` / `AsRef<str>`, so the markers gated nothing and enabled nothing
+  — despite trait-module docs that claimed they were what "enables" the per-format
+  impls. Their only consumer anywhere in the workspace was a single test asserting the
+  marker existed.
+
+  **Migration:** delete them from any `use` list; delete any `T: SecureEncoding` /
+  `T: SecureDecoding` bound and rely on `AsRef<[u8]>` / `AsRef<str>` (or on the
+  per-format trait itself) instead. No encoding or decoding behaviour changes.
+
+- **BREAKING: `DecodingError`.** A public enum that no function in the crate ever
+  produced. There was no `From<HexError>`, no constructor, and no signature returning
+  it — its only appearances were the definition, the crate-root re-export, and a block
+  of tests that hand-built values to assert the shape of a type nothing emitted. Code
+  decoding several formats can define the union it actually wants in the same number of
+  lines this removed.
+
+  **Migration:** match the per-format error (`HexError`, `Base32Error`, `Base64Error`,
+  `Bech32Error`) each decode call already returns, or declare your own wrapper enum.
+
+- **BREAKING: `Bech32Error::ConversionFailed`.** Unreachable, and documented as such in
+  its own rustdoc. All bit conversion happens inside `CheckedHrpstring::new()`; the
+  `.byte_iter()` that follows a successful `new()` is infallible, so every call site in
+  the crate maps failure to `OperationFailed`. The variant was retained "for forward
+  compatibility should a fallible conversion path be introduced" — but every error enum
+  here is `#[non_exhaustive]`, which already permits adding a variant in a patch release
+  without breaking downstream matches. It was pre-paying a cost the attribute had
+  covered. The two `# Errors` doc lists that advertised it (`FromBech32Str`,
+  `FromBech32mStr`) named an error those functions could not return; they now fold
+  bit-conversion failure into `OperationFailed`, which is where it actually surfaces.
+
+  **Migration:** delete the arm. `#[non_exhaustive]` means your match already has a
+  wildcard.
+
+- **BREAKING: the `encoding-bech32m` feature.** Removed outright, not aliased. BIP-173
+  and BIP-350 now ship together under `encoding-bech32`.
+
+  The split existed in case the `bech32` crate ever separated the two algorithms. It
+  will not: they are two seven-line `impl Checksum` blocks in one file, differing in a
+  single constant, under upstream's own comment `// Same as Bech32 except TARGET_RESIDUE
+  is different`. `bech32` 0.11 has exactly three features — `alloc`, `std`, `default` —
+  and nothing algorithm-level to split along. Both of this crate's features already
+  enabled the same `dep:bech32`, so turning one off never removed a line of dependency
+  code; it gated only this crate's own module.
+
+  What decided it was the code-length work above making the two genuinely symmetric.
+  Before, `encoding-bech32` meant a large non-standard variant and `encoding-bech32m`
+  meant the spec — an asymmetry that was a real argument for keeping them apart. They
+  are now twins: same shape, same `_sized::<N>` knob, same guarantee boundary, same
+  error type, differing in one constant no caller ever sets. Two features that are
+  provably parallel, over one dependency, are one feature.
+
+  Cost removed: two CI matrix rows and two entries in the `no_std` feature sweep, on
+  every push. `ToBech32m`, `FromBech32mStr`, `try_from_bech32m*` and the `Bech32mSized`
+  types are unchanged in every respect except the feature that turns them on.
+
+### Security
+
+- **Bech32 encoding left unwiped partial copies of the secret on the heap.**
+  `bech32::encode_lower` builds its output from `String::new()` and grows it by
+  reallocation. Each intermediate buffer holds a prefix of the encoded secret and is
+  freed **without being wiped**, and no wrapper can reach it afterwards — `zeroize`
+  says so itself: *"Ensures the entire capacity of the `Vec` is zeroed. Cannot ensure
+  that previous reallocations did not leave values on the heap."* So
+  `EncodedSecret`'s `Zeroizing` wiped the final buffer while earlier copies survived.
+
+  Measured on the old code: a 634-byte payload produced a string of len 1025 with
+  capacity 2048, and a 1568-byte ML-KEM ciphertext len 2519 with capacity 4096 — each
+  a reallocation, each leaving a copy behind. Payloads small enough to land on a
+  single allocation were unaffected, which is why this went unnoticed: it appears
+  exactly at the age- and KEM-sized inputs the `_sized` methods exist for.
+
+  Both encoders now reserve the exact length up front with `bech32_code_length` and
+  write through `encode_lower_to_fmt`, giving one allocation and no intermediate
+  copies. Output is byte-identical. Upstream computes the same length at the top of
+  `encode_lower_to_fmt` and discards it (`let _ = encoded_length::<Ck>(...)`), so
+  there was nothing to reuse.
+
+  This is the same defect class the crate already fixed for `Dynamic`'s `io::Write`
+  growth path in rc.8 — the pattern was understood, just not applied here.
+  Pinned by `bech32_encode_allocates_exactly_once` and its bech32m twin, which assert
+  `capacity() == len()` across nine payload sizes; both fail against the old code.
+
+  **And the stack.** Adversarial review then pointed out that `encode_lower_to_fmt`
+  itself stages every output character through a 1 KiB stack array
+  (`let mut buf = [0u8; BUF_LENGTH]`) that it never clears, so after the call returned
+  the encoded secret was still sitting in that frame. The refuters were right that this
+  is `bech32`'s code and outside the crate's heap guarantee — and it was still not
+  something to leave a footnote about. Both encoders now bypass `encode_lower_to_fmt`
+  and drive the same iterator chain upstream uses (`bytes_to_fes` →
+  `with_checksum::<Ck>` → `chars`) directly into the pre-sized `String`. The chain's
+  entire state is one pending byte, a bit offset, a borrowed HRP and a `u32` checksum
+  midstate — 72 bytes on x86_64, pinned under 96 by
+  `encoder_chain_carries_no_staging_buffer` so a reintroduced buffer fails the test —
+  and each character goes into `out` as it is
+  produced. The `CODE_LENGTH` gate upstream applied through `encoded_length` is
+  replicated with `bech32_code_length`, which the tests already prove exact.
+  `direct_chain_matches_upstream_encode_lower` (one per checksum) asserts byte-for-byte
+  equality with upstream across eight payload sizes, so nothing observable changed
+  except what is left on the stack. Upstream's function is still used in unit tests,
+  as the equivalence oracle only.
+
+### Fixed
+
+- **The newtype macros forwarded the sized bech32 *encoders* and not the *decoders*
+  (adversarial review, three lenses independently).** `fixed_newtype!` emitted
+  `try_to_bech32{,m}_sized{,_zeroizing}` but none of `try_from_bech32{,m}{,_unchecked}_sized`;
+  `dynamic_newtype!` was worse, with a single plain `try_from_bech32` and no
+  `_unchecked`, no bech32m decode at all, and no sized variants. So a newtype could emit
+  a 900-byte secret at a custom code length and then had no way to read it back except
+  decoding into a bare `Fixed`/`Dynamic` and copying into the newtype by hand — an extra
+  copy of the secret, on exactly the path the inherent constructors exist to avoid.
+  The CHANGELOG for this release claimed the forwarding was complete and tested; both
+  claims were false. Four constructors added to `fixed_newtype!`, seven to
+  `dynamic_newtype!`, and `newtype_forwards_sized_bech32_decode` round-trips every one
+  of them. Named `_sized` on the decode side because the two const parameters mean
+  different things: `N` is the byte count the newtype holds, `C` is the string length
+  it will accept.
+
+- **`bech32_code_length` panicked in debug and wrapped in release for payloads above
+  `usize::MAX / 8`.** The `payload_bytes * 8` was unchecked. Unreachable with real
+  memory, but the function is documented as exact and a wrapped result would have
+  under-sized an encode buffer. It now computes `⌈8b/5⌉` as `8·(b/5) + ⌈8·(b%5)/5⌉`
+  with saturating arithmetic: exact for every result that fits in a `usize`, and
+  `usize::MAX` — which every encoder refuses — when it does not. Never smaller than the
+  truth, never a panic. `code_length_saturates_instead_of_wrapping` pins both halves.
+
+- **`secure-gate-compat`'s `serde-serialize` / `serde-deserialize` features could not
+  build on their own.** Each enabled only the corresponding `secure-gate` feature, never
+  this crate's `dep:serde`, while the `#[cfg(feature = "serde-serialize")]` /
+  `#[cfg(feature = "serde-deserialize")]` blocks in `src/compat/` name `serde` types
+  directly. `cargo check -p secure-gate-compat --no-default-features --features
+  serde-serialize` failed with `E0220: associated type 'Ok' not found for 'S'`, and the
+  `serde-deserialize` half with `E0433: cannot find module or crate 'serde'`. The
+  combinations shipped in CI all passed because `secrecy-compat` happens to pull `serde`
+  in alongside them, so nothing exercised either feature alone. Both now list `serde`.
+  Cargo's `secure-gate/serde-serialize` names the *dependency's* feature and never the
+  same-named one in this crate — the two are independent, which is what the gap was.
+
+### Dependencies
+
+- **`thiserror` removed; `zeroize_derive` moved to `[dev-dependencies]`.** With default
+  features the dependency tree was nine crates, seven of which existed only to serve two
+  proc macros — it is now two:
+
+  ```
+  secure-gate                              secure-gate
+  ├── thiserror                     →      └── zeroize
+  │   └── thiserror-impl (proc-macro)
+  │       ├── proc-macro2 → unicode-ident
+  │       ├── quote
+  │       └── syn
+  └── zeroize
+      └── zeroize_derive (proc-macro)
+          └── proc-macro2, quote, syn (*)
+  ```
+
+  `thiserror` was generating `Display` for 6 enums — 14 fixed strings and 4 messages
+  interpolating two `usize` fields — plus 6 `Error` impls, 5 of them empty. Its one
+  non-trivial job, the `#[source]` chain, existed only on `DecodingError`, removed
+  above. `src/error.rs` now writes both out by hand against `core::error::Error`
+  (stable since 1.81, comfortably below the 1.85 MSRV), so `no_std` is unaffected.
+
+  `#[derive(Zeroize)]` appears nowhere in either crate's `src/` — the wrappers use
+  `Zeroize` and `ZeroizeOnDrop` as *traits* — and every real use is a bench, test, or
+  fuzz target. Enabling the derive feature on the library dependency put a proc macro in
+  every downstream build for something no shipped code used. Neither `secrecy` 0.8.0 nor
+  0.10.1 enables it either, so `secure-gate-compat`'s `pub use zeroize;` now mirrors
+  secrecy's re-export more faithfully than it did; the compat test suite had been
+  receiving the derive through feature unification and now asks for it directly.
+
+  A downstream crate that wants `#[derive(Zeroize)]` adds
+  `zeroize = { version = "1.8", features = ["zeroize_derive"] }` to its own manifest,
+  which it needs anyway to name the macro. Verified across seven core feature
+  combinations, clippy `--all-targets` on both crates, the full test and doctest suites,
+  and the `thumbv7em-none-eabihf` `no_std` cross-build.
+
+### Testing
+
+- **`tests/encoding_suite/bech32_sized.rs`** covers the code-length API against the
+  four invariants it has to hold: `N` never changes the encoding; a string decodes
+  under any `N` at least as large as itself and no smaller; bech32 and bech32m stay
+  mutually undecodable at every `N` (they differ only in target residue, which a shared
+  const-generic checksum could have blurred); and HRP validation, exact length
+  reporting, zeroizing output and the BIP-173/350 vectors behave identically on the
+  `_sized` path. Includes the exact 633/634-byte boundary at `BECH32_CODE_LENGTH`,
+  single-character corruption, truncation and extension, and a deterministic randomized
+  stress run over a ladder of seven code lengths. Property tests in
+  `proptest_suite/encoding.rs` and the `encoding` fuzz target assert the same
+  invariants; `tests/macros_suite/newtype_surface.rs` covers the macro-forwarded sized
+  methods in **both** directions — see the adversarial-review entry below for why the
+  decode half of that sentence was false when first written.
+
+- **Adversarial review of the bech32 refactor (41 agents, seven lenses, three refuters
+  per finding).** Nine findings survived; the three that were test defects are fixed
+  here, the rest under *Fixed*.
+  - `randomized_stress_across_code_lengths` had a vacuous invariant. Its ladder was
+    64/128/256/1023/1024/2048/4096, but with a 3-character HRP a code length is
+    `10 + ⌈8b/5⌉`, and since `gcd(8, 5) = 1` that only ever lands on residues
+    `{1, 2, 4, 6, 7} (mod 8)` — never a power of two. So `encoded.len() == N` was
+    unreachable on six of seven rungs and the `|| encoded.len() < N` escape took the
+    "too-small decoder refuses" assertion out of play. Rungs are now defined by payload
+    byte counts (32, 64, 128, 633, 640, 1280, 2560 → code lengths 62, 113, 215, 1023,
+    1034, 2058, 4106), case 0 of each rung encodes exactly that many bytes, and a
+    counter asserts the boundary branch ran on every rung. Mutating the decoder to
+    `N` instead of `N - 1` now fails on the first rung.
+  - The claim that the HRP is compared *before* any payload byte is materialized had
+    no test that could fail: every existing check observed only `Err(UnexpectedHrp)`,
+    which is identical whether the `Vec` was never built or built-then-discarded. A
+    refuter proved it by swapping the two statements and watching every test pass.
+    `tests/heap_zeroize.rs` gained an allocation-counting mode:
+    `check_bech32_hrp_mismatch_materializes_nothing` asserts **zero** heap allocations
+    on an HRP mismatch across all six sized decode paths (blanket, `Dynamic`, `Fixed`;
+    bech32 and bech32m), with a positive control that a correct `Vec` decode allocates
+    and a third check that `Fixed` decodes allocate nothing even on success. The same
+    statement swap now fails it with "2 heap allocation(s)".
+  - The `encoding` fuzz target's sized round-trip block used `if let Ok(..)` and
+    silently skipped an `Err`, although every capped payload (≤ 2048 bytes → 3288
+    characters) fits `BIG = 4096`, so an `Err` there can only be an encoder regression.
+    It is now an `expect`. Two comments in the same file still described a "90-byte
+    payload limit" and "BIP-350 compliance" cap that this release's CHANGELOG says never
+    existed; corrected.
+  Refuted and worth recording: `capacity() == len()` as proof of a single allocation —
+  a refuter mutated the reservation to half the length and the test **failed**, so it is
+  stronger than the finder assumed. And a real observation that fell outside the
+  refactor: upstream `encode_lower_to_fmt` stages every output character through a 1 KiB
+  stack array it never wipes. That is `bech32`'s code, not this crate's, and the stack
+  is outside the documented heap-wiping guarantee — but a future release could bypass it
+  by driving `bech32`'s iterator primitives directly into the pre-sized `String`.
+
+- **The bech32 test module no longer breaks `--all-targets` without `alloc`.** Its trait
+  imports and 38 test `cfg`s named only `encoding-bech32*`, but `ToBech32` and friends
+  require `alloc`, so `--no-default-features --features encoding-bech32 --all-targets`
+  failed to compile with 32 errors. CI never caught it because every encoding row pairs
+  the feature with `alloc` and the no_std job builds `--lib` only.
+
+- **`dse-check.yml` gained path filters and a job timeout.** It was the only push/PR
+  workflow in the repo with neither. Unfiltered, any commit touching `main` — a
+  changelog line, a README fix — spent four release builds (2 OS × 2 toolchains)
+  re-proving assembly that had not changed. It now triggers on the inputs the guard
+  actually depends on: `secure-gate-core/src/**` (the zeroize-on-drop paths and
+  `src/bin/asm_check.rs`, which the test compiles), `tests/asm_dse_check.rs`, the two
+  manifests, `Cargo.lock`, and the workflow file. The weekly cron and
+  `workflow_dispatch` are unchanged, so the guard still runs against toolchain drift
+  even in a quiet week — which is how the rustc 1.98 `.set` → `=` alias change fixed in
+  rc.8 would have been caught regardless. `timeout-minutes: 30` replaces GitHub's
+  360-minute default.
+
+### Documentation
+
+- **`ROADMAP.md` removed; its release-branch table salvaged into `README.md`.** The file
+  was stamped "Last updated: March 2026", still listed memory pinning (`mlock` /
+  `VirtualLock`) and HSM/TPM escape hatches as "Planned for 0.9.x", and was therefore
+  wrong about the release it shipped alongside. The one part worth keeping — the
+  `main` (0.9.x / edition 2024 / MSRV 1.85) vs `release/0.8` (LTS / edition 2021 / MSRV
+  1.70) table and the backport policy — replaces the two prose lines under
+  `README.md` § *Branch support*, where install-time information belongs. The two
+  workspace-`README.md` references were dropped with it.
+
+- **`docs/plans/base32_encoding.md` annotated as a historical record.** The plan is kept
+  for the reasoning it carries — why Base32 belongs in the crate, the constant-time
+  backend survey, the rejected alternatives — but it was written before #158 landed and
+  read as live instructions. It now states up front that it shipped in `cf43e69` (PR
+  #164), that its line numbers are a snapshot, and that it is not a guide to the current
+  tree. The two steps it prescribes for wiring a new format into the `SecureEncoding` /
+  `SecureDecoding` `cfg(any(...))` lists are flagged inline as superseded, since those
+  markers no longer exist.
+
+- **The `secrecy-compat` feature comment describes what the feature actually does.** It
+  claimed to "enable" the `v08` / `v10` shim modules; those carry no `cfg` on it and
+  always compile. What it really does is turn on the core features the shims need
+  (`alloc`, `cloneable`, `serde-serialize`) plus this crate's `serde` dependency, and gate
+  the whole compat test surface — `tests/compat_suite/`, `finding5_regression`,
+  `migration_full`, the trybuild cases, and via `dual-compat-test` the side-by-side parity
+  tests in `tests/compat_dual/`. The comment now says so, names the crate path correctly
+  (`secure_gate_compat::compat::…`, not `secure_gate::compat::…`), and records that the
+  feature does *not* switch on this crate's own serde features.
+
 ## [0.9.0-rc.8] - 2026-09-07
 
 ### Added
@@ -176,19 +517,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   work unchanged; `AsRef<str>` and `AsRef<[u8]>` are untouched. Enforced by
   `tests/compile-fail/encoded_secret_no_display.rs`.
 
-- **BREAKING: `SecureEncoding` / `SecureDecoding` marker traits.** Both were empty
-  markers with blanket impls over `AsRef<[u8]>` / `AsRef<str>`, and nothing in the crate
-  ever bounded on them. The per-format traits (`ToHex`, `ToBase32`, `ToBase64Url`,
-  `ToBech32`, `ToBech32m`, `FromHexStr`, `FromBase32Str`, …) are implemented directly
-  against `AsRef<[u8]>` / `AsRef<str>`, so the markers gated nothing and enabled nothing
-  — despite trait-module docs that claimed they were what "enables" the per-format
-  impls. Their only consumer anywhere in the workspace was a single test asserting the
-  marker existed.
-
-  **Migration:** delete them from any `use` list; delete any `T: SecureEncoding` /
-  `T: SecureDecoding` bound and rely on `AsRef<[u8]>` / `AsRef<str>` (or on the
-  per-format trait itself) instead. No encoding or decoding behaviour changes.
-
 ### Security
 
 - **`std::io::Write` on `Dynamic<Vec<u8>>` left the secret in the outgoing buffer when
@@ -289,17 +617,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the fold looked like a missing symbol and all four DSE jobs failed with "could not
   find 'make_and_drop_newtype' label". Both forms are recognised now; verified on 1.85
   (`.set`) and 1.98 (`=`), ELF and COFF.
-- **`secure-gate-compat`'s `serde-serialize` / `serde-deserialize` features could not
-  build on their own.** Each enabled only the corresponding `secure-gate` feature, never
-  this crate's `dep:serde`, while the `#[cfg(feature = "serde-serialize")]` /
-  `#[cfg(feature = "serde-deserialize")]` blocks in `src/compat/` name `serde` types
-  directly. `cargo check -p secure-gate-compat --no-default-features --features
-  serde-serialize` failed with `E0220: associated type 'Ok' not found for 'S'`, and the
-  `serde-deserialize` half with `E0433: cannot find module or crate 'serde'`. The
-  combinations shipped in CI all passed because `secrecy-compat` happens to pull `serde`
-  in alongside them, so nothing exercised either feature alone. Both now list `serde`.
-  Cargo's `secure-gate/serde-serialize` names the *dependency's* feature and never the
-  same-named one in this crate — the two are independent, which is what the gap was.
 
 ### Dependencies
 
@@ -411,31 +728,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `RevealSecret`, `SecretLen` gets a short doc of its own — and kept that way because
   rustdoc 1.70, the 0.8 line's MSRV toolchain, ICEs on intra-doc links in a grouped
   `use` re-export; the two lines share this file.
-- **`ROADMAP.md` removed; its release-branch table salvaged into `README.md`.** The file
-  was stamped "Last updated: March 2026", still listed memory pinning (`mlock` /
-  `VirtualLock`) and HSM/TPM escape hatches as "Planned for 0.9.x", and was therefore
-  wrong about the release it shipped alongside. The one part worth keeping — the
-  `main` (0.9.x / edition 2024 / MSRV 1.85) vs `release/0.8` (LTS / edition 2021 / MSRV
-  1.70) table and the backport policy — replaces the two prose lines under
-  `README.md` § *Branch support*, where install-time information belongs. The two
-  workspace-`README.md` references were dropped with it.
-- **`docs/plans/base32_encoding.md` annotated as a historical record.** The plan is kept
-  for the reasoning it carries — why Base32 belongs in the crate, the constant-time
-  backend survey, the rejected alternatives — but it was written before #158 landed and
-  read as live instructions. It now states up front that it shipped in `cf43e69` (PR
-  #164), that its line numbers are a snapshot, and that it is not a guide to the current
-  tree. The two steps it prescribes for wiring a new format into the `SecureEncoding` /
-  `SecureDecoding` `cfg(any(...))` lists are flagged inline as superseded, since those
-  markers no longer exist.
-- **The `secrecy-compat` feature comment describes what the feature actually does.** It
-  claimed to "enable" the `v08` / `v10` shim modules; those carry no `cfg` on it and
-  always compile. What it really does is turn on the core features the shims need
-  (`alloc`, `cloneable`, `serde-serialize`) plus this crate's `serde` dependency, and gate
-  the whole compat test surface — `tests/compat_suite/`, `finding5_regression`,
-  `migration_full`, the trybuild cases, and via `dual-compat-test` the side-by-side parity
-  tests in `tests/compat_dual/`. The comment now says so, names the crate path correctly
-  (`secure_gate_compat::compat::…`, not `secure_gate::compat::…`), and records that the
-  feature does *not* switch on this crate's own serde features.
 
 ## [0.9.0-rc.7] - 2026-07-06
 

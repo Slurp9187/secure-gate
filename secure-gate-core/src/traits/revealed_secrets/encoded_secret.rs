@@ -61,7 +61,6 @@ impl EncodedSecret {
         feature = "encoding-base32",
         feature = "encoding-base64",
         feature = "encoding-bech32",
-        feature = "encoding-bech32m",
     ))]
     #[inline(always)]
     pub(crate) fn new(s: alloc::string::String) -> Self {

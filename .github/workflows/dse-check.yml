@@ -7,14 +7,32 @@ name: DSE zeroization check
 # and are therefore not in the matrix; if x86_64 macOS coverage
 # is needed, switch to macos-13.
 
+# Path filters: the guard covers the zeroize-on-drop code paths, the binary the
+# test compiles, and the test itself. Every other push/PR workflow in this repo is
+# filtered the same way; without one, a docs- or changelog-only commit spends four
+# release builds re-proving assembly that did not change.
 on:
   workflow_dispatch:
   schedule:
     - cron: '0 3 * * 1' # weekly, Monday 03:00 UTC
   push:
     branches: [main]
+    paths:
+      - "secure-gate-core/src/**"
+      - "secure-gate-core/tests/asm_dse_check.rs"
+      - "secure-gate-core/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/dse-check.yml"
   pull_request:
     branches: [main]
+    paths:
+      - "secure-gate-core/src/**"
+      - "secure-gate-core/tests/asm_dse_check.rs"
+      - "secure-gate-core/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/dse-check.yml"
 
 permissions:
   contents: read
@@ -23,6 +41,10 @@ jobs:
   dse-check:
     name: DSE - volatile zero-store survival (${{ matrix.os }}, ${{ matrix.toolchain }})
     runs-on: ${{ matrix.os }}
+    # A release build of `asm_check` plus its deps in an isolated target dir; the
+    # slowest leg (windows-latest) runs well inside this. Without it the job would
+    # inherit GitHub's 360-minute default.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
