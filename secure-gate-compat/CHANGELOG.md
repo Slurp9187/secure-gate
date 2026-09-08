@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0-rc.12] - 2026-09-08
+
 > Backported from `main`, adapted to this branch. The substance is
 > `tests/integration.rs`, an aggregator this branch never had: without it cargo compiled
 > none of `tests/compat_suite/`, `tests/compat_dual/` or `tests/proptest_suite/`, so 248
@@ -20,8 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > branch's `.gitignore`, this CHANGELOG, and the three 0.8-only proptest modules
 > (`ct_eq`, `encoding`, `serde` — never present on `main`) are kept.
 
-### Fixed
+### Changed
+- Test modules brought up to `main`'s state: `compat_suite/`, `compat_dual/`,
+  `migration_full.rs`, `proptest_suite/proptest_compat.rs`.
+- `README.md` and `MIGRATING_FROM_SECRECY.md` use `secure_gate_compat::` import paths
+  (compat is its own crate), keeping this branch's `0.8` version strings.
 
+- `tests/integration.rs` carried core's crate docs verbatim (describing `core_tests`,
+  `zeroize_tests`, `heap_zeroize`); it now describes what this binary aggregates.
+- "Further Reading" links retarget `blob/main` to `blob/release/0.8`, and the migration
+  guide's opening sentence names `secure-gate-compat` rather than `secure-gate`.
+
+### Fixed
 - **248 tests were never compiled.** `tests/integration.rs` declares the suite modules,
   so `compat_suite/`, `compat_dual/` and `proptest_suite/` now build and run. Before
   this, only the four flat test files at `tests/` root were compiled at all: the whole
@@ -32,12 +44,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   became trait impls in #156 and nothing has compiled this file since; the bech32
   modules in the same file already imported theirs.
 
-### Changed
-
-- Test modules brought up to `main`'s state: `compat_suite/`, `compat_dual/`,
-  `migration_full.rs`, `proptest_suite/proptest_compat.rs`.
-- `README.md` and `MIGRATING_FROM_SECRECY.md` use `secure_gate_compat::` import paths
-  (compat is its own crate), keeping this branch's `0.8` version strings.
+- **The README advertised MSRV 1.85 on a 1.70 branch.** The badge and its
+  `Cargo.toml` link were taken from `main` wholesale, and the "Targets Rust 2021 +
+  MSRV 1.70" line was dropped with them. Both restored.
+- **Six `secure_gate::compat::…` paths in the migration guide did not resolve.** Core
+  exposes no `compat` module and the crate is `secure_gate_compat`; the *after*
+  snippets now use the real path. `main` carries the same six and needs the same fix.
+  The adjacent `secure_gate::Dynamic` / `::RevealSecret` / `::Fixed` paths are correct
+  and untouched.
 
 ## [0.8.0-rc.11] - 2026-09-06
 

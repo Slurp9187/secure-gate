@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0-rc.12] - 2026-09-08
+
+Backport release. Brings `main`'s PRs #171-#174 to the 0.8 LTS line, adapted to this
+branch's contract: MSRV 1.70, edition 2021, and its pinned dependencies. Unpublished
+release candidate; nothing is pushed to crates.io.
+
+### Changed (breaking, `secure-gate`)
+
+- **Every encoder returns `EncodedSecret`** (#172); the `*_zeroizing` twins are gone, so
+  the short name is the safe one. An encoded secret is a second full copy of the secret
+  in a longer alphabet, and is now wiped by default.
+- **`into_inner` returns the plain value** (#172); `InnerSecret<T>` is deleted.
+  Protection ends at that call rather than following the value into the caller.
+- **`encoding-bech32m` folded into `encoding-bech32`** (#171). BIP-173 and BIP-350 are
+  one dependency, one error type and one code-length knob.
+- **Encoders require the new `EncodableBytes` marker** (#172), so string-shaped inputs
+  are rejected: `"text".to_hex()` and re-encoding an `EncodedSecret` no longer compile.
+- `DecodingError` and `Bech32Error::ConversionFailed` removed (#171).
+
+### Added (`secure-gate`)
+
+- **Caller-chosen bech32 code length** (#171): `try_to_bech32_sized::<N>` and the
+  bech32m twin, `Bech32Sized` / `Bech32mSized`, `bech32_code_length`, and
+  `BECH32_CODE_LENGTH`. The default stays the BIP-173 bound.
+
+### Fixed
+
+- **`cargo doc` builds on MSRV 1.70 again.** Grouped `pub use` re-exports reintroduced
+  the rustdoc 1.70 ICE that `SecretLen` already hit; the three bech32 re-exports are
+  split, and a `Rustdoc - builds on MSRV (1.70)` CI job now guards it with
+  `-D warnings`. docs.rs builds on nightly and was never affected, which is why nothing
+  noticed.
+- **A base32 denial-of-service pin was restored.** `base32ct` 0.2 panics on trailing
+  block lengths of 1, 3 or 6 characters; the guard is live in `src/`, but the test
+  parity pass had briefly dropped its only test because `main` deleted it (0.3 fixed
+  the bug upstream, and 0.3 needs 1.85).
+- Two `Display` pins were gated on `std` by a merge artifact and silently skipped in
+  every feature row without it; `SecureEncoding` / `SecureDecoding` had lost their
+  existence pin the same way.
+
+### Testing / CI
+
+- Core: 405 -> 422 tests. `secure-gate-compat`: **10 -> 258**. The compat suite had no
+  `tests/integration.rs` aggregator, so cargo compiled none of `compat_suite/`,
+  `compat_dual/` or `proptest_suite/` - 248 tests were dead code, and turning them on
+  surfaced a file that had not compiled since the encoders became trait impls.
+- New CI rows: a no-alloc `encoding-bech32` build, and the 1.70 rustdoc job above.
+
+`secure-gate-compat`: test-suite activation and doc corrections; no code changes.
+
 ## [0.8.0-rc.11] - 2026-09-07
 
 ### Added
