@@ -122,17 +122,20 @@ fn encoded_secret_into_zeroizing_carries_the_content() {
     assert_eq!(protected.len(), expected.len());
 
     // `into_zeroizing` is a *partial* downgrade, and this is the half that is lost:
-    // `Zeroizing<String>` derives `Debug`, so the encoded secret prints in the clear.
-    // The type's own docs say so. If a future `zeroize` starts redacting, this assert
-    // fails and the claim in `EncodedSecret::into_zeroizing` needs rewriting -- that is
-    // the point of pinning it, not an accident of the dependency version.
-    let rendered = format!("{protected:?}");
+    // `Zeroizing<String>` derives `Debug`, so the encoded secret prints in the clear --
+    // emphatically not `[REDACTED]`. The type's own docs promise exactly that. If a
+    // future `zeroize` starts redacting, this assert fails and the claim in
+    // `EncodedSecret::into_zeroizing` needs rewriting; that is the point of pinning it,
+    // not an accident of the dependency version.
+    //
+    // The rendering is deliberately reduced to a bool before the assert, and never
+    // interpolated into the failure message. It is a plaintext copy derived from the
+    // wrapper, and formatting one into a panic is the precise pattern this crate tells
+    // callers to avoid; CodeQL's `rust/cleartext-logging` rule flags it, correctly, even
+    // though the fixture here is the literal `0xDEADBEEF`. Keep it out of the message.
+    let prints_in_clear = format!("{protected:?}").contains(expected);
     assert!(
-        rendered.contains(expected),
-        "zeroize no longer prints the wrapped value ({rendered:?});          update the into_zeroizing docs, which promise the opposite"
-    );
-    assert_ne!(
-        rendered, "[REDACTED]",
-        "redaction does not survive into_zeroizing -- that is the documented trade"
+        prints_in_clear,
+        "zeroize's Debug no longer prints the value in the clear; fix into_zeroizing's docs"
     );
 }
