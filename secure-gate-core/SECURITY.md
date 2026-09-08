@@ -19,7 +19,8 @@ This document outlines the security model, design choices, strengths, limitation
 - **OS swap, page files, core dumps** — secrets may be paged to disk; use `mlock` or encrypted swap at the OS level.
 - **`panic = "abort"` / SIGKILL / hard crash** — `Drop` impls do not run; secrets are not cleared.
 - **`static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized.
-- **Copies made by caller code** — after `expose_secret()`, encoding, or serialization, the caller holds ordinary non-zeroized memory.
+- **Copies made by caller code** — after `expose_secret()` or serialization, the caller holds ordinary non-zeroized memory.
+- **Anything past `into_inner()`** — extraction hands you the plain value and ends protection. It is not wiped for you, and its `Debug` is not redacted.
 - **Encoded/serialized output** — every encoder (`to_hex()`, `to_base32()`, `to_base64url()`, `try_to_bech32()`, `try_to_bech32m()`) returns `EncodedSecret`: `Zeroizing<String>` with a redacted `Debug` and no `Display`, so the encoded copy is wiped on drop. serde `Serialize`, by contrast, produces full secrets in ordinary non-zeroizing buffers that this crate cannot reach. `EncodedSecret::into_inner()` is the named call that hands you an unprotected `String`.
 - **All side channels beyond equality timing** — cache, power, EM, and branch-predictor attacks are out of scope.
 - **Allocation-based DoS from deserialization** — `MAX_DESERIALIZE_BYTES` is a post-materialization bound only; the upstream deserializer may allocate arbitrarily first.
@@ -46,7 +47,7 @@ zero an out-of-scope stack slot.
 
 - Use [`Fixed::new_with`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html#method.new_with) instead of [`Fixed::new`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html#method.new) to write secret material directly into the wrapper's storage — eliminates the construction-site stack temporary.
 - Pass `&Fixed<T>` / `&mut Fixed<T>` by reference rather than `Fixed<T>` by value. Keep the wrapper short-scope.
-- For long-lived secrets, prefer [`Dynamic<T>`](https://docs.rs/secure-gate/latest/secure_gate/struct.Dynamic.html) — heap-only, no stack surface to leak from.
+- For long-lived secrets, prefer [`Dynamic<T>`](https://docs.rs/secure-gate/latest/secure_gate/struct.Dynamic.html) built with `new_with` or a decode constructor — the buffer is heap-only and never passes through a stack temporary. (`Dynamic::new(v)` still moves `v` in by value.)
 - For address-stability needs (FFI, self-referential structs), users may pin the wrapper at the call site: `let key = core::pin::pin!(Fixed::new_with(|a| …));`. This is opt-in; the crate does not impose pinning by default because it would break idiomatic use (returning, storing).
 
 ### 2. Heap-reallocation residue (`Dynamic<Vec<T>>` / `Dynamic<String>`)
@@ -196,7 +197,7 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 | Zeroization                    | Full allocation always wiped on drop; includes `Vec`/`String` spare capacity (inner type must implement `Zeroize`) |
 | Timing safety                  | `ConstantTimeEq` (`.ct_eq()`) — deterministic constant-time comparison via `expose_secret()`. Avoid `==`.          |
 | Opt-in risky features          | Cloning/serialization gated by marker traits (`CloneableSecret`, `SerializableSecret`)                             |
-| Redacted debug                 | `Debug` impl always prints `[REDACTED]`                                                                            |
+| Redacted debug                 | `Debug` on `Fixed`, `Dynamic`, the generated newtypes and `EncodedSecret` always prints `[REDACTED]`. It is a property of the wrapper: values obtained through `into_inner` or a deref print normally, and error types print their own contents. |
 | No unsafe code                 | `#![forbid(unsafe_code)]` enforced in the library crate                                                            |
 
 
@@ -206,7 +207,7 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 | Feature             | Security Impact                                                                                                                                                           | Recommendation                                                                                                                   |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `alloc` *(default)* | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Use `default-features = false` for no-heap builds — the crate is `#![no_std]` without the `std` feature, verified in CI by cross-building for `thumbv7em-none-eabihf`. | Enable unless on embedded/pure-stack target                                                                                      |
-| `std`               | Full `std` support (implies `alloc`). Adds no additional security surface beyond `alloc`.                                                                                 | Optional; `alloc` is sufficient for most targets                                                                                 |
+| `std`               | Full `std` support (implies `alloc`). Adds two surfaces: `as_reader()` copies secret bytes into caller-owned buffers that this crate cannot wipe, and the `Write` impl on `Dynamic<Vec<u8>>` grows by hand so it can zeroize the outgoing buffer. Audit `as_reader` call sites like Tier 2 access. | Optional; `alloc` is sufficient for most targets                                                                                 |
 | `ct-eq`             | Timing-safe direct byte comparison (`.ct_eq()`)                                                                                                                           | Strongly recommended; avoid `==`                                                                                                 |
 | `rand`              | `from_random()` uses system `SysRng` (`rand` 0.10) and panics on failure; `from_rng()` accepts caller-supplied `TryRng + TryCryptoRng` and returns `Result`            | Use trusted entropy sources; prefer `from_rng()` where RNG failure should be handled explicitly                                 |
 | `serde-deserialize` | Decodes to inner type; temporary buffers use `zeroize::Zeroizing` (zeroized on rejection too). `Fixed<[u8; N]>` rejects over-length sequences before its buffer can grow, so no unzeroized realloc residue is left behind. 1 MiB default limit (`MAX_DESERIALIZE_BYTES`). See allocation notes below. | Enable for trusted deserialization sources; set a tight limit for untrusted input and enforce transport-level size caps upstream |
@@ -240,7 +241,7 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 
 ## Module-by-Module Security Notes
 
-> Security invariants (no `Deref`/`AsRef`, `Debug` prints `[REDACTED]`, zeroize on drop, opt-in clone/serialize) are documented in full on the `[Fixed](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html)` and `[Dynamic](https://docs.rs/secure-gate/latest/secure_gate/struct.Dynamic.html)` rustdoc. This section focuses on weaknesses and mitigations not visible from the API surface.
+> Security invariants (no `Deref`/`AsRef`, `Debug` prints `[REDACTED]`, zeroize on drop, opt-in clone/serialize) are documented in full on the [`Fixed`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html) and [`Dynamic`](https://docs.rs/secure-gate/latest/secure_gate/struct.Dynamic.html) rustdoc. This section focuses on weaknesses and mitigations not visible from the API surface.
 
 ### Wrappers (`dynamic.rs`, `fixed.rs`)
 
@@ -273,8 +274,9 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   Earlier releases returned an `InnerSecret<T>` that kept wiping. That type is gone: it
   was a newtype over `Zeroizing<T>` whose only distinct behaviour was escaping this
   crate's own no-`Deref` rule. If you want the protection to continue, keep the wrapper,
-  or move the value into `zeroize::Zeroizing` yourself. The old text follows for
-  historical context and no longer describes the API.
+  or move the value into `zeroize::Zeroizing` yourself. The superseded wording is kept
+  as an HTML comment in the source of this file, where it is visible to `git blame` but
+  not to a reader of the rendered page.
 
   <!-- historical: InnerSecret<T> restored the wrapper-level `[REDACTED]` invariant after ownership
   transfer by implementing `Debug` as constant redaction. Use
@@ -340,7 +342,11 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   `Dynamic::<Vec<u8>>::new_with(|v| { ... })` / `Dynamic::<String>::new_with(|s| { ... })`
   over `Fixed::new(value)` / `Dynamic::new(value)` when constructing from computed data
   inline — these write directly into the wrapper's storage and avoid any intermediate copy.
-  `Dynamic<T>` remains the strictest option (heap-only; secret bytes never on the stack).
+  `Dynamic<T>` remains the strictest option: its buffer lives only on the heap. That is
+  a property of the buffer, not of every value that ever reaches it — `Dynamic::new(v)`
+  and `From<T>` take `v` by value, and `into_inner` returns it by value, so those three
+  do put the secret on the stack briefly. The `new_with` and decode constructors
+  (`from_protected_bytes` + `mem::swap`) are the paths with no stack step at all.
 
 **Security-first construction and access patterns**
 
@@ -399,10 +405,16 @@ All secret materialization requires an explicit call. Use `rg`, `grep -rn`, or y
 
 ```
 expose_secret  expose_secret_mut  with_secret  with_secret_mut
-into_inner
+into_inner  into_zeroizing  as_reader
 to_hex  to_hex_upper  to_base32  to_base64url
 try_to_bech32  try_to_bech32m  try_to_bech32_sized  try_to_bech32m_sized
+try_from_hex  try_from_base32  try_from_base64url  try_from_bech32  try_from_bech32m
 ```
+
+`into_zeroizing` and `as_reader` materialize secret bytes as surely as the rest:
+the first hands off an unredacted `Zeroizing<String>`, the second copies into a
+buffer the caller owns and must wipe. The `try_from_*` constructors are the reverse
+direction, and belong in the sweep because they are where untrusted input enters.
 
 **Note:** `into_inner` does not appear in an `expose_secret*`-only sweep — audit it
 separately. It consumes the wrapper and transfers ownership of the **plain** value:
@@ -424,7 +436,7 @@ What errors may and may not carry:
 
 If even coarse error categories or length metadata are sensitive in your deployment (attacker fingerprinting, strict oracle avoidance), redact errors at the logging/response boundary — the library deliberately does not vary its behavior by build profile.
 
-## Encoding: Sensitive vs. Public Output
+## Encoding: One Protected Output Type
 
 Encoding methods on `Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`, and the encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`) all return the same protected type:
 
@@ -442,7 +454,7 @@ There is no unprotected encoder. Earlier releases paired each method with a `*_z
 
 - `EncodedSecret::into_inner()` → returns a plain `String`, ends zeroization protection. Use only when an API requires ownership of `String`.
 
-- `EncodedSecret::into_zeroizing()` → returns `Zeroizing<String>`, preserves zeroization. Prefer this when a downstream API accepts `Zeroizing<String>`.
+- `EncodedSecret::into_zeroizing()` → returns `Zeroizing<String>`. Zeroize-on-drop is preserved; the redacted `Debug` is **not**, because `zeroize::Zeroizing` derives its own. Prefer this when a downstream API accepts `Zeroizing<String>` by name.
 
 **Bech32 code length.** The plain `try_to_bech32` / `try_from_bech32` methods use
 `BECH32_CODE_LENGTH` (1023) — the length of the bech32 BCH code, within which the

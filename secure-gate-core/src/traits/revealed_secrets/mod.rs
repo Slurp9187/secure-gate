@@ -12,7 +12,8 @@
 //!   `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and their `_sized` forms).
 //!
 //! It wraps [`zeroize::Zeroizing`] internally, provides redacted `Debug` (`[REDACTED]`),
-//! and offers an `into_zeroizing()` escape hatch. It is the idiomatic way to hand off
+//! and offers an `into_zeroizing()` escape hatch that keeps the wiping but not the
+//! redaction. It is the idiomatic way to hand off
 //! encoded output while preserving the crate’s “secrets are radioactive”
 //! guarantees.
 //!

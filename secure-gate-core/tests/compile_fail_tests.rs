@@ -38,7 +38,7 @@ fn dynamic_string_no_hex_compile_fail() {
 //
 // This is the crate's load-bearing "no implicit access" claim, so it is enforced by the
 // compiler rather than only asserted in SECURITY.md. The boundary is deliberate: the
-// the output wrapper returned by encoding (`EncodedSecret`) *does* deref.
+// output wrapper returned by encoding (`EncodedSecret`) *does* deref.
 // See "Where accident-prevention ends" in the crate docs.
 #[cfg(not(miri))]
 #[test]

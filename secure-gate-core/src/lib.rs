@@ -437,8 +437,9 @@ pub use traits::SentinelValue;
 /// encoded secret. Write it out with `&*encoded`.
 ///
 /// Use [`into_inner()`](EncodedSecret::into_inner) to extract a plain `String`
-/// (ends zeroization) or [`into_zeroizing()`](EncodedSecret::into_zeroizing) to
-/// preserve it.
+/// (ends zeroization) or [`into_zeroizing()`](EncodedSecret::into_zeroizing) to keep
+/// the wiping. `into_zeroizing` is a partial downgrade: zeroize-on-drop survives, the
+/// redacted `Debug` does not, because `zeroize::Zeroizing` derives its own.
 ///
 /// Requires `alloc` feature.
 #[cfg(feature = "alloc")]

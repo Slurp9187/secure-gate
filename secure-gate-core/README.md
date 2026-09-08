@@ -211,7 +211,7 @@ secure-gate = { version = "0.9.0-rc.9", features = ["full"] }
 
 ## Encoding & Decoding
 
-`secure-gate` provides symmetric, zero-overhead encoding and decoding for five formats: hex, base32 (RFC 4648 §6), base64url, bech32 (BIP-173), and bech32m (BIP-350). All operations are explicit and return `Result` on failure.
+`secure-gate` provides symmetric, zero-overhead encoding and decoding for five formats: hex, base32 (RFC 4648 §6), base64url, bech32 (BIP-173), and bech32m (BIP-350). All operations are explicit. Decoding is always fallible; on the encode side only bech32 and bech32m return a `Result`, because they can reject an invalid HRP or an over-long payload — `to_hex`, `to_hex_upper`, `to_base32` and `to_base64url` cannot fail.
 
 ### Available traits
 
@@ -276,7 +276,7 @@ Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from st
 
 - Prefer HRP-validated constructors to prevent cross-protocol confusion attacks.
 - Use `_unchecked` only when HRP is validated upstream.
-- All constructors guarantee zeroization even on OOM panic via `Zeroizing`.
+- The decode constructors in this table stage into `Zeroizing` buffers, so a panic between a successful decode and wrapper construction still wipes them. (`Fixed::new` / `Dynamic::new` take an already-built value and have no such buffer.)
 - Encoded output is protected by default: every encoder returns [`EncodedSecret`], wiped on drop. `.into_inner()` is the named point where that ends (see `SECURITY.md`).
 
 ## Serde

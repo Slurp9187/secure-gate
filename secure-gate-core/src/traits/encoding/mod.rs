@@ -25,6 +25,9 @@ pub mod hex;
 
 /// Marker for types that may be **encoded**: byte-shaped sources.
 ///
+/// *Available whenever any encoding feature is on (`encoding-hex`, `encoding-base32`,
+/// `encoding-base64`, or `encoding-bech32`).*
+///
 /// Every encoding trait in this module is blanket-implemented for
 /// `T: AsRef<[u8]> + EncodableBytes`. The second bound is what keeps string-shaped
 /// types out, and it is load-bearing rather than decorative — removing it changes

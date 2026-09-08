@@ -205,7 +205,10 @@ fn newtype_forwards_sized_bech32_methods() {
     );
     let wide = big.try_to_bech32_sized::<2048>("sg").unwrap().into_inner();
     assert!(wide.starts_with("sg1"));
-    assert!(big.try_to_bech32_sized::<2048>("sg").is_ok());
-    assert!(big.try_to_bech32m_sized::<2048>("sg").is_ok());
-    assert!(big.try_to_bech32m_sized::<2048>("sg").is_ok());
+    let wide_m = big.try_to_bech32m_sized::<2048>("sg").unwrap().into_inner();
+    assert!(wide_m.starts_with("sg1"));
+    assert_ne!(
+        wide, wide_m,
+        "the two checksums must not produce the same string"
+    );
 }

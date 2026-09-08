@@ -21,7 +21,9 @@
 //!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
 //!   multi-step operations, prefer `with_secret(|b| b.to_hex())` — the borrow checker
 //!   enforces the reference cannot escape the closure.
-//! - **Treat all input as untrusted**: validate hex strings upstream before wrapping
+//! - **Decoding lives elsewhere**: this module encodes. For the reverse direction and
+//!   its untrusted-input rules see `FromHexStr`; validate hex
+//!   strings upstream before wrapping
 //!   in secrets.
 //!
 //! # Example
