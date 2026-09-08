@@ -4,6 +4,12 @@
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+// `Cargo.toml` tells docs.rs to build with `--cfg docsrs`. This is what reads it:
+// `doc_auto_cfg` annotates every feature-gated item with the feature that enables
+// it, so the docs people read say "Available on crate feature `encoding-hex`"
+// instead of leaving the reader to infer it. Nightly-only, which is fine — docs.rs
+// builds on nightly, and no other build sets `docsrs`.
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! Secure wrappers for secrets with **explicit access** and **mandatory zeroization** — a
 //! `no_std`-compatible, zero-overhead library with audit-friendly access patterns.

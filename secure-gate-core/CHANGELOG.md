@@ -520,6 +520,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **docs.rs now shows which feature each item needs.** `Cargo.toml` has been telling
+  docs.rs to build with `--cfg docsrs` for some time, but nothing in the crate read that
+  cfg — it enabled a configuration with no effect. `#![cfg_attr(docsrs, feature(doc_cfg))]`
+  is what it was for: every feature-gated item now carries an "Available on crate feature
+  `…` only" badge, 89 of them across the 173 `cfg(feature)` sites, so a reader no longer
+  has to infer from prose why a method is missing from their build. Nightly-only and
+  inert everywhere else — docs.rs builds on nightly, and no other build sets `docsrs`.
+  (`doc_auto_cfg`, the obvious spelling, was removed in 1.92 and merged into `doc_cfg`.)
+  A non-blocking nightly step in the `docs` job exercises that exact configuration, since
+  a future rename of the gate would otherwise break docs.rs and nothing else.
+
 - **`docs/encoded_secret_deref.md` records why the output wrapper derefs.** `EncodedSecret`
   is the one type in this crate that implements `Deref`, which is the exact thing
   `Fixed`/`Dynamic` refuse to do, and the note states the rejected alternative in full:

@@ -52,6 +52,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already resolved to the same item. Verified in the rendered HTML that all eleven reach
   the intended items, rather than merely resolving.
 
+- **Five more redundant explicit link targets that only nightly reports.** Stable
+  resolves the merged module docs in each submodule's own scope, where the bare labels do
+  not resolve, so it stays quiet; nightly resolves them in `crate::compat` scope, where
+  they do — making the explicit targets redundant. The human renderer prints these with no
+  source span at all, which is why they were initially left alone; `--message-format=json`
+  carries the spans the terminal output drops. Confirmed the five now resolve to the same
+  items the explicit targets named, and that dropping them is clean on 1.85, stable, 1.98
+  and nightly — the concern that stable might then fail to resolve them did not hold.
+
 - **Six `secure_gate::compat::` paths in `MIGRATING_FROM_SECRECY.md` that do not
   resolve.** Core exposes no `compat` module and the crate is `secure_gate_compat`. The
   file is not `include_str!`'d, so no rustdoc pass and no doctest ever read it, but it

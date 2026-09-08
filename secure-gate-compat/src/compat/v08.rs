@@ -34,7 +34,7 @@
 //!
 //! - `Secret<S>` is **stack-allocated** (inline `S`) — no `Box`. Use `SecretBox<S>` for
 //!   heap-allocated variants.
-//! - No [`ExposeSecretMut`](super::ExposeSecretMut) — mutable access was added in v0.9.
+//! - No [`ExposeSecretMut`] — mutable access was added in v0.9.
 //! - [`DebugSecret`](crate::compat::v08::DebugSecret) trait is required for `Debug` impls. Not present in v0.10.
 //!
 //! # Step-by-step migration

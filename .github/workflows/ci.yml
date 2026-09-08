@@ -68,6 +68,23 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --no-deps --all-features --package secure-gate-compat
 
+      # docs.rs builds on nightly with `--cfg docsrs`, which switches on the
+      # `doc_cfg` feature gate that produces the per-feature badges. Nothing else
+      # exercises that path, so a gate rename would break docs.rs and nothing else
+      # — `doc_auto_cfg` was removed in 1.92 and merged into `doc_cfg` exactly that
+      # way. Non-blocking: it runs on nightly, and unrelated lint churn there must
+      # not hold up a merge. A failure here means the next docs.rs build breaks.
+      - name: Install Rust nightly
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+
+      - name: cargo doc – docs.rs configuration (nightly, non-blocking)
+        continue-on-error: true
+        env:
+          RUSTDOCFLAGS: --cfg docsrs -D warnings
+        run: cargo +nightly doc --no-deps --all-features --package secure-gate
+
   lint:
     name: Lint (${{ matrix.package }}/${{ matrix.name }})
     runs-on: ubuntu-latest
