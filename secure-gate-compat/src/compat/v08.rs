@@ -20,22 +20,22 @@
 //!
 //! | secrecy 0.8 | This module | Notes |
 //! |---|---|---|
-//! | `Secret<S>` | [`Secret<S>`] | Stack/inline; `S: Zeroize` |
-//! | `SecretString` | [`SecretString`] | = `Secret<String>` |
-//! | `SecretVec<T>` | [`SecretVec<T>`] | = `Secret<Vec<T>>` |
-//! | `SecretBox<S>` | [`SecretBox<S>`] | = `Secret<Box<S>>` |
-//! | `ExposeSecret<S>` | [`compat::ExposeSecret`](super::ExposeSecret) | Shared trait |
-//! | `CloneableSecret` | [`compat::CloneableSecret`](super::CloneableSecret) | Shared trait |
-//! | `DebugSecret` | [`DebugSecret`] | v0.8-only trait |
-//! | `SerializableSecret` | [`compat::SerializableSecret`](super::SerializableSecret) | Shared trait |
-//! | `Zeroize` re-export | [`compat::zeroize`](super::zeroize) | Shared re-export |
+//! | `Secret<S>` | [`Secret<S>`](crate::compat::v08::Secret) | Stack/inline; `S: Zeroize` |
+//! | `SecretString` | [`SecretString`](crate::compat::v08::SecretString) | = `Secret<String>` |
+//! | `SecretVec<T>` | [`SecretVec<T>`](crate::compat::v08::SecretVec) | = `Secret<Vec<T>>` |
+//! | `SecretBox<S>` | [`SecretBox<S>`](crate::compat::v08::SecretBox) | = `Secret<Box<S>>` |
+//! | `ExposeSecret<S>` | [`compat::ExposeSecret`](crate::compat::ExposeSecret) | Shared trait |
+//! | `CloneableSecret` | [`compat::CloneableSecret`](crate::compat::CloneableSecret) | Shared trait |
+//! | `DebugSecret` | [`DebugSecret`](crate::compat::v08::DebugSecret) | v0.8-only trait |
+//! | `SerializableSecret` | [`compat::SerializableSecret`](crate::compat::SerializableSecret) | Shared trait |
+//! | `Zeroize` re-export | [`compat::zeroize`](crate::compat::zeroize) | Shared re-export |
 //!
 //! # Key differences from v0.10
 //!
 //! - `Secret<S>` is **stack-allocated** (inline `S`) — no `Box`. Use `SecretBox<S>` for
 //!   heap-allocated variants.
-//! - No [`ExposeSecretMut`](super::ExposeSecretMut) — mutable access was added in v0.9.
-//! - [`DebugSecret`] trait is required for `Debug` impls. Not present in v0.10.
+//! - No [`ExposeSecretMut`](crate::compat::ExposeSecretMut) — mutable access was added in v0.9.
+//! - [`DebugSecret`](crate::compat::v08::DebugSecret) trait is required for `Debug` impls. Not present in v0.10.
 //!
 //! # Step-by-step migration
 //!
@@ -116,7 +116,7 @@ impl<S: CloneableSecret + Zeroize> CloneableSecret for Vec<S> {}
 ///
 /// Stores the secret value **directly** (no heap allocation). On drop, calls
 /// `S::zeroize()` to wipe the memory. Access is only possible through
-/// [`ExposeSecret`](super::ExposeSecret).
+/// [`ExposeSecret`](crate::compat::ExposeSecret).
 ///
 /// # Generic parameter
 ///
@@ -202,7 +202,7 @@ impl<S: Zeroize> Drop for Secret<S> {
 /// `String: CloneableSecret`), and `Debug` (via `String: DebugSecret`).
 ///
 /// Note: secrecy 0.10's `SecretString` is `SecretBox<str>` (different type).
-/// Use [`v10::SecretString`](super::v10::SecretString) when migrating to v0.10 semantics.
+/// Use [`v10::SecretString`](crate::compat::v10::SecretString) when migrating to v0.10 semantics.
 pub type SecretString = Secret<String>;
 
 impl FromStr for SecretString {
@@ -225,14 +225,14 @@ pub type SecretVec<T> = Secret<Vec<T>>;
 /// Secret boxed type — mirrors `secrecy::SecretBox` (v0.8).
 ///
 /// Type alias for `Secret<Box<S>>`. Note that this is **different** from
-/// [`v10::SecretBox`](super::v10::SecretBox), which is a newtype around `Box<S>` with
+/// [`v10::SecretBox`](crate::compat::v10::SecretBox), which is a newtype around `Box<S>` with
 /// `?Sized` support. This v0.8 variant stores `Box<S>` as the `S` in `Secret<S>`.
 ///
 /// # Zeroize requirement
 ///
 /// `Box<S>` must implement [`Zeroize`]. In zeroize ≥ 1.8, this is only provided for
 /// `Box<[Z]>` (heap slices, `Z: Zeroize`) and `Box<str>`. For sized secret buffers,
-/// prefer [`v10::SecretBox`](super::v10::SecretBox) or the native
+/// prefer [`v10::SecretBox`](crate::compat::v10::SecretBox) or the native
 /// [`Dynamic<T>`](secure_gate::Dynamic).
 pub type SecretBox<S> = Secret<Box<S>>;
 

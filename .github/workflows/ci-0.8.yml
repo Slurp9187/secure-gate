@@ -346,10 +346,10 @@ jobs:
   # MSRV, which is what a contributor runs. `-D warnings` also catches broken
   # intra-doc links, which nothing else here does.
   #
-  # Core only. `secure-gate-compat` is experimental and never published, so release
-  # checks are scoped to core; it also has 11 pre-existing broken intra-doc links
-  # (same count on 3c2c127, before this job existed), and gating on them here would
-  # land this job red. Worth fixing separately, then widening this job.
+  # Covers both crates. It was core-only when introduced because compat carried 11
+  # broken intra-doc links that would have landed the job red; those are fixed, so
+  # compat is gated here too. `secure-gate-compat` is never published, but its docs
+  # are read from the repo and the same 1.70 rules apply.
   # ---------------------------------------------------------------------------
   rustdoc:
     name: Rustdoc – builds on MSRV (1.70)
@@ -371,6 +371,11 @@ jobs:
         env:
           RUSTDOCFLAGS: "-D warnings"
         run: cargo +1.70 doc -p secure-gate --features=full --no-deps
+
+      - name: cargo doc – compat (all features)
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo +1.70 doc -p secure-gate-compat --all-features --no-deps
 
   # ---------------------------------------------------------------------------
   # Compile-fail job — API-surface enforcement on the blessing toolchain

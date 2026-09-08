@@ -23,8 +23,8 @@
 //! | `SecretBox<T>` | [`Dynamic<T>`](secure_gate::Dynamic) |
 //! | `SecretString` | `Dynamic<String>` |
 //! | `SecretSlice<T>` | `Dynamic<Vec<T>>` |
-//! | `ExposeSecret<T>` | [`RevealSecret`](RevealSecret) |
-//! | `ExposeSecretMut<T>` | [`RevealSecretMut`](RevealSecretMut) |
+//! | `ExposeSecret<T>` | [`RevealSecret`](secure_gate::RevealSecret) |
+//! | `ExposeSecretMut<T>` | [`RevealSecretMut`](secure_gate::RevealSecretMut) |
 //! | `CloneableSecret` | [`CloneableSecret`](crate::CloneableSecret) (with `cloneable` feature) |
 //! | `SerializableSecret` | [`SerializableSecret`](crate::SerializableSecret) (with `serde-serialize` feature) |
 //!
@@ -34,7 +34,7 @@
 //! 2. Find/replace `use secrecy::` → `use secure_gate_compat::compat::v10::` (or `compat::` for traits)
 //! 3. Gradually replace `v10::SecretBox<T>` with [`Dynamic<T>`](secure_gate::Dynamic) using the
 //!    provided [`From`] conversions
-//! 4. Replace `compat::ExposeSecret` with [`RevealSecret`](RevealSecret) — bridge impls
+//! 4. Replace `compat::ExposeSecret` with [`RevealSecret`](secure_gate::RevealSecret) — bridge impls
 //!    on `Dynamic` and `Fixed` mean that call-sites using `.expose_secret()` continue to compile
 //! 5. Remove `secrecy-compat` feature once fully migrated
 
@@ -58,8 +58,8 @@ use secure_gate::RevealSecret;
 /// Heap-allocated secret wrapper — mirrors `secrecy::SecretBox`.
 ///
 /// Stores the secret in a `Box<S>`, zeroizes on drop, and only exposes the inner
-/// value through [`ExposeSecret`](super::ExposeSecret) /
-/// [`ExposeSecretMut`](super::ExposeSecretMut). `Debug` always prints `[REDACTED]`.
+/// value through [`ExposeSecret`](crate::compat::ExposeSecret) /
+/// [`ExposeSecretMut`](crate::compat::ExposeSecretMut). `Debug` always prints `[REDACTED]`.
 ///
 /// # Migration to native secure-gate
 ///
@@ -387,11 +387,11 @@ where
 
 // ── Legacy alias ─────────────────────────────────────────────────────────────
 
-/// Legacy type alias for [`SecretBox`] — mirrors `secrecy::Secret` from secrecy <0.9.
+/// Legacy type alias for [`SecretBox`](crate::compat::v10::SecretBox) — mirrors `secrecy::Secret` from secrecy <0.9.
 ///
-/// secrecy 0.9 renamed `Secret<T>` to `SecretBox<T>`. Use [`SecretBox`] instead.
+/// secrecy 0.9 renamed `Secret<T>` to `SecretBox<T>`. Use [`SecretBox`](crate::compat::v10::SecretBox) instead.
 ///
-/// **Note:** secrecy 0.8 users should use [`v08::Secret`](super::v08::Secret) instead,
+/// **Note:** secrecy 0.8 users should use [`v08::Secret`](crate::compat::v08::Secret) instead,
 /// which mirrors the original stack-allocated semantics.
 #[deprecated(
     since = "0.8.0",
