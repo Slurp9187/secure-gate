@@ -52,7 +52,9 @@ fn str_receiver_try_from_hex_decodes_via_blanket_impl() {
 /// re-exported at the crate root, and are the only items of their kind unique to this
 /// branch — an empty marker with no methods still needs a compile pin.
 ///
-/// Deliberately alloc-free so it runs in every `encoding-*` row, not just the alloc ones.
+/// Deliberately alloc-free so it runs in the `encoding-hex` rows whether or not `alloc`
+/// is on. It is gated on `encoding-hex`, so the base32/base64/bech32-only rows skip it —
+/// one row is enough to stop the traits from vanishing unnoticed.
 #[cfg(feature = "encoding-hex")]
 #[test]
 fn secure_encoding_and_decoding_markers_are_available() {

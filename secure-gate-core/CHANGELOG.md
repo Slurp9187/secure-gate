@@ -38,6 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`cargo doc` builds on 1.70 again; the bech32 re-exports are split.** The #171
+  backport reintroduced the grouped-`use` rustdoc ICE that `SecretLen` already hit:
+  `pub use traits::{Bech32Sized, Bech32Standard};` and two more grouped re-exports made
+  rustdoc 1.70 — this line's MSRV toolchain — panic resolving intra-doc links ("no
+  resolution for `Bech32Sized` MacroNS"), so `cargo doc` on 1.70 has been broken since
+  that backport. docs.rs builds on nightly and was never affected, which is why nothing
+  noticed. The three re-exports are split into six, each with its own doc comment, and
+  a `Rustdoc – builds on MSRV (1.70)` CI job now guards it with `-D warnings` (which
+  also catches broken intra-doc links, previously ungated). The job is scoped to core:
+  `secure-gate-compat` carries 11 pre-existing broken links and is never published.
 - **`base32_error_display` / `base64_error_display` were gated on `std` (audit).** A
   three-way merge artifact from the backport: the `DecodingError::source()` tests that
   once occupied those line positions were `std`-gated and were deleted by #171, and the

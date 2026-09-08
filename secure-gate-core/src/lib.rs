@@ -560,9 +560,9 @@ pub use traits::EncodableBytes;
 /// Bech32 (BIP-173) checksum with a caller-chosen code length. `N` caps the length of
 /// the whole encoded string and never enters the checksum. Above [`BECH32_CODE_LENGTH`]
 /// the BCH error-detection guarantee no longer holds - see the type docs.
-///
-/// Split from a grouped `pub use`: rustdoc 1.70 ICEs resolving an intra-doc link out of
-/// a grouped re-export, the same bug already worked around for `SecretLen`.
+// Kept as separate `use` statements on purpose: rustdoc 1.70 (this line's MSRV
+// toolchain) ICEs resolving intra-doc links on a grouped `pub use a::{B, C};`
+// re-export — the same bug already worked around for `SecretLen` above.
 #[cfg(feature = "encoding-bech32")]
 pub use traits::Bech32Sized;
 
