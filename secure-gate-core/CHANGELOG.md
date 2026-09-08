@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Caller-chosen bech32 / bech32m code length.** `Bech32Sized<N>` and `Bech32mSized<N>`
+  are const-generic `Checksum` implementations, and every bech32 and bech32m entry point
+  gained a `_sized::<N>` twin:
+
+  ```rust
+  use secure_gate::{ToBech32, bech32_code_length};
+
+  const N: usize = bech32_code_length(3, 1568);   // hrp "kem", ML-KEM-1024 ciphertext
+  let encoded = ct.try_to_bech32_sized::<N>("kem")?;
+  ```
+
+  Sized twins exist on `ToBech32` / `ToBech32m`, on
+  `FromBech32Str` / `FromBech32mStr` (HRP-checked and `_unchecked`), on
+  `Fixed::try_from_bech32*` and `Dynamic::try_from_bech32*`, and on the surface the
+  `fixed_newtype!` / `dynamic_newtype!` macros forward. `bech32_code_length(hrp_len,
+  payload_bytes)` is a `const fn` that sizes `N` exactly: HRP + separator + base32
+  payload + checksum, all four of which the previous "maximum payload" figures omitted.
+
+  **`N` is a length gate, not part of the encoding.** It never enters the checksum, so
+  the same bytes and HRP encode byte-identically at every `N` that admits them, a string
+  decodes under any `N` at least as large as itself, and a stored value stays valid
+  whatever `N` a later caller picks. Above `BECH32_CODE_LENGTH` the BCH error-detection
+  guarantee lapses — the type docs say so, and the choice is now spelled at the call
+  site rather than baked into a default.
+
+- **The encoding traits no longer accept string-shaped inputs.** Every `To*` trait is
+  now blanket-implemented for `AsRef<[u8]> + EncodableBytes` rather than `AsRef<[u8]>`
+  alone. `EncodableBytes` is a public opt-in marker in the same family as
+  `CloneableSecret` and `SerializableSecret`, implemented here for `[u8]`, `[u8; N]` and
+  `Vec<u8>`; implement it for your own byte newtype to make it encodable.
+
+  It exists because `str: AsRef<[u8]>` made every string an encoding *input* even though
+  strings are this crate's decoding input, which produced two silent wrong answers:
+  `encoded.to_hex()` compiled for an `EncodedSecret` (which derefs to `str`) and
+  hex-encoded the *encoded text* — a 32-byte key returning 124 characters — and
+  `"text".to_hex()` encoded a string's UTF-8 by accident. Both are compile errors now,
+  pinned by `encoded_secret_no_reencode` and `str_not_encodable`. Write `.as_bytes()`
+  when the UTF-8 is what you meant.
+
+  Unlike the `SecureEncoding` marker removed earlier in this release, this one is
+  load-bearing: deleting the bound changes which calls compile. Nothing in the byte-side
+  API moved — `[u8; N]`, `Vec<u8>`, `&[u8]` and `b"..."` all encode exactly as before,
+  and `Deref` on `EncodedSecret` is untouched.
+
 ### Changed
 
 - **BREAKING: every encoder returns `EncodedSecret`; the `*_zeroizing` variants are
@@ -31,84 +77,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `format!("{}", &*encoded)`, and no `PartialEq`, because comparing secret material with
   `==` is variable-time — that is what `ConstantTimeEq` is for.
 
-### Added
-
-- **Caller-chosen bech32 / bech32m code length.** `Bech32Sized<N>` and `Bech32mSized<N>`
-  are const-generic `Checksum` implementations, and every bech32 and bech32m entry point
-  gained a `_sized::<N>` twin:
+- **BREAKING: `RevealSecret::into_inner()` returns the plain value, not
+  `InnerSecret<T>`.** Protection ends at the call, and the call is the whole hand-off:
 
   ```rust
-  use secure_gate::{ToBech32, bech32_code_length};
-
-  const N: usize = bech32_code_length(3, 1568);   // hrp "kem", ML-KEM-1024 ciphertext
-  let encoded = ct.try_to_bech32_sized::<N>("kem")?;
+  let v: Vec<u8> = secret.into_inner();
   ```
 
-  Sized twins exist on `ToBech32` / `ToBech32m` (plain and `_zeroizing`), on
-  `FromBech32Str` / `FromBech32mStr` (HRP-checked and `_unchecked`), on
-  `Fixed::try_from_bech32*` and `Dynamic::try_from_bech32*`, and on the surface the
-  `fixed_newtype!` / `dynamic_newtype!` macros forward. `bech32_code_length(hrp_len,
-  payload_bytes)` is a `const fn` that sizes `N` exactly: HRP + separator + base32
-  payload + checksum, all four of which the previous "maximum payload" figures omitted.
+  The old shape was `secret.into_inner().into_zeroizing()`, or a clone through the
+  deref. `zeroize` deliberately exposes no way to move a value out of `Zeroizing<T>`, so
+  the only route from a `Dynamic<Vec<u8>>` to an owned `Vec<u8>` was three calls and a
+  second full copy of the secret, plus a wasted allocation for anything large.
 
-  **`N` is a length gate, not part of the encoding.** It never enters the checksum, so
-  the same bytes and HRP encode byte-identically at every `N` that admits them, a string
-  decodes under any `N` at least as large as itself, and a stored value stays valid
-  whatever `N` a later caller picks. Above `BECH32_CODE_LENGTH` the BCH error-detection
-  guarantee lapses — the type docs say so, and the choice is now spelled at the call
-  site rather than baked into a default.
-
-- **`RevealSecret::into_plain()` — the owned handoff, in one call.** `InnerSecret` was a dead end.
-  [`into_zeroizing`] hands back a `Zeroizing<T>`, and `zeroize` deliberately exposes no
-  way to move a value out of that wrapper, so the only route from a `Dynamic<Vec<u8>>`
-  to an owned `Vec<u8>` was to clone through the deref: three calls and a second full
-  copy of the secret, plus a wasted allocation for anything large. `EncodedSecret` has
-  had the equivalent escape hatch all along; the value wrapper did not.
-
-  ```rust
-  let v: Vec<u8> = secret.into_plain();
-  ```
-
-  `InnerSecret::into_plain()` is the same escape one level down, for code that already
-  holds one. It is deliberately *not* named `into_inner`: `secret.into_inner().into_inner()`
-  reads as noise, and the type is already called `InnerSecret`.
-
-  No copy is made. The value is moved out with `mem::replace` and an inert
+  No copy is made now. The value is moved out with `mem::replace` and an inert
   `SentinelValue` is left to be zeroized in its place — the same mechanism `Fixed` and
-  `Dynamic` already use for their own `into_inner`, so the bound (`T: SentinelValue`)
-  excludes nothing that could reach an `InnerSecret` in the first place. The returned
-  `T` is an ordinary value: protection is maximal right up to the call, and the call
-  ends it. Pinned by a test asserting pointer identity, so a future refactor that turns
-  the move back into a copy fails.
+  `Dynamic` already used internally, so the bound (`T: SentinelValue`) excludes nothing
+  that could reach a secret wrapper in the first place. The returned `T` is an ordinary
+  value: protection is maximal right up to the call, and the call ends it. Pinned by a
+  test asserting pointer identity, so a future refactor that turns the move back into a
+  copy fails.
 
-- **The encoding traits no longer accept string-shaped inputs.** Every `To*` trait is
-  now blanket-implemented for `AsRef<[u8]> + EncodableBytes` rather than `AsRef<[u8]>`
-  alone. `EncodableBytes` is a public opt-in marker in the same family as
-  `CloneableSecret` and `SerializableSecret`, implemented here for `[u8]`, `[u8; N]` and
-  `Vec<u8>`; implement it for your own byte newtype to make it encodable.
-
-  It exists because `str: AsRef<[u8]>` made every string an encoding *input* even though
-  strings are this crate's decoding input, which produced two silent wrong answers:
-  `encoded.to_hex()` compiled for an `EncodedSecret` (which derefs to `str`) and
-  hex-encoded the *encoded text* — a 32-byte key returning 124 characters — and
-  `"text".to_hex()` encoded a string's UTF-8 by accident. Both are compile errors now,
-  pinned by `encoded_secret_no_reencode` and `str_not_encodable`. Write `.as_bytes()`
-  when the UTF-8 is what you meant.
-
-  Unlike the `SecureEncoding` marker removed earlier in this release, this one is
-  load-bearing: deleting the bound changes which calls compile. Nothing in the byte-side
-  API moved — `[u8; N]`, `Vec<u8>`, `&[u8]` and `b"..."` all encode exactly as before,
-  and `Deref` on `EncodedSecret` is untouched.
-
-### Changed
+  **Migration:** write `secret.into_inner()` where you wrote
+  `secret.into_inner().into_zeroizing()` or `secret.expose_secret().clone()`. To keep the
+  wiping past the hand-off, keep the wrapper, or wrap the value yourself with
+  `zeroize::Zeroizing::new(..)`.
 
 - **BREAKING: the default bech32 code length is 1023, not 8191, and `Bech32Large` is
   gone.** `ToBech32` / `FromBech32Str` used a custom checksum whose `CODE_LENGTH` was
-  8191 — eight times the length of the bech32 BCH code, which is 1023 in the `bech32`
-
-  8191 — roughly eight times the length of the bech32 BCH code, which is 1023 in the `bech32`
-
-  crate for both `Bech32` and `Bech32m`. That constant is documented upstream as "how
+  8191 — roughly eight times the length of the bech32 BCH code, which is 1023 in the
+  `bech32` crate for both `Bech32` and `Bech32m`. That constant is documented upstream as "how
   long a coded message can be ... for the code to retain its error-correcting
   properties", so 8191 silently gave every caller a checksum stretched past the point
   where it detects anything in particular, while the rustdoc claimed it preserved "full
@@ -136,6 +133,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **BREAKING: `InnerSecret<T>`.** The wrapper `into_inner` used to return. It was a
+  newtype over `Zeroizing<T>` whose only distinct behaviour was escaping this crate's own
+  no-`Deref` rule, and it made the owned hand-off read as
+  `secret.into_inner().into_zeroizing()` — two calls, and a clone for anything you
+  actually wanted to own. Its redacted `Debug` was the argument for keeping it, but a
+  value the caller has just taken ownership of is past the point where this crate's
+  redaction means anything: `format!("{:?}", &*inner)` printed the secret already.
+
+  **Migration:** `into_inner()` hands back the `T` directly. If you want the wiping to
+  continue, wrap it yourself: `zeroize::Zeroizing::new(secret.into_inner())`.
+
 - **BREAKING: `AsRef<str>` and `AsRef<[u8]>` on `EncodedSecret`.** The type now has one
   accessor, `Deref<Target = str>`, plus the two named consumers `into_inner` (ends
   zeroization) and `into_zeroizing` (keeps it). The `AsRef` impls reached nothing
@@ -143,15 +151,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   method resolution through the deref all still work. For a type whose purpose is
   making extraction visible, four doors onto the same room was three too many.
 
-  **This does not close the accidental re-encode.** `encoded.to_hex()` still compiles,
-  because method resolution derefs to `str` and `str: AsRef<[u8]>` satisfies the
-  encoder blanket impls — so an already-encoded secret can be encoded a second time,
-  taking the encoded text as input (a 32-byte key comes back as 124 hex characters).
-  A compile-fail test written to pin the fix proved it: *"Expected test case to fail to
-  compile, but it succeeded."* The reachability comes from `Deref`, not from the
-  `AsRef` impls, and removing `Deref` would take the type's primary accessor with it.
-  Recorded in the type's source next to the documented boundary at *Where
-  accident-prevention ends* rather than papered over.
+  **This alone did not close the accidental re-encode.** `encoded.to_hex()` still
+  compiled afterwards, because method resolution derefs to `str` and `str: AsRef<[u8]>`
+  satisfied the encoder blanket impls — so an already-encoded secret could be encoded a
+  second time, taking the encoded text as input (a 32-byte key came back as 124 hex
+  characters). A compile-fail test written to pin the fix proved it: *"Expected test
+  case to fail to compile, but it succeeded."* The reachability came from `Deref`, and
+  dropping `Deref` would take the type's primary accessor with it. What closed it is the
+  `EncodableBytes` bound above: `str` does not implement it, so the second encode is a
+  compile error, pinned by `encoded_secret_no_reencode`.
 
 - **BREAKING: `SecureEncoding` / `SecureDecoding` marker traits.** Both were empty
   markers with blanket impls over `AsRef<[u8]>` / `AsRef<str>`, and nothing in the crate
@@ -239,8 +247,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Pinned by `bech32_encode_allocates_exactly_once` and its bech32m twin, which assert
   `capacity() == len()` across nine payload sizes; both fail against the old code.
 
-### Fixed
-
   **And the stack.** Adversarial review then pointed out that `encode_lower_to_fmt`
   itself stages every output character through a 1 KiB stack array
   (`let mut buf = [0u8; BUF_LENGTH]`) that it never clears, so after the call returned
@@ -264,7 +270,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The newtype macros forwarded the sized bech32 *encoders* and not the *decoders*
   (adversarial review, three lenses independently).** `fixed_newtype!` emitted
-  `try_to_bech32{,m}_sized{,_zeroizing}` but none of `try_from_bech32{,m}{,_unchecked}_sized`;
+  `try_to_bech32{,m}_sized` but none of `try_from_bech32{,m}{,_unchecked}_sized`;
   `dynamic_newtype!` was worse, with a single plain `try_from_bech32` and no
   `_unchecked`, no bech32m decode at all, and no sized variants. So a newtype could emit
   a 900-byte secret at a custom code length and then had no way to read it back except

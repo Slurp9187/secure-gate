@@ -6,7 +6,7 @@
 - **No unsafe code** — `#![forbid(unsafe_code)]` enforced in the library crate.
 - **3-tier access model** — explicit hierarchy (prefer Tier 1 scoped methods). Audit Tier 2/3 calls separately.
 - **Explicit exposure while held** — while a secret is inside `Fixed`/`Dynamic`, all external access requires `with_secret`/`expose_secret` (or mutable equivalents); those two types implement no `Deref`/`AsRef`. Internal impls (`Clone`, `Serialize`) access `.inner` directly by design — they require opt-in marker traits and do not expose secrets to callers.
-- **Extraction is a hand-off** — the output wrappers (`InnerSecret`, `EncodedSecret`) returned by `into_inner` / `to_*_zeroizing` **do** implement `Deref`. They keep zeroize-on-drop and redacted `Debug` for the buffer they own; copies you make through `Deref` are ordinary values. See [Where accident-prevention ends](#where-accident-prevention-ends).
+- **Extraction is a hand-off** — `into_inner` transfers ownership of the plain value and **ends protection**: what you get back is an ordinary `[u8; N]` / `String` / `Vec<T>` with no zeroize-on-drop and no redacted `Debug`. Encoding is the exception: every encoder returns `EncodedSecret`, which keeps zeroize-on-drop and a redacted `Debug` for the buffer it owns, because an encoded secret is a second full copy of the secret. Copies you make through its `Deref` are ordinary values. See [Where accident-prevention ends](#where-accident-prevention-ends).
 - **Zeroization on drop** — full buffer (incl. spare capacity) is wiped (inner type must implement `Zeroize`).
 - **Timing-safe equality** — use `.ct_eq()` (`ct-eq` feature); `==` is deliberately not implemented.
 - **Opt-in risk** — cloning/serialization requires marker traits (`CloneableSecret`/`SerializableSecret`).
@@ -20,7 +20,7 @@ This document outlines the security model, design choices, strengths, limitation
 - **`panic = "abort"` / SIGKILL / hard crash** — `Drop` impls do not run; secrets are not cleared.
 - **`static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized.
 - **Copies made by caller code** — after `expose_secret()`, encoding, or serialization, the caller holds ordinary non-zeroized memory.
-- **Encoded/serialized output** — `to_hex()`, `to_base32()`, `to_base64url()`, and serde `Serialize` produce full secrets in ordinary, non-zeroizing `String`s. Prefer the zeroizing variants (`to_*_zeroizing`, `try_to_bech32*_zeroizing`) that return `EncodedSecret` (wrapping `Zeroizing<String>` with redacted `Debug`) when the encoded form must remain sensitive. These zeroizing methods are available both as wrapper conveniences (`Fixed` / `Dynamic`) and on the encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
+- **Encoded/serialized output** — every encoder (`to_hex()`, `to_base32()`, `to_base64url()`, `try_to_bech32()`, `try_to_bech32m()`) returns `EncodedSecret`: `Zeroizing<String>` with a redacted `Debug` and no `Display`, so the encoded copy is wiped on drop. serde `Serialize`, by contrast, produces full secrets in ordinary non-zeroizing buffers that this crate cannot reach. `EncodedSecret::into_inner()` is the named call that hands you an unprotected `String`.
 - **All side channels beyond equality timing** — cache, power, EM, and branch-predictor attacks are out of scope.
 - **Allocation-based DoS from deserialization** — `MAX_DESERIALIZE_BYTES` is a post-materialization bound only; the upstream deserializer may allocate arbitrarily first.
 - **Stack/register residue** — temporaries, FFI boundaries, and compiler spills are outside wrapper control.
@@ -135,7 +135,7 @@ All secret access follows this explicit hierarchy (the table below expands on th
 
 - **Tier 1 — Scoped borrow (preferred)**: `with_secret` / `with_secret_mut` — borrow ends when closure returns, minimizing exposure.
 - **Tier 2 — Direct reference (escape hatch)**: `expose_secret` / `expose_secret_mut` — long-lived references; use only for FFI or third-party APIs requiring `&T`/`&mut T`.
-- **Tier 3 — Owned consumption**: `into_inner` — returns `InnerSecret<T>` (wraps `Zeroizing<T>`); zeroization transfers to caller. Audit separately.
+- **Tier 3 — Owned consumption**: `into_inner` — returns the plain `T`; **protection ends at the call**. Nothing is copied (an inert sentinel is left for the wrapper's `Drop`), but the value you receive is not wiped for you. Audit separately: `grep into_inner`.
 
 - **Streaming I/O (via `as_reader()`)**: `DynamicReader` implements `std::io::Read` by copying secret bytes into caller-provided buffers through `with_secret` internally. The caller owns zeroization of the destination buffer. `std::io::Write` on `Dynamic<Vec<u8>>` flows data **into** the wrapper, so it is not a *read* surface — but writing past capacity used to leave the outgoing buffer unwiped (see [Heap-reallocation residue](#2-heap-reallocation-residue-dynamicvect--dynamicstring)). That path now grows by hand and zeroizes the old allocation before releasing it. Requires the `std` feature.
 
@@ -151,21 +151,21 @@ the crate makes two different promises on either side of it.
 | Accidents must not compile | While the secret is held in `Fixed`/`Dynamic`. Ends at the named extraction. |
 | Documented behavior must be accurate | Everywhere, forever. |
 
-`into_inner`, `expose_secret`, and `to_*_zeroizing` are named exits. You typed the name,
+`into_inner`, `expose_secret`, and `EncodedSecret::into_inner` are named exits. You typed the name,
 the call site is grep-able, and ownership transfers to you. Past that point the crate is
 not trying to follow the bytes — that would mean either a fourth wrapper or a false claim.
 
 **What the output wrappers still do**: zeroize the buffer they own on drop, and print
 `[REDACTED]` for `Debug`.
 
-**What they do not do**: track copies. `InnerSecret<T>` derefs to `T` and `EncodedSecret`
+**What they do not do**: track copies. `EncodedSecret`
 derefs to `str`, so all of the following produce ordinary, untracked plaintext, by design:
 
 ```rust,ignore
-let inner = key.into_inner();         // InnerSecret<[u8; 32]>
+let inner = key.into_inner();         // [u8; 32] — plain, no longer wiped
 let copy: [u8; 32] = *inner;          // arrays are Copy — untracked
 
-let enc = key.to_hex_zeroizing();     // EncodedSecret
+let enc = key.to_hex();               // EncodedSecret — wiped on drop
 let s: String = enc.to_string();      // via Deref<Target = str> — untracked
 ```
 
@@ -174,7 +174,7 @@ Two specific consequences:
 - **`Debug` redaction does not survive a deref.** `format!("{:?}", inner)` prints
   `[REDACTED]`; `format!("{:?}", &*inner)` prints the secret. Redaction is a property of
   the wrapper, not of `T`.
-- **`into_zeroizing()` is a downgrade.** It returns `zeroize::Zeroizing<T>`, whose `Debug`
+- **`EncodedSecret::into_zeroizing()` is a downgrade.** It returns `zeroize::Zeroizing<String>`, whose `Debug`
   is not redacted (`zeroize` 1.8/1.9 derive it; a future release may change the
   rendering). Zeroize-on-drop is preserved, redaction is not. It exists for APIs that
   demand a `Zeroizing<T>` by name. Note that this crate does not re-export `zeroize`, so
@@ -233,7 +233,7 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 - Use `.ct_eq()` (`ct-eq` feature) for comparisons; avoid `==`. Bound untrusted input size at the transport/parser layer.
 - Audit all `CloneableSecret`/`SerializableSecret` implementations.
 - Validate inputs before encoding/decoding or using format-specific traits.
-- For encoding: prefer zeroizing methods (`to_hex_zeroizing`, `to_hex_upper_zeroizing`, `to_base32_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, `try_to_bech32m_zeroizing`) that return `EncodedSecret` when the encoded value should remain protected.
+- For encoding: every encoder returns `EncodedSecret`, which stays wiped until it drops. Read it with `&*encoded` (it derefs to `str`); call `.into_inner()` only when an API demands an owned `String`, which is the named moment protection ends.
 - Monitor dependencies for CVEs.
 - Treat secrets as radioactive — minimize exposure surface.
 
@@ -268,10 +268,16 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   sentinel allocation can OOM. Confidentiality is preserved — if `Box::new` panics
   before the swap, `self.inner` still holds the real secret and `Dynamic::drop` zeroizes
   it during unwind. `Fixed::into_inner` is zero-cost (no allocation).
-- **`into_inner` now returns `InnerSecret<T>` with redacted `Debug`.**
-  `InnerSecret<T>` restores the wrapper-level `[REDACTED]` invariant after ownership
+- **`into_inner` returns the plain value; protection ends there.**
+  Earlier releases returned an `InnerSecret<T>` that kept wiping. That type is gone: it
+  was a newtype over `Zeroizing<T>` whose only distinct behaviour was escaping this
+  crate's own no-`Deref` rule. If you want the protection to continue, keep the wrapper,
+  or move the value into `zeroize::Zeroizing` yourself. The old text follows for
+  historical context and no longer describes the API.
+
+  <!-- historical: InnerSecret<T> restored the wrapper-level `[REDACTED]` invariant after ownership
   transfer by implementing `Debug` as constant redaction. Use
-  `InnerSecret::into_zeroizing()` only when interoperability requires the raw
+  `InnerSecret::into_zeroizing()` only when interoperability required the raw
   `Zeroizing<T>` wrapper.
 - **`panic = "abort"` builds disable zeroization on panic.** When `panic = "abort"`
   is set in a profile, Rust aborts the process immediately on panic without running
@@ -289,7 +295,7 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   copy the data, and free the old one through the standard allocator — *without
   zeroizing the old buffer first*. The freed bytes remain readable in the heap
   until the allocator reuses or unmaps the page, and they survive into core
-  dumps and swap.
+  dumps and swap. -->
 
   **If your threat model includes process-memory disclosure (heap scrape, swap,
   core dump) of secrets that have been mutated in place after construction,
@@ -393,14 +399,13 @@ All secret materialization requires an explicit call. Use `rg`, `grep -rn`, or y
 ```
 expose_secret  expose_secret_mut  with_secret  with_secret_mut
 into_inner
-to_hex  to_base32  to_base64url  try_to_bech32  try_to_bech32m
-to_hex_zeroizing  to_hex_upper_zeroizing  to_base32_zeroizing
-to_base64url_zeroizing  try_to_bech32_zeroizing  try_to_bech32m_zeroizing
+to_hex  to_hex_upper  to_base32  to_base64url
+try_to_bech32  try_to_bech32m  try_to_bech32_sized  try_to_bech32m_sized
 ```
 
 **Note:** `into_inner` does not appear in an `expose_secret*`-only sweep — audit it
-separately. It consumes the wrapper and transfers ownership to a `Zeroizing<T>`;
-the caller is responsible for letting it drop normally (no `mem::forget`).
+separately. It consumes the wrapper and transfers ownership of the **plain** value:
+protection ends at the call, and the caller owns the secret's lifetime from there.
 
 Encoding traits (`ToHex`, `ToBech32`, etc.) are **explicit secret exposure** — they will not appear in an `expose_secret`-only sweep, so audit them separately.
 
@@ -420,12 +425,15 @@ If even coarse error categories or length metadata are sensitive in your deploym
 
 ## Encoding: Sensitive vs. Public Output
 
-Encoding methods on `Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`, and the encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`) come in two flavors:
+Encoding methods on `Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`, and the encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`) all return the same protected type:
 
-| Variant | Return type | Zeroized? | When to use |
-| ------- | ----------- | --------- | ----------- |
-| `to_hex()`, `to_hex_upper()`, `to_base32()`, `to_base64url()`, `try_to_bech32()`, `try_to_bech32m()` | `String` / `Result<String, _>` | No | Public encodings — transaction IDs, addresses, non-sensitive identifiers |
-| `to_hex_zeroizing()`, `to_hex_upper_zeroizing()`, `to_base32_zeroizing()`, `to_base64url_zeroizing()`, `try_to_bech32_zeroizing()`, `try_to_bech32m_zeroizing()` | `EncodedSecret` / `Result<EncodedSecret, _>` | Yes (on drop) | Sensitive encodings — private keys, long-lived tokens, full secret exports |
+| Method | Returns | Zeroized on drop? |
+|---|---|---|
+| `to_hex()`, `to_hex_upper()`, `to_base32()`, `to_base64url()` | `EncodedSecret` | Yes |
+| `try_to_bech32()`, `try_to_bech32m()`, and their `_sized::<N>` forms | `Result<EncodedSecret, _>` | Yes |
+| `EncodedSecret::into_inner()` | `String` | **No — protection ends here** |
+
+There is no unprotected encoder. Earlier releases paired each method with a `*_zeroizing` twin and made the *unprotected* one the short name; that pairing is gone. An encoded secret is a second full copy of the secret in a longer, human-readable alphabet, so it is wiped by default and the unprotected form costs a named call.
 
 `EncodedSecret` wraps `Zeroizing<String>`, redacts `Debug` as `[REDACTED]`, and zeroizes the string buffer on drop. Keep values in this form as long as possible.
 

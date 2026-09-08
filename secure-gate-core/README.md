@@ -68,7 +68,7 @@ pw.expose_secret_mut().clear();
 - `.len()` / `.is_empty()` via `SecretLen` — without exposing contents (length itself can still be sensitive)
 - Zeroize on drop (always)
 - Access via `.with_secret(|s| ...)` (preferred) or `.expose_secret()` (auditable escape hatch)
-- Owned extraction via `.into_inner()` → `InnerSecret<T>` (wraps `Zeroizing<T>`, transfers zeroization to caller)
+- Owned extraction via `.into_inner()` → the plain `T`; nothing is copied and protection ends at the call
 - Streaming I/O via `impl Write` and `.as_reader()` for `Dynamic<Vec<u8>>` (requires `std`)
 
 ### Preferred: scoped access
@@ -183,7 +183,7 @@ fn require_min_len<S: SecretLen>(secret: &S, min: usize) -> bool {
 ## What You Get
 
 - **Zero-cost safety** — mandatory zeroization on drop; `no_std` / `no_alloc` support.
-- **Audit-first API** — a held secret cannot leak via `Deref`: `Fixed`/`Dynamic` implement none. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch. Extraction (`into_inner`, `to_*_zeroizing`) hands ownership to the caller and returns output wrappers that *do* deref — see [Where accident-prevention ends](SECURITY.md#where-accident-prevention-ends).
+- **Audit-first API** — a held secret cannot leak via `Deref`: `Fixed`/`Dynamic` implement none. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch. `into_inner` hands ownership to the caller and ends protection; encoders return `EncodedSecret`, which *does* deref and stays wiped until it drops — see [Where accident-prevention ends](SECURITY.md#where-accident-prevention-ends).
 - **Named secret types** — `*_alias!` macros create `type` aliases over `Fixed` / `Dynamic` that inherit redacted `Debug` and zeroize-on-drop; same-shape aliases (e.g. two `Fixed<[u8; 32]>` aliases) are interchangeable at the type level. When distinct cryptographic roles share a shape, `fixed_newtype!` / `dynamic_newtype!` generate `struct`s instead, so the compiler rejects a swapped key role at the call site.
 - **Batteries included** — optional, zero-overhead support for serde, constant-time comparison (`subtle`), and secure encoding (hex, base32, base64url, bech32/m).
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`.
@@ -342,13 +342,13 @@ Encoding and decoding methods are **convenience wrappers** that internally use s
 
 They exist because users who call them have already decided to reveal the secret — the wrapper reduces boilerplate and avoids long-lived raw references.
 
-Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`) to maintain the zeroization guarantee for sensitive encoded output.
+Every encoder returns [`EncodedSecret`] (wrapping `Zeroizing<String>` with a redacted `Debug` and no `Display`), so encoded output is wiped on drop by default.
 
 **Audit every exposure point** by searching your codebase for:
 
 - **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
-- **Extract:** `into_inner` (hands the secret to the caller as `InnerSecret<T>`), `as_reader` (yields a reader over the secret bytes)
-- **Encode:** `to_hex`, `to_hex_upper`, `to_base32`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, `to_*_zeroizing`, `try_to_bech32*_zeroizing`
+- **Extract:** `into_inner` (hands the plain secret to the caller; protection ends), `as_reader` (yields a reader over the secret bytes)
+- **Encode:** `to_hex`, `to_hex_upper`, `to_base32`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and their `_sized::<N>` forms — all returning `EncodedSecret`
 - **Decode:** `try_from_hex`, `try_from_base32`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
 
 **Best practice**: Prefer scoped methods (`with_secret` / `with_secret_mut`) when possible — they keep exposure minimal.

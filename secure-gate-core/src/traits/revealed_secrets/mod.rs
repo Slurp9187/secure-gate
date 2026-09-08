@@ -8,13 +8,12 @@
 //! is worth keeping wiped until it drops.
 //!
 //! - [`EncodedSecret`] — returned by every encoding method (`to_hex`, `to_base32`,
-//!   `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and their `_sized` forms)
-//!   when the encoded form itself must remain sensitive.
+//!   `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and their `_sized` forms).
 //!
-//! Both types wrap [`zeroize::Zeroizing`] internally, provide redacted `Debug`
-//! (`[REDACTED]`), and offer an `into_zeroizing()` escape hatch. They are the
-//! idiomatic way to transfer ownership while preserving the crate’s “secrets are
-//! radioactive” guarantees.
+//! It wraps [`zeroize::Zeroizing`] internally, provides redacted `Debug` (`[REDACTED]`),
+//! and offers an `into_zeroizing()` escape hatch. It is the idiomatic way to hand off
+//! encoded output while preserving the crate’s “secrets are radioactive”
+//! guarantees.
 //!
 //! See the [3-Tier Access Model](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#3-tier-access-model)
 //! and the [“What secure-gate does NOT protect against”](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#what-secure-gate-does-not-protect-against)

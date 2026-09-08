@@ -22,7 +22,7 @@ Compatibility shims for migrating from the [`secrecy`](https://crates.io/crates/
   *Mitigation*: Prefer Tier 1 scoped methods in application code; audit every Tier 2 use.
 
 - **Tier 3 owned consumption** (`into_inner`): transfers ownership out of wrapper protection and does not appear in `expose_secret` grep sweeps.  
-  *Mitigation*: Audit `into_inner` calls separately; zeroization transfers to returned `InnerSecret<T>`.
+  *Mitigation*: Audit `into_inner` calls separately (`grep into_inner`). It returns the plain value and protection ends at the call — the caller owns the secret's lifetime from there.
 
 - **Clone window in conversions** (`SecretBox<S> → Dynamic<S>` requires `S: Clone`): temporary copy before zeroization.  
   *Mitigation*: Prefer `init_with_mut` constructors where possible.

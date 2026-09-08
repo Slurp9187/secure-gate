@@ -6,8 +6,10 @@
 //! returned by every encoding method (`to_hex`, `to_base32`, `to_base64url`,
 //! `try_to_bech32`, `try_to_bech32m`, and their `_sized` forms).
 //!
-//! Prefer zeroizing variants when the encoded form is sensitive (private keys, tokens).
-//! Use plain `String` variants for public encodings (addresses, transaction IDs).
+//! There is no unprotected encoder variant. An encoded secret is a second full copy of
+//! the secret in a longer, human-readable alphabet, so it is wiped by default; public
+//! encodings (addresses, transaction IDs) come back in the same wrapper. Name
+//! [`into_inner`](EncodedSecret::into_inner) when you genuinely want a plain `String`.
 //!
 //! This is **not** a secret wrapper like [`Fixed`](crate::Fixed) / [`Dynamic`](crate::Dynamic)
 //! — it is a zeroizing `String` wrapper for encoded output. Its only accessor is
@@ -114,10 +116,11 @@ impl core::fmt::Debug for EncodedSecret {
 // coercion, by `&*encoded`, and through method resolution, so both impls were doors
 // onto a room `Deref` already opens.
 //
-// Note what this does *not* fix. `encoded.to_hex()` still compiles, because method
-// resolution derefs to `str` and `str: AsRef<[u8]>` satisfies the encoder blanket
-// impls — so an already-encoded secret can still be encoded a second time, taking the
-// encoded text as input. That reachability comes from `Deref`, not from these impls;
-// removing it would mean dropping `Deref`, which is the type's primary accessor.
-// Filed here rather than papered over: it belongs with the documented boundary at
-// [Where accident-prevention ends](crate#where-accident-prevention-ends).
+// Removing them did not, on its own, close the accidental re-encode: method resolution
+// derefs to `str`, and `str: AsRef<[u8]>` satisfied the old encoder blanket impls, so
+// `encoded.to_hex()` compiled and hex-encoded the encoded text. That reachability comes
+// from `Deref`, which is the type's primary accessor and stays. The bound closed it
+// instead — the encoders now require `AsRef<[u8]> + EncodableBytes`, and `str` does not
+// implement `EncodableBytes`, so the second encode is a compile error. Pinned by the
+// `encoded_secret_no_reencode` compile-fail test. The surviving boundary is documented
+// at [Where accident-prevention ends](crate#where-accident-prevention-ends).

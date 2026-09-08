@@ -118,20 +118,22 @@
 //! is grep-able, and ownership moves to you.
 //!
 //! **Documented behavior must be accurate.** This never ends, and it is why the
-//! taxonomy table above says `Deref: Yes` for output wrappers.
+//! taxonomy table above says `Deref: Yes` for the output wrapper.
 //!
-//! What an output wrapper still guarantees: the buffer *it* owns is zeroized on drop,
+//! What [`EncodedSecret`] still guarantees: the `String` it owns is zeroized on drop,
 //! and its `Debug` prints `[REDACTED]`. What it does not guarantee: copies you make
-//! through `Deref` are ordinary values. `*inner` on a `Copy` type, `str::to_string()`,
-//! and `.to_owned()` all produce untracked plaintext. That is what extraction is for —
-//! the crate is not trying to follow the bytes into your TLS stack.
+//! through `Deref` are ordinary values. `str::to_string()` and `.to_owned()` both
+//! produce untracked plaintext. That is what extraction is for — the crate is not
+//! trying to follow the bytes into your TLS stack. `into_inner` gives up even the first
+//! guarantee, by design: it is the named end of protection.
 //!
 //! Two consequences worth knowing:
 //!
-//! - `format!("{:?}", &*inner)` prints the secret. Redaction lives on the wrapper, not
-//!   on `T`; dereferencing first opts out of it.
-//! - `into_zeroizing()` returns [`zeroize::Zeroizing<T>`], whose `Debug` is **not**
-//!   redacted. It is a deliberate hand-off to a foreign type, not an equivalent wrapper.
+//! - `format!("{:?}", &*encoded)` prints the encoded secret. Redaction lives on the
+//!   wrapper, not on `str`; dereferencing first opts out of it.
+//! - [`EncodedSecret::into_zeroizing`] returns a `Zeroizing<String>`, whose `Debug` is
+//!   **not** redacted. It is a deliberate hand-off to a foreign type, not an equivalent
+//!   wrapper.
 //!
 //! # Import paths
 //!
@@ -424,11 +426,13 @@ pub use traits::SentinelValue;
 ///
 /// This is an **output wrapper** — it exists *only* to keep encoded data zeroized until
 /// it drops. It is **not** a secret wrapper like [`Fixed`]/[`Dynamic`] and does not
-/// accept [`CloneableSecret`] or [`SerializableSecret`] markers. See also
-/// Returned by every encoding method (`to_hex`, `to_base32`, `to_base64url`,
-/// `try_to_bech32`, `try_to_bech32m`, and their `_sized` forms).
-/// Wraps `Zeroizing<String>` with `Debug` → `[REDACTED]`. Implements `Deref<Target = str>`,
-/// `AsRef<str>`, and `AsRef<[u8]>`. Deliberately **no** `Display`: `{}` on this type is
+/// accept [`CloneableSecret`] or [`SerializableSecret`] markers.
+///
+/// Returned by every encoding method (`to_hex`, `to_hex_upper`, `to_base32`,
+/// `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and their `_sized` forms).
+/// Wraps `Zeroizing<String>` with `Debug` → `[REDACTED]`. Its one accessor is
+/// `Deref<Target = str>`; there are deliberately no `AsRef` impls, because `Deref`
+/// already opens that door. Deliberately **no** `Display` either: `{}` on this type is
 /// a compile error, so `Debug` redaction cannot mislead a caller into logging the
 /// encoded secret. Write it out with `&*encoded`.
 ///
