@@ -12,7 +12,17 @@
 use secure_gate::{Fixed, ToBase32, ToBase64Url, ToBech32, ToBech32m, ToHex};
 
 fn main() {
-    let encoded = Fixed::new([0xABu8; 32]).to_hex();
+    let key = [0xABu8; 32];
+    let encoded = Fixed::new(key).to_hex();
+
+    // Every trait above is in scope and works for a byte-shaped source. Exercising
+    // them here keeps the imports used: a method call that fails to resolve does not
+    // count as a use, and CI builds with `-D warnings`, which would turn the resulting
+    // `unused_imports` into an error inside this test's .stderr snapshot.
+    let _ = key.to_base32();
+    let _ = key.to_base64url();
+    let _ = key.try_to_bech32("bc");
+    let _ = key.try_to_bech32m("bc");
 
     // None of these may compile: each would encode the hex text, not the key.
     let _b32 = encoded.to_base32();

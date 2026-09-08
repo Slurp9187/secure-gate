@@ -227,8 +227,13 @@ fn base64_error_display() {
     );
 }
 
-/// Every error type still implements `core::error::Error`, which was previously
-/// supplied by `thiserror`'s derive and is now a hand-written impl.
+/// Every error type still implements the `Error` trait, which was previously supplied
+/// by `thiserror`'s derive and is now a hand-written impl.
+///
+/// On the 0.8 LTS line that impl is gated behind the `std` feature — `core::error::Error`
+/// needs 1.81 and the MSRV here is 1.70 — so this test is gated the same way. 0.9
+/// implements it unconditionally and runs this without the gate.
+#[cfg(feature = "std")]
 #[test]
 fn error_types_implement_error_trait() {
     fn assert_error<E: std::error::Error>(_: &E) {}
