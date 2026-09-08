@@ -560,18 +560,32 @@ pub use traits::EncodableBytes;
 /// Bech32 (BIP-173) checksum with a caller-chosen code length. `N` caps the length of
 /// the whole encoded string and never enters the checksum. Above [`BECH32_CODE_LENGTH`]
 /// the BCH error-detection guarantee no longer holds - see the type docs.
+///
+/// Split from a grouped `pub use`: rustdoc 1.70 ICEs resolving an intra-doc link out of
+/// a grouped re-export, the same bug already worked around for `SecretLen`.
 #[cfg(feature = "encoding-bech32")]
-pub use traits::{Bech32Sized, Bech32Standard};
+pub use traits::Bech32Sized;
+
+/// The BIP-173 checksum at the default code length, used by every non-`_sized` method.
+#[cfg(feature = "encoding-bech32")]
+pub use traits::Bech32Standard;
 
 /// Bech32m (BIP-350) checksum with a caller-chosen code length - the bech32m twin of
 /// [`Bech32Sized`], with the same rules and the same guarantee boundary.
 #[cfg(feature = "encoding-bech32")]
-pub use traits::{Bech32mSized, Bech32mStandard};
+pub use traits::Bech32mSized;
 
-/// The bech32 BCH code length (1023) used by every non-`_sized` method, and the helper
-/// that sizes an `N` from an HRP length and a payload byte count.
+/// The BIP-350 checksum at the default code length, used by every non-`_sized` method.
 #[cfg(feature = "encoding-bech32")]
-pub use traits::{bech32_code_length, BECH32_CODE_LENGTH};
+pub use traits::Bech32mStandard;
+
+/// The bech32 BCH code length (1023) used by every non-`_sized` method.
+#[cfg(feature = "encoding-bech32")]
+pub use traits::BECH32_CODE_LENGTH;
+
+/// Sizes an `N` for the `_sized` methods from an HRP length and a payload byte count.
+#[cfg(feature = "encoding-bech32")]
+pub use traits::bech32_code_length;
 
 /// Encodes byte data as hexadecimal strings (constant-time via `base16ct`).
 /// Blanket impl for `AsRef<[u8]> + `[`EncodableBytes`]. Provides `to_hex()` and
