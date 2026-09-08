@@ -231,7 +231,7 @@
 //! enforced with `#![forbid(unsafe_code)]`. Prefer scoped access ([`RevealSecret::with_secret`])
 //! over direct references. Encoders return [`EncodedSecret`], which stays wiped until it
 //! drops; `EncodedSecret::into_inner` is the named call that ends that. See
-//! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md)
+//! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md)
 //! for the full threat model.
 //!
 //! # Inherent Rust Limitations
@@ -253,7 +253,7 @@
 //!   encrypted swap, disabled core dumps).
 //!
 //! Full discussion in
-//! [SECURITY.md § Inherent Rust Limitations](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#inherent-rust-limitations).
+//! [SECURITY.md § Inherent Rust Limitations](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md#inherent-rust-limitations).
 //!
 //! See the [README](https://github.com/Slurp9187/secure-gate/blob/main/README.md) and
 //! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md) for full details.
@@ -582,7 +582,8 @@ pub use traits::{bech32_code_length, BECH32_CODE_LENGTH};
 pub use traits::ToHex;
 
 /// Marker trait for types that support secure decoding (`AsRef<str>`). No methods —
-/// enables blanket impls of [`FromHexStr`], [`FromBase32Str`], [`FromBase64UrlStr`], etc.
+/// nothing bounds on it — the `From*Str` blankets are plain `AsRef<str>`. Retained for
+/// backwards compatibility; the 0.9 line removed it.
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base32",
@@ -591,8 +592,9 @@ pub use traits::ToHex;
 ))]
 pub use traits::SecureDecoding;
 
-/// Marker trait for types that support secure encoding (`AsRef<[u8]>`). No methods —
-/// enables blanket impls of [`ToHex`], [`ToBase32`], [`ToBase64Url`], etc.
+/// Vestigial marker for byte-shaped types (`AsRef<[u8]>`). No methods, and nothing
+/// bounds on it — the `To*` blankets are gated by [`EncodableBytes`]. Retained for
+/// backwards compatibility; the 0.9 line removed it.
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base32",

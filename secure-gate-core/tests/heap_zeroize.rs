@@ -100,13 +100,13 @@ thread_local! {
     /// teaches people to re-run it until it is green, which retires it as surely as deleting it.
     ///
     /// Thread-scoping is what introduces a genuine *fail-open* edge, and it is the one the
-    /// `count_allocs` docs guard: a thread spawned inside `f` starts at these const-initialized
-    /// defaults, so its allocations are silently uncounted. Undercounting is the direction that
+    /// `count_allocs` docs guard: a thread spawned inside `f` starts at these defaults, so
+    /// its allocations are silently uncounted. Undercounting is the direction that
     /// hides a regression. Hence the prohibition there on spawning and on nesting.
     ///
-    /// Both cells are `const`-initialized and hold `Copy` types with no destructor, so no TLS
-    /// destructor is registered and there is no lazily-initialized state that could be observed
-    /// torn down from inside `alloc`.
+    /// Both cells hold `Copy` types with no destructor, so no TLS destructor is registered and
+    /// there is no state that could be observed torn down from inside `alloc`. (0.9 also
+    /// `const`-initializes them; this branch cannot — see the 0.8 note below.)
     ///
     /// First touch is a separate question, and the ordering in `count_allocs` is what settles it
     /// rather than any promise about `thread_local!`. On some targets the first access to a
@@ -255,7 +255,7 @@ impl Drop for CountGuard {
 /// Allocations made concurrently by the libtest harness or any other thread are not counted, so a
 /// zero-allocation assertion cannot be broken by unrelated activity. The flip side, and the reason
 /// `f` must stay single-threaded: allocations made by a thread `f` spawns are *also* not counted,
-/// because that thread's cells start at their const-initialized defaults. That would undercount,
+/// because that thread's cells start at their `false`/`0` defaults. That would undercount,
 /// which is the direction that hides a regression. No closure here spawns a thread, and none
 /// should be added.
 ///
@@ -408,6 +408,7 @@ fn check_vec_zeroed(size: usize) {
         let mut secret: Dynamic<Vec<u8>> = Dynamic::new(Vec::with_capacity(size));
         secret.with_secret_mut(|v| {
             // Fill exactly N bytes so len == N before shrink_to_fit.
+            // MSRV 1.70: use repeat().take() (repeat_n stabilized in 1.82).
             v.extend(std::iter::repeat(0xBBu8).take(size));
             v.shrink_to_fit();
             // Test realism guard: shrink_to_fit is best-effort; the allocator may
@@ -493,6 +494,7 @@ fn check_string_zeroed(size: usize) {
         let mut secret: Dynamic<String> = Dynamic::new(String::with_capacity(size));
         secret.with_secret_mut(|s| {
             // Fill exactly `size` ASCII bytes so len == size before shrink_to_fit.
+            // MSRV 1.70: use repeat().take() (repeat_n stabilized in 1.82).
             s.extend(std::iter::repeat('A').take(size));
             s.shrink_to_fit();
             // Test realism guard: same rationale as check_vec_zeroed above.

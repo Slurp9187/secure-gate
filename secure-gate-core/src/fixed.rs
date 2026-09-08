@@ -963,7 +963,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// Fills a new `[u8; N]` from `rng` and wraps it.
     ///
     /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRngCore`](rand::TryRngCore) — for example,
-    /// a seeded [`StdRng`](rand::rngs::StdRng) for deterministic tests. Requires the `rand`
+    /// a seeded `StdRng` for deterministic tests. Requires the `rand`
     /// feature. Heap-free.
     ///
     /// # Errors

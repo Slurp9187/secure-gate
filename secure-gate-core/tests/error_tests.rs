@@ -209,7 +209,7 @@ fn hex_error_display() {
     );
 }
 
-#[cfg(all(feature = "std", feature = "encoding-base32"))]
+#[cfg(feature = "encoding-base32")]
 #[test]
 fn base32_error_display() {
     assert_eq!(
@@ -218,7 +218,7 @@ fn base32_error_display() {
     );
 }
 
-#[cfg(all(feature = "std", feature = "encoding-base64"))]
+#[cfg(feature = "encoding-base64")]
 #[test]
 fn base64_error_display() {
     assert_eq!(

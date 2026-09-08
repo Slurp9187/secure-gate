@@ -18,10 +18,11 @@
 //! | [`RevealSecretMut`]    | Mutable scoped / direct access               | Always available         | Same preference: `with_secret_mut` over `expose_secret_mut`           |
 //! | [`SentinelValue`]      | Inert placeholder left by `into_inner`       | Always available         | Implemented for `[T; N]` (any `N`), `String`, `Vec<T>`                |
 //! | [`ConstantTimeEq`]     | Deterministic constant-time equality         | `ct-eq`                  | Timing-attack resistant byte comparison                               |
-//! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for opt-in risk details. |
-//! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for opt-in risk details. |
-//! | [`SecureEncoding`]     | Marker + blanket impl for encoding traits    | Any `encoding-*`         | Enables `ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`   |
-//! | [`SecureDecoding`]     | Marker + blanket impl for decoding traits    | Any `encoding-*`         | Enables `FromHexStr`, `FromBase32Str`, `FromBase64UrlStr`, etc.       |
+//! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md) for opt-in risk details. |
+//! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md) for opt-in risk details. |
+//! | [`EncodableBytes`]     | Gates the encoder blanket impls              | Any `encoding-*`         | Load-bearing: every `To*` blanket is `T: AsRef<[u8]> + EncodableBytes`, which is what keeps `str`, `String` and [`EncodedSecret`] out |
+//! | [`SecureEncoding`]     | Vestigial marker for byte-shaped types       | Any `encoding-*`         | Auto-implemented for `T: AsRef<[u8]>`. Nothing in the crate bounds on it; the `To*` traits are gated by [`EncodableBytes`] |
+//! | [`SecureDecoding`]     | Vestigial marker for string-shaped types     | Any `encoding-*`         | Auto-implemented for `T: AsRef<str>`. Nothing in the crate bounds on it; the `From*Str` blankets are plain `AsRef<str>` |
 //!
 //! # Security Guarantees
 //!
@@ -125,8 +126,13 @@ pub use encoding::ToHex;
 /// Marker trait for types that support secure encoding operations.
 ///
 /// Automatically implemented for any type that implements `AsRef<[u8]>`,
-/// such as `&[u8]`, `Vec<u8>`, `[u8; N]`, etc. This enables blanket impls
-/// of the individual encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, etc.).
+/// such as `&[u8]`, `Vec<u8>`, `[u8; N]`, etc.
+///
+/// It does **not** gate the encoding traits. Every `To*` blanket is bounded on
+/// `AsRef<[u8]> + `[`EncodableBytes`], and this marker is
+/// implemented for `str` and `String` too — precisely the types `EncodableBytes`
+/// exists to reject. Nothing in the crate bounds on this trait; the 0.9 line removed
+/// it. It is retained here for backwards compatibility.
 ///
 /// Since this is a marker trait (no methods), it exists only to allow trait
 /// bounds and extension methods to be available where appropriate.
@@ -151,8 +157,11 @@ impl<T: AsRef<[u8]> + ?Sized> SecureEncoding for T {}
 /// Marker trait for types that support secure decoding operations.
 ///
 /// Automatically implemented for any type that implements `AsRef<str>`,
-/// such as `&str`, `String`, etc. This enables blanket impls of the
-/// individual decoding traits (`FromHexStr`, `FromBase32Str`, `FromBase64UrlStr`, etc.).
+/// such as `&str`, `String`, etc.
+///
+/// It does **not** gate the decoding traits: each `From*Str` blanket is bounded on
+/// plain `AsRef<str>` and does not mention this marker. Nothing in the crate bounds
+/// on it; the 0.9 line removed it. Retained here for backwards compatibility.
 ///
 /// Like `SecureEncoding`, this is a marker trait with no methods — it exists
 /// to allow trait bounds and extension methods where relevant.

@@ -664,7 +664,7 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// Allocates a `Vec<u8>` of length `len`, fills it from `rng`, and wraps it.
     ///
     /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRngCore`](rand::TryRngCore) — for example,
-    /// a seeded [`StdRng`](rand::rngs::StdRng) for deterministic tests. Requires the `rand`
+    /// a seeded `StdRng` for deterministic tests. Requires the `rand`
     /// feature and `alloc` (implicit — [`Dynamic<T>`](crate::Dynamic) itself requires it).
     ///
     /// # Errors
