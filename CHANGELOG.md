@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.9] - 2026-09-08
+
+A breaking encoder release. Every encoder now returns `EncodedSecret`, the parallel
+`*_zeroizing` surface is gone, and `InnerSecret<T>` is deleted. See the
+[core changelog](secure-gate-core/CHANGELOG.md) for the full detail — the summary below
+is the shape of the migration, not the whole of it.
+
+### Added
+
+- **Caller-chosen bech32 / bech32m code length** in `secure-gate-core` (#171).
+  `Bech32Sized<N>` / `Bech32mSized<N>` let the caller pick the code length instead of
+  taking the BCH bound; the default is now 1023, not 8191.
+
+### Changed
+
+- **BREAKING, `secure-gate-core`:** every encoder returns `EncodedSecret`, and
+  `RevealSecret::into_inner()` returns the plain value rather than a wrapper. The
+  encoding traits no longer accept string-shaped inputs — encode takes byte-shaped
+  types only.
+
+- **BREAKING, `secure-gate-compat`:** `serde-serialize` and `serde-deserialize` now
+  pull in `dep:serde`. Neither feature compiled on its own before.
+
+### Removed
+
+- **BREAKING, `secure-gate-core`:** `InnerSecret<T>`, the `*_zeroizing` encoder
+  variants, `AsRef<str>` / `AsRef<[u8]>` on `EncodedSecret`, the `SecureEncoding` /
+  `SecureDecoding` marker traits, `DecodingError`, `Bech32Error::ConversionFailed`, and
+  the `encoding-bech32m` feature — folded into `encoding-bech32`, not aliased.
+
+### Security
+
+- **Bech32 encoding left unwiped partial copies of the secret on the heap** in
+  `secure-gate-core`. The encoder chain is now driven directly, with no stack staging of
+  the encoded secret and the buffer allocated exactly once.
+
+### Dependencies
+
+- **`thiserror` removed** from both crates; `zeroize_derive` moved to
+  `[dev-dependencies]`.
+
+### Testing
+
+- **CI gained a rustdoc job (#175).** No workflow ran rustdoc at all, so a broken
+  intra-doc link in the shipping docs would have reached docs.rs unnoticed. It builds
+  `--no-deps --all-features` under `-D warnings`, matching what docs.rs builds. The
+  policy it enforces — the docs.rs feature set is the contract, minimal builds are
+  best-effort — is recorded in `README.md`.
+
 ## [0.9.0-rc.8] - 2026-09-07
 
 ### Added

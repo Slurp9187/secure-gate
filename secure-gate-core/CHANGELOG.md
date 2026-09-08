@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.9] - 2026-09-08
+
 ### Added
 
 - **Caller-chosen bech32 / bech32m code length.** `Bech32Sized<N>` and `Bech32mSized<N>`
@@ -493,6 +495,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   even in a quiet week — which is how the rustc 1.98 `.set` → `=` alias change fixed in
   rc.8 would have been caught regardless. `timeout-minutes: 30` replaces GitHub's
   360-minute default.
+
+- **`ci.yml` gained a rustdoc job — no workflow ran rustdoc at all (#175).** A broken
+  intra-doc link in the shipping docs would have reached docs.rs unnoticed; that is how
+  eleven of them accumulated in `secure-gate-compat`. The job builds `--no-deps
+  --all-features` under `RUSTDOCFLAGS: -D warnings`, matching
+  `[package.metadata.docs.rs] all-features = true` — the configuration docs.rs actually
+  builds — rather than the `--features full` the issue sketched, which omits `std` and
+  so would have gated a configuration docs.rs never builds. `--no-deps` is load-bearing:
+  documenting dependencies pulls this crate in under whatever feature set compat
+  activates, which trips the minimal-build links #175 deliberately leaves alone
+  (`Fixed::from_rng` among them). Confirmed that a deliberately broken link fails the
+  job and that the tree is clean again once the probe is reverted; `secure-gate` is
+  clean on 1.85, 1.97, 1.98 and nightly. The ~92 unresolved links in minimal builds
+  (`alloc` alone) stay best-effort and unfixed, as #175 decides, and `README.md` now
+  records that policy.
+
+- **The MSRV job checks `--all-features --all-targets`.** It ran `cargo +1.85 check`
+  with `default` and `full` only — neither implies `std`, and `check` without
+  `--all-targets` never compiles test targets. A compat test file had stopped compiling
+  on 1.85 while every job stayed green, because CI's `stable` had moved to 1.98, where
+  the offending expression is accepted. The added step is the configuration that catches
+  it, and the workspace is clean under it today.
 
 ### Documentation
 

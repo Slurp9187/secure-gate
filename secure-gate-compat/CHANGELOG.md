@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.9] - 2026-09-08
+
+### Changed
+
+- **`serde-serialize` and `serde-deserialize` now pull in `dep:serde`.** Neither
+  compiled on its own: the `#[cfg(feature = ...)]` blocks in `src/compat/` name `serde`
+  types directly, and `secure-gate/serde-serialize` names the *dependency's* feature,
+  not this crate's same-named one. Only `secrecy-compat` happened to drag `serde` in,
+  which is why the gap went unnoticed.
+
+- **`zeroize` is now an explicit dev-dependency carrying `zeroize_derive`.** The test
+  suite's `#[derive(Zeroize)]` previously arrived by feature unification from
+  `secure-gate`, which no longer enables `zeroize_derive`. The shim itself does not need
+  the derive, and neither does real `secrecy` — 0.8 and 0.10 both depend on `zeroize`
+  with `default-features = false`.
+
+- **The `secrecy-compat` feature comment describes what the feature actually does.** It
+  claimed to "enable" the `v08` / `v10` shim modules, which carry no `cfg` on it and
+  always compile. What it really does is turn on the core features the shims need
+  (`alloc`, `cloneable`, `serde-serialize`) plus this crate's `serde` dependency, and
+  gate the whole compat test surface. It also names the crate path correctly.
+
+- **`SECURITY.md`'s Tier 3 mitigation matches the wrapper's actual behaviour.** It told
+  auditors that zeroization transfers to a returned `InnerSecret<T>`; that type is gone
+  in this release, and `into_inner` now returns the plain value, so protection ends at
+  the call and the caller owns the secret's lifetime from there.
+
+### Fixed
+
+- **Eleven intra-doc link errors — the whole crate's rustdoc output was failing.**
+  `cargo doc --all-features` exited 101 under `-D warnings`. Six were unresolved links
+  in `v08`'s API table: rustdoc merges the outer `///` on `pub mod v08;` with the inner
+  `//!` and resolves the result in `crate::compat` scope, where `Secret`,
+  `SecretString`, `SecretVec`, `SecretBox` and `DebugSecret` are not in scope — they
+  live one module down. They now carry explicit `crate::compat::v08::` targets, which
+  resolve from either scope. The other five were redundant explicit targets whose label
+  already resolved to the same item. Verified in the rendered HTML that all eleven reach
+  the intended items, rather than merely resolving.
+
+- **Six `secure_gate::compat::` paths in `MIGRATING_FROM_SECRECY.md` that do not
+  resolve.** Core exposes no `compat` module and the crate is `secure_gate_compat`. The
+  file is not `include_str!`'d, so no rustdoc pass and no doctest ever read it, but it
+  does ship in the published tarball via `include`. The adjacent `use
+  secure_gate::Dynamic;` / `Fixed` lines are correct and unchanged.
+
+- **`tests/proptest_suite/` did not compile on the declared MSRV under
+  `--all-features`.** `prop_assert_eq!(*v08_back.expose_secret(), arr)` dereferenced a
+  `[u8; 32]`, which rustc rejects with E0614 on 1.85 through 1.97; 1.98 accepts it. The
+  module is gated on this crate's own `alloc` feature, which only `--all-features` turns
+  on, and nothing caught the gap: CI's `stable` had moved to 1.98, and the MSRV job
+  compiles the library alone. The assertion now compares references, matching the two
+  round-trip tests beside it.
+
+### Removed
+
+- **`scripts/package_it.py`.** Obsolete packaging script.
+
 ## [0.9.0-rc.8] - 2026-09-06
 
 ### Changed
