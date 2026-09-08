@@ -257,3 +257,40 @@ fn to_base32_is_generic_over_wrappers() {
     }
     assert_eq!(&*export_wrapped(&newtype), "VOV2XKY");
 }
+
+/// Regression guard specific to the 0.8 line.
+///
+/// `base32ct` 0.2 (the newest release that builds on MSRV 1.70) sizes its output
+/// buffer from `decoded_len()` but indexes it from the input remainder, so an
+/// encoded length whose trailing block is 1, 3 or 6 characters writes out of
+/// bounds and panics instead of returning an error. `secure-gate` guards every
+/// delegation to `base32ct`, so these must be ordinary `Err`s — a panic here
+/// would be a denial-of-service path on attacker-supplied input.
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
+#[test]
+fn base32_impossible_block_lengths_error_and_never_panic() {
+    use secure_gate::{Dynamic, Fixed};
+
+    // Trailing blocks of 1, 3 and 6 chars are unrepresentable in unpadded Base32.
+    for len in [1usize, 3, 6, 9, 11, 14, 17, 19, 22] {
+        assert!(
+            !matches!(len % 8, 0 | 2 | 4 | 5 | 7),
+            "test vector {len} must be an impossible length"
+        );
+        let s = "A".repeat(len);
+        assert!(
+            Fixed::<[u8; 4]>::try_from_base32(&s).is_err(),
+            "Fixed must reject impossible length {len} without panicking"
+        );
+        assert!(
+            Dynamic::<Vec<u8>>::try_from_base32(&s).is_err(),
+            "Dynamic must reject impossible length {len} without panicking"
+        );
+    }
+
+    // The valid trailing blocks must still decode (or fail on length, not shape).
+    for len in [2usize, 4, 5, 7, 8] {
+        let s = "A".repeat(len);
+        let _ = Dynamic::<Vec<u8>>::try_from_base32(&s);
+    }
+}

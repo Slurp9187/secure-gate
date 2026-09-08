@@ -376,7 +376,9 @@ fn fixed_new_with_is_zero_cost() {
 #[cfg(feature = "rand")]
 struct FailingRng;
 
-// rand 0.10 requires TryRng::Error: core::error::Error, so &'static str is not enough.
+// rand 0.9 requires TryRngCore::Error: Debug + Display, so &'static str is not enough.
+// (0.10 renames the trait to TryRng and tightens this to core::error::Error, which
+// needs 1.81 — above this branch's MSRV.)
 #[cfg(feature = "rand")]
 #[derive(Debug)]
 struct RngError;
@@ -457,7 +459,7 @@ fn dynamic_from_rng_error_returns_err() {
     assert!(result.is_err());
 }
 
-// === len() element-count semantics (issue #5) ===
+// === len() element-count semantics ===
 
 #[cfg(feature = "alloc")]
 #[test]
