@@ -110,17 +110,26 @@ fn newtype_forwards_sized_bech32_decode() {
     let big = Big::from_random();
 
     let s = big.try_to_bech32_sized::<N>("sg").unwrap();
-    assert!(Big::try_from_bech32(&s, "sg").is_err(), "900 bytes must exceed the default");
+    assert!(
+        Big::try_from_bech32(&s, "sg").is_err(),
+        "900 bytes must exceed the default"
+    );
     let back = Big::try_from_bech32_sized::<N>(&s, "sg").unwrap();
     assert_eq!(back.expose_secret(), big.expose_secret());
     assert!(Big::try_from_bech32_unchecked_sized::<N>(&s).is_ok());
-    assert!(Big::try_from_bech32_sized::<N>(&s, "xx").is_err(), "HRP still checked");
+    assert!(
+        Big::try_from_bech32_sized::<N>(&s, "xx").is_err(),
+        "HRP still checked"
+    );
 
     let m = big.try_to_bech32m_sized::<N>("sg").unwrap();
     let back = Big::try_from_bech32m_sized::<N>(&m, "sg").unwrap();
     assert_eq!(back.expose_secret(), big.expose_secret());
     assert!(Big::try_from_bech32m_unchecked_sized::<N>(&m).is_ok());
-    assert!(Big::try_from_bech32_sized::<N>(&m, "sg").is_err(), "bech32m never decodes as bech32");
+    assert!(
+        Big::try_from_bech32_sized::<N>(&m, "sg").is_err(),
+        "bech32m never decodes as bech32"
+    );
 
     // ── dynamic_newtype!: sized, plus the plain constructors it never had ──
     let t = Token::from_random(900);
@@ -140,7 +149,10 @@ fn newtype_forwards_sized_bech32_decode() {
     let sm = small.try_to_bech32m("sg").unwrap();
     assert!(Token::try_from_bech32m(&sm, "sg").is_ok());
     assert!(Token::try_from_bech32m_unchecked(&sm).is_ok());
-    assert!(Token::try_from_bech32m(&sm, "xx").is_err(), "HRP still checked");
+    assert!(
+        Token::try_from_bech32m(&sm, "xx").is_err(),
+        "HRP still checked"
+    );
 }
 
 /// The `_sized` bech32 / bech32m encode methods forwarded by the newtype macros.
@@ -168,7 +180,10 @@ fn newtype_forwards_sized_bech32_methods() {
 
     // Dynamic newtype, with a payload past the default code length.
     let big = Token::from_random(900);
-    assert!(big.try_to_bech32("sg").is_err(), "900 bytes exceeds 1023 chars");
+    assert!(
+        big.try_to_bech32("sg").is_err(),
+        "900 bytes exceeds 1023 chars"
+    );
     let wide = big.try_to_bech32_sized::<2048>("sg").unwrap();
     assert!(wide.starts_with("sg1"));
     assert!(big.try_to_bech32_sized_zeroizing::<2048>("sg").is_ok());

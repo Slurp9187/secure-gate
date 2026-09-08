@@ -53,8 +53,13 @@ use bech32::primitives::checksum::Checksum;
 /// Bech32/Bech32m generator coefficients (BIP-173 § Checksum, Bitcoin Core `bech32.cpp`).
 /// Identical for both checksums; only `TARGET_RESIDUE` differs.
 #[cfg(feature = "encoding-bech32")]
-pub(crate) const GENERATOR_SH: [u32; 5] =
-    [0x3b6a_57b2, 0x2650_8e6d, 0x1ea1_19fa, 0x3d42_33dd, 0x2a14_62b3];
+pub(crate) const GENERATOR_SH: [u32; 5] = [
+    0x3b6a_57b2,
+    0x2650_8e6d,
+    0x1ea1_19fa,
+    0x3d42_33dd,
+    0x2a14_62b3,
+];
 
 /// The code length of the bech32 BCH code: **1023**.
 ///
@@ -275,7 +280,11 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32 for T {
         for c in chain {
             out.push(c);
         }
-        debug_assert_eq!(out.len(), len, "bech32_code_length disagreed with the encoder");
+        debug_assert_eq!(
+            out.len(),
+            len,
+            "bech32_code_length disagreed with the encoder"
+        );
         Ok(out)
     }
 
@@ -327,8 +336,16 @@ mod tests {
     #[test]
     fn direct_chain_matches_upstream_encode_lower() {
         use bech32::encode_lower;
-        for (hrp, len) in [("a", 0usize), ("age", 1), ("age", 4), ("age", 32), ("kem", 633),
-                           ("age", 634), ("kem", 1568), ("x", 4096)] {
+        for (hrp, len) in [
+            ("a", 0usize),
+            ("age", 1),
+            ("age", 4),
+            ("age", 32),
+            ("kem", 633),
+            ("age", 634),
+            ("kem", 1568),
+            ("x", 4096),
+        ] {
             let data: Vec<u8> = (0..len).map(|i| (i * 131 + 7) as u8).collect();
             let ours = data.try_to_bech32_sized::<65535>(hrp).expect("ours");
             let theirs = encode_lower::<Bech32Sized<65535>>(Hrp::parse(hrp).unwrap(), &data)
@@ -357,8 +374,7 @@ mod tests {
         assert_eq!(decoded_hrp, hrp);
         assert_eq!(decoded_data, large_data);
 
-        let re_encoded =
-            encode_lower::<Bech32Sized<2048>>(decoded_hrp, &decoded_data).unwrap();
+        let re_encoded = encode_lower::<Bech32Sized<2048>>(decoded_hrp, &decoded_data).unwrap();
         assert_eq!(re_encoded, encoded);
     }
 

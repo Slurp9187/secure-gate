@@ -16,11 +16,11 @@
 use secure_gate::{BECH32_CODE_LENGTH, Bech32Error, bech32_code_length};
 
 #[cfg(feature = "encoding-bech32")]
+use secure_gate::{Dynamic, Fixed, RevealSecret};
+#[cfg(feature = "encoding-bech32")]
 use secure_gate::{FromBech32Str, ToBech32};
 #[cfg(feature = "encoding-bech32")]
 use secure_gate::{FromBech32mStr, ToBech32m};
-#[cfg(feature = "encoding-bech32")]
-use secure_gate::{Dynamic, Fixed, RevealSecret};
 
 // ─────────────────────────── the helper ───────────────────────────
 
@@ -49,7 +49,10 @@ fn code_length_saturates_instead_of_wrapping() {
     let b = usize::MAX / 8 + 1;
     let expected = (b / 5) * 8 + ((b % 5) * 8).div_ceil(5) + 10;
     assert_eq!(bech32_code_length(3, b), expected);
-    assert!(expected > usize::MAX / 8, "sanity: the exact answer is large, not wrapped");
+    assert!(
+        expected > usize::MAX / 8,
+        "sanity: the exact answer is large, not wrapped"
+    );
     // Ordinary inputs are unaffected.
     assert_eq!(bech32_code_length(3, 32), 62);
     assert_eq!(bech32_code_length(3, 633), 1023);
@@ -147,12 +150,16 @@ fn bech32_long_string_needs_a_large_n_at_both_ends() {
         "the default code length must refuse an over-long string"
     );
     assert_eq!(
-        encoded.try_from_bech32_sized::<2519>("age").expect("round trip"),
+        encoded
+            .try_from_bech32_sized::<2519>("age")
+            .expect("round trip"),
         data
     );
     // Any larger N also works.
     assert_eq!(
-        encoded.try_from_bech32_sized::<65535>("age").expect("larger N"),
+        encoded
+            .try_from_bech32_sized::<65535>("age")
+            .expect("larger N"),
         data
     );
 }
@@ -161,7 +168,10 @@ fn bech32_long_string_needs_a_large_n_at_both_ends() {
 #[test]
 fn bech32m_long_string_needs_a_large_n_at_both_ends() {
     let data = vec![0x22u8; 900];
-    assert_eq!(data.try_to_bech32m("age"), Err(Bech32Error::OperationFailed));
+    assert_eq!(
+        data.try_to_bech32m("age"),
+        Err(Bech32Error::OperationFailed)
+    );
 
     let encoded = data.try_to_bech32m_sized::<2519>("age").expect("2519 fits");
     assert_eq!(
@@ -353,8 +363,8 @@ fn fixed_sized_round_trip_and_length_mismatch() {
     let encoded = secret
         .try_to_bech32_sized::<2519>("age")
         .expect("wrapper encodes");
-    let back = Fixed::<[u8; 32]>::try_from_bech32_sized::<2519>(&encoded, "age")
-        .expect("wrapper decodes");
+    let back =
+        Fixed::<[u8; 32]>::try_from_bech32_sized::<2519>(&encoded, "age").expect("wrapper decodes");
     back.with_secret(|b| assert_eq!(b, &[0xBBu8; 32]));
 
     // Wrong target length reports the exact decoded count.

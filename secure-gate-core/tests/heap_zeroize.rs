@@ -240,7 +240,10 @@ fn check_bech32_hrp_mismatch_materializes_nothing() {
         let v = b32.try_from_bech32_sized::<N>("age").expect("decode");
         core::hint::black_box(&v);
     });
-    assert!(right >= 1, "positive control: a successful Vec decode must allocate");
+    assert!(
+        right >= 1,
+        "positive control: a successful Vec decode must allocate"
+    );
 
     // And Fixed decodes onto the stack: zero allocations even on success (the
     // no-alloc path is the same code on every target).
@@ -248,7 +251,10 @@ fn check_bech32_hrp_mismatch_materializes_nothing() {
         let f = Fixed::<[u8; 900]>::try_from_bech32_sized::<N>(&b32, "age").expect("decode");
         core::hint::black_box(&f);
     });
-    assert_eq!(fixed_ok, 0, "Fixed::try_from_bech32_sized allocated {fixed_ok} time(s)");
+    assert_eq!(
+        fixed_ok, 0,
+        "Fixed::try_from_bech32_sized allocated {fixed_ok} time(s)"
+    );
 }
 
 // ---------------------------------------------------------------------------

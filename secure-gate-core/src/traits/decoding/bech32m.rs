@@ -50,13 +50,13 @@
 //! # }
 //! ```
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+use super::super::encoding::bech32m::{BECH32_CODE_LENGTH, Bech32mSized};
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use crate::error::Bech32Error;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use alloc::string::{String, ToString};
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use alloc::vec::Vec;
-#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-use super::super::encoding::bech32m::{BECH32_CODE_LENGTH, Bech32mSized};
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use bech32::primitives::decode::CheckedHrpstring;
 

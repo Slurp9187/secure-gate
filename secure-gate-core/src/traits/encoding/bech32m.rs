@@ -50,10 +50,10 @@
 //! ```
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use bech32::Hrp;
-#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-use bech32::primitives::iter::{ByteIterExt, Fe32IterExt};
 #[cfg(feature = "encoding-bech32")]
 use bech32::primitives::checksum::Checksum;
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+use bech32::primitives::iter::{ByteIterExt, Fe32IterExt};
 
 #[cfg(feature = "encoding-bech32")]
 use super::bech32::GENERATOR_SH;
@@ -232,7 +232,11 @@ impl<T: AsRef<[u8]> + ?Sized> ToBech32m for T {
         for c in chain {
             out.push(c);
         }
-        debug_assert_eq!(out.len(), len, "bech32_code_length disagreed with the encoder");
+        debug_assert_eq!(
+            out.len(),
+            len,
+            "bech32_code_length disagreed with the encoder"
+        );
         Ok(out)
     }
 
@@ -256,7 +260,13 @@ mod tests {
     #[test]
     fn direct_chain_matches_upstream_encode_lower() {
         use bech32::{Hrp, encode_lower};
-        for (hrp, len) in [("a", 0usize), ("kem", 32), ("kem", 633), ("kem", 1568), ("x", 4096)] {
+        for (hrp, len) in [
+            ("a", 0usize),
+            ("kem", 32),
+            ("kem", 633),
+            ("kem", 1568),
+            ("x", 4096),
+        ] {
             let data: alloc::vec::Vec<u8> = (0..len).map(|i| (i * 131 + 7) as u8).collect();
             let ours = data.try_to_bech32m_sized::<65535>(hrp).expect("ours");
             let theirs = encode_lower::<Bech32mSized<65535>>(Hrp::parse(hrp).unwrap(), &data)

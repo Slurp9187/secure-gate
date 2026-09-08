@@ -1,4 +1,3 @@
-
 // no_std by default; the `std` feature opts back into the standard library.
 // Verified in CI by cross-building for a bare-metal target.
 #![cfg_attr(not(feature = "std"), no_std)]
