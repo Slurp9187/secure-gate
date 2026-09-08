@@ -3,13 +3,12 @@
 //! > **Import path:** `use secure_gate::RevealSecret;`
 //!
 //! This module defines the core `RevealSecret` trait. See
-//! [`revealed_secrets`](crate::traits::revealed_secrets) for the owned wrapper types
-//! [`InnerSecret<T>`](crate::InnerSecret) and [`EncodedSecret`](crate::EncodedSecret).
+//! [`revealed_secrets`](crate::traits::revealed_secrets) for
+//! [`EncodedSecret`](crate::EncodedSecret), the wrapper for encoded output.
 //!
 //! The design ensures:
 //! - No implicit borrowing (`Deref`, `AsRef`, etc.) from the secret wrapper itself —
-//!   the [`InnerSecret<T>`](crate::InnerSecret) returned by `into_inner` does deref,
-//!   because extraction hands ownership to the caller
+//!   reaching the secret always names a method
 //! - Scoped access is preferred (minimizes lifetime of exposed references)
 //! - Direct exposure is possible but clearly marked as an escape hatch
 //! - Owned consumption is available for FFI hand-off and type migration
@@ -40,12 +39,14 @@
 //! # Security Model
 //!
 //! - **Core wrappers** (`Fixed<T>`, `Dynamic<T>`) implement both traits → full access.
-//! - **Read-only wrappers** (encoding wrappers, random types) implement only `RevealSecret` → mutation prevented.
+//! - **Generated newtypes** (`fixed_newtype!` / `dynamic_newtype!`) implement both, forwarding to the wrapper they hold.
+//! - **`EncodedSecret` implements neither.** It is an output wrapper, not a secret wrapper: its contents are reached through `Deref<Target = str>` and its two named consumers.
 //! - **Zero-cost** — all methods are `#[inline(always)]` where possible.
 //! - **Scoped access preferred** — `with_secret` / `with_secret_mut` limit borrow lifetime, reducing leak risk.
 //! - **Direct exposure** (`expose_secret` / `expose_secret_mut`) is provided for legitimate needs (FFI, third-party APIs), but marked as an escape hatch.
-//! - **Owned consumption** (`into_inner`) is available when the secret must be moved out of the wrapper.
-//!   Zeroization transfers to the returned [`crate::InnerSecret<T>`] — the caller must let it drop normally.
+//! - **Owned consumption** (`into_inner`) is available when the secret must be moved out of the
+//!   wrapper. It transfers ownership of the plain value and nothing is copied; the wrapper's
+//!   zeroize-on-drop does not follow it, so the caller owns the value's lifetime from there.
 //!
 //! # Note for `RevealSecret` Implementors
 //!
@@ -107,11 +108,11 @@
 //! use secure_gate::{Fixed, RevealSecret};
 //!
 //! let key = Fixed::new([0xABu8; 16]);
-//! // Consumes `key`; zeroization transfers to the returned InnerSecret<[u8; 16]>.
-//! let owned: secure_gate::InnerSecret<[u8; 16]> = key.into_inner();
-//! assert_eq!(*owned, [0xABu8; 16]);
-//! assert_eq!(format!("{:?}", owned), "[REDACTED]");
-//! // `owned` zeroizes its bytes when it drops.
+//! // Consumes `key` and transfers ownership of the bytes. Nothing is copied:
+//! // an inert sentinel is left for `Fixed::drop` to zeroize in their place.
+//! let owned: [u8; 16] = key.into_inner();
+//! assert_eq!(owned, [0xABu8; 16]);
+//! // `owned` is an ordinary array now — you own its lifetime.
 //! ```
 //!
 //! Polymorphic generic code:
@@ -185,16 +186,18 @@ pub trait RevealSecret {
     /// ```
     fn expose_secret(&self) -> &Self::Inner;
 
-    /// Consumes the wrapper and returns the inner value wrapped in [`InnerSecret`],
-    /// preserving automatic zeroization on drop.
+    /// Consumes the wrapper and transfers ownership of the plain inner value.
     ///
     /// This is the safe, idiomatic path when ownership of the secret is required — for
     /// example, to hand the value to an API that takes `T` by value, to move between
     /// wrapper types, or at FFI boundaries where the callee takes ownership.
     ///
-    /// The zeroization contract transfers to the caller: when the returned
-    /// `InnerSecret<Self::Inner>` drops, it calls `Self::Inner::zeroize()` automatically,
-    /// exactly as the wrapper's own `Drop` impl would have.
+    /// **Protection ends here.** The returned value is an ordinary `[u8; N]` / `String` /
+    /// `Vec<T>` with no zeroize-on-drop and no redacted `Debug` — you own the secret and
+    /// its lifetime from this call onward. Nothing is copied: the value is moved out and
+    /// an inert [`SentinelValue`](crate::SentinelValue) is left for the wrapper's `Drop`
+    /// to zeroize in its place. If you want the protection to continue, do not call this
+    /// — keep the wrapper, or move the value into a new one.
     ///
     /// # Availability
     ///
@@ -204,7 +207,7 @@ pub trait RevealSecret {
     /// out. (A plain `Default` bound is deliberately **not** used: the standard library
     /// only implements `Default` for arrays up to 32 elements, which would make
     /// `into_inner` unusable for `[u8; 64]` and other common key sizes.) The `Zeroize`
-    /// bound is required so the returned `InnerSecret<T>` can call `zeroize()` on drop.
+    /// bound is required because the wrapper still zeroizes the sentinel on drop.
     /// For custom inner types that intentionally omit `SentinelValue` (e.g. key types
     /// where no safe placeholder value exists), `into_inner` is not callable — use
     /// `with_secret` or `expose_secret` instead.
@@ -213,11 +216,6 @@ pub trait RevealSecret {
     /// - `Fixed<[u8; N]>` — `[u8; N]: SentinelValue + Zeroize` for **any** `N` ✓
     /// - `Dynamic<String>` — `String: SentinelValue + Zeroize` ✓
     /// - `Dynamic<Vec<T>>` — `Vec<T>: SentinelValue + Zeroize` ✓
-    ///
-    /// # Debug Behavior
-    ///
-    /// The returned [`crate::InnerSecret<T>`] always redacts `Debug` as `[REDACTED]`, preserving
-    /// the wrapper-level redaction invariant after ownership transfer.
     ///
     /// # Allocation Behavior
     ///
@@ -234,10 +232,9 @@ pub trait RevealSecret {
     /// use secure_gate::{Fixed, RevealSecret};
     ///
     /// let key = Fixed::new([0xABu8; 16]);
-    /// let owned: secure_gate::InnerSecret<[u8; 16]> = key.into_inner();
-    /// // `owned` zeroizes its 16 bytes when it drops — same guarantee as Fixed<[u8; 16]>.
-    /// assert_eq!(*owned, [0xABu8; 16]);
-    /// assert_eq!(format!("{:?}", owned), "[REDACTED]");
+    /// let owned: [u8; 16] = key.into_inner();
+    /// assert_eq!(owned, [0xABu8; 16]);
+    /// // `owned` is a plain array — no wiping, no redaction. You own it.
     /// ```
     ///
     /// ```rust
@@ -246,12 +243,12 @@ pub trait RevealSecret {
     /// use secure_gate::{Dynamic, RevealSecret};
     ///
     /// let pw = Dynamic::<String>::new("hunter2".to_string());
-    /// let owned: secure_gate::InnerSecret<String> = pw.into_inner();
-    /// assert_eq!(*owned, "hunter2");
-    /// // `owned` zeroizes its heap buffer when it drops.
+    /// let owned: String = pw.into_inner();
+    /// assert_eq!(owned, "hunter2");
+    /// // Same allocation, moved out — no copy was made.
     /// # }
     /// ```
-    fn into_inner(self) -> crate::InnerSecret<Self::Inner>
+    fn into_inner(self) -> Self::Inner
     where
         Self: Sized,
         Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize;

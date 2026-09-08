@@ -1,0 +1,11 @@
+error[E0599]: the method `to_hex` exists for reference `&str`, but its trait bounds were not satisfied
+  --> tests/compile-fail/str_not_encodable.rs:16:20
+   |
+16 |     let _ = "text".to_hex();
+   |                    ^^^^^^ method cannot be called on `&str` due to unsatisfied trait bounds
+   |
+   = note: the following trait bounds were not satisfied:
+           `str: EncodableBytes`
+           which is required by `str: ToHex`
+           `&str: EncodableBytes`
+           which is required by `&str: ToHex`

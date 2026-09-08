@@ -1,28 +1,28 @@
-//! Owned wrapper types that complete the reveal model (Tier 3 owned consumption).
+//! The output wrapper for encoded secret material.
 //!
-//! > **Import paths:** `use secure_gate::{InnerSecret, EncodedSecret};`
+//! > **Import path:** `use secure_gate::EncodedSecret;`
 //!
-//! These types provide strong zeroization guarantees for secrets that have been
-//! intentionally extracted from a [`RevealSecret`] wrapper:
+//! [`RevealSecret::into_inner`](crate::RevealSecret::into_inner) hands back the plain
+//! value and ends protection, because
+//! the caller has decided to own it. Encoding is the one case that still needs a wrapper:
+//! the encoded form is a *second full copy* of the secret in a different alphabet, and it
+//! is worth keeping wiped until it drops.
 //!
-//! - [`InnerSecret<T>`] — returned by [`RevealSecret::into_inner`] for raw secret values.
-//! - [`EncodedSecret`] — returned by zeroizing encoding methods (`to_hex_zeroizing`,
-//!   `to_base32_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.)
-//!   when the encoded form itself must remain sensitive.
+//! - [`EncodedSecret`] — returned by every encoding method: `to_hex`, `to_hex_upper`,
+//!   `to_base32`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and the
+//!   `_sized::<N>` forms of the last two. Only bech32 and bech32m take a code length.
 //!
-//! Both types wrap [`zeroize::Zeroizing`] internally, provide redacted `Debug`
-//! (`[REDACTED]`), and offer an `into_zeroizing()` escape hatch. They are the
-//! idiomatic way to transfer ownership while preserving the crate’s “secrets are
-//! radioactive” guarantees.
+//! It wraps [`zeroize::Zeroizing`] internally, provides redacted `Debug` (`[REDACTED]`),
+//! and offers an `into_zeroizing()` escape hatch that keeps the wiping but not the
+//! redaction. It is the idiomatic way to hand off
+//! encoded output while preserving the crate’s “secrets are radioactive”
+//! guarantees.
 //!
 //! See the [3-Tier Access Model](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#3-tier-access-model)
 //! and the [“What secure-gate does NOT protect against”](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#what-secure-gate-does-not-protect-against)
-//! section in `SECURITY.md` for full guidance on when and how to use these types.
+//! section in `SECURITY.md` for full guidance on when and how to use this type.
 
 #[cfg(feature = "alloc")]
 pub use self::encoded_secret::EncodedSecret;
 
-pub use self::inner_secret::InnerSecret;
-
 mod encoded_secret;
-mod inner_secret;

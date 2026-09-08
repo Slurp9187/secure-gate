@@ -16,11 +16,11 @@
 //! | [`FromBase32Str`]   | `encoding-base32`   |
 //! | [`FromBase64UrlStr`]| `encoding-base64`   |
 //! | [`FromBech32Str`]   | `encoding-bech32`   |
-//! | [`FromBech32mStr`]  | `encoding-bech32m`  |
+//! | [`FromBech32mStr`]  | `encoding-bech32`   |
 pub mod base32;
 pub mod base64_url;
 pub mod bech32;
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 pub mod bech32m;
 pub mod hex;
 
@@ -30,7 +30,7 @@ pub use self::bech32::FromBech32Str;
 pub use base32::FromBase32Str;
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use base64_url::FromBase64UrlStr;
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use bech32m::FromBech32mStr;
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub use hex::FromHexStr;

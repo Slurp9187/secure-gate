@@ -1,4 +1,3 @@
-
 // no_std by default; the `std` feature opts back into the standard library.
 // Verified in CI by cross-building for a bare-metal target.
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -13,14 +12,22 @@
 //! [`Zeroize`](zeroize::Zeroize)). While a secret is held in [`Fixed`] or [`Dynamic`],
 //! there is no `Deref` and no `AsRef`: callers reach the inner secret only via
 //! [`RevealSecret`] / [`RevealSecretMut`], and `Debug` always prints `[REDACTED]`.
-//! All access follows a **3-tier model**: scoped closures (preferred), direct
-//! references (escape hatch), and owned extraction (consumption).
+//! Access has two shapes: **borrow** it, or **take** it.
+//! [`with_secret()`](RevealSecret::with_secret) and
+//! [`expose_secret()`](RevealSecret::expose_secret) lend you a reference while the
+//! wrapper keeps ownership and keeps wiping. [`into_inner()`](RevealSecret::into_inner)
+//! transfers ownership: you get the plain value and the protection ends with the call.
 //!
-//! Extraction is a hand-off, not a third layer of protection. The
-//! [output wrappers](#type-taxonomy) it returns ([`InnerSecret<T>`], [`EncodedSecret`])
-//! **do** implement `Deref` — that is their purpose. They keep zeroize-on-drop for the
-//! buffer they own and keep `Debug` redacted; ordinary copies you make of the derefed
-//! value (`*inner`, `.to_string()`) are not tracked. See
+//! Those two shapes are what the **3-tier access model** in `SECURITY.md` counts in
+//! threes: `with_secret` (Tier 1) and `expose_secret` (Tier 2) are both the borrow
+//! shape, differing only in how tightly the lifetime is pinned, and `into_inner`
+//! (Tier 3) is the take. Two shapes, three volumes — the tiers say how loudly you
+//! have to announce which one you picked, not how many protections there are.
+//!
+//! Extraction is a hand-off, not a third layer of protection. Encoding output is the
+//! one case that keeps a wrapper — [`EncodedSecret`] **does** implement `Deref`, because
+//! its job is to keep an encoded *copy* of the secret wiped until it drops. Ordinary
+//! copies you make of the derefed value (`.to_string()`) are not tracked. See
 //! [Where accident-prevention ends](#where-accident-prevention-ends).
 //!
 //! # Which type should I use?
@@ -82,7 +89,6 @@
 //! │   ├── RevealSecret      ← immutable access (always available)
 //! │   ├── RevealSecretMut   ← mutable access (always available)
 //! │   ├── revealed_secrets/
-//! │   │   ├── InnerSecret<T>    ← owned extraction wrapper
 //! │   │   └── EncodedSecret     ← zeroizing encoded string wrapper (alloc)
 //! │   ├── ConstantTimeEq    ← ct-eq feature
 //! │   ├── CloneableSecret   ← cloneable feature
@@ -90,7 +96,7 @@
 //! │   ├── encoding/         ← ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m
 //! │   └── decoding/         ← FromHexStr, FromBase32Str, FromBase64UrlStr, FromBech32Str, FromBech32mStr
 //! ├── macros/               ← fixed_alias!, fixed_newtype!, dynamic_alias!, dynamic_newtype!, etc.
-//! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error, DecodingError
+//! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error
 //! ```
 //!
 //! All public items are re-exported at the crate root. Use `secure_gate::Fixed`,
@@ -101,37 +107,42 @@
 //! | Category | Types | `Deref` to secret? | Purpose |
 //! |----------|-------|-------------------|----------|
 //! | **Secret wrappers** | [`Fixed<T>`], [`Dynamic<T>`] | No — use [`RevealSecret`] | Hold live secrets; `Debug` → `[REDACTED]` |
-//! | **Output wrappers** | [`InnerSecret<T>`], [`EncodedSecret`] | Yes — caller owns the data | Hold extracted or encoded results |
+//! | **Output wrapper** | [`EncodedSecret`] | Yes — yields `&str`; copies you make are yours, the buffer stays the wrapper's | Holds encoded output, wiped on drop |
 //! | **Opt-in markers** | [`CloneableSecret`], [`SerializableSecret`] | — (no methods) | Implement on inner type `T` to unlock gated impls |
 //!
 //! `CloneableSecret` and `SerializableSecret` are implemented on the **inner type `T`**,
-//! not on `Fixed<T>` or `Dynamic<T>` directly. Output wrappers ([`InnerSecret`],
-//! [`EncodedSecret`]) are not secret wrappers and do not interact with these markers.
+//! not on `Fixed<T>` or `Dynamic<T>` directly. [`EncodedSecret`] is not a secret
+//! wrapper and does not interact with these markers.
 //!
 //! # Where accident-prevention ends
 //!
 //! This crate carries two separate obligations, and they end in different places.
 //!
 //! **Accidents must not compile.** This applies while the secret is held in
-//! [`Fixed`]/[`Dynamic`], and it ends at the named extraction. `into_inner`,
-//! `expose_secret`, and `to_*_zeroizing` are the exits: you typed a name, the call site
-//! is grep-able, and ownership moves to you.
+//! [`Fixed`]/[`Dynamic`], and it ends at the named extraction. `into_inner` and
+//! `EncodedSecret::into_inner` are the exits that transfer ownership: you typed a
+//! name, the call site is grep-able, and the wrapper is consumed. `expose_secret` is
+//! a named *borrow* — the wrapper still owns the secret and still wipes it — but it
+//! hands out a reference with no lifetime bound to a call site, so it is audited
+//! alongside them.
 //!
 //! **Documented behavior must be accurate.** This never ends, and it is why the
-//! taxonomy table above says `Deref: Yes` for output wrappers.
+//! taxonomy table above says `Deref: Yes` for the output wrapper.
 //!
-//! What an output wrapper still guarantees: the buffer *it* owns is zeroized on drop,
+//! What [`EncodedSecret`] still guarantees: the `String` it owns is zeroized on drop,
 //! and its `Debug` prints `[REDACTED]`. What it does not guarantee: copies you make
-//! through `Deref` are ordinary values. `*inner` on a `Copy` type, `str::to_string()`,
-//! and `.to_owned()` all produce untracked plaintext. That is what extraction is for —
-//! the crate is not trying to follow the bytes into your TLS stack.
+//! through `Deref` are ordinary values. `str::to_string()` and `.to_owned()` both
+//! produce untracked plaintext. That is what extraction is for — the crate is not
+//! trying to follow the bytes into your TLS stack. `into_inner` gives up even the first
+//! guarantee, by design: it is the named end of protection.
 //!
 //! Two consequences worth knowing:
 //!
-//! - `format!("{:?}", &*inner)` prints the secret. Redaction lives on the wrapper, not
-//!   on `T`; dereferencing first opts out of it.
-//! - `into_zeroizing()` returns [`zeroize::Zeroizing<T>`], whose `Debug` is **not**
-//!   redacted. It is a deliberate hand-off to a foreign type, not an equivalent wrapper.
+//! - `format!("{:?}", &*encoded)` prints the encoded secret. Redaction lives on the
+//!   wrapper, not on `str`; dereferencing first opts out of it.
+//! - [`EncodedSecret::into_zeroizing`] returns a `Zeroizing<String>`, whose `Debug` is
+//!   **not** redacted. It is a deliberate hand-off to a foreign type, not an equivalent
+//!   wrapper.
 //!
 //! # Import paths
 //!
@@ -177,8 +188,7 @@
 //! | `encoding-hex` | no | [`ToHex`] / [`FromHexStr`] via `base16ct` (constant-time) |
 //! | `encoding-base32` | no | [`ToBase32`] / [`FromBase32Str`] via `base32ct` (constant-time) |
 //! | `encoding-base64` | no | [`ToBase64Url`] / [`FromBase64UrlStr`] via `base64ct` (constant-time) |
-//! | `encoding-bech32` | no | [`ToBech32`] / [`FromBech32Str`] — BIP-173, extended ~5 KB limit |
-//! | `encoding-bech32m` | no | [`ToBech32m`] / [`FromBech32mStr`] — BIP-350, standard 90-byte limit |
+//! | `encoding-bech32` | no | [`ToBech32`] / [`FromBech32Str`] (BIP-173) **and** [`ToBech32m`] / [`FromBech32mStr`] (BIP-350); `_sized::<N>` for a caller-chosen code length |
 //! | `encoding` | no | All encoding features |
 //! | | | **Meta** |
 //! | `cloneable` | no | [`CloneableSecret`] opt-in cloning |
@@ -187,7 +197,7 @@
 //! # What's available without `alloc`?
 //!
 //! With `default-features = false`:
-//! - [`Fixed<T>`], [`RevealSecret`], [`RevealSecretMut`], [`InnerSecret`]
+//! - [`Fixed<T>`], [`RevealSecret`], [`RevealSecretMut`]
 //! - [`Fixed::try_from_hex`](Fixed::try_from_hex), [`Fixed::try_from_base32`](Fixed::try_from_base32),
 //!   [`Fixed::try_from_base64url`](Fixed::try_from_base64url),
 //!   [`Fixed::try_from_bech32`](Fixed::try_from_bech32), [`Fixed::try_from_bech32m`](Fixed::try_from_bech32m)
@@ -219,8 +229,8 @@
 //!
 //! This crate has **not** undergone an independent security audit. No unsafe code —
 //! enforced with `#![forbid(unsafe_code)]`. Prefer scoped access ([`RevealSecret::with_secret`])
-//! over direct references. Prefer zeroizing encoding variants (`to_hex_zeroizing`, etc.)
-//! when the encoded form is sensitive. See
+//! over direct references. Encoders return [`EncodedSecret`], which stays wiped until it
+//! drops; `EncodedSecret::into_inner` is the named call that ends that. See
 //! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md)
 //! for the full threat model.
 //!
@@ -384,8 +394,8 @@ pub use traits::ConstantTimeEq;
 ///   borrow cannot escape.
 /// - **Tier 2** (escape hatch): [`expose_secret()`](RevealSecret::expose_secret) — direct
 ///   `&T` reference for FFI / third-party APIs.
-/// - **Tier 3** (consumption): [`into_inner()`](RevealSecret::into_inner) — returns
-///   [`InnerSecret<T>`] with zeroization transferred to caller.
+/// - **Tier 3** (consumption): [`into_inner()`](RevealSecret::into_inner) — transfers
+///   ownership of the plain value; protection ends with the call.
 ///
 /// Length metadata lives in the separate [`SecretLen`] trait. See
 /// [`RevealSecretMut`] for the mutable counterpart.
@@ -407,22 +417,9 @@ pub use traits::SecretLen;
 ///
 /// Extends [`RevealSecret`]. Prefer [`with_secret_mut()`](RevealSecretMut::with_secret_mut)
 /// (Tier 1) over [`expose_secret_mut()`](RevealSecretMut::expose_secret_mut) (Tier 2).
-/// Only [`Fixed`] and [`Dynamic`] implement this — read-only wrappers deliberately do not.
+/// Implemented by [`Fixed`], [`Dynamic`], and the generated newtypes. [`EncodedSecret`]
+/// implements neither this nor [`RevealSecret`] — it is an output wrapper, not a secret one.
 pub use traits::RevealSecretMut;
-
-/// Owned extraction **output wrapper** returned by [`RevealSecret::into_inner`] (Tier 3 access).
-///
-/// Wraps [`Zeroizing<T>`](zeroize::Zeroizing) with `Debug` → `[REDACTED]`. Implements
-/// `Deref<Target = T>` for ergonomic access. Both output wrappers deref
-/// ([`EncodedSecret`] derefs to `str`); the secret wrappers [`Fixed`] and [`Dynamic`]
-/// deliberately do not.
-///
-/// This is an **output wrapper**, not a secret wrapper like [`Fixed`]/[`Dynamic`] — it
-/// holds the owned result of Tier 3 extraction, with zeroization transferred to the
-/// caller. See also [`EncodedSecret`] (the other output wrapper, for encoded strings).
-/// Use [`into_zeroizing()`](InnerSecret::into_zeroizing) when an API requires
-/// `Zeroizing<T>` directly.
-pub use traits::InnerSecret;
 
 /// Placeholder values left behind by [`RevealSecret::into_inner`] (Tier 3 access).
 ///
@@ -433,25 +430,32 @@ pub use traits::InnerSecret;
 ///
 /// Implement this for your own inner types to make `into_inner` available on wrappers
 /// around them. A sentinel must never contain secret material.
+///
+/// Leaving it unimplemented is a deliberate position, not a gap: `into_inner` is then
+/// uncallable for that inner type, so a secret with no safe inert placeholder simply
+/// cannot be extracted by ownership transfer. `with_secret` and `expose_secret` still
+/// work. That is the safe default rather than a missing feature.
 pub use traits::SentinelValue;
 
 /// Encoded string **output wrapper** for zeroizing encoded output.
 ///
 /// This is an **output wrapper** — it exists *only* to keep encoded data zeroized until
 /// it drops. It is **not** a secret wrapper like [`Fixed`]/[`Dynamic`] and does not
-/// accept [`CloneableSecret`] or [`SerializableSecret`] markers. See also
-/// [`InnerSecret`] (the other output wrapper, for owned secret extraction).
+/// accept [`CloneableSecret`] or [`SerializableSecret`] markers.
 ///
-/// Returned by all `*_zeroizing` encoding methods (`to_hex_zeroizing`,
-/// `to_base32_zeroizing`, `to_base64url_zeroizing`, `try_to_bech32_zeroizing`, etc.).
-/// Wraps `Zeroizing<String>` with `Debug` → `[REDACTED]`. Implements `Deref<Target = str>`,
-/// `AsRef<str>`, and `AsRef<[u8]>`. Deliberately **no** `Display`: `{}` on this type is
+/// Returned by every encoding method (`to_hex`, `to_hex_upper`, `to_base32`,
+/// `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and the `_sized::<N>` forms of
+/// the last two — only bech32 and bech32m take a code length).
+/// Wraps `Zeroizing<String>` with `Debug` → `[REDACTED]`. Its one accessor is
+/// `Deref<Target = str>`; there are deliberately no `AsRef` impls, because `Deref`
+/// already opens that door. Deliberately **no** `Display` either: `{}` on this type is
 /// a compile error, so `Debug` redaction cannot mislead a caller into logging the
 /// encoded secret. Write it out with `&*encoded`.
 ///
 /// Use [`into_inner()`](EncodedSecret::into_inner) to extract a plain `String`
-/// (ends zeroization) or [`into_zeroizing()`](EncodedSecret::into_zeroizing) to
-/// preserve it.
+/// (ends zeroization) or [`into_zeroizing()`](EncodedSecret::into_zeroizing) to keep
+/// the wiping. `into_zeroizing` is a partial downgrade: zeroize-on-drop survives, the
+/// redacted `Debug` does not, because `zeroize::Zeroizing` derives its own.
 ///
 /// Requires `alloc` feature.
 #[cfg(feature = "alloc")]
@@ -502,8 +506,8 @@ pub use traits::FromBase64UrlStr;
 pub use traits::FromBech32Str;
 
 /// Decodes Bech32m (BIP-350) strings to `Vec<u8>` with HRP validation.
-/// Requires `encoding-bech32m` + `alloc`. See [`ToBech32m`] for the encoding counterpart.
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+/// Requires `encoding-bech32` + `alloc`. See [`ToBech32m`] for the encoding counterpart.
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use traits::FromBech32mStr;
 
 /// Decodes hex strings (`&str`) to `Vec<u8>`. Blanket impl for `AsRef<str>`.
@@ -512,32 +516,67 @@ pub use traits::FromBech32mStr;
 pub use traits::FromHexStr;
 
 /// Encodes byte data as Base32 strings (RFC 4648 §6, uppercase, no padding).
-/// Blanket impl for `AsRef<[u8]>`. Requires `encoding-base32` + `alloc`.
+/// Blanket impl for `AsRef<[u8]> + `[`EncodableBytes`]. Returns [`EncodedSecret`].
+/// Requires `encoding-base32` + `alloc`.
 /// See [`FromBase32Str`] for the decoding counterpart.
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 pub use traits::ToBase32;
 
 /// Encodes byte data as Base64url strings (RFC 4648, URL-safe, no padding).
-/// Blanket impl for `AsRef<[u8]>`. Requires `encoding-base64` + `alloc`.
+/// Blanket impl for `AsRef<[u8]> + `[`EncodableBytes`]. Returns [`EncodedSecret`].
+/// Requires `encoding-base64` + `alloc`.
 /// See [`FromBase64UrlStr`] for the decoding counterpart.
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use traits::ToBase64Url;
 
-/// Encodes byte data as Bech32 (BIP-173) strings with extended ~5 KB payload limit.
-/// Blanket impl for `AsRef<[u8]>`. Requires `encoding-bech32` + `alloc`.
+/// Encodes byte data as Bech32 (BIP-173) strings. Blanket impl for
+/// `AsRef<[u8]> + `[`EncodableBytes`]; returns `Result<`[`EncodedSecret`]`, _>`.
+/// The plain methods use [`BECH32_CODE_LENGTH`]; `try_to_bech32_sized::<N>` takes the
+/// code length as a parameter. Requires `encoding-bech32` + `alloc`.
 /// See [`FromBech32Str`] for the decoding counterpart.
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use traits::ToBech32;
 
-/// Encodes byte data as Bech32m (BIP-350) strings with standard 90-byte payload limit.
-/// Blanket impl for `AsRef<[u8]>`. Requires `encoding-bech32m` + `alloc`.
+/// Encodes byte data as Bech32m (BIP-350) strings. Blanket impl for
+/// `AsRef<[u8]> + `[`EncodableBytes`]; returns `Result<`[`EncodedSecret`]`, _>`.
+/// The plain methods use [`BECH32_CODE_LENGTH`]; `try_to_bech32m_sized::<N>` takes the
+/// code length as a parameter. Requires `encoding-bech32` + `alloc`.
 /// See [`FromBech32mStr`] for the decoding counterpart.
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use traits::ToBech32m;
 
+/// Opt-in marker for byte-shaped encoding inputs. Every `To*` trait is blanket
+/// implemented for `AsRef<[u8]> + EncodableBytes`; the second bound keeps string-shaped
+/// types out, so an already-encoded value cannot be silently encoded again. Implement it
+/// for your own byte newtype to make it encodable.
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base32",
+    feature = "encoding-base64",
+    feature = "encoding-bech32",
+))]
+pub use traits::EncodableBytes;
+
+/// Bech32 (BIP-173) checksum with a caller-chosen code length. `N` caps the length of
+/// the whole encoded string and never enters the checksum. Above [`BECH32_CODE_LENGTH`]
+/// the BCH error-detection guarantee no longer holds - see the type docs.
+#[cfg(feature = "encoding-bech32")]
+pub use traits::{Bech32Sized, Bech32Standard};
+
+/// Bech32m (BIP-350) checksum with a caller-chosen code length - the bech32m twin of
+/// [`Bech32Sized`], with the same rules and the same guarantee boundary.
+#[cfg(feature = "encoding-bech32")]
+pub use traits::{Bech32mSized, Bech32mStandard};
+
+/// The bech32 BCH code length (1023) used by every non-`_sized` method, and the helper
+/// that sizes an `N` from an HRP length and a payload byte count.
+#[cfg(feature = "encoding-bech32")]
+pub use traits::{bech32_code_length, BECH32_CODE_LENGTH};
+
 /// Encodes byte data as hexadecimal strings (constant-time via `base16ct`).
-/// Blanket impl for `AsRef<[u8]>`. Provides `to_hex()`, `to_hex_upper()`, and
-/// zeroizing variants. Requires `encoding-hex` + `alloc`.
+/// Blanket impl for `AsRef<[u8]> + `[`EncodableBytes`]. Provides `to_hex()` and
+/// `to_hex_upper()`, both returning [`EncodedSecret`].
+/// Requires `encoding-hex` + `alloc`.
 /// See [`FromHexStr`] for the decoding counterpart.
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub use traits::ToHex;
@@ -549,7 +588,6 @@ pub use traits::ToHex;
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
 ))]
 pub use traits::SecureDecoding;
 
@@ -560,14 +598,13 @@ pub use traits::SecureDecoding;
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
 ))]
 pub use traits::SecureEncoding;
 
 /// Errors from Bech32 (BIP-173) and Bech32m (BIP-350) decoding.
 /// Variant shapes are identical in debug and release builds; no secret material
 /// (payload bytes, HRP strings) is ever carried in an error.
-#[cfg(any(feature = "encoding-bech32", feature = "encoding-bech32m"))]
+#[cfg(feature = "encoding-bech32")]
 pub use error::Bech32Error;
 
 /// Errors from Base32 (RFC 4648 §6, uppercase, unpadded) decoding. Variant shapes are
@@ -584,11 +621,6 @@ pub use error::Base64Error;
 /// release builds; only numeric length metadata is carried.
 #[cfg(feature = "encoding-hex")]
 pub use error::HexError;
-
-/// Unified error type wrapping format-specific decoding errors ([`HexError`],
-/// [`Base32Error`], [`Base64Error`], [`Bech32Error`]). Always available; variants depend
-/// on enabled features.
-pub use error::DecodingError;
 
 /// Error returned when a byte slice cannot be converted to `Fixed<[u8; N]>` due to
 /// length mismatch. Produced by `Fixed::try_from(&[u8])`.

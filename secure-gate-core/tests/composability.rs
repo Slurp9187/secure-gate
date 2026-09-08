@@ -120,22 +120,16 @@ mod generic_encoding {
     /// One bound, three shapes: Fixed, Dynamic, and a hand-rolled newtype
     /// whose only forwarding is `RevealSecret` + `ToHex`.
     fn fingerprint<S: ToHex>(secret: &S) -> String {
-        secret.to_hex()
+        secret.to_hex().into_inner()
     }
 
     struct EncKey(Fixed<[u8; 4]>);
     impl ToHex for EncKey {
-        fn to_hex(&self) -> String {
+        fn to_hex(&self) -> secure_gate::EncodedSecret {
             self.0.to_hex()
         }
-        fn to_hex_upper(&self) -> String {
+        fn to_hex_upper(&self) -> secure_gate::EncodedSecret {
             self.0.to_hex_upper()
-        }
-        fn to_hex_zeroizing(&self) -> secure_gate::EncodedSecret {
-            self.0.to_hex_zeroizing()
-        }
-        fn to_hex_upper_zeroizing(&self) -> secure_gate::EncodedSecret {
-            self.0.to_hex_upper_zeroizing()
         }
     }
 
@@ -148,7 +142,7 @@ mod generic_encoding {
         assert_eq!(fingerprint(&d), "abababab");
         assert_eq!(fingerprint(&n), "abababab");
         // The inner-bytes blanket impl serves the closure form as before:
-        assert_eq!(f.with_secret(|b| b.to_hex()), "abababab");
+        assert_eq!(f.with_secret(|b| b.to_hex().into_inner()), "abababab");
         let _ = d.expose_secret(); // RevealSecret still in play
     }
 }

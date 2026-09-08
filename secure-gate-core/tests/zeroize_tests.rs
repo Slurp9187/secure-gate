@@ -290,39 +290,24 @@ fn dynamic_spare_capacity_vec_zeroized() {
     // element[1].0 == 0 (zeroed in the spare_capacity_mut pass above) ✓
 }
 
-/// `into_inner()` transfers the full zeroization contract — including spare capacity —
-/// to the returned `InnerSecret<Vec<T>>`.
+/// `into_inner()` transfers ownership: moved, never copied.
 ///
-/// This is the critical regression guard for the `into_inner` code path. It mirrors
-/// `dynamic_spare_capacity_vec_zeroized` exactly, but calls `secret.into_inner()`
-/// instead of `secret.zeroize()`, proving that:
-///
-/// 1. `into_inner()` consumes the wrapper without running the secret through `zeroize()`.
-/// 2. The returned `InnerSecret<Vec<PanicOnNonZeroDrop>>` calls `Vec::zeroize()` on drop.
-/// 3. `Vec::zeroize()` byte-zeroes spare capacity via `spare_capacity_mut()`.
-/// 4. `PanicOnNonZeroDrop::drop` finds `.0 == 0` for the spare-capacity element → passes. ✓
+/// This replaces a test of the *old* contract, where the extracted value kept wiping
+/// itself. It does not: `into_inner` hands back a plain `Vec<u8>` and protection ends
+/// at the call. What is still guaranteed, and what this pins, is that nothing is copied.
 #[test]
 #[cfg(feature = "alloc")]
-fn dynamic_into_inner_spare_capacity_zeroized() {
-    let mut v = vec![PanicOnNonZeroDrop(42); 2];
-    // SAFETY: reducing len makes element[1] spare capacity; its memory remains initialized.
-    unsafe { v.set_len(1) };
-
-    let secret: Dynamic<Vec<PanicOnNonZeroDrop>> = Dynamic::new(v);
-
-    // Consume the wrapper via into_inner; zeroization contract transfers to `extracted`.
-    let extracted: secure_gate::InnerSecret<Vec<PanicOnNonZeroDrop>> = secret.into_inner();
-    // This test needs temporary mutable Vec access for unsafe len restoration. Convert to
-    // the explicit interoperability wrapper; zeroization contract remains unchanged.
-    let mut extracted = extracted.into_zeroizing();
-
-    // Restore len=2 so element[1] is visible as a `PanicOnNonZeroDrop` when Drop runs.
-    // SAFETY: `PanicOnNonZeroDrop` wraps a `u64`; all-zero bytes are a valid `u64`
-    // representation (zero). Zeroizing::drop → Vec::zeroize() will byte-zero the spare
-    // slot before the element's Drop fires, so PanicOnNonZeroDrop::drop finds `.0 == 0`. ✓
-    unsafe { extracted.set_len(2) };
-    // drop: Zeroizing::drop → Vec::zeroize() → Vec::clear → PanicOnNonZeroDrop::drop
-    // element[1].0 == 0 (zeroed by Vec::zeroize() spare_capacity_mut pass) ✓
+fn dynamic_into_inner_moves_without_copying() {
+    let original = vec![0xCCu8; 64];
+    let ptr = original.as_ptr();
+    let secret: Dynamic<Vec<u8>> = Dynamic::new(original);
+    let extracted: Vec<u8> = secret.into_inner();
+    assert_eq!(
+        extracted.as_ptr(),
+        ptr,
+        "into_inner copied instead of moving"
+    );
+    assert_eq!(extracted, vec![0xCCu8; 64]);
 }
 
 /// `Dynamic<Vec<u8>>` has a real `Drop` glue destructor.

@@ -1,7 +1,8 @@
 //! `dynamic_newtype!` — nominal newtype over `Dynamic<T>`.
 //!
 //! Ships in 0.9.0; backported to the 0.8 line in 0.8.0-rc.11. Design record:
-//! `docs/nominal_newtypes.md` (describes `main`).
+//! [`docs/nominal_newtypes.md`](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/docs/nominal_newtypes.md) — a repository file, not part of the
+//! published crate, so this is a link and not a path. It describes `main`.
 
 /// Creates a distinct nominal type wrapping [`Dynamic<T>`](crate::Dynamic).
 ///
@@ -113,9 +114,10 @@
 /// | Contents (the wrapper's protection) | `new`, `From<&str>` / `From<&[u8]>` | `with_secret`, `expose_secret`, `into_inner` |
 /// | Role (the nominal label) | `from_wrapper` | `as_wrapper`, `as_wrapper_mut`, `into_wrapper` |
 ///
-/// `into_inner` leaves the protection: the [`InnerSecret`](crate::InnerSecret)
-/// it returns derefs, so the contents are in the caller's hands (tier 3 of
-/// the access model, audited). `into_wrapper` only removes the label: the
+/// `into_inner` leaves the protection: it hands back the plain value, so the
+/// contents are in the caller's hands (tier 3 of the access model, audited).
+/// `into_wrapper` is a **label** drop; `into_inner` is a **protection** drop.
+/// Confusing those two names is the main way this model gets misread. `into_wrapper` only removes the label: the
 /// result is still a `Dynamic`, still unreadable without `with_secret`. The
 /// role row exists so that dropping a label never forces opening the
 /// contents — without it, reaching base-typed code costs an `into_inner` plus
@@ -255,20 +257,12 @@ macro_rules! dynamic_newtype {
             }
             impl $crate::ToHex for $name {
                 #[inline]
-                fn to_hex(&self) -> $crate::__private::String {
+                fn to_hex(&self) -> $crate::EncodedSecret {
                     $crate::ToHex::to_hex(&self.0)
                 }
                 #[inline]
-                fn to_hex_upper(&self) -> $crate::__private::String {
+                fn to_hex_upper(&self) -> $crate::EncodedSecret {
                     $crate::ToHex::to_hex_upper(&self.0)
-                }
-                #[inline]
-                fn to_hex_zeroizing(&self) -> $crate::EncodedSecret {
-                    $crate::ToHex::to_hex_zeroizing(&self.0)
-                }
-                #[inline]
-                fn to_hex_upper_zeroizing(&self) -> $crate::EncodedSecret {
-                    $crate::ToHex::to_hex_upper_zeroizing(&self.0)
                 }
             }
         }
@@ -285,12 +279,8 @@ macro_rules! dynamic_newtype {
             }
             impl $crate::ToBase32 for $name {
                 #[inline]
-                fn to_base32(&self) -> $crate::__private::String {
+                fn to_base32(&self) -> $crate::EncodedSecret {
                     $crate::ToBase32::to_base32(&self.0)
-                }
-                #[inline]
-                fn to_base32_zeroizing(&self) -> $crate::EncodedSecret {
-                    $crate::ToBase32::to_base32_zeroizing(&self.0)
                 }
             }
         }
@@ -307,12 +297,8 @@ macro_rules! dynamic_newtype {
             }
             impl $crate::ToBase64Url for $name {
                 #[inline]
-                fn to_base64url(&self) -> $crate::__private::String {
+                fn to_base64url(&self) -> $crate::EncodedSecret {
                     $crate::ToBase64Url::to_base64url(&self.0)
-                }
-                #[inline]
-                fn to_base64url_zeroizing(&self) -> $crate::EncodedSecret {
-                    $crate::ToBase64Url::to_base64url_zeroizing(&self.0)
                 }
             }
         }
@@ -327,40 +313,98 @@ macro_rules! dynamic_newtype {
                         <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32(s, expected_hrp)?,
                     ))
                 }
+                /// Bech32 decode without HRP validation.
+                #[inline]
+                pub fn try_from_bech32_unchecked(s: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32_unchecked(s)?,
+                    ))
+                }
+                /// HRP-validated Bech32 decode accepting strings up to `C` characters.
+                #[inline]
+                pub fn try_from_bech32_sized<const C: usize>(s: &str, expected_hrp: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32_sized::<C>(s, expected_hrp)?,
+                    ))
+                }
+                /// Bech32 decode without HRP validation, accepting strings up to `C` characters.
+                #[inline]
+                pub fn try_from_bech32_unchecked_sized<const C: usize>(s: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32_unchecked_sized::<C>(s)?,
+                    ))
+                }
             }
             impl $crate::ToBech32 for $name {
                 #[inline]
                 fn try_to_bech32(
                     &self,
                     hrp: &str,
-                ) -> ::core::result::Result<$crate::__private::String, $crate::Bech32Error> {
+                ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
                     $crate::ToBech32::try_to_bech32(&self.0, hrp)
                 }
                 #[inline]
-                fn try_to_bech32_zeroizing(
+                fn try_to_bech32_sized<const C: usize>(
                     &self,
                     hrp: &str,
                 ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
-                    $crate::ToBech32::try_to_bech32_zeroizing(&self.0, hrp)
+                    $crate::ToBech32::try_to_bech32_sized::<C>(&self.0, hrp)
                 }
             }
         }
 
         $crate::__sg_if_bech32m! {
+            impl $name {
+                /// HRP-validated Bech32m decode into this secret type.
+                #[inline]
+                pub fn try_from_bech32m(s: &str, expected_hrp: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32m(s, expected_hrp)?,
+                    ))
+                }
+                /// Bech32m decode without HRP validation.
+                #[inline]
+                pub fn try_from_bech32m_unchecked(s: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32m_unchecked(s)?,
+                    ))
+                }
+                /// HRP-validated Bech32m decode accepting strings up to `C` characters.
+                #[inline]
+                pub fn try_from_bech32m_sized<const C: usize>(s: &str, expected_hrp: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32m_sized::<C>(s, expected_hrp)?,
+                    ))
+                }
+                /// Bech32m decode without HRP validation, accepting strings up to `C` characters.
+                #[inline]
+                pub fn try_from_bech32m_unchecked_sized<const C: usize>(s: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_from_bech32m_unchecked_sized::<C>(s)?,
+                    ))
+                }
+            }
             impl $crate::ToBech32m for $name {
                 #[inline]
                 fn try_to_bech32m(
                     &self,
                     hrp: &str,
-                ) -> ::core::result::Result<$crate::__private::String, $crate::Bech32Error> {
+                ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
                     $crate::ToBech32m::try_to_bech32m(&self.0, hrp)
                 }
                 #[inline]
-                fn try_to_bech32m_zeroizing(
+                fn try_to_bech32m_sized<const C: usize>(
                     &self,
                     hrp: &str,
                 ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
-                    $crate::ToBech32m::try_to_bech32m_zeroizing(&self.0, hrp)
+                    $crate::ToBech32m::try_to_bech32m_sized::<C>(&self.0, hrp)
                 }
             }
         }

@@ -1,7 +1,8 @@
 //! Shared machinery for `fixed_newtype!` / `dynamic_newtype!`.
 //!
 //! Ships in 0.9.0; backported to the 0.8 line in 0.8.0-rc.11. Design record:
-//! `docs/nominal_newtypes.md` (describes `main`).
+//! [`docs/nominal_newtypes.md`](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/docs/nominal_newtypes.md) — a repository file, not part of the
+//! published crate, so this is a link and not a path. It describes `main`.
 
 // ---- cfg relays -------------------------------------------------------------
 // `#[cfg(feature = "...")]` inside an exported macro is evaluated in the CALLER's
@@ -88,7 +89,7 @@ macro_rules! __sg_newtype_base {
                 $crate::RevealSecret::expose_secret(&self.0)
             }
             #[inline(always)]
-            fn into_inner(self) -> $crate::InnerSecret<Self::Inner>
+            fn into_inner(self) -> Self::Inner
             where
                 Self: Sized,
                 Self::Inner: Sized + $crate::SentinelValue + $crate::__private::Zeroize,
@@ -344,11 +345,11 @@ macro_rules! __sg_if_base64 {
 
 #[doc(hidden)]
 #[macro_export]
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 macro_rules! __sg_if_bech32m { ($($t:tt)*) => { $($t)* }; }
 #[doc(hidden)]
 #[macro_export]
-#[cfg(not(feature = "encoding-bech32m"))]
+#[cfg(not(feature = "encoding-bech32"))]
 macro_rules! __sg_if_bech32m {
     ($($t:tt)*) => {};
 }

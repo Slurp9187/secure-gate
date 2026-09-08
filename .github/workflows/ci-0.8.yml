@@ -137,14 +137,19 @@ jobs:
           - name: encoding-base64 only
             features: "--no-default-features --features=alloc,encoding-base64"
 
+          # Covers BIP-173 and BIP-350 together: they are one feature now, so the
+          # former `encoding-bech32m only` and `encoding-bech32 + bech32m` rows
+          # collapse into this one.
           - name: encoding-bech32 only
             features: "--no-default-features --features=alloc,encoding-bech32"
 
-          - name: encoding-bech32m only
-            features: "--no-default-features --features=alloc,encoding-bech32m"
-
-          - name: encoding-bech32 + bech32m
-            features: "--no-default-features --features=alloc,encoding-bech32,encoding-bech32m"
+          # No `alloc`: the only row that expands a consumer `fixed_newtype!` on the
+          # no-alloc path. Its absence is what let the BIP-173 decode constructors sit
+          # inside `__sg_if_alloc!` undetected. Every item in encoding_suite/bech32*.rs
+          # is gated on all(encoding-bech32, alloc), so that suite compiles out here and
+          # what this row actually exercises is tests/newtype_nostd.rs.
+          - name: encoding-bech32, no alloc
+            features: "--no-default-features --features=encoding-bech32"
 
           # ── Serde ─────────────────────────────────────────────────────────────
           - name: serde (serialize + deserialize)
@@ -266,10 +271,9 @@ jobs:
             "encoding-base32" \
             "encoding-base64" \
             "encoding-bech32" \
-            "encoding-bech32m" \
-            "encoding-hex,encoding-base32,encoding-base64,encoding-bech32,encoding-bech32m" \
+            "encoding-hex,encoding-base32,encoding-base64,encoding-bech32" \
             "ct-eq" \
-            "ct-eq,encoding-hex,encoding-base32,encoding-base64,encoding-bech32,encoding-bech32m"
+            "ct-eq,encoding-hex,encoding-base32,encoding-base64,encoding-bech32"
           do
             cargo build -p secure-gate --lib \
               --target thumbv7em-none-eabihf \
@@ -397,7 +401,7 @@ jobs:
           ASAN_OPTIONS: "detect_leaks=1:abort_on_error=1:symbolize=1"
         run: >
           cargo +nightly test -p secure-gate
-          --features alloc
+          --features alloc,encoding-hex,encoding-base32,encoding-base64,encoding-bech32
           --test heap_zeroize
           -Z build-std
           --target x86_64-unknown-linux-gnu

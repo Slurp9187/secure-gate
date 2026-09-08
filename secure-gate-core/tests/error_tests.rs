@@ -13,14 +13,6 @@
 #[cfg(feature = "encoding-bech32")]
 use secure_gate::Bech32Error;
 
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base32",
-    feature = "encoding-base64",
-    feature = "encoding-bech32"
-))]
-use secure_gate::DecodingError;
-
 /// FromSliceError carries expected/got lengths in every build profile.
 #[test]
 fn from_slice_error_invalid_length() {
@@ -85,27 +77,6 @@ fn bech32_error_display() {
         format!("{}", Bech32Error::OperationFailed),
         "bech32 operation failed"
     );
-}
-
-/// Test DecodingError variants and behavior
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base32",
-    feature = "encoding-base64",
-    feature = "encoding-bech32"
-))]
-#[test]
-fn decoding_error_variants() {
-    // Fieldless in every build profile — no hint text is ever captured.
-    let invalid_encoding = DecodingError::InvalidEncoding;
-
-    match invalid_encoding {
-        DecodingError::InvalidEncoding => (),
-        _ => panic!("Expected InvalidEncoding"),
-    }
-
-    // Test Display
-    assert_eq!(format!("{}", invalid_encoding), "invalid encoding");
 }
 
 /// HexError::InvalidLength carries expected/got in every build profile.
@@ -199,7 +170,11 @@ fn bech32_error_invalid_length() {
 #[test]
 fn bech32_error_invalid_length_oversized_exact() {
     use secure_gate::ToBech32;
-    let encoded = [0u8; 8].as_slice().try_to_bech32("test").unwrap();
+    let encoded = [0u8; 8]
+        .as_slice()
+        .try_to_bech32("test")
+        .unwrap()
+        .into_inner();
     let err = secure_gate::Fixed::<[u8; 4]>::try_from_bech32(&encoded, "test")
         .expect_err("length mismatch must fail");
     match err {
@@ -222,54 +197,58 @@ fn bech32_error_unexpected_hrp() {
     assert_eq!(format!("{}", err), "unexpected HRP");
 }
 
-/// Test the DecodingError source() chain — verifies the hand-written
-/// std::error::Error impl returns the inner error for each feature-gated
-/// variant. On the 0.8 LTS line the Error impl is gated behind the `std`
-/// feature (no core::error::Error on MSRV 1.70), so these tests are too.
-#[cfg(all(feature = "std", feature = "encoding-hex"))]
+/// The fieldless `Display` strings, which are written out by hand in `src/error.rs`
+/// rather than derived. The `InvalidLength` arms are covered by the per-format
+/// `*_invalid_length` tests above, which assert the interpolated message exactly.
+#[cfg(feature = "encoding-hex")]
 #[test]
-fn decoding_error_source_hex() {
-    use std::error::Error;
-    let inner = secure_gate::HexError::InvalidHex;
-    let outer = DecodingError::InvalidHex(inner);
-    let source = outer
-        .source()
-        .expect("DecodingError::InvalidHex must have a source");
-    assert!(source.to_string().contains("invalid hex"));
+fn hex_error_display() {
+    assert_eq!(
+        format!("{}", secure_gate::HexError::InvalidHex),
+        "invalid hex string"
+    );
 }
 
 #[cfg(all(feature = "std", feature = "encoding-base32"))]
 #[test]
-fn decoding_error_source_base32() {
-    use std::error::Error;
-    let inner = secure_gate::Base32Error::InvalidBase32;
-    let outer = DecodingError::InvalidBase32(inner);
-    let source = outer
-        .source()
-        .expect("DecodingError::InvalidBase32 must have a source");
-    assert!(source.to_string().contains("invalid base32"));
+fn base32_error_display() {
+    assert_eq!(
+        format!("{}", secure_gate::Base32Error::InvalidBase32),
+        "invalid base32 string"
+    );
 }
 
 #[cfg(all(feature = "std", feature = "encoding-base64"))]
 #[test]
-fn decoding_error_source_base64() {
-    use std::error::Error;
-    let inner = secure_gate::Base64Error::InvalidBase64;
-    let outer = DecodingError::InvalidBase64(inner);
-    let source = outer
-        .source()
-        .expect("DecodingError::InvalidBase64 must have a source");
-    assert!(source.to_string().contains("invalid base64"));
+fn base64_error_display() {
+    assert_eq!(
+        format!("{}", secure_gate::Base64Error::InvalidBase64),
+        "invalid base64 string"
+    );
 }
 
-#[cfg(all(feature = "std", feature = "encoding-bech32"))]
+/// Every error type still implements the `Error` trait, which was previously supplied
+/// by `thiserror`'s derive and is now a hand-written impl.
+///
+/// On the 0.8 LTS line that impl is gated behind the `std` feature — `core::error::Error`
+/// needs 1.81 and the MSRV here is 1.70 — so this test is gated the same way. 0.9
+/// implements it unconditionally and runs this without the gate.
+#[cfg(feature = "std")]
 #[test]
-fn decoding_error_source_bech32() {
-    use std::error::Error;
-    let inner = Bech32Error::OperationFailed;
-    let outer = DecodingError::InvalidBech32(inner);
-    let source = outer
-        .source()
-        .expect("DecodingError::InvalidBech32 must have a source");
-    assert!(source.to_string().contains("bech32 operation failed"));
+fn error_types_implement_error_trait() {
+    fn assert_error<E: std::error::Error>(_: &E) {}
+
+    // `InvalidLength` is `#[non_exhaustive]`, so it cannot be built with a struct
+    // expression from outside the crate — obtain one the way a caller would.
+    let from_slice = secure_gate::Fixed::<[u8; 4]>::try_from([0u8; 2].as_slice())
+        .expect_err("length mismatch must fail");
+    assert_error(&from_slice);
+    #[cfg(feature = "encoding-hex")]
+    assert_error(&secure_gate::HexError::InvalidHex);
+    #[cfg(feature = "encoding-base32")]
+    assert_error(&secure_gate::Base32Error::InvalidBase32);
+    #[cfg(feature = "encoding-base64")]
+    assert_error(&secure_gate::Base64Error::InvalidBase64);
+    #[cfg(feature = "encoding-bech32")]
+    assert_error(&Bech32Error::OperationFailed);
 }

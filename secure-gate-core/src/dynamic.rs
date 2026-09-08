@@ -15,7 +15,7 @@
 //! - **Unconditional zeroization on drop** — includes `Vec`/`String` spare capacity.
 //! - **Heap-only** — secret bytes never reside on the stack. Inner value stored in `Box<T>`.
 //! - **Opt-in `Clone`** — requires `T: CloneableSecret` and the `cloneable` feature.
-//! - **Opt-in `Serialize`/`Deserialize`** — requires marker traits and the
+//! - **Opt-in `Serialize`** — requires the `SerializableSecret` marker and the
 //!   `serde-serialize`/`serde-deserialize` features.
 //! - **Panic safety** — all decode constructors use the `from_protected_bytes` pattern:
 //!   a `Zeroizing` wrapper survives OOM panics from `Box::new`.
@@ -66,9 +66,9 @@
 //! // Tier 2 — direct reference (escape hatch).
 //! assert_eq!(pw.expose_secret(), "HUNTER2");
 //!
-//! // Tier 3 — owned consumption.
-//! let owned = pw.into_inner();
-//! assert_eq!(format!("{:?}", owned), "[REDACTED]");
+//! // Tier 3 — transfer ownership. Protection ends here.
+//! let owned: String = pw.into_inner();
+//! assert_eq!(owned, "HUNTER2");
 //! # }
 //! ```
 //!
@@ -104,7 +104,6 @@ use zeroize::Zeroize;
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
     feature = "ct-eq",
     feature = "std",
 ))]
@@ -117,7 +116,7 @@ use crate::traits::encoding::base32::ToBase32;
 use crate::traits::encoding::base64_url::ToBase64Url;
 #[cfg(feature = "encoding-bech32")]
 use crate::traits::encoding::bech32::ToBech32;
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 use crate::traits::encoding::bech32m::ToBech32m;
 #[cfg(feature = "encoding-hex")]
 use crate::traits::encoding::hex::ToHex;
@@ -133,7 +132,7 @@ use crate::traits::decoding::base32::FromBase32Str;
 use crate::traits::decoding::base64_url::FromBase64UrlStr;
 #[cfg(feature = "encoding-bech32")]
 use crate::traits::decoding::bech32::FromBech32Str;
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 use crate::traits::decoding::bech32m::FromBech32mStr;
 #[cfg(feature = "encoding-hex")]
 use crate::traits::decoding::hex::FromHexStr;
@@ -172,8 +171,8 @@ use crate::traits::decoding::hex::FromHexStr;
 /// | [`try_from_base64url(s)`](Self::try_from_base64url) | `encoding-base64` | Constant-time Base64url decoding |
 /// | [`try_from_bech32(s, hrp)`](Self::try_from_bech32) | `encoding-bech32` | HRP-validated Bech32 |
 /// | [`try_from_bech32_unchecked(s)`](Self::try_from_bech32_unchecked) | `encoding-bech32` | Bech32 without HRP check |
-/// | [`try_from_bech32m(s, hrp)`](Self::try_from_bech32m) | `encoding-bech32m` | HRP-validated Bech32m |
-/// | [`try_from_bech32m_unchecked(s)`](Self::try_from_bech32m_unchecked) | `encoding-bech32m` | Bech32m without HRP check |
+/// | [`try_from_bech32m(s, hrp)`](Self::try_from_bech32m) | `encoding-bech32` | HRP-validated Bech32m |
+/// | [`try_from_bech32m_unchecked(s)`](Self::try_from_bech32m_unchecked) | `encoding-bech32` | Bech32m without HRP check |
 /// | [`from_random(len)`](Self::from_random) | `rand` | System RNG |
 /// | [`from_rng(len, rng)`](Self::from_rng) | `rand` | Custom RNG |
 ///
@@ -303,8 +302,22 @@ impl Dynamic<Vec<u8>> {
     /// HRP comparison is non-constant-time — this is intentional, as the HRP is public
     /// metadata, not secret material.
     pub fn try_from_bech32(s: &str, expected_hrp: &str) -> Result<Self, crate::error::Bech32Error> {
+        Self::try_from_bech32_sized::<{ crate::BECH32_CODE_LENGTH }>(s, expected_hrp)
+    }
+
+    /// Like [`try_from_bech32`](Self::try_from_bech32), accepting strings up to `C`
+    /// characters.
+    ///
+    /// `C` is the bech32 code length: the cap on the whole encoded string. Pass the `C`
+    /// the string was encoded with, or any larger value. See
+    /// [`Bech32Sized`](crate::Bech32Sized) for what `C` above
+    /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
+    pub fn try_from_bech32_sized<const C: usize>(
+        s: &str,
+        expected_hrp: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
         Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
-            s.try_from_bech32(expected_hrp)?,
+            s.try_from_bech32_sized::<C>(expected_hrp)?,
         )))
     }
 
@@ -313,13 +326,21 @@ impl Dynamic<Vec<u8>> {
     /// Use [`try_from_bech32`](Self::try_from_bech32) in security-critical code to prevent
     /// cross-protocol confusion attacks.
     pub fn try_from_bech32_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes) = s.try_from_bech32_unchecked()?;
+        Self::try_from_bech32_unchecked_sized::<{ crate::BECH32_CODE_LENGTH }>(s)
+    }
+
+    /// Like [`try_from_bech32_unchecked`](Self::try_from_bech32_unchecked), accepting
+    /// strings up to `C` characters.
+    pub fn try_from_bech32_unchecked_sized<const C: usize>(
+        s: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes) = s.try_from_bech32_unchecked_sized::<C>()?;
         Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(bytes)))
     }
 }
 
 // Bech32m (BIP-350) encoding and decoding for Dynamic<Vec<u8>>.
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 impl Dynamic<Vec<u8>> {
     /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>`, validating the HRP
     /// (case-insensitive).
@@ -330,8 +351,18 @@ impl Dynamic<Vec<u8>> {
         s: &str,
         expected_hrp: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
+        Self::try_from_bech32m_sized::<{ crate::BECH32_CODE_LENGTH }>(s, expected_hrp)
+    }
+
+    /// Like [`try_from_bech32m`](Self::try_from_bech32m), accepting strings up to `C`
+    /// characters. See [`Bech32mSized`](crate::Bech32mSized) for what `C` above
+    /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
+    pub fn try_from_bech32m_sized<const C: usize>(
+        s: &str,
+        expected_hrp: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
         Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
-            s.try_from_bech32m(expected_hrp)?,
+            s.try_from_bech32m_sized::<C>(expected_hrp)?,
         )))
     }
 
@@ -339,7 +370,15 @@ impl Dynamic<Vec<u8>> {
     ///
     /// Use [`try_from_bech32m`](Self::try_from_bech32m) in security-critical code.
     pub fn try_from_bech32m_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes) = s.try_from_bech32m_unchecked()?;
+        Self::try_from_bech32m_unchecked_sized::<{ crate::BECH32_CODE_LENGTH }>(s)
+    }
+
+    /// Like [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked), accepting
+    /// strings up to `C` characters.
+    pub fn try_from_bech32m_unchecked_sized<const C: usize>(
+        s: &str,
+    ) -> Result<Self, crate::error::Bech32Error> {
+        let (_hrp, bytes) = s.try_from_bech32m_unchecked_sized::<C>()?;
         Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(bytes)))
     }
 }
@@ -428,29 +467,19 @@ impl Dynamic<alloc::string::String> {
 /// use secure_gate::{Dynamic, ToHex};
 ///
 /// let token: Dynamic<Vec<u8>> = Dynamic::from(&[0xDEu8, 0xAD][..]);
-/// assert_eq!(token.to_hex(), "dead");
+/// assert_eq!(&*token.to_hex(), "dead");
 /// # }
 /// ```
 #[cfg(feature = "encoding-hex")]
 impl ToHex for Dynamic<Vec<u8>> {
     #[inline]
-    fn to_hex(&self) -> alloc::string::String {
+    fn to_hex(&self) -> crate::EncodedSecret {
         self.with_secret(|s| s.to_hex())
     }
 
     #[inline]
-    fn to_hex_upper(&self) -> alloc::string::String {
+    fn to_hex_upper(&self) -> crate::EncodedSecret {
         self.with_secret(|s| s.to_hex_upper())
-    }
-
-    #[inline]
-    fn to_hex_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s| s.to_hex_zeroizing())
-    }
-
-    #[inline]
-    fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s| s.to_hex_upper_zeroizing())
     }
 }
 
@@ -463,19 +492,14 @@ impl ToHex for Dynamic<Vec<u8>> {
 /// use secure_gate::{Dynamic, ToBase32};
 ///
 /// let token: Dynamic<Vec<u8>> = Dynamic::from(&[0xABu8; 4][..]);
-/// assert_eq!(token.to_base32(), "VOV2XKY");
+/// assert_eq!(&*token.to_base32(), "VOV2XKY");
 /// # }
 /// ```
 #[cfg(feature = "encoding-base32")]
 impl ToBase32 for Dynamic<Vec<u8>> {
     #[inline]
-    fn to_base32(&self) -> alloc::string::String {
+    fn to_base32(&self) -> crate::EncodedSecret {
         self.with_secret(|s| s.to_base32())
-    }
-
-    #[inline]
-    fn to_base32_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s| s.to_base32_zeroizing())
     }
 }
 
@@ -488,19 +512,14 @@ impl ToBase32 for Dynamic<Vec<u8>> {
 /// use secure_gate::{Dynamic, ToBase64Url};
 ///
 /// let token: Dynamic<Vec<u8>> = Dynamic::from(&[0xABu8; 4][..]);
-/// assert_eq!(token.to_base64url(), "q6urqw");
+/// assert_eq!(&*token.to_base64url(), "q6urqw");
 /// # }
 /// ```
 #[cfg(feature = "encoding-base64")]
 impl ToBase64Url for Dynamic<Vec<u8>> {
     #[inline]
-    fn to_base64url(&self) -> alloc::string::String {
+    fn to_base64url(&self) -> crate::EncodedSecret {
         self.with_secret(|s| s.to_base64url())
-    }
-
-    #[inline]
-    fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s| s.to_base64url_zeroizing())
     }
 }
 
@@ -510,38 +529,35 @@ impl ToBase64Url for Dynamic<Vec<u8>> {
 #[cfg(feature = "encoding-bech32")]
 impl ToBech32 for Dynamic<Vec<u8>> {
     #[inline]
-    fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, crate::error::Bech32Error> {
+    fn try_to_bech32(&self, hrp: &str) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
         self.with_secret(|s| s.try_to_bech32(hrp))
     }
 
     #[inline]
-    fn try_to_bech32_zeroizing(
+    fn try_to_bech32_sized<const C: usize>(
         &self,
         hrp: &str,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32_zeroizing(hrp))
+        self.with_secret(|s| s.try_to_bech32_sized::<C>(hrp))
     }
 }
 
 /// Bech32m encoding for `Dynamic<Vec<u8>>`; delegates via `with_secret`.
 ///
 /// Bring the trait into scope: `use secure_gate::ToBech32m;`.
-#[cfg(feature = "encoding-bech32m")]
+#[cfg(feature = "encoding-bech32")]
 impl ToBech32m for Dynamic<Vec<u8>> {
     #[inline]
-    fn try_to_bech32m(
-        &self,
-        hrp: &str,
-    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
+    fn try_to_bech32m(&self, hrp: &str) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
         self.with_secret(|s| s.try_to_bech32m(hrp))
     }
 
     #[inline]
-    fn try_to_bech32m_zeroizing(
+    fn try_to_bech32m_sized<const C: usize>(
         &self,
         hrp: &str,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32m_zeroizing(hrp))
+        self.with_secret(|s| s.try_to_bech32m_sized::<C>(hrp))
     }
 }
 
@@ -565,7 +581,7 @@ impl<T: ?Sized + zeroize::Zeroize> crate::RevealSecret for Dynamic<T> {
         &self.inner
     }
 
-    /// Consumes `self` and returns the inner value wrapped in [`crate::InnerSecret`].
+    /// Consumes `self` and transfers ownership of the plain inner value.
     ///
     /// **Allocation note:** allocates one small `Box<T>` sentinel (24 bytes for
     /// `String`/`Vec` on 64-bit) before the swap. If that allocation panics (OOM),
@@ -573,14 +589,11 @@ impl<T: ?Sized + zeroize::Zeroize> crate::RevealSecret for Dynamic<T> {
     /// unwind — confidentiality is preserved. This is the same OOM-safety pattern
     /// used by `from_protected_bytes` and `deserialize_with_limit`.
     ///
-    /// After ownership transfer, capacity-changing mutations on the returned
-    /// `InnerSecret<T>` have the same realloc-residue caveats as mutating
-    /// `Dynamic<T>` in place; see `SECURITY.md`.
-    ///
-    /// See [`RevealSecret::into_inner`](crate::RevealSecret::into_inner) for full
-    /// documentation including the redacted `Debug` behavior.
+    /// See [`RevealSecret::into_inner`](crate::RevealSecret::into_inner) for the full
+    /// contract. Protection ends at this call: the returned value is an ordinary
+    /// `String` / `Vec<T>`, moved out without copying.
     #[inline(always)]
-    fn into_inner(mut self) -> crate::InnerSecret<T>
+    fn into_inner(mut self) -> T
     where
         Self: Sized,
         Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize,
@@ -593,7 +606,7 @@ impl<T: ?Sized + zeroize::Zeroize> crate::RevealSecret for Dynamic<T> {
             &mut self.inner,
             Box::new(crate::SentinelValue::sentinel_value()),
         );
-        crate::InnerSecret::new(*boxed)
+        *boxed
     }
 }
 
@@ -790,7 +803,7 @@ impl std::io::Write for Dynamic<alloc::vec::Vec<u8>> {
 /// Cursor-like reader over a [`Dynamic<Vec<u8>>`].
 ///
 /// Created by [`Dynamic::<Vec<u8>>::as_reader`]. Borrows the `Dynamic`
-/// immutably and tracks the read position internally. Each [`Read::read`]
+/// immutably and tracks the read position internally. Each [`Read::read`](std::io::Read::read)
 /// call goes through [`with_secret`](crate::RevealSecret::with_secret),
 /// preserving the crate's auditable access model.
 ///

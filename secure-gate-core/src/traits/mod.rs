@@ -18,21 +18,22 @@
 //! | [`RevealSecretMut`]    | Mutable scoped / direct access               | Always available         | Same preference: `with_secret_mut` over `expose_secret_mut`           |
 //! | [`SentinelValue`]      | Inert placeholder left by `into_inner`       | Always available         | Implemented for `[T; N]` (any `N`), `String`, `Vec<T>`                |
 //! | [`ConstantTimeEq`]     | Deterministic constant-time equality         | `ct-eq`                  | Timing-attack resistant byte comparison                               |
-//! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for opt-in risk details. |
-//! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for opt-in risk details. |
+//! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for opt-in risk details. |
+//! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for opt-in risk details. |
 //! | [`SecureEncoding`]     | Marker + blanket impl for encoding traits    | Any `encoding-*`         | Enables `ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`   |
 //! | [`SecureDecoding`]     | Marker + blanket impl for decoding traits    | Any `encoding-*`         | Enables `FromHexStr`, `FromBase32Str`, `FromBase64UrlStr`, etc.       |
 //!
 //! # Security Guarantees
 //!
 //! - **No implicit access while held** — Reaching a secret inside `Fixed`/`Dynamic`
-//!   requires an explicit trait method. The output wrappers returned by extraction
-//!   ([`InnerSecret`], [`EncodedSecret`]) deref by design
+//!   requires an explicit trait method. `into_inner` ends that protection and hands
+//!   back the plain value; the encoders return [`EncodedSecret`], which derefs by design
 //! - **Scoped preference** — `with_secret` / `with_secret_mut` limit borrow lifetime
 //! - **Zero-cost** — All methods use `#[inline(always)]` where possible
 //! - **Timing safety** — `ConstantTimeEq` provides constant-time equality
 //! - **Opt-in risk** — Cloning and serialization require deliberate marker impls
-//! - **Read-only enforcement** — Encoding wrappers and random types only expose immutable access
+//! - **Read-only output** — [`EncodedSecret`] exposes its buffer only through `Deref`
+//!   and its two named consumers; there is no mutable access to encoded output
 //!
 //! # Feature Gates
 //!
@@ -48,7 +49,6 @@
 //! See individual trait docs for detailed usage and examples.
 
 pub mod revealed_secrets;
-pub use revealed_secrets::InnerSecret;
 
 #[cfg(feature = "alloc")]
 pub use revealed_secrets::EncodedSecret;
@@ -80,7 +80,7 @@ pub use decoding::FromBase64UrlStr;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use decoding::FromBech32Str;
 
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use decoding::FromBech32mStr;
 
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
@@ -88,8 +88,8 @@ pub use decoding::FromHexStr;
 
 // Re-export per-format encoding traits (feature-gated)
 // Note: blanket impls of ToBase32, ToBase64Url, ToBech32, ToBech32m require alloc (String output).
-// The traits themselves are exported unconditionally so inherent methods on Fixed/Dynamic
-// can call them; the blanket impls gate the alloc dependency.
+// Each trait is exported only with its own encoding feature *and* alloc, because every
+// encoder returns EncodedSecret and that type requires alloc.
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 pub use encoding::ToBase32;
 
@@ -99,7 +99,24 @@ pub use encoding::ToBase64Url;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use encoding::ToBech32;
 
-#[cfg(all(feature = "encoding-bech32m", feature = "alloc"))]
+#[cfg(any(
+    feature = "encoding-hex",
+    feature = "encoding-base32",
+    feature = "encoding-base64",
+    feature = "encoding-bech32",
+))]
+pub use encoding::EncodableBytes;
+
+#[cfg(feature = "encoding-bech32")]
+pub use encoding::{Bech32Sized, Bech32Standard};
+
+#[cfg(feature = "encoding-bech32")]
+pub use encoding::{Bech32mSized, Bech32mStandard};
+
+#[cfg(feature = "encoding-bech32")]
+pub use encoding::{bech32_code_length, BECH32_CODE_LENGTH};
+
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use encoding::ToBech32m;
 
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
@@ -120,7 +137,6 @@ pub use encoding::ToHex;
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
 ))]
 pub trait SecureEncoding {}
 
@@ -129,7 +145,6 @@ pub trait SecureEncoding {}
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
 ))]
 impl<T: AsRef<[u8]> + ?Sized> SecureEncoding for T {}
 
@@ -148,7 +163,6 @@ impl<T: AsRef<[u8]> + ?Sized> SecureEncoding for T {}
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
 ))]
 pub trait SecureDecoding {}
 
@@ -157,7 +171,6 @@ pub trait SecureDecoding {}
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
 ))]
 impl<T: AsRef<str> + ?Sized> SecureDecoding for T {}
 
