@@ -29,8 +29,9 @@ fn encoded_secret_debug_is_redacted() {
 // tests/compile-fail/encoded_secret_no_display.rs.
 #[cfg(feature = "encoding-hex")]
 #[test]
-// `format!("{}", &*encoded)` is the documented migration from the removed `Display`;
-// clippy's `to_string()` suggestion is a different path and not what this asserts.
+// The `format!` call *is* the assertion: `format!("{}", &*encoded)` is the migration
+// path the #149 changelog gives callers, so it has to be exercised as a format string.
+// `.to_string()`, which clippy suggests, would stop testing that path.
 #[allow(clippy::useless_format)]
 fn encoded_secret_content_requires_explicit_deref() {
     let encoded = sample_hex_secret();

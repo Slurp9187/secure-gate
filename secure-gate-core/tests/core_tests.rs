@@ -114,6 +114,40 @@ fn dynamic_vec_from_slice() {
     dyn_vec.with_secret(|s| assert_eq!(s, b"hello world"));
 }
 
+// === Dynamic<T> From impls ===
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_from_box_vec() {
+    let boxed: Box<Vec<u8>> = Box::new(vec![1u8, 2, 3]);
+    let d: Dynamic<Vec<u8>> = boxed.into();
+    d.with_secret(|s| assert_eq!(s, &[1u8, 2, 3]));
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_from_box_string() {
+    let boxed: Box<String> = Box::new(String::from("boxed_secret"));
+    let d: Dynamic<String> = boxed.into();
+    d.with_secret(|s| assert_eq!(s, "boxed_secret"));
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_from_owned_vec() {
+    let v = vec![10u8, 20, 30];
+    let d: Dynamic<Vec<u8>> = v.into();
+    d.with_secret(|s| assert_eq!(s, &[10u8, 20, 30]));
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_from_owned_string() {
+    let s = String::from("owned_secret");
+    let d: Dynamic<String> = s.into();
+    d.with_secret(|s| assert_eq!(s, "owned_secret"));
+}
+
 // === TryFrom for Fixed ===
 #[test]
 fn fixed_try_from_slice() {
@@ -342,7 +376,7 @@ fn fixed_new_with_is_zero_cost() {
 #[cfg(feature = "rand")]
 struct FailingRng;
 
-// Use a dedicated error type for `TryRngCore::Error` so callers see a real `Error` impl (matches typical RNG usage).
+// rand 0.10 requires TryRng::Error: core::error::Error, so &'static str is not enough.
 #[cfg(feature = "rand")]
 #[derive(Debug)]
 struct RngError;
@@ -358,6 +392,7 @@ impl core::fmt::Display for RngError {
 impl std::error::Error for RngError {}
 
 #[cfg(feature = "rand")]
+// rand 0.9 on this branch: the trait is `TryRngCore`; 0.10 renamed it `TryRng`.
 impl rand::TryRngCore for FailingRng {
     type Error = RngError;
     fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
@@ -422,7 +457,7 @@ fn dynamic_from_rng_error_returns_err() {
     assert!(result.is_err());
 }
 
-// === len() element-count semantics ===
+// === len() element-count semantics (issue #5) ===
 
 #[cfg(feature = "alloc")]
 #[test]

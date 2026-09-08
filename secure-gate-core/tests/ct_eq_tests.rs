@@ -39,6 +39,30 @@ fn wrapper_ct_eq_dynamic_and_fixed() {
     assert!(!dyn1.ct_eq(&dyn3));
 }
 
+#[cfg(all(feature = "ct-eq", feature = "alloc"))]
+#[test]
+fn string_ct_eq_basic() {
+    let a = String::from("hello");
+    let b = String::from("hello");
+    let c = String::from("world");
+    let d = String::from("hel");
+    assert!(a.ct_eq(&b));
+    assert!(!a.ct_eq(&c));
+    assert!(!a.ct_eq(&d));
+}
+
+#[cfg(all(feature = "ct-eq", feature = "alloc"))]
+#[test]
+fn wrapper_ct_eq_dynamic_string() {
+    let d1: Dynamic<String> = "secret".into();
+    let d2: Dynamic<String> = "secret".into();
+    let d3: Dynamic<String> = "differ".into();
+    let d4: Dynamic<String> = "short".into();
+    assert!(d1.ct_eq(&d2));
+    assert!(!d1.ct_eq(&d3));
+    assert!(!d1.ct_eq(&d4));
+}
+
 #[cfg(all(not(feature = "ct-eq"), feature = "alloc"))]
 #[test]
 fn manual_comparison_without_ct_eq_feature() {
