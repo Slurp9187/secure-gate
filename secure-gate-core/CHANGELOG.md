@@ -13,7 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > `heap_zeroize.rs` drop their inline `const` blocks (1.79), which only elided lazy
 > initialization and so change nothing the ordering in `count_allocs` did not already
 > guarantee; and `error.rs` keeps this branch's `std`-gated `std::error::Error` instead
-> of 0.9's unconditional `core::error::Error` (1.81). Edition 2021 needs `self::bech32::`
+> of 0.9's unconditional `core::error::Error` (1.81).
+> Modern clippy asks for those `const` blocks back via `missing_const_for_thread_local`,
+> so both statics carry an explicit `#[allow]`, paired with `#[allow(unknown_lints)]`
+> because 1.70's clippy predates that lint name and `-D warnings` would otherwise reject
+> the allow itself. The bech32m fold also reached six `cfg` arms on this branch's
+> `SecureEncoding` / `SecureDecoding` markers, which do not exist on `main`, and the fuzz
+> manifest; the fuzz targets now request `zeroize_derive` directly, since core no longer
+> enables it for its dependents. Edition 2021 needs `self::bech32::`
 > to disambiguate the module from the crate of the same name in the encoding and decoding
 > re-exports. Dependency pins are untouched — `base16ct` 0.2, `base32ct` 0.2 (so the
 > `encoded_len_is_decodable` trailing-block guard stays, where 0.3 fixed it upstream),

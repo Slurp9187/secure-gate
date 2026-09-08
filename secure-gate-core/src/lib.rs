@@ -588,7 +588,6 @@ pub use traits::ToHex;
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
 ))]
 pub use traits::SecureDecoding;
 
@@ -599,7 +598,6 @@ pub use traits::SecureDecoding;
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
 ))]
 pub use traits::SecureEncoding;
 

@@ -83,6 +83,11 @@ static PANIC_CHECK_ZEROED: AtomicBool = AtomicBool::new(false);
 /// `THREAD_COUNTING` says whether it is *this* thread's.
 static COUNTING: AtomicBool = AtomicBool::new(false);
 
+// This branch cannot use the inline `const` initializers 0.9 uses: those are stable
+// only from 1.79 and the MSRV here is 1.70. Modern clippy asks for them anyway via
+// `missing_const_for_thread_local`, so the ask is declined explicitly. `unknown_lints`
+// is allowed alongside it because 1.70's clippy predates that lint name and would
+// otherwise warn about the allow itself under `-D warnings`.
 thread_local! {
     /// `true` only on the thread currently inside `count_allocs`.
     ///
@@ -117,9 +122,13 @@ thread_local! {
     /// initialization -- it is exactly the "promise about `thread_local!`" the paragraph
     /// above declines to rely on, so its absence changes nothing here. Neither cell is
     /// `Drop`, so no TLS destructor is registered either way.
+    #[allow(unknown_lints)] // 1.70's clippy predates the lint named below
+    #[allow(clippy::missing_const_for_thread_local)] // `const {}` needs 1.79; MSRV is 1.70
     static THREAD_COUNTING: Cell<bool> = Cell::new(false);
 
     /// Number of `alloc` calls observed on this thread while `THREAD_COUNTING` was set.
+    #[allow(unknown_lints)] // 1.70's clippy predates the lint named below
+    #[allow(clippy::missing_const_for_thread_local)] // `const {}` needs 1.79; MSRV is 1.70
     static THREAD_ALLOC_COUNT: Cell<usize> = Cell::new(0);
 }
 

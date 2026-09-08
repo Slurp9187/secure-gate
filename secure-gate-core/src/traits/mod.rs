@@ -137,7 +137,6 @@ pub use encoding::ToHex;
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
 ))]
 pub trait SecureEncoding {}
 
@@ -146,7 +145,6 @@ pub trait SecureEncoding {}
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
 ))]
 impl<T: AsRef<[u8]> + ?Sized> SecureEncoding for T {}
 
@@ -165,7 +163,6 @@ impl<T: AsRef<[u8]> + ?Sized> SecureEncoding for T {}
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
 ))]
 pub trait SecureDecoding {}
 
@@ -174,7 +171,6 @@ pub trait SecureDecoding {}
     feature = "encoding-base32",
     feature = "encoding-base64",
     feature = "encoding-bech32",
-    feature = "encoding-bech32m",
 ))]
 impl<T: AsRef<str> + ?Sized> SecureDecoding for T {}
 
