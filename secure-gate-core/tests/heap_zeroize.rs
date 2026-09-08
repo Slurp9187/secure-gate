@@ -130,6 +130,24 @@ thread_local! {
 ///     allocations made by panic infrastructure (backtrace, symbol resolution).
 struct ProxyAllocator;
 
+// `realloc` and `alloc_zeroed` are deliberately NOT overridden. Both `GlobalAlloc` defaults are
+// written in terms of `self.alloc` / `self.dealloc`, so a resize still flows through the two
+// hooks below and nothing escapes observation. The consequence for counting is that a growth
+// reads as one `alloc` rather than as a native in-place resize -- an over-count relative to what
+// `System.realloc` might do, which is the conservative direction for a zero-allocation assertion:
+// it can add a phantom allocation, never erase a real one.
+//
+// No check in this file depends on that choice. `check_write_growth_orphan_zeroed` looks like it
+// would -- it watches for the orphaned buffer released while a `Dynamic<Vec<u8>>` grows -- but
+// the `Write` impl in src/dynamic.rs grows by hand (`Vec::with_capacity`, `extend_from_slice`,
+// `zeroize` the old buffer, replace) rather than through `Vec`'s own reallocation, so the orphan
+// is dropped explicitly and reaches `dealloc` either way. Measured, not assumed: instrumenting
+// the asserting gate with a hit counter and forwarding `realloc` to `System.realloc` leaves the
+// hit count at 1 per call, unchanged from the default.
+//
+// Revisit only if an assertion is added that needs "zero new heap blocks, including in-place
+// resizes", or one that relies on `Vec`'s own growth path -- both are different properties from
+// the ones measured here.
 unsafe impl GlobalAlloc for ProxyAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         // Two gates: the global one keeps non-counting threads out of TLS entirely, the
