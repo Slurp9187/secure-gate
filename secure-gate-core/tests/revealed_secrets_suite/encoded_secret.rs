@@ -97,3 +97,42 @@ fn encoded_secret_empty_string() {
     let protected = encoded.into_zeroizing();
     assert_eq!(&*protected, "");
 }
+
+// The empty case above is the degenerate one: `assert_eq!(&*protected, "")` would still
+// pass if `into_zeroizing` threw the buffer away and returned `Zeroizing::default()`.
+// This is the case that pins the content. The wipe-on-drop half of the contract needs an
+// allocator to observe, so it lives in tests/heap_zeroize.rs
+// (`check_into_zeroizing_string_zeroed`); the two together cover the method.
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn encoded_secret_into_zeroizing_carries_the_content() {
+    let expected = "deadbeef";
+
+    let encoded = sample_hex_secret();
+    assert_eq!(
+        &*encoded, expected,
+        "precondition: the wrapper holds the encoding"
+    );
+
+    let protected = sample_hex_secret().into_zeroizing();
+    assert_eq!(
+        &**protected, expected,
+        "into_zeroizing must hand over the same bytes, not a fresh String"
+    );
+    assert_eq!(protected.len(), expected.len());
+
+    // `into_zeroizing` is a *partial* downgrade, and this is the half that is lost:
+    // `Zeroizing<String>` derives `Debug`, so the encoded secret prints in the clear.
+    // The type's own docs say so. If a future `zeroize` starts redacting, this assert
+    // fails and the claim in `EncodedSecret::into_zeroizing` needs rewriting -- that is
+    // the point of pinning it, not an accident of the dependency version.
+    let rendered = format!("{protected:?}");
+    assert!(
+        rendered.contains(expected),
+        "zeroize no longer prints the wrapped value ({rendered:?});          update the into_zeroizing docs, which promise the opposite"
+    );
+    assert_ne!(
+        rendered, "[REDACTED]",
+        "redaction does not survive into_zeroizing -- that is the documented trade"
+    );
+}

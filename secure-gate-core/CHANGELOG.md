@@ -379,6 +379,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Testing
 
+- **The allocation oracle is thread-scoped, so harness activity can no longer invent an
+  allocation.** `tests/heap_zeroize.rs` counted allocations in a process-global
+  `AtomicUsize` gated by a process-global flag, which charged every allocation made by the
+  libtest harness thread to the closure under test. That is fail-open in the direction that
+  matters for a zero-allocation assertion: it cannot hide a real allocation, but it can
+  invent one, and it did — one CI run reported 4 allocations for
+  `check_bech32_hrp_mismatch_materializes_nothing` against a decode path byte-identical to
+  four green runs. The counter is now a `const`-initialized `thread_local!` `Cell` pair, so
+  only the counting thread's own allocations are attributed; the global flag is kept as an
+  outer gate so non-counting threads never touch TLS from inside the allocator. No size
+  threshold was added — a threshold would hide real small-allocation regressions. Asserting
+  mode (`CHECKING` + `TARGET_SIZE`) is still process-global, so the file still runs as one
+  aggregate test.
+
+- **Coverage inventory over the 43 encoder tests deleted by the encoder merge — no
+  restoration needed.** The deletions were plain-vs-`*_zeroizing` pairs, and the concern was
+  that a real assertion had been deleted alongside the tautologies. Five formats were
+  checked against four axes (round-trip encode/decode, redacted `Debug`, `into_inner` yields
+  the plain encoding, and a compile-fail pin against re-encoding), then each result was
+  handed to an independent agent instructed to refute it. All 20 axes hold and no citation
+  was found vacuous, so none of the 43 were restored.
+
+  Two axes are covered *once for the type* rather than five times, which is correct and
+  worth stating plainly: every encoder now returns the same `EncodedSecret`, and
+  `into_inner` is a `mem::take` on its `String`, so
+  `encoded_secret_into_inner_returns_string` covers all five formats through a hex fixture.
+  `Debug` redaction is likewise type-level, with bech32 additionally asserting it on its own
+  encoder output in `tests/encoding_suite/bech32_sized.rs`. Round-trip and the re-encode pin
+  are genuinely per-format: `tests/encoding_suite/{hex,base32,base64,bech32}.rs` and
+  `tests/compile-fail/encoded_secret_no_reencode{,_all_formats}.rs`.
+
+- **`into_zeroizing` was only ever tested on the empty string.** The single assertion,
+  `assert_eq!(&*protected, "")`, would have passed unchanged if the method had discarded
+  the buffer and returned `Zeroizing::default()`. Two tests replace that vacuum:
+  `encoded_secret_into_zeroizing_carries_the_content` pins that the returned value holds
+  the actual encoding (and that `Zeroizing`'s derived `Debug` still prints it in the clear,
+  which is what the method's own docs promise), and `check_into_zeroizing_string_zeroed` in
+  `tests/heap_zeroize.rs` observes the buffer being zeroed at deallocation. The second was
+  falsified before being kept: swapping `into_zeroizing` for `into_inner` makes it fail at
+  byte offset 0, so it distinguishes the two exits rather than passing on both.
+
 - **`tests/encoding_suite/bech32_sized.rs`** covers the code-length API against the
   four invariants it has to hold: `N` never changes the encoding; a string decodes
   under any `N` at least as large as itself and no smaller; bech32 and bech32m stay
