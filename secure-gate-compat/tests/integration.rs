@@ -1,12 +1,11 @@
-//! Integration test runner for `secure-gate` directory-based suites.
+//! Integration test runner for `secure-gate-compat`'s directory-based suites.
 //!
-//! Compiles those suites into a single binary.
-//! Flat test files (`core_tests`, `ct_eq_tests`, `zeroize_tests`, `error_tests`, …)
-//! each run as their own binary — that is intentional, not a gap.
+//! Compiles `compat_suite/`, `compat_dual/` and `proptest_suite/` into a single
+//! binary. Without this file cargo compiles none of them.
 //!
-//! Separate binaries are also kept for:
-//! - `heap_zeroize.rs`       (uses #[global_allocator])
-//! - `compile_fail_tests.rs` (uses trybuild)
+//! Flat test files at `tests/` root (`migration_full`, `finding5_regression`) each
+//! run as their own binary — that is intentional, not a gap. `compile_fail_tests.rs`
+//! is also kept separate because it uses trybuild.
 #![allow(clippy::redundant_clone)]
 
 #[cfg(feature = "secrecy-compat")]
