@@ -14,9 +14,9 @@
 
 #![allow(deprecated)] // for the Secret<T> alias test
 
-use secure_gate::compat::v10::{SecretBox, SecretSlice, SecretString};
-use secure_gate::compat::{CloneableSecret, ExposeSecret, ExposeSecretMut};
 use secure_gate::{Dynamic, Fixed};
+use secure_gate_compat::compat::v10::{SecretBox, SecretSlice, SecretString};
+use secure_gate_compat::compat::{CloneableSecret, ExposeSecret, ExposeSecretMut};
 
 // ── 1. SecretBox construction ─────────────────────────────────────────────────
 
@@ -73,6 +73,36 @@ fn secret_box_expose_secret_mut() {
     let mut sb: SecretBox<String> = SecretBox::init_with(|| String::from("original"));
     sb.expose_secret_mut().push_str("_modified");
     assert_eq!(sb.expose_secret(), "original_modified");
+}
+
+// ── 2b. SecretString / SecretSlice expose_secret_mut ─────────────────────────
+
+#[test]
+fn secret_string_expose_secret_mut() {
+    // SecretString = SecretBox<str>, so expose_secret_mut returns &mut str.
+    // &mut str does not support push_str, but we can modify bytes in-place.
+    let mut ss: SecretString = "hello".into();
+    let s: &mut str = ExposeSecretMut::expose_secret_mut(&mut ss);
+    // Verify we get mutable access and can modify individual bytes.
+    unsafe {
+        s.as_bytes_mut()[0] = b'H';
+    }
+    assert_eq!(ss.expose_secret(), "Hello");
+}
+
+#[test]
+fn secret_slice_expose_secret_mut_modify() {
+    // SecretSlice<u8> = SecretBox<[u8]>, so expose_secret_mut returns &mut [u8].
+    let mut sl: SecretSlice<u8> = vec![10u8, 20, 30].into();
+    ExposeSecretMut::expose_secret_mut(&mut sl)[0] = 99;
+    assert_eq!(sl.expose_secret()[0], 99);
+}
+
+#[test]
+fn secret_slice_expose_secret_mut_fill() {
+    let mut sl: SecretSlice<u8> = vec![0u8; 4].into();
+    ExposeSecretMut::expose_secret_mut(&mut sl).fill(0xFF);
+    assert_eq!(sl.expose_secret(), &[0xFFu8; 4]);
 }
 
 // ── 3. SecretString ───────────────────────────────────────────────────────────
@@ -137,7 +167,11 @@ fn secret_slice_clone() {
 fn secret_box_debug_redacted() {
     let sb: SecretBox<String> = SecretBox::init_with(|| String::from("sensitive"));
     let dbg = format!("{:?}", sb);
-    assert!(dbg.contains("[REDACTED]"), "Debug output should contain [REDACTED]: {}", dbg);
+    assert!(
+        dbg.contains("[REDACTED]"),
+        "Debug output should contain [REDACTED]: {}",
+        dbg
+    );
     assert!(!dbg.contains("sensitive"), "Debug must not leak the secret");
 }
 
@@ -296,7 +330,7 @@ fn dynamic_vec_to_secret_box_vec() {
 
 #[test]
 fn zeroize_reexport_accessible() {
-    use secure_gate::compat::zeroize::Zeroize;
+    use secure_gate_compat::compat::zeroize::Zeroize;
     let mut val = vec![1u8, 2, 3];
     val.zeroize();
     assert!(val.iter().all(|&b| b == 0));
@@ -306,7 +340,7 @@ fn zeroize_reexport_accessible() {
 
 #[test]
 fn legacy_secret_alias_compiles() {
-    use secure_gate::compat::v10::Secret;
+    use secure_gate_compat::compat::v10::Secret;
     let _s: Secret<String> = Secret::new(Box::new(String::from("legacy")));
 }
 
@@ -331,7 +365,7 @@ fn secret_string_deserialize() {
 #[cfg(all(feature = "serde-serialize", feature = "serde-deserialize"))]
 #[test]
 fn secret_box_serialize_requires_marker() {
-    use secure_gate::compat::SerializableSecret;
+    use secure_gate_compat::compat::SerializableSecret;
     use zeroize::Zeroize;
 
     #[derive(Clone, Zeroize, serde::Serialize, serde::Deserialize)]

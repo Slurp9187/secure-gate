@@ -13,12 +13,11 @@
 //! | `edge_cases` | ZSTs, large payloads, panic-in-drop, move / borrow patterns      |
 //! | `examples`   | Canonical copy-paste migration patterns (MIGRATING_FROM_SECRECY) |
 
-#![cfg(feature = "secrecy-compat")]
 // Helper types shared across sub-modules are not all used in every config.
 #![allow(dead_code)]
 
-mod v08;
-mod v10;
-mod round_trip;
 mod edge_cases;
 mod examples;
+mod round_trip;
+mod v08;
+mod v10;

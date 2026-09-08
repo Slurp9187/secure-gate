@@ -9,12 +9,15 @@
 //!   4. ct_eq agreement (when feature = "ct-eq"): ct_eq must agree with ==
 
 #[cfg(all(feature = "secrecy-compat", feature = "alloc"))]
+#[allow(unused_imports)]
 mod tests {
     use proptest::prelude::*;
-    use secure_gate::compat::v08::Secret as V08Secret;
-    use secure_gate::compat::v10::{SecretBox as V10SecretBox, SecretString as V10SecretString};
-    use secure_gate::compat::{ExposeSecret, ExposeSecretMut};
     use secure_gate::{Dynamic, Fixed};
+    use secure_gate_compat::compat::v08::Secret as V08Secret;
+    use secure_gate_compat::compat::v10::{
+        SecretBox as V10SecretBox, SecretString as V10SecretString,
+    };
+    use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
 
     // ── v08::Secret<String> round-trips ──────────────────────────────────────
 

@@ -1,7 +1,8 @@
 # Migrating from secrecy
 
-This guide covers dropping `secrecy` and using `secure-gate-compat` instead. The
-`secrecy-compat` feature provides type- and import-compatible shims for both
+This guide covers dropping `secrecy` and using `secure-gate` instead. The
+compatibility layer is now provided by the separate `secure-gate-compat` crate.
+The `secrecy-compat` feature (in the compat crate) provides type- and import-compatible shims for both
 major secrecy generations so that migration can be done incrementally.
 
 > **Experimental status**: The `secrecy-compat` migration layer is still
@@ -16,7 +17,6 @@ major secrecy generations so that migration can be done incrementally.
 > [`tests/migration_full.rs`](tests/migration_full.rs) (standalone harness),
 > and [`tests/compat_suite/examples.rs`](tests/compat_suite/examples.rs)
 > (canonical copy-paste examples). Run:
->
 > ```
 > cargo test --features secrecy-compat
 > cargo test --test migration_full --features secrecy-compat
@@ -26,7 +26,6 @@ major secrecy generations so that migration can be done incrementally.
 > [`tests/compat_dual/`](tests/compat_dual/) **twice** — once against the real
 > `secrecy` crate (0.8.0 / 0.10.1) and once against the `secure-gate` compat shim.
 > Both must pass identically, giving you machine-verified proof of drop-in compatibility.
->
 > ```
 > cargo test --features dual-compat-test
 > ```
@@ -97,14 +96,16 @@ use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
    use secure_gate::compat::v10::SecretBox;
    use secure_gate::Dynamic;
 
-   let compat: SecretBox<String> = SecretBox::init_with(|| String::from("hunter2"));
+   // Prefer init_with_mut — avoids the clone-then-zeroize window of init_with
+   let compat: SecretBox<String> = SecretBox::init_with_mut(|s| s.push_str("hunter2"));
    let native: Dynamic<String> = compat.into();   // From<SecretBox<S>> for Dynamic<S>
    ```
 
    > **Note**: The conversion clones the inner value (`SecretBox` has a `Drop`
    > impl so moving out without `unsafe` is not possible). The clone is
    > immediately wrapped in `Dynamic` and the original is zeroized on drop.
-   > For zero-copy construction, build `Dynamic<T>` directly.
+   > For zero-copy native construction, build `Dynamic<T>` directly using
+   > `new_with` (see step 4).
 
 3. Replace `compat::ExposeSecret` trait bounds with `RevealSecret`. Bridge impls
    on `Dynamic<T>` and `Fixed<[T; N]>` implement both traits, so call sites using
@@ -118,8 +119,24 @@ use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
    fn show<S: secure_gate::RevealSecret>(s: &S) { … }
    ```
 
-4. Prefer `with_secret` / `with_secret_mut` scoped access over `expose_secret`
-   for new code — it limits borrow lifetime and is the recommended audit pattern.
+4. Prefer scoped construction and access for new code:
+   - **Access**: use `with_secret` / `with_secret_mut` closures over `expose_secret`
+     — limits borrow lifetime and is the recommended audit pattern.
+   - **Construction**: use `new_with` closures when building secrets from computed
+     data inline — writes directly into the wrapper's storage, no intermediate copy:
+
+   ```rust
+   // Dynamic<Vec<u8>>
+   let key = Dynamic::<Vec<u8>>::new_with(|v| v.extend_from_slice(&raw_bytes));
+
+   // Dynamic<String>
+   let token = Dynamic::<String>::new_with(|s| s.push_str(&decoded));
+
+   // Fixed<[u8; N]>
+   let key = Fixed::<[u8; 32]>::new_with(|arr| arr.copy_from_slice(&raw_bytes));
+   ```
+
+   `Dynamic::new(value)` and `Fixed::new(value)` remain available as the ergonomic default.
 
 5. Remove `secrecy-compat` from `Cargo.toml` once all call sites are updated.
 
@@ -144,8 +161,8 @@ use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
 use secrecy::{Secret, SecretString, SecretVec, DebugSecret, CloneableSecret, ExposeSecret};
 
 // After (one global find/replace)
-use secure_gate::compat::v08::{Secret, SecretString, SecretVec, DebugSecret};
-use secure_gate::compat::{CloneableSecret, ExposeSecret};
+use secure_gate_compat::compat::v08::{Secret, SecretString, SecretVec, DebugSecret};
+use secure_gate_compat::compat::{CloneableSecret, ExposeSecret};
 ```
 
 ### Type mapping
@@ -192,8 +209,19 @@ use secure_gate::compat::{CloneableSecret, ExposeSecret};
    let native: Fixed<[u8; 32]> = old.into();   // From<Secret<[T; N]>> for Fixed<[T; N]>
    ```
 
-4. Replace `compat::ExposeSecret` bounds with `RevealSecret`, and `expose_secret()`
-   call sites with `with_secret(|s| …)` where possible.
+4. Prefer scoped construction and access for new code:
+   - **Access**: replace `expose_secret()` call sites with `with_secret(|s| …)` closures
+     and `compat::ExposeSecret` bounds with `RevealSecret`.
+   - **Construction**: use `new_with` closures when building secrets inline — writes
+     directly into the wrapper's storage:
+
+   ```rust
+   // Fixed<[u8; 32]> — avoids intermediate stack copy
+   let key = Fixed::<[u8; 32]>::new_with(|arr| arr.copy_from_slice(&raw_bytes));
+
+   // Dynamic<Vec<u8>>
+   let key = Dynamic::<Vec<u8>>::new_with(|v| v.extend_from_slice(&raw_bytes));
+   ```
 
 5. Remove `secrecy-compat` from `Cargo.toml` once all call sites are updated.
 
@@ -247,35 +275,35 @@ is behaviorally identical for that test case.
 
 ```bash
 # Primary parity run — recommended for CI and before releases
-cargo test --features dual-compat-test
+cargo test --features dual-compat-test -p secure-gate-compat
 
 # Verify fast path is unchanged (no dual tests)
-cargo test --features secrecy-compat
+cargo test --features secrecy-compat -p secure-gate-compat
 
 # Full suite including parity
-cargo test --all-features
+cargo test --all-features -p secure-gate-compat
 ```
 
 ### What each file tests
 
-| File                              | What it verifies                                                              |
-| --------------------------------- | ----------------------------------------------------------------------------- |
-| `tests/compat_dual/parity_v08.rs` | ~21 shared API tests against secrecy 0.8.0 baseline + 3 bridge tests          |
+| File | What it verifies |
+| --- | --- |
+| `tests/compat_dual/parity_v08.rs` | ~21 shared API tests against secrecy 0.8.0 baseline + 3 bridge tests |
 | `tests/compat_dual/parity_v10.rs` | ~20 shared API tests against secrecy 0.10.1 baseline + 5 shim-extension tests |
-| `tests/compat_dual/divergence.rs` | Zeroization parity checks; shim-only stricter behaviors documented            |
+| `tests/compat_dual/divergence.rs` | Zeroization parity checks; shim-only stricter behaviors documented |
 
 ### Shim extensions (not in real secrecy)
 
 The following are convenience additions our shim provides beyond what real
 secrecy implements. They are tested in Part B of the parity files:
 
-| API                                   | Shim version                                  | Real secrecy                 |
-| ------------------------------------- | --------------------------------------------- | ---------------------------- |
-| `SecretString::from("&str")` (v10)    | `impl From<&'a str>`                          | Missing — use `From<String>` |
-| `"...".parse::<SecretString>()` (v10) | `impl FromStr`                                | Missing                      |
-| `SecretString::default()` (v10)       | Concrete impl                                 | Missing — `str: !Default`    |
-| `SecretSlice::<T>::default()` (v10)   | Concrete impl                                 | Missing — `[T]: !Default`    |
-| `with_secret` / `with_secret_mut`     | On native `Dynamic` / `Fixed` after migration | Not in secrecy               |
+| API | Shim version | Real secrecy |
+| --- | --- | --- |
+| `SecretString::from("&str")` (v10) | `impl From<&'a str>` | Missing — use `From<String>` |
+| `"...".parse::<SecretString>()` (v10) | `impl FromStr` | Missing |
+| `SecretString::default()` (v10) | Concrete impl | Missing — `str: !Default` |
+| `SecretSlice::<T>::default()` (v10) | Concrete impl | Missing — `[T]: !Default` |
+| `with_secret` / `with_secret_mut` | On native `Dynamic` / `Fixed` after migration | Not in secrecy |
 
 ---
 
@@ -284,7 +312,11 @@ secrecy implements. They are tested in Part B of the parity files:
 - Two access trait families coexist during transition: compat `ExposeSecret` and
   native `RevealSecret`. Audit sweeps must cover **both** — search for
   `expose_secret` **and** `with_secret` / `expose_secret` (native).
-- Prefer `SecretBox::init_with_mut` over `SecretBox::init_with` where possible
-  to avoid the clone-then-zeroize window.
-- See [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md#compatibility-layer-compat) for the full compat
-  security analysis.
+- **Compat construction**: prefer `SecretBox::init_with_mut` over `SecretBox::init_with`
+  to avoid the clone-then-zeroize window inherent in `init_with`.
+- **Native construction**: prefer `Fixed::new_with(|arr| …)` and
+  `Dynamic::<Vec<u8>>::new_with(|v| …)` over `new(value)` when constructing secrets
+  from computed data inline — these write directly into the wrapper's storage and
+  eliminate any intermediate copy.
+- See [SECURITY.md](SECURITY.md#wrappers-dynamicrs-fixedrs) for the full stack-residue
+  analysis and mitigations.

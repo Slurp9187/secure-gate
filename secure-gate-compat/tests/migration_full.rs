@@ -182,10 +182,10 @@ fn stage3_native() {
 
 #[cfg(feature = "secrecy-compat")]
 fn stage4_cross_version_migration() {
+    use secure_gate::{Dynamic, Fixed, RevealSecret};
     use secure_gate_compat::compat::v08::Secret as V08Secret;
     use secure_gate_compat::compat::v10::SecretBox as V10SecretBox;
     use secure_gate_compat::compat::ExposeSecret;
-    use secure_gate_compat::{Dynamic, Fixed, RevealSecret};
 
     let payload = "migration_payload_value";
 
@@ -228,8 +228,7 @@ fn stage4_cross_version_migration() {
 
 #[cfg(feature = "secrecy-compat")]
 fn stage5_realistic_application_struct() {
-    use secure_gate::SecretLen;
-    use secure_gate_compat::{Dynamic, Fixed, RevealSecret};
+    use secure_gate::{Dynamic, Fixed, RevealSecret, SecretLen};
 
     // Fully migrated application config — no compat types remain.
     struct AppSecrets {
