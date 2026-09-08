@@ -93,7 +93,7 @@ use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
 2. Replace `v10::SecretBox<T>` with `Dynamic<T>` using the provided `From` impl:
 
    ```rust
-   use secure_gate::compat::v10::SecretBox;
+   use secure_gate_compat::compat::v10::SecretBox;
    use secure_gate::Dynamic;
 
    // Prefer init_with_mut — avoids the clone-then-zeroize window of init_with
@@ -113,7 +113,7 @@ use secure_gate_compat::compat::{ExposeSecret, ExposeSecretMut};
 
    ```rust
    // During transition — still works
-   fn show<S: secure_gate::compat::ExposeSecret<str>>(s: &S) { … }
+   fn show<S: secure_gate_compat::compat::ExposeSecret<str>>(s: &S) { … }
 
    // Final form
    fn show<S: secure_gate::RevealSecret>(s: &S) { … }
@@ -192,7 +192,7 @@ use secure_gate_compat::compat::{CloneableSecret, ExposeSecret};
 2. Replace heap-allocated `Secret<String>` / `Secret<Vec<T>>` with `Dynamic<T>`:
 
    ```rust
-   use secure_gate::compat::v08::Secret;
+   use secure_gate_compat::compat::v08::Secret;
    use secure_gate::Dynamic;
 
    let old: Secret<String> = Secret::new(String::from("hunter2"));
@@ -202,7 +202,7 @@ use secure_gate_compat::compat::{CloneableSecret, ExposeSecret};
 3. Replace fixed-size array secrets with `Fixed<[T; N]>`:
 
    ```rust
-   use secure_gate::compat::v08::Secret;
+   use secure_gate_compat::compat::v08::Secret;
    use secure_gate::Fixed;
 
    let old: Secret<[u8; 32]> = Secret::new([0xABu8; 32]);
@@ -245,7 +245,7 @@ Native `Dynamic<T>` and `Fixed<[T; N]>` implement `compat::ExposeSecret` and
 types one at a time without changing any trait bounds:
 
 ```rust
-use secure_gate::compat::ExposeSecret;
+use secure_gate_compat::compat::ExposeSecret;
 use secure_gate::Dynamic;
 
 fn process<S: ExposeSecret<str>>(secret: &S) {
@@ -254,7 +254,7 @@ fn process<S: ExposeSecret<str>>(secret: &S) {
 }
 
 // Works with a compat type:
-let compat: secure_gate::compat::v10::SecretBox<str> = "hi".parse().unwrap();
+let compat: secure_gate_compat::compat::v10::SecretBox<str> = "hi".parse().unwrap();
 process(&compat);
 
 // Also works with the native type — no code change at the call site:

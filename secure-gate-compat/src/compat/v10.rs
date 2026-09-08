@@ -58,8 +58,8 @@ use secure_gate::RevealSecret;
 /// Heap-allocated secret wrapper — mirrors `secrecy::SecretBox`.
 ///
 /// Stores the secret in a `Box<S>`, zeroizes on drop, and only exposes the inner
-/// value through [`ExposeSecret`](super::ExposeSecret) /
-/// [`ExposeSecretMut`](super::ExposeSecretMut). `Debug` always prints `[REDACTED]`.
+/// value through [`ExposeSecret`] /
+/// [`ExposeSecretMut`]. `Debug` always prints `[REDACTED]`.
 ///
 /// # Migration to native secure-gate
 ///

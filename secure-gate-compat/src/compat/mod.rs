@@ -72,7 +72,7 @@ pub use zeroize;
 ///
 /// # Migration
 ///
-/// For new code, prefer [`RevealSecret`](RevealSecret), which additionally provides
+/// For new code, prefer [`RevealSecret`], which additionally provides
 /// scoped `with_secret` access and byte-length metadata.
 pub trait ExposeSecret<S: ?Sized> {
     /// Returns a shared reference to the inner secret.
@@ -86,7 +86,7 @@ pub trait ExposeSecret<S: ?Sized> {
 ///
 /// # Migration
 ///
-/// For new code, prefer [`RevealSecretMut`](RevealSecretMut).
+/// For new code, prefer [`RevealSecretMut`].
 pub trait ExposeSecretMut<S: ?Sized> {
     /// Returns a mutable reference to the inner secret.
     fn expose_secret_mut(&mut self) -> &mut S;
