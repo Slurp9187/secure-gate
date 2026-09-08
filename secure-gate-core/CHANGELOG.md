@@ -12,8 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > written out in `bech32_code_length` and two assertions; the `thread_local!` cells in
 > `heap_zeroize.rs` drop their inline `const` blocks (1.79), which only elided lazy
 > initialization and so change nothing the ordering in `count_allocs` did not already
-> guarantee; and `error.rs` keeps this branch's `std`-gated `std::error::Error` instead
-> of 0.9's unconditional `core::error::Error` (1.81).
+> guarantee; `heap_zeroize.rs` spells `Iterator::repeat_n` (1.82) as `repeat().take()`
+> at all five sites; and `error.rs` keeps this branch's `std`-gated `std::error::Error`
+> instead of 0.9's unconditional `core::error::Error` (1.81).
 > Modern clippy asks for those `const` blocks back via `missing_const_for_thread_local`,
 > so both statics carry an explicit `#[allow]`, paired with `#[allow(unknown_lints)]`
 > because 1.70's clippy predates that lint name and `-D warnings` would otherwise reject
@@ -34,6 +35,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > used it, because its `no_std` path needs `core::error::Error` too. `secure-gate-compat`
 > keeps its `encoding-bech32m` feature as an alias onto core's `encoding-bech32` so the
 > workspace resolves; compat is backported separately.
+
+### Fixed
+
+- **`base32_error_display` / `base64_error_display` were gated on `std` (audit).** A
+  three-way merge artifact from the backport: the `DecodingError::source()` tests that
+  once occupied those line positions were `std`-gated and were deleted by #171, and the
+  old `cfg` lines were carried onto the new function bodies. Both assert only `Display`,
+  which every build implements, so feature rows without `std` were silently skipping two
+  pins that still run on `main`. `hex_error_display` was unaffected.
+- **`SecureEncoding` / `SecureDecoding` documentation claimed to gate the encoders
+  (audit).** Neither is used as a bound anywhere in the crate. Every `To*` blanket is
+  `T: AsRef<[u8]> + EncodableBytes` and every `From*Str` blanket is plain `AsRef<str>`.
+  `SecureEncoding` is even implemented for `str` and `String` — exactly what
+  `EncodableBytes` exists to reject — so the old wording pointed readers at the wrong
+  guarantee. `EncodableBytes` now appears in the trait table as the load-bearing bound,
+  and both markers are described as vestigial.
+- **Stale references to types this backport removed (audit).** `SECURITY.md` still cited
+  `source()` chaining on `DecodingError`; the allocation oracle still described its
+  `thread_local!` cells as `const`-initialized in three places, which is true on 0.9 and
+  false here.
+- **Crate-level `SECURITY.md` links pointed at `main` (audit).** Six links across
+  `lib.rs`, `traits/mod.rs` and `revealed_secrets/mod.rs` now target `release/0.8`,
+  since that file is branch-specific. Design-record links stay on `main`: this branch
+  carries those records verbatim and they describe `main`.
+- **README and the `EncodedSecret` design record were incomplete (audit).** The README
+  upgrade notes now list the `EncodableBytes` bound and the removal of `DecodingError`
+  and `Bech32Error::ConversionFailed`; `docs/encoded_secret_deref.md` is annotated with
+  its 0.8 backport, matching the newtype design records.
 
 ### Added
 

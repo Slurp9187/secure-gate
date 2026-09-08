@@ -18,8 +18,8 @@
 //! encoded output while preserving the crate’s “secrets are radioactive”
 //! guarantees.
 //!
-//! See the [3-Tier Access Model](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#3-tier-access-model)
-//! and the [“What secure-gate does NOT protect against”](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#what-secure-gate-does-not-protect-against)
+//! See the [3-Tier Access Model](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md#3-tier-access-model)
+//! and the [“What secure-gate does NOT protect against”](https://github.com/Slurp9187/secure-gate/blob/release/0.8/secure-gate-core/SECURITY.md#what-secure-gate-does-not-protect-against)
 //! section in `SECURITY.md` for full guidance on when and how to use this type.
 
 #[cfg(feature = "alloc")]

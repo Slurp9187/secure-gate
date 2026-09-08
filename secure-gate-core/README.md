@@ -383,6 +383,14 @@ Every encoder returns [`EncodedSecret`] (wrapping `Zeroizing<String>` with a red
 - **`encoding-bech32m` folded into `encoding-bech32`** — one feature now covers BIP-173
   and BIP-350; they are one dependency, one error type, and one code-length knob.
   Backported from the 0.9 line (#171).
+- **Encoders now require `EncodableBytes`** — the `To*` blankets are
+  `T: AsRef<[u8]> + EncodableBytes`, so string-shaped inputs are rejected.
+  `"text".to_hex()` and re-encoding an `EncodedSecret` no longer compile; say
+  `.as_bytes()` when the UTF-8 really is what you want. Backported from the 0.9 line
+  (#172).
+- **`DecodingError` and `Bech32Error::ConversionFailed` are gone** — the wrapper enum
+  had no producer, and the variant was unreachable (bit-conversion failures surface as
+  `OperationFailed`). Backported from the 0.9 line (#171).
 
 ## Branch support
 

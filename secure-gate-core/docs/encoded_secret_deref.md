@@ -2,7 +2,9 @@
 
 > **Status: decided, and implemented as described.** Ships in 0.9.0 alongside the
 > encoder merge (every encoder returns `EncodedSecret`; the `*_zeroizing` variants
-> are gone) and the deletion of `InnerSecret<T>`.
+> are gone) and the deletion of `InnerSecret<T>`. Backported to the 0.8 line in
+> 0.8.0-rc.12, where the same three changes landed together; the record otherwise
+> describes `main`.
 >
 > This is a rejected-alternatives record. It exists because `EncodedSecret` is the
 > one type in this crate that deliberately breaks the crate's own no-`Deref` rule,

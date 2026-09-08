@@ -474,7 +474,7 @@ What errors may and may not carry:
 - **Numeric length metadata** (`InvalidLength { expected, got }`) is present in all builds. Expected lengths are compile-time protocol parameters (key sizes, nonce sizes) and actual lengths derive from the caller's own input — neither is secret in this crate's threat model.
 - **Input-derived strings are never captured**, in any build: no received-HRP text, no encoding "hints", no payload bytes. All error types are heap-free and `Copy`.
 - All error enums (and their struct variants) are `#[non_exhaustive]`, so variants and fields can be added without a semver-major bump.
-- **0.8 LTS note:** `std::error::Error` impls (including `source()` chaining on `DecodingError`) are gated behind the `std` feature — this branch's MSRV (1.70) predates `core::error::Error`, so the error types themselves stay `no_std` while trait-object integration requires `std`.
+- **0.8 LTS note:** `std::error::Error` impls are gated behind the `std` feature — this branch's MSRV (1.70) predates `core::error::Error`, so the error types themselves stay `no_std` while trait-object integration requires `std`.
 
 If even coarse error categories or length metadata are sensitive in your deployment (attacker fingerprinting, strict oracle avoidance), redact errors at the logging/response boundary — the library deliberately does not vary its behavior by build profile.
 
