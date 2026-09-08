@@ -1,0 +1,20 @@
+error[E0599]: the method `to_hex` exists for struct `Dynamic<String>`, but its trait bounds were not satisfied
+  --> tests/compile-fail/dynamic_string_no_hex.rs:15:20
+   |
+15 |     let _ = secret.to_hex();
+   |                    ^^^^^^ method cannot be called on `Dynamic<String>` due to unsatisfied trait bounds
+   |
+  ::: src/dynamic.rs
+   |
+   | pub struct Dynamic<T: ?Sized + zeroize::Zeroize> {
+   | ------------------------------------------------
+   | |
+   | doesn't satisfy `Dynamic<String>: AsRef<[u8]>`
+   | doesn't satisfy `Dynamic<String>: EncodableBytes`
+   | doesn't satisfy `Dynamic<String>: ToHex`
+   |
+   = note: the following trait bounds were not satisfied:
+           `Dynamic<String>: AsRef<[u8]>`
+           which is required by `Dynamic<String>: ToHex`
+           `Dynamic<String>: EncodableBytes`
+           which is required by `Dynamic<String>: ToHex`

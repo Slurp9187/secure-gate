@@ -3,7 +3,7 @@
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 use secure_gate::Dynamic;
 #[cfg(feature = "encoding-hex")]
-use secure_gate::{Fixed, FromHexStr, RevealSecret, SecureDecoding, ToHex};
+use secure_gate::{Fixed, FromHexStr, RevealSecret, ToHex};
 
 #[cfg(feature = "encoding-hex")]
 #[test]
@@ -39,10 +39,8 @@ fn dynamic_try_from_hex_invalid_input_returns_err() {
 
 #[cfg(feature = "encoding-hex")]
 #[test]
-fn secure_decoding_marker_trait_is_available() {
-    fn assert_marker<T: SecureDecoding + ?Sized>(_value: &T) {}
+fn str_receiver_try_from_hex_decodes_via_blanket_impl() {
     let input = "00ff";
-    assert_marker(input);
     let bytes = input.try_from_hex().expect("hex");
     assert_eq!(bytes, vec![0x00, 0xFF]);
 }

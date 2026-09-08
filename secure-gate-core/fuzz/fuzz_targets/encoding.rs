@@ -1,5 +1,6 @@
-// Encoding/decoding round-trip fuzz target for secure-gate v0.8.0.
-// Tests hex, base32, base64url, bech32, and bech32m formats with both valid and arbitrary inputs.
+// Encoding/decoding round-trip fuzz target for `secure-gate`.
+// Exercises hex, base64url, base32, bech32, and bech32m with structured payloads
+// and arbitrary bytes.
 //
 // Invariants:
 //   - decode(encode(raw)) == raw          (lossless round-trip)

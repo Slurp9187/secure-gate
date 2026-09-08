@@ -151,8 +151,7 @@ fn fixed_drop_emits_volatile_zero_stores() {
 /// Asserts that `symbol`'s body in `asm` still contains zero-store instructions.
 ///
 /// If the symbol was folded into another by identical-code folding — LLVM emits
-/// an alias, `.set <symbol>, <target>` or `<symbol> = <target>` depending on the
-/// toolchain — the assertion runs against the target instead.
+/// `.set <symbol>, <target>` — the assertion runs against the target instead.
 /// For the newtype that outcome is the *strongest* possible result: it proves
 /// the generated wrapper compiles to byte-identical code, not merely to
 /// equivalent code.
@@ -222,31 +221,29 @@ fn assert_zero_stores_present(asm: &str, asm_path: &std::path::Path, symbol: &st
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Follows an alias directive for `symbol`, if present.
+/// Follows an assembler alias for `symbol`, if present.
 ///
 /// LLVM's identical-code folding emits one when two functions compile to the
 /// same machine code — which is exactly what happens for a
-/// `#[repr(transparent)]` newtype that adds no `Drop` of its own. The spelling
-/// depends on the toolchain: rustc 1.85 writes `.set <symbol>, <target>`,
-/// current stable and nightly write the assignment form `<symbol> = <target>`.
-/// Both are followed; an unaliased symbol resolves to itself.
+/// `#[repr(transparent)]` newtype that adds no `Drop` of its own. The directive
+/// has two spellings, and the toolchain picks one:
+///
+/// - `.set <symbol>, <target>` — rustc 1.85 and earlier LLVMs, on ELF and COFF
+/// - `<symbol> = <target>`      — rustc 1.98 (LLVM 22), on ELF and COFF alike
+///
+/// Both are followed. Missing either one makes the fold look like a missing
+/// symbol, which is how the 1.98 upgrade first showed up: every DSE job failed
+/// with "could not find 'make_and_drop_newtype' label".
 fn resolve_symbol_alias(asm: &str, symbol: &str) -> String {
+    let set_form = format!(".set {symbol},");
+    let eq_form = format!("{symbol} =");
     for line in asm.lines() {
         let line = line.trim();
-        // `.set <symbol>, <target>`
-        if let Some(rest) = line.strip_prefix(".set") {
-            let mut parts = rest.trim_start().splitn(2, ',');
-            if parts.next().map(str::trim) == Some(symbol) {
-                if let Some(target) = parts.next() {
-                    return target.trim().to_string();
-                }
-            }
+        if let Some(rest) = line.strip_prefix(&set_form) {
+            return rest.trim().to_string();
         }
-        // `<symbol> = <target>`
-        if let Some(rest) = line.strip_prefix(symbol) {
-            if let Some(target) = rest.trim_start().strip_prefix('=') {
-                return target.trim().to_string();
-            }
+        if let Some(rest) = line.strip_prefix(&eq_form) {
+            return rest.trim().to_string();
         }
     }
     symbol.to_string()
