@@ -200,7 +200,12 @@ fuzz_target!(|data: &[u8]| {
         // 2 KiB of payload still fits BIG with room to spare for any HRP here.
         let capped = if raw.len() > 2048 { &raw[..2048] } else { &raw[..] };
 
-        if let Ok(encoded) = capped.try_to_bech32_sized::<BIG>("fuzz") {
+        // Every capped payload fits BIG (2048 bytes -> 3288 chars < 4096), so an Err
+        // here is a regression in the sized encode gate, not a legitimate refusal.
+        let encoded = capped
+            .try_to_bech32_sized::<BIG>("fuzz")
+            .expect("sized bech32 encode refused a payload that fits");
+        {
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32_sized::<BIG>(&encoded, "fuzz")
                 .expect("sized bech32 from valid encode");
             assert_eq!(
@@ -228,7 +233,10 @@ fuzz_target!(|data: &[u8]| {
 
         // Bech32m at the same code length: same properties, and the two checksums
         // must never decode as one another.
-        if let Ok(encoded_m) = capped.try_to_bech32m_sized::<BIG>("fuzz") {
+        let encoded_m = capped
+            .try_to_bech32m_sized::<BIG>("fuzz")
+            .expect("sized bech32m encode refused a payload that fits");
+        {
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32m_sized::<BIG>(&encoded_m, "fuzz")
                 .expect("sized bech32m from valid encode");
             assert_eq!(
@@ -271,7 +279,7 @@ fuzz_target!(|data: &[u8]| {
         let _ = Dynamic::<Vec<u8>>::try_from_bech32_unchecked("");
     }
 
-    // === BECH32M (BIP-350, 90-byte payload limit) ===
+    // === BECH32M (BIP-350, default code length) ===
 
     // 5a. Arbitrary strings to try_from_bech32m — no panic
     {
@@ -279,7 +287,7 @@ fuzz_target!(|data: &[u8]| {
         let _ = Dynamic::<Vec<u8>>::try_from_bech32m_unchecked(&arbitrary_str);
     }
 
-    // 5b. Valid bech32m round-trip (cap to 32 bytes for BIP-350 compliance)
+    // 5b. Valid bech32m round-trip (32 bytes: an address-sized payload)
     {
         let dyn_vec2 = match FuzzDynamicVec::arbitrary(&mut u) {
             Ok(d) => d.0,

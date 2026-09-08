@@ -81,6 +81,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING: the default bech32 code length is 1023, not 8191, and `Bech32Large` is
   gone.** `ToBech32` / `FromBech32Str` used a custom checksum whose `CODE_LENGTH` was
   8191 — eight times the length of the bech32 BCH code, which is 1023 in the `bech32`
+
+  8191 — roughly eight times the length of the bech32 BCH code, which is 1023 in the `bech32`
+
   crate for both `Bech32` and `Bech32m`. That constant is documented upstream as "how
   long a coded message can be ... for the code to retain its error-correcting
   properties", so 8191 silently gave every caller a checksum stretched past the point
@@ -214,6 +217,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+  **And the stack.** Adversarial review then pointed out that `encode_lower_to_fmt`
+  itself stages every output character through a 1 KiB stack array
+  (`let mut buf = [0u8; BUF_LENGTH]`) that it never clears, so after the call returned
+  the encoded secret was still sitting in that frame. The refuters were right that this
+  is `bech32`'s code and outside the crate's heap guarantee — and it was still not
+  something to leave a footnote about. Both encoders now bypass `encode_lower_to_fmt`
+  and drive the same iterator chain upstream uses (`bytes_to_fes` →
+  `with_checksum::<Ck>` → `chars`) directly into the pre-sized `String`. The chain's
+  entire state is one pending byte, a bit offset, a borrowed HRP and a `u32` checksum
+  midstate — 72 bytes on x86_64, pinned under 96 by
+  `encoder_chain_carries_no_staging_buffer` so a reintroduced buffer fails the test —
+  and each character goes into `out` as it is
+  produced. The `CODE_LENGTH` gate upstream applied through `encoded_length` is
+  replicated with `bech32_code_length`, which the tests already prove exact.
+  `direct_chain_matches_upstream_encode_lower` (one per checksum) asserts byte-for-byte
+  equality with upstream across eight payload sizes, so nothing observable changed
+  except what is left on the stack. Upstream's function is still used in unit tests,
+  as the equivalence oracle only.
+
+### Fixed
+
+- **The newtype macros forwarded the sized bech32 *encoders* and not the *decoders*
+  (adversarial review, three lenses independently).** `fixed_newtype!` emitted
+  `try_to_bech32{,m}_sized{,_zeroizing}` but none of `try_from_bech32{,m}{,_unchecked}_sized`;
+  `dynamic_newtype!` was worse, with a single plain `try_from_bech32` and no
+  `_unchecked`, no bech32m decode at all, and no sized variants. So a newtype could emit
+  a 900-byte secret at a custom code length and then had no way to read it back except
+  decoding into a bare `Fixed`/`Dynamic` and copying into the newtype by hand — an extra
+  copy of the secret, on exactly the path the inherent constructors exist to avoid.
+  The CHANGELOG for this release claimed the forwarding was complete and tested; both
+  claims were false. Four constructors added to `fixed_newtype!`, seven to
+  `dynamic_newtype!`, and `newtype_forwards_sized_bech32_decode` round-trips every one
+  of them. Named `_sized` on the decode side because the two const parameters mean
+  different things: `N` is the byte count the newtype holds, `C` is the string length
+  it will accept.
+
+- **`bech32_code_length` panicked in debug and wrapped in release for payloads above
+  `usize::MAX / 8`.** The `payload_bytes * 8` was unchecked. Unreachable with real
+  memory, but the function is documented as exact and a wrapped result would have
+  under-sized an encode buffer. It now computes `⌈8b/5⌉` as `8·(b/5) + ⌈8·(b%5)/5⌉`
+  with saturating arithmetic: exact for every result that fits in a `usize`, and
+  `usize::MAX` — which every encoder refuses — when it does not. Never smaller than the
+  truth, never a panic. `code_length_saturates_instead_of_wrapping` pins both halves.
+
 - **`secure-gate-compat`'s `serde-serialize` / `serde-deserialize` features could not
   build on their own.** Each enabled only the corresponding `secure-gate` feature, never
   this crate's `dep:serde`, while the `#[cfg(feature = "serde-serialize")]` /
@@ -278,6 +325,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `proptest_suite/encoding.rs` and the `encoding` fuzz target assert the same
   invariants; `tests/macros_suite/newtype_surface.rs` covers the macro-forwarded sized
   methods, which are the easiest of the expansion sites to leave out.
+
+  methods in **both** directions — see the adversarial-review entry below for why the
+  decode half of that sentence was false when first written.
+
+- **Adversarial review of the bech32 refactor (41 agents, seven lenses, three refuters
+  per finding).** Nine findings survived; the three that were test defects are fixed
+  here, the rest under *Fixed*.
+  - `randomized_stress_across_code_lengths` had a vacuous invariant. Its ladder was
+    64/128/256/1023/1024/2048/4096, but with a 3-character HRP a code length is
+    `10 + ⌈8b/5⌉`, and since `gcd(8, 5) = 1` that only ever lands on residues
+    `{1, 2, 4, 6, 7} (mod 8)` — never a power of two. So `encoded.len() == N` was
+    unreachable on six of seven rungs and the `|| encoded.len() < N` escape took the
+    "too-small decoder refuses" assertion out of play. Rungs are now defined by payload
+    byte counts (32, 64, 128, 633, 640, 1280, 2560 → code lengths 62, 113, 215, 1023,
+    1034, 2058, 4106), case 0 of each rung encodes exactly that many bytes, and a
+    counter asserts the boundary branch ran on every rung. Mutating the decoder to
+    `N` instead of `N - 1` now fails on the first rung.
+  - The claim that the HRP is compared *before* any payload byte is materialized had
+    no test that could fail: every existing check observed only `Err(UnexpectedHrp)`,
+    which is identical whether the `Vec` was never built or built-then-discarded. A
+    refuter proved it by swapping the two statements and watching every test pass.
+    `tests/heap_zeroize.rs` gained an allocation-counting mode:
+    `check_bech32_hrp_mismatch_materializes_nothing` asserts **zero** heap allocations
+    on an HRP mismatch across all six sized decode paths (blanket, `Dynamic`, `Fixed`;
+    bech32 and bech32m), with a positive control that a correct `Vec` decode allocates
+    and a third check that `Fixed` decodes allocate nothing even on success. The same
+    statement swap now fails it with "2 heap allocation(s)".
+  - The `encoding` fuzz target's sized round-trip block used `if let Ok(..)` and
+    silently skipped an `Err`, although every capped payload (≤ 2048 bytes → 3288
+    characters) fits `BIG = 4096`, so an `Err` there can only be an encoder regression.
+    It is now an `expect`. Two comments in the same file still described a "90-byte
+    payload limit" and "BIP-350 compliance" cap that this release's CHANGELOG says never
+    existed; corrected.
+  Refuted and worth recording: `capacity() == len()` as proof of a single allocation —
+  a refuter mutated the reservation to half the length and the test **failed**, so it is
+  stronger than the finder assumed. And a real observation that fell outside the
+  refactor: upstream `encode_lower_to_fmt` stages every output character through a 1 KiB
+  stack array it never wipes. That is `bech32`'s code, not this crate's, and the stack
+  is outside the documented heap-wiping guarantee — but a future release could bypass it
+  by driving `bech32`'s iterator primitives directly into the pre-sized `String`.
+
 
 - **The bech32 test module no longer breaks `--all-targets` without `alloc`.** Its trait
   imports and 38 test `cfg`s named only `encoding-bech32*`, but `ToBech32` and friends

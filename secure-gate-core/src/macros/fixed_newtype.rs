@@ -324,6 +324,22 @@ macro_rules! fixed_newtype {
                     -> ::core::result::Result<Self, $crate::Bech32Error> {
                     ::core::result::Result::Ok(Self($crate::Fixed::try_from_bech32m_unchecked(s)?))
                 }
+                /// HRP-validated Bech32m decode accepting strings up to `C` characters.
+                #[inline]
+                pub fn try_from_bech32m_sized<const C: usize>(s: &str, expected_hrp: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        $crate::Fixed::try_from_bech32m_sized::<C>(s, expected_hrp)?,
+                    ))
+                }
+                /// Bech32m decode without HRP validation, accepting strings up to `C` characters.
+                #[inline]
+                pub fn try_from_bech32m_unchecked_sized<const C: usize>(s: &str)
+                    -> ::core::result::Result<Self, $crate::Bech32Error> {
+                    ::core::result::Result::Ok(Self(
+                        $crate::Fixed::try_from_bech32m_unchecked_sized::<C>(s)?,
+                    ))
+                }
             }
             $crate::__sg_if_alloc! {
                 impl $crate::ToBech32m for $name {
@@ -403,6 +419,22 @@ macro_rules! fixed_newtype {
                     pub fn try_from_bech32_unchecked(s: &str)
                         -> ::core::result::Result<Self, $crate::Bech32Error> {
                         ::core::result::Result::Ok(Self($crate::Fixed::try_from_bech32_unchecked(s)?))
+                    }
+                    /// HRP-validated Bech32 decode accepting strings up to `C` characters.
+                    #[inline]
+                    pub fn try_from_bech32_sized<const C: usize>(s: &str, expected_hrp: &str)
+                        -> ::core::result::Result<Self, $crate::Bech32Error> {
+                        ::core::result::Result::Ok(Self(
+                            $crate::Fixed::try_from_bech32_sized::<C>(s, expected_hrp)?,
+                        ))
+                    }
+                    /// Bech32 decode without HRP validation, accepting strings up to `C` characters.
+                    #[inline]
+                    pub fn try_from_bech32_unchecked_sized<const C: usize>(s: &str)
+                        -> ::core::result::Result<Self, $crate::Bech32Error> {
+                        ::core::result::Result::Ok(Self(
+                            $crate::Fixed::try_from_bech32_unchecked_sized::<C>(s)?,
+                        ))
                     }
                 }
             }
