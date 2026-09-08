@@ -347,6 +347,13 @@ jobs:
       - name: cargo check – full features
         run: cargo +1.85 check --features=full
 
+      # `check` with `default`/`full` compiles the library only: neither implies
+      # `std`, and neither builds test targets. That let a test file stop compiling
+      # on the declared MSRV while every job stayed green — `--all-features
+      # --all-targets` is the configuration that catches it.
+      - name: cargo check – all features, all targets
+        run: cargo +1.85 check --workspace --all-features --all-targets
+
   # ---------------------------------------------------------------------------
   # Compile-fail job — API-surface enforcement on the blessing toolchain
   #
