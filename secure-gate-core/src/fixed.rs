@@ -13,7 +13,7 @@
 //! - **Unconditional zeroization on drop** — the inner `T` is overwritten with
 //!   zeroes when the wrapper is dropped, even on error paths.
 //! - **Opt-in `Clone`** — requires `T: CloneableSecret` and the `cloneable` feature.
-//! - **Opt-in `Serialize`/`Deserialize`** — requires marker traits and the
+//! - **Opt-in `Serialize`** — requires the `SerializableSecret` marker and the
 //!   `serde-serialize`/`serde-deserialize` features.
 //! - **Avoid move-by-value for long-lived secrets.** Each move of a `Fixed<T>`
 //!   bitwise-copies the bytes to a new location and leaves the original stack
@@ -378,8 +378,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// # Errors
     ///
-    /// - [`HexError::InvalidHex`] — non-hex characters or odd-length input.
-    /// - [`HexError::InvalidLength`] — decoded byte count does not equal `N`.
+    /// - [`HexError::InvalidHex`](crate::HexError::InvalidHex) — non-hex characters or odd-length input.
+    /// - [`HexError::InvalidLength`](crate::HexError::InvalidLength) — decoded byte count does not equal `N`.
     ///
     /// # Examples
     ///
@@ -480,7 +480,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// // Round-trip.
     /// let original = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
     /// let encoded = original.to_base32();
-    /// assert_eq!(encoded, "32W353Y");
+    /// assert_eq!(&*encoded, "32W353Y");
     /// let decoded = Fixed::<[u8; 4]>::try_from_base32(&encoded).unwrap();
     /// assert_eq!(decoded.expose_secret(), &[0xDE, 0xAD, 0xBE, 0xEF]);
     /// # }
@@ -539,8 +539,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// # Errors
     ///
-    /// - [`Base64Error::InvalidBase64`] — non-base64 characters or invalid padding.
-    /// - [`Base64Error::InvalidLength`] — decoded byte count does not equal `N`.
+    /// - [`Base64Error::InvalidBase64`](crate::Base64Error::InvalidBase64) — non-base64 characters or invalid padding.
+    /// - [`Base64Error::InvalidLength`](crate::Base64Error::InvalidLength) — decoded byte count does not equal `N`.
     ///
     /// # Examples
     ///
@@ -757,31 +757,20 @@ impl<const N: usize> Fixed<[u8; N]> {
 /// use secure_gate::{Fixed, ToHex};
 ///
 /// let key = Fixed::new([0xABu8; 4]);
-/// assert_eq!(key.to_hex(), "abababab");
-/// assert_eq!(key.to_hex_upper(), "ABABABAB");
-/// // Zeroizing variant — encoded form wipes itself on drop:
-/// assert_eq!(&*key.to_hex_zeroizing(), "abababab");
+/// assert_eq!(&*key.to_hex(), "abababab");
+/// assert_eq!(&*key.to_hex_upper(), "ABABABAB");
+/// // Both return an `EncodedSecret` — the encoded form wipes itself on drop.
 /// ```
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 impl<const N: usize> ToHex for Fixed<[u8; N]> {
     #[inline]
-    fn to_hex(&self) -> alloc::string::String {
+    fn to_hex(&self) -> crate::EncodedSecret {
         self.with_secret(|s| s.to_hex())
     }
 
     #[inline]
-    fn to_hex_upper(&self) -> alloc::string::String {
+    fn to_hex_upper(&self) -> crate::EncodedSecret {
         self.with_secret(|s| s.to_hex_upper())
-    }
-
-    #[inline]
-    fn to_hex_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s| s.to_hex_zeroizing())
-    }
-
-    #[inline]
-    fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s| s.to_hex_upper_zeroizing())
     }
 }
 
@@ -793,18 +782,13 @@ impl<const N: usize> ToHex for Fixed<[u8; N]> {
 /// use secure_gate::{Fixed, ToBase32};
 ///
 /// let key = Fixed::new([0xABu8; 4]);
-/// assert_eq!(key.to_base32(), "VOV2XKY");
+/// assert_eq!(&*key.to_base32(), "VOV2XKY");
 /// ```
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 impl<const N: usize> ToBase32 for Fixed<[u8; N]> {
     #[inline]
-    fn to_base32(&self) -> alloc::string::String {
+    fn to_base32(&self) -> crate::EncodedSecret {
         self.with_secret(|s| s.to_base32())
-    }
-
-    #[inline]
-    fn to_base32_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s| s.to_base32_zeroizing())
     }
 }
 
@@ -816,18 +800,13 @@ impl<const N: usize> ToBase32 for Fixed<[u8; N]> {
 /// use secure_gate::{Fixed, ToBase64Url};
 ///
 /// let key = Fixed::new([0xABu8; 4]);
-/// assert_eq!(key.to_base64url(), "q6urqw");
+/// assert_eq!(&*key.to_base64url(), "q6urqw");
 /// ```
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 impl<const N: usize> ToBase64Url for Fixed<[u8; N]> {
     #[inline]
-    fn to_base64url(&self) -> alloc::string::String {
+    fn to_base64url(&self) -> crate::EncodedSecret {
         self.with_secret(|s| s.to_base64url())
-    }
-
-    #[inline]
-    fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
-        self.with_secret(|s| s.to_base64url_zeroizing())
     }
 }
 
@@ -837,32 +816,16 @@ impl<const N: usize> ToBase64Url for Fixed<[u8; N]> {
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<const N: usize> ToBech32 for Fixed<[u8; N]> {
     #[inline]
-    fn try_to_bech32(&self, hrp: &str) -> Result<alloc::string::String, crate::error::Bech32Error> {
+    fn try_to_bech32(&self, hrp: &str) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
         self.with_secret(|s| s.try_to_bech32(hrp))
-    }
-
-    #[inline]
-    fn try_to_bech32_zeroizing(
-        &self,
-        hrp: &str,
-    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32_zeroizing(hrp))
     }
 
     #[inline]
     fn try_to_bech32_sized<const C: usize>(
         &self,
         hrp: &str,
-    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32_sized::<C>(hrp))
-    }
-
-    #[inline]
-    fn try_to_bech32_sized_zeroizing<const C: usize>(
-        &self,
-        hrp: &str,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32_sized_zeroizing::<C>(hrp))
+        self.with_secret(|s| s.try_to_bech32_sized::<C>(hrp))
     }
 }
 
@@ -872,35 +835,16 @@ impl<const N: usize> ToBech32 for Fixed<[u8; N]> {
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<const N: usize> ToBech32m for Fixed<[u8; N]> {
     #[inline]
-    fn try_to_bech32m(
-        &self,
-        hrp: &str,
-    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
+    fn try_to_bech32m(&self, hrp: &str) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
         self.with_secret(|s| s.try_to_bech32m(hrp))
-    }
-
-    #[inline]
-    fn try_to_bech32m_zeroizing(
-        &self,
-        hrp: &str,
-    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32m_zeroizing(hrp))
     }
 
     #[inline]
     fn try_to_bech32m_sized<const C: usize>(
         &self,
         hrp: &str,
-    ) -> Result<alloc::string::String, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32m_sized::<C>(hrp))
-    }
-
-    #[inline]
-    fn try_to_bech32m_sized_zeroizing<const C: usize>(
-        &self,
-        hrp: &str,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32m_sized_zeroizing::<C>(hrp))
+        self.with_secret(|s| s.try_to_bech32m_sized::<C>(hrp))
     }
 }
 
@@ -921,25 +865,25 @@ impl<T: zeroize::Zeroize> RevealSecret for Fixed<T> {
         &self.inner
     }
 
-    /// Consumes `self` and returns the inner `[T; N]` wrapped in [`crate::InnerSecret`].
+    /// Consumes `self` and transfers ownership of the plain `[T; N]`.
     ///
     /// Zero cost — no allocation. The sentinel placed in `self.inner` is
     /// `[T::default(); N]` via [`crate::SentinelValue`] (already zeroed for `u8`),
     /// so `Fixed::drop` zeroizes an already-zero array — a harmless no-op.
     /// Works for **any** array length `N` (not limited to 32 like `Default`).
     ///
-    /// See [`RevealSecret::into_inner`] for full documentation including the
-    /// `SentinelValue` bound rationale and redacted `Debug` behavior.
+    /// See [`RevealSecret::into_inner`] for the full contract, including the
+    /// `SentinelValue` bound rationale. Protection ends at this call: the array you
+    /// get back is plain — not wiped on drop, and its `Debug` is not redacted.
     #[inline(always)]
-    fn into_inner(mut self) -> crate::InnerSecret<T>
+    fn into_inner(mut self) -> T
     where
         Self: Sized,
         Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize,
     {
         // Replace inner with the sentinel so Fixed::drop zeroizes a harmless
-        // placeholder while the caller receives the real secret.
-        let inner = core::mem::replace(&mut self.inner, crate::SentinelValue::sentinel_value());
-        crate::InnerSecret::new(inner)
+        // placeholder while the caller receives the real secret. Nothing is copied.
+        core::mem::replace(&mut self.inner, crate::SentinelValue::sentinel_value())
     }
 }
 
@@ -1008,7 +952,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// Fills a new `[u8; N]` from `rng` and wraps it.
     ///
     /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRng`](rand::TryRng) — for example,
-    /// a seeded [`StdRng`](rand::rngs::StdRng) for deterministic tests. Requires the `rand`
+    /// a seeded `StdRng` for deterministic tests. Requires the `rand`
     /// feature. Heap-free.
     ///
     /// # Errors

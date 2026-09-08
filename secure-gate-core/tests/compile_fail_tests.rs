@@ -38,7 +38,7 @@ fn dynamic_string_no_hex_compile_fail() {
 //
 // This is the crate's load-bearing "no implicit access" claim, so it is enforced by the
 // compiler rather than only asserted in SECURITY.md. The boundary is deliberate: the
-// output wrappers returned by extraction (`InnerSecret`, `EncodedSecret`) *do* deref.
+// output wrapper returned by encoding (`EncodedSecret`) *does* deref.
 // See "Where accident-prevention ends" in the crate docs.
 #[cfg(not(miri))]
 #[test]
@@ -64,6 +64,50 @@ fn dynamic_no_deref_compile_fail() {
 fn encoded_secret_no_display_compile_fail() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/encoded_secret_no_display.rs");
+}
+
+// Compile-fail tests: the `EncodableBytes` bound keeps string-shaped types out of the
+// encoder blanket impls, so an already-encoded value cannot be re-encoded and a `str`
+// is not silently an encoding input.
+#[cfg(all(feature = "alloc", feature = "encoding-hex"))]
+#[cfg(not(miri))]
+#[test]
+fn encoded_secret_no_reencode_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/encoded_secret_no_reencode.rs");
+}
+
+#[cfg(all(feature = "alloc", feature = "encoding-hex"))]
+#[cfg(not(miri))]
+#[test]
+fn str_not_encodable_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/str_not_encodable.rs");
+}
+
+// The hex case above would keep passing if a later edit restored the bare
+// `AsRef<[u8]>` blanket on any of the other four encoders. This covers them.
+#[cfg(all(
+    feature = "alloc",
+    feature = "encoding-hex",
+    feature = "encoding-base32",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
+#[cfg(not(miri))]
+#[test]
+fn encoded_secret_no_reencode_all_formats_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/encoded_secret_no_reencode_all_formats.rs");
+}
+
+// `EncodedSecret` has no `PartialEq`: `==` on secret material is variable-time.
+#[cfg(all(feature = "alloc", feature = "encoding-hex"))]
+#[cfg(not(miri))]
+#[test]
+fn encoded_secret_no_eq_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/encoded_secret_no_eq.rs");
 }
 
 // Compile-fail test: `SecretLen` must stay narrow. `RevealSecret` covers every

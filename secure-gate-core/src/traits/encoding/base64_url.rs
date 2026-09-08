@@ -12,9 +12,11 @@
 //!
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
-//! - **Zeroizing variants**: Prefer `to_base64url_zeroizing()`, which returns [`EncodedSecret`]
-//!   (wrapping `Zeroizing<String>` with redacted `Debug`). Use plain `to_base64url()`
-//!   only for public values.
+//! - **Always wiped**: `to_base64url()` returns
+//!   [`EncodedSecret`](crate::EncodedSecret), which wraps `Zeroizing<String>`, redacts
+//!   its `Debug`, and wipes on drop.
+//!   Public values come back in the same wrapper. `.into_inner()` is the named point where that
+//!   protection ends.
 //! - **Explicit exposure**: `to_base64url()` (and the other encoding methods) perform deliberate full-secret exposure —
 //!   the same security contract as `with_secret` or `expose_secret`. Direct calls do not
 //!   appear in `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams
@@ -33,14 +35,11 @@
 //!
 //! // Blanket impl on the inner byte array (via with_secret):
 //! let b64 = secret.with_secret(|s| s.to_base64url());
-//! assert_eq!(b64, "QkJCQg");
+//! assert_eq!(&*b64, "QkJCQg");
 //!
 //! // Wrapper method (Direct Fixed<[u8; N]> API — same result):
-//! assert_eq!(secret.to_base64url(), "QkJCQg");
-//!
-//! // Zeroizing variant for sensitive encoded output:
-//! let b64z = secret.to_base64url_zeroizing();
-//! // b64z is EncodedSecret — zeroized on drop, redacted Debug
+//! assert_eq!(&*secret.to_base64url(), "QkJCQg");
+//! // Returns an `EncodedSecret`: wiped on drop, `Debug` redacted.
 //! }
 //! ```
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
@@ -50,7 +49,7 @@ use base64ct::{Base64UrlUnpadded, Encoding};
 ///
 /// *Requires feature `encoding-base64`.*
 ///
-/// Blanket-implemented for all `AsRef<[u8]>` types, and implemented directly on the
+/// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes), and implemented directly on the
 /// byte-shaped wrappers (`Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`). Uses the RFC 4648
 /// URL-safe alphabet without `=` padding. To encode a secret wrapper, call
 /// `key.to_base64url()` with this trait in scope (ergonomically safest for single
@@ -59,22 +58,14 @@ use base64ct::{Base64UrlUnpadded, Encoding};
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub trait ToBase64Url {
     /// Encode bytes as URL-safe base64 (no padding).
-    fn to_base64url(&self) -> alloc::string::String;
-
-    /// Encode bytes as URL-safe base64 and wrap the result in [`crate::EncodedSecret`].
-    fn to_base64url_zeroizing(&self) -> crate::EncodedSecret;
+    fn to_base64url(&self) -> crate::EncodedSecret;
 }
 
-// Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
+// Blanket impl over AsRef<[u8]> + EncodableBytes (e.g. &[u8], Vec<u8>, [u8; N]).
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
-impl<T: AsRef<[u8]> + ?Sized> ToBase64Url for T {
+impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBase64Url for T {
     #[inline(always)]
-    fn to_base64url(&self) -> alloc::string::String {
-        Base64UrlUnpadded::encode_string(self.as_ref())
-    }
-
-    #[inline(always)]
-    fn to_base64url_zeroizing(&self) -> crate::EncodedSecret {
-        crate::EncodedSecret::new(self.to_base64url())
+    fn to_base64url(&self) -> crate::EncodedSecret {
+        crate::EncodedSecret::new(Base64UrlUnpadded::encode_string(self.as_ref()))
     }
 }

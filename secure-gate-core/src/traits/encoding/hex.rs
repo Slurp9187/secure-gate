@@ -12,14 +12,18 @@
 //!
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
-//! - **Zeroizing variants**: `to_hex_zeroizing()` / `to_hex_upper_zeroizing()` return
-//!   [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`). Prefer these
-//!   when the encoded form itself is sensitive.
+//! - **Always wiped**: `to_hex()` / `to_hex_upper()` return
+//!   [`EncodedSecret`](crate::EncodedSecret), which wraps `Zeroizing<String>`, redacts
+//!   its `Debug`, and wipes on drop.
+//!   There is no unprotected variant. `.into_inner()` is the named point where that
+//!   protection ends.
 //! - **Audit visibility**: Direct calls (`key.to_hex()` / `key.to_hex_upper()`) do **not** appear in
 //!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
 //!   multi-step operations, prefer `with_secret(|b| b.to_hex())` — the borrow checker
 //!   enforces the reference cannot escape the closure.
-//! - **Treat all input as untrusted**: validate hex strings upstream before wrapping
+//! - **Decoding lives elsewhere**: this module encodes. For the reverse direction and
+//!   its untrusted-input rules see `FromHexStr`; validate hex
+//!   strings upstream before wrapping
 //!   in secrets.
 //!
 //! # Example
@@ -33,13 +37,13 @@
 //!
 //! // Blanket impl on the inner byte array (via with_secret):
 //! let hex = secret.with_secret(|s| s.to_hex());
-//! assert_eq!(hex, "0a0b0c0d");
+//! assert_eq!(&*hex, "0a0b0c0d");
 //!
 //! let hex_upper = secret.with_secret(|s| s.to_hex_upper());
-//! assert_eq!(hex_upper, "0A0B0C0D");
+//! assert_eq!(&*hex_upper, "0A0B0C0D");
 //!
 //! // Wrapper method (Direct Fixed<[u8; N]> API — same result):
-//! assert_eq!(secret.to_hex(), "0a0b0c0d");
+//! assert_eq!(&*secret.to_hex(), "0a0b0c0d");
 //! }
 //! ```
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
@@ -49,7 +53,7 @@ use base16ct;
 ///
 /// *Requires feature `encoding-hex`.*
 ///
-/// Blanket-implemented for all `AsRef<[u8]>` types (byte slices, arrays, `Vec<u8>`),
+/// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes) (byte slices, arrays, `Vec<u8>`),
 /// and implemented directly on the byte-shaped wrappers (`Fixed<[u8; N]>`,
 /// `Dynamic<Vec<u8>>`). To encode a secret wrapper, call `key.to_hex()` with this
 /// trait in scope (ergonomically safest for single operations — no reference in the
@@ -58,39 +62,23 @@ use base16ct;
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub trait ToHex {
     /// Encode bytes as lowercase hexadecimal.
-    fn to_hex(&self) -> alloc::string::String;
+    fn to_hex(&self) -> crate::EncodedSecret;
 
     /// Encode bytes as uppercase hexadecimal.
-    fn to_hex_upper(&self) -> alloc::string::String;
-
-    /// Encode bytes as lowercase hexadecimal and wrap the result in [`crate::EncodedSecret`].
-    fn to_hex_zeroizing(&self) -> crate::EncodedSecret;
-
-    /// Encode bytes as uppercase hexadecimal and wrap the result in [`crate::EncodedSecret`].
-    fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret;
+    fn to_hex_upper(&self) -> crate::EncodedSecret;
 }
 
-// Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
+// Blanket impl over AsRef<[u8]> + EncodableBytes (e.g. &[u8], Vec<u8>, [u8; N]).
 // encode_string requires alloc — the trait itself is alloc-gated.
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
-impl<T: AsRef<[u8]> + ?Sized> ToHex for T {
+impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToHex for T {
     #[inline(always)]
-    fn to_hex(&self) -> alloc::string::String {
-        base16ct::lower::encode_string(self.as_ref())
+    fn to_hex(&self) -> crate::EncodedSecret {
+        crate::EncodedSecret::new(base16ct::lower::encode_string(self.as_ref()))
     }
 
     #[inline(always)]
-    fn to_hex_upper(&self) -> alloc::string::String {
-        base16ct::upper::encode_string(self.as_ref())
-    }
-
-    #[inline(always)]
-    fn to_hex_zeroizing(&self) -> crate::EncodedSecret {
-        crate::EncodedSecret::new(self.to_hex())
-    }
-
-    #[inline(always)]
-    fn to_hex_upper_zeroizing(&self) -> crate::EncodedSecret {
-        crate::EncodedSecret::new(self.to_hex_upper())
+    fn to_hex_upper(&self) -> crate::EncodedSecret {
+        crate::EncodedSecret::new(base16ct::upper::encode_string(self.as_ref()))
     }
 }

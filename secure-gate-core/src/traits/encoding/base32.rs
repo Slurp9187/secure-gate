@@ -15,10 +15,11 @@
 //!
 //! - **Full secret exposure**: The resulting string contains the **entire** secret.
 //!   Always treat output as sensitive; do not log or persist without protection.
-//! - **Zeroizing variants**: Prefer `to_base32_zeroizing()`, which returns
-//!   [`EncodedSecret`](crate::EncodedSecret)
-//!   (wrapping `Zeroizing<String>` with redacted `Debug`). Use plain `to_base32()`
-//!   only for public values.
+//! - **Always wiped**: `to_base32()` returns
+//!   [`EncodedSecret`](crate::EncodedSecret), which wraps `Zeroizing<String>`, redacts
+//!   its `Debug`, and wipes on drop.
+//!   Public values come back in the same wrapper. `.into_inner()` is the named point where that
+//!   protection ends.
 //! - **Explicit exposure**: `to_base32()` (and the other encoding methods) perform deliberate full-secret exposure —
 //!   the same security contract as `with_secret` or `expose_secret`. Direct calls do not
 //!   appear in `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams
@@ -38,14 +39,11 @@
 //!
 //! // Blanket impl on the inner byte array (via with_secret):
 //! let b32 = secret.with_secret(|s| s.to_base32());
-//! assert_eq!(b32, "IJBEEQQ");
+//! assert_eq!(&*b32, "IJBEEQQ");
 //!
 //! // Wrapper method (Direct Fixed<[u8; N]> API — same result):
-//! assert_eq!(secret.to_base32(), "IJBEEQQ");
-//!
-//! // Zeroizing variant for sensitive encoded output:
-//! let b32z = secret.to_base32_zeroizing();
-//! // b32z is EncodedSecret — zeroized on drop, redacted Debug
+//! assert_eq!(&*secret.to_base32(), "IJBEEQQ");
+//! // Both return an `EncodedSecret`: wiped on drop, `Debug` redacted.
 //! }
 //! ```
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
@@ -55,7 +53,7 @@ use base32ct::{Base32UpperUnpadded, Encoding};
 ///
 /// *Requires feature `encoding-base32`.*
 ///
-/// Blanket-implemented for all `AsRef<[u8]>` types, and implemented directly on the
+/// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes), and implemented directly on the
 /// byte-shaped wrappers (`Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`). Uses the RFC 4648 §6
 /// alphabet (`A`–`Z`, `2`–`7`) without `=` padding. To encode a secret wrapper, call
 /// `key.to_base32()` with this trait in scope (ergonomically safest for single
@@ -64,22 +62,14 @@ use base32ct::{Base32UpperUnpadded, Encoding};
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 pub trait ToBase32 {
     /// Encode bytes as Base32 (RFC 4648 §6 alphabet, uppercase, no padding).
-    fn to_base32(&self) -> alloc::string::String;
-
-    /// Encode bytes as Base32 and wrap the result in [`crate::EncodedSecret`].
-    fn to_base32_zeroizing(&self) -> crate::EncodedSecret;
+    fn to_base32(&self) -> crate::EncodedSecret;
 }
 
-// Blanket impl to cover any AsRef<[u8]> (e.g., &[u8], Vec<u8>, [u8; N], etc.)
+// Blanket impl over AsRef<[u8]> + EncodableBytes (e.g. &[u8], Vec<u8>, [u8; N]).
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
-impl<T: AsRef<[u8]> + ?Sized> ToBase32 for T {
+impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBase32 for T {
     #[inline(always)]
-    fn to_base32(&self) -> alloc::string::String {
-        Base32UpperUnpadded::encode_string(self.as_ref())
-    }
-
-    #[inline(always)]
-    fn to_base32_zeroizing(&self) -> crate::EncodedSecret {
-        crate::EncodedSecret::new(self.to_base32())
+    fn to_base32(&self) -> crate::EncodedSecret {
+        crate::EncodedSecret::new(Base32UpperUnpadded::encode_string(self.as_ref()))
     }
 }

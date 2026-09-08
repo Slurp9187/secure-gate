@@ -11,7 +11,7 @@
 use secure_gate::{Fixed, ToHex};
 
 fn main() {
-    let encoded = Fixed::new([0xABu8; 4]).to_hex_zeroizing();
+    let encoded = Fixed::new([0xABu8; 4]).to_hex();
 
     // Must not compile: `{}` on a secret-bearing type.
     println!("{encoded}");

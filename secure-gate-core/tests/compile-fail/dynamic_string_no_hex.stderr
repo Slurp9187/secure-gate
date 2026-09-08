@@ -7,8 +7,10 @@ error[E0599]: the method `to_hex` exists for struct `Dynamic<String>`, but its t
  ::: src/dynamic.rs
   |
   | pub struct Dynamic<T: ?Sized + zeroize::Zeroize> {
-  | ------------------------------------------------ doesn't satisfy `Dynamic<String>: AsRef<[u8]>` or `Dynamic<String>: ToHex`
+  | ------------------------------------------------ doesn't satisfy `Dynamic<String>: AsRef<[u8]>`, `Dynamic<String>: EncodableBytes` or `Dynamic<String>: ToHex`
   |
   = note: the following trait bounds were not satisfied:
           `Dynamic<String>: AsRef<[u8]>`
+          which is required by `Dynamic<String>: ToHex`
+          `Dynamic<String>: EncodableBytes`
           which is required by `Dynamic<String>: ToHex`

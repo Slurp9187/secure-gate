@@ -164,25 +164,18 @@ fn fixed_try_from_slice() {
 
 // === into_inner ===
 
-#[test]
-fn fixed_into_inner_returns_zeroizing() {
-    let key = Fixed::new([0xABu8; 32]);
-    let owned: secure_gate::InnerSecret<[u8; 32]> = key.into_inner();
-    assert_eq!(*owned, [0xABu8; 32]);
-}
-
 /// Regression: `into_inner` must work for arrays larger than 32 elements.
 /// A plain `Default` bound would fail here — std only implements `Default`
 /// for arrays up to 32; the `SentinelValue` bound has no such limit.
 #[test]
 fn fixed_into_inner_beyond_default_limit() {
     let key64 = Fixed::new([0xCDu8; 64]);
-    let owned64: secure_gate::InnerSecret<[u8; 64]> = key64.into_inner();
-    assert_eq!(*owned64, [0xCDu8; 64]);
+    let owned64: [u8; 64] = key64.into_inner();
+    assert_eq!(owned64, [0xCDu8; 64]);
 
     let key128 = Fixed::new([0xEFu8; 128]);
-    let owned128: secure_gate::InnerSecret<[u8; 128]> = key128.into_inner();
-    assert_eq!(*owned128, [0xEFu8; 128]);
+    let owned128: [u8; 128] = key128.into_inner();
+    assert_eq!(owned128, [0xEFu8; 128]);
 }
 
 /// `SentinelValue` is implementable for downstream inner types, and generic
@@ -196,22 +189,6 @@ fn sentinel_value_provided_impls() {
         assert_eq!(String::sentinel_value(), String::new());
         assert_eq!(Vec::<u8>::sentinel_value(), Vec::<u8>::new());
     }
-}
-
-#[cfg(feature = "alloc")]
-#[test]
-fn dynamic_string_into_inner_returns_zeroizing() {
-    let pw = Dynamic::<String>::new("hunter2".to_string());
-    let owned: secure_gate::InnerSecret<String> = pw.into_inner();
-    assert_eq!(*owned, "hunter2");
-}
-
-#[cfg(feature = "alloc")]
-#[test]
-fn dynamic_vec_into_inner_returns_zeroizing() {
-    let secret: Dynamic<Vec<u8>> = Dynamic::new(vec![1u8, 2, 3]);
-    let owned: secure_gate::InnerSecret<Vec<u8>> = secret.into_inner();
-    assert_eq!(*owned, [1u8, 2, 3]);
 }
 
 // === Streaming I/O (std) ===

@@ -5,9 +5,10 @@
 //! This module defines the [`RevealSecretMut`] trait, which extends
 //! [`RevealSecret`] to provide controlled mutable access to secrets.
 //!
-//! Only the core secret wrappers (`Fixed<T>` and `Dynamic<T>`) implement this
-//! trait. Read-only wrappers (e.g., encoding types, random generators) deliberately
-//! **do not** implement it to prevent accidental mutation.
+//! The secret wrappers (`Fixed<T>`, `Dynamic<T>`, and the newtypes the macros
+//! generate over them) implement this trait. [`EncodedSecret`](crate::EncodedSecret)
+//! deliberately does **not**: encoded output is reached only through `Deref` and its
+//! named consumers, so there is no mutable path into it.
 //!
 //! # Security Model
 //!
@@ -16,8 +17,9 @@
 //! - **Direct mutable exposure** (`expose_secret_mut`) is an explicit escape hatch
 //!   for legitimate needs (e.g., FFI, third-party APIs that require `&mut T`).
 //! - **Zero-cost**: All methods use `#[inline(always)]` where appropriate.
-//! - **Inheritance**: You automatically get `.len()`, `.is_empty()`, `with_secret`,
-//!   and `expose_secret` from [`RevealSecret`].
+//! - **Inheritance**: You automatically get `with_secret` and `expose_secret` from
+//!   [`RevealSecret`]. `.len()` / `.is_empty()` come from
+//!   [`SecretLen`](crate::SecretLen), which is a separate trait.
 //! - **No implicit leaks**: No `DerefMut`, `AsMut`, or accidental borrowing.
 //!
 //! # Usage Guidelines
@@ -73,7 +75,9 @@ use crate::RevealSecret;
 /// [`SecretLen`](crate::SecretLen), a separate trait implemented only where a
 /// length is meaningful.
 ///
-/// Only core wrappers (`Fixed<T>`, `Dynamic<T>`) implement this trait.
+/// Implemented by `Fixed<T>`, `Dynamic<T>`, and the newtypes the macros generate
+/// over them. [`EncodedSecret`](crate::EncodedSecret) implements neither this trait
+/// nor [`RevealSecret`]: encoded output has no mutable path into it.
 pub trait RevealSecretMut: RevealSecret {
     /// Provides scoped (recommended) mutable access to the secret.
     ///

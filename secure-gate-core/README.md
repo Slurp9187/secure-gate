@@ -45,10 +45,10 @@ pw.expose_secret_mut().clear();
     let key: Fixed<[u8; 32]> = Fixed::new([42u8; 32]);
 
     // Encode to hex (scoped borrow — no long-lived reference)
-    let hex: String = key.with_secret(|bytes| bytes.to_hex());
+    let hex = key.with_secret(|bytes| bytes.to_hex()); // EncodedSecret
 
     // Encode to Bech32 (BIP-173) with human-readable prefix "key"
-    let bech32: String = key.with_secret(|bytes| {
+    let bech32 = key.with_secret(|bytes| {
         bytes.try_to_bech32("key").expect("valid bech32")
     });
 
@@ -68,7 +68,7 @@ pw.expose_secret_mut().clear();
 - `.len()` / `.is_empty()` via `SecretLen` — without exposing contents (length itself can still be sensitive)
 - Zeroize on drop (always)
 - Access via `.with_secret(|s| ...)` (preferred) or `.expose_secret()` (auditable escape hatch)
-- Owned extraction via `.into_inner()` → `InnerSecret<T>` (wraps `Zeroizing<T>`, transfers zeroization to caller)
+- Owned extraction via `.into_inner()` → the plain `T`; nothing is copied and protection ends at the call
 - Streaming I/O via `impl Write` and `.as_reader()` for `Dynamic<Vec<u8>>` (requires `std`)
 
 ### Preferred: scoped access
@@ -124,9 +124,10 @@ let raw: &[u8; 32] = key.expose_secret();
 // When you need to move the secret value out (FFI hand-off, type migration)
 use secure_gate::{Fixed, RevealSecret};
 let key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
-let owned: secure_gate::InnerSecret<[u8; 32]> = key.into_inner();
-// Zeroizes its 32 bytes when it drops — same guarantee as Fixed<[u8; 32]>.
-assert_eq!(format!("{:?}", owned), "[REDACTED]");
+let owned: [u8; 32] = key.into_inner();
+// Protection ends here: `owned` is a plain array and you own its lifetime.
+// Nothing was copied — the bytes were moved out and a sentinel left behind.
+assert_eq!(owned, [0xAB; 32]);
 ```
 
 ### Macros for named secret types
@@ -182,7 +183,7 @@ fn require_min_len<S: SecretLen>(secret: &S, min: usize) -> bool {
 ## What You Get
 
 - **Zero-cost safety** — mandatory zeroization on drop; `no_std` / `no_alloc` support.
-- **Audit-first API** — a held secret cannot leak via `Deref`: `Fixed`/`Dynamic` implement none. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch. Extraction (`into_inner`, `to_*_zeroizing`) hands ownership to the caller and returns output wrappers that *do* deref — see [Where accident-prevention ends](SECURITY.md#where-accident-prevention-ends).
+- **Audit-first API** — a held secret cannot leak via `Deref`: `Fixed`/`Dynamic` implement none. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch. `into_inner` hands ownership to the caller and ends protection; encoders return `EncodedSecret`, which *does* deref and stays wiped until it drops — see [Where accident-prevention ends](SECURITY.md#where-accident-prevention-ends).
 - **Named secret types** — `*_alias!` macros create `type` aliases over `Fixed` / `Dynamic` that inherit redacted `Debug` and zeroize-on-drop; same-shape aliases (e.g. two `Fixed<[u8; 32]>` aliases) are interchangeable at the type level. When distinct cryptographic roles share a shape, `fixed_newtype!` / `dynamic_newtype!` generate `struct`s instead, so the compiler rejects a swapped key role at the call site.
 - **Batteries included** — optional, zero-overhead support for serde, constant-time comparison (`subtle`), and secure encoding (hex, base32, base64url, bech32/m).
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`.
@@ -210,7 +211,7 @@ secure-gate = { version = "0.9.0-rc.9", features = ["full"] }
 
 ## Encoding & Decoding
 
-`secure-gate` provides symmetric, zero-overhead encoding and decoding for five formats: hex, base32 (RFC 4648 §6), base64url, bech32 (BIP-173), and bech32m (BIP-350). All operations are explicit and return `Result` on failure.
+`secure-gate` provides symmetric, zero-overhead encoding and decoding for five formats: hex, base32 (RFC 4648 §6), base64url, bech32 (BIP-173), and bech32m (BIP-350). All operations are explicit. Decoding is always fallible; on the encode side only bech32 and bech32m return a `Result`, because they can reject an invalid HRP or an over-long payload — `to_hex`, `to_hex_upper`, `to_base32` and `to_base64url` cannot fail.
 
 ### Available traits
 
@@ -226,14 +227,14 @@ Base32 is here for TOTP/HOTP interop: `otpauth://` key URIs (RFC 6238 / RFC 4226
 
 ### Encoding (to string)
 
-The wrapper encoding methods are trait impls, so the trait must be in scope — `use secure_gate::{ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};` — before `key.to_base32()` resolves. Plain methods return `String` (for public values). Use the zeroizing variants (returning [`EncodedSecret`]) when the encoded form should remain sensitive.
+The wrapper encoding methods are trait impls, so the trait must be in scope — `use secure_gate::{ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};` — before `key.to_base32()` resolves. Every one of them returns [`EncodedSecret`], which wipes itself on drop and prints `[REDACTED]`. Read it through the deref (`&*encoded` is a `&str`) and call `.into_inner()` only when an API demands an owned `String`.
 
 ```rust
 use secure_gate::{Fixed, RevealSecret, ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};
 # fn main() -> Result<(), secure_gate::Bech32Error> {
 let key: Fixed<[u8; 32]> = Fixed::new([0x42u8; 32]);
 
-// Plain — returns String (suitable for public encodings)
+// Direct on the wrapper
 let hex     = key.to_hex();
 let hex_u   = key.to_hex_upper();
 let b32     = key.to_base32();
@@ -241,13 +242,8 @@ let b64     = key.to_base64url();
 let bech32  = key.try_to_bech32("bc")?;
 let bech32m = key.try_to_bech32m("bc")?;
 
-// Zeroizing — returns EncodedSecret (preserves zeroization for sensitive encodings)
-let hex_z     = key.to_hex_zeroizing();
-let hex_u_z   = key.to_hex_upper_zeroizing();
-let b32_z     = key.to_base32_zeroizing();
-let b64_z     = key.to_base64url_zeroizing();
-let bech32_z  = key.try_to_bech32_zeroizing("bc")?;
-let bech32m_z = key.try_to_bech32m_zeroizing("bc")?;
+// Every one of these returns an `EncodedSecret`: it wipes itself on drop and its
+// `Debug` is redacted. Call `.into_inner()` when an API needs an owned `String`.
 
 // Scoped on the inner bytes (preferred when you want `with_secret` in audit sweeps)
 let hex_scoped     = key.with_secret(|s| s.to_hex());
@@ -256,15 +252,11 @@ let b64_scoped     = key.with_secret(|s| s.to_base64url());
 let bech32_scoped  = key.with_secret(|s| s.try_to_bech32("bc"))?;
 let bech32m_scoped = key.with_secret(|s| s.try_to_bech32m("bc"))?;
 
-// Trait-level zeroizing APIs are also available on byte-like values:
-let hex_trait_z = key.with_secret(|s| s.to_hex_zeroizing());
-let b32_trait_z = key.with_secret(|s| s.to_base32_zeroizing());
-let b64_trait_z = key.with_secret(|s| s.to_base64url_zeroizing());
 # Ok(())
 # }
 ```
 
-Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`) to maintain the zeroization guarantee for sensitive encoded output. These APIs are available both on wrapper conveniences (`Fixed` / `Dynamic`) and on encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
+Every encoder returns [`EncodedSecret`] — `Zeroizing<String>` with a redacted `Debug` and no `Display` — because an encoded secret is a second full copy of the secret and deserves the same wiping as the first. Read it with `&*encoded` (it derefs to `str`), which is what `serde_json` and every database driver want; call `.into_inner()` for an owned `String`, which is the named moment protection ends. The same methods exist on the wrappers (`Fixed` / `Dynamic`) and on the encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
 
 ### Direct Constructors (Recommended)
 
@@ -284,8 +276,8 @@ Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from st
 
 - Prefer HRP-validated constructors to prevent cross-protocol confusion attacks.
 - Use `_unchecked` only when HRP is validated upstream.
-- All constructors guarantee zeroization even on OOM panic via `Zeroizing`.
-- For encoding _output_, prefer zeroizing methods when the encoded string itself is sensitive (see `EncodedSecret` and `SECURITY.md`).
+- The decode constructors in this table stage into `Zeroizing` buffers, so a panic between a successful decode and wrapper construction still wipes them. (`Fixed::new` / `Dynamic::new` take an already-built value and have no such buffer.)
+- Encoded output is protected by default: every encoder returns [`EncodedSecret`], wiped on drop. `.into_inner()` is the named point where that ends (see `SECURITY.md`).
 
 ## Serde
 
@@ -350,13 +342,13 @@ Encoding and decoding methods are **convenience wrappers** that internally use s
 
 They exist because users who call them have already decided to reveal the secret — the wrapper reduces boilerplate and avoids long-lived raw references.
 
-Zeroizing variants (`*_zeroizing`) return [`EncodedSecret`] (wrapping `Zeroizing<String>` with redacted `Debug`) to maintain the zeroization guarantee for sensitive encoded output.
+Every encoder returns [`EncodedSecret`] (wrapping `Zeroizing<String>` with a redacted `Debug` and no `Display`), so encoded output is wiped on drop by default.
 
 **Audit every exposure point** by searching your codebase for:
 
 - **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
-- **Extract:** `into_inner` (hands the secret to the caller as `InnerSecret<T>`), `as_reader` (yields a reader over the secret bytes)
-- **Encode:** `to_hex`, `to_hex_upper`, `to_base32`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, `to_*_zeroizing`, `try_to_bech32*_zeroizing`
+- **Extract:** `into_inner` (hands the plain secret to the caller; protection ends), `as_reader` (yields a reader over the secret bytes)
+- **Encode:** `to_hex`, `to_hex_upper`, `to_base32`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and their `_sized::<N>` forms — all returning `EncodedSecret`
 - **Decode:** `try_from_hex`, `try_from_base32`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
 
 **Best practice**: Prefer scoped methods (`with_secret` / `with_secret_mut`) when possible — they keep exposure minimal.
@@ -367,7 +359,12 @@ Edition 2024, MSRV 1.85, `rand` 0.10 (`OsRng` → `SysRng`), dep bumps.
 Across the release candidates: `SecretLen` split out of `RevealSecret` (which now covers
 every inner type); Base32 (RFC 4648 §6) added behind `encoding-base32`; wrapper encoders
 are `ToHex` / `ToBase32` / `ToBase64Url` / `ToBech32` / `ToBech32m` trait impls; `fixed_newtype!` / `dynamic_newtype!` for nominal secret roles; no `Display`
-on `EncodedSecret`.  
+on `EncodedSecret`.
+
+Two breaking changes are worth reading before you upgrade. Every encoder now returns
+`EncodedSecret` and the `*_zeroizing` twins are gone, so the short name is the safe one.
+And `into_inner` returns the plain value rather than a wrapper that kept wiping —
+**protection now ends at that call**, where earlier release candidates continued it.  
 Full details in [CHANGELOG.md](CHANGELOG.md). Users on Rust < 1.85: pin `secure-gate = "0.8"`.
 
 ## Branch support

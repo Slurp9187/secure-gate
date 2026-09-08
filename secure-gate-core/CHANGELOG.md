@@ -7,57 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- **BREAKING (bug): `fixed_newtype!` lost BIP-173 decode without `alloc`.** Found by a
-  read-only audit of PR #171. `Fixed::try_from_bech32*` is deliberately alloc-free — it
-  drains into a stack `Zeroizing<[u8; N]>` — and the macro forwards the bech32m
-  constructors accordingly, outside `__sg_if_alloc!`. The bech32 ones were nested
-  *inside* the alloc gate along with the `ToBech32` encode impl, so after the feature
-  fold a `no_std` newtype could decode BIP-350 and not BIP-173, while `lib.rs` still
-  advertised `Fixed::try_from_bech32` as available without `alloc`. CI could not catch
-  it: no host job runs `encoding-bech32` without `alloc`, which this release already
-  recorded as a known gap. The four constructors now sit outside the gate, matching
-  bech32m, and `tests/newtype_nostd.rs::nostd_newtype_decodes_both_checksums` pins all
-  eight by name under `--no-default-features --features encoding-bech32` -- including
-  the four `_sized` constructors, which are the ones #171 actually dropped and which a
-  first version of this test did not name. CI gained a matching matrix row, without
-  which the pin only ever ran locally.
-
-- **The ASan job did not instrument the bech32 heap oracles.** It ran
-  `--features alloc`, but `check_bech32_hrp_mismatch_materializes_nothing` and the
-  bech32 decode-zeroize helpers are `#[cfg(feature = "encoding-bech32")]`, so the very
-  tests written for this release's "no extra copies of the secret" claim were compiled
-  out of the sanitizer run. Now
-  `--features alloc,encoding-hex,encoding-base32,encoding-base64,encoding-bech32`.
-  Verified by mutation: reordering the HRP check after `byte_iter().collect()` is
-  **not noticed** under the old feature set and **fails** under the new one.
-
-- **The default-path fuzz encodes swallowed an impossible `Err`.** The `_sized` paths
-  were changed to `expect` during adversarial review; the three default-path sites
-  (`try_to_bech32("fuzz")`, `try_to_bech32("mykey")`, `try_to_bech32m("fuzz")`) kept
-  `if let Ok(..)`. All three use valid HRPs and payloads far under the code length, so
-  an `Err` can only be a regression. Now `expect`.
-
-### Documentation
-
-- **Four stale statements corrected after the feature fold and the encoder rewrite.**
-  `decoding/bech32.rs` described `encoding-bech32` as "distinct from Bech32m" — false
-  since the fold; both checksums ship under it. The `# Errors` lists on the unchecked
-  decode paths still named "bit-conversion failure" as a class, which went away with
-  `Bech32Error::ConversionFailed`; that case is a string longer than the code length.
-  The CHANGELOG still said the encoder writes through `encode_lower_to_fmt`, which a
-  later commit in the same PR abandoned over the 1 KiB stack staging buffer. And
-  `SECURITY.md` never mentioned the 1023 bound at all; it now states what `_sized`
-  costs and how to size `N`.
-
-  Not changed, but worth recording from the same audit: `capacity() == len()` in
-  `bech32_encode_allocates_exactly_once` is a canary, not a proof — `with_capacity(n)`
-  guarantees only `capacity >= n`, so allocator size-class rounding could mask a
-  reallocation. It has real value when it fails (a refuter halved the reservation and it
-  went red), and the load-bearing guards are the exact `bech32_code_length` assertion
-  and the upstream-equivalence test.
-
 ### Added
 
 - **Caller-chosen bech32 / bech32m code length.** `Bech32Sized<N>` and `Bech32mSized<N>`
@@ -71,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   let encoded = ct.try_to_bech32_sized::<N>("kem")?;
   ```
 
-  Sized twins exist on `ToBech32` / `ToBech32m` (plain and `_zeroizing`), on
+  Sized twins exist on `ToBech32` / `ToBech32m`, on
   `FromBech32Str` / `FromBech32mStr` (HRP-checked and `_unchecked`), on
   `Fixed::try_from_bech32*` and `Dynamic::try_from_bech32*`, and on the surface the
   `fixed_newtype!` / `dynamic_newtype!` macros forward. `bech32_code_length(hrp_len,
@@ -85,12 +34,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guarantee lapses — the type docs say so, and the choice is now spelled at the call
   site rather than baked into a default.
 
+- **The encoding traits no longer accept string-shaped inputs.** Every `To*` trait is
+  now blanket-implemented for `AsRef<[u8]> + EncodableBytes` rather than `AsRef<[u8]>`
+  alone. `EncodableBytes` is a public opt-in marker in the same family as
+  `CloneableSecret` and `SerializableSecret`, implemented here for `[u8]`, `[u8; N]` and
+  `Vec<u8>`; implement it for your own byte newtype to make it encodable.
+
+  It exists because `str: AsRef<[u8]>` made every string an encoding *input* even though
+  strings are this crate's decoding input, which produced two silent wrong answers:
+  `encoded.to_hex()` compiled for an `EncodedSecret` (which derefs to `str`) and
+  hex-encoded the *encoded text* — a 32-byte key returning 124 characters — and
+  `"text".to_hex()` encoded a string's UTF-8 by accident. Both are compile errors now,
+  pinned by `encoded_secret_no_reencode` and `str_not_encodable`. Write `.as_bytes()`
+  when the UTF-8 is what you meant.
+
+  Unlike the `SecureEncoding` marker removed earlier in this release, this one is
+  load-bearing: deleting the bound changes which calls compile. Nothing in the byte-side
+  API moved — `[u8; N]`, `Vec<u8>`, `&[u8]` and `b"..."` all encode exactly as before,
+  and `Deref` on `EncodedSecret` is untouched.
+
 ### Changed
+
+- **BREAKING: every encoder returns `EncodedSecret`; the `*_zeroizing` variants are
+  gone.** `to_hex()`, `to_hex_upper()`, `to_base32()`, `to_base64url()`,
+  `try_to_bech32()`, `try_to_bech32m()` and both `_sized` forms now return
+  [`EncodedSecret`] instead of `String`. The eight `*_zeroizing` twins are removed: the
+  short name now *is* the safe one. **16 encode methods become 8.**
+
+  The old pairing put the leaky variant on the short, obvious name and charged nine
+  characters for the safe one — the opposite of every other decision in this crate. It
+  also meant the crate shipped a documented path that hands a full second copy of a
+  secret to an unwiped `String`, which is what repeated review passes kept flagging.
+  Adding `EncodedSecret` alongside it did not make that go away; only deleting it does.
+
+  **Migration:** drop the `_zeroizing` suffix — `to_hex_zeroizing()` becomes `to_hex()`.
+  Where you consumed a `String`, read through the deref instead: `&*encoded` is a `&str`,
+  which is what `serde_json`, `sqlx`, `rusqlite` and every other driver binds. Call
+  `.into_inner()` only when an API demands an owned `String`; that call is now the named,
+  greppable moment protection ends.
+
+  `EncodedSecret` has no `Display`, so `format!("{encoded}")` becomes
+  `format!("{}", &*encoded)`, and no `PartialEq`, because comparing secret material with
+  `==` is variable-time — that is what `ConstantTimeEq` is for.
+
+- **BREAKING: `RevealSecret::into_inner()` returns the plain value, not
+  `InnerSecret<T>`.** Protection ends at the call, and the call is the whole hand-off:
+
+  ```rust
+  let v: Vec<u8> = secret.into_inner();
+  ```
+
+  The old shape was `secret.into_inner().into_zeroizing()`, or a clone through the
+  deref. `zeroize` deliberately exposes no way to move a value out of `Zeroizing<T>`, so
+  the only route from a `Dynamic<Vec<u8>>` to an owned `Vec<u8>` was three calls and a
+  second full copy of the secret, plus a wasted allocation for anything large.
+
+  No copy is made now. The value is moved out with `mem::replace` and an inert
+  `SentinelValue` is left to be zeroized in its place — the same mechanism `Fixed` and
+  `Dynamic` already used internally, so the bound (`T: SentinelValue`) excludes nothing
+  that could reach a secret wrapper in the first place. The returned `T` is an ordinary
+  value: protection is maximal right up to the call, and the call ends it. Pinned by a
+  test asserting pointer identity, so a future refactor that turns the move back into a
+  copy fails.
+
+  **Migration:** write `secret.into_inner()` where you wrote
+  `secret.into_inner().into_zeroizing()` or `secret.expose_secret().clone()`. To keep the
+  wiping past the hand-off, keep the wrapper, or wrap the value yourself with
+  `zeroize::Zeroizing::new(..)`.
 
 - **BREAKING: the default bech32 code length is 1023, not 8191, and `Bech32Large` is
   gone.** `ToBech32` / `FromBech32Str` used a custom checksum whose `CODE_LENGTH` was
-  8191 — roughly eight times the length of the bech32 BCH code, which is 1023 in the `bech32`
-  crate for both `Bech32` and `Bech32m`. That constant is documented upstream as "how
+  8191 — roughly eight times the length of the bech32 BCH code, which is 1023 in the
+  `bech32` crate for both `Bech32` and `Bech32m`. That constant is documented upstream as "how
   long a coded message can be ... for the code to retain its error-correcting
   properties", so 8191 silently gave every caller a checksum stretched past the point
   where it detects anything in particular, while the rustdoc claimed it preserved "full
@@ -118,18 +133,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **BREAKING: `InnerSecret<T>`.** The wrapper `into_inner` used to return. It was a
+  newtype over `Zeroizing<T>` whose only distinct behaviour was escaping this crate's own
+  no-`Deref` rule, and it made the owned hand-off read as
+  `secret.into_inner().into_zeroizing()` — two calls, and a clone for anything you
+  actually wanted to own. Its redacted `Debug` was the argument for keeping it, but a
+  value the caller has just taken ownership of is past the point where this crate's
+  redaction means anything: `format!("{:?}", &*inner)` printed the secret already.
+
+  **Migration:** `into_inner()` hands back the `T` directly. If you want the wiping to
+  continue, wrap it yourself: `zeroize::Zeroizing::new(secret.into_inner())`.
+
+- **BREAKING: `AsRef<str>` and `AsRef<[u8]>` on `EncodedSecret`.** The type now has one
+  accessor, `Deref<Target = str>`, plus the two named consumers `into_inner` (ends
+  zeroization) and `into_zeroizing` (keeps it). The `AsRef` impls reached nothing
+  `Deref` does not: `&str` coercion, `&*encoded`, every inherent `str` method, and
+  method resolution through the deref all still work. For a type whose purpose is
+  making extraction visible, four doors onto the same room was three too many.
+
+  **This alone did not close the accidental re-encode.** `encoded.to_hex()` still
+  compiled afterwards, because method resolution derefs to `str` and `str: AsRef<[u8]>`
+  satisfied the encoder blanket impls — so an already-encoded secret could be encoded a
+  second time, taking the encoded text as input (a 32-byte key came back as 124 hex
+  characters). A compile-fail test written to pin the fix proved it: *"Expected test
+  case to fail to compile, but it succeeded."* The reachability came from `Deref`, and
+  dropping `Deref` would take the type's primary accessor with it. What closed it is the
+  `EncodableBytes` bound above: `str` does not implement it, so the second encode is a
+  compile error, pinned by `encoded_secret_no_reencode`.
+
 - **BREAKING: `SecureEncoding` / `SecureDecoding` marker traits.** Both were empty
   markers with blanket impls over `AsRef<[u8]>` / `AsRef<str>`, and nothing in the crate
   ever bounded on them. The per-format traits (`ToHex`, `ToBase32`, `ToBase64Url`,
-  `ToBech32`, `ToBech32m`, `FromHexStr`, `FromBase32Str`, …) are implemented directly
+  `ToBech32`, `ToBech32m`, `FromHexStr`, `FromBase32Str`, …) were implemented directly
   against `AsRef<[u8]>` / `AsRef<str>`, so the markers gated nothing and enabled nothing
   — despite trait-module docs that claimed they were what "enables" the per-format
   impls. Their only consumer anywhere in the workspace was a single test asserting the
   marker existed.
 
+  Contrast `EncodableBytes` above, which replaced the encoder side of that `AsRef<[u8]>`
+  blanket later in this release: it looks like the same shape and is the opposite case,
+  because deleting it changes which calls compile.
+
   **Migration:** delete them from any `use` list; delete any `T: SecureEncoding` /
-  `T: SecureDecoding` bound and rely on `AsRef<[u8]>` / `AsRef<str>` (or on the
-  per-format trait itself) instead. No encoding or decoding behaviour changes.
+  `T: SecureDecoding` bound and rely on the per-format trait itself, or on
+  `AsRef<[u8]> + EncodableBytes` for encoding and `AsRef<str>` for decoding. No encoding
+  or decoding behaviour changes from this removal.
 
 - **BREAKING: `DecodingError`.** A public enum that no function in the crate ever
   produced. There was no `From<HexError>`, no constructor, and no signature returning
@@ -226,9 +274,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **BREAKING (bug): `fixed_newtype!` lost BIP-173 decode without `alloc`.** Found by a
+  read-only audit of PR #171. `Fixed::try_from_bech32*` is deliberately alloc-free — it
+  drains into a stack `Zeroizing<[u8; N]>` — and the macro forwards the bech32m
+  constructors accordingly, outside `__sg_if_alloc!`. The bech32 ones were nested
+  *inside* the alloc gate along with the `ToBech32` encode impl, so after the feature
+  fold a `no_std` newtype could decode BIP-350 and not BIP-173, while `lib.rs` still
+  advertised `Fixed::try_from_bech32` as available without `alloc`. CI could not catch
+  it: no host job runs `encoding-bech32` without `alloc`, which this release already
+  recorded as a known gap. The four constructors now sit outside the gate, matching
+  bech32m, and `tests/newtype_nostd.rs::nostd_newtype_decodes_both_checksums` pins all
+  eight by name under `--no-default-features --features encoding-bech32` -- including
+  the four `_sized` constructors, which are the ones #171 actually dropped and which a
+  first version of this test did not name. CI gained a matching matrix row, without
+  which the pin only ever ran locally.
+
+- **The ASan job did not instrument the bech32 heap oracles.** It ran
+  `--features alloc`, but `check_bech32_hrp_mismatch_materializes_nothing` and the
+  bech32 decode-zeroize helpers are `#[cfg(feature = "encoding-bech32")]`, so the very
+  tests written for this release's "no extra copies of the secret" claim were compiled
+  out of the sanitizer run. Now
+  `--features alloc,encoding-hex,encoding-base32,encoding-base64,encoding-bech32`.
+  Verified by mutation: reordering the HRP check after `byte_iter().collect()` is
+  **not noticed** under the old feature set and **fails** under the new one.
+
+- **The default-path fuzz encodes swallowed an impossible `Err`.** The `_sized` paths
+  were changed to `expect` during adversarial review; the three default-path sites
+  (`try_to_bech32("fuzz")`, `try_to_bech32("mykey")`, `try_to_bech32m("fuzz")`) kept
+  `if let Ok(..)`. All three use valid HRPs and payloads far under the code length, so
+  an `Err` can only be a regression. Now `expect`.
+
 - **The newtype macros forwarded the sized bech32 *encoders* and not the *decoders*
   (adversarial review, three lenses independently).** `fixed_newtype!` emitted
-  `try_to_bech32{,m}_sized{,_zeroizing}` but none of `try_from_bech32{,m}{,_unchecked}_sized`;
+  `try_to_bech32{,m}_sized` but none of `try_from_bech32{,m}{,_unchecked}_sized`;
   `dynamic_newtype!` was worse, with a single plain `try_from_bech32` and no
   `_unchecked`, no bech32m decode at all, and no sized variants. So a newtype could emit
   a 900-byte secret at a custom code length and then had no way to read it back except
@@ -312,8 +390,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stress run over a ladder of seven code lengths. Property tests in
   `proptest_suite/encoding.rs` and the `encoding` fuzz target assert the same
   invariants; `tests/macros_suite/newtype_surface.rs` covers the macro-forwarded sized
-  methods in **both** directions — see the adversarial-review entry below for why the
-  decode half of that sentence was false when first written.
+  methods in **both** directions — the easiest of the expansion sites to leave out, and
+  see the adversarial-review entry below for why the decode half of that sentence was
+  false when first written.
 
 - **Adversarial review of the bech32 refactor (41 agents, seven lenses, three refuters
   per finding).** Nine findings survived; the three that were test defects are fixed
@@ -352,6 +431,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is outside the documented heap-wiping guarantee — but a future release could bypass it
   by driving `bech32`'s iterator primitives directly into the pre-sized `String`.
 
+
 - **The bech32 test module no longer breaks `--all-targets` without `alloc`.** Its trait
   imports and 38 test `cfg`s named only `encoding-bech32*`, but `ToBech32` and friends
   require `alloc`, so `--no-default-features --features encoding-bech32 --all-targets`
@@ -371,6 +451,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   360-minute default.
 
 ### Documentation
+
+- **Four stale statements corrected after the feature fold and the encoder rewrite.**
+  `decoding/bech32.rs` described `encoding-bech32` as "distinct from Bech32m" — false
+  since the fold; both checksums ship under it. The `# Errors` lists on the unchecked
+  decode paths still named "bit-conversion failure" as a class, which went away with
+  `Bech32Error::ConversionFailed`; that case is a string longer than the code length.
+  The CHANGELOG still said the encoder writes through `encode_lower_to_fmt`, which a
+  later commit in the same PR abandoned over the 1 KiB stack staging buffer. And
+  `SECURITY.md` never mentioned the 1023 bound at all; it now states what `_sized`
+  costs and how to size `N`.
+
+  Not changed, but worth recording from the same audit: `capacity() == len()` in
+  `bech32_encode_allocates_exactly_once` is a canary, not a proof — `with_capacity(n)`
+  guarantees only `capacity >= n`, so allocator size-class rounding could mask a
+  reallocation. It has real value when it fails (a refuter halved the reservation and it
+  went red), and the load-bearing guards are the exact `bech32_code_length` assertion
+  and the upstream-equivalence test.
 
 - **`ROADMAP.md` removed; its release-branch table salvaged into `README.md`.** The file
   was stamped "Last updated: March 2026", still listed memory pinning (`mlock` /
