@@ -53,7 +53,7 @@ fuzz_target!(|data: &[u8]| {
             Err(_) => return,
         };
         if let Ok(decoded) = Dynamic::<Vec<u8>>::try_from_hex(&hex_str) {
-            let re_encoded = decoded.expose_secret().to_hex();
+            let re_encoded = decoded.expose_secret().to_hex().into_inner();
             assert_eq!(hex_str, re_encoded, "Hex round-trip not stable");
         }
     }
@@ -61,7 +61,7 @@ fuzz_target!(|data: &[u8]| {
     // 1c. Fixed<[u8; 32]> hex round-trip
     {
         if let Ok(fixed) = FuzzFixed32::arbitrary(&mut u) {
-            let hex = fixed.0.expose_secret().to_hex();
+            let hex = fixed.0.expose_secret().to_hex().into_inner();
             let recovered = Fixed::<[u8; 32]>::try_from_hex(&hex).expect("hex from valid encode");
             assert_eq!(recovered.expose_secret(), fixed.0.expose_secret(), "Fixed hex round-trip");
         }
@@ -92,7 +92,7 @@ fuzz_target!(|data: &[u8]| {
             Err(_) => return,
         };
         if let Ok(decoded) = Dynamic::<Vec<u8>>::try_from_base64url(&b64_str) {
-            let re_encoded = decoded.expose_secret().to_base64url();
+            let re_encoded = decoded.expose_secret().to_base64url().into_inner();
             assert_eq!(b64_str, re_encoded, "Base64url round-trip not stable");
         }
     }
@@ -100,7 +100,7 @@ fuzz_target!(|data: &[u8]| {
     // 2c. Fixed<[u8; 16]> base64url round-trip
     {
         if let Ok(fixed16) = FuzzFixed16::arbitrary(&mut u) {
-            let b64 = fixed16.0.expose_secret().to_base64url();
+            let b64 = fixed16.0.expose_secret().to_base64url().into_inner();
             let recovered = Fixed::<[u8; 16]>::try_from_base64url(&b64)
                 .expect("base64url from valid encode");
             assert_eq!(recovered.expose_secret(), fixed16.0.expose_secret(), "Fixed base64 RT");
@@ -132,7 +132,7 @@ fuzz_target!(|data: &[u8]| {
             Err(_) => return,
         };
         if let Ok(decoded) = Dynamic::<Vec<u8>>::try_from_base32(&b32_str) {
-            let re_encoded = decoded.expose_secret().to_base32();
+            let re_encoded = decoded.expose_secret().to_base32().into_inner();
             assert_eq!(b32_str, re_encoded, "Base32 round-trip not stable");
         }
     }
@@ -140,7 +140,7 @@ fuzz_target!(|data: &[u8]| {
     // 3c. Fixed<[u8; 16]> base32 round-trip (16 bytes ↔ 26 chars)
     {
         if let Ok(fixed16) = FuzzFixed16::arbitrary(&mut u) {
-            let b32 = fixed16.0.expose_secret().to_base32();
+            let b32 = fixed16.0.expose_secret().to_base32().into_inner();
             assert_eq!(b32.len(), 26, "16 bytes must encode to 26 base32 chars");
             let recovered = Fixed::<[u8; 16]>::try_from_base32(&b32)
                 .expect("base32 from valid encode");
@@ -208,7 +208,8 @@ fuzz_target!(|data: &[u8]| {
         // here is a regression in the sized encode gate, not a legitimate refusal.
         let encoded = capped
             .try_to_bech32_sized::<BIG>("fuzz")
-            .expect("sized bech32 encode refused a payload that fits");
+            .expect("sized bech32 encode refused a payload that fits")
+            .into_inner();
         {
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32_sized::<BIG>(&encoded, "fuzz")
                 .expect("sized bech32 from valid encode");
@@ -222,7 +223,7 @@ fuzz_target!(|data: &[u8]| {
             // admits this payload, the two encodings must be identical.
             if let Ok(at_default) = capped.try_to_bech32("fuzz") {
                 assert_eq!(
-                    at_default, encoded,
+                    &*at_default, &*encoded,
                     "code length must not change the encoding"
                 );
             } else {
@@ -239,7 +240,8 @@ fuzz_target!(|data: &[u8]| {
         // must never decode as one another.
         let encoded_m = capped
             .try_to_bech32m_sized::<BIG>("fuzz")
-            .expect("sized bech32m encode refused a payload that fits");
+            .expect("sized bech32m encode refused a payload that fits")
+            .into_inner();
         {
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32m_sized::<BIG>(&encoded_m, "fuzz")
                 .expect("sized bech32m from valid encode");
@@ -269,14 +271,11 @@ fuzz_target!(|data: &[u8]| {
         let encoded = b"hello"
             .try_to_bech32("mykey")
             .expect("default bech32 encode refused a valid HRP and a 5-byte payload");
-        {
-            let (hrp, payload) = encoded
-                .as_str()
-                .try_from_bech32_unchecked()
-                .expect("valid bech32");
-            assert_eq!(hrp.to_ascii_lowercase(), "mykey");
-            assert_eq!(payload, b"hello");
-        }
+        let (hrp, payload) = (*encoded)
+            .try_from_bech32_unchecked()
+            .expect("valid bech32");
+        assert_eq!(hrp.to_ascii_lowercase(), "mykey");
+        assert_eq!(payload, b"hello");
     }
 
     // 4e. Bech32 edge cases
