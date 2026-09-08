@@ -1,5 +1,8 @@
 [package]
 name = "secure-gate-compat"
+# Experimental migration shim: never published. Only `secure-gate` ships to
+# crates.io. Without this key a workspace-wide publish would push this crate too.
+publish = false
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

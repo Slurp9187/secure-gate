@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`publish = false`.** This crate is experimental and has never been intended for
+  crates.io, but nothing enforced that: with no `publish` key, a workspace-wide publish
+  would have pushed it alongside `secure-gate`. The intent is now mechanical —
+  `cargo publish -p secure-gate-compat` is refused, and `cargo publish -p secure-gate`
+  is unaffected.
+
 - **`serde-serialize` and `serde-deserialize` now pull in `dep:serde`.** Neither
   compiled on its own: the `#[cfg(feature = ...)]` blocks in `src/compat/` name `serde`
   types directly, and `secure-gate/serde-serialize` names the *dependency's* feature,
