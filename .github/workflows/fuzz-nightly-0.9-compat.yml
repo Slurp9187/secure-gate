@@ -10,11 +10,19 @@ on:
       - "secure-gate-compat/fuzz/**"
       - "secure-gate-compat/src/**"
       - "secure-gate-compat/Cargo.toml"
+      # This fuzz crate is built against `secure-gate`, so a core API change can
+      # break it while nothing under `secure-gate-compat/` is touched. That is how
+      # the encoder rewrite left it uncompilable with every PR green — only the
+      # nightly cron saw it.
+      - "secure-gate-core/src/**"
+      - "secure-gate-core/Cargo.toml"
   pull_request:
     paths:
       - "secure-gate-compat/fuzz/**"
       - "secure-gate-compat/src/**"
       - "secure-gate-compat/Cargo.toml"
+      - "secure-gate-core/src/**"
+      - "secure-gate-core/Cargo.toml"
 
 permissions:
   contents: read

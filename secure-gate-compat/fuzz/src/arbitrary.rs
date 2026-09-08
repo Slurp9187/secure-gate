@@ -112,7 +112,7 @@ impl<'a> Arbitrary<'a> for FuzzBech32String {
 
         // Encode with secure-gate's ToBech32 so fuzz decoding can validate HRP
         match capped.try_to_bech32(&hrp) {
-            Ok(encoded) => Ok(FuzzBech32String(encoded)),
+            Ok(encoded) => Ok(FuzzBech32String(encoded.to_string())),
             Err(_) => Ok(FuzzBech32String("fuzz1vehk7cnpwgry9h76".to_string())),
         }
     }

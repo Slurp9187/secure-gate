@@ -66,6 +66,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compiles the library alone. The assertion now compares references, matching the two
   round-trip tests beside it.
 
+- **`fuzz/` did not compile after the encoder rewrite.** `try_to_bech32` returns
+  `EncodedSecret` rather than `String` now, so `FuzzBech32String(encoded)` was a type
+  error and every compat fuzz target failed to build. The value is a synthetic bech32
+  string generated from fuzzer bytes, not a secret, so it converts through
+  `EncodedSecret`'s `Deref<Target = str>`. The workflow's path filters also now include
+  `secure-gate-core/src/**`: this crate builds against `secure-gate`, so a core API
+  change can break it with nothing under `secure-gate-compat/` touched — which is
+  exactly how this survived, visible only to the nightly cron.
+
 ### Removed
 
 - **`scripts/package_it.py`.** Obsolete packaging script.
