@@ -301,8 +301,10 @@ mod tests {
     /// The encoder chain holds no payload-sized state. `encode_lower_to_fmt` staged
     /// output through a 1 KiB stack array; this crate now drives the chain directly,
     /// and the chain itself is a pending byte, a bit offset, a borrowed HRP, and a
-    /// `u32` checksum midstate. If someone reintroduces a staging buffer inside the
-    /// chain, this number grows and the test says so.
+    /// `u32` checksum midstate — 72 bytes on x86_64. If someone reintroduces a staging
+    /// buffer inside the chain, this number grows and the test says so. The bound is
+    /// 96 rather than 72 so that pointer-width and padding differences across targets
+    /// do not fail it; anything staging a payload would be orders of magnitude over.
     #[test]
     fn encoder_chain_carries_no_staging_buffer() {
         let data = [0xABu8; 1568];

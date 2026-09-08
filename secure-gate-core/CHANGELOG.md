@@ -162,8 +162,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and drive the same iterator chain upstream uses (`bytes_to_fes` →
   `with_checksum::<Ck>` → `chars`) directly into the pre-sized `String`. The chain's
   entire state is one pending byte, a bit offset, a borrowed HRP and a `u32` checksum
-  midstate — under 96 bytes, pinned by `encoder_chain_carries_no_staging_buffer` so a
-  reintroduced buffer fails the test — and each character goes into `out` as it is
+  midstate — 72 bytes on x86_64, pinned under 96 by
+  `encoder_chain_carries_no_staging_buffer` so a reintroduced buffer fails the test —
+  and each character goes into `out` as it is
   produced. The `CODE_LENGTH` gate upstream applied through `encoded_length` is
   replicated with `bech32_code_length`, which the tests already prove exact.
   `direct_chain_matches_upstream_encode_lower` (one per checksum) asserts byte-for-byte
