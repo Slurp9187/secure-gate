@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **BREAKING (bug): `fixed_newtype!` lost BIP-173 decode without `alloc`.** Found by a
+  read-only audit of PR #171. `Fixed::try_from_bech32*` is deliberately alloc-free — it
+  drains into a stack `Zeroizing<[u8; N]>` — and the macro forwards the bech32m
+  constructors accordingly, outside `__sg_if_alloc!`. The bech32 ones were nested
+  *inside* the alloc gate along with the `ToBech32` encode impl, so after the feature
+  fold a `no_std` newtype could decode BIP-350 and not BIP-173, while `lib.rs` still
+  advertised `Fixed::try_from_bech32` as available without `alloc`. CI could not catch
+  it: no host job runs `encoding-bech32` without `alloc`, which this release already
+  recorded as a known gap. The four constructors now sit outside the gate, matching
+  bech32m, and `tests/newtype_nostd.rs::nostd_newtype_decodes_both_checksums` pins all
+  eight by name under `--no-default-features --features encoding-bech32` -- including
+  the four `_sized` constructors, which are the ones #171 actually dropped and which a
+  first version of this test did not name. CI gained a matching matrix row, without
+  which the pin only ever ran locally.
+
+- **The ASan job did not instrument the bech32 heap oracles.** It ran
+  `--features alloc`, but `check_bech32_hrp_mismatch_materializes_nothing` and the
+  bech32 decode-zeroize helpers are `#[cfg(feature = "encoding-bech32")]`, so the very
+  tests written for this release's "no extra copies of the secret" claim were compiled
+  out of the sanitizer run. Now
+  `--features alloc,encoding-hex,encoding-base32,encoding-base64,encoding-bech32`.
+  Verified by mutation: reordering the HRP check after `byte_iter().collect()` is
+  **not noticed** under the old feature set and **fails** under the new one.
+
+- **The default-path fuzz encodes swallowed an impossible `Err`.** The `_sized` paths
+  were changed to `expect` during adversarial review; the three default-path sites
+  (`try_to_bech32("fuzz")`, `try_to_bech32("mykey")`, `try_to_bech32m("fuzz")`) kept
+  `if let Ok(..)`. All three use valid HRPs and payloads far under the code length, so
+  an `Err` can only be a regression. Now `expect`.
+
+### Documentation
+
+- **Four stale statements corrected after the feature fold and the encoder rewrite.**
+  `decoding/bech32.rs` described `encoding-bech32` as "distinct from Bech32m" — false
+  since the fold; both checksums ship under it. The `# Errors` lists on the unchecked
+  decode paths still named "bit-conversion failure" as a class, which went away with
+  `Bech32Error::ConversionFailed`; that case is a string longer than the code length.
+  The CHANGELOG still said the encoder writes through `encode_lower_to_fmt`, which a
+  later commit in the same PR abandoned over the 1 KiB stack staging buffer. And
+  `SECURITY.md` never mentioned the 1023 bound at all; it now states what `_sized`
+  costs and how to size `N`.
+
+  Not changed, but worth recording from the same audit: `capacity() == len()` in
+  `bech32_encode_allocates_exactly_once` is a canary, not a proof — `with_capacity(n)`
+  guarantees only `capacity >= n`, so allocator size-class rounding could mask a
+  reallocation. It has real value when it fails (a refuter halved the reservation and it
+  went red), and the load-bearing guards are the exact `bech32_code_length` assertion
+  and the upstream-equivalence test.
+
 ### Added
 
 - **Caller-chosen bech32 / bech32m code length.** `Bech32Sized<N>` and `Bech32mSized<N>`
@@ -143,8 +194,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exactly at the age- and KEM-sized inputs the `_sized` methods exist for.
 
   Both encoders now reserve the exact length up front with `bech32_code_length` and
-  write through `encode_lower_to_fmt`, giving one allocation and no intermediate
-  copies. Output is byte-identical. Upstream computes the same length at the top of
+  drive `bech32`'s iterator chain into it directly, giving one allocation and no
+  intermediate copies. (A later commit in this release replaced the original
+  `encode_lower_to_fmt` call for the stack-staging reason described below.) Output is byte-identical. Upstream computes the same length at the top of
   `encode_lower_to_fmt` and discards it (`let _ = encoded_length::<Ck>(...)`), so
   there was nothing to reuse.
 

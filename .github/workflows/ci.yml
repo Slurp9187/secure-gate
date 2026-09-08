@@ -123,6 +123,10 @@ jobs:
           # ── Encoding ──────────────────────────────────────────────────────────
           # Encoding traits return String and require alloc; integration tests
           # import the traits, so alloc is needed to compile the test binaries.
+          # True of every row here except the last. The bech32 no-alloc row builds
+          # because every item in encoding_suite/bech32*.rs is gated on
+          # all(encoding-bech32, alloc): the suite compiles out, and what that row
+          # actually exercises is tests/newtype_nostd.rs.
           - name: encoding (all formats)
             features: "--no-default-features --features=alloc,encoding"
 
@@ -137,6 +141,12 @@ jobs:
 
           - name: encoding-bech32 only (BIP-173 + BIP-350)
             features: "--no-default-features --features=alloc,encoding-bech32"
+
+          # No `alloc`: the only row that expands a consumer `fixed_newtype!` on the
+          # no-alloc path. Its absence is what let the BIP-173 decode constructors sit
+          # inside `__sg_if_alloc!` undetected.
+          - name: encoding-bech32, no alloc
+            features: "--no-default-features --features=encoding-bech32"
 
           # ── Serde ─────────────────────────────────────────────────────────────
           - name: serde (serialize + deserialize)
@@ -371,7 +381,7 @@ jobs:
           ASAN_OPTIONS: "detect_leaks=1:abort_on_error=1:symbolize=1"
         run: >
           cargo +nightly test
-          --features alloc
+          --features alloc,encoding-hex,encoding-base32,encoding-base64,encoding-bech32
           --test heap_zeroize
           -Z build-std
           --target x86_64-unknown-linux-gnu
