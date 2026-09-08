@@ -104,7 +104,9 @@ secure-gate-workspace/
 
 ## CI
 
-The CI pipeline (`main` branch) runs lint, test (20 feature combinations), MSRV (1.85), AddressSanitizer heap verification, and libFuzzer/Miri targets. See [`.github/workflows/`](.github/workflows/).
+The CI pipeline (`main` branch) runs lint, test (20 feature combinations), rustdoc, MSRV (1.85), AddressSanitizer heap verification, and libFuzzer/Miri targets. See [`.github/workflows/`](.github/workflows/).
+
+The `rustdoc` job builds with `--all-features`, matching `[package.metadata.docs.rs]`: **the docs.rs feature set is the enforced documentation contract.** Intra-doc links that only break in minimal builds (`alloc` alone, for instance) are best-effort and deliberately not fixed — see [#175](https://github.com/Slurp9187/secure-gate/issues/175).
 
 ## License
 
