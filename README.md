@@ -17,7 +17,7 @@ Secure wrappers for in-memory secrets with **explicit access** and **mandatory z
 | Crate                                       | Published as                                                        | Purpose                                                       |
 | ------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------- |
 | [`secure-gate-core`](secure-gate-core/)     | [`secure-gate`](https://crates.io/crates/secure-gate)               | Core library — `Fixed<T>`, `Dynamic<T>`, encoding, serde, rng |
-| [`secure-gate-compat`](secure-gate-compat/) | [`secure-gate-compat`](https://crates.io/crates/secure-gate-compat) | Migration shims for `secrecy` v0.8 and v0.10                  |
+| [`secure-gate-compat`](secure-gate-compat/) | *Not published* — experimental, use a git dependency                | Migration shims for `secrecy` v0.8 and v0.10                  |
 
 ## Quick Start
 
@@ -87,6 +87,7 @@ secure-gate-workspace/
 └── secure-gate-compat/     secrecy migration shims
     ├── src/
     ├── tests/
+    ├── fuzz/
     ├── README.md
     ├── SECURITY.md
     └── MIGRATING_FROM_SECRECY.md
@@ -95,7 +96,7 @@ secure-gate-workspace/
 ## Documentation
 
 - [secure-gate API docs](https://docs.rs/secure-gate) — full rustdoc reference
-- [secure-gate-compat API docs](https://docs.rs/secure-gate-compat)
+- [secure-gate-compat rustdoc](secure-gate-compat/src/compat/) — not on docs.rs; the crate is unpublished
 - [secure-gate-core/README.md](secure-gate-core/README.md) — core library guide (features, encoding, serde, rng, macros)
 - [secure-gate-compat/README.md](secure-gate-compat/README.md) — compat quick-start
 - [secure-gate-compat/MIGRATING_FROM_SECRECY.md](secure-gate-compat/MIGRATING_FROM_SECRECY.md) — full migration guide for secrecy v0.8 and v0.10
@@ -104,7 +105,7 @@ secure-gate-workspace/
 
 ## CI
 
-The CI pipeline (`main` branch) runs lint, test (20 feature combinations), rustdoc, MSRV (1.85), AddressSanitizer heap verification, and libFuzzer/Miri targets. See [`.github/workflows/`](.github/workflows/).
+The CI pipeline (`main` branch) runs lint, test (19 feature combinations), rustdoc, MSRV (1.85), AddressSanitizer heap verification, and libFuzzer/Miri targets. See [`.github/workflows/`](.github/workflows/).
 
 The `rustdoc` job builds with `--all-features`, matching `[package.metadata.docs.rs]`: **the docs.rs feature set is the enforced documentation contract.** Intra-doc links that only break in minimal builds (`alloc` alone, for instance) are best-effort and deliberately not fixed — see [#175](https://github.com/Slurp9187/secure-gate/issues/175).
 

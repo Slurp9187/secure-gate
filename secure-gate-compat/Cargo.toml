@@ -9,7 +9,8 @@ rust-version.workspace = true
 license.workspace = true
 description = "Compatibility layer providing drop-in secrecy shims for secure-gate"
 repository = "https://github.com/Slurp9187/secure-gate/tree/main/secure-gate-compat"
-documentation = "https://docs.rs/secure-gate-compat"
+# No `documentation` key: this crate is unpublished, so docs.rs will never build it
+# and the URL would 404. The module docs in `src/compat/` are the reference.
 keywords = ["crypto", "security", "zeroize", "secrecy", "compat"]
 categories = ["cryptography", "no-std", "data-structures"]
 include = [

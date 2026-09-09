@@ -18,7 +18,7 @@ major secrecy generations so that migration can be done incrementally.
 > and [`tests/compat_suite/examples.rs`](tests/compat_suite/examples.rs)
 > (canonical copy-paste examples). Run:
 > ```
-> cargo test --features secrecy-compat
+> cargo test -p secure-gate-compat --features secrecy-compat
 > cargo test --test migration_full --features secrecy-compat
 > ```
 >
@@ -53,7 +53,7 @@ version sub-module) and work with both generations.
 # secrecy = "0.10"   (or "0.8")
 
 # Add:
-secure-gate-compat = { version = "0.9", features = ["secrecy-compat"] }
+secure-gate-compat = { git = "https://github.com/Slurp9187/secure-gate", package = "secure-gate-compat", features = ["secrecy-compat"] }
 ```
 
 Then do a global find/replace on imports (details below). Your code should
