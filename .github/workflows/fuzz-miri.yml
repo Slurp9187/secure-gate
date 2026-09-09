@@ -13,10 +13,7 @@ on:
       - "secure-gate-core/src/**"
       - "secure-gate-core/fuzz/**"
       - "secure-gate-core/tests/**"
-      - "secure-gate-compat/src/**"
-      - "secure-gate-compat/tests/**"
       - "secure-gate-core/Cargo.toml"
-      - "secure-gate-compat/Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
 

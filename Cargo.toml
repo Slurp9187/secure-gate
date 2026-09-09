@@ -1,9 +1,8 @@
 [workspace]
-members = ["secure-gate-core", "secure-gate-compat"]
-# Both nested fuzz crates declare their own `[workspace]`, so this is belt and braces
-# rather than load-bearing today — but naming only one of them invites the asymmetry
-# being read as intent.
-exclude = ["secure-gate-core/fuzz", "secure-gate-compat/fuzz"]
+members = ["secure-gate-core"]
+# The nested fuzz crate declares its own `[workspace]`, so this is belt and braces
+# rather than load-bearing today.
+exclude = ["secure-gate-core/fuzz"]
 resolver = "2"
 
 [workspace.package]
