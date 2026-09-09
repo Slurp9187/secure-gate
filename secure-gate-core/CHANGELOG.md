@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`docs/nominal_newtypes.md` amended on two points that had gone stale or were too
+  broad.** §5.2's decision to stay with `macro_rules!` rested partly on not adding `syn`
+  + `quote` to a minimal dependency graph. Half of that no longer holds: both are
+  already in the published graph via `serde` → `serde_derive` whenever the `serde`
+  feature is on, and `full` enables it — measured with `cargo tree --edges normal`, 6
+  hits under `full` and 0 under `--no-default-features`. The decision stands, but on the
+  narrower `no_std` ground it was written to protect, and the amendment restates the
+  reasons that actually carry it now: the macros work, are covered by tests, and
+  rewriting tested generation before 1.0 is churn against real behaviour-drift risk.
+
+  §5.3 recorded "there is no coherence obstacle", which is true for *concrete* impls and
+  too broad as stated. A second *blanket* impl keyed on the wrapper trait — the shape
+  that would let any newtype inherit the encoder surface — is genuinely **E0119**,
+  reproduced standalone. That distinction is the reason per-type forwarding exists at
+  all, and it is also why implementing `RevealSecret` on a hand-written newtype buys
+  none of the encoders: `to_hex` resolves through the byte-shaped blanket, and a wrapper
+  is deliberately not byte-shaped.
+
 - **Zero-length secrets: what is actually guarded, and what is not.** The README implied
   the `N = 0` rejection covered `Fixed`. It does not — the guard is a const-eval check
   inside `fixed_alias!` and nowhere else, so `type Name = Fixed<[u8; 0]>;` written
