@@ -16,6 +16,11 @@ on:
       # nightly cron saw it.
       - "secure-gate-core/src/**"
       - "secure-gate-core/Cargo.toml"
+      # A resolver or [workspace.dependencies] change reaches this crate too, and a
+      # typo in this file's own matrix would otherwise never run before merge.
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/fuzz-nightly-0.9-compat.yml"
   pull_request:
     paths:
       - "secure-gate-compat/fuzz/**"
@@ -23,6 +28,11 @@ on:
       - "secure-gate-compat/Cargo.toml"
       - "secure-gate-core/src/**"
       - "secure-gate-core/Cargo.toml"
+      # A resolver or [workspace.dependencies] change reaches this crate too, and a
+      # typo in this file's own matrix would otherwise never run before merge.
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/fuzz-nightly-0.9-compat.yml"
 
 permissions:
   contents: read
