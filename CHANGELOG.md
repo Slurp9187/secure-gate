@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`fuzz/Cargo.lock` is tracked.** Fuzzing is part of this crate's assurance story, and
+  a crash is only worth finding if it still reproduces later. `arbitrary` decides how a
+  stored corpus byte string maps to a generated value, so a minor bump there can change
+  what a saved reproducer decodes to and a crash can quietly stop crashing — not because
+  the bug was fixed, but because the input now means something else. Pinning the lock
+  keeps "this input failed on this tree" durable. The crate's own `Cargo.lock` is tracked
+  for the same reason. `target/`, `corpus/`, `artifacts/` and `coverage/` stay ignored:
+  those are generated, and the corpus is an input to fuzzing rather than to the build.
+
 - **The repository is a single crate at the root.** With `secure-gate-compat` gone the
   workspace had one member, so `secure-gate-core/` is dissolved: `src/`, `tests/`,
   `benches/` and `fuzz/` move to the root, and the crate's `README.md`, `CHANGELOG.md`
