@@ -16,7 +16,7 @@ Secure wrappers for in-memory secrets with **explicit access** and **mandatory z
 | Crate                                       | Published as                                                        | Purpose                                                       |
 | ------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------- |
 | [`secure-gate-core`](secure-gate-core/)     | [`secure-gate`](https://crates.io/crates/secure-gate)               | Core library — `Fixed<T>`, `Dynamic<T>`, encoding, serde, rng |
-| [`secure-gate-compat`](secure-gate-compat/) | [`secure-gate-compat`](https://crates.io/crates/secure-gate-compat) | Migration shims for `secrecy` v0.8 and v0.10                  |
+| [`secure-gate-compat`](secure-gate-compat/) | *Not published* — experimental, use a git dependency | Migration shims for `secrecy` v0.8 and v0.10                  |
 
 ## Quick Start
 
@@ -95,7 +95,7 @@ secure-gate-workspace/
 ## Documentation
 
 - [secure-gate API docs](https://docs.rs/secure-gate) — full rustdoc reference
-- [secure-gate-compat API docs](https://docs.rs/secure-gate-compat)
+- [secure-gate-compat rustdoc](secure-gate-compat/src/compat/) — not on docs.rs; the crate is unpublished
 - [secure-gate-core/README.md](secure-gate-core/README.md) — core library guide (features, encoding, serde, rng, macros)
 - [secure-gate-compat/README.md](secure-gate-compat/README.md) — compat quick-start
 - [secure-gate-compat/MIGRATING_FROM_SECRECY.md](secure-gate-compat/MIGRATING_FROM_SECRECY.md) — full migration guide for secrecy v0.8 and v0.10

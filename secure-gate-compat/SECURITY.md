@@ -2,7 +2,7 @@
 
 Compatibility shims for migrating from the [`secrecy`](https://crates.io/crates/secrecy) crate (v0.8.0 and v0.10.1).
 
-**Last updated:** March 2026 (for v0.9.0)
+**Last updated:** September 2026 (for v0.8.0-rc.12)
 
 ## TL;DR
 
@@ -48,7 +48,7 @@ Compatibility shims for migrating from the [`secrecy`](https://crates.io/crates/
   - Tier 2 (escape hatch): `expose_secret` / `expose_secret_mut` (direct reference)
   - Tier 3 (rare): `into_inner` (owned consumption — audit separately)
 - Enable `secrecy-compat` only on crates that are actively migrating.
-- Run the migration test suite (`cargo test --features secrecy-compat` and `--features dual-compat-test`).
+- Run the migration test suite (`cargo test -p secure-gate-compat --features secrecy-compat` and `--features dual-compat-test`).
 - Treat every Tier 2 and Tier 3 call as a security-sensitive audit point.
 - Migrate to native `RevealSecret` / `with_secret` API for new code and remove the compat dependency.
 

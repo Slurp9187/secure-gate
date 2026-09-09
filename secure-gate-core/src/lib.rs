@@ -192,7 +192,7 @@
 //! | `encoding` | no | All encoding features |
 //! | | | **Meta** |
 //! | `cloneable` | no | [`CloneableSecret`] opt-in cloning |
-//! | `full` | no | Everything |
+//! | `full` | no | Everything except `std` |
 //!
 //! # What's available without `alloc`?
 //!

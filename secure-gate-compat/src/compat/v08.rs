@@ -39,13 +39,14 @@
 //!
 //! # Step-by-step migration
 //!
-//! 1. Replace `secrecy` dependency with `secure-gate` + `features = ["secrecy-compat"]`
+//! 1. Replace the `secrecy` dependency with `secure-gate-compat` (git dependency —
+//!    the crate is unpublished), `features = ["secrecy-compat"]`
 //! 2. Find/replace `use secrecy::` → `use secure_gate_compat::compat::v08::` (types) or
 //!    `use secure_gate_compat::compat::` (traits)
 //! 3. Gradually replace `v08::Secret<String>` with [`Dynamic<String>`](secure_gate::Dynamic) using
 //!    the provided [`From`] conversions
 //! 4. Replace `v08::Secret<[T; N]>` with [`Fixed<[T; N]>`](secure_gate::Fixed)
-//! 5. Remove `secrecy-compat` feature once fully migrated
+//! 5. Remove the `secure-gate-compat` dependency once fully migrated, keeping `secure-gate`
 
 extern crate alloc;
 

@@ -69,6 +69,23 @@ jobs:
           - name: full
             package: secure-gate-compat
             features: "--features=full"
+          # Each serde feature on its own. On `main` neither compiled alone, because
+          # only `secrecy-compat` pulled `serde` in; this branch's feature list already
+          # names `dep:serde` in both, so these rows are the gate rather than the fix.
+          - name: serde-serialize only
+            package: secure-gate-compat
+            features: "--features=serde-serialize"
+          - name: serde-deserialize only
+            package: secure-gate-compat
+            features: "--features=serde-deserialize"
+          # The shim surface itself, and the whole of it. Neither was linted here: the
+          # compat rows stopped at `full`, which does not enable `secrecy-compat`.
+          - name: secrecy-compat
+            package: secure-gate-compat
+            features: "--features=secrecy-compat"
+          - name: all features
+            package: secure-gate-compat
+            features: "--all-features"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

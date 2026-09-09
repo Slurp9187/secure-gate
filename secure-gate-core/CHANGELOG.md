@@ -109,6 +109,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `encoded.as_bytes()`.
 
 ### Fixed
+
+- **Backported the pre-publish audit fixes from `main` (#182).** Same defects, same
+  branch, found by an adversarial review of the 0.9 release candidate and confirmed
+  present here rather than assumed. `publish = false` had stopped at the manifest while
+  the root README still listed the compat crate under "Published as" with a crates.io
+  link, both READMEs and `MIGRATING_FROM_SECRECY.md` gave a `version = "0.8"` dependency
+  line that cannot resolve, and `Cargo.toml` advertised a `documentation` URL on docs.rs
+  that will never be built. The migration steps in `v08` and `v10` told readers to add
+  `secure-gate` with `features = ["secrecy-compat"]`, which is a feature on *this* crate
+  — the same class as the `secure_gate::compat::` paths rc.12 already fixed, missed in
+  the steps beside them. Three intra-doc links resolved successfully to the wrong item:
+  `mod.rs`'s `CloneableSecret` was labelled `secure_gate::CloneableSecret` but targeted
+  compat's own marker, `v10`'s "secure-gate native" table pointed at that same compat
+  trait, and `SerializableSecret`'s doc named `crate::SerializableSecret` when the
+  `pub use` is `secure_gate::SerializableSecret`. `ExposeSecret`'s docs credited
+  `RevealSecret` with byte-length metadata that lives on `SecretLen`. `secrecy-compat`
+  was documented as "enabling" shim modules that carry no `cfg` on it. `v08` was
+  described as having no const-generic arrays while implementing `DebugSecret for
+  [T; N]`. The `full` feature was documented as "Everything" when it deliberately omits
+  `std`. `SECURITY.md`'s `cargo test` line lacked `-p secure-gate-compat`, and its "last
+  updated" stamp still read March 2026.
+
+- **`tests/proptest_suite/` was gated on this crate's `alloc`, which `secrecy-compat`
+  does not enable.** `secrecy-compat` turns on `alloc` transitively but the file's
+  `#[cfg(all(…, feature = "alloc"))]` names *this* crate's feature, so
+  `--features secrecy-compat --all-targets` compiled none of it and only `--all-features`
+  ever did. Measured: 0 proptest cases before, 12 after. The parent module already gates
+  on `secrecy-compat`, so the conjunct was pure concealment.
 - **`cargo doc` builds on 1.70 again; the bech32 re-exports are split.** The #171
   backport reintroduced the grouped-`use` rustdoc ICE that `SecretLen` already hit:
   `pub use traits::{Bech32Sized, Bech32Standard};` and two more grouped re-exports made
@@ -146,6 +174,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its 0.8 backport, matching the newtype design records.
 
 ### Testing
+
+- **The compat lint matrix gained four rows.** It stopped at `full`, which does not
+  enable `secrecy-compat` — so the shim surface itself, the whole feature set, and each
+  serde feature alone were never linted on this branch. All four pass today; these are
+  gates, not fixes. (The serde-alone bug `main` had does not exist here: this branch's
+  `serde-serialize` / `serde-deserialize` already name `dep:serde`.)
+
+  `main`'s companion change, running compat's runtime suites in debug rather than
+  release-only, is **not** needed here — the MSRV job already runs
+  `cargo +1.70 test -p secure-gate-compat --all-features`, which is the debug profile.
 - **Core test and fuzz suites brought up to `main`, on this branch's toolchain.**
   405 → 422 tests. Gained `Dynamic<T>` From-impl coverage (`Box<Vec>`, `Box<String>`,
   owned values) this branch had none of; additions across the base32, hex, ct_eq and

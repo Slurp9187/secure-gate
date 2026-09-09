@@ -1,12 +1,16 @@
 [package]
 name = "secure-gate-compat"
+# Experimental migration shim: never published. Only `secure-gate` ships to
+# crates.io. Without this key a workspace-wide publish would push this crate too.
+publish = false
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 description = "Compatibility layer providing drop-in secrecy shims for secure-gate"
 repository = "https://github.com/Slurp9187/secure-gate/tree/release/0.8"
-documentation = "https://docs.rs/secure-gate-compat/0.8.0"
+# No `documentation` key: this crate is unpublished, so docs.rs will never build it
+# and the URL would 404. The module docs in `src/compat/` are the reference.
 keywords = ["crypto", "security", "zeroize", "secrecy", "compat"]
 categories = ["cryptography", "no-std", "data-structures"]
 include = [
