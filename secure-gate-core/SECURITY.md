@@ -245,6 +245,12 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 - Audit all `CloneableSecret`/`SerializableSecret` implementations.
 - Validate inputs before encoding/decoding or using format-specific traits.
 - For encoding: every encoder returns `EncodedSecret`, which stays wiped until it drops. Read it with `&*encoded` (it derefs to `str`); call `.into_inner()` only when an API demands an owned `String`, which is the named moment protection ends.
+- Check that a secret's length is non-zero when it is generic or configuration-driven.
+  A zero-length secret is accepted everywhere and fails silently rather than loudly:
+  `Fixed<[u8; 0]>` constructs, reports `len() == 0`, still prints `[REDACTED]`, encodes
+  to `""`, and compares `ct_eq`-equal to any other empty. `fixed_alias!(Name, 0)` is a
+  compile error, but that guard is in the macro only — writing
+  `type Name = Fixed<[u8; 0]>;` bypasses it, as do the generic and dynamic alias macros.
 - Monitor dependencies for CVEs.
 - Treat secrets as radioactive — minimize exposure surface.
 
