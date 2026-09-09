@@ -40,7 +40,7 @@ pw.expose_secret_mut().clear();
 
 #[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
 {
-    use secure_gate::{Fixed, RevealSecret, ToHex, ToBech32, FromHexStr};
+    use secure_gate::{Case, Fixed, RevealSecret, ToHex, ToBech32, FromHexStr};
 
     let key: Fixed<[u8; 32]> = Fixed::new([42u8; 32]);
 
@@ -49,7 +49,7 @@ pw.expose_secret_mut().clear();
 
     // Encode to Bech32 (BIP-173) with human-readable prefix "key"
     let bech32 = key.with_secret(|bytes| {
-        bytes.try_to_bech32("key").expect("valid bech32")
+        bytes.try_to_bech32("key", Case::Lower).expect("valid bech32")
     });
 
     // Round-trip demonstration (decode hex back to bytes)
@@ -227,10 +227,10 @@ Base32 is here for TOTP/HOTP interop: `otpauth://` key URIs (RFC 6238 / RFC 4226
 
 ### Encoding (to string)
 
-The wrapper encoding methods are trait impls, so the trait must be in scope — `use secure_gate::{ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};` — before `key.to_base32()` resolves. Every one of them returns [`EncodedSecret`], which wipes itself on drop and prints `[REDACTED]`. Read it through the deref (`&*encoded` is a `&str`) and call `.into_inner()` only when an API demands an owned `String`.
+The wrapper encoding methods are trait impls, so the trait must be in scope — `use secure_gate::{Case, ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};` — before `key.to_base32()` resolves. Every one of them returns [`EncodedSecret`], which wipes itself on drop and prints `[REDACTED]`. Read it through the deref (`&*encoded` is a `&str`) and call `.into_inner()` only when an API demands an owned `String`.
 
 ```rust
-use secure_gate::{Fixed, RevealSecret, ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};
+use secure_gate::{Case, Fixed, RevealSecret, ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};
 # fn main() -> Result<(), secure_gate::Bech32Error> {
 let key: Fixed<[u8; 32]> = Fixed::new([0x42u8; 32]);
 
@@ -239,8 +239,8 @@ let hex     = key.to_hex();
 let hex_u   = key.to_hex_upper();
 let b32     = key.to_base32();
 let b64     = key.to_base64url();
-let bech32  = key.try_to_bech32("bc")?;
-let bech32m = key.try_to_bech32m("bc")?;
+let bech32  = key.try_to_bech32("bc", Case::Lower)?;
+let bech32m = key.try_to_bech32m("bc", Case::Lower)?;
 
 // Every one of these returns an `EncodedSecret`: it wipes itself on drop and its
 // `Debug` is redacted. Call `.into_inner()` when an API needs an owned `String`.
@@ -249,8 +249,8 @@ let bech32m = key.try_to_bech32m("bc")?;
 let hex_scoped     = key.with_secret(|s| s.to_hex());
 let b32_scoped     = key.with_secret(|s| s.to_base32());
 let b64_scoped     = key.with_secret(|s| s.to_base64url());
-let bech32_scoped  = key.with_secret(|s| s.try_to_bech32("bc"))?;
-let bech32m_scoped = key.with_secret(|s| s.try_to_bech32m("bc"))?;
+let bech32_scoped  = key.with_secret(|s| s.try_to_bech32("bc", Case::Lower))?;
+let bech32m_scoped = key.with_secret(|s| s.try_to_bech32m("bc", Case::Lower))?;
 
 # Ok(())
 # }

@@ -557,6 +557,9 @@ pub use traits::ToBech32m;
 /// implemented for `AsRef<[u8]> + EncodableBytes`; the second bound keeps string-shaped
 /// types out, so an already-encoded value cannot be silently encoded again. Implement it
 /// for your own byte newtype to make it encodable.
+#[cfg(feature = "encoding-bech32")]
+pub use traits::Case;
+
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base32",

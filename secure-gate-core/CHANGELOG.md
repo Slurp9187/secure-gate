@@ -11,89 +11,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`EncodedSecret::make_ascii_uppercase` / `make_ascii_lowercase`.** Requested by a
-  downstream adopter (age-pq-workspace) whose private identity key is a bech32 string in
-  age's uppercase form, `AGE-SECRET-KEY-…`. Encoders emit lowercase, `EncodedSecret` has
-  no `DerefMut`, and its constructor is `pub(crate)`, so the one value in that workspace
-  that most warranted the wrapper was the one value that could not have it — it shipped
-  as a plain unzeroized `String`.
+- **`Case` on the bech32 encoders — `try_to_bech32`, `try_to_bech32m`, and both
+  `_sized::<N>` forms now take `Case::Lower` or `Case::Upper`.** Requested by a
+  downstream adopter whose private identity key is a bech32 string in age's uppercase
+  form, `AGE-SECRET-KEY-…`; encoders emitted lowercase only, so the value that most
+  warranted `EncodedSecret` shipped as a plain unzeroized `String`.
 
-  In place is the whole point, not a convenience. ASCII case conversion is
-  length-preserving, so the buffer is never reallocated and the secret is never copied;
-  the alternative route, `into_inner()` then `to_uppercase()`, allocates a second
-  `String` and leaves the encoded secret in a buffer this type no longer owns and cannot
-  wipe — the same failure shape as #152. A test pins the property by asserting the
-  buffer pointer is unchanged across the call, and it was mutation-checked: swapping in
-  a reallocating implementation makes it fail.
+  Uppercasing happens inside the encoder, on the exact-capacity buffer it already owns.
+  ASCII case conversion is length-preserving, so it cannot reallocate and the secret is
+  never copied. BIP-173 defines the checksum over the lowercase form and accepts either
+  pure case, so uppercasing HRP, separator, payload and checksum together stays valid
+  and decodable.
 
-  ASCII-only avoids Unicode case-folding hazards, but **which encodings this is valid
-  for is a narrower question**, and the docs carry the table: case is cosmetic in hex
-  (decoding is case-insensitive) and in bech32/bech32m (BIP-173 accepts either pure
-  case), but *semantic* in base64url, where `a`–`z` and `A`–`Z` are distinct symbols and
-  either conversion destroys the value — and base32 output is already uppercase, so
-  lowercasing it fails to decode. `EncodedSecret` does not record which encoder produced
-  it, so it cannot check; the documentation is the guard, and a test pins the base64url
-  claim so the table cannot silently go stale.
+  **The parameter's absence elsewhere is the safety property.** `to_base64url` and
+  `to_base32` take no `Case`, because there is no legitimate choice: base64url gives
+  `a`–`z` and `A`–`Z` distinct meanings, so converting case destroys the value
+  (`3q2-7w` → `3Q2-7W` fails to decode), and RFC 4648 §6 base32 is uppercase by
+  definition with a decoder that rejects anything else. A caller cannot ask for a
+  conversion that would corrupt the value, because there is no parameter to pass.
+  `to_hex` / `to_hex_upper` are unchanged: hex decoding is case-insensitive either way,
+  so there is no hazard to close, and `to_hex` is the most common call in the crate.
 
-  Deliberately narrower than a general `map_in_place(&mut String)`, which would permit
-  `*s = s.to_uppercase()` and reintroduce exactly the reallocation this avoids. Also
-  chosen over encoder-side `try_to_bech32_upper_*` variants (four more methods whose
-  bodies would each be this call) and over `DerefMut<Target = str>` (same no-realloc
-  property, since every `&mut str` method is length-preserving, but this crate's thesis
-  is explicit access and a named method says what it does at the call site).
-
-  For bech32 specifically: BIP-173 forbids mixed case and accepts either pure case, with
-  the checksum defined over the lowercase form, so uppercasing the entire output — HRP,
-  separator, payload and checksum — stays valid and decodable. Pinned by a round-trip
-  test. `EncodedSecret::new` stays `pub(crate)`: the adopter withdrew that half of the
-  request once this covered their need, and widening what the type means is a decision
-  worth making on its own merits rather than under pressure from one use case.
-
-- **Caller-chosen bech32 / bech32m code length.** `Bech32Sized<N>` and `Bech32mSized<N>`
-  are const-generic `Checksum` implementations, and every bech32 and bech32m entry point
-  gained a `_sized::<N>` twin:
-
-  ```rust
-  use secure_gate::{ToBech32, bech32_code_length};
-
-  const N: usize = bech32_code_length(3, 1568);   // hrp "kem", ML-KEM-1024 ciphertext
-  let encoded = ct.try_to_bech32_sized::<N>("kem")?;
-  ```
-
-  Sized twins exist on `ToBech32` / `ToBech32m`, on
-  `FromBech32Str` / `FromBech32mStr` (HRP-checked and `_unchecked`), on
-  `Fixed::try_from_bech32*` and `Dynamic::try_from_bech32*`, and on the surface the
-  `fixed_newtype!` / `dynamic_newtype!` macros forward. `bech32_code_length(hrp_len,
-  payload_bytes)` is a `const fn` that sizes `N` exactly: HRP + separator + base32
-  payload + checksum, all four of which the previous "maximum payload" figures omitted.
-
-  **`N` is a length gate, not part of the encoding.** It never enters the checksum, so
-  the same bytes and HRP encode byte-identically at every `N` that admits them, a string
-  decodes under any `N` at least as large as itself, and a stored value stays valid
-  whatever `N` a later caller picks. Above `BECH32_CODE_LENGTH` the BCH error-detection
-  guarantee lapses — the type docs say so, and the choice is now spelled at the call
-  site rather than baked into a default.
-
-- **The encoding traits no longer accept string-shaped inputs.** Every `To*` trait is
-  now blanket-implemented for `AsRef<[u8]> + EncodableBytes` rather than `AsRef<[u8]>`
-  alone. `EncodableBytes` is a public opt-in marker in the same family as
-  `CloneableSecret` and `SerializableSecret`, implemented here for `[u8]`, `[u8; N]` and
-  `Vec<u8>`; implement it for your own byte newtype to make it encodable.
-
-  It exists because `str: AsRef<[u8]>` made every string an encoding *input* even though
-  strings are this crate's decoding input, which produced two silent wrong answers:
-  `encoded.to_hex()` compiled for an `EncodedSecret` (which derefs to `str`) and
-  hex-encoded the *encoded text* — a 32-byte key returning 124 characters — and
-  `"text".to_hex()` encoded a string's UTF-8 by accident. Both are compile errors now,
-  pinned by `encoded_secret_no_reencode` and `str_not_encodable`. Write `.as_bytes()`
-  when the UTF-8 is what you meant.
-
-  Unlike the `SecureEncoding` marker removed earlier in this release, this one is
-  load-bearing: deleting the bound changes which calls compile. Nothing in the byte-side
-  API moved — `[u8; N]`, `Vec<u8>`, `&[u8]` and `b"..."` all encode exactly as before,
-  and `Deref` on `EncodedSecret` is untouched.
+  This replaces the `EncodedSecret::make_ascii_uppercase` / `make_ascii_lowercase` pair
+  that briefly existed on this branch and was never published. Those were general over a
+  type that deliberately erases which encoder produced it, so they could not check
+  anything — and since `EncodedSecret::new` is `pub(crate)`, the only values that type
+  can hold are the five encodings this crate emits, two of which corrupt under case
+  change. The generality was confined entirely to the set where the operation is
+  sometimes wrong, and bought nothing outside it. Documentation was the only guard;
+  moving the choice to encode time makes the hazard unrepresentable instead.
 
 ### Changed
+
+- **BREAKING: the four bech32 encoders take a `Case`.** `try_to_bech32(hrp)` becomes
+  `try_to_bech32(hrp, Case::Lower)`, and likewise for `try_to_bech32m` and both
+  `_sized::<N>` forms, on `Fixed`, `Dynamic` and the newtype macros. Every one of these
+  call sites is already being edited in this unpublished release: rc.8 returned
+  `Result<String, _>` and rc.9 returns `Result<EncodedSecret, _>`, with the
+  `*_zeroizing` twins removed. The parameter makes an edit callers are already making
+  slightly larger rather than adding a migration of its own.
+
 
 - **BREAKING: every encoder returns `EncodedSecret`; the `*_zeroizing` variants are
   gone.** `to_hex()`, `to_hex_upper()`, `to_base32()`, `to_base64url()`,

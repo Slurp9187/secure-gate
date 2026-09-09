@@ -94,6 +94,9 @@ pub use encoding::ToBase32;
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use encoding::ToBase64Url;
 
+#[cfg(feature = "encoding-bech32")]
+pub use encoding::Case;
+
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use encoding::ToBech32;
 
