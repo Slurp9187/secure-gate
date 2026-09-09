@@ -78,9 +78,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--all-features` ever compiled it. That is why the MSRV break could hide. The
   redundant conjunct is dropped; the parent module already gates on `secrecy-compat`.
 
-- **`SECURITY.md` and `MIGRATING_FROM_SECRECY.md` gave a `cargo test` line that fails.**
-  This is a virtual workspace, so `cargo test --features secrecy-compat` needs
-  `-p secure-gate-compat`. `SECURITY.md`'s "last updated" stamp also still read March
+- **The documented `cargo test` invocations are scoped to this crate.** Three lines in
+  `SECURITY.md` and `MIGRATING_FROM_SECRECY.md` omitted `-p secure-gate-compat` while
+  the examples further down the same file included it. They are not broken — this is a
+  virtual workspace, but cargo resolves `--features` against the members regardless
+  (verified on 1.85, 1.97 and 1.98) — they just run every member's suite instead of the
+  one the guide is about. `SECURITY.md`'s "last updated" stamp also still read March
   2026 despite this cycle rewriting its Tier 3 guidance.
 
 - **`v08` was described as having "no const-generic arrays".** It has them —
@@ -115,16 +118,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`tests/proptest_suite/` did not compile on the declared MSRV under
   `--all-features`.** `prop_assert_eq!(*v08_back.expose_secret(), arr)` dereferenced a
   `[u8; 32]`, which rustc rejects with E0614 on 1.85 through 1.97; 1.98 accepts it. The
-  module is gated on this crate's own `alloc` feature, which only `--all-features` turns
-  on, and nothing caught the gap: CI's `stable` had moved to 1.98, and the MSRV job
-  compiles the library alone. The assertion now compares references, matching the two
+  module was gated on this crate's own `alloc` feature, which only `--all-features`
+  turns on (that gate is dropped above), and nothing caught the gap: CI's `stable` had
+  moved to 1.98, and the MSRV job compiles the library alone. The assertion now compares references, matching the two
   round-trip tests beside it.
 
 - **`fuzz/` did not compile after the encoder rewrite.** `try_to_bech32` returns
   `EncodedSecret` rather than `String` now, so `FuzzBech32String(encoded)` was a type
   error and every compat fuzz target failed to build. The value is a synthetic bech32
-  string generated from fuzzer bytes, not a secret, so it converts through
-  `EncodedSecret`'s `Deref<Target = str>`. The workflow's path filters also now include
+  string generated from fuzzer bytes, not a secret; it is converted with
+  `into_inner()` (see above — the first fix here reached for `Deref` instead). The
+  workflow's path filters also now include
   `secure-gate-core/src/**`: this crate builds against `secure-gate`, so a core API
   change can break it with nothing under `secure-gate-compat/` touched — which is
   exactly how this survived, visible only to the nightly cron.

@@ -500,12 +500,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   intra-doc link in the shipping docs would have reached docs.rs unnoticed; that is how
   eleven of them accumulated in `secure-gate-compat`. The job builds `--no-deps
   --all-features` under `RUSTDOCFLAGS: -D warnings`, matching
-  `[package.metadata.docs.rs] all-features = true` — the configuration docs.rs actually
-  builds — rather than the `--features full` the issue sketched, which omits `std` and
-  so would have gated a configuration docs.rs never builds. `--no-deps` is load-bearing:
-  documenting dependencies pulls this crate in under whatever feature set compat
-  activates, which trips the minimal-build links #175 deliberately leaves alone
-  (`Fixed::from_rng` among them). Confirmed that a deliberately broken link fails the
+  `[package.metadata.docs.rs] all-features = true` — so the *feature set* is the one
+  docs.rs builds, rather than the `--features full` the issue sketched, which omits
+  `std`. It matches docs.rs in no other respect: not the toolchain, not `--cfg docsrs`.
+  `--no-deps` is right anyway, because a docs.rs page documents only the target crate
+  and links dependency items out to their own pages. It is separately load-bearing for
+  the compat step, where documenting dependencies pulls this crate in under whatever
+  feature set compat activates and trips the minimal-build links #175 deliberately
+  leaves alone (`Fixed::from_rng` among them). Confirmed that a deliberately broken link fails the
   job and that the tree is clean again once the probe is reverted; `secure-gate` is
   clean on 1.85, 1.97, 1.98 and nightly. The ~92 unresolved links in minimal builds
   (`alloc` alone) stay best-effort and unfixed, as #175 decides, and `README.md` now

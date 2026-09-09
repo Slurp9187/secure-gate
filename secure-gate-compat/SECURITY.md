@@ -49,7 +49,8 @@ Compatibility shims for migrating from the [`secrecy`](https://crates.io/crates/
   - Tier 3 (rare): `into_inner` (owned consumption — audit separately)
 - Enable `secrecy-compat` only on crates that are actively migrating.
 - Run the migration test suite (`cargo test -p secure-gate-compat --features secrecy-compat`,
-  and again with `--features dual-compat-test`). The `-p` is required: this is a virtual workspace.
+  and again with `--features dual-compat-test`). The `-p` scopes the run to this crate;
+  without it cargo tests every workspace member.
 - Treat every Tier 2 and Tier 3 call as a security-sensitive audit point.
 - Migrate to native `RevealSecret` / `with_secret` API for new code and remove the compat dependency.
 

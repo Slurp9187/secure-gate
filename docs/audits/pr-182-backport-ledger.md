@@ -47,7 +47,7 @@ actual `git show origin/release/0.8:<path> | grep` result.
 | 21 | compat `serde-serialize` / `serde-deserialize` lint rows | absent | **yes** | `ci-0.8.yml` has no such rows — re-derive, do not copy the YAML |
 | 22 | compat runtime tests in debug, not release-only | absent | **yes** | `ci-0.8.yml` does not run compat tests at all — check before adding |
 | 23 | `proptest_suite` gated on this crate's `alloc` | **yes** | **yes** | 0.8 has the identical gate, so the same suite is being skipped there |
-| 24 | `cargo test` lines missing `-p secure-gate-compat` | yes (3×) | **yes** | 2 in MIGRATING, 1 in SECURITY |
+| 24 | `cargo test` lines missing `-p secure-gate-compat` | yes (3×) | **yes** | Scoping, not a fix: the bare form works on 1.85/1.97/1.98 — the audit's "virtual workspace makes it fail" premise is wrong. Without `-p` it just runs every member |
 | 25 | README "20 feature combinations" → 19 | no | n/a | 0.8's README has no such count; its own matrix differs |
 | 26 | `full` documented as "Everything" (omits `std`) | yes (both) | **yes** | Confirm 0.8's `full` definition first — it may differ |
 | 27 | "no const-generic arrays" — v08 uses them | yes | **yes** | |

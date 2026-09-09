@@ -19,7 +19,7 @@ major secrecy generations so that migration can be done incrementally.
 > (canonical copy-paste examples). Run:
 > ```
 > cargo test -p secure-gate-compat --features secrecy-compat
-> cargo test --test migration_full --features secrecy-compat
+> cargo test -p secure-gate-compat --test migration_full --features secrecy-compat
 > ```
 >
 > **Parity suite**: The `dual-compat-test` feature runs every test in
@@ -27,7 +27,7 @@ major secrecy generations so that migration can be done incrementally.
 > `secrecy` crate (0.8.0 / 0.10.1) and once against the `secure-gate` compat shim.
 > Both must pass identically, giving you machine-verified proof of drop-in compatibility.
 > ```
-> cargo test --features dual-compat-test
+> cargo test -p secure-gate-compat --features dual-compat-test
 > ```
 
 ---
