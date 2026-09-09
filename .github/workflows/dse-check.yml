@@ -40,6 +40,11 @@ permissions:
 jobs:
   dse-check:
     name: DSE - volatile zero-store survival (${{ matrix.os }}, ${{ matrix.toolchain }})
+    # Push/PR only. The weekly cron is served by `dse-check-scheduled` below, which
+    # also covers `release/0.8` — a `schedule:` block on that branch would never fire
+    # (GitHub only raises scheduled events from the default branch), so the LTS line
+    # has to be reached from here. See #169.
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ${{ matrix.os }}
     # A release build of `asm_check` plus its deps in an isolated target dir; the
     # slowest leg (windows-latest) runs well inside this. Without it the job would
@@ -63,6 +68,42 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run DSE check (${{ matrix.toolchain }})
+        run: >
+          cargo +${{ matrix.toolchain }} test
+          -p secure-gate
+          --release
+          --test asm_dse_check
+          -- --ignored --nocapture
+
+  # Weekly cross-branch run. `release/0.8` cannot schedule itself, so its DSE
+  # coverage lives here and checks the branch out explicitly — the same pattern
+  # `audit.yml` already uses for `cargo audit`. See #169.
+  dse-check-scheduled:
+    name: DSE - ${{ matrix.ref }} (${{ matrix.os }}, ${{ matrix.toolchain }})
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        ref: [main, "release/0.8"]
+        os: [ubuntu-latest, windows-latest]
+        toolchain: [stable, nightly]
+    steps:
+      - name: Checkout ${{ matrix.ref }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+
+      - name: Install Rust ${{ matrix.toolchain }}
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run DSE check (${{ matrix.ref }}, ${{ matrix.toolchain }})
         run: >
           cargo +${{ matrix.toolchain }} test
           -p secure-gate
