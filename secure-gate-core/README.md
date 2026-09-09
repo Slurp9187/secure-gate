@@ -145,6 +145,10 @@ fixed_alias!(pub Aes256Key, 32, "32-byte AES-256 key");
 dynamic_alias!(pub Password, String, "variable-length password");
 ```
 
+Aliases are the right reach when a value is sensitive enough to want zeroize-on-drop and a redacted `Debug`, but has no role it could be confused *with* — a session blob, a cached token, a nonce store. You get the protection and a self-documenting name, the alias stays interchangeable with its base type so it crosses into APIs you do not own without ceremony, and there is no cross-contamination to prevent because nothing else shares its shape and meaning.
+
+Reach for a newtype the moment two values of the same shape mean different things. That is the case the compiler can help with, and the only one where the extra surface pays for itself.
+
 **Newtypes** (`fixed_newtype!`, `dynamic_newtype!`) expand to `struct`s instead, so two of the same shape are **distinct** types. Reach for these when distinct cryptographic roles share a shape — an encryption key and a MAC key are both `Fixed<[u8; 32]>`, and under an alias the compiler cannot tell them apart:
 
 ```rust
@@ -163,8 +167,19 @@ Generated newtypes carry the same guarantees as the wrapper (zeroize on drop, re
 See [`fixed_alias!`], [`dynamic_alias!`], [`fixed_generic_alias!`], [`dynamic_generic_alias!`], [`fixed_newtype!`], and [`dynamic_newtype!`] in the [API docs](https://docs.rs/secure-gate).
 
 **Zero-size behavior note**  
-`fixed_alias!(Name, N)` rejects `N = 0` at compile time (via a const-eval index-out-of-bounds guard).  
-However, `fixed_generic_alias!`, `dynamic_alias!`, and `dynamic_generic_alias!` **allow** zero-sized types (`SecretBuffer<0>`, `Dynamic<[u8; 0]>`, `Dynamic<()>` etc.). These compile successfully but have no cryptographic value and should never be used in production. Always validate that the effective size is > 0 in your unit tests when using the generic or dynamic alias macros.
+`fixed_alias!(Name, 0)` is a compile error, via a const-eval index-out-of-bounds guard in the macro. That guard lives in the macro and nowhere else, so it protects only the path that opts into it:
+
+| Written as | Result |
+|---|---|
+| `fixed_alias!(Name, 0)` | compile error |
+| `type Name = Fixed<[u8; 0]>;` | **compiles** — the macro guard is bypassed |
+| `fixed_generic_alias!`, `dynamic_alias!`, `dynamic_generic_alias!` | compile — zero-sized inner types are allowed |
+
+A zero-length secret then behaves normally at runtime rather than failing: `len()` is 0, `Debug` is still `[REDACTED]`, `ct_eq` against another empty is `true`, `to_hex()` returns `""`, and drop is clean. Nothing reports a problem, which is precisely why this is worth stating — the failure is silent and semantic, not a panic you would notice.
+
+`Fixed` could reject it at construction with a `const` assertion in `new` (a post-monomorphization error), and that does work; it is not implemented today. Note it could only ever fire on **construction**, never on declaration — naming `Fixed<[u8; 0]>` without building one compiles either way, so no guard placed in the type can make the type itself unnameable.
+
+Until then, validate that the effective size is > 0 in your own tests whenever a size is generic or comes from configuration.
 
 See also the Best Practices section in [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for the equivalent guidance.
 

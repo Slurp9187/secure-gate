@@ -575,6 +575,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`docs/nominal_newtypes.md` amended on two points that had gone stale or were too
+  broad.** §5.2's decision to stay with `macro_rules!` rested partly on not adding `syn`
+  + `quote` to a minimal dependency graph. Half of that no longer holds: both are
+  already in the published graph via `serde` → `serde_derive` whenever the `serde`
+  feature is on, and `full` enables it — measured with `cargo tree --edges normal`, 6
+  hits under `full` and 0 under `--no-default-features`. The decision stands, but on the
+  narrower `no_std` ground it was written to protect, and the amendment restates the
+  reasons that actually carry it now: the macros work, are covered by tests, and
+  rewriting tested generation before 1.0 is churn against real behaviour-drift risk.
+
+  §5.3 recorded "there is no coherence obstacle", which is true for *concrete* impls and
+  too broad as stated. A second *blanket* impl keyed on the wrapper trait — the shape
+  that would let any newtype inherit the encoder surface — is genuinely **E0119**,
+  reproduced standalone. That distinction is the reason per-type forwarding exists at
+  all, and it is also why implementing `RevealSecret` on a hand-written newtype buys
+  none of the encoders: `to_hex` resolves through the byte-shaped blanket, and a wrapper
+  is deliberately not byte-shaped.
+
+- **Zero-length secrets: what is actually guarded, and what is not.** The README implied
+  the `N = 0` rejection covered `Fixed`. It does not — the guard is a const-eval check
+  inside `fixed_alias!` and nowhere else, so `type Name = Fixed<[u8; 0]>;` written
+  directly compiles, as do the generic and dynamic alias macros. Tested end to end rather
+  than reasoned about: a zero-length secret then behaves *normally* at runtime — it
+  constructs, reports `len() == 0`, still prints `[REDACTED]`, encodes to `""`, compares
+  `ct_eq`-equal to any other empty, and drops cleanly. Nothing reports a problem, which
+  is what makes it worth writing down: the failure is silent and semantic, not a panic.
+
+  Also records that `Fixed` *could* reject it with a `const` assertion in `new` — a
+  post-monomorphization error, confirmed to work — and that such a guard could only ever
+  fire on construction, never on declaration. Naming the type without building one
+  compiles either way, so no guard placed in the type can make the type unnameable.
+  `SECURITY.md` gained the corresponding Best Practices entry, which the README already
+  claimed existed.
+
+- **When an alias is the right reach, rather than a weaker newtype.** The docs described
+  what aliases *are* and when newtypes are better, but never named the case aliases serve
+  well: material worth zeroize-on-drop and a redacted `Debug` that has no role it could be
+  confused with. There the alias earns its place — protection plus a self-documenting
+  name, interchangeable with its base type so it crosses into third-party APIs without
+  ceremony, and no cross-contamination to prevent because nothing else shares its shape
+  and meaning. Newtypes remain the answer the moment two same-shaped values mean
+  different things.
+
 - **docs.rs now shows which feature each item needs.** `Cargo.toml` has been telling
   docs.rs to build with `--cfg docsrs` for some time, but nothing in the crate read that
   cfg — it enabled a configuration with no effect. `#![cfg_attr(docsrs, feature(doc_cfg))]`
