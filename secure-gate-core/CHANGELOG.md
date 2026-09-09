@@ -511,6 +511,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`alloc` alone) stay best-effort and unfixed, as #175 decides, and `README.md` now
   records that policy.
 
+- **The docs.rs nightly step blocks instead of warning.** It was the only step
+  reproducing docs.rs's configuration and it was `continue-on-error: true`, so a rename
+  of the `doc_cfg` gate would have failed it and merged anyway — breaking docs.rs and
+  nothing else. It now fails the build, and drops `-D warnings` to make that safe: a
+  removed gate is a hard error and still fails, while a new nightly rustdoc lint is only
+  a warning and cannot block an unrelated merge.
+
+- **`secure-gate-compat` gained `serde-serialize` / `serde-deserialize` lint rows.** The
+  compat matrix ran only no-features, `secrecy-compat` and `--all-features`. Only
+  `secrecy-compat` pulls `serde` in, which is exactly how "neither serde feature compiled
+  on its own" survived a full cycle unnoticed.
+
+- **Compat's runtime suites run in debug, not just release.** They were in `test-release`
+  only, so the profile where `debug_assertions` and overflow checks are live — and the
+  one contributors actually run — had no compat coverage.
+
+- **`fuzz-quick.yml` builds the compat fuzz targets.** Compile-breakage there was caught
+  only by the nightly compat workflow (4 jobs × ~50 min), which is how a fuzz crate that
+  did not build shipped. `cargo fuzz build` catches that class in about a minute. The
+  compat fuzz workflow's path filters also now include the workspace manifests,
+  `Cargo.lock` and the workflow file itself, and `fuzz-quick.yml` watches its own path.
+
 - **The MSRV job checks `--all-features --all-targets`.** It ran `cargo +1.85 check`
   with `default` and `full` only — neither implies `std`, and `check` without
   `--all-targets` never compiles test targets. A compat test file had stopped compiling
@@ -526,10 +548,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is what it was for: every feature-gated item now carries an "Available on crate feature
   `…` only" badge, 89 of them across the 173 `cfg(feature)` sites, so a reader no longer
   has to infer from prose why a method is missing from their build. Nightly-only and
-  inert everywhere else — docs.rs builds on nightly, and no other build sets `docsrs`.
-  (`doc_auto_cfg`, the obvious spelling, was removed in 1.92 and merged into `doc_cfg`.)
-  A non-blocking nightly step in the `docs` job exercises that exact configuration, since
-  a future rename of the gate would otherwise break docs.rs and nothing else.
+  inert everywhere else — nothing sets `docsrs` except docs.rs itself and the CI step
+  below, added to guard it. (`doc_auto_cfg`, the obvious spelling, was removed in 1.92
+  and merged into `doc_cfg`.) The `docs` job runs that exact configuration on nightly,
+  and it is allowed to fail the build: a rename of the gate breaks docs.rs and nothing
+  else. It runs without `-D warnings`, so a removed gate (a hard error) still fails
+  while nightly lint churn cannot block an unrelated merge.
+
+- **The `full` feature was documented as "Everything".** It omits `std`
+  (`["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]`), which is deliberate,
+  so both the crate docs and the README now say "everything except `std`".
 
 - **`docs/encoded_secret_deref.md` records why the output wrapper derefs.** `EncodedSecret`
   is the one type in this crate that implements `Deref`, which is the exact thing

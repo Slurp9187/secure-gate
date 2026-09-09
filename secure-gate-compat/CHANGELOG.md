@@ -42,6 +42,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`publish = false` was not followed through to anything a user reads.** The root
+  README still listed this crate under "Published as" with a crates.io link, both READMEs
+  and `MIGRATING_FROM_SECRECY.md` gave a `version = "0.9"` dependency line that cannot
+  resolve, and `Cargo.toml` advertised a `documentation` URL on docs.rs that will never
+  build. Install snippets are now git dependencies and the docs.rs URL is gone.
+
+- **The migration steps named the wrong crate — the same class as the
+  `secure_gate::compat::` paths fixed above.** Step 1 in both `v08` and `v10` told
+  readers to add `secure-gate` with `features = ["secrecy-compat"]`; that feature is on
+  *this* crate. Step 5 said to remove the feature when it should say the dependency.
+
+- **`secrecy-compat` was documented as enabling the shim modules.** It does not — `v08`
+  and `v10` carry no `cfg` on it and always compile. The module docs and the compat
+  README now match the corrected `Cargo.toml` comment.
+
+- **Three intra-doc links pointed at the wrong item, resolving silently.**
+  `mod.rs`'s `CloneableSecret` was labelled `secure_gate::CloneableSecret` but targeted
+  `crate::CloneableSecret`, which is compat's own marker — clicking it never left the
+  compat trait. `v10`'s migration table, headed "secure-gate native", linked that same
+  compat trait. `mod.rs`'s `SerializableSecret` doc said it re-exports
+  `crate::SerializableSecret` when the `pub use` is `secure_gate::SerializableSecret`.
+
+- **`ExposeSecret`'s docs credited `RevealSecret` with byte-length metadata.**
+  `len` / `byte_len` / `is_empty` live on `SecretLen`, a separate trait.
+
+- **`fuzz/` used `.to_string()` where the crate documents `into_inner()`.**
+  `EncodedSecret` has no `Display`; that call went through `Deref` to `str::to_string()`
+  — the copy `encoded_secret.rs` explicitly tells auditors to sweep for. Core's fuzz
+  harness already used the named exit; this one now does too.
+
+- **`proptest_suite` was gated on this crate's `alloc`, which `secrecy-compat` does not
+  enable.** `secrecy-compat` turns on `secure-gate/alloc`, a different feature, so
+  `--features secrecy-compat --all-targets` skipped the file entirely and only
+  `--all-features` ever compiled it. That is why the MSRV break could hide. The
+  redundant conjunct is dropped; the parent module already gates on `secrecy-compat`.
+
+- **`SECURITY.md` and `MIGRATING_FROM_SECRECY.md` gave a `cargo test` line that fails.**
+  This is a virtual workspace, so `cargo test --features secrecy-compat` needs
+  `-p secure-gate-compat`. `SECURITY.md`'s "last updated" stamp also still read March
+  2026 despite this cycle rewriting its Tier 3 guidance.
+
+- **`v08` was described as having "no const-generic arrays".** It has them —
+  `impl<T: fmt::Debug, const N: usize> DebugSecret for [T; N]`.
+
 - **Eleven intra-doc link errors — the whole crate's rustdoc output was failing.**
   `cargo doc --all-features` exited 101 under `-D warnings`. Six were unresolved links
   in `v08`'s API table: rustdoc merges the outer `///` on `pub mod v08;` with the inner
@@ -63,8 +107,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Six `secure_gate::compat::` paths in `MIGRATING_FROM_SECRECY.md` that do not
   resolve.** Core exposes no `compat` module and the crate is `secure_gate_compat`. The
-  file is not `include_str!`'d, so no rustdoc pass and no doctest ever read it, but it
-  does ship in the published tarball via `include`. The adjacent `use
+  file is not `include_str!`'d, so no rustdoc pass and no doctest ever read it, and it
+  is listed in `include` — it would ship in a tarball if this crate were ever
+  published, which as of this release it explicitly is not. The adjacent `use
   secure_gate::Dynamic;` / `Fixed` lines are correct and unchanged.
 
 - **`tests/proptest_suite/` did not compile on the declared MSRV under

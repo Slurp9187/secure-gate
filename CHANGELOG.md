@@ -45,16 +45,23 @@ is the shape of the migration, not the whole of it.
 
 ### Dependencies
 
-- **`thiserror` removed** from both crates; `zeroize_derive` moved to
-  `[dev-dependencies]`.
+- **`thiserror` removed** from `secure-gate-core`; `zeroize_derive` moved to
+  `[dev-dependencies]`. `secure-gate-compat` entered this cycle already without
+  `thiserror`, so nothing was removed there.
 
 ### Testing
 
 - **CI gained a rustdoc job (#175).** No workflow ran rustdoc at all, so a broken
   intra-doc link in the shipping docs would have reached docs.rs unnoticed. It builds
-  `--no-deps --all-features` under `-D warnings`, matching what docs.rs builds. The
-  policy it enforces — the docs.rs feature set is the contract, minimal builds are
-  best-effort — is recorded in `README.md`.
+  `--no-deps --all-features` under `-D warnings` on stable. What it enforces is the
+  *feature set* docs.rs builds — `all-features = true` — not docs.rs's toolchain or
+  its `--cfg docsrs`; those are a separate nightly step. Minimal builds stay
+  best-effort, and `README.md` records the policy.
+
+- **docs.rs feature badges, and a nightly step that guards them.** `--cfg docsrs` was
+  configured but unread until `#![cfg_attr(docsrs, feature(doc_cfg))]` gave it an
+  effect; the `docs` job now runs that exact configuration on nightly so a rename of
+  the gate cannot break docs.rs silently. See the core changelog.
 
 ## [0.9.0-rc.8] - 2026-09-07
 
