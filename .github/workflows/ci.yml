@@ -62,13 +62,6 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --no-deps --all-features --package secure-gate
 
-      # `secure-gate-compat` is experimental and never published, so this is not a
-      # release gate. It is here to keep its intra-doc links from rotting again.
-      - name: cargo doc – secure-gate-compat (deny warnings)
-        env:
-          RUSTDOCFLAGS: -D warnings
-        run: cargo doc --no-deps --all-features --package secure-gate-compat
-
       # docs.rs builds on nightly with `--cfg docsrs`, which switches on the `doc_cfg`
       # feature gate that produces the per-feature badges. This is the only step that
       # reproduces that, so it has to be able to fail the build: a rename of the gate
