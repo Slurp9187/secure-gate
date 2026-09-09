@@ -20,13 +20,13 @@
 //!
 //! | secrecy 0.8 | This module | Notes |
 //! |---|---|---|
-//! | `Secret<S>` | [`Secret<S>`] | Stack/inline; `S: Zeroize` |
-//! | `SecretString` | [`SecretString`] | = `Secret<String>` |
-//! | `SecretVec<T>` | [`SecretVec<T>`] | = `Secret<Vec<T>>` |
-//! | `SecretBox<S>` | [`SecretBox<S>`] | = `Secret<Box<S>>` |
+//! | `Secret<S>` | [`Secret<S>`](crate::compat::v08::Secret) | Stack/inline; `S: Zeroize` |
+//! | `SecretString` | [`SecretString`](crate::compat::v08::SecretString) | = `Secret<String>` |
+//! | `SecretVec<T>` | [`SecretVec<T>`](crate::compat::v08::SecretVec) | = `Secret<Vec<T>>` |
+//! | `SecretBox<S>` | [`SecretBox<S>`](crate::compat::v08::SecretBox) | = `Secret<Box<S>>` |
 //! | `ExposeSecret<S>` | [`compat::ExposeSecret`](super::ExposeSecret) | Shared trait |
 //! | `CloneableSecret` | [`compat::CloneableSecret`](super::CloneableSecret) | Shared trait |
-//! | `DebugSecret` | [`DebugSecret`] | v0.8-only trait |
+//! | `DebugSecret` | [`DebugSecret`](crate::compat::v08::DebugSecret) | v0.8-only trait |
 //! | `SerializableSecret` | [`compat::SerializableSecret`](super::SerializableSecret) | Shared trait |
 //! | `Zeroize` re-export | [`compat::zeroize`](super::zeroize) | Shared re-export |
 //!
@@ -34,18 +34,19 @@
 //!
 //! - `Secret<S>` is **stack-allocated** (inline `S`) — no `Box`. Use `SecretBox<S>` for
 //!   heap-allocated variants.
-//! - No [`ExposeSecretMut`](super::ExposeSecretMut) — mutable access was added in v0.9.
-//! - [`DebugSecret`] trait is required for `Debug` impls. Not present in v0.10.
+//! - No [`ExposeSecretMut`] — mutable access was added in v0.9.
+//! - [`DebugSecret`](crate::compat::v08::DebugSecret) trait is required for `Debug` impls. Not present in v0.10.
 //!
 //! # Step-by-step migration
 //!
-//! 1. Replace `secrecy` dependency with `secure-gate` + `features = ["secrecy-compat"]`
+//! 1. Replace the `secrecy` dependency with `secure-gate-compat` (git dependency — the crate is unpublished),
+//!    `features = ["secrecy-compat"]`
 //! 2. Find/replace `use secrecy::` → `use secure_gate_compat::compat::v08::` (types) or
 //!    `use secure_gate_compat::compat::` (traits)
 //! 3. Gradually replace `v08::Secret<String>` with [`Dynamic<String>`](secure_gate::Dynamic) using
 //!    the provided [`From`] conversions
 //! 4. Replace `v08::Secret<[T; N]>` with [`Fixed<[T; N]>`](secure_gate::Fixed)
-//! 5. Remove `secrecy-compat` feature once fully migrated
+//! 5. Remove the `secure-gate-compat` dependency once fully migrated, keeping `secure-gate`
 
 extern crate alloc;
 
@@ -116,7 +117,7 @@ impl<S: CloneableSecret + Zeroize> CloneableSecret for Vec<S> {}
 ///
 /// Stores the secret value **directly** (no heap allocation). On drop, calls
 /// `S::zeroize()` to wipe the memory. Access is only possible through
-/// [`ExposeSecret`](super::ExposeSecret).
+/// [`ExposeSecret`].
 ///
 /// # Generic parameter
 ///

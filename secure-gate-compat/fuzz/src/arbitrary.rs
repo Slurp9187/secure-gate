@@ -111,8 +111,8 @@ impl<'a> Arbitrary<'a> for FuzzBech32String {
         let capped = if data.len() > 256 { &data[..256] } else { &data[..] };
 
         // Encode with secure-gate's ToBech32 so fuzz decoding can validate HRP
-        match capped.try_to_bech32(&hrp) {
-            Ok(encoded) => Ok(FuzzBech32String(encoded)),
+        match capped.try_to_bech32(&hrp, secure_gate::Case::Lower) {
+            Ok(encoded) => Ok(FuzzBech32String(encoded.into_inner())),
             Err(_) => Ok(FuzzBech32String("fuzz1vehk7cnpwgry9h76".to_string())),
         }
     }

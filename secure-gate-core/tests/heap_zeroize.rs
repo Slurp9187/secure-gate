@@ -285,11 +285,11 @@ fn check_bech32_hrp_mismatch_materializes_nothing() {
     const N: usize = bech32_code_length(3, 900);
     let secret = vec![0x5Au8; 900];
     let b32 = secret
-        .try_to_bech32_sized::<N>("age")
+        .try_to_bech32_sized::<N>("age", secure_gate::Case::Lower)
         .expect("encode")
         .into_inner();
     let b32m = secret
-        .try_to_bech32m_sized::<N>("age")
+        .try_to_bech32m_sized::<N>("age", secure_gate::Case::Lower)
         .expect("encode")
         .into_inner();
 
@@ -567,7 +567,10 @@ fn check_decode_base64_zeroed(data: &[u8]) {
 #[cfg(feature = "encoding-bech32")]
 fn check_decode_bech32_zeroed(data: &[u8]) {
     use secure_gate::ToBech32;
-    let encoded = data.try_to_bech32("test").expect("valid hrp").into_inner();
+    let encoded = data
+        .try_to_bech32("test", secure_gate::Case::Lower)
+        .expect("valid hrp")
+        .into_inner();
     let mut secret = Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "test").expect("valid bech32");
     secret.with_secret_mut(|v| {
         v.shrink_to_fit();
@@ -587,7 +590,7 @@ fn check_decode_bech32_zeroed(data: &[u8]) {
 fn check_decode_bech32m_zeroed(data: &[u8]) {
     use secure_gate::ToBech32m;
     let encoded = data
-        .try_to_bech32m("testm")
+        .try_to_bech32m("testm", secure_gate::Case::Lower)
         .expect("valid hrp")
         .into_inner();
     let mut secret =

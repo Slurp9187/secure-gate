@@ -529,16 +529,21 @@ impl ToBase64Url for Dynamic<Vec<u8>> {
 #[cfg(feature = "encoding-bech32")]
 impl ToBech32 for Dynamic<Vec<u8>> {
     #[inline]
-    fn try_to_bech32(&self, hrp: &str) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32(hrp))
+    fn try_to_bech32(
+        &self,
+        hrp: &str,
+        case: crate::Case,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32(hrp, case))
     }
 
     #[inline]
     fn try_to_bech32_sized<const C: usize>(
         &self,
         hrp: &str,
+        case: crate::Case,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32_sized::<C>(hrp))
+        self.with_secret(|s| s.try_to_bech32_sized::<C>(hrp, case))
     }
 }
 
@@ -548,16 +553,21 @@ impl ToBech32 for Dynamic<Vec<u8>> {
 #[cfg(feature = "encoding-bech32")]
 impl ToBech32m for Dynamic<Vec<u8>> {
     #[inline]
-    fn try_to_bech32m(&self, hrp: &str) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32m(hrp))
+    fn try_to_bech32m(
+        &self,
+        hrp: &str,
+        case: crate::Case,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32m(hrp, case))
     }
 
     #[inline]
     fn try_to_bech32m_sized<const C: usize>(
         &self,
         hrp: &str,
+        case: crate::Case,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32m_sized::<C>(hrp))
+        self.with_secret(|s| s.try_to_bech32m_sized::<C>(hrp, case))
     }
 }
 

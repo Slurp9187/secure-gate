@@ -1,6 +1,6 @@
 /benches/results
 /code_packages*/
-/docs
+/secure-gate-compat/docs
 /issues
 /target
 
@@ -30,4 +30,5 @@ prompt.md
 AGENT.md
 
 **/plan*/
+!/docs/plans/
 .claude/

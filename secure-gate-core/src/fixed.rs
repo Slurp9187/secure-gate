@@ -816,16 +816,21 @@ impl<const N: usize> ToBase64Url for Fixed<[u8; N]> {
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<const N: usize> ToBech32 for Fixed<[u8; N]> {
     #[inline]
-    fn try_to_bech32(&self, hrp: &str) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32(hrp))
+    fn try_to_bech32(
+        &self,
+        hrp: &str,
+        case: crate::Case,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32(hrp, case))
     }
 
     #[inline]
     fn try_to_bech32_sized<const C: usize>(
         &self,
         hrp: &str,
+        case: crate::Case,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32_sized::<C>(hrp))
+        self.with_secret(|s| s.try_to_bech32_sized::<C>(hrp, case))
     }
 }
 
@@ -835,16 +840,21 @@ impl<const N: usize> ToBech32 for Fixed<[u8; N]> {
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<const N: usize> ToBech32m for Fixed<[u8; N]> {
     #[inline]
-    fn try_to_bech32m(&self, hrp: &str) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32m(hrp))
+    fn try_to_bech32m(
+        &self,
+        hrp: &str,
+        case: crate::Case,
+    ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
+        self.with_secret(|s| s.try_to_bech32m(hrp, case))
     }
 
     #[inline]
     fn try_to_bech32m_sized<const C: usize>(
         &self,
         hrp: &str,
+        case: crate::Case,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.with_secret(|s| s.try_to_bech32m_sized::<C>(hrp))
+        self.with_secret(|s| s.try_to_bech32m_sized::<C>(hrp, case))
     }
 }
 

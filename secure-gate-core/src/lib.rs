@@ -4,6 +4,14 @@
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+// `Cargo.toml` tells docs.rs to build with `--cfg docsrs`. This is what reads it:
+// `doc_cfg` annotates every feature-gated item with the feature that enables it, so
+// the docs people read say "Available on crate feature `encoding-hex`" instead of
+// leaving the reader to infer it. Nightly-only, which is fine — docs.rs builds on
+// nightly, and the only other build that sets `docsrs` is the CI step that exists to
+// catch this gate being renamed. It has been renamed before: `doc_auto_cfg` was the
+// spelling until 1.92 removed it and merged it into `doc_cfg`.
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! Secure wrappers for secrets with **explicit access** and **mandatory zeroization** — a
 //! `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
@@ -192,7 +200,7 @@
 //! | `encoding` | no | All encoding features |
 //! | | | **Meta** |
 //! | `cloneable` | no | [`CloneableSecret`] opt-in cloning |
-//! | `full` | no | Everything |
+//! | `full` | no | Everything except `std` |
 //!
 //! # What's available without `alloc`?
 //!
@@ -549,6 +557,9 @@ pub use traits::ToBech32m;
 /// implemented for `AsRef<[u8]> + EncodableBytes`; the second bound keeps string-shaped
 /// types out, so an already-encoded value cannot be silently encoded again. Implement it
 /// for your own byte newtype to make it encodable.
+#[cfg(feature = "encoding-bech32")]
+pub use traits::Case;
+
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base32",

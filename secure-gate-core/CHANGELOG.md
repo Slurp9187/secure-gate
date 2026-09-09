@@ -7,53 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.9] - 2026-09-08
+
 ### Added
 
-- **Caller-chosen bech32 / bech32m code length.** `Bech32Sized<N>` and `Bech32mSized<N>`
-  are const-generic `Checksum` implementations, and every bech32 and bech32m entry point
-  gained a `_sized::<N>` twin:
+- **`Case` on the bech32 encoders — `try_to_bech32`, `try_to_bech32m`, and both
+  `_sized::<N>` forms now take `Case::Lower` or `Case::Upper`.** Requested by a
+  downstream adopter whose private identity key is a bech32 string in age's uppercase
+  form, `AGE-SECRET-KEY-…`; encoders emitted lowercase only, so the value that most
+  warranted `EncodedSecret` shipped as a plain unzeroized `String`.
 
-  ```rust
-  use secure_gate::{ToBech32, bech32_code_length};
+  Uppercasing happens inside the encoder, on the exact-capacity buffer it already owns.
+  ASCII case conversion is length-preserving, so it cannot reallocate and the secret is
+  never copied. BIP-173 defines the checksum over the lowercase form and accepts either
+  pure case, so uppercasing HRP, separator, payload and checksum together stays valid
+  and decodable.
 
-  const N: usize = bech32_code_length(3, 1568);   // hrp "kem", ML-KEM-1024 ciphertext
-  let encoded = ct.try_to_bech32_sized::<N>("kem")?;
-  ```
+  **The parameter's absence elsewhere is the safety property.** `to_base64url` and
+  `to_base32` take no `Case`, because there is no legitimate choice: base64url gives
+  `a`–`z` and `A`–`Z` distinct meanings, so converting case destroys the value
+  (`3q2-7w` → `3Q2-7W` fails to decode), and RFC 4648 §6 base32 is uppercase by
+  definition with a decoder that rejects anything else. A caller cannot ask for a
+  conversion that would corrupt the value, because there is no parameter to pass.
+  `to_hex` / `to_hex_upper` are unchanged: hex decoding is case-insensitive either way,
+  so there is no hazard to close, and `to_hex` is the most common call in the crate.
 
-  Sized twins exist on `ToBech32` / `ToBech32m`, on
-  `FromBech32Str` / `FromBech32mStr` (HRP-checked and `_unchecked`), on
-  `Fixed::try_from_bech32*` and `Dynamic::try_from_bech32*`, and on the surface the
-  `fixed_newtype!` / `dynamic_newtype!` macros forward. `bech32_code_length(hrp_len,
-  payload_bytes)` is a `const fn` that sizes `N` exactly: HRP + separator + base32
-  payload + checksum, all four of which the previous "maximum payload" figures omitted.
-
-  **`N` is a length gate, not part of the encoding.** It never enters the checksum, so
-  the same bytes and HRP encode byte-identically at every `N` that admits them, a string
-  decodes under any `N` at least as large as itself, and a stored value stays valid
-  whatever `N` a later caller picks. Above `BECH32_CODE_LENGTH` the BCH error-detection
-  guarantee lapses — the type docs say so, and the choice is now spelled at the call
-  site rather than baked into a default.
-
-- **The encoding traits no longer accept string-shaped inputs.** Every `To*` trait is
-  now blanket-implemented for `AsRef<[u8]> + EncodableBytes` rather than `AsRef<[u8]>`
-  alone. `EncodableBytes` is a public opt-in marker in the same family as
-  `CloneableSecret` and `SerializableSecret`, implemented here for `[u8]`, `[u8; N]` and
-  `Vec<u8>`; implement it for your own byte newtype to make it encodable.
-
-  It exists because `str: AsRef<[u8]>` made every string an encoding *input* even though
-  strings are this crate's decoding input, which produced two silent wrong answers:
-  `encoded.to_hex()` compiled for an `EncodedSecret` (which derefs to `str`) and
-  hex-encoded the *encoded text* — a 32-byte key returning 124 characters — and
-  `"text".to_hex()` encoded a string's UTF-8 by accident. Both are compile errors now,
-  pinned by `encoded_secret_no_reencode` and `str_not_encodable`. Write `.as_bytes()`
-  when the UTF-8 is what you meant.
-
-  Unlike the `SecureEncoding` marker removed earlier in this release, this one is
-  load-bearing: deleting the bound changes which calls compile. Nothing in the byte-side
-  API moved — `[u8; N]`, `Vec<u8>`, `&[u8]` and `b"..."` all encode exactly as before,
-  and `Deref` on `EncodedSecret` is untouched.
+  This replaces the `EncodedSecret::make_ascii_uppercase` / `make_ascii_lowercase` pair
+  that briefly existed on this branch and was never published. Those were general over a
+  type that deliberately erases which encoder produced it, so they could not check
+  anything — and since `EncodedSecret::new` is `pub(crate)`, the only values that type
+  can hold are the five encodings this crate emits, two of which corrupt under case
+  change. The generality was confined entirely to the set where the operation is
+  sometimes wrong, and bought nothing outside it. Documentation was the only guard;
+  moving the choice to encode time makes the hazard unrepresentable instead.
 
 ### Changed
+
+- **BREAKING: the four bech32 encoders take a `Case`.** `try_to_bech32(hrp)` becomes
+  `try_to_bech32(hrp, Case::Lower)`, and likewise for `try_to_bech32m` and both
+  `_sized::<N>` forms, on `Fixed`, `Dynamic` and the newtype macros. Every one of these
+  call sites is already being edited in this unpublished release: rc.8 returned
+  `Result<String, _>` and rc.9 returns `Result<EncodedSecret, _>`, with the
+  `*_zeroizing` twins removed. The parameter makes an edit callers are already making
+  slightly larger rather than adding a migration of its own.
+
 
 - **BREAKING: every encoder returns `EncodedSecret`; the `*_zeroizing` variants are
   gone.** `to_hex()`, `to_hex_upper()`, `to_base32()`, `to_base64url()`,
@@ -146,10 +143,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING: `AsRef<str>` and `AsRef<[u8]>` on `EncodedSecret`.** The type now has one
   accessor, `Deref<Target = str>`, plus the two named consumers `into_inner` (ends
-  zeroization) and `into_zeroizing` (keeps it). The `AsRef` impls reached nothing
-  `Deref` does not: `&str` coercion, `&*encoded`, every inherent `str` method, and
-  method resolution through the deref all still work. For a type whose purpose is
-  making extraction visible, four doors onto the same room was three too many.
+  zeroization) and `into_zeroizing` (keeps it). `&str` coercion, `&*encoded`, every
+  inherent `str` method, and method resolution through the deref all still work. For a
+  type whose purpose is making extraction visible, four doors onto the same room was
+  three too many.
+
+  **Migration:** one pattern does break. Deref coercion applies at a coercion site but
+  does not satisfy a generic bound, so a parameter of `impl AsRef<[u8]>` — `fs::write(path,
+  &encoded)` being the common one — no longer accepts an `EncodedSecret`. Pass
+  `encoded.as_bytes()`. Reported by a downstream adopter who hit it in two key-writing
+  paths; an earlier draft of this entry claimed the `AsRef` impls reached nothing `Deref`
+  does, which is wrong for exactly this case.
 
   **This alone did not close the accidental re-encode.** `encoded.to_hex()` still
   compiled afterwards, because method resolution derefs to `str` and `str: AsRef<[u8]>`
@@ -494,7 +498,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rc.8 would have been caught regardless. `timeout-minutes: 30` replaces GitHub's
   360-minute default.
 
+- **`ci.yml` gained a rustdoc job — no workflow ran rustdoc at all (#175).** A broken
+  intra-doc link in the shipping docs would have reached docs.rs unnoticed; that is how
+  eleven of them accumulated in `secure-gate-compat`. The job builds `--no-deps
+  --all-features` under `RUSTDOCFLAGS: -D warnings`, matching
+  `[package.metadata.docs.rs] all-features = true` — so the *feature set* is the one
+  docs.rs builds, rather than the `--features full` the issue sketched, which omits
+  `std`. It matches docs.rs in no other respect: not the toolchain, not `--cfg docsrs`.
+  `--no-deps` is right anyway, because a docs.rs page documents only the target crate
+  and links dependency items out to their own pages. It is separately load-bearing for
+  the compat step, where documenting dependencies pulls this crate in under whatever
+  feature set compat activates and trips the minimal-build links #175 deliberately
+  leaves alone (`Fixed::from_rng` among them). Confirmed that a deliberately broken link fails the
+  job and that the tree is clean again once the probe is reverted; `secure-gate` is
+  clean on 1.85, 1.97, 1.98 and nightly. The ~92 unresolved links in minimal builds
+  (`alloc` alone) stay best-effort and unfixed, as #175 decides, and `README.md` now
+  records that policy.
+
+- **The docs.rs nightly step blocks instead of warning.** It was the only step
+  reproducing docs.rs's configuration and it was `continue-on-error: true`, so a rename
+  of the `doc_cfg` gate would have failed it and merged anyway — breaking docs.rs and
+  nothing else. It now fails the build, and drops `-D warnings` to make that safe: a
+  removed gate is a hard error and still fails, while a new nightly rustdoc lint is only
+  a warning and cannot block an unrelated merge.
+
+- **`secure-gate-compat` gained `serde-serialize` / `serde-deserialize` lint rows.** The
+  compat matrix ran only no-features, `secrecy-compat` and `--all-features`. Only
+  `secrecy-compat` pulls `serde` in, which is exactly how "neither serde feature compiled
+  on its own" survived a full cycle unnoticed.
+
+- **Compat's runtime suites run in debug, not just release.** They were in `test-release`
+  only, so the profile where `debug_assertions` and overflow checks are live — and the
+  one contributors actually run — had no compat coverage.
+
+- **`fuzz-quick.yml` builds the compat fuzz targets.** Compile-breakage there was caught
+  only by the nightly compat workflow (4 jobs × ~50 min), which is how a fuzz crate that
+  did not build shipped. `cargo fuzz build` catches that class in about a minute. The
+  compat fuzz workflow's path filters also now include the workspace manifests,
+  `Cargo.lock` and the workflow file itself, and `fuzz-quick.yml` watches its own path.
+
+- **The MSRV job checks `--all-features --all-targets`.** It ran `cargo +1.85 check`
+  with `default` and `full` only — neither implies `std`, and `check` without
+  `--all-targets` never compiles test targets. A compat test file had stopped compiling
+  on 1.85 while every job stayed green, because CI's `stable` had moved to 1.98, where
+  the offending expression is accepted. The added step is the configuration that catches
+  it, and the workspace is clean under it today.
+
 ### Documentation
+
+- **docs.rs now shows which feature each item needs.** `Cargo.toml` has been telling
+  docs.rs to build with `--cfg docsrs` for some time, but nothing in the crate read that
+  cfg — it enabled a configuration with no effect. `#![cfg_attr(docsrs, feature(doc_cfg))]`
+  is what it was for: every feature-gated item now carries an "Available on crate feature
+  `…` only" badge, 89 of them across the 173 `cfg(feature)` sites, so a reader no longer
+  has to infer from prose why a method is missing from their build. Nightly-only and
+  inert everywhere else — nothing sets `docsrs` except docs.rs itself and the CI step
+  below, added to guard it. (`doc_auto_cfg`, the obvious spelling, was removed in 1.92
+  and merged into `doc_cfg`.) The `docs` job runs that exact configuration on nightly,
+  and it is allowed to fail the build: a rename of the gate breaks docs.rs and nothing
+  else. It runs without `-D warnings`, so a removed gate (a hard error) still fails
+  while nightly lint churn cannot block an unrelated merge.
+
+- **The `full` feature was documented as "Everything".** It omits `std`
+  (`["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]`), which is deliberate,
+  so both the crate docs and the README now say "everything except `std`".
 
 - **`docs/encoded_secret_deref.md` records why the output wrapper derefs.** `EncodedSecret`
   is the one type in this crate that implements `Deref`, which is the exact thing

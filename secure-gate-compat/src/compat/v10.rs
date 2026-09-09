@@ -23,20 +23,21 @@
 //! | `SecretBox<T>` | [`Dynamic<T>`](secure_gate::Dynamic) |
 //! | `SecretString` | `Dynamic<String>` |
 //! | `SecretSlice<T>` | `Dynamic<Vec<T>>` |
-//! | `ExposeSecret<T>` | [`RevealSecret`](RevealSecret) |
-//! | `ExposeSecretMut<T>` | [`RevealSecretMut`](RevealSecretMut) |
-//! | `CloneableSecret` | [`CloneableSecret`](crate::CloneableSecret) (with `cloneable` feature) |
-//! | `SerializableSecret` | [`SerializableSecret`](crate::SerializableSecret) (with `serde-serialize` feature) |
+//! | `ExposeSecret<T>` | [`RevealSecret`] |
+//! | `ExposeSecretMut<T>` | [`RevealSecretMut`] |
+//! | `CloneableSecret` | [`CloneableSecret`](secure_gate::CloneableSecret) (with `cloneable` feature) |
+//! | `SerializableSecret` | [`SerializableSecret`] (with `serde-serialize` feature) |
 //!
 //! # Step-by-step migration
 //!
-//! 1. Replace `secrecy` dependency with `secure-gate` + `features = ["secrecy-compat"]`
+//! 1. Replace the `secrecy` dependency with `secure-gate-compat` (git dependency — the crate is unpublished),
+//!    `features = ["secrecy-compat"]`
 //! 2. Find/replace `use secrecy::` → `use secure_gate_compat::compat::v10::` (or `compat::` for traits)
 //! 3. Gradually replace `v10::SecretBox<T>` with [`Dynamic<T>`](secure_gate::Dynamic) using the
 //!    provided [`From`] conversions
-//! 4. Replace `compat::ExposeSecret` with [`RevealSecret`](RevealSecret) — bridge impls
+//! 4. Replace `compat::ExposeSecret` with [`RevealSecret`] — bridge impls
 //!    on `Dynamic` and `Fixed` mean that call-sites using `.expose_secret()` continue to compile
-//! 5. Remove `secrecy-compat` feature once fully migrated
+//! 5. Remove the `secure-gate-compat` dependency once fully migrated, keeping `secure-gate`
 
 extern crate alloc;
 
@@ -58,8 +59,8 @@ use secure_gate::RevealSecret;
 /// Heap-allocated secret wrapper — mirrors `secrecy::SecretBox`.
 ///
 /// Stores the secret in a `Box<S>`, zeroizes on drop, and only exposes the inner
-/// value through [`ExposeSecret`](super::ExposeSecret) /
-/// [`ExposeSecretMut`](super::ExposeSecretMut). `Debug` always prints `[REDACTED]`.
+/// value through [`ExposeSecret`] /
+/// [`ExposeSecretMut`]. `Debug` always prints `[REDACTED]`.
 ///
 /// # Migration to native secure-gate
 ///

@@ -10,11 +10,29 @@ on:
       - "secure-gate-compat/fuzz/**"
       - "secure-gate-compat/src/**"
       - "secure-gate-compat/Cargo.toml"
+      # This fuzz crate is built against `secure-gate`, so a core API change can
+      # break it while nothing under `secure-gate-compat/` is touched. That is how
+      # the encoder rewrite left it uncompilable with every PR green — only the
+      # nightly cron saw it.
+      - "secure-gate-core/src/**"
+      - "secure-gate-core/Cargo.toml"
+      # A resolver or [workspace.dependencies] change reaches this crate too, and a
+      # typo in this file's own matrix would otherwise never run before merge.
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/fuzz-nightly-0.9-compat.yml"
   pull_request:
     paths:
       - "secure-gate-compat/fuzz/**"
       - "secure-gate-compat/src/**"
       - "secure-gate-compat/Cargo.toml"
+      - "secure-gate-core/src/**"
+      - "secure-gate-core/Cargo.toml"
+      # A resolver or [workspace.dependencies] change reaches this crate too, and a
+      # typo in this file's own matrix would otherwise never run before merge.
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/fuzz-nightly-0.9-compat.yml"
 
 permissions:
   contents: read

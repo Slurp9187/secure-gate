@@ -91,7 +91,7 @@ fuzz_target!(|data: &[u8]| {
             let v08_arr: Secret<[u8; 32]> = Secret::new(arr);
             let fixed: Fixed<[u8; 32]> = v08_arr.into();
             let v08_arr_back: Secret<[u8; 32]> = fixed.into();
-            assert_eq!(*v08_arr_back.expose_secret(), arr,
+            assert_eq!(v08_arr_back.expose_secret(), &arr,
                 "[u8; 32]: round-trip value identity failed");
         }
     }

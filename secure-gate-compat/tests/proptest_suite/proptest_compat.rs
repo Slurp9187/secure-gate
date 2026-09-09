@@ -8,7 +8,7 @@
 //!   3. Clone independence: modifying a clone does not affect the original
 //!   4. ct_eq agreement (when feature = "ct-eq"): ct_eq must agree with ==
 
-#[cfg(all(feature = "secrecy-compat", feature = "alloc"))]
+#[cfg(feature = "secrecy-compat")]
 #[allow(unused_imports)]
 mod tests {
     use proptest::prelude::*;
@@ -48,7 +48,7 @@ mod tests {
             let v08: V08Secret<[u8; 32]> = V08Secret::new(arr);
             let fixed: Fixed<[u8; 32]> = v08.into();
             let v08_back: V08Secret<[u8; 32]> = fixed.into();
-            prop_assert_eq!(*v08_back.expose_secret(), arr);
+            prop_assert_eq!(v08_back.expose_secret(), &arr);
         }
 
         /// Debug invariant: V08Secret<String> debug output never contains the payload.
