@@ -195,6 +195,32 @@ Fixed<[u8; N]>` compiles cleanly alongside the existing blanket
 deliberately does not implement `AsRef<[u8]>`, so `rustc` can rule out overlap
 locally. The initial assumption that this would be **E0119** was wrong.
 
+**Amendment (rc.9): that holds for *concrete* impls only, and the distinction is
+why per-type forwarding exists at all.** A second *blanket* impl keyed on the
+wrapper trait — the one shape that would let any newtype inherit the encoder
+surface without forwarding — is genuinely rejected:
+
+```text
+error[E0119]: conflicting implementations of trait `ToHex`
+   impl<T: AsRef<[u8]> + EncodableBytes + ?Sized> ToHex for T   // first
+   impl<T: RevealSecret> ToHex for T                            // conflicting
+```
+
+`rustc` cannot prove the two bounds disjoint — there is no negative reasoning —
+so it refuses regardless of whether any type actually satisfies both. Reproduced
+standalone rather than inferred.
+
+This is also why implementing `RevealSecret` on a hand-written newtype buys none
+of the encoders: `to_hex` resolves through the byte-shaped blanket, and a wrapper
+is deliberately not byte-shaped. Confirmed by compiling one — the error is
+`method `to_hex` not found ... doesn't satisfy `ApiKey: AsRef<[u8]>``.
+
+The two findings compose: concrete per-wrapper impls are legal (§ above), a
+blanket over the wrapper trait is not, and the note at the head of this document
+gives the semantic reason a blanket would be wrong even if it were legal —
+`String: AsRef<[u8]>` holds, so it would hand `Dynamic<String>` hex encoding,
+which `tests/compile-fail/dynamic_string_no_hex.rs` exists to forbid.
+
 Not taken in this spike because the split front end already covers the same
 methods concretely. Worth revisiting if the forwarding list grows: it would
 shrink the per-family macros and benefit `Dynamic`'s generic arm, which today
@@ -360,6 +386,23 @@ degradation) is fixed without new dependencies; what remains is message
 quality, which does not justify adding `syn` + `quote` to a crate whose
 selling points include a minimal dependency graph, `forbid(unsafe_code)`, and
 `no_std` cleanliness. Revisit only if the generation logic outgrows arms.
+
+**Amendment (rc.9): half of that dependency argument no longer holds.**
+`syn`, `quote` and `proc-macro2` are already in the published graph whenever the
+`serde` feature is on, pulled in by `serde` → `serde_derive` — and `full`
+enables `serde`. Measured on 0.9.0-rc.9 with `cargo tree -p secure-gate
+--features=full --edges normal`. So for the configuration most users select,
+a derive macro would add a crate to the graph, not a compiler-plugin toolchain.
+
+The objection survives only for `--no-default-features` builds, which are
+exactly the `no_std` ones the argument was written to protect — so the decision
+stands, but on narrower ground than "adding `syn`". The real reasons to stay put
+are now: the macros work and are covered by `tests/macros_suite/`, rewriting
+tested generation before 1.0 is churn against a real risk of behaviour drift,
+and the maintenance cost is bounded and rare (an encoder signature change
+touches the forwarding sites once — the `Case` parameter in rc.9 hit sixteen
+across `fixed.rs`, `dynamic.rs` and both newtype macros). If that number grows,
+that is the signal, not the dependency count.
 
 ### 5.3 Scope of the forwarded surface
 
