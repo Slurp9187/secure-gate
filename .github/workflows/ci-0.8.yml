@@ -80,9 +80,12 @@ jobs:
             features: "--features=serde-deserialize"
           # The shim surface itself, and the whole of it. Neither was linted here: the
           # compat rows stopped at `full`, which does not enable `secrecy-compat`.
-          - name: secrecy-compat
+          # `--no-default-features` deliberately: `secrecy-compat` is experimental and
+          # must stand on its own, not lean on `default = ["alloc"]`. It is also
+          # deliberately absent from `full` — see the note in the compat manifest.
+          - name: secrecy-compat (standalone)
             package: secure-gate-compat
-            features: "--features=secrecy-compat"
+            features: "--no-default-features --features=secrecy-compat"
           - name: all features
             package: secure-gate-compat
             features: "--all-features"

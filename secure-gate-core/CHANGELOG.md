@@ -175,6 +175,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Testing
 
+- **`secrecy-compat` is gated as standalone, and stays out of `full`.** The shim is
+  experimental and may yet be purged, so it has to be opt-in and has to stand on its own
+  rather than lean on `default = ["alloc"]`. Both were already true — `full` forwards
+  only to `secure-gate`'s own full set, and the shim builds and tests from
+  `--no-default-features --features=secrecy-compat` — but nothing held them true. The
+  lint row now uses that exact form, and the reason is recorded on the `full` definition
+  in the manifest where someone would otherwise add it.
+
 - **The compat lint matrix gained four rows.** It stopped at `full`, which does not
   enable `secrecy-compat` — so the shim surface itself, the whole feature set, and each
   serde feature alone were never linted on this branch. All four pass today; these are

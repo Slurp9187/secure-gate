@@ -63,6 +63,10 @@ serde = ["dep:serde", "secure-gate/serde"]
 serde-serialize = ["dep:serde", "secure-gate/serde-serialize"]
 serde-deserialize = ["dep:serde", "secure-gate/serde-deserialize"]
 cloneable = ["secure-gate/cloneable"]
+# Deliberately does NOT include `secrecy-compat`. That shim is experimental and may
+# be purged; it must be opt-in and must stand alone, so `full` forwards only to
+# `secure-gate`'s own full set. The `secrecy-compat (standalone)` CI row builds it
+# with `--no-default-features` to keep that honest.
 full = ["secure-gate/full"]
 
 # secrecy compatibility shims — drop-in replacements for secrecy v0.8.0 and v0.10.1.
