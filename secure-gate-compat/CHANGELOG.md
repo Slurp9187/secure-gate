@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-rc.9] - 2026-09-08
+
 ### Changed
 
 - **CI no longer gates this crate's rustdoc.** The bar for an experimental,
@@ -26,10 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for, and the reason is recorded on the feature definition where someone would
   otherwise widen it. Keeping this property means removing the crate stays a deletion
   rather than an untangling.
-
-## [0.9.0-rc.9] - 2026-09-08
-
-### Changed
 
 - **`publish = false`.** This crate is experimental and has never been intended for
   crates.io, but nothing enforced that: with no `publish` key, a workspace-wide publish
