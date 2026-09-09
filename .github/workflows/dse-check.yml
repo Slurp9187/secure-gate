@@ -18,18 +18,18 @@ on:
   push:
     branches: [main]
     paths:
-      - "secure-gate-core/src/**"
-      - "secure-gate-core/tests/asm_dse_check.rs"
-      - "secure-gate-core/Cargo.toml"
+      - "src/**"
+      - "tests/asm_dse_check.rs"
+      - "Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/dse-check.yml"
   pull_request:
     branches: [main]
     paths:
-      - "secure-gate-core/src/**"
-      - "secure-gate-core/tests/asm_dse_check.rs"
-      - "secure-gate-core/Cargo.toml"
+      - "src/**"
+      - "tests/asm_dse_check.rs"
+      - "Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/dse-check.yml"

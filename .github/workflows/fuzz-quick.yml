@@ -9,17 +9,17 @@ on:
     branches: [main]
     tags: ["v*.*.*"]
     paths:
-      - "secure-gate-core/fuzz/**"
-      - "secure-gate-core/src/**"
-      - "secure-gate-core/Cargo.toml"
+      - "fuzz/**"
+      - "src/**"
+      - "Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/fuzz-quick.yml"
   pull_request:
     paths:
-      - "secure-gate-core/fuzz/**"
-      - "secure-gate-core/src/**"
-      - "secure-gate-core/Cargo.toml"
+      - "fuzz/**"
+      - "src/**"
+      - "Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/fuzz-quick.yml"
@@ -51,7 +51,7 @@ jobs:
 
       - name: Quick smoke test – ${{ matrix.target }} (90 s)
         run: |
-          cd secure-gate-core && cargo +nightly fuzz run ${{ matrix.target }} -- \
+          cargo +nightly fuzz run ${{ matrix.target }} -- \
             -fork=1 \
             -max_total_time=90 \
             -timeout=30
@@ -61,6 +61,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fuzz-crash-${{ matrix.target }}-${{ github.run_id }}
-          path: secure-gate-core/fuzz/artifacts/${{ matrix.target }}/**
+          path: fuzz/artifacts/${{ matrix.target }}/**
           retention-days: 7
 

@@ -2,7 +2,7 @@
 
 > **Status: shipped.** Merged to `main` in PR #159 (`f2a8f1c`) and released in
 > **0.9.0-rc.8**; layered on the `fixed_newtype!`/`dynamic_newtype!` work
-> (#155, `docs/nominal_newtypes.md`), which ships in the same release.
+> (#155, `docs/design/nominal_newtypes.md`), which ships in the same release.
 > Breaking relative to earlier 0.9.0 release candidates; no stable release had
 > shipped, so it was the cheapest possible moment.
 >
@@ -95,7 +95,7 @@ impl ToHex for Dynamic<Vec<u8>> { /* likewise */ }
 - **No coherence conflict** with the existing blanket
   `impl<T: AsRef<[u8]> + ?Sized> ToHex for T`: the wrappers are local and
   deliberately do not implement `AsRef<[u8]>`, so the compiler rules out
-  overlap. (Verified before implementation — `docs/nominal_newtypes.md` §3.3.)
+  overlap. (Verified before implementation — `docs/design/nominal_newtypes.md` §3.3.)
 - **Call syntax is unchanged** — `key.to_hex()` still works — but the trait
   must be in scope: `use secure_gate::ToHex;`.
 - **One trait means one bound.** `fn fingerprint<S: ToHex>(s: &S)` now accepts
@@ -140,7 +140,7 @@ newtypes**. So:
 - Encoder forwarding became **trait impls** (`impl ToHex for $name` etc., UFCS
   delegation) instead of generated inherent methods — the macro-generated
   newtypes now satisfy the same bounds as the wrappers.
-- Trap 7 of `docs/nominal_newtypes.md` (custom inner types cannot be newtyped)
+- Trap 7 of `docs/design/nominal_newtypes.md` (custom inner types cannot be newtyped)
   is fixed by Move 1 — previously they had no `RevealSecret` impl at all.
   §3.3 of that document is now implemented. §5.1 is **decided** (option (c),
   see Move 3 above), §5.2 is **decided** (stay with `macro_rules!`), §6 polish
