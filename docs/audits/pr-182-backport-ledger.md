@@ -56,6 +56,7 @@ actual `git show origin/release/0.8:<path> | grep` result.
 | 30 | `exclude` names both fuzz crates | no | n/a | 0.8 has no compat fuzz to exclude |
 | 31 | `SECURITY.md` "Last updated" stamp | yes | **yes** | Stamp with the 0.8 rc, not rc.9 |
 | 32 | PR description refresh | — | no | Process, not code |
+| 34 | `AsRef` removal note claimed nothing broke; `impl AsRef<[u8]>` params do | **yes** (source comment) | **yes** | Found by the age-pq downstream, confirmed by compile test. 0.8 has the same comment at `encoded_secret.rs:140`; check its changelog wording separately |
 | 33 | *(refuted)* second rustdoc step with deps | — | no | docs.rs documents only the target crate; `--no-deps` is closer to what ships |
 
 ### Known main-only (do **not** port)

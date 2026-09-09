@@ -148,10 +148,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING: `AsRef<str>` and `AsRef<[u8]>` on `EncodedSecret`.** The type now has one
   accessor, `Deref<Target = str>`, plus the two named consumers `into_inner` (ends
-  zeroization) and `into_zeroizing` (keeps it). The `AsRef` impls reached nothing
-  `Deref` does not: `&str` coercion, `&*encoded`, every inherent `str` method, and
-  method resolution through the deref all still work. For a type whose purpose is
-  making extraction visible, four doors onto the same room was three too many.
+  zeroization) and `into_zeroizing` (keeps it). `&str` coercion, `&*encoded`, every
+  inherent `str` method, and method resolution through the deref all still work. For a
+  type whose purpose is making extraction visible, four doors onto the same room was
+  three too many.
+
+  **Migration:** one pattern does break. Deref coercion applies at a coercion site but
+  does not satisfy a generic bound, so a parameter of `impl AsRef<[u8]>` — `fs::write(path,
+  &encoded)` being the common one — no longer accepts an `EncodedSecret`. Pass
+  `encoded.as_bytes()`. Reported by a downstream adopter who hit it in two key-writing
+  paths; an earlier draft of this entry claimed the `AsRef` impls reached nothing `Deref`
+  does, which is wrong for exactly this case.
 
   **This alone did not close the accidental re-encode.** `encoded.to_hex()` still
   compiled afterwards, because method resolution derefs to `str` and `str: AsRef<[u8]>`
