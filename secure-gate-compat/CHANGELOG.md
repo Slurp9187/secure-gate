@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **CI no longer gates this crate's rustdoc.** The bar for an experimental,
+  never-published crate is that it compiles and its tests pass — not that its docs are
+  publication-clean. The rustdoc job was added as a rot guard, which is a real cost on
+  every PR for docs that are not on docs.rs and that may be deleted with the crate.
+  `secure-gate`'s rustdoc is still gated, on both the stable feature set and the nightly
+  `--cfg docsrs` configuration.
+
+- **`secrecy-compat` is gated as standalone.** The shim is experimental and may be
+  purged, so it has to stay opt-in and self-contained: no aggregate feature reaches it,
+  and it pulls in what it needs itself rather than assuming a `default`. Both were
+  already true — verified with `cargo tree` across `full`, `alloc`, `std`, `serde` and
+  `ct-eq`, none of which reach it — but nothing in CI held them true. The lint row now
+  uses `--no-default-features --features=secrecy-compat` rather than
+  `--features=secrecy-compat`, which never exercised the standalone case it was named
+  for, and the reason is recorded on the feature definition where someone would
+  otherwise widen it. Keeping this property means removing the crate stays a deletion
+  rather than an untangling.
+
 ## [0.9.0-rc.9] - 2026-09-08
 
 ### Changed
