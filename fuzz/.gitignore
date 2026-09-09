@@ -1,0 +1,11 @@
+target
+corpus
+artifacts
+coverage
+
+# Cargo.lock is deliberately NOT ignored. A crash a fuzz run finds is only
+# reproducible if the inputs map to the same values later, and `arbitrary`
+# decides that mapping — a minor bump can change what a stored corpus byte
+# string decodes to, so a reproducer can quietly stop reproducing. Pinning the
+# lock keeps "this input crashed on this tree" durable. The crate's own
+# Cargo.lock is tracked for the same reason.

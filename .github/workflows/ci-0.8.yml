@@ -5,16 +5,14 @@ on:
   push:
     branches: [release/0.8]
     paths:
-      - "secure-gate-core/**"
-      - "secure-gate-compat/**"
+      - "**"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/ci-0.8.yml"
   pull_request:
     branches: [release/0.8]
     paths:
-      - "secure-gate-core/**"
-      - "secure-gate-compat/**"
+      - "**"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/ci-0.8.yml"
@@ -59,26 +57,6 @@ jobs:
             features: "--features=full"
           - name: all features
             package: secure-gate
-            features: "--all-features"
-          - name: no features
-            package: secure-gate-compat
-            features: "--no-default-features"
-          - name: rand (no_std)
-            package: secure-gate-compat
-            features: "--no-default-features --features=rand"
-          - name: full
-            package: secure-gate-compat
-            features: "--features=full"
-          # The shim surface itself, and the whole of it. Neither was linted here: the
-          # compat rows stopped at `full`, which does not enable `secrecy-compat`.
-          # `--no-default-features` deliberately: `secrecy-compat` is experimental and
-          # must stand on its own, not lean on `default = ["alloc"]`. It is also
-          # deliberately absent from `full` — see the note in the compat manifest.
-          - name: secrecy-compat (standalone)
-            package: secure-gate-compat
-            features: "--no-default-features --features=secrecy-compat"
-          - name: all features
-            package: secure-gate-compat
             features: "--all-features"
     steps:
       - name: Checkout repository
@@ -222,8 +200,7 @@ jobs:
   # diagnostics (blessed against the pinned toolchain) which drift on stable and
   # are independent of the build profile — the property this job guards is
   # runtime behavior. Core cases are skipped by the `compile_fail` name suffix
-  # (plus the one legacy name); keep the compat list in sync with the test
-  # names in secure-gate-compat/tests/compile_fail_tests.rs.
+  # (plus the one legacy name).
   # ---------------------------------------------------------------------------
   test-release:
     name: Test – release profile
@@ -243,9 +220,6 @@ jobs:
 
       - name: Run core tests (release, full features)
         run: cargo test -p secure-gate --tests --release --features=full -- --skip compile_fail --skip serializable_secret_misuse
-
-      - name: Run compat tests (release, all features)
-        run: cargo test -p secure-gate-compat --release --all-features -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip compat_no_deref --skip compat_no_asref --skip compat_no_debug_without_marker
 
   # ---------------------------------------------------------------------------
   # no_std job — cross-build for a bare-metal target
@@ -291,14 +265,6 @@ jobs:
               --no-default-features \
               ${features:+--features "$features"}
           done
-
-      - name: Cross-build compat for bare metal
-        # secure-gate-compat is unconditionally #![no_std] (alloc-based shims).
-        run: |
-          set -eux
-          cargo build -p secure-gate-compat --lib --target thumbv7em-none-eabihf
-          cargo build -p secure-gate-compat --lib --target thumbv7em-none-eabihf --features secrecy-compat
-
   # ---------------------------------------------------------------------------
   # MSRV job — verify declared rust-version is actually buildable
   #
@@ -329,21 +295,12 @@ jobs:
       - name: cargo check – full features (core)
         run: cargo +1.70 check -p secure-gate --locked --features=full
 
-      - name: cargo check – default features (compat)
-        run: cargo +1.70 check -p secure-gate-compat --locked
-
-      - name: cargo check – full features (compat)
-        run: cargo +1.70 check -p secure-gate-compat --locked --features=full
-
       - name: cargo test – all features (core, MSRV compatibility)
         # Skip compile-fail tests: they verify diagnostic wording, not MSRV
         # compatibility. They are covered by the dedicated `compile-fail` job, which
         # runs the whole suite on 1.70. (They do not run in the stable `test` job —
         # that job skips them too, because the snapshots mismatch on stable.)
         run: cargo +1.70 test -p secure-gate --locked --all-features -- --skip compile_fail --skip serializable_secret_misuse
-
-      - name: cargo test – all features (compat, MSRV compatibility)
-        run: cargo +1.70 test -p secure-gate-compat --locked --all-features
 
   # ---------------------------------------------------------------------------
   # Rustdoc job — docs must build on the pinned toolchain
@@ -357,11 +314,7 @@ jobs:
   # MSRV, which is what a contributor runs. `-D warnings` also catches broken
   # intra-doc links, which nothing else here does.
   #
-  # Core only. `secure-gate-compat` was gated here for a while, as a guard against its
-  # intra-doc links rotting again after 11 of them were fixed. That is the wrong bar for
-  # an experimental crate that is never published and may be purged: it must compile and
-  # its tests must pass, so it cannot block core, but its docs are not release-blocking
-  # and are not worth a job on every PR.
+  # Core only.
   # ---------------------------------------------------------------------------
   rustdoc:
     name: Rustdoc – builds on MSRV (1.70)
