@@ -22,17 +22,26 @@
 #![cfg(feature = "secrecy-compat")]
 
 use secure_gate_compat::compat::v10::SecretBox;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::cell::Cell;
 use zeroize::Zeroize;
 
-static ORIGINAL_ZEROIZED: AtomicBool = AtomicBool::new(false);
+// Thread-local, not a global `AtomicBool`. Both tests in this binary reset the flag,
+// run their scenario, then assert it was set; cargo runs them on parallel threads, so
+// a shared global let one test's reset land between the other's set and its assert.
+// That raced about once per full-workspace run and never in isolation, which is the
+// worst shape a failure can have. The panic, the unwind and the `zeroize` call all
+// happen on the calling thread -- `catch_unwind` runs its closure inline -- so a
+// thread-local is not a workaround, it is the correct scope for the observation.
+thread_local! {
+    static ORIGINAL_ZEROIZED: Cell<bool> = const { Cell::new(false) };
+}
 
 struct PanicOnClone(Vec<u8>);
 
 impl Zeroize for PanicOnClone {
     fn zeroize(&mut self) {
         self.0.zeroize();
-        ORIGINAL_ZEROIZED.store(true, Ordering::SeqCst);
+        ORIGINAL_ZEROIZED.with(|f| f.set(true));
     }
 }
 
@@ -44,7 +53,7 @@ impl Clone for PanicOnClone {
 
 #[test]
 fn init_with_zeros_original_on_clone_panic() {
-    ORIGINAL_ZEROIZED.store(false, Ordering::SeqCst);
+    ORIGINAL_ZEROIZED.with(|f| f.set(false));
 
     let result = std::panic::catch_unwind(|| {
         let _: SecretBox<PanicOnClone> = SecretBox::init_with(|| PanicOnClone(vec![0xAAu8; 64]));
@@ -55,14 +64,14 @@ fn init_with_zeros_original_on_clone_panic() {
         "catch_unwind should have captured the clone panic"
     );
     assert!(
-        ORIGINAL_ZEROIZED.load(Ordering::SeqCst),
+        ORIGINAL_ZEROIZED.with(|f| f.get()),
         "Zeroizing<S> must call S::zeroize() on the original during unwind from S::clone() panic"
     );
 }
 
 #[test]
 fn try_init_with_zeros_original_on_clone_panic() {
-    ORIGINAL_ZEROIZED.store(false, Ordering::SeqCst);
+    ORIGINAL_ZEROIZED.with(|f| f.set(false));
 
     let result = std::panic::catch_unwind(|| {
         let _: Result<SecretBox<PanicOnClone>, ()> =
@@ -74,7 +83,7 @@ fn try_init_with_zeros_original_on_clone_panic() {
         "catch_unwind should have captured the clone panic"
     );
     assert!(
-        ORIGINAL_ZEROIZED.load(Ordering::SeqCst),
+        ORIGINAL_ZEROIZED.with(|f| f.get()),
         "Zeroizing<S> must call S::zeroize() on the original during unwind from S::clone() panic in try_init_with"
     );
 }
