@@ -304,8 +304,6 @@ jobs:
               ${features:+--features "$features"}
           done
 
-      - name: Cross-build compat for bare metal
-
   # ---------------------------------------------------------------------------
   # MSRV job — verify declared rust-version is actually buildable
   #
