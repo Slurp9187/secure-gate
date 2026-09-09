@@ -86,7 +86,7 @@ mod bech32_roundtrip {
             hrp in "[a-z0-9]{1,10}"
         ) {
             let secret: Dynamic<Vec<u8>> = data.clone().into();
-            let encoded = secret.with_secret(|s| s.try_to_bech32(&hrp)).expect("encode");
+            let encoded = secret.with_secret(|s| s.try_to_bech32(&hrp, secure_gate::Case::Lower)).expect("encode");
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32(&encoded, &hrp).expect("decode");
             let decoded_vec = decoded.expose_secret();
             prop_assert_eq!(decoded_vec, data.as_slice());
@@ -107,7 +107,7 @@ mod bech32m_roundtrip {
             hrp in "[a-z0-9]{1,10}"
         ) {
             let secret: Dynamic<Vec<u8>> = data.clone().into();
-            let encoded = secret.with_secret(|s| s.try_to_bech32m(&hrp)).expect("encode");
+            let encoded = secret.with_secret(|s| s.try_to_bech32m(&hrp, secure_gate::Case::Lower)).expect("encode");
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32m(&encoded, &hrp).expect("decode");
             let decoded_vec = decoded.expose_secret();
             prop_assert_eq!(decoded_vec, data.as_slice());
@@ -137,7 +137,7 @@ mod bech32_sized_roundtrip {
             prop::collection::vec(any::<u8>(), 600usize..700),   // straddles the default
             prop::collection::vec(any::<u8>(), 1500usize..1600), // KEM-sized
         ]) {
-            let encoded = data.try_to_bech32_sized::<BIG>("age").expect("encodes").into_inner();
+            let encoded = data.try_to_bech32_sized::<BIG>("age", secure_gate::Case::Lower).expect("encodes").into_inner();
             let decoded = encoded.try_from_bech32_sized::<BIG>("age").expect("decodes");
             prop_assert_eq!(decoded, data);
         }
@@ -148,8 +148,8 @@ mod bech32_sized_roundtrip {
         fn code_length_does_not_change_the_encoding(
             data in prop::collection::vec(any::<u8>(), 0usize..600)
         ) {
-            let at_default = data.try_to_bech32_sized::<BECH32_CODE_LENGTH>("age");
-            let at_big = data.try_to_bech32_sized::<BIG>("age");
+            let at_default = data.try_to_bech32_sized::<BECH32_CODE_LENGTH>("age", secure_gate::Case::Lower);
+            let at_big = data.try_to_bech32_sized::<BIG>("age", secure_gate::Case::Lower);
             match (at_default, at_big) {
                 (Ok(a), Ok(b)) => prop_assert_eq!(&*a, &*b),
                 (Err(_), Ok(_)) => { /* payload needs more than the default: fine */ }
@@ -162,7 +162,7 @@ mod bech32_sized_roundtrip {
         fn decoder_refuses_strings_longer_than_its_code_length(
             data in prop::collection::vec(any::<u8>(), 700usize..900)
         ) {
-            let encoded = data.try_to_bech32_sized::<BIG>("age").expect("encodes").into_inner();
+            let encoded = data.try_to_bech32_sized::<BIG>("age", secure_gate::Case::Lower).expect("encodes").into_inner();
             prop_assume!(encoded.len() > BECH32_CODE_LENGTH);
             prop_assert_eq!(
                 encoded.try_from_bech32("age"),
@@ -175,7 +175,7 @@ mod bech32_sized_roundtrip {
         fn sized_hrp_mismatch_is_always_detected(
             data in prop::collection::vec(any::<u8>(), 0usize..600)
         ) {
-            let encoded = data.try_to_bech32_sized::<BIG>("age").expect("encodes").into_inner();
+            let encoded = data.try_to_bech32_sized::<BIG>("age", secure_gate::Case::Lower).expect("encodes").into_inner();
             prop_assert_eq!(
                 encoded.try_from_bech32_sized::<BIG>("kem"),
                 Err(Bech32Error::UnexpectedHrp)
@@ -200,7 +200,7 @@ mod bech32m_sized_roundtrip {
             prop::collection::vec(any::<u8>(), 600usize..700),
             prop::collection::vec(any::<u8>(), 1500usize..1600),
         ]) {
-            let encoded = data.try_to_bech32m_sized::<BIG>("age").expect("encodes").into_inner();
+            let encoded = data.try_to_bech32m_sized::<BIG>("age", secure_gate::Case::Lower).expect("encodes").into_inner();
             let decoded = encoded.try_from_bech32m_sized::<BIG>("age").expect("decodes");
             prop_assert_eq!(decoded, data);
         }
@@ -224,8 +224,8 @@ mod bech32_variants_never_cross {
         fn checksums_stay_distinct(
             data in prop::collection::vec(any::<u8>(), 0usize..900)
         ) {
-            let b32 = data.try_to_bech32_sized::<BIG>("x").expect("bech32").into_inner();
-            let b32m = data.try_to_bech32m_sized::<BIG>("x").expect("bech32m").into_inner();
+            let b32 = data.try_to_bech32_sized::<BIG>("x", secure_gate::Case::Lower).expect("bech32").into_inner();
+            let b32m = data.try_to_bech32m_sized::<BIG>("x", secure_gate::Case::Lower).expect("bech32m").into_inner();
 
             // Identical payloads, different checksums: the strings differ, and
             // neither decodes under the other's algorithm.

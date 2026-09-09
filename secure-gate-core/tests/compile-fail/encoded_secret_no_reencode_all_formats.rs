@@ -27,6 +27,6 @@ fn main() {
     // None of these may compile: each would encode the hex text, not the key.
     let _b32 = encoded.to_base32();
     let _b64 = encoded.to_base64url();
-    let _bech = encoded.try_to_bech32("bc");
-    let _bechm = encoded.try_to_bech32m("bc");
+    let _bech = encoded.try_to_bech32("bc", secure_gate::Case::Lower);
+    let _bechm = encoded.try_to_bech32m("bc", secure_gate::Case::Lower);
 }

@@ -59,7 +59,7 @@ mod bech32_roundtrip {
             hrp in "[a-z0-9]{1,10}"
         ) {
             let secret: Dynamic<Vec<u8>> = data.clone().into();
-            let encoded = secret.with_secret(|s| s.try_to_bech32(&hrp)).expect("encode");
+            let encoded = secret.with_secret(|s| s.try_to_bech32(&hrp, secure_gate::Case::Lower)).expect("encode");
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32(&encoded, &hrp).expect("decode");
             let decoded_vec = decoded.expose_secret();
             prop_assert_eq!(decoded_vec, data.as_slice());
@@ -80,7 +80,7 @@ mod bech32m_roundtrip {
             hrp in "[a-z0-9]{1,10}"
         ) {
             let secret: Dynamic<Vec<u8>> = data.clone().into();
-            let encoded = secret.with_secret(|s| s.try_to_bech32m(&hrp)).expect("encode");
+            let encoded = secret.with_secret(|s| s.try_to_bech32m(&hrp, secure_gate::Case::Lower)).expect("encode");
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32m(&encoded, &hrp).expect("decode");
             let decoded_vec = decoded.expose_secret();
             prop_assert_eq!(decoded_vec, data.as_slice());

@@ -94,59 +94,6 @@ impl EncodedSecret {
         Self(zeroize::Zeroizing::new(s))
     }
 
-    /// Converts the encoded text to uppercase in place, ASCII only.
-    ///
-    /// Every encoding this crate produces — hex, base32, base64url, bech32, bech32m —
-    /// is ASCII by construction, so this covers all of them with no Unicode
-    /// case-folding hazards.
-    ///
-    /// # Why in place
-    ///
-    /// ASCII case conversion is length-preserving, so the buffer is never reallocated
-    /// and the secret is never copied. The alternative — [`into_inner`] followed by
-    /// [`str::to_uppercase`] — allocates a second `String` and leaves the original
-    /// contents in a buffer this type no longer owns. Doing the transformation inside
-    /// the wrapper is the point of the method, not a convenience: it is the step where
-    /// a copy would otherwise escape.
-    ///
-    /// [`into_inner`]: EncodedSecret::into_inner
-    ///
-    /// # Bech32 and uppercase formats
-    ///
-    /// BIP-173 forbids mixed case and accepts either pure case, with the checksum
-    /// defined over the lowercase form. Uppercasing an entire encoded output — HRP,
-    /// separator, payload and checksum together — therefore yields a valid, decodable
-    /// bech32 string. That is how uppercase key formats such as age's
-    /// `AGE-SECRET-KEY-1…` are produced.
-    ///
-    /// ```
-    /// # #[cfg(all(feature = "alloc", feature = "encoding-hex"))] {
-    /// use secure_gate::{Fixed, ToHex};
-    ///
-    /// let key = Fixed::new([0xABu8, 0xCD]);
-    /// let mut encoded = key.to_hex();
-    /// assert_eq!(&*encoded, "abcd");
-    ///
-    /// encoded.make_ascii_uppercase();
-    /// assert_eq!(&*encoded, "ABCD");
-    /// # }
-    /// ```
-    #[inline(always)]
-    pub fn make_ascii_uppercase(&mut self) {
-        self.0.make_ascii_uppercase();
-    }
-
-    /// Converts the encoded text to lowercase in place, ASCII only.
-    ///
-    /// The counterpart to [`make_ascii_uppercase`], with the same properties: ASCII
-    /// only, length-preserving, no reallocation, no second copy of the secret.
-    ///
-    /// [`make_ascii_uppercase`]: EncodedSecret::make_ascii_uppercase
-    #[inline(always)]
-    pub fn make_ascii_lowercase(&mut self) {
-        self.0.make_ascii_lowercase();
-    }
-
     /// Consumes self and returns the inner `String`.
     ///
     /// This ends zeroization protection for the encoded output.

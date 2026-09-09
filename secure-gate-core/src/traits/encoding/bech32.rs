@@ -17,9 +17,9 @@
 //!   its `Debug`, and wipes on drop.
 //!   Addresses and other public values come back in the same wrapper. `.into_inner()` is the named point where that
 //!   protection ends.
-//! - **Audit visibility**: Direct wrapper calls (`key.try_to_bech32(...)`) do **not** appear in
+//! - **Audit visibility**: Direct wrapper calls (`key.try_to_bech32(..., Case::Lower)`) do **not** appear in
 //!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
-//!   multi-step operations, prefer `with_secret(|b| b.try_to_bech32(...))` — the borrow
+//!   multi-step operations, prefer `with_secret(|b| b.try_to_bech32(..., Case::Lower))` — the borrow
 //!   checker enforces the reference cannot escape the closure.
 //! - **HRP**: pass the intended human-readable part to `try_to_bech32`; test empty and
 //!   invalid HRP inputs in security-critical code.
@@ -35,16 +35,18 @@
 //!
 //! ```rust
 //! # #[cfg(feature = "encoding-bech32")]
-//! use secure_gate::{Fixed, ToBech32, RevealSecret};
+//! use secure_gate::{Case, Fixed, ToBech32, RevealSecret};
 //! # #[cfg(feature = "encoding-bech32")]
 //! {
 //! let secret = Fixed::new([0x42u8; 4]);
 //!
 //! // Use try_to_bech32 — the sole encoding API:
-//! let encoded = secret.with_secret(|s| s.try_to_bech32("test")).unwrap();
+//! let encoded = secret.with_secret(|s| s.try_to_bech32("test", Case::Lower)).unwrap();
 //! assert!(encoded.starts_with("test1"));
 //! }
 //! ```
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+use super::Case;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use bech32::primitives::iter::{ByteIterExt, Fe32IterExt};
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
@@ -83,11 +85,11 @@ pub const BECH32_CODE_LENGTH: usize = 1023;
 /// the 6-character checksum. Use it to pick an `N` for the `_sized` methods:
 ///
 /// ```rust
-/// use secure_gate::{ToBech32, bech32_code_length};
+/// use secure_gate::{Case, ToBech32, bech32_code_length};
 ///
 /// const N: usize = bech32_code_length(3, 4096); // hrp "age", 4 KiB payload
 /// let blob = [0xA5u8; 4096];
-/// let encoded = blob.try_to_bech32_sized::<N>("age")?;
+/// let encoded = blob.try_to_bech32_sized::<N>("age", Case::Lower)?;
 /// assert!(encoded.starts_with("age1"));
 /// # Ok::<(), secure_gate::Bech32Error>(())
 /// ```
@@ -137,11 +139,11 @@ pub const fn bech32_code_length(hrp_len: usize, payload_bytes: usize) -> usize {
 /// [`Bech32Standard`].
 ///
 /// ```rust
-/// use secure_gate::ToBech32;
+/// use secure_gate::{Case, ToBech32};
 ///
 /// // A 2 KiB KEM ciphertext needs a code length well past the BCH bound.
 /// let ct = [0x5Au8; 2048];
-/// let encoded = ct.try_to_bech32_sized::<4096>("kyber")?;
+/// let encoded = ct.try_to_bech32_sized::<4096>("kyber", Case::Lower)?;
 /// assert!(encoded.starts_with("kyber1"));
 /// # Ok::<(), secure_gate::Bech32Error>(())
 /// ```
@@ -188,13 +190,13 @@ pub trait ToBech32 {
     /// # Examples
     ///
     /// ```rust
-    /// use secure_gate::ToBech32;
+    /// use secure_gate::{Case, ToBech32};
     ///
-    /// let encoded = b"hello".try_to_bech32("test")?;
+    /// let encoded = b"hello".try_to_bech32("test", Case::Lower)?;
     /// assert!(encoded.starts_with("test1"));
     /// # Ok::<(), secure_gate::Bech32Error>(())
     /// ```
-    fn try_to_bech32(&self, hrp: &str) -> Result<crate::EncodedSecret, Bech32Error>;
+    fn try_to_bech32(&self, hrp: &str, case: Case) -> Result<crate::EncodedSecret, Bech32Error>;
 
     /// Like [`try_to_bech32`](Self::try_to_bech32), with a caller-chosen code length `N`.
     ///
@@ -214,18 +216,19 @@ pub trait ToBech32 {
     /// # Examples
     ///
     /// ```rust
-    /// use secure_gate::ToBech32;
+    /// use secure_gate::{Case, ToBech32};
     ///
     /// let recipient = [0x11u8; 900];
     /// // 900 bytes does not fit the default 1023-character code length.
-    /// assert!(recipient.try_to_bech32("age").is_err());
-    /// let encoded = recipient.try_to_bech32_sized::<2048>("age")?;
+    /// assert!(recipient.try_to_bech32("age", Case::Lower).is_err());
+    /// let encoded = recipient.try_to_bech32_sized::<2048>("age", Case::Lower)?;
     /// assert!(encoded.starts_with("age1"));
     /// # Ok::<(), secure_gate::Bech32Error>(())
     /// ```
     fn try_to_bech32_sized<const N: usize>(
         &self,
         hrp: &str,
+        case: Case,
     ) -> Result<crate::EncodedSecret, Bech32Error>;
 }
 
@@ -234,14 +237,15 @@ pub trait ToBech32 {
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBech32 for T {
     #[inline(always)]
-    fn try_to_bech32(&self, hrp: &str) -> Result<crate::EncodedSecret, Bech32Error> {
-        self.try_to_bech32_sized::<BECH32_CODE_LENGTH>(hrp)
+    fn try_to_bech32(&self, hrp: &str, case: Case) -> Result<crate::EncodedSecret, Bech32Error> {
+        self.try_to_bech32_sized::<BECH32_CODE_LENGTH>(hrp, case)
     }
 
     #[inline(always)]
     fn try_to_bech32_sized<const N: usize>(
         &self,
         hrp: &str,
+        case: Case,
     ) -> Result<crate::EncodedSecret, Bech32Error> {
         let hrp_parsed = Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
         let data = self.as_ref();
@@ -276,6 +280,14 @@ impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBech32 for T {
             len,
             "bech32_code_length disagreed with the encoder"
         );
+        // BIP-173 defines the checksum over the lowercase form and accepts either pure
+        // case, so uppercasing the finished string -- HRP, separator, payload and
+        // checksum together -- stays valid and decodable. Done here, on a buffer we
+        // still own at exact capacity: ASCII case conversion is length-preserving, so
+        // it cannot reallocate and the secret is never copied.
+        if matches!(case, Case::Upper) {
+            out.make_ascii_uppercase();
+        }
         Ok(crate::EncodedSecret::new(out))
     }
 }
@@ -329,7 +341,9 @@ mod tests {
             ("x", 4096),
         ] {
             let data: Vec<u8> = (0..len).map(|i| (i * 131 + 7) as u8).collect();
-            let ours = data.try_to_bech32_sized::<65535>(hrp).expect("ours");
+            let ours = data
+                .try_to_bech32_sized::<65535>(hrp, Case::Lower)
+                .expect("ours");
             let theirs = encode_lower::<Bech32Sized<65535>>(Hrp::parse(hrp).unwrap(), &data)
                 .expect("upstream");
             assert_eq!(&*ours, &*theirs, "hrp={hrp} len={len}");

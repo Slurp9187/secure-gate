@@ -145,10 +145,10 @@ pub trait FromBech32mStr {
     /// # Examples
     ///
     /// ```rust
-    /// use secure_gate::{FromBech32mStr, ToBech32m};
+    /// use secure_gate::{Case, FromBech32mStr, ToBech32m};
     ///
     /// let ct = [0x5Au8; 1568];
-    /// let encoded = ct.try_to_bech32m_sized::<4096>("kem")?;
+    /// let encoded = ct.try_to_bech32m_sized::<4096>("kem", Case::Lower)?;
     /// let decoded = encoded.try_from_bech32m_sized::<4096>("kem")?;
     /// assert_eq!(decoded, ct);
     /// # Ok::<(), secure_gate::Bech32Error>(())
