@@ -69,15 +69,6 @@ jobs:
           - name: full
             package: secure-gate-compat
             features: "--features=full"
-          # Each serde feature on its own. On `main` neither compiled alone, because
-          # only `secrecy-compat` pulled `serde` in; this branch's feature list already
-          # names `dep:serde` in both, so these rows are the gate rather than the fix.
-          - name: serde-serialize only
-            package: secure-gate-compat
-            features: "--features=serde-serialize"
-          - name: serde-deserialize only
-            package: secure-gate-compat
-            features: "--features=serde-deserialize"
           # The shim surface itself, and the whole of it. Neither was linted here: the
           # compat rows stopped at `full`, which does not enable `secrecy-compat`.
           # `--no-default-features` deliberately: `secrecy-compat` is experimental and
@@ -366,10 +357,11 @@ jobs:
   # MSRV, which is what a contributor runs. `-D warnings` also catches broken
   # intra-doc links, which nothing else here does.
   #
-  # Covers both crates. It was core-only when introduced because compat carried 11
-  # broken intra-doc links that would have landed the job red; those are fixed, so
-  # compat is gated here too. `secure-gate-compat` is never published, but its docs
-  # are read from the repo and the same 1.70 rules apply.
+  # Core only. `secure-gate-compat` was gated here for a while, as a guard against its
+  # intra-doc links rotting again after 11 of them were fixed. That is the wrong bar for
+  # an experimental crate that is never published and may be purged: it must compile and
+  # its tests must pass, so it cannot block core, but its docs are not release-blocking
+  # and are not worth a job on every PR.
   # ---------------------------------------------------------------------------
   rustdoc:
     name: Rustdoc – builds on MSRV (1.70)
@@ -391,11 +383,6 @@ jobs:
         env:
           RUSTDOCFLAGS: "-D warnings"
         run: cargo +1.70 doc -p secure-gate --features=full --no-deps
-
-      - name: cargo doc – compat (all features)
-        env:
-          RUSTDOCFLAGS: "-D warnings"
-        run: cargo +1.70 doc -p secure-gate-compat --all-features --no-deps
 
   # ---------------------------------------------------------------------------
   # Compile-fail job — API-surface enforcement on the blessing toolchain

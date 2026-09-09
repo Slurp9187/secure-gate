@@ -183,11 +183,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lint row now uses that exact form, and the reason is recorded on the `full` definition
   in the manifest where someone would otherwise add it.
 
-- **The compat lint matrix gained four rows.** It stopped at `full`, which does not
-  enable `secrecy-compat` — so the shim surface itself, the whole feature set, and each
-  serde feature alone were never linted on this branch. All four pass today; these are
-  gates, not fixes. (The serde-alone bug `main` had does not exist here: this branch's
-  `serde-serialize` / `serde-deserialize` already name `dep:serde`.)
+- **The compat lint matrix gained two rows, and the rustdoc job lost compat.** The
+  matrix stopped at `full`, which does not enable `secrecy-compat`, so the shim surface
+  itself and the whole feature set were never linted here; both are now covered. Two
+  further rows for each serde feature alone were considered and dropped — the bug they
+  would guard cannot occur on this branch, since `serde-serialize` and
+  `serde-deserialize` already name `dep:serde`, and `--all-features` covers compilation.
+
+  Compat's rustdoc is no longer gated. The bar for an experimental, never-published
+  crate that may be purged is that it compiles and its tests pass, so it cannot block
+  core — not that its docs are publication-clean. Core's rustdoc is still gated on 1.70.
 
   `main`'s companion change, running compat's runtime suites in debug rather than
   release-only, is **not** needed here — the MSRV job already runs
