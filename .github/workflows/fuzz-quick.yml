@@ -12,9 +12,6 @@ on:
       - "secure-gate-core/fuzz/**"
       - "secure-gate-core/src/**"
       - "secure-gate-core/Cargo.toml"
-      - "secure-gate-compat/fuzz/**"
-      - "secure-gate-compat/src/**"
-      - "secure-gate-compat/Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/fuzz-quick.yml"
@@ -23,9 +20,6 @@ on:
       - "secure-gate-core/fuzz/**"
       - "secure-gate-core/src/**"
       - "secure-gate-core/Cargo.toml"
-      - "secure-gate-compat/fuzz/**"
-      - "secure-gate-compat/src/**"
-      - "secure-gate-compat/Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/fuzz-quick.yml"
@@ -70,34 +64,3 @@ jobs:
           path: secure-gate-core/fuzz/artifacts/${{ matrix.target }}/**
           retention-days: 7
 
-  # ---------------------------------------------------------------------------
-  # Compat fuzz build smoke
-  #
-  # `secure-gate-compat/fuzz` builds against `secure-gate`, so a core API change
-  # can leave it uncompilable. Until now the only thing that noticed was the
-  # nightly compat workflow — 4 jobs x ~50 min — which is how the encoder rewrite
-  # shipped a fuzz crate that did not build. Building the targets (no fuzzing)
-  # catches that class in a couple of minutes.
-  # ---------------------------------------------------------------------------
-  compat-fuzz-build:
-    name: Compat fuzz – build only
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust nightly
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: nightly
-
-      - name: Cache cargo registry + target dir
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz
-
-      - name: cargo fuzz build (compat targets)
-        run: cd secure-gate-compat && cargo +nightly fuzz build

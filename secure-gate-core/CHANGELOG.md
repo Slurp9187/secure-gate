@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **`secure-gate-compat` is deleted.** The `secrecy` v0.8 / v0.10 shim crate was
+  experimental, never published to crates.io, and had no known consumers — the one
+  downstream tracking this project depends on `secure-gate` alone. It cost more than it
+  returned: a disproportionate share of every review, audit and release cycle went to a
+  crate nobody could install.
+
+  **Recovering it:** the crate is intact in git history and in both release tags.
+  `git checkout v0.9.0-rc.9 -- secure-gate-compat` restores it here;
+  `git checkout v0.8.0-rc.12 -- secure-gate-compat` restores the LTS version. Both tags
+  are pushed, so this works from any clone. Nothing is lost, only unmaintained.
+
+  Removed with it: the crate's five CI lint rows, its release- and debug-profile test
+  steps, its `no_std` cross-build, its Miri and fuzz-quick path filters, and the
+  `fuzz-nightly-0.9-compat.yml` workflow. `secure-gate` itself is unchanged — this is a
+  workspace and CI change, and the published crate's contents and API are untouched.
+
+  The workspace is now a single member. Only `cargo publish` still needs `-p secure-gate`;
+  `check`, `test` and `doc` work bare.
+
 ## [0.9.0-rc.9] - 2026-09-08
 
 ### Added

@@ -383,10 +383,10 @@ relies on remain compatible with Rust 1.70.
 
 ## Migrating from secrecy
 
-See the [`secure-gate-compat`](../secure-gate-compat/) crate for drop-in replacements. It is
-experimental and unpublished, so depend on it by git rather than from crates.io.
-
-See [MIGRATING_FROM_SECRECY.md](../secure-gate-compat/MIGRATING_FROM_SECRECY.md) for the full guide.
+The `secure-gate-compat` shim crate, which provided drop-in replacements for `secrecy`
+v0.8 and v0.10, has been removed. It was experimental and never published. If you need
+it, it is recoverable from git history — `git checkout v0.9.0-rc.9 -- secure-gate-compat`
+restores the last version, along with its migration guide.
 
 ## Features
 

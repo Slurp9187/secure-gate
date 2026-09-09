@@ -6,7 +6,6 @@ on:
     branches: [main]
     paths:
       - "secure-gate-core/**"
-      - "secure-gate-compat/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/ci.yml"
@@ -14,7 +13,6 @@ on:
     branches: [main]
     paths:
       - "secure-gate-core/**"
-      - "secure-gate-compat/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/ci.yml"
@@ -100,27 +98,6 @@ jobs:
           - name: all features
             package: secure-gate
             features: "--all-features"
-          - name: no features
-            package: secure-gate-compat
-            features: "--no-default-features"
-          # `--no-default-features` deliberately: `secrecy-compat` is experimental and
-          # must stand on its own rather than lean on whatever `default` happens to be.
-          # It is also deliberately reachable from no other feature — see the note on
-          # the feature definition in the compat manifest.
-          - name: secrecy-compat (standalone)
-            package: secure-gate-compat
-            features: "--no-default-features --features=secrecy-compat"
-          - name: all features
-            package: secure-gate-compat
-            features: "--all-features"
-          # Each serde feature on its own. Only `secrecy-compat` happened to drag
-          # `serde` in, so neither of these compiled alone and no row noticed.
-          - name: serde-serialize only
-            package: secure-gate-compat
-            features: "--features=serde-serialize"
-          - name: serde-deserialize only
-            package: secure-gate-compat
-            features: "--features=serde-deserialize"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -261,8 +238,7 @@ jobs:
   # diagnostics (blessed against the pinned toolchain) which drift on stable and
   # are independent of the build profile — the property this job guards is
   # runtime behavior. Core cases are skipped by the `compile_fail` name suffix
-  # (plus the one legacy name); keep the compat list in sync with the test
-  # names in secure-gate-compat/tests/compile_fail_tests.rs.
+  # (plus the one legacy name).
   # ---------------------------------------------------------------------------
   test-release:
     name: Test – release profile
@@ -282,16 +258,6 @@ jobs:
 
       - name: Run core tests (release, full features)
         run: cargo test -p secure-gate --tests --release --features=full -- --skip compile_fail --skip serializable_secret_misuse
-
-      - name: Run compat tests (release, all features)
-        run: cargo test -p secure-gate-compat --release --all-features -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip compat_no_deref --skip compat_no_asref --skip compat_no_debug_without_marker
-
-      # Compat's runtime suites otherwise run only under `--release`. Debug is where
-      # `debug_assertions` and overflow checks are live, and it is the profile a
-      # contributor actually runs, so the same suites run here too. Core already has
-      # debug coverage from the `test` matrix above.
-      - name: Run compat tests (debug, all features)
-        run: cargo test -p secure-gate-compat --all-features -- --skip fixed_alias_zero_size_compile_fail --skip serializable_secret_misuse --skip compat_no_deref --skip compat_no_asref --skip compat_no_debug_without_marker
 
   # ---------------------------------------------------------------------------
   # no_std job — cross-build for a bare-metal target
@@ -339,11 +305,6 @@ jobs:
           done
 
       - name: Cross-build compat for bare metal
-        # secure-gate-compat is unconditionally #![no_std] (alloc-based shims).
-        run: |
-          set -eux
-          cargo build -p secure-gate-compat --lib --target thumbv7em-none-eabihf
-          cargo build -p secure-gate-compat --lib --target thumbv7em-none-eabihf --features secrecy-compat
 
   # ---------------------------------------------------------------------------
   # MSRV job — verify declared rust-version is actually buildable
