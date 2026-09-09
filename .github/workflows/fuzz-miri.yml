@@ -106,8 +106,12 @@ jobs:
           toolchain: nightly
           components: miri, rust-src
 
-      - name: Cache cargo registry + target dir
-        uses: Swatinem/rust-cache@v2
+      # No dependency cache in this job, deliberately. It runs in the default
+      # branch's privilege context (schedule / workflow_dispatch) while checking out
+      # a *different* ref, so writing a shared cache here is the cache-poisoning
+      # pattern CodeQL flags as `actions/cache-poisoning/poisonable-step` — a
+      # compromised `release/0.8` could plant artifacts that `main`'s builds later
+      # restore and execute. A weekly job does not need the speedup.
 
       - name: Setup Miri
         run: cargo miri setup
