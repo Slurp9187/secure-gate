@@ -137,10 +137,10 @@ pub trait FromBech32Str {
     /// # Examples
     ///
     /// ```rust
-    /// use secure_gate::{FromBech32Str, ToBech32};
+    /// use secure_gate::{Case, FromBech32Str, ToBech32};
     ///
     /// let secret = [0x11u8; 900];
-    /// let encoded = secret.try_to_bech32_sized::<2048>("age")?;
+    /// let encoded = secret.try_to_bech32_sized::<2048>("age", Case::Lower)?;
     /// let decoded = encoded.try_from_bech32_sized::<2048>("age")?;
     /// assert_eq!(decoded, secret);
     /// // The default code length refuses it: the string is longer than 1023.

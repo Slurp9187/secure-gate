@@ -70,7 +70,7 @@ fn helper_is_exact_not_approximate() {
             const N: usize = bech32_code_length($hrp.len(), $len);
             let data = vec![0x5Au8; $len];
             let encoded = data
-                .try_to_bech32_sized::<N>($hrp)
+                .try_to_bech32_sized::<N>($hrp, secure_gate::Case::Lower)
                 .expect("the computed code length must fit")
                 .into_inner();
             assert_eq!(
@@ -81,7 +81,8 @@ fn helper_is_exact_not_approximate() {
                 $len
             );
             assert_eq!(
-                data.try_to_bech32_sized::<{ N - 1 }>($hrp).unwrap_err(),
+                data.try_to_bech32_sized::<{ N - 1 }>($hrp, secure_gate::Case::Lower)
+                    .unwrap_err(),
                 Bech32Error::OperationFailed,
                 "N-1 must be too small for hrp={} len={}",
                 $hrp,
@@ -105,19 +106,19 @@ fn helper_is_exact_not_approximate() {
 fn bech32_output_is_byte_identical_across_code_lengths() {
     let data = [0xABu8; 32];
     let a = data
-        .try_to_bech32_sized::<62>("age")
+        .try_to_bech32_sized::<62>("age", secure_gate::Case::Lower)
         .expect("exact fit")
         .into_inner();
     let b = data
-        .try_to_bech32_sized::<1023>("age")
+        .try_to_bech32_sized::<1023>("age", secure_gate::Case::Lower)
         .expect("default")
         .into_inner();
     let c = data
-        .try_to_bech32_sized::<65535>("age")
+        .try_to_bech32_sized::<65535>("age", secure_gate::Case::Lower)
         .expect("huge")
         .into_inner();
     let d = data
-        .try_to_bech32("age")
+        .try_to_bech32("age", secure_gate::Case::Lower)
         .expect("plain method")
         .into_inner();
     assert_eq!(a, b);
@@ -130,19 +131,19 @@ fn bech32_output_is_byte_identical_across_code_lengths() {
 fn bech32m_output_is_byte_identical_across_code_lengths() {
     let data = [0xABu8; 32];
     let a = data
-        .try_to_bech32m_sized::<62>("age")
+        .try_to_bech32m_sized::<62>("age", secure_gate::Case::Lower)
         .expect("exact fit")
         .into_inner();
     let b = data
-        .try_to_bech32m_sized::<1023>("age")
+        .try_to_bech32m_sized::<1023>("age", secure_gate::Case::Lower)
         .expect("default")
         .into_inner();
     let c = data
-        .try_to_bech32m_sized::<65535>("age")
+        .try_to_bech32m_sized::<65535>("age", secure_gate::Case::Lower)
         .expect("huge")
         .into_inner();
     let d = data
-        .try_to_bech32m("age")
+        .try_to_bech32m("age", secure_gate::Case::Lower)
         .expect("plain method")
         .into_inner();
     assert_eq!(a, b);
@@ -157,7 +158,7 @@ fn bech32m_output_is_byte_identical_across_code_lengths() {
 fn bech32_short_string_written_large_decodes_at_the_default() {
     let data = [0x11u8; 32];
     let encoded = data
-        .try_to_bech32_sized::<65535>("age")
+        .try_to_bech32_sized::<65535>("age", secure_gate::Case::Lower)
         .expect("encodes")
         .into_inner();
     assert!(encoded.len() < BECH32_CODE_LENGTH);
@@ -170,12 +171,13 @@ fn bech32_short_string_written_large_decodes_at_the_default() {
 fn bech32_long_string_needs_a_large_n_at_both_ends() {
     let data = vec![0x22u8; 900]; // 1440 payload chars
     assert_eq!(
-        data.try_to_bech32("age").unwrap_err(),
+        data.try_to_bech32("age", secure_gate::Case::Lower)
+            .unwrap_err(),
         Bech32Error::OperationFailed
     );
 
     let encoded = data
-        .try_to_bech32_sized::<2519>("age")
+        .try_to_bech32_sized::<2519>("age", secure_gate::Case::Lower)
         .expect("2519 fits")
         .into_inner();
     assert!(encoded.len() > BECH32_CODE_LENGTH);
@@ -205,12 +207,13 @@ fn bech32_long_string_needs_a_large_n_at_both_ends() {
 fn bech32m_long_string_needs_a_large_n_at_both_ends() {
     let data = vec![0x22u8; 900];
     assert_eq!(
-        data.try_to_bech32m("age").unwrap_err(),
+        data.try_to_bech32m("age", secure_gate::Case::Lower)
+            .unwrap_err(),
         Bech32Error::OperationFailed
     );
 
     let encoded = data
-        .try_to_bech32m_sized::<2519>("age")
+        .try_to_bech32m_sized::<2519>("age", secure_gate::Case::Lower)
         .expect("2519 fits")
         .into_inner();
     assert_eq!(
@@ -232,7 +235,7 @@ fn boundary_exactly_at_and_one_past_the_code_length() {
     // for a 3-character HRP: (1023 - 3 - 1 - 6) * 5 / 8 = 633 bytes.
     let fits = vec![0x33u8; 633];
     let encoded = fits
-        .try_to_bech32("age")
+        .try_to_bech32("age", secure_gate::Case::Lower)
         .expect("633 bytes must fit")
         .into_inner();
     assert_eq!(encoded.len(), BECH32_CODE_LENGTH);
@@ -241,7 +244,8 @@ fn boundary_exactly_at_and_one_past_the_code_length() {
     // One byte more must not.
     let over = vec![0x33u8; 634];
     assert_eq!(
-        over.try_to_bech32("age").unwrap_err(),
+        over.try_to_bech32("age", secure_gate::Case::Lower)
+            .unwrap_err(),
         Bech32Error::OperationFailed
     );
 }
@@ -253,8 +257,14 @@ fn boundary_exactly_at_and_one_past_the_code_length() {
 fn bech32_and_bech32m_never_cross_decode_at_any_code_length() {
     let data = [0x44u8; 32];
 
-    let b32 = data.try_to_bech32("x").expect("bech32").into_inner();
-    let b32m = data.try_to_bech32m("x").expect("bech32m").into_inner();
+    let b32 = data
+        .try_to_bech32("x", secure_gate::Case::Lower)
+        .expect("bech32")
+        .into_inner();
+    let b32m = data
+        .try_to_bech32m("x", secure_gate::Case::Lower)
+        .expect("bech32m")
+        .into_inner();
     assert_ne!(b32, b32m, "different residues must give different strings");
 
     // Short strings, well inside every code length: still mutually undecodable.
@@ -283,11 +293,11 @@ fn bech32_and_bech32m_never_cross_decode_at_any_code_length() {
 fn long_payloads_also_never_cross_decode() {
     let data = vec![0x55u8; 900];
     let b32 = data
-        .try_to_bech32_sized::<2519>("x")
+        .try_to_bech32_sized::<2519>("x", secure_gate::Case::Lower)
         .expect("bech32")
         .into_inner();
     let b32m = data
-        .try_to_bech32m_sized::<2519>("x")
+        .try_to_bech32m_sized::<2519>("x", secure_gate::Case::Lower)
         .expect("bech32m")
         .into_inner();
     assert_ne!(b32, b32m);
@@ -308,7 +318,7 @@ fn long_payloads_also_never_cross_decode() {
 fn sized_still_validates_the_hrp() {
     let data = vec![0x66u8; 900];
     let encoded = data
-        .try_to_bech32_sized::<2519>("age")
+        .try_to_bech32_sized::<2519>("age", secure_gate::Case::Lower)
         .expect("encodes")
         .into_inner();
     assert_eq!(
@@ -329,7 +339,7 @@ fn sized_still_validates_the_hrp() {
 fn sized_unchecked_returns_the_hrp_without_validating_it() {
     let data = vec![0x77u8; 900];
     let encoded = data
-        .try_to_bech32_sized::<2519>("age")
+        .try_to_bech32_sized::<2519>("age", secure_gate::Case::Lower)
         .expect("encodes")
         .into_inner();
     let (hrp, bytes) = encoded
@@ -373,15 +383,15 @@ fn empty_payload_round_trips_at_every_code_length() {
     // (`try_to_bech32_sized` is on the byte slice, so annotate the array explicitly.)
     for encoded in [
         empty
-            .try_to_bech32_sized::<10>("a")
+            .try_to_bech32_sized::<10>("a", secure_gate::Case::Lower)
             .expect("minimum")
             .into_inner(),
         empty
-            .try_to_bech32_sized::<1023>("a")
+            .try_to_bech32_sized::<1023>("a", secure_gate::Case::Lower)
             .expect("default")
             .into_inner(),
         empty
-            .try_to_bech32_sized::<65535>("a")
+            .try_to_bech32_sized::<65535>("a", secure_gate::Case::Lower)
             .expect("huge")
             .into_inner(),
     ] {
@@ -395,10 +405,13 @@ fn empty_payload_round_trips_at_every_code_length() {
 fn a_code_length_too_small_for_the_payload_is_an_error_not_a_truncation() {
     let data = [0xAAu8; 32]; // needs 62 characters with a 3-char HRP
     assert_eq!(
-        data.try_to_bech32_sized::<61>("age").unwrap_err(),
+        data.try_to_bech32_sized::<61>("age", secure_gate::Case::Lower)
+            .unwrap_err(),
         Bech32Error::OperationFailed
     );
-    assert!(data.try_to_bech32_sized::<62>("age").is_ok());
+    assert!(data
+        .try_to_bech32_sized::<62>("age", secure_gate::Case::Lower)
+        .is_ok());
 }
 
 // ─────────────────── wrapper types ───────────────────
@@ -408,7 +421,7 @@ fn a_code_length_too_small_for_the_payload_is_an_error_not_a_truncation() {
 fn fixed_sized_round_trip_and_length_mismatch() {
     let secret = Fixed::new([0xBBu8; 32]);
     let encoded = secret
-        .try_to_bech32_sized::<2519>("age")
+        .try_to_bech32_sized::<2519>("age", secure_gate::Case::Lower)
         .expect("wrapper encodes")
         .into_inner();
     let back =
@@ -446,7 +459,7 @@ fn fixed_sized_round_trip_and_length_mismatch() {
 fn fixed_sized_round_trip_bech32m() {
     let secret = Fixed::new([0xCCu8; 32]);
     let encoded = secret
-        .try_to_bech32m_sized::<2519>("age")
+        .try_to_bech32m_sized::<2519>("age", secure_gate::Case::Lower)
         .expect("wrapper encodes")
         .into_inner();
     Fixed::<[u8; 32]>::try_from_bech32m_sized::<2519>(&encoded, "age")
@@ -470,14 +483,16 @@ fn dynamic_sized_round_trip_for_a_kem_sized_payload() {
     let secret = Dynamic::new(ct.clone());
 
     assert_eq!(
-        secret.try_to_bech32("kem").unwrap_err(),
+        secret
+            .try_to_bech32("kem", secure_gate::Case::Lower)
+            .unwrap_err(),
         Bech32Error::OperationFailed,
         "the default must refuse a KEM ciphertext"
     );
 
     const N: usize = bech32_code_length(3, 1568);
     let encoded = secret
-        .try_to_bech32_sized::<N>("kem")
+        .try_to_bech32_sized::<N>("kem", secure_gate::Case::Lower)
         .expect("encodes")
         .into_inner();
     assert_eq!(encoded.len(), N);
@@ -502,7 +517,7 @@ fn dynamic_sized_round_trip_bech32m() {
     let secret = Dynamic::new(ct.clone());
     const N: usize = bech32_code_length(3, 1568);
     let encoded = secret
-        .try_to_bech32m_sized::<N>("kem")
+        .try_to_bech32m_sized::<N>("kem", secure_gate::Case::Lower)
         .expect("encodes")
         .into_inner();
     Dynamic::<Vec<u8>>::try_from_bech32m_sized::<N>(&encoded, "kem")
@@ -525,7 +540,9 @@ fn age_style_recipient_list_round_trips() {
     const N: usize = bech32_code_length(3, 1280);
     // Left as an EncodedSecret on purpose: this test asserts the redaction the
     // wrapper provides, which is now what every encoder returns by default.
-    let encoded = recipients.try_to_bech32_sized::<N>("age").expect("encodes");
+    let encoded = recipients
+        .try_to_bech32_sized::<N>("age", secure_gate::Case::Lower)
+        .expect("encodes");
     assert!(encoded.starts_with("age1"));
     assert_eq!(format!("{encoded:?}"), "[REDACTED]");
 
@@ -542,7 +559,7 @@ fn age_style_recipient_list_round_trips() {
 fn single_character_corruption_is_rejected_at_large_code_lengths() {
     let data = vec![0x7Eu8; 900];
     let encoded = data
-        .try_to_bech32_sized::<2519>("age")
+        .try_to_bech32_sized::<2519>("age", secure_gate::Case::Lower)
         .expect("encodes")
         .into_inner();
 
@@ -565,7 +582,7 @@ fn single_character_corruption_is_rejected_at_large_code_lengths() {
 fn truncated_and_extended_strings_are_rejected() {
     let data = vec![0x7Fu8; 900];
     let encoded = data
-        .try_to_bech32_sized::<2519>("age")
+        .try_to_bech32_sized::<2519>("age", secure_gate::Case::Lower)
         .expect("encodes")
         .into_inner();
 
@@ -626,7 +643,7 @@ fn randomized_stress_across_code_lengths() {
                         let data = rng.bytes(len);
                         let seed_note = format!("N={} B={} case={} len={}", N, $b, case, len);
 
-                        let encoded = match data.try_to_bech32_sized::<N>("age") {
+                        let encoded = match data.try_to_bech32_sized::<N>("age", secure_gate::Case::Lower) {
                             Ok(e) => e,
                             Err(Bech32Error::OperationFailed) => {
                                 // Only legitimate when the string would exceed N.
@@ -651,7 +668,7 @@ fn randomized_stress_across_code_lengths() {
 
                         // 2. The encoding does not depend on N: a bigger N gives the same bytes.
                         assert_eq!(
-                            &*data.try_to_bech32_sized::<65535>("age").expect(&seed_note),
+                            &*data.try_to_bech32_sized::<65535>("age", secure_gate::Case::Lower).expect(&seed_note),
                             &*encoded,
                             "code length changed the encoding: {seed_note}"
                         );
@@ -709,7 +726,7 @@ fn bech32_encode_allocates_exactly_once() {
         const BIG: usize = 65535;
 
         let encoded = data
-            .try_to_bech32_sized::<BIG>("age")
+            .try_to_bech32_sized::<BIG>("age", secure_gate::Case::Lower)
             .expect("encodes")
             .into_inner();
         assert_eq!(
@@ -732,7 +749,7 @@ fn bech32m_encode_allocates_exactly_once() {
         const BIG: usize = 65535;
 
         let encoded = data
-            .try_to_bech32m_sized::<BIG>("age")
+            .try_to_bech32m_sized::<BIG>("age", secure_gate::Case::Lower)
             .expect("encodes")
             .into_inner();
         assert_eq!(

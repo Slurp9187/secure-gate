@@ -343,15 +343,17 @@ macro_rules! dynamic_newtype {
                 fn try_to_bech32(
                     &self,
                     hrp: &str,
+                    case: $crate::Case,
                 ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
-                    $crate::ToBech32::try_to_bech32(&self.0, hrp)
+                    $crate::ToBech32::try_to_bech32(&self.0, hrp, case)
                 }
                 #[inline]
                 fn try_to_bech32_sized<const C: usize>(
                     &self,
                     hrp: &str,
+                    case: $crate::Case,
                 ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
-                    $crate::ToBech32::try_to_bech32_sized::<C>(&self.0, hrp)
+                    $crate::ToBech32::try_to_bech32_sized::<C>(&self.0, hrp, case)
                 }
             }
         }
@@ -396,15 +398,17 @@ macro_rules! dynamic_newtype {
                 fn try_to_bech32m(
                     &self,
                     hrp: &str,
+                    case: $crate::Case,
                 ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
-                    $crate::ToBech32m::try_to_bech32m(&self.0, hrp)
+                    $crate::ToBech32m::try_to_bech32m(&self.0, hrp, case)
                 }
                 #[inline]
                 fn try_to_bech32m_sized<const C: usize>(
                     &self,
                     hrp: &str,
+                    case: $crate::Case,
                 ) -> ::core::result::Result<$crate::EncodedSecret, $crate::Bech32Error> {
-                    $crate::ToBech32m::try_to_bech32m_sized::<C>(&self.0, hrp)
+                    $crate::ToBech32m::try_to_bech32m_sized::<C>(&self.0, hrp, case)
                 }
             }
         }

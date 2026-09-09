@@ -53,7 +53,7 @@ version sub-module) and work with both generations.
 # secrecy = "0.10"   (or "0.8")
 
 # Add:
-secure-gate-compat = { version = "0.8.{x}", features = ["secrecy-compat"] }
+secure-gate-compat = { git = "https://github.com/Slurp9187/secure-gate", branch = "release/0.8", package = "secure-gate-compat", features = ["secrecy-compat"] }
 ```
 
 Then do a global find/replace on imports (details below). Your code should

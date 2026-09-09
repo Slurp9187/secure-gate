@@ -12,7 +12,7 @@ Compatibility shims for migrating from the [`secrecy`](https://crates.io/crates/
 
 ```toml
 [dependencies]
-secure-gate-compat = { version = "0.8", features = ["secrecy-compat"] }
+secure-gate-compat = { git = "https://github.com/Slurp9187/secure-gate", branch = "release/0.8", package = "secure-gate-compat", features = ["secrecy-compat"] }
 ```
 
 ## Quick Migration Example
@@ -31,7 +31,9 @@ Your existing code should compile with only import changes. See the full guide f
 
 ## Features
 
-- `secrecy-compat` — enables the `compat::v08` and `compat::v10` modules + bridge traits
+- `secrecy-compat` — turns on the core features the shims need (`alloc`, `cloneable`,
+  `serde-serialize`) plus this crate's `serde`, and gates the compat test suite. The
+  `compat::v08` and `compat::v10` modules themselves always compile.
 - `dual-compat-test` — enables side-by-side parity tests against the real `secrecy` crate (dev only)
 
 ## Further Reading

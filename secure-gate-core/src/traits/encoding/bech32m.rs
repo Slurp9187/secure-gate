@@ -18,9 +18,9 @@
 //!   its `Debug`, and wipes on drop.
 //!   Addresses and other public values come back in the same wrapper. `.into_inner()` is the named point where that
 //!   protection ends.
-//! - **Audit visibility**: Direct wrapper calls (`key.try_to_bech32m(...)`) do **not** appear in
+//! - **Audit visibility**: Direct wrapper calls (`key.try_to_bech32m(..., Case::Lower)`) do **not** appear in
 //!   `grep expose_secret` / `grep with_secret` audit sweeps. For audit-first teams or
-//!   multi-step operations, prefer `with_secret(|b| b.try_to_bech32m(...))` — the borrow
+//!   multi-step operations, prefer `with_secret(|b| b.try_to_bech32m(..., Case::Lower))` — the borrow
 //!   checker enforces the reference cannot escape the closure.
 //! - **HRP**: pass the intended human-readable part to `try_to_bech32m`; test empty and
 //!   invalid HRP inputs in security-critical code.
@@ -37,15 +37,17 @@
 //! # Example
 //!
 //! ```rust
-//! use secure_gate::{Fixed, ToBech32m, RevealSecret};
+//! use secure_gate::{Case, Fixed, ToBech32m, RevealSecret};
 //!
 //! let secret = Fixed::new([0x00u8, 0x01]);
 //!
 //! // Use try_to_bech32m — the sole encoding API:
-//! let encoded = secret.with_secret(|s| s.try_to_bech32m("key")).unwrap();
+//! let encoded = secret.with_secret(|s| s.try_to_bech32m("key", Case::Lower)).unwrap();
 //! assert!(encoded.starts_with("key1"));
 //! // `encoded` is an `EncodedSecret`: wiped on drop, `Debug` redacted.
 //! ```
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+use super::Case;
 #[cfg(feature = "encoding-bech32")]
 use bech32::primitives::checksum::Checksum;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
@@ -76,11 +78,11 @@ pub use super::bech32::{bech32_code_length, BECH32_CODE_LENGTH};
 /// 90-character cap. Exceeding it produces valid bech32m that wallets will reject.
 ///
 /// ```rust
-/// use secure_gate::ToBech32m;
+/// use secure_gate::{Case, ToBech32m};
 ///
 /// let blob = [0x5Au8; 900];
-/// assert!(blob.try_to_bech32m("kem").is_err()); // past the 1023 default
-/// let encoded = blob.try_to_bech32m_sized::<2048>("kem")?;
+/// assert!(blob.try_to_bech32m("kem", Case::Lower).is_err()); // past the 1023 default
+/// let encoded = blob.try_to_bech32m_sized::<2048>("kem", Case::Lower)?;
 /// assert!(encoded.starts_with("kem1"));
 /// # Ok::<(), secure_gate::Bech32Error>(())
 /// ```
@@ -135,13 +137,13 @@ pub trait ToBech32m {
     /// # Examples
     ///
     /// ```rust
-    /// use secure_gate::ToBech32m;
+    /// use secure_gate::{Case, ToBech32m};
     ///
-    /// let encoded = b"hello".try_to_bech32m("key")?;
+    /// let encoded = b"hello".try_to_bech32m("key", Case::Lower)?;
     /// assert!(encoded.starts_with("key1"));
     /// # Ok::<(), secure_gate::Bech32Error>(())
     /// ```
-    fn try_to_bech32m(&self, hrp: &str) -> Result<crate::EncodedSecret, Bech32Error>;
+    fn try_to_bech32m(&self, hrp: &str, case: Case) -> Result<crate::EncodedSecret, Bech32Error>;
 
     /// Like [`try_to_bech32m`](Self::try_to_bech32m), with a caller-chosen code length `N`.
     ///
@@ -159,17 +161,18 @@ pub trait ToBech32m {
     /// # Examples
     ///
     /// ```rust
-    /// use secure_gate::{ToBech32m, bech32_code_length};
+    /// use secure_gate::{Case, ToBech32m, bech32_code_length};
     ///
     /// const N: usize = bech32_code_length(3, 1568); // ML-KEM-1024 ciphertext
     /// let ct = [0x5Au8; 1568];
-    /// let encoded = ct.try_to_bech32m_sized::<N>("kem")?;
+    /// let encoded = ct.try_to_bech32m_sized::<N>("kem", Case::Lower)?;
     /// assert!(encoded.starts_with("kem1"));
     /// # Ok::<(), secure_gate::Bech32Error>(())
     /// ```
     fn try_to_bech32m_sized<const N: usize>(
         &self,
         hrp: &str,
+        case: Case,
     ) -> Result<crate::EncodedSecret, Bech32Error>;
 }
 
@@ -178,14 +181,15 @@ pub trait ToBech32m {
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBech32m for T {
     #[inline(always)]
-    fn try_to_bech32m(&self, hrp: &str) -> Result<crate::EncodedSecret, Bech32Error> {
-        self.try_to_bech32m_sized::<BECH32_CODE_LENGTH>(hrp)
+    fn try_to_bech32m(&self, hrp: &str, case: Case) -> Result<crate::EncodedSecret, Bech32Error> {
+        self.try_to_bech32m_sized::<BECH32_CODE_LENGTH>(hrp, case)
     }
 
     #[inline(always)]
     fn try_to_bech32m_sized<const N: usize>(
         &self,
         hrp: &str,
+        case: Case,
     ) -> Result<crate::EncodedSecret, Bech32Error> {
         let hrp_parsed = Hrp::parse(hrp).map_err(|_| Bech32Error::InvalidHrp)?;
         let data = self.as_ref();
@@ -220,6 +224,14 @@ impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBech32m for T {
             len,
             "bech32_code_length disagreed with the encoder"
         );
+        // BIP-173 defines the checksum over the lowercase form and accepts either pure
+        // case, so uppercasing the finished string -- HRP, separator, payload and
+        // checksum together -- stays valid and decodable. Done here, on a buffer we
+        // still own at exact capacity: ASCII case conversion is length-preserving, so
+        // it cannot reallocate and the secret is never copied.
+        if matches!(case, Case::Upper) {
+            out.make_ascii_uppercase();
+        }
         Ok(crate::EncodedSecret::new(out))
     }
 }
@@ -242,7 +254,9 @@ mod tests {
             ("x", 4096),
         ] {
             let data: alloc::vec::Vec<u8> = (0..len).map(|i| (i * 131 + 7) as u8).collect();
-            let ours = data.try_to_bech32m_sized::<65535>(hrp).expect("ours");
+            let ours = data
+                .try_to_bech32m_sized::<65535>(hrp, Case::Lower)
+                .expect("ours");
             let theirs = encode_lower::<Bech32mSized<65535>>(Hrp::parse(hrp).unwrap(), &data)
                 .expect("upstream");
             assert_eq!(&*ours, &*theirs, "hrp={hrp} len={len}");
@@ -254,7 +268,7 @@ mod tests {
         // 800 bytes is 1280 base32 characters, past BECH32_CODE_LENGTH.
         let large_data = vec![0u8; 800];
         assert_eq!(
-            large_data.try_to_bech32m("test").unwrap_err(),
+            large_data.try_to_bech32m("test", Case::Lower).unwrap_err(),
             crate::error::Bech32Error::OperationFailed
         );
     }
@@ -262,9 +276,9 @@ mod tests {
     #[test]
     fn sized_accepts_what_the_default_rejects() {
         let large_data = vec![0u8; 800];
-        assert!(large_data.try_to_bech32m("test").is_err());
+        assert!(large_data.try_to_bech32m("test", Case::Lower).is_err());
         let encoded = large_data
-            .try_to_bech32m_sized::<2048>("test")
+            .try_to_bech32m_sized::<2048>("test", Case::Lower)
             .expect("2048 is long enough");
         assert!(encoded.starts_with("test1"));
     }

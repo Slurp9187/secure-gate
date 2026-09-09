@@ -181,7 +181,7 @@ fuzz_target!(|data: &[u8]| {
         // "fuzz" is a valid HRP and `capped` is far under the default code length,
         // so an Err here can only be a regression -- do not skip it.
         let encoded = capped
-            .try_to_bech32("fuzz")
+            .try_to_bech32("fuzz", secure_gate::Case::Lower)
             .expect("default bech32 encode refused a valid HRP and a small payload");
         {
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "fuzz")
@@ -208,7 +208,7 @@ fuzz_target!(|data: &[u8]| {
         // Every capped payload fits BIG (2048 bytes -> 3288 chars < 4096), so an Err
         // here is a regression in the sized encode gate, not a legitimate refusal.
         let encoded = capped
-            .try_to_bech32_sized::<BIG>("fuzz")
+            .try_to_bech32_sized::<BIG>("fuzz", secure_gate::Case::Lower)
             .expect("sized bech32 encode refused a payload that fits")
             .into_inner();
         {
@@ -222,7 +222,7 @@ fuzz_target!(|data: &[u8]| {
 
             // The code length is a gate, not an input: whenever the default also
             // admits this payload, the two encodings must be identical.
-            if let Ok(at_default) = capped.try_to_bech32("fuzz") {
+            if let Ok(at_default) = capped.try_to_bech32("fuzz", secure_gate::Case::Lower) {
                 assert_eq!(
                     &*at_default, &*encoded,
                     "code length must not change the encoding"
@@ -240,7 +240,7 @@ fuzz_target!(|data: &[u8]| {
         // Bech32m at the same code length: same properties, and the two checksums
         // must never decode as one another.
         let encoded_m = capped
-            .try_to_bech32m_sized::<BIG>("fuzz")
+            .try_to_bech32m_sized::<BIG>("fuzz", secure_gate::Case::Lower)
             .expect("sized bech32m encode refused a payload that fits")
             .into_inner();
         {
@@ -270,7 +270,7 @@ fuzz_target!(|data: &[u8]| {
     // 4d. HRP round-trip: encode with hrp, decode, verify hrp preserved
     {
         let encoded = b"hello"
-            .try_to_bech32("mykey")
+            .try_to_bech32("mykey", secure_gate::Case::Lower)
             .expect("default bech32 encode refused a valid HRP and a 5-byte payload");
         let (hrp, payload) = (*encoded)
             .try_from_bech32_unchecked()
@@ -304,7 +304,7 @@ fuzz_target!(|data: &[u8]| {
         let capped2 = if raw2.len() > 32 { &raw2[..32] } else { &raw2[..] };
 
         let encoded = capped2
-            .try_to_bech32m("fuzz")
+            .try_to_bech32m("fuzz", secure_gate::Case::Lower)
             .expect("default bech32m encode refused a valid HRP and a 32-byte payload");
         {
             let decoded = Dynamic::<Vec<u8>>::try_from_bech32m(&encoded, "fuzz")

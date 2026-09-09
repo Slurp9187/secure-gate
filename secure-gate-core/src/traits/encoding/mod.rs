@@ -23,6 +23,34 @@ pub mod bech32;
 pub mod bech32m;
 pub mod hex;
 
+/// Which case an encoder should emit.
+///
+/// This parameter appears only on encoders where both cases are canonical and decoding
+/// accepts either — currently bech32 and bech32m, where BIP-173 forbids mixed case and
+/// accepts either pure case, with the checksum defined over the lowercase form.
+///
+/// It is deliberately absent elsewhere, and the absence is the safety property:
+///
+/// - `to_base64url` takes no case, because base64url's alphabet gives `a`–`z` and
+///   `A`–`Z` distinct meanings. Converting the case of a base64url string destroys it.
+/// - `to_base32` takes no case, because RFC 4648 §6 output is uppercase by definition
+///   and the decoder rejects anything else.
+/// - `to_hex` / `to_hex_upper` stay two methods, because hex decoding is case-insensitive
+///   either way and the pair predates this type.
+///
+/// A caller therefore cannot ask for a case conversion that would corrupt the value —
+/// there is no parameter to pass.
+#[cfg(feature = "encoding-bech32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Case {
+    /// Lowercase output. The canonical form for bech32 and bech32m.
+    Lower,
+    /// Uppercase output. Valid per BIP-173, and the form used by key formats such as
+    /// age's `AGE-SECRET-KEY-…`.
+    Upper,
+}
+
 /// Marker for types that may be **encoded**: byte-shaped sources.
 ///
 /// *Available whenever any encoding feature is on (`encoding-hex`, `encoding-base32`,

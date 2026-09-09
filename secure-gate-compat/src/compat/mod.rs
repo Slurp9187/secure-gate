@@ -1,6 +1,9 @@
 //! secrecy compatibility layers — drop-in replacements for the `secrecy` crate.
 //!
-//! Enable with `features = ["secrecy-compat"]` in your `Cargo.toml`.
+//! The `v08` and `v10` modules always compile — they carry no `cfg` on any feature.
+//! `features = ["secrecy-compat"]` turns on what they need to be complete and exercised:
+//! `secure-gate`'s `alloc`, `cloneable` and `serde-serialize`, plus this crate's `serde`.
+//! It also gates the compat test surface.
 //!
 //! Two sub-modules mirror the two most-deployed secrecy generations:
 //!
@@ -71,8 +74,9 @@ pub use zeroize;
 ///
 /// # Migration
 ///
-/// For new code, prefer [`RevealSecret`](crate::RevealSecret), which additionally provides
-/// scoped `with_secret` access and byte-length metadata.
+/// For new code, prefer [`RevealSecret`](secure_gate::RevealSecret), which additionally
+/// provides scoped `with_secret` access. Length metadata lives on
+/// [`SecretLen`](secure_gate::SecretLen), a separate trait.
 pub trait ExposeSecret<S: ?Sized> {
     /// Returns a shared reference to the inner secret.
     fn expose_secret(&self) -> &S;
@@ -99,7 +103,7 @@ pub trait ExposeSecretMut<S: ?Sized> {
 /// works without requiring callers to enable that feature flag.
 ///
 /// For native secure-gate code, enable the `cloneable` feature and use
-/// [`secure_gate::CloneableSecret`](crate::CloneableSecret) directly.
+/// [`secure_gate::CloneableSecret`] directly.
 pub trait CloneableSecret: Clone + Zeroize {}
 
 impl CloneableSecret for i8 {}
@@ -120,9 +124,9 @@ impl<Z: CloneableSecret, const N: usize> CloneableSecret for [Z; N] {}
 
 /// Marker trait for secrets that may be serialized — mirrors `secrecy::SerializableSecret`.
 ///
-/// Re-exports [`crate::SerializableSecret`] so that code importing from the compat layer
-/// obtains the **same** trait as code importing from the crate root, preventing
-/// disambiguation issues in compiler error messages.
+/// Re-exports [`secure_gate::SerializableSecret`] so that code importing from the compat
+/// layer obtains the **same** trait as code importing from the `secure-gate` crate root,
+/// preventing disambiguation issues in compiler error messages.
 ///
 /// Requires the `serde-serialize` feature. Serialization of secret wrappers is
 /// deliberately opt-in to prevent accidental exfiltration.
@@ -189,6 +193,6 @@ pub mod v10;
 
 /// secrecy **v0.8.0** compatibility — inline/stack-allocated `Secret<S>`.
 ///
-/// Mirrors secrecy 0.8.0 (edition 2018, no const-generic arrays).
+/// Mirrors secrecy 0.8.0's API (edition 2018).
 /// See the [module docs](v08) for a per-item migration guide.
 pub mod v08;

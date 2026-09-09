@@ -39,24 +39,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > workspace resolves; compat is backported separately.
 
 ### Added
-- **Caller-chosen bech32 code length (#171).** `try_to_bech32_sized::<N>` /
-  `try_to_bech32m_sized::<N>` and `Fixed::try_from_bech32_sized` /
-  `try_from_bech32m_sized`, plus `Bech32Sized` / `Bech32mSized`, `Bech32Standard` /
-  `Bech32mStandard`, the `bech32_code_length(hrp_len, payload_bytes)` const fn, and
-  `BECH32_CODE_LENGTH`. The default stays the BIP-173 bound; `N` above it is opt-in.
-- **`EncodableBytes` marker (#172).** Encoder blanket impls are now
-  `T: AsRef<[u8]> + EncodableBytes`, which keeps string-shaped types out.
-- **Compile-fail pins (#172).** An `EncodedSecret` cannot be re-encoded (hex, and a
-  second case covering all four formats so restoring a bare `AsRef<[u8]>` blanket on any
-  one of them is caught), `EncodedSecret` has no `PartialEq`, and a `str` is not an
-  encoding input.
-- **`docs/encoded_secret_deref.md` (#174).** Why `EncodedSecret` derefs to `str` when
-  `Fixed` and `Dynamic` refuse to, and what got a compile error instead.
-- **Allocation-oracle coverage for `EncodedSecret::into_zeroizing` (#174).**
-- **CI: a no-alloc `encoding-bech32` row (#173),** the row whose absence let the BIP-173
-  decode constructors sit inside `__sg_if_alloc!` undetected.
+- **`Case` on the bech32 encoders — `try_to_bech32`, `try_to_bech32m` and both
+  `_sized::<N>` forms now take `Case::Lower` or `Case::Upper`.** Requested by a
+  downstream adopter tracking this branch, whose bech32-encoded private identity key is
+  in age's uppercase `AGE-SECRET-KEY-…` form. Encoders emitted lowercase only, so the
+  value that most warranted `EncodedSecret` shipped as a plain unzeroized `String`.
+
+  Uppercasing happens inside the encoder, on the exact-capacity buffer it already owns:
+  ASCII case conversion is length-preserving, so it cannot reallocate and the secret is
+  never copied. BIP-173 defines the checksum over the lowercase form and accepts either
+  pure case, so uppercasing HRP, separator, payload and checksum together stays valid
+  and decodable.
+
+  **The parameter's absence elsewhere is the safety property.** `to_base64url` and
+  `to_base32` take no `Case`, because no legitimate choice exists: base64url gives
+  `a`–`z` and `A`–`Z` distinct meanings, so converting case destroys the value
+  (`3q2-7w` → `3Q2-7W` fails to decode), and RFC 4648 §6 base32 is uppercase by
+  definition with a decoder that rejects anything else. A caller cannot ask for a
+  conversion that would corrupt the value, because there is no parameter to pass.
+  `to_hex` / `to_hex_upper` are unchanged: hex decodes mixed case either way, so there
+  is no hazard there to close.
+
+  This replaces a general `EncodedSecret::make_ascii_uppercase` / `make_ascii_lowercase`
+  pair that existed briefly on this branch and was never released. Those were general
+  over a type that deliberately erases which encoder produced it, so they could not
+  check anything — and since `EncodedSecret::new` is `pub(crate)`, the only values that
+  type can hold are the five encodings this crate emits, two of which corrupt under case
+  change. The generality was confined entirely to the set where the operation is
+  sometimes wrong.
 
 ### Changed
+
+- **BREAKING: the four bech32 encoders take a `Case`.** `try_to_bech32(hrp)` becomes
+  `try_to_bech32(hrp, Case::Lower)`, and likewise for `try_to_bech32m` and both
+  `_sized::<N>` forms, on `Fixed`, `Dynamic` and the newtype macros. These call sites
+  are already being edited in this unreleased candidate: rc.11 returned
+  `Result<String, _>` and rc.12 returns `Result<EncodedSecret, _>`, with the
+  `*_zeroizing` twins removed. The parameter enlarges an edit callers are already
+  making rather than adding a migration of its own.
 - **BREAKING — every encoder returns `EncodedSecret` (#172).** The `*_zeroizing` twins
   are gone, so the short name is the safe one. An encoded secret is a second full copy of
   the secret in a longer alphabet; it is wiped by default now, and the unprotected form
@@ -77,8 +97,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`Bech32Error::ConversionFailed` and `DecodingError` (#171)** — the first was
   unreachable, and the second was a wrapper nothing produced.
 - **The `encoding-bech32m` feature (#171)** — see the fold above.
+- **BREAKING: `AsRef<str>` and `AsRef<[u8]>` on `EncodedSecret` (#172).** Removed with
+  the rest of the #172 surface reduction but missed by this entry until now, which is
+  how a downstream adopter met it without warning. `Deref<Target = str>` is the single
+  accessor: `&str` coercion, `&*encoded`, inherent `str` methods and method resolution
+  through the deref all still work.
+
+  **Migration:** one pattern genuinely breaks. Deref coercion applies at a coercion site
+  but does not satisfy a generic bound, so an `impl AsRef<[u8]>` parameter no longer
+  accepts an `EncodedSecret` — `fs::write(path, &encoded)` being the common shape. Pass
+  `encoded.as_bytes()`.
 
 ### Fixed
+
+- **Backported the pre-publish audit fixes from `main` (#182).** Same defects, same
+  branch, found by an adversarial review of the 0.9 release candidate and confirmed
+  present here rather than assumed. `publish = false` had stopped at the manifest while
+  the root README still listed the compat crate under "Published as" with a crates.io
+  link, both READMEs and `MIGRATING_FROM_SECRECY.md` gave a `version = "0.8"` dependency
+  line that cannot resolve, and `Cargo.toml` advertised a `documentation` URL on docs.rs
+  that will never be built. The migration steps in `v08` and `v10` told readers to add
+  `secure-gate` with `features = ["secrecy-compat"]`, which is a feature on *this* crate
+  — the same class as the `secure_gate::compat::` paths rc.12 already fixed, missed in
+  the steps beside them. Three intra-doc links resolved successfully to the wrong item:
+  `mod.rs`'s `CloneableSecret` was labelled `secure_gate::CloneableSecret` but targeted
+  compat's own marker, `v10`'s "secure-gate native" table pointed at that same compat
+  trait, and `SerializableSecret`'s doc named `crate::SerializableSecret` when the
+  `pub use` is `secure_gate::SerializableSecret`. `ExposeSecret`'s docs credited
+  `RevealSecret` with byte-length metadata that lives on `SecretLen`. `secrecy-compat`
+  was documented as "enabling" shim modules that carry no `cfg` on it. `v08` was
+  described as having no const-generic arrays while implementing `DebugSecret for
+  [T; N]`. The `full` feature was documented as "Everything" when it deliberately omits
+  `std`. `SECURITY.md`'s `cargo test` line lacked `-p secure-gate-compat`, and its "last
+  updated" stamp still read March 2026.
+
+- **`tests/proptest_suite/` was gated on this crate's `alloc`, which `secrecy-compat`
+  does not enable.** `secrecy-compat` turns on `alloc` transitively but the file's
+  `#[cfg(all(…, feature = "alloc"))]` names *this* crate's feature, so
+  `--features secrecy-compat --all-targets` compiled none of it and only `--all-features`
+  ever did. Measured: 0 proptest cases before, 12 after. The parent module already gates
+  on `secrecy-compat`, so the conjunct was pure concealment.
 - **`cargo doc` builds on 1.70 again; the bech32 re-exports are split.** The #171
   backport reintroduced the grouped-`use` rustdoc ICE that `SecretLen` already hit:
   `pub use traits::{Bech32Sized, Bech32Standard};` and two more grouped re-exports made
@@ -116,6 +174,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its 0.8 backport, matching the newtype design records.
 
 ### Testing
+
+- **`secrecy-compat` is gated as standalone, and stays out of `full`.** The shim is
+  experimental and may yet be purged, so it has to be opt-in and has to stand on its own
+  rather than lean on `default = ["alloc"]`. Both were already true — `full` forwards
+  only to `secure-gate`'s own full set, and the shim builds and tests from
+  `--no-default-features --features=secrecy-compat` — but nothing held them true. The
+  lint row now uses that exact form, and the reason is recorded on the `full` definition
+  in the manifest where someone would otherwise add it.
+
+- **The compat lint matrix gained two rows, and the rustdoc job lost compat.** The
+  matrix stopped at `full`, which does not enable `secrecy-compat`, so the shim surface
+  itself and the whole feature set were never linted here; both are now covered. Two
+  further rows for each serde feature alone were considered and dropped — the bug they
+  would guard cannot occur on this branch, since `serde-serialize` and
+  `serde-deserialize` already name `dep:serde`, and `--all-features` covers compilation.
+
+  Compat's rustdoc is no longer gated. The bar for an experimental, never-published
+  crate that may be purged is that it compiles and its tests pass, so it cannot block
+  core — not that its docs are publication-clean. Core's rustdoc is still gated on 1.70.
+
+  `main`'s companion change, running compat's runtime suites in debug rather than
+  release-only, is **not** needed here — the MSRV job already runs
+  `cargo +1.70 test -p secure-gate-compat --all-features`, which is the debug profile.
 - **Core test and fuzz suites brought up to `main`, on this branch's toolchain.**
   405 → 422 tests. Gained `Dynamic<T>` From-impl coverage (`Box<Vec>`, `Box<String>`,
   owned values) this branch had none of; additions across the base32, hex, ct_eq and

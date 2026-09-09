@@ -136,9 +136,16 @@ impl core::fmt::Debug for EncodedSecret {
     }
 }
 
-// No `AsRef<str>` / `AsRef<[u8]>`: `Deref<Target = str>` already yields `&str` by
-// coercion, by `&*encoded`, and through method resolution, so both impls were doors
+// No `AsRef<str>` / `AsRef<[u8]>`: `Deref<Target = str>` yields `&str` by coercion, by
+// `&*encoded`, and through method resolution, so for those uses the impls were doors
 // onto a room `Deref` already opens.
+//
+// They were not equivalent, though, and the difference is worth stating because it is
+// the one thing removing them broke. Deref coercion applies at a coercion site; it does
+// not satisfy a generic bound. So `fs::write(path, &encoded)` — or any
+// `impl AsRef<[u8]>` parameter — no longer compiles, and the caller writes
+// `encoded.as_bytes()` instead. That is a deliberate cost: a generic byte sink is
+// exactly the call that should name the extraction rather than have it inferred.
 //
 // Removing them did not, on its own, close the accidental re-encode: method resolution
 // derefs to `str`, and `str: AsRef<[u8]>` satisfied the old encoder blanket impls, so
