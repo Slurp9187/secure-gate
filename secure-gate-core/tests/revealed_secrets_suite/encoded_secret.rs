@@ -198,7 +198,9 @@ fn uppercased_bech32_still_decodes() {
     // defined over the lowercase form. Uppercasing the whole output -- HRP, separator,
     // payload and checksum -- must therefore stay decodable. This is the property that
     // uppercase key formats such as age's `AGE-SECRET-KEY-1...` rely on.
-    use secure_gate::{FromBech32Str, ToBech32};
+    // `Fixed` is imported at module scope only under `encoding-hex`; this test runs
+    // without it, so name it here.
+    use secure_gate::{Fixed, FromBech32Str, ToBech32};
 
     let payload = [0x00u8, 0x01, 0x02, 0x03, 0xFE, 0xFF];
     let secret = Fixed::new(payload);
