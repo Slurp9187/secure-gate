@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`SECURITY.md` gained the zero-length-secret entry from `main`.** A zero-length secret
+  is accepted everywhere and fails silently: `Fixed<[u8; 0]>` constructs, reports
+  `len() == 0`, still prints `[REDACTED]`, encodes to `""`, and compares `ct_eq`-equal to
+  any other empty. `fixed_alias!(Name, 0)` is a compile error, but that guard lives in the
+  macro alone — `type Name = Fixed<[u8; 0]>;` bypasses it. Verified on 1.70 against this
+  branch rather than copied on faith from `main`.
+
 - **`fuzz/Cargo.lock` is tracked.** Fuzzing is part of this crate's assurance story, and
   a crash is only useful if it still reproduces later. `arbitrary` decides how a stored
   corpus byte string maps to a generated value, so a minor bump there can change what a
