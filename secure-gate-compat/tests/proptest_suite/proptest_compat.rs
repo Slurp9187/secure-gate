@@ -8,7 +8,7 @@
 //!   3. Clone independence: modifying a clone does not affect the original
 //!   4. ct_eq agreement (when feature = "ct-eq"): ct_eq must agree with ==
 
-#[cfg(all(feature = "secrecy-compat", feature = "alloc"))]
+#[cfg(feature = "secrecy-compat")]
 #[allow(unused_imports)]
 mod tests {
     use proptest::prelude::*;
