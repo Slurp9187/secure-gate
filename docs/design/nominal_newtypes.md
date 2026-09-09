@@ -1,7 +1,7 @@
 # Nominal Newtypes over `Fixed` and `Dynamic` (`fixed_newtype!` / `dynamic_newtype!`)
 
 > **Status: ships in 0.9.0 — in the next release candidate, alongside the
-> composability restructure (`docs/composability_restructure.md`, #156).**
+> composability restructure (`docs/design/composability_restructure.md`, #156).**
 > §5.1 is decided and implemented (option (c): `Clone`/`Serialize` dropped
 > from `derive:`, callers write them by hand), §5.2 is decided (stay with
 > `macro_rules!`; trap 6 fixed by the explicit `generic` marker), §6 polish is
@@ -13,7 +13,7 @@
 > Tracking issue: #155. Branch: `claude/fixed-dynamic-newtype-hl7e19`.
 > Not a candidate for `release/0.8` — that branch is security patches only.
 >
-> **Superseded in part by `docs/composability_restructure.md`** (same branch,
+> **Superseded in part by `docs/design/composability_restructure.md`** (same branch,
 > 0.9.0 candidate): §3.3 is now implemented (wrapper encoders are trait
 > impls) and trap 7 is fixed (`RevealSecret` now covers custom inner types,
 > which previously had no access impl at all). The spike macros in

@@ -461,7 +461,7 @@ that keeps the bytes is a copy the crate no longer tracks. (`format!("{}", enc)`
 deref does not compile — `EncodedSecret` has no `Display` — which is the point of that
 omission.)
 Rationale for keeping `Deref`, and why this residual is accepted rather than closed:
-`docs/encoded_secret_deref.md`.
+`docs/design/encoded_secret_deref.md`.
 
 **Note:** `into_inner` does not appear in an `expose_secret*`-only sweep — audit it
 separately. It consumes the wrapper and transfers ownership of the **plain** value:
