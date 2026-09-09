@@ -39,6 +39,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > workspace resolves; compat is backported separately.
 
 ### Added
+- **`EncodedSecret::make_ascii_uppercase` / `make_ascii_lowercase`.** In place, ASCII
+  only, length-preserving — so the buffer is never reallocated and the secret is never
+  copied. The alternative, `into_inner()` then `to_uppercase()`, allocates a second
+  `String` and leaves the encoded secret in a buffer this type no longer owns and cannot
+  wipe; doing the transformation inside the wrapper is the point of the method. A test
+  pins that by asserting the buffer pointer is unchanged, and it was mutation-checked
+  against a deliberately reallocating implementation.
+
+  Every encoding this crate produces is ASCII, so one pair of methods covers hex,
+  base32, base64url, bech32 and bech32m with no case-folding hazards. For bech32,
+  BIP-173 forbids mixed case and accepts either pure case with the checksum defined over
+  the lowercase form, so uppercasing a whole output stays decodable — which is how
+  uppercase key formats such as age's `AGE-SECRET-KEY-…` are built. Pinned by a
+  round-trip test.
+
+  Requested by a downstream adopter tracking this branch, whose bech32-encoded private
+  identity key could not use the wrapper at all: encoders emit lowercase, there is no
+  `DerefMut`, and `EncodedSecret::new` is `pub(crate)` — so the value that most warranted
+  the type was the one value that could not have it. `new` stays `pub(crate)`.
 - **Caller-chosen bech32 code length (#171).** `try_to_bech32_sized::<N>` /
   `try_to_bech32m_sized::<N>` and `Fixed::try_from_bech32_sized` /
   `try_from_bech32m_sized`, plus `Bech32Sized` / `Bech32mSized`, `Bech32Standard` /
@@ -77,6 +96,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`Bech32Error::ConversionFailed` and `DecodingError` (#171)** — the first was
   unreachable, and the second was a wrapper nothing produced.
 - **The `encoding-bech32m` feature (#171)** — see the fold above.
+- **BREAKING: `AsRef<str>` and `AsRef<[u8]>` on `EncodedSecret` (#172).** Removed with
+  the rest of the #172 surface reduction but missed by this entry until now, which is
+  how a downstream adopter met it without warning. `Deref<Target = str>` is the single
+  accessor: `&str` coercion, `&*encoded`, inherent `str` methods and method resolution
+  through the deref all still work.
+
+  **Migration:** one pattern genuinely breaks. Deref coercion applies at a coercion site
+  but does not satisfy a generic bound, so an `impl AsRef<[u8]>` parameter no longer
+  accepts an `EncodedSecret` — `fs::write(path, &encoded)` being the common shape. Pass
+  `encoded.as_bytes()`.
 
 ### Fixed
 - **`cargo doc` builds on 1.70 again; the bech32 re-exports are split.** The #171
