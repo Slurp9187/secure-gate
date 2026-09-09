@@ -62,6 +62,11 @@ proptest = "1.10"
 #
 # Shared traits (ExposeSecret, CloneableSecret, zeroize re-export) live in compat root.
 # See `src/compat/` for the full migration guides.
+# Nothing else may enable this. The shim is experimental and may be purged, so it
+# stays opt-in and self-contained: no aggregate feature reaches it, and it pulls in
+# what it needs itself rather than assuming a `default`. That keeps removal a
+# deletion rather than an untangling. The `secrecy-compat (standalone)` CI row
+# builds it with `--no-default-features` to hold that true.
 secrecy-compat = ["secure-gate/alloc", "secure-gate/cloneable", "secure-gate/serde-serialize", "serde"]
 
 # Enables side-by-side parity tests in tests/compat_dual/ that run the exact same

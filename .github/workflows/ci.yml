@@ -110,9 +110,13 @@ jobs:
           - name: no features
             package: secure-gate-compat
             features: "--no-default-features"
-          - name: secrecy-compat
+          # `--no-default-features` deliberately: `secrecy-compat` is experimental and
+          # must stand on its own rather than lean on whatever `default` happens to be.
+          # It is also deliberately reachable from no other feature — see the note on
+          # the feature definition in the compat manifest.
+          - name: secrecy-compat (standalone)
             package: secure-gate-compat
-            features: "--features=secrecy-compat"
+            features: "--no-default-features --features=secrecy-compat"
           - name: all features
             package: secure-gate-compat
             features: "--all-features"
