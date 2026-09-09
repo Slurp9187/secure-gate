@@ -26,9 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   buffer pointer is unchanged across the call, and it was mutation-checked: swapping in
   a reallocating implementation makes it fail.
 
-  ASCII-only is correct rather than a limitation. Every encoding this crate produces —
-  hex, base32, base64url, bech32, bech32m — is ASCII by construction, so one pair of
-  methods covers all of them with no Unicode case-folding hazards and no length changes.
+  ASCII-only avoids Unicode case-folding hazards, but **which encodings this is valid
+  for is a narrower question**, and the docs carry the table: case is cosmetic in hex
+  (decoding is case-insensitive) and in bech32/bech32m (BIP-173 accepts either pure
+  case), but *semantic* in base64url, where `a`–`z` and `A`–`Z` are distinct symbols and
+  either conversion destroys the value — and base32 output is already uppercase, so
+  lowercasing it fails to decode. `EncodedSecret` does not record which encoder produced
+  it, so it cannot check; the documentation is the guard, and a test pins the base64url
+  claim so the table cannot silently go stale.
 
   Deliberately narrower than a general `map_in_place(&mut String)`, which would permit
   `*s = s.to_uppercase()` and reintroduce exactly the reallocation this avoids. Also

@@ -96,9 +96,23 @@ impl EncodedSecret {
 
     /// Converts the encoded text to uppercase in place, ASCII only.
     ///
-    /// Every encoding this crate produces — hex, base32, base64url, bech32, bech32m —
-    /// is ASCII by construction, so this covers all of them with no Unicode
-    /// case-folding hazards.
+    /// # Which encodings this is valid for
+    ///
+    /// `EncodedSecret` does not record which encoder produced it, so this method cannot
+    /// check. Case is cosmetic in some alphabets and *semantic* in others, and applying
+    /// it to the wrong one destroys the value:
+    ///
+    /// | Encoding | `make_ascii_uppercase` | `make_ascii_lowercase` |
+    /// |---|---|---|
+    /// | hex | safe — decoding is case-insensitive (`base16ct::mixed`) | safe |
+    /// | bech32 / bech32m | safe — BIP-173 accepts either pure case | safe |
+    /// | base32 | no-op — output is already uppercase | **corrupts** — the decoder is `Base32UpperUnpadded` |
+    /// | base64url | **corrupts** — `a`–`z` and `A`–`Z` are distinct symbols | **corrupts** |
+    ///
+    /// Reach for this when a format demands a case the encoder does not emit — bech32 in
+    /// age's uppercase `AGE-SECRET-KEY-…` form is the motivating case. For hex, prefer
+    /// [`ToHex::to_hex_upper`](crate::ToHex::to_hex_upper), which selects the alphabet at
+    /// encode time in one constant-time pass instead of rewriting the buffer afterwards.
     ///
     /// # Why in place
     ///
@@ -139,7 +153,9 @@ impl EncodedSecret {
     /// Converts the encoded text to lowercase in place, ASCII only.
     ///
     /// The counterpart to [`make_ascii_uppercase`], with the same properties: ASCII
-    /// only, length-preserving, no reallocation, no second copy of the secret.
+    /// only, length-preserving, no reallocation, no second copy of the secret — and the
+    /// same caveat. See the table on [`make_ascii_uppercase`]: lowercasing a base32 or
+    /// base64url output corrupts it.
     ///
     /// [`make_ascii_uppercase`]: EncodedSecret::make_ascii_uppercase
     #[inline(always)]

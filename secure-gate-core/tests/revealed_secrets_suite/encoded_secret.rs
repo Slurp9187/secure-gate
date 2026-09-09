@@ -227,3 +227,32 @@ fn uppercased_bech32_still_decodes() {
         "round-trip through uppercase changed the payload"
     );
 }
+
+#[cfg(feature = "encoding-base64")]
+#[test]
+fn case_conversion_corrupts_base64url_as_documented() {
+    // `make_ascii_uppercase` docs claim case is *semantic* in base64url and that
+    // converting destroys the value. That claim is load-bearing -- `EncodedSecret` does
+    // not know which encoder produced it, so the docs are the only guard. Pin it the
+    // same way `into_zeroizing`'s Debug behaviour is pinned: if base64ct ever became
+    // case-insensitive, the table in those docs would need rewriting.
+    use secure_gate::{Fixed, FromBase64UrlStr, ToBase64Url};
+
+    let payload = [0xDEu8, 0xAD, 0xBE, 0xEF];
+    let mut encoded = Fixed::new(payload).to_base64url();
+
+    let round_trips = (*encoded).try_from_base64url().as_deref() == Ok(&payload[..]);
+    assert!(round_trips, "fixture must round-trip before conversion");
+
+    encoded.make_ascii_uppercase();
+
+    let still_valid = (*encoded)
+        .try_from_base64url()
+        .map(|v| v == payload)
+        .unwrap_or(false);
+    assert!(
+        !still_valid,
+        "uppercasing base64url no longer corrupts it; the case table in \
+         EncodedSecret::make_ascii_uppercase needs updating"
+    );
+}
