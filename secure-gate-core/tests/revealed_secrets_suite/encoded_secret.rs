@@ -149,3 +149,79 @@ fn encoded_secret_into_zeroizing_carries_the_content() {
         "zeroize's Debug no longer prints the value in the clear; fix into_zeroizing's docs"
     );
 }
+
+// ── ASCII case conversion ────────────────────────────────────────────────────
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn ascii_case_converts_in_place_and_round_trips() {
+    let mut encoded = sample_hex_secret();
+    assert_eq!(&*encoded, "deadbeef");
+
+    encoded.make_ascii_uppercase();
+    assert_eq!(&*encoded, "DEADBEEF");
+
+    encoded.make_ascii_lowercase();
+    assert_eq!(&*encoded, "deadbeef");
+}
+
+#[cfg(feature = "encoding-hex")]
+#[test]
+fn ascii_case_does_not_reallocate() {
+    // The security property, not a performance one. ASCII case conversion is
+    // length-preserving, so the buffer must be mutated in place: a reallocation would
+    // leave the encoded secret in a freed allocation this type no longer owns and
+    // cannot wipe. Pinning the pointer is the only way to assert that from outside.
+    let mut encoded = sample_hex_secret();
+    let before = encoded.as_ptr();
+    let len_before = encoded.len();
+
+    encoded.make_ascii_uppercase();
+
+    assert_eq!(
+        encoded.as_ptr(),
+        before,
+        "make_ascii_uppercase reallocated; the pre-conversion bytes are now in a buffer \
+         EncodedSecret cannot zeroize"
+    );
+    assert_eq!(
+        encoded.len(),
+        len_before,
+        "ASCII case conversion changed the length"
+    );
+}
+
+#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+#[test]
+fn uppercased_bech32_still_decodes() {
+    // BIP-173 forbids mixed case and accepts either pure case, with the checksum
+    // defined over the lowercase form. Uppercasing the whole output -- HRP, separator,
+    // payload and checksum -- must therefore stay decodable. This is the property that
+    // uppercase key formats such as age's `AGE-SECRET-KEY-1...` rely on.
+    use secure_gate::{FromBech32Str, ToBech32};
+
+    let payload = [0x00u8, 0x01, 0x02, 0x03, 0xFE, 0xFF];
+    let secret = Fixed::new(payload);
+
+    let lower = secret.try_to_bech32("sg").expect("encode");
+    let mut upper = secret.try_to_bech32("sg").expect("encode");
+    upper.make_ascii_uppercase();
+
+    assert_ne!(
+        &*lower, &*upper,
+        "fixture must actually contain cased characters"
+    );
+    assert_eq!(
+        &*upper,
+        lower.to_uppercase(),
+        "in-place must match the naive form"
+    );
+
+    let decoded = (*upper)
+        .try_from_bech32("sg")
+        .expect("uppercase bech32 must decode");
+    assert_eq!(
+        decoded, payload,
+        "round-trip through uppercase changed the payload"
+    );
+}

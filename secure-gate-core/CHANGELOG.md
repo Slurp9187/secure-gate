@@ -11,6 +11,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`EncodedSecret::make_ascii_uppercase` / `make_ascii_lowercase`.** Requested by a
+  downstream adopter (age-pq-workspace) whose private identity key is a bech32 string in
+  age's uppercase form, `AGE-SECRET-KEY-…`. Encoders emit lowercase, `EncodedSecret` has
+  no `DerefMut`, and its constructor is `pub(crate)`, so the one value in that workspace
+  that most warranted the wrapper was the one value that could not have it — it shipped
+  as a plain unzeroized `String`.
+
+  In place is the whole point, not a convenience. ASCII case conversion is
+  length-preserving, so the buffer is never reallocated and the secret is never copied;
+  the alternative route, `into_inner()` then `to_uppercase()`, allocates a second
+  `String` and leaves the encoded secret in a buffer this type no longer owns and cannot
+  wipe — the same failure shape as #152. A test pins the property by asserting the
+  buffer pointer is unchanged across the call, and it was mutation-checked: swapping in
+  a reallocating implementation makes it fail.
+
+  ASCII-only is correct rather than a limitation. Every encoding this crate produces —
+  hex, base32, base64url, bech32, bech32m — is ASCII by construction, so one pair of
+  methods covers all of them with no Unicode case-folding hazards and no length changes.
+
+  Deliberately narrower than a general `map_in_place(&mut String)`, which would permit
+  `*s = s.to_uppercase()` and reintroduce exactly the reallocation this avoids. Also
+  chosen over encoder-side `try_to_bech32_upper_*` variants (four more methods whose
+  bodies would each be this call) and over `DerefMut<Target = str>` (same no-realloc
+  property, since every `&mut str` method is length-preserving, but this crate's thesis
+  is explicit access and a named method says what it does at the call site).
+
+  For bech32 specifically: BIP-173 forbids mixed case and accepts either pure case, with
+  the checksum defined over the lowercase form, so uppercasing the entire output — HRP,
+  separator, payload and checksum — stays valid and decodable. Pinned by a round-trip
+  test. `EncodedSecret::new` stays `pub(crate)`: the adopter withdrew that half of the
+  request once this covered their need, and widening what the type means is a decision
+  worth making on its own merits rather than under pressure from one use case.
+
 - **Caller-chosen bech32 / bech32m code length.** `Bech32Sized<N>` and `Bech32mSized<N>`
   are const-generic `Checksum` implementations, and every bech32 and bech32m entry point
   gained a `_sized::<N>` twin:
