@@ -1,4 +1,4 @@
-name: DSE zeroization check
+name: DSE zeroization check (release/0.8)
 
 # The DSE asm-grep test in tests/asm_dse_check.rs is gated to
 # x86_64 (cfg(target_arch = "x86_64")). It checks both AT&T
@@ -9,8 +9,11 @@ name: DSE zeroization check
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 3 * * 1' # weekly, Monday 03:00 UTC
+  # NOTE: no `schedule:` here, deliberately. GitHub raises scheduled events
+  # only from the default branch, so a cron block on this branch would never
+  # fire -- it would read as coverage that does not exist. The weekly run
+  # against this branch is hosted on `main`, which checks `release/0.8` out
+  # explicitly. See issue #169.
   push:
     branches: [release/0.8]
   pull_request:

@@ -26,7 +26,7 @@ name: CodeQL
 # until the variable is set, so the only cost is a short unscanned window.
 #
 # This is the one workflow in the repo allowed to skip every job (contrast the
-# `guard` jobs in audit.yml, dse-check.yml and fuzz-miri.yml): here an all-skip
+# `guard` job in audit.yml): here an all-skip
 # state is the intended pre-activation state, not a coverage hole, and while it
 # holds, default setup is still doing the scanning.
 

@@ -4,8 +4,11 @@ permissions:
   contents: read
 
 on:
-  schedule:
-    - cron: "0 0 * * 0" # Every Sunday at 00:00 UTC
+  # NOTE: no `schedule:` here, deliberately. GitHub raises scheduled events
+  # only from the default branch, so a cron block on this branch would never
+  # fire -- it would read as coverage that does not exist. The weekly run
+  # against this branch is hosted on `main`, which checks `release/0.8` out
+  # explicitly. See issue #169.
   workflow_dispatch:
   push:
     branches: [release/0.8]

@@ -1,10 +1,11 @@
 name: Security audit
 
 on:
-  schedule:
-    # Weekly (Mondays 05:00 UTC). Advisories are time-sensitive; a monthly
-    # cadence would leave up to a four-week blind window.
-    - cron: "0 5 * * 1"
+  # NOTE: no `schedule:` here, deliberately. GitHub raises scheduled events
+  # only from the default branch, so a cron block on this branch would never
+  # fire -- it would read as coverage that does not exist. The weekly run
+  # against this branch is hosted on `main`, which checks `release/0.8` out
+  # explicitly. See issue #169.
   push:
     branches: [main, "release/0.8"]
     paths:
