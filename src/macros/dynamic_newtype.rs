@@ -28,6 +28,42 @@
 /// [`fixed_newtype!`](crate::fixed_newtype) for the reasoning and the
 /// hand-written pattern, which applies identically here.
 ///
+/// # The `"doc string"` slot takes exactly one string literal
+///
+/// That argument is matched as `$doc:literal`, so it accepts a single string
+/// literal and nothing else. `concat!("a ", "b")` is a macro call, not a
+/// literal, and will not match â€” nor will a `const`, or pieces joined together
+/// at compile time.
+///
+/// **The error you get is misleading.** When the doc argument fails to match,
+/// the input falls through to the catch-all arm, which reports that the *inner
+/// type* is not one of the shaped types and suggests writing `String` or
+/// `Vec<u8>` literally. The inner type is usually fine; the doc slot is what
+/// failed. If you see that message on a call whose inner type is plainly
+/// `String` or `Vec<u8>`, look at the doc argument first.
+///
+/// For anything longer than one literal â€” multiple paragraphs, generated text,
+/// `#[doc = ...]` â€” put ordinary attributes before the name instead. The macro
+/// accepts `$(#[$attr:meta])*` there, so normal `///` comments work and are the
+/// better style for real prose:
+///
+/// ```rust
+/// # #[cfg(feature = "alloc")] {
+/// use secure_gate::dynamic_newtype;
+///
+/// dynamic_newtype!(
+///     /// First line of prose.
+///     ///
+///     /// A second paragraph, as many lines as you like.
+///     pub SessionToken, String
+/// );
+/// # let _ = SessionToken::new(String::from("x"));
+/// # }
+/// ```
+///
+/// The `"doc string"` form remains for short one-liners and for callers
+/// generating the whole invocation from another macro.
+///
 /// # Inner types must be written literally
 ///
 /// Macros match **tokens**, not resolved types. `String` and `Vec<u8>` are
