@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.0-rc.9] - 2026-09-09
 
 ### Changed
 
@@ -30,11 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   workspace that no longer exists. They are superseded by the crate's own, which are the
   ones that ship and the ones docs.rs renders; their content is in git history. The CI
   section from the old root README is carried over.
-
-> Everything below is unreleased. `0.9.0-rc.8` is the newest version on crates.io;
-> `0.9.0-rc.9` was tagged but never published, so its entries live here rather than
-> under a heading that claims a release that did not happen. Only `secure-gate` has
-> ever been published.
 
 ### Added
 
@@ -597,6 +592,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it, and the workspace is clean under it today.
 
 
+- **Payload freedom in the error types is enforced, not just documented.**
+  `error.rs` has always promised that errors "never contain payload bytes, HRP
+  strings, or other input-derived text". That is a security property: these
+  errors are produced while parsing secret material, so a variant that captured
+  its input would put decoded secret bytes into a value callers routinely log,
+  bubble up with `?`, and format into panic messages. `tests/error_tests.rs` now
+  applies `assert_payload_free<T: Copy + 'static>()` to all five error types, in
+  both a `#[test]` and a `const _` block so it binds builds that never run the
+  suite. `Copy` rejects owned payloads (`String`, `Vec<u8>`, `Box<str>`);
+  `'static` rejects payloads borrowed from the input. A size ceiling backs it up
+  so a payload cannot hide behind an indirection.
+
+  Mutation-tested in three stages, because the first two proved nothing: adding a
+  `String` variant is caught by the existing `#[derive(Copy)]` (E0204), and
+  dropping `Copy` to make room is caught by `Display`'s match (E0004) — in both
+  the crate fails to build before the test runs. Only the third mutation — drop
+  `Copy`, add the payload, and extend `Display` so the crate compiles cleanly —
+  isolates the new bound, which fires there with E0277. That is the case the
+  derive alone does not cover, and the one a future edit would actually produce.
+
+
+### CI
+
+- **`release/0.8` is scanned by CodeQL for the first time.** Code scanning ran on
+  *default setup*, which analyses the default branch and pull requests into it and
+  offers no multi-branch option. Measured against the API: 751 analyses on
+  `refs/heads/main`, **zero** referencing `release/0.8` — and pull requests into
+  the LTS branch received no CodeQL checks at all, including the one that changed
+  191 files across the repository flatten. `.github/workflows/codeql.yml` now
+  covers push and pull_request on both branches for both configured languages.
+  Migrating required disabling default setup in repository settings, so the
+  workflow ships gated on `vars.CODEQL_ADVANCED` — GitHub rejects SARIF from an
+  advanced configuration while default setup is enabled, and an ungated workflow
+  would have failed every push in between. Rationale and the activation order are
+  recorded in `docs/design/ci_cross_branch_coverage.md`.
+
+- **A workflow that runs no jobs now fails instead of reporting success.**
+  `audit.yml`, `dse-check.yml` and `fuzz-miri.yml` each split into an event-ref job
+  and a cross-ref scheduled job, both gated on `github.event_name`. Every trigger
+  they declare currently maps to one of the two — but nothing enforced that. Add a
+  trigger without extending an `if:` and both skip, and **a workflow whose jobs all
+  skipped reports success**: a green tick for a run that executed nothing, which is
+  the failure mode least likely to be noticed. Each now carries a `guard` job that
+  reads `toJSON(needs)` and fails when every result is `"skipped"`.
+
+- **`release/0.8` gained the weekly `cargo audit`, DSE and Miri coverage it never
+  had (#169).** GitHub raises scheduled events only from the default branch, so a
+  `schedule:` block on the LTS branch can never fire; those workflows now matrix
+  over both refs from `main`. The cross-ref jobs deliberately carry no dependency
+  cache.
+
 ### Documentation
 
 - **`docs/nominal_newtypes.md` amended on two points that had gone stale or were too
@@ -738,6 +784,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tests in `tests/compat_dual/`. The comment now says so, names the crate path correctly
   (`secure_gate_compat::compat::…`, not `secure_gate::compat::…`), and records that the
   feature does *not* switch on this crate's own serde features.
+
+- **`Error` impl availability is stated on each error type, not only in the module
+  doc.** A downstream hit this on the 0.8 LTS line, where the impl is `std`-gated
+  because `core::error::Error` needs Rust 1.81 and that branch targets 1.70. All
+  five types now say the impl is unconditional here and gated there, so code
+  building against both lines does not have to infer it.
+
+- **`EncodedSecret::into_inner` documents what it costs at a public API boundary.**
+  Returning the `String` from your own public function hands callers a value with
+  no zeroize-on-drop and no redacted `Debug`; every later copy — a `format!`, a log
+  line, a `Clone`, a `serde` round-trip — is an ordinary heap allocation this crate
+  can no longer clear. Returning `EncodedSecret` keeps the protection travelling
+  with the value, and it derefs to `str`, so read-only callers need no change.
+
+- **`dynamic_newtype!`'s doc slot takes exactly one string literal.** It is matched
+  as `$doc:literal`, so `concat!(...)` does not match. Documented along with
+  something worse found while checking it: the failure is reported by the catch-all
+  arm as *the inner type* not being one of the shaped types, suggesting you write
+  `String` literally — when `String` is already correct and the doc argument is the
+  real problem. The `///`-attributes form is documented as the way to write real
+  prose.
 
 ## [0.9.0-rc.8] - 2026-09-07
 
