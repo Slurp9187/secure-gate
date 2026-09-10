@@ -12,14 +12,12 @@ on:
       - "fuzz/**"
       - "src/**"
       - "Cargo.toml"
-      - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/fuzz-quick.yml"
   pull_request:
     paths:
       - "fuzz/**"
       - "src/**"
-      - "Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/fuzz-quick.yml"
