@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0-rc.12] - 2026-09-09
 
 ### Changed
 
@@ -251,6 +251,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   both markers (the original covered only `SecureDecoding`) and written alloc-free.
   `main` removed the traits and deleted their pin with them; this branch kept the
   traits, so two public, crate-root-re-exported items were left untested.
+
+- **Payload freedom in the error types is enforced, not just documented.**
+  `error.rs` has always promised that errors "never contain payload bytes, HRP
+  strings, or other input-derived text". That is a security property: these
+  errors are produced while parsing secret material, so a variant that captured
+  its input would put decoded secret bytes into a value callers routinely log,
+  bubble up with `?`, and format into panic messages. `tests/error_tests.rs` now
+  applies `assert_payload_free<T: Copy + 'static>()` to all five error types, in
+  both a `#[test]` and a `const _` block so it binds builds that never run the
+  suite. `Copy` rejects owned payloads; `'static` rejects payloads borrowed from
+  the input. A `const fn` with a non-`Sized` bound has been legal since 1.61, so
+  this carries to MSRV 1.70 unchanged.
+
+  Additionally verified on five separate feature rows — `--no-default-features`,
+  `alloc`, `std`, `alloc,encoding-hex` and `full` — since a backport that only
+  builds under `--all-features` is the usual way this looks green while broken.
+
+### CI
+
+- **This branch is scanned by CodeQL for the first time.** Code scanning ran on
+  *default setup*, which analyses only the default branch and pull requests into
+  it. Measured against the API: 751 analyses on `refs/heads/main`, **zero**
+  referencing `release/0.8` — and pull requests into this branch received no
+  CodeQL checks at all, including the one that changed 191 files across the
+  repository flatten. `.github/workflows/codeql.yml` now covers push and
+  pull_request on both branches. The file has to exist *here* as well as on
+  `main`, because a push to this branch runs this branch's workflow file. Note
+  the weekly cron does not cover this branch — GitHub raises scheduled events
+  only from the default branch — so push and pull_request are its coverage.
+
+- **A workflow that runs no jobs now fails instead of reporting success.** This
+  branch's `audit.yml` carries the same two-job split as main's, both halves
+  gated on `github.event_name`. Add a trigger without extending an `if:` and both
+  skip — and **a workflow whose jobs all skipped reports success**, showing a
+  green tick for a run that executed nothing. A `guard` job now fails when every
+  result in `toJSON(needs)` is `"skipped"`.
+
+### Documentation
+
+- **`Error` impl availability is stated on each error type, not only in the module
+  doc.** On this branch the impl **is** `std`-gated: without the `std` feature the
+  type still exists and still implements `Display`, but it is not an `Error`, so
+  `?` into `Box<dyn Error>` and `std::io::Error::other` will not compile. The note
+  names the cause — `core::error::Error` needs Rust 1.81 and this LTS line targets
+  1.70 — and points at 0.9.x, where the impl is unconditional. This is the exact
+  confusion a downstream hit: the module doc mentioned it, the types did not.
+
+- **`EncodedSecret::into_inner` documents what it costs at a public API boundary.**
+  Returning the `String` from your own public function hands callers a value with
+  no zeroize-on-drop and no redacted `Debug`; every later copy is an ordinary heap
+  allocation this crate can no longer clear. Returning `EncodedSecret` keeps the
+  protection travelling with the value, and it derefs to `str`, so read-only
+  callers need no change.
+
+- **`dynamic_newtype!`'s doc slot takes exactly one string literal.** It is matched
+  as `$doc:literal`, so `concat!(...)` does not match. Documented along with
+  something worse found while checking it: the failure is reported by the catch-all
+  arm as *the inner type* not being one of the shaped types, when the doc argument
+  is the real problem.
 
 ## [0.8.0-rc.11] - 2026-09-07
 
