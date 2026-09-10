@@ -18,8 +18,12 @@ name: CodeQL
 # Until step 2, the job below skips. That is deliberate: GitHub rejects SARIF
 # from an advanced configuration while default setup is still enabled, so a
 # workflow that ran unconditionally would fail every push and pull request
-# between merging this file and flipping the setting. The variable lets the
-# switchover happen in one motion, in either order, with no red window.
+# between merging this file and flipping the setting.
+#
+# DO THE STEPS IN ORDER. Step 2 before step 1 lets this job run while default
+# setup is still on, and its SARIF upload is rejected -- the exact red state
+# the gate exists to prevent. Step 1 first is safe: this job keeps skipping
+# until the variable is set, so the only cost is a short unscanned window.
 #
 # This is the one workflow in the repo allowed to skip every job (contrast the
 # `guard` jobs in audit.yml, dse-check.yml and fuzz-miri.yml): here an all-skip
