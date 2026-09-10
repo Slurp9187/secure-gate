@@ -247,3 +247,79 @@ fn error_types_implement_error_trait() {
     #[cfg(feature = "encoding-bech32")]
     assert_error(&Bech32Error::OperationFailed);
 }
+
+// ---------------------------------------------------------------------------
+// Payload freedom
+// ---------------------------------------------------------------------------
+//
+// `error.rs` promises: "Errors carry at most `usize` length metadata; they never
+// contain payload bytes, HRP strings, or other input-derived text."
+//
+// That is a security property, not a style preference. These error types are
+// produced while parsing secret material; a variant that captured the offending
+// input would put decoded secret bytes into a value that callers routinely log,
+// bubble up with `?`, or format into a panic message.
+//
+// Prose alone does not hold a property like that across future edits, so the
+// bounds below pin it. `Copy` is the load-bearing one: `String`, `Vec<u8>`,
+// `Box<str>` and every other owned payload is not `Copy`, so a variant that
+// gained one would fail to compile here. `'static` closes the borrowed case --
+// a variant holding `&'a str` borrowed from the input would fail instead.
+//
+// A `&'static str` field would slip past both, but no input-derived text can be
+// `&'static`, so the gap is not reachable by the mistake this guards against.
+//
+// If one of these stops compiling, do not relax the bound. Either drop the
+// payload, or -- if the payload is genuinely necessary and genuinely not
+// secret-derived -- update the promise in `error.rs` and SECURITY.md in the
+// same commit, so the documented guarantee and the code cannot drift apart.
+
+/// Compile-time proof that `T` carries no owned or borrowed payload.
+const fn assert_payload_free<T: Copy + 'static>() {}
+
+#[test]
+fn error_types_carry_no_payload() {
+    assert_payload_free::<secure_gate::FromSliceError>();
+    #[cfg(feature = "encoding-bech32")]
+    assert_payload_free::<secure_gate::Bech32Error>();
+    #[cfg(feature = "encoding-base32")]
+    assert_payload_free::<secure_gate::Base32Error>();
+    #[cfg(feature = "encoding-base64")]
+    assert_payload_free::<secure_gate::Base64Error>();
+    #[cfg(feature = "encoding-hex")]
+    assert_payload_free::<secure_gate::HexError>();
+}
+
+// Enforced at compile time as well as under `cargo test`, so the guarantee also
+// holds for builds that never run the test suite.
+const _: () = {
+    assert_payload_free::<secure_gate::FromSliceError>();
+    #[cfg(feature = "encoding-bech32")]
+    assert_payload_free::<secure_gate::Bech32Error>();
+    #[cfg(feature = "encoding-base32")]
+    assert_payload_free::<secure_gate::Base32Error>();
+    #[cfg(feature = "encoding-base64")]
+    assert_payload_free::<secure_gate::Base64Error>();
+    #[cfg(feature = "encoding-hex")]
+    assert_payload_free::<secure_gate::HexError>();
+};
+
+/// The error types are small enough that no variant can be hiding a payload
+/// behind an indirection. Two `usize` (the `InvalidLength` fields) plus a
+/// discriminant is the documented ceiling.
+#[test]
+fn error_types_stay_small() {
+    let max = 3 * core::mem::size_of::<usize>();
+    assert!(
+        core::mem::size_of::<secure_gate::FromSliceError>() <= max,
+        "FromSliceError grew to {} bytes (ceiling {max}); a variant may have \
+         gained a payload -- see the payload-freedom note above",
+        core::mem::size_of::<secure_gate::FromSliceError>()
+    );
+    #[cfg(feature = "encoding-bech32")]
+    assert!(
+        core::mem::size_of::<secure_gate::Bech32Error>() <= max,
+        "Bech32Error grew to {} bytes (ceiling {max})",
+        core::mem::size_of::<secure_gate::Bech32Error>()
+    );
+}
