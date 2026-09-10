@@ -64,3 +64,28 @@ jobs:
 
       - name: cargo audit
         run: cargo audit
+
+  # Regression canary for the `if:`-gated split above. Every trigger this
+  # workflow declares currently maps to one of the two jobs, so at least one
+  # always runs. Add a trigger without extending an `if:` and both would skip
+  # â€” and a workflow whose jobs all skipped reports **success**, so the gap
+  # would be invisible on the checks list. Fail loudly instead. See #169.
+  guard:
+    name: at least one audit job ran
+    needs: [audit, audit-scheduled]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if every job was skipped
+        # Reads every job listed in `needs:` above, so adding a job there is the
+        # only edit required -- no job name is repeated in this script.
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "event=$GITHUB_EVENT_NAME"
+          echo "$NEEDS"
+          if ! printf '%s' "$NEEDS" | jq -e 'any(.[].result; . != "skipped")' > /dev/null; then
+            echo "::error::No job ran for event '$GITHUB_EVENT_NAME'. A trigger was added without extending an 'if:' condition, so this workflow would have reported success having executed nothing."
+            exit 1
+          fi
