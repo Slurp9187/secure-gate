@@ -112,7 +112,11 @@ window between merging the file and changing the setting. Activation is:
 2. Settings → Secrets and variables → Actions → Variables → set
    `CODEQL_ADVANCED` = `true`.
 
-Either order works, and there is no red window in between.
+**Do these in order.** Step 2 before step 1 lets the analyze job run while
+default setup is still enabled, and GitHub rejects its SARIF upload -- the exact
+red state the gate exists to prevent. Step 1 first is safe: the workflow keeps
+skipping until the variable is set, so the only cost is a short window with no
+scanning.
 
 Both steps are repository-settings changes and cannot be performed by a pull
 request. Until they are made, `release/0.8` remains unscanned.
