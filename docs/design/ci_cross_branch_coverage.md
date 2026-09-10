@@ -119,4 +119,20 @@ skipping until the variable is set, so the only cost is a short window with no
 scanning.
 
 Both steps are repository-settings changes and cannot be performed by a pull
-request. Until they are made, `release/0.8` remains unscanned.
+request.
+
+After activating, `release/0.8` still has no analyses until the workflow actually
+runs there. Trigger it from the Actions tab (**Run workflow** -> branch
+`release/0.8`) or with `gh workflow run codeql.yml --ref release/0.8`; both need
+the `workflow_dispatch:` trigger, which this workflow carries for exactly that
+reason. The weekly cron does **not** cover that branch -- scheduled events fire
+only from the default branch, so `release/0.8` is reached by push and
+pull_request alone.
+
+Success is a nonzero `refs/heads/release/0.8` row in:
+
+```bash
+gh api --paginate 'repos/Slurp9187/secure-gate/code-scanning/analyses?per_page=100'   --jq '.[].ref' | sort | uniq -c | sort -rn
+```
+
+A 200 from the settings API is not success. Until they are made, `release/0.8` remains unscanned.
