@@ -38,7 +38,19 @@ on:
   schedule:
     # Weekly, matching the cadence default setup used. Monday 07:00 UTC, offset
     # from the audit (05:00) and DSE (03:00) crons so the three do not contend.
+    #
+    # This fires only from the default branch -- GitHub raises scheduled events
+    # nowhere else -- so the copy of this file on `release/0.8` never runs on the
+    # cron, and a scheduled run here analyses `main` only (there is no cross-ref
+    # checkout: CodeQL results must be attributed to the ref they came from).
+    # `release/0.8` is covered by the push and pull_request triggers above, which
+    # is why this file has to exist on that branch too.
     - cron: "0 7 * * 1"
+  # Needed to scan a branch on demand -- without it the Actions UI shows no "Run
+  # workflow" button and `gh workflow run codeql.yml` fails. That matters most
+  # right after activation, when `release/0.8` has never been analysed and the
+  # alternative is pushing a commit or waiting until Monday.
+  workflow_dispatch:
 
 permissions:
   contents: read
