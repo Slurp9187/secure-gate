@@ -1,0 +1,79 @@
+name: CodeQL
+
+# Advanced setup, replacing the repository's CodeQL *default* setup.
+#
+# Default setup analyses the default branch and pull requests targeting it, and
+# offers no way to add a second branch. That left `release/0.8` — a maintained
+# LTS line carrying security-sensitive code — with zero analyses, and gave pull
+# requests into it no code-scanning checks at all. See
+# docs/design/ci_cross_branch_coverage.md.
+#
+# ACTIVATION IS A TWO-STEP SETTINGS CHANGE, not a merge:
+#
+#   1. Settings -> Code security -> Code scanning -> CodeQL analysis ->
+#      switch "Default setup" off.
+#   2. Settings -> Secrets and variables -> Actions -> Variables ->
+#      set repository variable  CODEQL_ADVANCED = true
+#
+# Until step 2, the job below skips. That is deliberate: GitHub rejects SARIF
+# from an advanced configuration while default setup is still enabled, so a
+# workflow that ran unconditionally would fail every push and pull request
+# between merging this file and flipping the setting. The variable lets the
+# switchover happen in one motion, in either order, with no red window.
+#
+# This is the one workflow in the repo allowed to skip every job (contrast the
+# `guard` jobs in audit.yml, dse-check.yml and fuzz-miri.yml): here an all-skip
+# state is the intended pre-activation state, not a coverage hole, and while it
+# holds, default setup is still doing the scanning.
+
+on:
+  push:
+    branches: [main, "release/0.8"]
+  pull_request:
+    branches: [main, "release/0.8"]
+  schedule:
+    # Weekly, matching the cadence default setup used. Monday 07:00 UTC, offset
+    # from the audit (05:00) and DSE (03:00) crons so the three do not contend.
+    - cron: "0 7 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    # See the activation note at the top of this file.
+    if: vars.CODEQL_ADVANCED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      # Required to upload results to the code-scanning API.
+      security-events: write
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # Mirrors the languages default setup had configured.
+        language: [actions, rust]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # The query suite is left at the action's default, which matches the
+          # `default` suite that default setup was configured with. Raising it
+          # to `security-extended` changes the alert set and is a separate
+          # decision -- it should not ride along with this migration.
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
