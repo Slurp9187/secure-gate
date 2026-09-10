@@ -58,6 +58,13 @@ use core::fmt;
 ///
 /// Carries the expected and actual lengths in all build profiles. Lengths are
 /// public protocol parameters, not secret material.
+///
+/// The [`std::error::Error`] impl requires the `std` feature. Without it the
+/// type still exists and still implements [`Display`](core::fmt::Display), but
+/// it is not an `Error`, so `?` into `Box<dyn Error>` and `std::io::Error::other`
+/// will not compile. This is an MSRV consequence, not a policy: `core::error::Error`
+/// needs Rust 1.81 and this LTS line targets 1.70. On 0.9.x the impl is
+/// unconditional and available in `no_std`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FromSliceError {
@@ -91,6 +98,13 @@ impl std::error::Error for FromSliceError {}
 /// Variant shapes are identical in debug and release builds. No input-derived
 /// strings (such as the received HRP) are ever captured — the caller already
 /// holds the input and the expected HRP.
+///
+/// The [`std::error::Error`] impl requires the `std` feature. Without it the
+/// type still exists and still implements [`Display`](core::fmt::Display), but
+/// it is not an `Error`, so `?` into `Box<dyn Error>` and `std::io::Error::other`
+/// will not compile. This is an MSRV consequence, not a policy: `core::error::Error`
+/// needs Rust 1.81 and this LTS line targets 1.70. On 0.9.x the impl is
+/// unconditional and available in `no_std`.
 #[cfg(feature = "encoding-bech32")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -141,6 +155,13 @@ impl std::error::Error for Bech32Error {}
 ///
 /// Variant shapes are identical in debug and release builds; only numeric
 /// length metadata is carried.
+///
+/// The [`std::error::Error`] impl requires the `std` feature. Without it the
+/// type still exists and still implements [`Display`](core::fmt::Display), but
+/// it is not an `Error`, so `?` into `Box<dyn Error>` and `std::io::Error::other`
+/// will not compile. This is an MSRV consequence, not a policy: `core::error::Error`
+/// needs Rust 1.81 and this LTS line targets 1.70. On 0.9.x the impl is
+/// unconditional and available in `no_std`.
 #[cfg(feature = "encoding-base32")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -179,6 +200,13 @@ impl std::error::Error for Base32Error {}
 ///
 /// Variant shapes are identical in debug and release builds; only numeric
 /// length metadata is carried.
+///
+/// The [`std::error::Error`] impl requires the `std` feature. Without it the
+/// type still exists and still implements [`Display`](core::fmt::Display), but
+/// it is not an `Error`, so `?` into `Box<dyn Error>` and `std::io::Error::other`
+/// will not compile. This is an MSRV consequence, not a policy: `core::error::Error`
+/// needs Rust 1.81 and this LTS line targets 1.70. On 0.9.x the impl is
+/// unconditional and available in `no_std`.
 #[cfg(feature = "encoding-base64")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -216,6 +244,13 @@ impl std::error::Error for Base64Error {}
 ///
 /// Variant shapes are identical in debug and release builds; only numeric
 /// length metadata is carried.
+///
+/// The [`std::error::Error`] impl requires the `std` feature. Without it the
+/// type still exists and still implements [`Display`](core::fmt::Display), but
+/// it is not an `Error`, so `?` into `Box<dyn Error>` and `std::io::Error::other`
+/// will not compile. This is an MSRV consequence, not a policy: `core::error::Error`
+/// needs Rust 1.81 and this LTS line targets 1.70. On 0.9.x the impl is
+/// unconditional and available in `no_std`.
 #[cfg(feature = "encoding-hex")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
