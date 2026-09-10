@@ -48,6 +48,12 @@ use core::fmt;
 ///
 /// Carries the expected and actual lengths in all build profiles. Lengths are
 /// public protocol parameters, not secret material.
+///
+/// Implements [`core::error::Error`] unconditionally — no `std` feature is
+/// required, and the impl is present in `no_std` builds. (On the 0.8 LTS line
+/// this impl is `std`-gated, because `core::error::Error` needs Rust 1.81 and
+/// that branch targets 1.70. Code that must build against both should not
+/// assume the trait is available without `std`.)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FromSliceError {
@@ -80,6 +86,12 @@ impl core::error::Error for FromSliceError {}
 /// Variant shapes are identical in debug and release builds. No input-derived
 /// strings (such as the received HRP) are ever captured — the caller already
 /// holds the input and the expected HRP.
+///
+/// Implements [`core::error::Error`] unconditionally — no `std` feature is
+/// required, and the impl is present in `no_std` builds. (On the 0.8 LTS line
+/// this impl is `std`-gated, because `core::error::Error` needs Rust 1.81 and
+/// that branch targets 1.70. Code that must build against both should not
+/// assume the trait is available without `std`.)
 #[cfg(feature = "encoding-bech32")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -130,6 +142,12 @@ impl core::error::Error for Bech32Error {}
 ///
 /// Variant shapes are identical in debug and release builds; only numeric
 /// length metadata is carried.
+///
+/// Implements [`core::error::Error`] unconditionally — no `std` feature is
+/// required, and the impl is present in `no_std` builds. (On the 0.8 LTS line
+/// this impl is `std`-gated, because `core::error::Error` needs Rust 1.81 and
+/// that branch targets 1.70. Code that must build against both should not
+/// assume the trait is available without `std`.)
 #[cfg(feature = "encoding-base32")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -168,6 +186,12 @@ impl core::error::Error for Base32Error {}
 ///
 /// Variant shapes are identical in debug and release builds; only numeric
 /// length metadata is carried.
+///
+/// Implements [`core::error::Error`] unconditionally — no `std` feature is
+/// required, and the impl is present in `no_std` builds. (On the 0.8 LTS line
+/// this impl is `std`-gated, because `core::error::Error` needs Rust 1.81 and
+/// that branch targets 1.70. Code that must build against both should not
+/// assume the trait is available without `std`.)
 #[cfg(feature = "encoding-base64")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -205,6 +229,12 @@ impl core::error::Error for Base64Error {}
 ///
 /// Variant shapes are identical in debug and release builds; only numeric
 /// length metadata is carried.
+///
+/// Implements [`core::error::Error`] unconditionally — no `std` feature is
+/// required, and the impl is present in `no_std` builds. (On the 0.8 LTS line
+/// this impl is `std`-gated, because `core::error::Error` needs Rust 1.81 and
+/// that branch targets 1.70. Code that must build against both should not
+/// assume the trait is available without `std`.)
 #[cfg(feature = "encoding-hex")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]

@@ -97,6 +97,35 @@ impl EncodedSecret {
     /// Consumes self and returns the inner `String`.
     ///
     /// This ends zeroization protection for the encoded output.
+    ///
+    /// # At a public API boundary
+    ///
+    /// Returning the `String` from your own public function hands callers a value
+    /// with no zeroize-on-drop and no redacted `Debug`. Every later copy — a
+    /// `format!`, a log line, a `Clone`, a `serde` round-trip — is an ordinary
+    /// heap allocation this crate can no longer clear.
+    ///
+    /// Prefer returning [`EncodedSecret`] itself: it derefs to `str`, so callers
+    /// that only read it need no change, and the protection travels with the value
+    /// instead of stopping at your boundary. Call `into_inner()` at the point where
+    /// a foreign API genuinely demands an owned `String`, and keep the result's
+    /// lifetime as short as you can.
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "alloc", feature = "encoding-hex"))] {
+    /// use secure_gate::{Fixed, ToHex, EncodedSecret};
+    ///
+    /// // Prefer this: protection crosses the boundary with the value.
+    /// fn good(key: &Fixed<[u8; 4]>) -> EncodedSecret { key.to_hex() }
+    ///
+    /// // Only when a foreign API insists on an owned String.
+    /// fn needs_string(key: &Fixed<[u8; 4]>) -> String { key.to_hex().into_inner() }
+    ///
+    /// let key = Fixed::from([0xde, 0xad, 0xbe, 0xef]);
+    /// assert_eq!(&*good(&key), "deadbeef");
+    /// assert_eq!(needs_string(&key), "deadbeef");
+    /// # }
+    /// ```
     #[inline(always)]
     pub fn into_inner(mut self) -> alloc::string::String {
         core::mem::take(&mut self.0)
