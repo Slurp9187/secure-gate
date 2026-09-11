@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Testing
+
+- **The DSE guard follows the drop path instead of assuming the glue is inlined.**
+  `tests/asm_dse_check.rs` extracted `make_and_drop_fixed`'s body and asserted the
+  zero-stores were in it. Whether they are is LLVM's inlining decision, not a
+  property of zeroization, and the lockfile refresh to zeroize 1.9 flipped it:
+  1.9 replaces the per-element `compiler_fence(SeqCst)` with an `asm!` barrier, a
+  body carrying 32 inline-asm blocks is no longer cheap enough to inline, and the
+  wrapper collapsed to a single `callq core::ptr::drop_glue::<Fixed<[u8; 32]>>`.
+  All four DSE jobs went red reporting `ZEROIZATION REGRESSION DETECTED` against
+  assembly whose zeroization was intact — and *stronger* than before, since the
+  barrier is now an `asm!` block rather than a compiler fence.
+
+  The assertion now walks from the symbol through the drop glue it calls and
+  passes at the first body that still holds its stores, reporting which one it
+  used. It steps only into callees whose mangled name identifies them as drop
+  glue (`drop_glue` under v0, `drop_in_place` under legacy), so it cannot credit
+  an unrelated function's stores, and a negative control — `Fixed`'s `Drop` body
+  emptied — still fails. The existing identical-code-folding path is unchanged.
+
 ## [0.9.0-rc.9] - 2026-09-09
 
 ### Changed

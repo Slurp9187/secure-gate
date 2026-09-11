@@ -8,6 +8,14 @@
 //! is required), extracts that function's body, and asserts that store-to-zero
 //! instructions are present.
 //!
+//! The stores do not have to be in that body. LLVM decides whether to inline the
+//! drop glue, and it changes its mind: under zeroize 1.9 the glue carries an
+//! `asm!` barrier per element and stays out of line, so the wrapper is reduced to
+//! a `callq core::ptr::drop_glue::<Fixed<[u8; 32]>>`. The assertion therefore
+//! walks the drop path — the symbol, then any drop glue it calls — and passes at
+//! the first body that still has its stores. What is being guarded is that the
+//! volatile writes survive optimization, not where they land.
+//!
 //! The assembly is emitted to an explicit path (`--emit=asm=<path>` under the
 //! target directory) and that path is deleted before the build. Cargo's
 //! intermediate-artifact layout is not a stable interface — nightly moved these
@@ -38,6 +46,25 @@
 
 use std::path::PathBuf;
 use std::process::Command;
+
+/// How far the drop-path walk follows calls to drop glue.
+///
+/// Whether the glue is inlined into the caller is LLVM's choice and it has
+/// already flipped once: zeroize 1.9 replaced the per-element
+/// `compiler_fence(SeqCst)` with an `asm!` barrier, and a body carrying 32
+/// inline-asm blocks is no longer cheap enough to inline, so the stores moved
+/// from `make_and_drop_fixed` into an out-of-line
+/// `core::ptr::drop_glue::<Fixed<[u8; 32]>>`.
+///
+/// Following the call is not a weakening of the guard. What this test proves is
+/// that the volatile stores still exist somewhere the drop reaches — DSE
+/// deleting them is the regression, an inlining decision is not. The walk only
+/// ever steps into symbols whose names identify them as drop glue, so it cannot
+/// wander off and credit an unrelated function's stores.
+///
+/// One hop is what today's codegen needs; the headroom covers glue that defers
+/// to a nested field's glue.
+const MAX_GLUE_HOPS: usize = 4;
 
 // ---------------------------------------------------------------------------
 // Test
@@ -148,43 +175,119 @@ fn fixed_drop_emits_volatile_zero_stores() {
     }
 }
 
-/// Asserts that `symbol`'s body in `asm` still contains zero-store instructions.
+/// Asserts that the zero-store instructions survive somewhere on `symbol`'s
+/// drop path.
 ///
-/// If the symbol was folded into another by identical-code folding — LLVM emits
-/// `.set <symbol>, <target>` — the assertion runs against the target instead.
-/// For the newtype that outcome is the *strongest* possible result: it proves
-/// the generated wrapper compiles to byte-identical code, not merely to
-/// equivalent code.
+/// Two indirections are followed before the assertion gives up:
+///
+/// **Identical-code folding.** If the symbol was folded into another — LLVM
+/// emits `.set <symbol>, <target>` — the walk starts at the fold target. For the
+/// newtype that outcome is the *strongest* possible result: it proves the
+/// generated wrapper compiles to byte-identical code, not merely to equivalent
+/// code.
+///
+/// **Out-of-line drop glue.** If a body holds no stores but calls drop glue, the
+/// walk continues into the glue. See the note on [`MAX_GLUE_HOPS`] for why that
+/// is not a weakening of the guard.
 fn assert_zero_stores_present(asm: &str, asm_path: &std::path::Path, symbol: &str) {
-    let resolved = resolve_symbol_alias(asm, symbol);
-    if resolved != symbol {
+    let entry = resolve_symbol_alias(asm, symbol);
+    if entry != symbol {
         println!(
-            "note: `{symbol}` was folded into `{resolved}` (identical codegen) — \
+            "note: `{symbol}` was folded into `{entry}` (identical codegen) — \
              asserting against the fold target"
         );
     }
-    let symbol: &str = &resolved;
-    let body = extract_function_body(asm, symbol).unwrap_or_else(|| {
-        panic!(
-            "could not find '{symbol}' label in {}\n\
-             First 40 lines of assembly:\n{}",
-            asm_path.display(),
-            asm.lines().take(40).collect::<Vec<_>>().join("\n")
-        )
-    });
 
-    // Assert that at least one zero-store pattern is present.
-    //
-    // LLVM may codegen 32 volatile byte-writes as any of:
-    //
-    //   (a) SSE:  xorps/pxor to zero xmm0, then movaps/movups/movdqa/movdqu x2
-    //   (b) AVX:  vxorps/vpxor + vmovaps/vmovups x2
-    //   (c) Scalar 8-byte: mov QWORD PTR [...], 0  x4
-    //   (d) Scalar 1-byte: mov BYTE PTR  [...], 0  x32
-    //   (e) Rep string:    xor eax,eax / rep stosb
-    //
-    // The assertion is deliberately broad: any of these confirms the stores
-    // survived. The failure mode we guard against is *none* being present.
+    // Breadth-first over {entry symbol} ∪ {drop glue it reaches}, stopping at the
+    // first body that still has its stores.
+    let mut inspected: Vec<(String, String)> = Vec::new();
+    let mut undefined: Vec<String> = Vec::new();
+    let mut frontier = vec![entry.clone()];
+
+    for _hop in 0..=MAX_GLUE_HOPS {
+        if frontier.is_empty() {
+            break;
+        }
+        let mut next: Vec<String> = Vec::new();
+        for name in frontier.drain(..) {
+            if inspected.iter().any(|(seen, _)| *seen == name) {
+                continue;
+            }
+            let Some(body) = extract_function_body(asm, &name) else {
+                // The entry symbol is `#[no_mangle]`d and defined in the crate
+                // under compilation, so its absence is a harness failure, not a
+                // zeroization verdict. A callee's absence is reported below.
+                assert!(
+                    name != entry,
+                    "could not find '{name}' label in {}\n\
+                     First 40 lines of assembly:\n{}",
+                    asm_path.display(),
+                    asm.lines().take(40).collect::<Vec<_>>().join("\n")
+                );
+                undefined.push(name);
+                continue;
+            };
+            if has_zero_store(&body) {
+                if name != entry {
+                    println!(
+                        "note: `{entry}` calls out to `{name}` for its drop glue — \
+                         asserting the zero-stores there"
+                    );
+                }
+                return;
+            }
+            for callee in drop_glue_callees(&body) {
+                next.push(resolve_symbol_alias(asm, &callee));
+            }
+            inspected.push((name, body));
+        }
+        frontier = next;
+    }
+
+    let mut report = String::new();
+    for (name, body) in &inspected {
+        report.push_str(&format!(
+            "\n{name}:\n\
+             ─────────────────────────────────────────────\n\
+             {body}\n\
+             ─────────────────────────────────────────────\n"
+        ));
+    }
+    if !undefined.is_empty() {
+        report.push_str(&format!(
+            "\nDrop glue called but not defined in this assembly, so its body could \
+             not be checked (this is a limitation of the guard, not itself a \
+             regression):\n  {}\n",
+            undefined.join("\n  ")
+        ));
+    }
+
+    panic!(
+        "ZEROIZATION REGRESSION DETECTED\n\n\
+         No volatile zero-store instructions were found on the drop path of \
+         {symbol}.\n\
+         LLVM may have eliminated the zeroization writes via dead-store elimination.\n\n\
+         Assembly file : {}\n\n\
+         Inspected {} function bod{}:\n{report}",
+        asm_path.display(),
+        inspected.len(),
+        if inspected.len() == 1 { "y" } else { "ies" },
+    );
+}
+
+/// Returns `true` if `body` contains a recognizable store-to-zero.
+///
+/// LLVM may codegen 32 volatile byte-writes as any of:
+///
+///   (a) SSE:  xorps/pxor to zero xmm0, then movaps/movups/movdqa/movdqu x2
+///   (b) AVX:  vxorps/vpxor + vmovaps/vmovups x2
+///   (c) Scalar 8-byte: mov QWORD PTR [...], 0  x4
+///   (d) Scalar 1-byte: mov BYTE PTR  [...], 0  x32
+///   (e) Rep string:    xor eax,eax / rep stosb
+///
+/// The check is deliberately broad: any of these confirms the stores survived.
+/// The failure mode guarded against is *none* being present.
+fn has_zero_store(body: &str) -> bool {
     let has_sse_zero = (body.contains("xorps")
         || body.contains("xorpd")
         || body.contains("pxor")
@@ -199,27 +302,50 @@ fn assert_zero_stores_present(asm: &str, asm_path: &std::path::Path, symbol: &st
             || body.contains("vmovdqa")
             || body.contains("vmovdqu"));
 
-    let has_scalar_zero = has_mov_zero_pattern(&body);
+    let has_scalar_zero = has_mov_zero_pattern(body);
 
     let has_rep_stos = body.contains("rep") && body.contains("stos");
 
-    assert!(
-        has_sse_zero || has_scalar_zero || has_rep_stos,
-        "ZEROIZATION REGRESSION DETECTED\n\n\
-         No volatile zero-store instructions were found in {symbol}.\n\
-         LLVM may have eliminated the zeroization writes via dead-store elimination.\n\n\
-         Assembly file : {}\n\n\
-         Extracted function body:\n\
-         ─────────────────────────────────────────────\n\
-         {body}\n\
-         ─────────────────────────────────────────────",
-        asm_path.display()
-    );
+    has_sse_zero || has_scalar_zero || has_rep_stos
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/// Direct `call`/`jmp` targets of `body` that name drop glue.
+///
+/// rustc emits AT&T syntax on every x86_64 target this test runs on —
+/// `*-pc-windows-msvc` included — so the operand is the bare symbol. Indirect
+/// targets (`callq *%rax`) are skipped: there is no symbol to follow.
+///
+/// Both mangling schemes spell the function recognizably: v0 renders
+/// `core::ptr::drop_glue` as `...9drop_glue...`, legacy renders
+/// `core::ptr::drop_in_place` as `...drop_in_place...`.
+fn drop_glue_callees(body: &str) -> Vec<String> {
+    let mut targets = Vec::new();
+    for line in body.lines() {
+        let mut tokens = line.split_whitespace();
+        let Some(mnemonic) = tokens.next() else {
+            continue;
+        };
+        if !matches!(mnemonic, "call" | "callq" | "jmp" | "jmpq") {
+            continue;
+        }
+        let Some(target) = tokens.next() else {
+            continue;
+        };
+        if target.starts_with('*') {
+            continue; // indirect call through a register or memory operand
+        }
+        if (target.contains("drop_glue") || target.contains("drop_in_place"))
+            && !targets.iter().any(|seen| seen == target)
+        {
+            targets.push(target.to_owned());
+        }
+    }
+    targets
+}
 
 /// Follows an assembler alias for `symbol`, if present.
 ///

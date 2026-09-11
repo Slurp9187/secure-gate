@@ -449,6 +449,12 @@ All items done; feature-complete. Ships in 0.9.0 (see the status header).
    folding, i.e. the newtype compiles to *byte-identical* machine code, not
    merely equivalent code. `tests/asm_dse_check.rs` follows the alias
    directive and asserts the zero-stores against the fold target.
+
+   Whether the fold happens is the toolchain's call, and zeroize 1.9 changed it:
+   its `asm!` barrier pushes the zeroization out of line into
+   `core::ptr::drop_glue::<Fixed<[u8; 32]>>`, and the two wrappers now survive as
+   separate symbols with identical bodies calling that same glue. The transparency
+   result stands either way, and the test accepts both shapes.
 8. ✅ `CHANGELOG.md` entry under `Unreleased`.
 9. ✅ Feature-matrix coverage: the newtype tests live inside the `integration`
    binary (`macros_suite`), so the existing 20-combination CI matrix already
