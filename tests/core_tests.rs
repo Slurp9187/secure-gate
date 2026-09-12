@@ -275,7 +275,6 @@ fn cloneable_secret_works() {
 
     #[derive(Clone, Zeroize, Debug)]
     struct CloneKey(Vec<u8>);
-    impl secure_gate::FixedStorage for CloneKey {}
 
     impl CloneableSecret for CloneKey {}
 
@@ -286,11 +285,17 @@ fn cloneable_secret_works() {
     // Verify zeroization on drop works
     drop(original);
 
-    // Wrapper-level clone: Fixed<CloneKey> exposes Clone when CloneableSecret is
-    // implemented, and the clone owns independent heap memory (deep clone semantics).
-    // If the clone were shallow (shared Vec backing), one of the two sequential drops
-    // below would corrupt the other, causing UB or a panic in CloneKey::zeroize.
-    let w: Fixed<CloneKey> = Fixed::new(CloneKey(vec![0xBBu8; 4]));
+    // Wrapper-level clone: the wrapper exposes Clone when CloneableSecret is implemented,
+    // and the clone owns independent heap memory (deep clone semantics). If the clone were
+    // shallow (shared Vec backing), one of the two sequential drops below would corrupt the
+    // other, causing UB or a panic in CloneKey::zeroize.
+    //
+    // `Dynamic`, not `Fixed`: `CloneKey` owns a `Vec<u8>`, so it is not `FixedStorage` and
+    // `Fixed::new` refuses it. This test previously wrapped it in a `Fixed` with a
+    // hand-written `impl FixedStorage for CloneKey {}` — a false assertion, since the whole
+    // point of the type here is that it owns heap memory. The marker is an assertion the
+    // compiler does not check, and this is what writing a false one looks like.
+    let w: Dynamic<CloneKey> = Dynamic::new(CloneKey(vec![0xBBu8; 4]));
     let w2 = w.clone();
     drop(w); // zeroizes w's Vec<u8> backing via CloneKey::zeroize
     drop(w2); // independently zeroizes w2's backing — no UB/panic = independent
