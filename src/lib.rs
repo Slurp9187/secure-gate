@@ -79,11 +79,11 @@
 //! ```
 //!
 //! ```rust
-//! use secure_gate::{fixed_alias, RevealSecret};
+//! use secure_gate::{fixed_newtype, RevealSecret};
 //!
-//! fixed_alias!(pub Aes256Key, 32);
+//! fixed_newtype!(pub Aes256Key, 32);
 //!
-//! let key: Aes256Key = [0xABu8; 32].into();
+//! let key = Aes256Key::new([0xABu8; 32]);
 //! key.with_secret(|b| assert_eq!(b.len(), 32));
 //! ```
 //!
@@ -103,7 +103,7 @@
 //! │   ├── SerializableSecret← serde-serialize feature
 //! │   ├── encoding/         ← ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m
 //! │   └── decoding/         ← FromHexStr, FromBase32Str, FromBase64UrlStr, FromBech32Str, FromBech32mStr
-//! ├── macros/               ← fixed_alias!, fixed_newtype!, dynamic_alias!, dynamic_newtype!, etc.
+//! ├── macros/               ← fixed_newtype!, dynamic_newtype!
 //! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error
 //! ```
 //!
@@ -210,14 +210,14 @@
 //!   [`Fixed::try_from_base64url`](Fixed::try_from_base64url),
 //!   [`Fixed::try_from_bech32`](Fixed::try_from_bech32), [`Fixed::try_from_bech32m`](Fixed::try_from_bech32m)
 //!   (no-alloc stack-based decoding)
-//! - [`fixed_alias!`], [`fixed_generic_alias!`] (type aliases), and
-//!   [`fixed_newtype!`] (distinct nominal types — two keys of the same size that
-//!   the compiler keeps apart)
+//! - [`fixed_newtype!`] (distinct nominal types — two keys of the same size that
+//!   the compiler keeps apart); a plain `type` alias over [`Fixed<T>`] needs nothing
+//!   at all
 //! - [`FromSliceError`]
 //!
 //! **Not** available without `alloc`: [`Dynamic<T>`], [`EncodedSecret`],
 //! encoding traits ([`ToHex`], etc.), decoding traits ([`FromHexStr`], etc.),
-//! [`dynamic_alias!`], [`dynamic_generic_alias!`], [`dynamic_newtype!`], serde support.
+//! [`dynamic_newtype!`], serde support.
 //!
 //! # `no_std`
 //!
@@ -495,7 +495,7 @@ pub use traits::EncodedSecret;
 #[cfg(feature = "serde-serialize")]
 pub use traits::SerializableSecret;
 
-// Type alias macros (always available)
+// Newtype macros (`dynamic_newtype!` needs `alloc`)
 mod macros;
 
 /// Decodes Base32 strings (`&str`) to `Vec<u8>`. Blanket impl for `AsRef<str>`.

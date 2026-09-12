@@ -6,9 +6,9 @@
 
 /// Creates a distinct nominal type wrapping [`Dynamic<T>`](crate::Dynamic).
 ///
-/// Mirrors [`dynamic_alias!`](crate::dynamic_alias) syntax, but generates a
-/// `struct` rather than a `type` alias: two `dynamic_newtype!` types over the
-/// same inner type are **not** interchangeable.
+/// Generates a `struct` rather than a `type` alias: two `dynamic_newtype!`
+/// types over the same inner type are distinct, where two plain `type`
+/// aliases over [`Dynamic<T>`](crate::Dynamic) are one type.
 ///
 /// # Syntax
 ///
@@ -112,9 +112,9 @@
 /// The generated type is `#[repr(transparent)]` over the wrapper and delegates
 /// through `#[inline]` methods, so it costs nothing at runtime.
 ///
-/// Unlike [`fixed_newtype!`](crate::fixed_newtype) there is **no zero-size
-/// guard** — a `Dynamic` is pointer-sized whatever it holds, so the check
-/// would be meaningless. Validate expected lengths in your own tests.
+/// Unlike [`Fixed`](crate::Fixed), there is **no compile-time zero-size
+/// check** here: a `Dynamic` is pointer-sized whatever it holds, so validate
+/// expected lengths in your own tests.
 ///
 /// **Do not add your own `Drop` impl.** None is needed: the wrapped
 /// [`Dynamic`](crate::Dynamic) still runs its own, so zeroization is
@@ -133,7 +133,7 @@
 ///
 /// **Nominal separation guards against mistakes, not intent** — but nothing is
 /// generated that would undo it by accident. There is no `From<Wrapper>` and
-/// no `Deref`, so an alias-typed value cannot flow into a newtype through
+/// no `Deref`, so a base-typed value cannot flow into a newtype through
 /// `.into()`, and `&Newtype` never coerces to `&Wrapper` at a call site. By
 /// default the only way material enters or leaves is the 3-tier access API —
 /// a `with_secret` round trip — which is explicit and shows up in the audit
@@ -160,30 +160,29 @@
 /// a rebuild, a reveal the job never needed.
 ///
 /// **Which direction is safe depends on the pool.** In a mixed tree the base
-/// type is not raw material: every plain alias sharing it *is* that type, so
-/// a directional token connects this role to all of them at once.
+/// type is not raw material: every plain `type` alias sharing it *is* that
+/// type, so a directional token connects this role to all of them at once.
 /// `FromWrapper` lets anything in the pool become this role — the source never
 /// opts in, because the source is just the base type — so a type that guards
 /// a boundary must never take it. `IntoWrapper` lets this role become anything
 /// in the pool, which is safe only when the role is no more sensitive than
-/// the least-sensitive alias sharing its base; on a secret role it is an
+/// the least-sensitive plain alias sharing its base; on a secret role it is an
 /// explicit, greppable downgrade, not a neutral operation. The default,
 /// neither token, is sufficient more often than it looks. The exposure is
 /// largest during a partial migration — the regime real consumers live in —
-/// because while most aliases stay plain the base type is a universal donor.
-/// Audit these methods the way you audit `expose_secret()`.
+/// because while most of the pool stays a plain `type` alias, the base type
+/// is a universal donor. Audit these methods the way you audit
+/// `expose_secret()`.
 ///
 /// The heap caveats of [`Dynamic`](crate::Dynamic) carry over unchanged: see
 /// `SECURITY.md` on realloc residue for `Vec`/`String` growth after wrapping.
 ///
 /// # See also
 ///
-/// - [`dynamic_alias!`](crate::dynamic_alias) — a `type` alias instead, when
-///   readability rather than role separation is the goal
 /// - [`fixed_newtype!`](crate::fixed_newtype) — stack-allocated counterpart,
 ///   and the reference for the `derive:` rules
-/// - [`dynamic_generic_alias!`](crate::dynamic_generic_alias) — one name
-///   across several inner types
+/// - [the crate root docs](crate) — the macros module section on when a
+///   plain `type` alias is the right reach instead of a newtype
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! dynamic_newtype {

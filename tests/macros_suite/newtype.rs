@@ -2,9 +2,9 @@
 
 use secure_gate::{RevealSecret, SecretLen, dynamic_newtype, fixed_newtype};
 
-// Compare directly with the existing alias macros:
-//   fixed_alias!(pub Aes256Key, 32);         -> type alias, structural
-//   fixed_newtype!(pub EncKey, 32);          -> newtype, nominal
+// Compare directly with a plain type alias:
+//   type Aes256Key = Fixed<[u8; 32]>;        -> a second name, structural
+//   fixed_newtype!(pub EncKey, 32);          -> a distinct type, nominal
 fixed_newtype!(pub EncKey, 32);
 fixed_newtype!(pub MacKey, 32, "HMAC-SHA256 key. Never used for encryption.");
 fixed_newtype!(pub Nonce, 12);

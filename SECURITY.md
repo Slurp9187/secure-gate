@@ -245,12 +245,14 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 - Audit all `CloneableSecret`/`SerializableSecret` implementations.
 - Validate inputs before encoding/decoding or using format-specific traits.
 - For encoding: every encoder returns `EncodedSecret`, which stays wiped until it drops. Read it with `&*encoded` (it derefs to `str`); call `.into_inner()` only when an API demands an owned `String`, which is the named moment protection ends.
-- Check that a secret's length is non-zero when it is generic or configuration-driven.
-  A zero-length secret is accepted everywhere and fails silently rather than loudly:
-  `Fixed<[u8; 0]>` constructs, reports `len() == 0`, still prints `[REDACTED]`, encodes
-  to `""`, and compares `ct_eq`-equal to any other empty. `fixed_alias!(Name, 0)` is a
-  compile error, but that guard is in the macro only — writing
-  `type Name = Fixed<[u8; 0]>;` bypasses it, as do the generic and dynamic alias macros.
+- A zero-sized `Fixed` is a compile error at construction — the guard is raised at
+  monomorphization, so it covers generic code too; naming the type without building one
+  still compiles. Note that a post-monomorphization error is raised during codegen, so
+  `cargo check` will not report it: rely on `cargo build` or `cargo test` to surface one,
+  not on an editor. `Dynamic` has no compile-time equivalent, so check that a
+  variable-length secret is non-empty when its length is generic or configuration-driven.
+  If an empty one reaches you anyway: it reports `len() == 0`, still prints `[REDACTED]`,
+  encodes to `""`, and compares `ct_eq`-equal to any other empty.
 - Monitor dependencies for CVEs.
 - Treat secrets as radioactive — minimize exposure surface.
 
@@ -263,7 +265,8 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 **Potential weaknesses**
 
 - Long-lived `expose_secret()` references can defeat scoping
-- Macro-generated aliases lack runtime size checks
+- `Dynamic<T>` performs no size check and empty contents are a runtime fact; `Fixed`
+  rejects a zero-sized inner value at construction.
 - Certain error variants may indirectly leak length information (e.g. wrong decoded length).
   In most real-world usage (logging, API responses), length is already public metadata anyway (e.g. key length in JWT headers, signature length). Still, contextualize or redact errors when possible.
 - `Fixed<T>` decode constructors previously used `copy_from_slice` into a separate
