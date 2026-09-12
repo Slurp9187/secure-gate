@@ -36,6 +36,17 @@
 //! its pointer slot is a single global. Counting mode additionally must not be nested or entered
 //! from two threads at once; see `count_allocs`. Nothing in this file spawns a thread.
 //!
+//! # Why the size assertions do not print their own numbers
+//!
+//! A buffer's capacity is read through `with_secret`, so CodeQL's `rust/cleartext-logging` query
+//! treats it as secret-derived, and an `assert_eq!` **format argument** is a logging sink for that
+//! query. Interpolating the capacity into the failure message therefore raised a high-severity
+//! alert at every one of these assertions. A capacity is a block size and not secret material, but
+//! the interpolation was redundant anyway: `assert_eq!` prints both operands on failure, so the
+//! numbers are still there. The messages say what a mismatch *means* instead, and the tainted value
+//! stays an operand, which that query does not treat as a sink. Do not put a `with_secret`-derived
+//! value back into a format string here.
+//!
 //! # What this instrument can and cannot see
 //!
 //! * It sees a buffer abandoned by `Vec`/`String` growth **only because** `GlobalAlloc::realloc` is
@@ -478,8 +489,8 @@ fn check_str_and_slice_conversions_copy_then_wipe(size: usize) {
     assert!(w.freed, "the copied byte buffer was never released");
     assert_eq!(
         w.size, cap,
-        "the allocator inspected {} of {cap} bytes",
-        w.size
+        "the watched block's size is not the buffer's capacity, so this check covered only part \
+         of the allocation"
     );
     assert_eq!(
         w.nonzero, 0,
@@ -515,8 +526,8 @@ fn check_new_with_keeps_the_closures_buffer(size: usize) {
     assert!(w.freed, "the closure's buffer was never released");
     assert_eq!(
         w.size, cap,
-        "the allocator inspected {} of {cap} bytes",
-        w.size
+        "the watched block's size is not the buffer's capacity, so this check covered only part \
+         of the allocation"
     );
     assert_eq!(w.nonzero, 0, "{} bytes survived the drop", w.nonzero);
 
@@ -536,8 +547,8 @@ fn check_new_with_keeps_the_closures_buffer(size: usize) {
     assert!(w.freed, "the closure's buffer was never released");
     assert_eq!(
         w.size, cap,
-        "the allocator inspected {} of {cap} bytes",
-        w.size
+        "the watched block's size is not the buffer's capacity, so this check covered only part \
+         of the allocation"
     );
     assert_eq!(w.nonzero, 0, "{} bytes survived the drop", w.nonzero);
 }
@@ -625,8 +636,8 @@ fn check_decoded_buffer_wiped(path: &str, size: usize, decode: impl FnOnce() -> 
     assert!(w.freed, "{path}: the decoded buffer was never released");
     assert_eq!(
         w.size, cap,
-        "{path}: the allocator inspected {} bytes of a buffer whose capacity is {cap}",
-        w.size
+        "{path}: the watched block's size is not the decoded buffer's capacity, so this check \
+         covered only part of the allocation"
     );
     assert_eq!(
         w.nonzero, 0,
@@ -776,8 +787,8 @@ fn check_capacity_stable_mutation_stays_in_one_buffer(size: usize) {
     assert!(w.freed, "the mutated buffer was never released");
     assert_eq!(
         w.size, cap,
-        "the allocator inspected {} of {cap} bytes",
-        w.size
+        "the watched block's size is not the buffer's capacity, so this check covered only part \
+         of the allocation"
     );
     assert_eq!(
         w.nonzero, 0,
@@ -822,8 +833,8 @@ fn check_truncating_mutation_wipes_the_abandoned_tail(size: usize) {
     assert!(w.freed, "the truncated buffer was never released");
     assert_eq!(
         w.size, cap,
-        "the allocator inspected {} bytes of a {cap}-byte allocation",
-        w.size
+        "the watched block's size is not the buffer's capacity, so the abandoned tail was not \
+         part of the measurement"
     );
     assert_eq!(
         w.nonzero, 0,
@@ -938,8 +949,8 @@ fn check_growth_orphan_retains_secret_vec(initial: usize, extra: usize) {
     assert!(w.freed, "the grown buffer was never released");
     assert_eq!(
         w.size, cap,
-        "the allocator inspected {} of {cap} bytes",
-        w.size
+        "the watched block's size is not the buffer's capacity, so this check covered only part \
+         of the allocation"
     );
     assert_eq!(
         w.nonzero, 0,
@@ -982,8 +993,8 @@ fn check_growth_orphan_via_expose_secret_mut(initial: usize, extra: usize) {
     assert!(w.freed, "the grown buffer was never released");
     assert_eq!(
         w.size, cap,
-        "the allocator inspected {} of {cap} bytes",
-        w.size
+        "the watched block's size is not the buffer's capacity, so this check covered only part \
+         of the allocation"
     );
     assert_eq!(w.nonzero, 0, "{} bytes survived the drop", w.nonzero);
 }
@@ -1022,8 +1033,8 @@ fn check_growth_orphan_retains_secret_string(initial: usize, extra: usize) {
     assert!(w.freed, "the grown String buffer was never released");
     assert_eq!(
         w.size, cap,
-        "the allocator inspected {} of {cap} bytes",
-        w.size
+        "the watched block's size is not the buffer's capacity, so this check covered only part \
+         of the allocation"
     );
     assert_eq!(w.nonzero, 0, "{} bytes survived the drop", w.nonzero);
 }
@@ -1067,8 +1078,8 @@ fn check_growth_orphan_retains_secret_generic(initial_elems: usize, extra_elems:
     assert!(w.freed, "the grown Vec<u32> buffer was never released");
     assert_eq!(
         w.size, cap_bytes,
-        "the allocator inspected {} of {cap_bytes} bytes",
-        w.size
+        "the watched block's size is not the Vec<u32> buffer's capacity in bytes, so this check \
+         covered only part of the allocation"
     );
     assert_eq!(w.nonzero, 0, "{} bytes survived the drop", w.nonzero);
 }
@@ -1125,8 +1136,8 @@ fn check_write_growth_wipes_the_orphan(initial: usize, extra: usize) {
     assert!(w.freed, "the grown buffer was never released");
     assert_eq!(
         w.size, cap,
-        "the allocator inspected {} of {cap} bytes",
-        w.size
+        "the watched block's size is not the buffer's capacity, so this check covered only part \
+         of the allocation"
     );
     assert_eq!(w.nonzero, 0, "{} bytes survived the drop", w.nonzero);
 }
@@ -1249,8 +1260,8 @@ fn check_into_wrapper_drops_the_label_not_the_protection(size: usize) {
     assert!(w.freed, "the unlabelled buffer was never released");
     assert_eq!(
         w.size, cap,
-        "the allocator inspected {} of {cap} bytes",
-        w.size
+        "the watched block's size is not the buffer's capacity, so this check covered only part \
+         of the allocation"
     );
     assert_eq!(
         w.nonzero, 0,
@@ -1307,8 +1318,8 @@ fn check_from_wrapper_relabels_in_place(size: usize) {
     assert!(w.freed, "the relabelled buffer was never released");
     assert_eq!(
         w.size, cap,
-        "the allocator inspected {} of {cap} bytes",
-        w.size
+        "the watched block's size is not the buffer's capacity, so this check covered only part \
+         of the allocation"
     );
     assert_eq!(
         w.nonzero, 0,
