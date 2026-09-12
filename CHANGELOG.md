@@ -274,6 +274,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sentinel. The trait doc, the module example and the `Fixed` comment now draw that
   distinction instead of claiming the stronger thing.
 
+  **CodeQL raised 13 high-severity alerts against the heap trace, and the fix is a better
+  message.** Every one was `rust/cleartext-logging` on the same assertion shape: a buffer's
+  capacity, read through `with_secret` and therefore secret-derived in the query's model,
+  interpolated into an `assert_eq!` failure message. A format argument is a logging sink for
+  that query; an operand is not, which is why the assertions comparing *against* a
+  `with_secret` result were never flagged. A capacity is a block size rather than secret
+  material, so the alerts overstate the exposure — but the interpolation was redundant in the
+  first place, because `assert_eq!` prints both operands on failure. The messages now say what
+  a mismatch means and let the macro print the numbers, which removes the sink without
+  suppressing anything and without losing a byte of diagnostic detail. Confirmed by breaking
+  one assertion on purpose: the failure still reports both sizes. The file's header says not to
+  put a `with_secret`-derived value back into a format string there. This branch is scanned by
+  the same advanced CodeQL setup as `main` (`docs/design/ci_cross_branch_coverage.md`), so the
+  alerts would have landed here too.
+
 ### Backport notes
 
 - **Mirrors the same change on `main`, re-derived against this branch rather than copied.**
