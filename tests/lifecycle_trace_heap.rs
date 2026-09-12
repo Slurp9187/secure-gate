@@ -58,12 +58,18 @@
 //!
 //! # What this instrument can and cannot see
 //!
-//! * It sees a buffer abandoned by `Vec`/`String` growth **only because** `GlobalAlloc::realloc` is
-//!   not overridden: the default implementation is alloc + copy + dealloc, so the old block passes
-//!   through `dealloc` where its bytes can be counted. A native in-place resize would leave the
-//!   same residue in the same page while never reaching `dealloc` — the residue would still exist,
-//!   the instrument just could not quantify it. `check_growth_orphan_*` therefore asserts the block
-//!   *was* freed before reading anything into its contents.
+//! * It sees a buffer abandoned by a `Vec`/`String` capacity change **only because**
+//!   `GlobalAlloc::realloc` is not overridden: the default implementation is alloc + copy + dealloc,
+//!   so the old block passes through `dealloc` where its bytes can be counted. That choice is what
+//!   makes the measurement possible, and it also *forces* the copying path — so these numbers are
+//!   the worst case rather than the typical one. With the real system allocator and no instrument,
+//!   growing a full 1008-byte buffer by 96 (the exact pair `check_growth_orphan_retains_secret_vec`
+//!   uses) extends the chunk in place and abandons nothing; on a fragmented heap the same growth
+//!   moves and the abandoned chunk holds the secret. A true in-place resize leaves **no** residue,
+//!   because nothing is abandoned: the old bytes are inside the allocation the wrapper still owns
+//!   and still wipes at drop. `check_growth_orphan_*` therefore asserts the block *was* freed
+//!   before reading anything into its contents — not as a formality, but because the abandoned
+//!   buffer it measures does not exist in every run of the same code outside this instrument.
 //! * It sees only blocks this process frees. Bytes already copied into a core dump, into swap, or
 //!   into a caller's own buffer are out of reach, and so is the stack.
 //! * It reads a block after the owner has released it but before `System.dealloc` is told about it,

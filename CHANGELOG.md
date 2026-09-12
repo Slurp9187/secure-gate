@@ -120,6 +120,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   where a zero-length result is representable — which is what this crate's own base32 test
   did.
 
+- **The heap-residue threat model is corrected in four places, all by measurement.** A review
+  pass built its own allocator instruments rather than reading the prose, and the documented
+  story turned out to be wrong in one direction and incomplete in three.
+
+  **The residue is not unconditional.** `SECURITY.md` said a growth past capacity "allocates a
+  new buffer, memcpys the contents, and frees the old buffer". That is what happens when the
+  allocator *moves* the buffer. `Vec` asks for a `realloc`, and an allocator that can extend
+  the chunk in place does so, copying and abandoning nothing. Measured with the default system
+  allocator and no instrumentation: a full 1008-byte buffer grown by 96 — the exact pair
+  `check_growth_orphan_retains_secret_vec` uses — extends in place, as do a 1040-byte `String`
+  grown by 16, a 4096-byte buffer grown by 65536, and a growth with one allocated neighbour
+  immediately behind. On a fragmented heap the same growth moves and the abandoned chunk holds
+  the secret. So the exposure is real with a probabilistic trigger. The documentation now says
+  so, and says that the byte counts come from an instrument that does not override `realloc`
+  and therefore forces the copying path on every growth. That is the right choice for a threat
+  model, but it is the worst case rather than the typical one, and `lifecycle_trace_heap.rs`'s
+  header no longer claims that an in-place resize "would leave the same residue" — it leaves
+  none, because nothing is abandoned: the old bytes are inside the allocation the wrapper still
+  owns and still wipes.
+
+  **Shrinking abandons a buffer too.** Framing the weakness as growth past capacity was the
+  wrong mental model. `shrink_to_fit` and `shrink_to` reallocate downward and free the old
+  block with the secret in it, and truncate-then-shrink is the worst of the family: a pre-sized
+  4096-byte buffer truncated to 2048 and then shrunk released its old block holding **4096**
+  non-zero bytes, the live prefix and the discarded tail together, while the wrapper went on to
+  protect only the smaller replacement. A buffer that never grew can leak its entire contents
+  this way. `reserve` is the converse surprise: it abandons the old buffer while writing no
+  payload at all. The dangerous-operation list and the README both now say *capacity-changing*
+  rather than growing, and name both shrink methods.
+
+  **The bound on the exposure was never stated.** The documentation said what is not covered
+  and never said what is. The buffer the wrapper holds after the change is the currently-held
+  allocation, so it is zeroized on drop, spare capacity included — measured at 0 non-zero bytes
+  of 2016, with a positive control confirming its tail held payload going in. The exposure is
+  confined to the abandoned buffers, plural, one per move. `tests/lifecycle_trace_heap.rs`
+  already asserted this five times; only the prose was missing it.
+
+  **The recommended remedy leaked.** `SECURITY.md` advised replacing the wrapper with
+  `Dynamic::new_with(|v| …)`. That closure starts with an empty `Vec`, so filling it byte by
+  byte reallocates its way up and abandons its own intermediate buffers: 1016 secret bytes
+  across 7 blocks for a 1008-byte secret. The advice now says to pre-size inside the closure or
+  to build the value and use `Dynamic::new`, both of which measured 0. The limitation's scope is
+  also widened to name the two routes it omitted: `as_wrapper_mut` on a newtype declared with
+  `derive: [IntoWrapper]` or `[WrapperAccess]`, and the `new_with` closure itself.
+
 ### Removed
 
 - **BREAKING: `fixed_alias!`, `dynamic_alias!`, `fixed_generic_alias!` and

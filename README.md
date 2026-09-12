@@ -345,10 +345,15 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
 
 For `Dynamic<Vec<_>>` and `Dynamic<String>`, avoid capacity-changing mutations
-after wrapping unless your deployment handles allocator-level residue. For
-known-size heap-only key material, prefer `Dynamic<[u8; N]>` (boxed array — no
-realloc surface). See `SECURITY.md` for the realloc threat-model note and
-operational mitigations.
+after wrapping unless your deployment handles allocator-level residue. Capacity-changing
+means more than growing: `reserve` abandons the old buffer while writing no payload, and
+`shrink_to_fit` / `shrink_to` abandon it while the buffer only ever got smaller, carrying
+the discarded tail with it. The buffer the wrapper holds afterwards is still zeroized on
+drop, spare capacity included, so the exposure is confined to the abandoned buffers — one
+per move, and whether a move happens at all depends on whether the allocator can resize
+the chunk in place. For known-size heap-only key material, prefer `Dynamic<[u8; N]>`
+(boxed array — no realloc surface). See `SECURITY.md` for the realloc threat-model note
+and operational mitigations.
 
 ### Inherent Rust limitations
 
