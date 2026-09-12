@@ -454,10 +454,12 @@ pub use traits::SentinelValue;
 /// any capacity change — the same weakness `Dynamic` documents, minus `Dynamic`'s
 /// safe-growth `std::io::Write` path.
 ///
-/// Implemented for the primitives, `[T; N]` for any `N`, tuples up to four elements,
-/// `Option<T>`, and `Box<[T]>` — a boxed slice has a fixed length and cannot grow.
-/// `Vec<T>` and `String` are deliberately absent; use [`Dynamic`] for those, which
-/// documents the residue and offers the one safe growth path.
+/// Implemented for the primitives, `[T; N]` for any `N`, tuples up to four elements, and
+/// `Option<T>`. Nothing heap-owning is implemented: `Vec<T>`, `String` and `Box<[T]>` are
+/// all absent, because the residue does not need a capacity change — replacing the whole
+/// value abandons the allocation too, measured at 1024 of 1024 bytes through a
+/// `Fixed<Box<[u8]>>`. For a heap-backed secret use [`Dynamic`], which documents the
+/// residue and offers the one safe growth path.
 ///
 /// A custom inner type writes `impl FixedStorage for MyKey {}`. Like [`CloneableSecret`],
 /// the compiler checks that you made the claim, not that it is true — see the trait docs

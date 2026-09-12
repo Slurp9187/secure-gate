@@ -494,15 +494,22 @@ fn fixed_u8_len_unchanged() {
 
 // === FixedStorage: what `Fixed::new` accepts, and what it no longer does ===
 
-/// A boxed slice has a length fixed at construction and no API that can grow it, so it is
-/// `FixedStorage` and `Fixed` accepts it. This shape lives here rather than in the
-/// `compile-pass` fixture because that fixture also runs under `--no-default-features`,
-/// where `Box` does not exist.
+/// A boxed slice is **not** `FixedStorage`, and the reason is worth recording because the
+/// first version of the trait accepted it. Its length is fixed at construction, so it
+/// satisfies "cannot be resized" — but that was the wrong predicate. Replacing the whole
+/// value abandons the allocation just as a reallocation would, and the wrapper wipes what it
+/// holds at drop rather than what it used to hold. Measured on a `Fixed<Box<[u8]>>` with a
+/// 1024-byte secret, `with_secret_mut(|slot| *slot = other)` released the original block
+/// with 1024 of 1024 bytes intact. The rejection is pinned in
+/// `tests/compile-fail/fixed_reallocating_inner.rs`; this comment is the rationale, since a
+/// future reader will otherwise be tempted to add the impl back.
+///
+/// For a heap-backed secret of fixed size the supported shape is `Dynamic<[u8; N]>`, which
+/// allocates once and is wiped on drop.
 #[cfg(feature = "alloc")]
 #[test]
-fn fixed_storage_accepts_a_boxed_slice() {
-    let boxed: alloc::boxed::Box<[u8]> = alloc::vec![7u8; 8].into_boxed_slice();
-    let secret = Fixed::new(boxed);
+fn dynamic_boxed_array_is_the_heap_fixed_size_shape() {
+    let secret: Dynamic<[u8; 8]> = Dynamic::new([7u8; 8]);
     assert_eq!(secret.with_secret(|b| b[0]), 7);
     assert_eq!(secret.with_secret(|b| b.len()), 8);
 }

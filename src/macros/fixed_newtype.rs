@@ -123,8 +123,8 @@
 /// with no `io::Write` escape of the sort [`Dynamic<Vec<u8>>`](crate::Dynamic) has.
 /// [`Fixed::new`](crate::Fixed::new) now requires
 /// [`FixedStorage`](crate::FixedStorage), so those forms are a compile error reported
-/// at this declaration. Arrays, the primitives, tuples, `Option` and boxed slices are
-/// covered for you, which is every shape this arm exists for; a custom inner type adds
+/// at this declaration. Arrays, the primitives, tuples and `Option` are covered for you,
+/// which is every shape this arm exists for; a custom inner type adds
 /// `impl FixedStorage for MyType {}`, which asserts that it owns no buffer whose
 /// capacity can change. For a growable payload reach for
 /// [`dynamic_newtype!`](crate::dynamic_newtype) instead, where the residue is

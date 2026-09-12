@@ -90,7 +90,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   payload and, unlike plain `Dynamic<Vec<u8>>`, no `io::Write` escape. That is left as a
   separate decision rather than widened into this one.
 
-  **Migration.** Nothing for byte arrays, non-byte arrays, tuples, `Option`s or boxed slices.
+  **`Box<[T]>` was blessed and then un-blessed, because the predicate was wrong.** The trait
+  first asked only that a type's capacity cannot change, and a boxed slice satisfies that — its
+  length is fixed at construction. An adversarial pass measured the consequence on a shape the
+  crate had just permitted: a `Fixed<Box<[u8]>>` holding a 1024-byte secret, mutated with
+  `with_secret_mut(|slot| *slot = other_boxed_slice)`, released the original block with **1024
+  of 1024** bytes intact, and the same assignment through `expose_secret_mut` did too.
+  `Option<Box<[u8]>>` and `[Box<[u8]>; 2]` were permitted by the same impl. The inline
+  contrast, `Fixed<[u8; 1024]>` assigned the same way, freed nothing at all, because there is
+  no allocation to abandon.
+
+  The residue never required a capacity change: replacing the whole value abandons the
+  allocation just as well, and the wrapper wipes what it holds at drop rather than what it used
+  to hold. So the contract is now **heap ownership**, not resizability, the `Box<[T]>` impl is
+  gone, and all three boxed shapes are refused. The supported shape for a heap-backed secret of
+  fixed size is `Dynamic<[u8; N]>`, which allocates once. The rejection is pinned in
+  `tests/compile-fail/fixed_reallocating_inner.rs` and the reasoning is recorded beside a test
+  in `tests/core_tests.rs`, because a future reader will otherwise be tempted to add the impl
+  back for exactly the reason it was added the first time.
+
+  **Migration.** Nothing for byte arrays, non-byte arrays, tuples or `Option`s.
   A custom inner type adds one line, `impl FixedStorage for MyKey {}`, next to its `Zeroize`
   impl. A `Fixed<Vec<u8>>` or `Fixed<String>` must become `Dynamic`, which is the wrapper for
   a growable payload. Inside this repository the change touched nine custom inner types across

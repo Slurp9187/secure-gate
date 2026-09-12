@@ -11,10 +11,10 @@
 //! case it runs `cargo build`. This file is that `pass` case.
 //! It is also the positive control for the `FixedStorage` bound on `Fixed::new`: every
 //! shape that bound must keep accepting is built here — a byte array, a non-byte array, a
-//! tuple, an `Option`, and a custom inner type that makes the assertion in one line. It
-//! stays `alloc`-free on purpose: its test runs under `--no-default-features` too, so the
-//! boxed-slice shape is covered by `fixed_storage_accepts_a_boxed_slice` in
-//! `tests/core_tests.rs` instead.
+//! tuple, an `Option`, and a custom inner type that makes the assertion in one line. Every
+//! shape here is heap-free, which is the predicate `FixedStorage` actually asserts — nothing
+//! heap-owning qualifies, not even a boxed slice, whose rejection is pinned in
+//! `tests/compile-fail/fixed_reallocating_inner.rs`.
 use secure_gate::{Fixed, FixedStorage, RevealSecret, SentinelValue, fixed_newtype};
 use zeroize::Zeroize;
 
