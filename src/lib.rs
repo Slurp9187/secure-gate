@@ -445,7 +445,7 @@ pub use traits::RevealSecretMut;
 /// work. That is the safe default rather than a missing feature.
 pub use traits::SentinelValue;
 
-/// Asserts that an inner type owns no buffer whose capacity can change.
+/// Asserts that an inner type owns no heap allocation.
 ///
 /// Required by [`Fixed::new`], which is what makes `SECURITY.md`'s claim that `Fixed<T>`
 /// "has no realloc surface" true rather than aspirational. Before this bound existed,

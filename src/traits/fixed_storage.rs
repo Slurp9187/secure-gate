@@ -1,4 +1,4 @@
-//! Marker trait asserting that a secret's storage cannot be reallocated.
+//! Marker trait asserting that a secret's storage owns no heap allocation.
 //!
 //! [`Fixed<T>`](crate::Fixed) is documented as having no reallocation surface, which is
 //! what lets `SECURITY.md` exempt it from the heap-residue weakness that
@@ -11,7 +11,7 @@
 //! nothing.
 //!
 //! [`FixedStorage`] is what makes the exemption true. [`Fixed::new`](crate::Fixed::new)
-//! requires it, so the compiler now rejects an inner type whose capacity can change.
+//! requires it, so the compiler now rejects an inner type that owns a heap allocation.
 //!
 //! # The contract
 //!
@@ -48,10 +48,36 @@
 //! # What is implemented for you
 //!
 //! - the integer, floating-point, `bool`, `char` and `()` primitives;
+//! - the twelve `NonZero` integers;
 //! - `[T; N]` for any `N`, when `T: FixedStorage` — which covers `[u8; 32]` and the
 //!   non-byte arrays the `generic` arm exists for, such as `[i16; 256]`;
-//! - tuples up to four elements of `FixedStorage` types;
-//! - `Option<T>` when `T: FixedStorage` — a discriminant adds no heap storage.
+//! - tuples up to ten elements of `FixedStorage` types, matching `zeroize`'s own ceiling;
+//! - `Option<T>` when `T: FixedStorage` — a discriminant adds no heap storage;
+//! - `Wrapping<T>` and `MaybeUninit<T>` when `T: FixedStorage` — both are `T`'s own storage;
+//! - `zeroize::Zeroizing<T>` when `T: FixedStorage`;
+//! - `Fixed<T>` itself when `T: FixedStorage`, so the wrapper nests.
+//!
+//! # Why that list has to be this long
+//!
+//! The bound is an allow-list, which means it fails closed: a type is refused both when it
+//! owns a heap allocation and when nothing has asserted that it does not. For a type you
+//! define, the second case costs one line. For a type you do **not** own it costs nothing,
+//! because you cannot pay it — `impl FixedStorage for NonZeroU32` in your crate is E0117,
+//! the orphan rule, and no amount of effort downstream changes that.
+//!
+//! So every heap-free type reachable through `zeroize`'s own `Zeroize` impls has to be
+//! blessed here or it is simply unavailable as a `Fixed` inner type, with the caller's only
+//! escape being to change their own type. That is the reason for the `NonZero`, `Wrapping`,
+//! `MaybeUninit` and `Zeroizing` impls above, and for tuples reaching ten rather than four:
+//! each was a shape that compiled before this bound existed and that no downstream crate
+//! could have restored. Ten is not arbitrary — `zeroize` implements `Zeroize` for tuples up
+//! to ten elements and no further, so an eleventh element fails the `Zeroize` bound before
+//! this one is ever consulted.
+//!
+//! The deny-list alternative — accept everything except a known set of heap owners — was
+//! rejected deliberately. It has no false rejections, but it fails **open**: a custom type
+//! wrapping a `Vec` would be accepted in silence, which is the exact weakness this trait
+//! exists to close.
 //!
 //! Nothing heap-owning is implemented, deliberately. `Box<[T]>` was and is not: see the
 //! contract above for the measurement that removed it. `Box<[u8; N]>` never arises anyway,
@@ -76,7 +102,7 @@
 //!         Poly([0i16; 256])
 //!     }
 //! }
-//! // Asserted here: `Poly` owns no buffer whose capacity can change.
+//! // Asserted here: `Poly` owns no heap allocation.
 //! impl FixedStorage for Poly {}
 //!
 //! let p = Fixed::new(Poly([7i16; 256]));
@@ -90,7 +116,7 @@
 //! legal type expression and no guard in the type could make it otherwise. What the bound
 //! removes is every *value* of it.
 
-/// Marker trait asserting that a type owns no buffer whose capacity can change.
+/// Marker trait asserting that a type owns no heap allocation.
 ///
 /// Required by [`Fixed::new`](crate::Fixed::new). See the
 /// [module documentation](self) for the contract, for what is already implemented,
@@ -99,11 +125,12 @@
 /// No methods — its only purpose is to gate construction of a
 /// [`Fixed<T>`](crate::Fixed).
 #[diagnostic::on_unimplemented(
-    message = "`{Self}` owns a heap allocation, so it cannot be the inner type of a `Fixed`",
-    label = "`Fixed` holds its secret inline; `{Self}` does not qualify",
-    note = "`Fixed<T>` exists so a secret can be held with no allocator at all, and `FixedStorage` is what keeps that true: a heap allocation can be abandoned unwiped, either by a reallocation or by replacing the whole value.",
-    note = "For a heap-backed secret use `Dynamic<T>` instead, which documents the residue and offers one safe growth path. `Dynamic` needs this crate's `alloc` feature — if you are seeing this with `alloc` off while still able to name `Vec` or `String`, enabling it is the fix.",
-    note = "For a custom inner type that genuinely owns no heap allocation, write an empty `impl FixedStorage` block for it. That is an assertion the compiler cannot check, so only write it if it is true."
+    message = "`{Self}` is not known to be free of heap allocations, so it cannot be the inner type of a `Fixed`",
+    label = "`Fixed` holds its secret inline; `{Self}` does not implement `FixedStorage`",
+    note = "`Fixed<T>` exists so a secret can be held with no allocator at all, and `FixedStorage` is what keeps that true: a heap allocation can be abandoned unwiped, either by a reallocation or by replacing the whole value. The bound is an allow-list, so there are two reasons to land here — `{Self}` owns a heap allocation, or nothing has asserted that it does not.",
+    note = "If `{Self}` does own one — a `Vec`, a `String`, a `Box<[T]>`, a collection, or a struct holding any of those — then this is the bound doing its job: reach for `Dynamic<T>`, which documents the residue and offers one safe growth path. `Dynamic` needs this crate's `alloc` feature, so if you are seeing this with `alloc` off while still able to name `Vec`, enabling it is the fix.",
+    note = "If `{Self}` owns no heap allocation, it is only missing the assertion. For a type you define, add an empty `impl FixedStorage` block for it. For a type you do not own, the orphan rule makes that impossible and rejects the impl with E0117 — wrap it in a newtype of your own and implement the marker for that, or ask for an impl upstream.",
+    note = "Already covered: the primitives, `[T; N]`, tuples up to ten elements, `Option<T>`, the twelve `NonZero` integers, `Wrapping<T>`, `MaybeUninit<T>`, `zeroize::Zeroizing<T>`, and `Fixed<T>` itself — each when its payload qualifies."
 )]
 pub trait FixedStorage {}
 
@@ -135,10 +162,52 @@ __sg_fixed_storage_prims!(
     ()
 );
 
+// The twelve `NonZero` integers `zeroize` implements `Zeroize` for. Each is a single integer
+// with a niche, so there is no allocation to abandon.
+//
+// These are foreign types, so a downstream crate cannot assert this itself: `impl
+// FixedStorage for NonZeroU32` is E0117. That is why the impls live here — without them,
+// `Fixed<NonZeroU32>` would be refused with no fix available to the caller.
+__sg_fixed_storage_prims!(
+    core::num::NonZeroU8,
+    core::num::NonZeroU16,
+    core::num::NonZeroU32,
+    core::num::NonZeroU64,
+    core::num::NonZeroU128,
+    core::num::NonZeroUsize,
+    core::num::NonZeroI8,
+    core::num::NonZeroI16,
+    core::num::NonZeroI32,
+    core::num::NonZeroI64,
+    core::num::NonZeroI128,
+    core::num::NonZeroIsize,
+);
+
 /// An array never reallocates, whatever its length, so it is `FixedStorage` exactly when
 /// its element type is. This is the impl that covers `[u8; N]` and the non-byte arrays the
 /// `generic` arm of [`fixed_newtype!`](crate::fixed_newtype) exists for.
 impl<T: FixedStorage, const N: usize> FixedStorage for [T; N] {}
+
+/// `Wrapping` is a transparent arithmetic wrapper: same storage as its payload.
+impl<T: FixedStorage> FixedStorage for core::num::Wrapping<T> {}
+
+/// `MaybeUninit<T>` is `T`'s storage, initialised or not. No allocation either way.
+impl<T: FixedStorage> FixedStorage for core::mem::MaybeUninit<T> {}
+
+/// `zeroize::Zeroizing<T>` holds `T` inline and wipes it on drop, so it qualifies exactly
+/// when `T` does.
+///
+/// This one matters out of proportion to its size. `Zeroizing` is the idiomatic "wipe this
+/// on drop" wrapper from this crate's only non-optional dependency, so
+/// `Fixed<Zeroizing<[u8; 32]>>` is a shape people reach for — and because both the trait and
+/// the type are foreign to the caller, the orphan rule leaves them no way to assert it. It
+/// has to be here or it is unavailable.
+impl<T: FixedStorage + zeroize::Zeroize> FixedStorage for zeroize::Zeroizing<T> {}
+
+/// A `Fixed<T>` holds `T` inline, so the wrapper nests: `Fixed<Fixed<[u8; 32]>>` is legal
+/// exactly when the payload qualifies. Without this impl the crate's own wrapper could not
+/// be used as its own inner type.
+impl<T: zeroize::Zeroize + FixedStorage> FixedStorage for crate::Fixed<T> {}
 
 macro_rules! __sg_fixed_storage_tuples {
     ($(($($name:ident),+);)*) => {
@@ -153,6 +222,12 @@ __sg_fixed_storage_tuples! {
     (A, B);
     (A, B, C);
     (A, B, C, D);
+    (A, B, C, D, E);
+    (A, B, C, D, E, F);
+    (A, B, C, D, E, F, G);
+    (A, B, C, D, E, F, G, H);
+    (A, B, C, D, E, F, G, H, I);
+    (A, B, C, D, E, F, G, H, I, J);
 }
 
 /// An `Option` adds a discriminant and no heap storage, so it qualifies exactly when its

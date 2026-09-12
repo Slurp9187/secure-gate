@@ -178,7 +178,7 @@ fn drain_bech32_payload<const N: usize>(
 /// # What `T` may be
 ///
 /// [`Fixed::new`] requires [`FixedStorage`](crate::FixedStorage) on the inner type: a
-/// type that owns no buffer whose capacity can change. This is what makes the documented
+/// type that owns no heap allocation. This is what makes the documented
 /// claim that `Fixed` has no reallocation surface true rather than aspirational. It used
 /// to be bounded only by `Zeroize`, so `Fixed<Vec<u8>>`, `Fixed<String>` and even
 /// `Fixed<[Vec<u8>; 2]>` compiled and abandoned an unwiped buffer holding the whole

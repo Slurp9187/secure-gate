@@ -536,3 +536,55 @@ fn fixed_storage_accepts_the_fixed_capacity_shapes() {
     );
     assert_eq!(Fixed::new([[6u8; 2]; 3]).with_secret(|a| a[2][1]), 6);
 }
+
+/// Every shape here is heap-free, was constructible before the `FixedStorage` bound
+/// existed, and is **foreign** — so if the crate withdrew these impls, no downstream crate
+/// could restore them. `impl secure_gate::FixedStorage for NonZeroU32` in a consumer is
+/// E0117, the orphan rule, and a consumer's only escape would be to change its own type.
+///
+/// That asymmetry is why this test exists. The bound is an allow-list, so a missing impl is
+/// indistinguishable to the caller from a deliberate refusal, and the cost of an accidental
+/// omission is not a worse error message — it is a shape that cannot be used at all.
+/// Measured before the impls were added: all eight of these failed `cargo check` while
+/// reporting, verbatim, that `(u8, u8, u8, u8, u8)` "owns a heap allocation".
+#[test]
+fn fixed_storage_covers_the_heap_free_foreign_shapes() {
+    use core::mem::MaybeUninit;
+    use core::num::{NonZeroU32, Wrapping};
+
+    assert_eq!(
+        Fixed::new(NonZeroU32::new(7).unwrap()).with_secret(|n| n.get()),
+        7
+    );
+    assert_eq!(
+        Fixed::new([NonZeroU32::new(9).unwrap(); 4]).with_secret(|a| a[3].get()),
+        9
+    );
+    assert_eq!(Fixed::new(Wrapping(11u32)).with_secret(|w| w.0), 11);
+    // Construction is the property under test; reading a `MaybeUninit` back would need
+    // `unsafe`, which this crate does not use and its tests should not model either.
+    assert_eq!(
+        Fixed::new(MaybeUninit::new(13u64)).with_secret(|_| size_of::<MaybeUninit<u64>>()),
+        8
+    );
+    assert_eq!(
+        Fixed::new(zeroize::Zeroizing::new([15u8; 32])).with_secret(|z| z[31]),
+        15
+    );
+
+    // Tuple arities 5 and 10: four was the old ceiling, ten is `zeroize`'s.
+    assert_eq!(
+        Fixed::new((1u8, 2u8, 3u8, 4u8, 5u8)).with_secret(|t| t.4),
+        5
+    );
+    assert_eq!(
+        Fixed::new((1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8, 9u8, 10u8)).with_secret(|t| t.9),
+        10
+    );
+
+    // The wrapper nests: `Fixed<T>` is itself heap-free when `T` is.
+    assert_eq!(
+        Fixed::new(Fixed::new([17u8; 4])).with_secret(|inner| inner.expose_secret()[0]),
+        17
+    );
+}

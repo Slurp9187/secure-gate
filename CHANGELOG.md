@@ -124,9 +124,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   **The error now says what to do instead, and names the one configuration that is easy to
   get wrong.** `FixedStorage` carries a `#[diagnostic::on_unimplemented]` attribute, so instead
-  of a bare unsatisfied-bound error a consumer reads that the inner type owns a heap allocation,
-  that `Dynamic<T>` is the wrapper for that, and that `Dynamic` needs this crate's `alloc`
-  feature. That last clause exists because of a real gap: the claim that `Fixed<Vec<u8>>` is
+  of a bare unsatisfied-bound error a consumer reads why the inner type does not qualify, that
+  `Dynamic<T>` is the wrapper for a heap-backed secret, and that `Dynamic` needs this crate's
+  `alloc` feature. That last clause exists because of a real gap: the claim that `Fixed<Vec<u8>>` is
   dominated "in every feature configuration" is not quite true. A consumer can disable this
   crate's `alloc` while `zeroize`'s own `alloc` is enabled elsewhere in the graph, and in that
   configuration `Vec<u8>: Zeroize` holds, `Fixed<Vec<u8>>` used to compile, and
@@ -137,7 +137,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   attribute needs Rust 1.78, so it is on the 0.9 line only; the 0.8 line carries the same
   guidance in the trait's documentation instead.
 
-  **Migration.** Nothing for byte arrays, non-byte arrays, tuples or `Option`s.
+  **The allow-list had to be completed, and the first version of the diagnostic told a
+  falsehood.** A positive marker bound fails closed, which is the right direction for a
+  security crate but means a type is refused for two indistinguishable reasons: it owns a heap
+  allocation, or nothing has asserted that it does not. The first version of this change only
+  blessed the primitives, `[T; N]`, tuples to four and `Option<T>` — so eight heap-free shapes
+  that compiled at `0.9.0-rc.9` stopped compiling, measured against the parent commit with a
+  consumer crate: the twelve `NonZero` integers, `Wrapping<T>`, `MaybeUninit<T>`,
+  `zeroize::Zeroizing<T>`, tuples of five to ten elements, `[NonZeroU32; 4]`, and `Fixed<T>`
+  nested in itself. None of them owns a heap allocation.
+
+  What made that a defect rather than an inconvenience is the orphan rule. Every one of those
+  types is foreign, so a consumer cannot add the missing impl: `impl secure_gate::FixedStorage
+  for core::num::NonZeroU32` in a downstream crate is `error[E0117]`. There was no workaround
+  short of changing their own type, and the diagnostic actively misdirected them — it stated as
+  fact that the type "owns a heap allocation", which for `(u8, u8, u8, u8, u8)` is simply
+  untrue, and then recommended writing the impl that E0117 forbids. Both are fixed: the impls
+  above are now present, the message says the type "is not known to be free of heap
+  allocations", and it distinguishes the two cases, naming E0117 for the foreign one. Tuples
+  stop at ten because that is `zeroize`'s own ceiling — an eleventh element fails the `Zeroize`
+  bound before this one is consulted. `tests/core_tests.rs` pins all eight shapes, and
+  `tests/compile-fail/fixed_reallocating_inner.rs` pins that `Zeroizing<T>` stays conditional,
+  so the wipe-on-drop wrapper cannot smuggle a `Vec` past the bound.
+
+  **Migration.** Nothing for byte arrays, non-byte arrays, tuples, `Option`s, `NonZero`
+  integers, `Wrapping`, `MaybeUninit` or `zeroize::Zeroizing`.
   A custom inner type adds one line, `impl FixedStorage for MyKey {}`, next to its `Zeroize`
   impl. A `Fixed<Vec<u8>>` or `Fixed<String>` must become `Dynamic`, which is the wrapper for
   a growable payload. Inside this repository the change touched nine custom inner types across

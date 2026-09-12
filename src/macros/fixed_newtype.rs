@@ -125,8 +125,8 @@
 /// [`FixedStorage`](crate::FixedStorage), so those forms are a compile error reported
 /// at this declaration. Arrays, the primitives, tuples and `Option` are covered for you,
 /// which is every shape this arm exists for; a custom inner type adds
-/// `impl FixedStorage for MyType {}`, which asserts that it owns no buffer whose
-/// capacity can change. For a growable payload reach for
+/// `impl FixedStorage for MyType {}`, which asserts that it owns no heap
+/// allocation. For a growable payload reach for
 /// [`dynamic_newtype!`](crate::dynamic_newtype) instead, where the residue is
 /// documented and one safe growth path exists.
 ///
