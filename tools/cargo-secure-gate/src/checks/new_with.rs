@@ -39,10 +39,12 @@
 //! happens in a body this pass never connects to this buffer. Those sites are
 //! reported as unresolved rather than passed.
 
+use std::collections::HashSet;
+
 use syn::visit::Visit;
 
 use crate::index::{Index, Wrapper, line_of};
-use crate::report::{Finding, Severity};
+use crate::report::{Finding, Kind, Severity};
 
 pub const RULE: &str = "SG002";
 
@@ -149,6 +151,7 @@ impl SiteVisitor<'_> {
                     return Some(vec![
                         Finding::new(
                             RULE,
+                            Kind::Route,
                             Severity::Unresolved,
                             self.file,
                             line,
@@ -170,6 +173,7 @@ impl SiteVisitor<'_> {
             return Some(vec![
                 Finding::new(
                     RULE,
+                    Kind::Route,
                     Severity::Unresolved,
                     self.file,
                     line,
@@ -181,7 +185,7 @@ impl SiteVisitor<'_> {
         let target = closure_param(closure)?;
 
         let mut scan = ClosureScan {
-            target: &target,
+            aliases: HashSet::from([target.clone()]),
             presized: false,
             growth: Vec::new(),
             escaped: None,
@@ -193,6 +197,7 @@ impl SiteVisitor<'_> {
             return Some(vec![
                 Finding::new(
                     RULE,
+                    Kind::Route,
                     Severity::Unresolved,
                     self.file,
                     line,
@@ -212,8 +217,8 @@ impl SiteVisitor<'_> {
         let message = if severity == Severity::Error {
             format!(
                 "`{receiver}::new_with` grows `{target}` repeatedly without sizing it (`{}`); the \
-                 closure starts with an empty buffer, so every reallocation after the first \
-                 abandons one holding the secret",
+                 closure starts with an empty buffer, so each growth past capacity can abandon \
+                 one holding the secret",
                 growth.method
             )
         } else {
@@ -225,7 +230,8 @@ impl SiteVisitor<'_> {
         };
 
         Some(vec![
-            Finding::new(RULE, severity, self.file, growth.line, message).with_note(format!(
+            Finding::new(RULE, Kind::Route, severity, self.file, growth.line, message)
+                .with_note(format!(
                 "add `{target}.reserve_exact(len)` as the first statement, or build the value and \
                  use `{receiver}::new`. Measured: 1016 secret bytes across 7 abandoned blocks for \
                  a 1008-byte secret, against 0 for either fix -- SECURITY.md, \"Heap-reallocation \
@@ -253,15 +259,23 @@ struct Growth {
 
 /// Walks the closure body in source order, so a `reserve_exact` counts only when
 /// it actually precedes the growth it is meant to cover.
-struct ClosureScan<'a> {
-    target: &'a str,
+struct ClosureScan {
+    /// Every name that reaches the same buffer. `let alias = v;` is one
+    /// statement and it used to defeat this check silently, which is the worst
+    /// way to fail: a miss that reads exactly like a pass.
+    aliases: HashSet<String>,
     presized: bool,
     growth: Vec<Growth>,
     escaped: Option<String>,
     loop_depth: usize,
 }
 
-impl ClosureScan<'_> {
+impl ClosureScan {
+    /// Whether an expression names the buffer, under any of its names.
+    fn refers_to(&self, expr: &syn::Expr) -> bool {
+        base_ident(expr).is_some_and(|i| self.aliases.contains(&i))
+    }
+
     fn record(&mut self, method: String, line: usize, shape: Shape) {
         let repeated = self.loop_depth > 0;
         self.growth.push(Growth {
@@ -296,9 +310,9 @@ impl ClosureScan<'_> {
     }
 }
 
-impl<'ast> Visit<'ast> for ClosureScan<'_> {
+impl<'ast> Visit<'ast> for ClosureScan {
     fn visit_expr_method_call(&mut self, node: &'ast syn::ExprMethodCall) {
-        if base_ident(&node.receiver).as_deref() == Some(self.target) {
+        if self.refers_to(&node.receiver) {
             let method = node.method.to_string();
             let line = line_of(&node.method);
             if PRESIZE.contains(&method.as_str()) {
@@ -317,7 +331,7 @@ impl<'ast> Visit<'ast> for ClosureScan<'_> {
     /// `*v = Vec::with_capacity(n)` and `*v = already_built` both replace the
     /// empty buffer wholesale rather than growing it, which abandons nothing.
     fn visit_expr_assign(&mut self, node: &'ast syn::ExprAssign) {
-        if base_ident(&node.left).as_deref() == Some(self.target) {
+        if self.refers_to(&node.left) {
             self.presized = true;
         }
         syn::visit::visit_expr_assign(self, node);
@@ -325,9 +339,7 @@ impl<'ast> Visit<'ast> for ClosureScan<'_> {
 
     /// `*s += "..."` is `push_str` spelled as an operator.
     fn visit_expr_binary(&mut self, node: &'ast syn::ExprBinary) {
-        if matches!(node.op, syn::BinOp::AddAssign(_))
-            && base_ident(&node.left).as_deref() == Some(self.target)
-        {
+        if matches!(node.op, syn::BinOp::AddAssign(_)) && self.refers_to(&node.left) {
             let line = line_of(&node.left);
             self.record("+=".to_string(), line, Shape::Bulk);
         }
@@ -345,7 +357,7 @@ impl<'ast> Visit<'ast> for ClosureScan<'_> {
         if is_write {
             if let Some(proc_macro2::TokenTree::Ident(id)) = node.tokens.clone().into_iter().next()
             {
-                if id == self.target {
+                if self.aliases.contains(&id.to_string()) {
                     let line = id.span().start().line;
                     self.record("write!".to_string(), line, Shape::Bulk);
                 }
@@ -375,10 +387,31 @@ impl<'ast> Visit<'ast> for ClosureScan<'_> {
         self.loop_depth -= 1;
     }
 
+    /// `let alias = v;` gives the same buffer a second name. Following it is
+    /// one line here and the difference between a miss and a silent miss.
+    fn visit_local(&mut self, node: &'ast syn::Local) {
+        if let Some(init) = &node.init {
+            if self.refers_to(&init.expr) {
+                match pat_ident(&node.pat) {
+                    Some(name) => {
+                        self.aliases.insert(name);
+                    }
+                    // Destructured into a shape this pass does not model.
+                    None => {
+                        if self.escaped.is_none() {
+                            self.escaped = Some("a destructuring `let`".to_string());
+                        }
+                    }
+                }
+            }
+        }
+        syn::visit::visit_local(self, node);
+    }
+
     /// A helper call that takes the buffer is growth this pass cannot see.
     fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
         for arg in &node.args {
-            if base_ident(arg).as_deref() == Some(self.target) && self.escaped.is_none() {
+            if self.refers_to(arg) && self.escaped.is_none() {
                 self.escaped = Some(crate::storage::render(&*node.func));
             }
         }

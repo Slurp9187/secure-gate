@@ -21,7 +21,7 @@
 //! like this is what makes that sentence false for one `T`.
 
 use crate::index::Index;
-use crate::report::{Finding, Severity};
+use crate::report::{Finding, Kind, Severity};
 use crate::storage::{Storage, classify_named};
 
 pub const RULE: &str = "SG001";
@@ -42,6 +42,7 @@ pub fn check(index: &Index) -> Vec<Finding> {
                 findings.push(
                     Finding::new(
                         RULE,
+                        Kind::Assertion,
                         Severity::Error,
                         &site.file,
                         site.line,
@@ -64,6 +65,7 @@ pub fn check(index: &Index) -> Vec<Finding> {
                 findings.push(
                     Finding::new(
                         RULE,
+                        Kind::Assertion,
                         Severity::Unresolved,
                         &site.file,
                         site.line,

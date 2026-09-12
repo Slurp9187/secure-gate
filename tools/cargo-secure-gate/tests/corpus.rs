@@ -17,7 +17,7 @@
 //! recommends, teaches its users to ignore it.
 
 use cargo_secure_gate::analyze_sources;
-use cargo_secure_gate::report::Severity;
+use cargo_secure_gate::report::{Kind, Severity};
 
 fn run(fixture: &str) -> Vec<(String, Severity, usize)> {
     let path = format!("{}/tests/fixtures/{fixture}", env!("CARGO_MANIFEST_DIR"));
@@ -219,4 +219,67 @@ fn a_comma_inside_generics_does_not_split_the_inner_type() {
     .expect("parses");
     assert_eq!(findings.len(), 1, "the newtype name failed to resolve");
     assert_eq!(findings[0].severity, Severity::Error);
+}
+
+// ---------------------------------------------------------------------------
+// Shapes a text-based matcher misses, and bait it falls for
+//
+// These come from a peer sweep of this crate that measured ~23% recall for a
+// regex prototype against a deliberately evasive corpus, with the misses
+// systematic rather than random: anything that rebinds the exposed reference.
+// Two of the three below were verified against this pass directly; the aliasing
+// one failed, silently, and is fixed.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn an_aliased_buffer_is_still_the_buffer() {
+    // `let alias = v;` used to defeat this check without leaving a trace.
+    let errors = rules("aliased_buffer.rs", Severity::Error);
+    assert_eq!(errors, vec!["SG002", "SG002"], "one per aliased call site");
+    assert!(
+        run("aliased_buffer.rs").len() == 2,
+        "the third function pre-sizes and binds a capacity, which is not the buffer"
+    );
+}
+
+#[test]
+fn comments_string_literals_and_unrelated_vecs_are_not_findings() {
+    // The bait a text matcher takes. Parsing makes this free, which is most of
+    // the argument for parsing.
+    assert_eq!(run("lexical_bait.rs"), vec![]);
+}
+
+#[test]
+fn a_non_ascii_type_name_does_not_evade_the_check() {
+    // Rust identifiers are XID. A one-character rename defeats `[A-Za-z_]`.
+    let errors = rules("non_ascii_idents.rs", Severity::Error);
+    assert_eq!(errors, vec!["SG001", "SG001"]);
+}
+
+// ---------------------------------------------------------------------------
+// The two kinds of claim
+// ---------------------------------------------------------------------------
+
+#[test]
+fn an_assertion_and_a_route_are_not_the_same_kind_of_claim() {
+    // SG001 is decidable from the source: the impl contradicts the type whether
+    // or not a secret ever flows through it. SG002 names a place a
+    // reallocation can happen -- whether it does depends on capacity and on
+    // whether the allocator extends in place, which SECURITY.md measures
+    // happening. Reporting them in one severity list invites the reader to
+    // treat a route as an observed leak.
+    let assertion = analyze_sources(&[(
+        "a.rs".to_string(),
+        "struct S { v: Vec<u8> }\nimpl FixedStorage for S {}".to_string(),
+    )])
+    .expect("parses");
+    assert_eq!(assertion[0].kind, Kind::Assertion);
+
+    let route = analyze_sources(&[(
+        "b.rs".to_string(),
+        "fn f(m: &[u8]) -> Dynamic<Vec<u8>> { Dynamic::new_with(|v| { for b in m { v.push(*b); } }) }"
+            .to_string(),
+    )])
+    .expect("parses");
+    assert_eq!(route[0].kind, Kind::Route);
 }
