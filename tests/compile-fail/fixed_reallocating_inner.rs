@@ -34,4 +34,9 @@ fn main() {
     let _ = Fixed::new(boxed);
     let _ = Fixed::new(Some(vec![1u8].into_boxed_slice()));
     let _ = Fixed::new([vec![1u8].into_boxed_slice(), vec![2u8].into_boxed_slice()]);
+
+    // `Zeroizing<T>` is `FixedStorage` only when `T` is, so the wrapper that exists to wipe
+    // on drop cannot be used to smuggle a growable buffer past the bound. Wiping the
+    // replacement value is not the same property as not abandoning the old allocation.
+    let _ = Fixed::new(zeroize::Zeroizing::new(vec![1u8, 2, 3]));
 }

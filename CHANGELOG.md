@@ -136,7 +136,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Dynamic`, enable `alloc` if you can still name `Vec` with it off, and only write the marker
   if the assertion is true — are written into the trait's documentation instead.
 
-  **Migration.** Nothing for byte arrays, non-byte arrays, tuples or `Option`s.
+  **The allow-list had to be completed, and its rejection guidance corrected.** A positive
+  marker bound fails closed, which is the right direction for a security crate but means a type
+  is refused for two indistinguishable reasons: it owns a heap allocation, or nothing has
+  asserted that it does not. The first version of this change blessed only the primitives,
+  `[T; N]`, tuples to four and `Option<T>` — so eight heap-free shapes that compiled at
+  `0.8.0-rc.12` stopped compiling: the twelve `NonZero` integers, `Wrapping<T>`,
+  `MaybeUninit<T>`, `zeroize::Zeroizing<T>`, tuples of five to ten elements, `[NonZeroU32; 4]`,
+  and `Fixed<T>` nested in itself. None of them owns a heap allocation.
+
+  The orphan rule is what made that a defect rather than an inconvenience: every one of those
+  types is foreign, so a consumer cannot add the missing impl — `impl secure_gate::FixedStorage
+  for core::num::NonZeroU32` downstream is `error[E0117]`, leaving no workaround short of
+  changing their own type. The impls are now present, tuples reach ten because that is
+  `zeroize`'s own ceiling (an eleventh element fails the `Zeroize` bound before this one is
+  consulted), and the "If the bound rejects your type" section now separates the two cases and
+  names E0117 for the foreign one. `Zeroizing<T>` is implemented only when `T` qualifies, so the
+  wipe-on-drop wrapper cannot smuggle a growable buffer past the bound; a compile-fail case pins
+  it. Four stale "owns no buffer whose capacity can change" phrasings are corrected to heap
+  ownership — that wording predates the `Box<[T]>` measurement and contradicts the contract
+  stated two paragraphs above it.
+
+  Mirrors the same change on `main`, re-derived against this branch: the impl set and the
+  measurement are identical, but the guidance lands in the trait's own rustdoc rather than in a
+  `#[diagnostic::on_unimplemented]` attribute (which needs Rust 1.78), and the new test spells
+  `core::mem::size_of` because the prelude form arrived in 1.80, after this line's MSRV 1.70.
+
+  **Migration.** Nothing for byte arrays, non-byte arrays, tuples, `Option`s, `NonZero`
+  integers, `Wrapping`, `MaybeUninit` or `zeroize::Zeroizing`.
   A custom inner type adds one line, `impl FixedStorage for MyKey {}`, next to its `Zeroize`
   impl. A `Fixed<Vec<u8>>` or `Fixed<String>` must become `Dynamic`, which is the wrapper for
   a growable payload. Inside this repository the change touched nine custom inner types across
