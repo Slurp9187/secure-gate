@@ -417,7 +417,30 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   limitation applies to `secrecy`, `zeroize`-wrapped collections, and every
   other secret wrapper around the standard collections; a custom-allocator
   workaround exists but trades off significant complexity and is not enabled
-  by default in this crate. **`Fixed<T>` is exempt** — it has no realloc surface.
+  by default in this crate.
+
+  **`Fixed<T>` is exempt, and is now held to it by the compiler.** That sentence
+  used to be a claim about the shape people were expected to use rather than
+  something the type system checked. `Fixed<T>` was bounded only by `Zeroize`, so
+  `Fixed<Vec<u8>>` and `Fixed<String>` compiled, `Fixed<[Vec<u8>; 2]>` hid a growable
+  container inside the very array shape this document called exempt, and
+  `fixed_newtype!(pub Name, generic Vec<u8>)` was a documented path straight to all
+  of it. Measured, each abandoned an unwiped buffer holding the whole secret on any
+  capacity change — the same weakness as `Dynamic`, and worse, because
+  `Dynamic<Vec<u8>>` has the safe-growth `io::Write` path above and `Fixed<Vec<u8>>`
+  has none. `Fixed::new` now requires
+  [`FixedStorage`](https://docs.rs/secure-gate/latest/secure_gate/trait.FixedStorage.html)
+  on the inner type, so every one of those is a `cargo check` error, and for the macro
+  forms the error lands on the declaration.
+
+  Two limits to be precise about. The marker is an **assertion, not an
+  enforcement**: like `CloneableSecret`, the compiler checks that you wrote the impl,
+  not that it is true, so a type with a `Vec` field that implements `FixedStorage`
+  anyway will compile and will leak. What the bound buys is that the claim is written
+  at a greppable line in the crate making it. And the bound is on `Fixed`, so it says
+  nothing about `dynamic_newtype!(pub Name, generic Vec<u8>)`, which has the growable
+  payload and — unlike plain `Dynamic<Vec<u8>>` — no `io::Write` escape. Treat that
+  form the way this section treats `with_secret_mut`.
 
   For stricter deployment threat models, handle this below the library layer:
   install a zero-on-dealloc global allocator such as

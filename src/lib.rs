@@ -437,6 +437,25 @@ pub use traits::RevealSecretMut;
 /// work. That is the safe default rather than a missing feature.
 pub use traits::SentinelValue;
 
+/// Asserts that an inner type owns no buffer whose capacity can change.
+///
+/// Required by [`Fixed::new`], which is what makes `SECURITY.md`'s claim that `Fixed<T>`
+/// "has no realloc surface" true rather than aspirational. Before this bound existed,
+/// `Fixed<Vec<u8>>`, `Fixed<String>` and `fixed_newtype!(pub Name, generic Vec<u8>)` all
+/// compiled, and measured, they abandoned an unwiped buffer holding the whole secret on
+/// any capacity change — the same weakness `Dynamic` documents, minus `Dynamic`'s
+/// safe-growth `std::io::Write` path.
+///
+/// Implemented for the primitives, `[T; N]` for any `N`, tuples up to four elements,
+/// `Option<T>`, and `Box<[T]>` — a boxed slice has a fixed length and cannot grow.
+/// `Vec<T>` and `String` are deliberately absent; use [`Dynamic`] for those, which
+/// documents the residue and offers the one safe growth path.
+///
+/// A custom inner type writes `impl FixedStorage for MyKey {}`. Like [`CloneableSecret`],
+/// the compiler checks that you made the claim, not that it is true — see the trait docs
+/// for the test to apply and for why an assertion is the right trade here.
+pub use traits::FixedStorage;
+
 /// Encoded string **output wrapper** for zeroizing encoded output.
 ///
 /// This is an **output wrapper** — it exists *only* to keep encoded data zeroized until

@@ -175,6 +175,22 @@ fn drain_bech32_payload<const N: usize>(
 /// | [`from_random()`](Self::from_random) | `rand` | System RNG |
 /// | [`from_rng(rng)`](Self::from_rng) | `rand` | Custom RNG |
 ///
+/// # What `T` may be
+///
+/// [`Fixed::new`] requires [`FixedStorage`](crate::FixedStorage) on the inner type: a
+/// type that owns no buffer whose capacity can change. This is what makes the documented
+/// claim that `Fixed` has no reallocation surface true rather than aspirational. It used
+/// to be bounded only by `Zeroize`, so `Fixed<Vec<u8>>`, `Fixed<String>` and even
+/// `Fixed<[Vec<u8>; 2]>` compiled and abandoned an unwiped buffer holding the whole
+/// secret on any capacity change. Arrays, the primitives, tuples, `Option` and boxed
+/// slices satisfy the marker already; a custom inner type writes one line. For a
+/// growable payload use [`Dynamic`](crate::Dynamic), which documents the residue and
+/// offers one safe growth path.
+///
+/// The bound is on the constructor rather than on the struct, so naming
+/// `Fixed<Vec<u8>>` still compiles and no value of it can exist — the same shape as the
+/// zero-size guard below.
+///
 /// # Zero-size
 ///
 /// A value of zero size has nothing to protect, so a `Fixed` cannot be built around
@@ -305,7 +321,10 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     /// assert_eq!(secret.len(), 32);
     /// ```
     #[inline(always)]
-    pub const fn new(value: T) -> Self {
+    pub const fn new(value: T) -> Self
+    where
+        T: crate::FixedStorage,
+    {
         // Binding the unit-valued const is what forces it to be evaluated; clippy reads
         // that as a pointless binding. Kept explicit because the 1.70 lint (the 0.8
         // line's MSRV) fires on every spelling that still triggers the evaluation.
@@ -1124,7 +1143,7 @@ impl<T: zeroize::Zeroize> core::fmt::Debug for Fixed<T> {
 /// marker on the inner type. Each clone is independently zeroized on drop, but cloning
 /// increases the in-memory exposure surface. Use sparingly.
 #[cfg(feature = "cloneable")]
-impl<T: zeroize::Zeroize + crate::CloneableSecret> Clone for Fixed<T> {
+impl<T: zeroize::Zeroize + crate::CloneableSecret + crate::FixedStorage> Clone for Fixed<T> {
     fn clone(&self) -> Self {
         Self::new(self.inner.clone())
     }

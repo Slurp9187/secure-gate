@@ -2,6 +2,7 @@ use secure_gate::{Fixed, SecretLen};
 use zeroize::Zeroize;
 
 struct SessionKey([u8; 32]);
+impl secure_gate::FixedStorage for SessionKey {}
 impl Zeroize for SessionKey {
     fn zeroize(&mut self) {
         self.0.zeroize();

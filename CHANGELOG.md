@@ -44,6 +44,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING: `Fixed::new` now requires `FixedStorage` on the inner type, which makes
+  `SECURITY.md`'s "`Fixed<T>` is exempt" true instead of aspirational.** That sentence was a
+  claim about the shape people were expected to use, not something the type system checked.
+  `Fixed<T>` was bounded only by `Zeroize`, so all of these compiled, and measured with an
+  allocator instrument, each abandoned an unwiped buffer holding the whole secret on any
+  capacity change: `Fixed<Vec<u8>>` and `Fixed<String>` at 1008 of 1008 bytes;
+  `Fixed<[Vec<u8>; 2]>`, which hides a growable container inside the very array shape the
+  document called exempt; and `fixed_newtype!(pub Name, generic Vec<u8>)`, which was the
+  documented, blessed path to all of it. Worse than the `Dynamic` equivalent, because
+  `Dynamic<Vec<u8>>` has a safe-growth `io::Write` impl that grows by hand and wipes the old
+  allocation, and `Fixed<Vec<u8>>` has nothing. Grepping the repository for `Fixed<Vec`
+  returned zero hits, so nothing warned anyone off it while `SECURITY.md` promised the
+  opposite.
+
+  `FixedStorage` is a marker with no methods, in the same family as `CloneableSecret`,
+  `SerializableSecret` and `SentinelValue`. Implementing it asserts that the type owns no
+  buffer whose capacity can change. The crate covers the primitives, `[T; N]` for any `N`
+  when the element type qualifies, tuples up to four elements, `Option<T>`, and `Box<[T]>` —
+  a boxed slice has a length fixed at construction. `Vec<T>` and `String` are deliberately
+  absent.
+
+  **Why a bound rather than another `const` assertion.** The zero-size guard is a
+  post-monomorphization `const` error: `cargo check` cannot see it, generic code defers it to
+  the instantiation site, and a release build of a library can swallow it entirely. A trait
+  bound has none of those properties. Measured against a consumer crate: `Fixed<Vec<u8>>`,
+  `Fixed<String>`, `Fixed<[Vec<u8>; 2]>`, `Fixed<Option<Vec<u8>>>` and a tuple containing a
+  `Vec` are all `cargo check` errors, and for `fixed_newtype!(pub X, generic Vec<u8>)` the
+  error lands on the declaration line rather than at the first construction. A downstream
+  generic function cannot launder a `Vec` through either, because the bound propagates to its
+  caller.
+
+  A `needs_drop` const assertion was prototyped first and rejected. It classifies every case
+  that matters correctly, but it also rejects `#[derive(Zeroize, ZeroizeOnDrop)] struct
+  Key([u8; 32])` — the shape the `zeroize` documentation recommends — along with any
+  hand-written `Drop` and `Zeroizing<[u8; 32]>`, because all three have drop glue while owning
+  nothing heap-allocated. A `const` cannot ask whether a type implements a trait, so it cannot
+  be paired with an opt-out either. The marker has no such false positives.
+
+  **Two limits, stated rather than glossed.** It is an assertion, not an enforcement: the
+  compiler checks that you wrote the impl, not that it is true, so a type with a `Vec` field
+  that implements `FixedStorage` anyway compiles and leaks — verified. The alternative, a
+  closed set of blessed types, would destroy the one thing the `generic` arm exists for,
+  holding a custom secret on a target with no allocator. And the bound is on `Fixed`, so it
+  says nothing about `dynamic_newtype!(pub Name, generic Vec<u8>)`, which has the growable
+  payload and, unlike plain `Dynamic<Vec<u8>>`, no `io::Write` escape. That is left as a
+  separate decision rather than widened into this one.
+
+  **Migration.** Nothing for byte arrays, non-byte arrays, tuples, `Option`s or boxed slices.
+  A custom inner type adds one line, `impl FixedStorage for MyKey {}`, next to its `Zeroize`
+  impl. A `Fixed<Vec<u8>>` or `Fixed<String>` must become `Dynamic`, which is the wrapper for
+  a growable payload. Inside this repository the change touched nine custom inner types across
+  five test files and one bench — and one doctest: `SerializableSecret`'s example wrapped a
+  `BackupKey(Vec<u8>)` in a `Fixed`, so the crate's own documentation contained an instance of
+  the weakness. It now uses `Dynamic`.
+
 - **BREAKING: a zero-sized `Fixed` no longer constructs.** `main`'s 0.9.0-rc.9 notes
   recorded that the `N = 0` rejection lived inside `fixed_alias!` and nowhere else, so
   `type Name = Fixed<[u8; 0]>;` written by hand bypassed it, and that `Fixed` *could* carry
