@@ -249,8 +249,9 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   monomorphization, so it covers generic code too; naming the type without building one
   still compiles. Two limits on when it fires, both measured: a post-monomorphization error
   is raised during codegen, so `cargo check` will not report it; and it fires only for a
-  codegen root, so a *library* whose zero-sized constructions sit behind `#[inline]` or
-  generic code builds and tests clean and defers the error to its consumers. No value of
+  codegen root, and every method the newtype macros generate carries an inline attribute,
+  so a *library* whose zero-sized constructions sit behind `#[inline]` or generic code
+  builds and tests clean and defers the error to its consumers. No value of
   such a type can exist at runtime, but do not treat green library CI as proof you have
   none. `Dynamic` has no compile-time equivalent, so check that a
   variable-length secret is non-empty when its length is generic or configuration-driven.

@@ -126,7 +126,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   With `fixed_newtype!` / `dynamic_newtype!` shipped since rc.8, the alias macros were also
   dominated on every axis. A newtype costs nothing at runtime — `tests/asm_dse_check.rs`
-  shows byte-identical codegen — and is strictly safer, so where a role exists the newtype
+  proves the zeroization stores survive optimization through the extra layer, and under an
+  LLVM that folds the two symbols it is byte-identical, though whether the fold happens is
+  the toolchain's call and zeroize 1.9 stopped it here — and is strictly safer, so where a
+  role exists the newtype
   wins; and where no role exists, one line of ordinary Rust is shorter than the macro call it
   replaces. Keeping both left two same-shaped macros one word apart, differing only in the
   property that matters, which is why the documentation had to carry a "Nominal?" column to

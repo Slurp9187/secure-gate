@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Proposed** — written against `0.9.0-rc.9` (`main`) and `0.8.0-rc.12` (`release/0.8`) |
+| **Status** | **Implemented** on `claude/alias-macros-necessity-i3gtge` (PR #201) and `claude/alias-macros-necessity-0.8` (PR #202). Written against `0.9.0-rc.9` (`main`) and `0.8.0-rc.12` (`release/0.8`). Review rounds since then corrected several claims in this document; where it and the code disagree, the code and the CHANGELOG win |
 | **Scope** | Remove the four `*_alias!` macros; reject a zero-sized `Fixed` at construction; add `fixed_newtype!(.., generic T)`; backport all three to the 0.8 line |
 | **Breaking** | Yes, twice — the macros are gone, and `Fixed<[u8; 0]>` no longer constructs. Both lines are pre-release |
 | **MSRV** | Unchanged: 1.85 on `main`, 1.70 on `release/0.8`. The zero-size guard is spelled as an associated `const` so one hunk builds on both |
@@ -244,8 +244,11 @@ impl<const N: usize> Fixed<[u8; N]> {
 ```
 
 `T` is `Sized` (inline field). `assert!` with a literal message is const-stable since 1.57.
-The `()` pattern is exempt from clippy's `let_unit_value`; if a toolchain disagrees, `let _ =`
-is the other exempt form. Struct docs (`:138-227`): add a short "# Zero-size" section: building
+**Corrected during implementation:** the `()` pattern is NOT exempt from clippy's
+`let_unit_value`. Clippy 1.70, this line's MSRV, rejects it, while 1.85 accepts it, and the
+alternatives clippy suggests — a bare path statement and `_ =` — are rejected by both. An
+explicit `#[allow(clippy::let_unit_value)]` with a comment is the only form clean on both,
+and it is what shipped. Struct docs (`:138-227`): add a short "# Zero-size" section: building
 a `Fixed` whose value has zero size is a compile error raised at monomorphization, so it fires
 wherever a concrete zero-sized instantiation is constructed, generic code included; naming the
 type still compiles. `new` docs (`:233-250`): one line pointing there.
