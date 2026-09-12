@@ -104,8 +104,15 @@
 /// The `generic` form deliberately provides less: [`RevealSecret`](crate::RevealSecret),
 /// [`RevealSecretMut`](crate::RevealSecretMut), redacted `Debug`, `Zeroize`,
 /// `ZeroizeOnDrop`, and `new` — no [`SecretLen`](crate::SecretLen) and no
-/// encoders, since neither is meaningful for an arbitrary inner type. Writing
-/// the marker is how you say you know that.
+/// encoders. The reason is what the macro can see rather than what each method
+/// means: the inner type arrives as one opaque token, so the expansion cannot
+/// tell a `Vec` from a struct and withholds the shape-dependent surface
+/// uniformly. An encoder genuinely has no meaning for an arbitrary inner type;
+/// `SecretLen` does, and the base wrapper implements it for every
+/// `Dynamic<Vec<T>>` with a correct `byte_len`, so `derive: [IntoWrapper]`
+/// reaches it through `as_wrapper()`. What the arm withholds is the newtype's
+/// own `len()`, not the answer. Writing the marker is how you say you know
+/// that.
 ///
 /// It also has no `new_with`, which the `String` and `Vec<u8>` arms do get. That
 /// one is not a question of meaning — it is meaningful for any inner type — so

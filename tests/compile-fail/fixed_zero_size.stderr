@@ -6,7 +6,7 @@ error[E0080]: evaluation of `secure_gate::Fixed::<[u8; 0]>::NON_ZERO_SIZED` fail
   | |         ::core::mem::size_of::<T>() > 0,
   | |         "secure-gate: Fixed<T> cannot hold a zero-sized value; there is nothing to protect"
   | |     );
-  | |_____^ the evaluated program panicked at 'secure-gate: Fixed<T> cannot hold a zero-sized value; there is nothing to protect', $DIR/src/fixed.rs:274:32
+  | |_____^ the evaluated program panicked at 'secure-gate: Fixed<T> cannot hold a zero-sized value; there is nothing to protect', $DIR/src/fixed.rs:282:32
   |
   = note: this error originates in the macro `$crate::panic::panic_2021` which comes from the expansion of the macro `assert` (in Nightly builds, run with -Z macro-backtrace for more info)
 
@@ -24,7 +24,7 @@ error[E0080]: evaluation of `secure_gate::Fixed::<[u8; 0]>::NON_ZERO_LEN` failed
   | |         N > 0,
   | |         "secure-gate: Fixed<[u8; 0]> cannot be constructed; there is nothing to protect"
   | |     );
-  | |_____^ the evaluated program panicked at 'secure-gate: Fixed<[u8; 0]> cannot be constructed; there is nothing to protect', $DIR/src/fixed.rs:370:30
+  | |_____^ the evaluated program panicked at 'secure-gate: Fixed<[u8; 0]> cannot be constructed; there is nothing to protect', $DIR/src/fixed.rs:378:30
   |
   = note: this error originates in the macro `$crate::panic::panic_2021` which comes from the expansion of the macro `assert` (in Nightly builds, run with -Z macro-backtrace for more info)
 
