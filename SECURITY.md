@@ -100,6 +100,18 @@ regression test (`tests/heap_zeroize.rs`,
 `check_write_growth_orphan_zeroed`) that inspects the freed page at the moment
 of growth rather than only at drop.
 
+**Two things to know before relying on that path.** It needs the `std` feature, and
+`full` does **not** enable `std` (`full = ["alloc", "rand", "encoding", "ct-eq",
+"cloneable", "serde"]`), so a consumer who builds with `--features full` does not have
+this impl at all and has no safe growth path. Enable `std` explicitly if you want it.
+
+And it is the impl **on the wrapper** that is safe, not `Write` in general. Reaching
+through the wrapper first defeats it: `d.expose_secret_mut().write_all(b"…")` resolves
+to the standard library's `impl Write for Vec<u8>`, which grows by `extend_from_slice`
+and abandons the old buffer unwiped. Measured on a 1000-byte secret, `d.write_all(…)`
+leaves 0 surviving bytes and `d.expose_secret_mut().write_all(…)` leaves 1000. The two
+lines look alike and differ completely, so prefer the wrapper's own `Write`.
+
 It cannot do the same for `with_secret_mut` / `expose_secret_mut`: those hand the
 caller a `&mut Vec<T>` or `&mut String`, and any capacity-changing operation on it
 reallocates entirely outside this crate. **That case remains a real limitation**,

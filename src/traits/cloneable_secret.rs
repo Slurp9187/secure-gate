@@ -66,6 +66,28 @@
 //! drop(copy);      // independently zeroized on drop
 //! ```
 //!
+//! # One diagnostic that points the wrong way
+//!
+//! If you call `.clone()` on a **reference** to a wrapper whose inner type lacks this
+//! marker, and you do not annotate the target type, the call resolves to
+//! `<&T as Clone>::clone` instead. It compiles, copies the reference rather than the
+//! secret, and produces rustc's `noop_method_call` warning — whose `help:` suggests
+//! adding `#[derive(Clone)]` to `Dynamic`, which is to say it suggests deleting this gate:
+//!
+//! ```text
+//! warning: call to `.clone()` on a reference in this situation does nothing
+//!    = note: the type `Dynamic<Vec<u8>>` does not implement `Clone`, so calling `clone`
+//!            on `&Dynamic<Vec<u8>>` copies the reference, which does not do anything
+//! help: if you meant to clone `Dynamic<Vec<u8>>`, implement `Clone` for it
+//! 184 + #[derive(Clone)]
+//! ```
+//!
+//! Nothing is duplicated, so no secret escapes — the opposite, the call does nothing at
+//! all. It is recorded here because the suggested fix is wrong for this crate and a reader
+//! who follows it removes the opt-in. The gate itself still holds: an owned receiver, or
+//! an annotated target, gives the real error instead —
+//! `error[E0277]: the trait bound ... CloneableSecret is not satisfied`.
+//!
 //! # Security Notes
 //!
 //! - Cloning **does not** bypass zeroization — **every** copy is independently zeroized on drop.
