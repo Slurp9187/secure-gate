@@ -102,12 +102,23 @@
 ///
 /// The `generic` form deliberately provides less: [`RevealSecret`](crate::RevealSecret),
 /// [`RevealSecretMut`](crate::RevealSecretMut), redacted `Debug`, `Zeroize`,
-/// `ZeroizeOnDrop`, and `new` — no [`SecretLen`](crate::SecretLen), no
-/// `new_with`, no `From` or `TryFrom`, no encoders and no RNG constructors,
-/// since none of those has a meaning for an arbitrary `T`. Writing the marker
-/// is how you say you know that. A zero-sized inner value is still refused:
-/// there is no `N` for the macro to check, so [`Fixed`](crate::Fixed) rejects
-/// it at construction instead.
+/// `ZeroizeOnDrop`, and `new`. Absent are [`SecretLen`](crate::SecretLen), `From`
+/// and `TryFrom`, the encoders and the RNG constructors, none of which has a
+/// meaning for an arbitrary `T` — a length in elements is not the byte length
+/// callers expect, and hex over a `Vec<u32>` has no defined byte order. Writing
+/// the marker is how you say you know that. A zero-sized inner value is still
+/// refused: there is no `N` for the macro to check, so
+/// [`Fixed`](crate::Fixed) rejects it at construction instead.
+///
+/// **`new_with` is absent for a different reason, and it costs you something.**
+/// Unlike the others it is perfectly meaningful for an arbitrary `T`; it simply
+/// is not generated. So the arm has no in-place constructor, and `new` takes its
+/// value by value — which is the construction the size-literal arms offer
+/// `new_with` to avoid, because a by-value argument may leave a copy of the
+/// secret on the caller's frame that nothing will wipe (see
+/// [`Fixed::new_with`](crate::Fixed::new_with)). On this arm that mitigation is
+/// unavailable: build the value as close to the call as you can, and prefer a
+/// size-literal newtype when the secret is a byte array and residue matters.
 ///
 /// # Cloning and serialization are not generated
 ///

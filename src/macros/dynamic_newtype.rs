@@ -107,6 +107,13 @@
 /// encoders, since neither is meaningful for an arbitrary inner type. Writing
 /// the marker is how you say you know that.
 ///
+/// It also has no `new_with`, which the `String` and `Vec<u8>` arms do get. That
+/// one is not a question of meaning — it is meaningful for any inner type — so
+/// the consequence is worth knowing: `new` takes its value by value, and the
+/// in-place construction that keeps a secret from ever existing outside the
+/// wrapper is unavailable here. [`fixed_newtype!`](crate::fixed_newtype) explains
+/// the same gap on its own `generic` arm at more length.
+///
 /// # Implementation Notes
 ///
 /// The generated type is `#[repr(transparent)]` over the wrapper and delegates
