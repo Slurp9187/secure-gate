@@ -146,8 +146,28 @@ Unresolved has to stay rare enough to read, or it becomes its own kind of noise.
 
 The dataflow cases beyond a single rebinding — the buffer passed to a helper, or
 reached through a trait object — are still reported as unresolved rather than
-followed. Getting a real recall number needs the evasion corpus itself. Until
-then, treat the precision result as measured and the recall as unknown.
+followed. Unresolved is better than silence and it is **not** a catch, and the
+scorer below counts it as a miss for exactly that reason.
+
+### Scoring against a corpus
+
+`score` measures both numbers at once, given files whose answers are known:
+
+```
+score --leaking <path>... [--clean <path>...]
+```
+
+Cases are marked in the corpus source with the `compiletest` convention this
+repository already uses for `trybuild` — `//~ LEAK` on the line that should be
+reported, or `//~^ LEAK` for the line above. An unmarked corpus still runs: it
+prints what was found and where, and leaves the reconciling to a reader, because
+a corpus is worth having before it is worth annotating.
+
+A self-test over four shapes — plain repeated growth, an aliased binding, field
+access, and a buffer passed to a helper — scores 3/4 with 0 false positives, the
+miss being the helper. That is this pass measured against cases it already knew
+about, so it is a check that the harness works and not a recall figure. The
+number that will mean something is the one from a corpus somebody else wrote.
 
 ## Robustness
 
