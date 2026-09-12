@@ -22,7 +22,7 @@
 
 use crate::index::Index;
 use crate::report::{Finding, Kind, Severity};
-use crate::storage::{Storage, classify_named};
+use crate::storage::Storage;
 
 pub const RULE: &str = "SG001";
 
@@ -37,7 +37,7 @@ pub fn check(index: &Index) -> Vec<Finding> {
             continue;
         }
 
-        match classify_named(&site.type_name, &index.locals) {
+        match index.resolver.classify_named(&site.type_name, &site.args) {
             Storage::Resizable { path, ty } => {
                 findings.push(
                     Finding::new(
@@ -70,14 +70,15 @@ pub fn check(index: &Index) -> Vec<Finding> {
                         &site.file,
                         site.line,
                         format!(
-                            "`{}` implements FixedStorage; the field at `{}: {}` is defined \
-                             outside this crate and was not checked",
+                            "`{}` implements FixedStorage; the type at `{}: {}` is not defined \
+                             in the scanned files, so the assertion was not checked",
                             site.type_name, path, ty
                         ),
                     )
                     .with_note(
-                        "the assertion may well be correct -- this pass cannot see the fields of \
-                         a foreign type to confirm it",
+                        "the assertion may well be correct; this is a report that it was not \
+                         checked, not that it failed. Scan the crate defining that type, or \
+                         review the impl by hand",
                     ),
                 );
             }

@@ -117,22 +117,56 @@ sweep of this crate measured a regex prototype at 6 of 26 against a deliberately
 evasive, allocator-verified corpus, with the misses systematic rather than
 random — anything that rebinds the exposed reference before growing it.
 
-Three of those shapes were run against this pass directly. Two it already
-handled and one it did not:
+A later adversarial pass corrected that figure downward: against an independent
+11-leak corpus the same prototype caught **0**, and pointed at a directory of one
+leaking file and one clean one it put all ten of its findings on the clean file.
+Its output was inverted with respect to the truth.
 
-| Evasion | Result |
+Every shape either pass named was run against this one. Six results, four of
+them clean and two of them real misses now fixed:
+
+| Shape | Result here |
 | --- | --- |
-| Trigger phrases in comments and string literals; unrelated `Vec::push` nearby | not flagged, correctly — parsing makes this free |
-| `impl FixedStorage for Ключ` | flagged — Rust identifiers are XID, and `syn` reads them |
-| `let alias = v;` then `alias.push(..)` | **missed, silently** — now fixed, with aliases tracked through `let` and reborrows |
+| Trigger phrases in comments and string literals; unrelated `Vec::push` nearby | not flagged — parsing makes this free |
+| `impl FixedStorage for Ключ` | flagged — identifiers are XID, and `syn` reads them |
+| A doc comment mentioning `Vec` on a type with no `Vec` field | not flagged — a doc comment is an attribute, not a field |
+| `type Blob = Vec<u8>; struct S { body: Blob }` | **was unresolved, now an error** — a local alias is one lookup away |
+| `struct Gen<T>(T); impl FixedStorage for Gen<Vec<u8>>` | **was unresolved, now an error** — the impl site supplies the argument |
+| `let alias = v;` then `alias.push(..)` | **was a silent miss, now flagged** |
+| `s.token.push(b)` on a `Dynamic<Session>` | **was a silent miss, now flagged** |
 
-That third one is the reason the unresolved category exists, and it still got
-through: a miss that leaves no trace is worse than a miss that says so. The
-dataflow cases beyond a single rebinding — the buffer passed to a helper, or
-reached through a trait object — are reported as unresolved rather than followed.
+The last two were the ones that mattered. Field access is the most idiomatic
+shape in the language and it matched nothing, which is why the scan now tracks
+access paths — `s`, `s.token`, `alias` after a `let` — rather than bindings. That
+also keeps `s.token.reserve_exact(..)` from excusing a growth of `s.label`.
 
-Getting the real number needs that evasion corpus. Until then, treat the
-precision result as measured and the recall as unknown.
+The two alias cases were not silent here, but they were wrong: a resolvable
+answer sat in the unresolved pile under a message claiming the type was foreign.
+Unresolved has to stay rare enough to read, or it becomes its own kind of noise.
+
+The dataflow cases beyond a single rebinding — the buffer passed to a helper, or
+reached through a trait object — are still reported as unresolved rather than
+followed. Getting a real recall number needs the evasion corpus itself. Until
+then, treat the precision result as measured and the recall as unknown.
+
+## Robustness
+
+Defect classes reported against the regex implementation, and where this one
+stands. Several cannot occur once you parse rather than match, which is worth
+saying explicitly because it is most of the argument for parsing:
+
+| Class | Here |
+| --- | --- |
+| Struct body read from raw source, so a doc comment became evidence | cannot occur — fields come from the AST |
+| Suppression directive matched in comments and strings, disabling the scan | no suppression mechanism exists yet; when one lands it must not read raw text |
+| Exit code computed after display filters, so `--min-severity` turned off detection | exit depends only on `--deny-routes`, which is documented as a gate rather than a filter |
+| Unknown rule id silently filtered everything and exited 0 | no rule filter exists |
+| The matched secret copied verbatim into output and CI logs | no rule reports a literal; findings name types, paths and method names only |
+| Quadratic scan — 113 KB in 96 s | roughly linear: 37 KB / 86 ms, 302 KB / 696 ms, 1214 KB / 3.7 s, all debug builds |
+| Name heuristics matching substrings (`mac` in `MachineIdBlock`) | no name heuristics |
+| Rules that fire on any use of a feature and can only be suppressed | every rule has a fix; none fires on correct code |
+| Unreadable files reported on stderr and invisible in JSON | reported as `SG000`, in both outputs, and they no longer abort the run |
+| Findings keyed on line number, so a new comment churns a baseline | **still true** — no stable fingerprint yet |
 
 ## Tests
 
@@ -175,6 +209,8 @@ running it needs no toolchain switch.
 - **`dynamic_newtype!(pub Name, generic Vec<u8>)`**, which `SECURITY.md` names as
   outside the `FixedStorage` bound and without `Dynamic<Vec<u8>>`'s `io::Write`
   escape.
+- A stable fingerprint per finding (rule, file, normalised matched text) so a
+  baseline-suppression workflow can tell a new finding from a moved one.
 - Type resolution via dylint, for the cases alias and newtype tracking cannot
   reach. Everything above is decidable without it. A peer built and ran one:
   receiver-aware and type-aware as hoped, 2 genuine warnings with none of
