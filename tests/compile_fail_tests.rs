@@ -7,11 +7,24 @@
 // To regenerate .stderr files after a toolchain upgrade:
 //   TRYBUILD=overwrite cargo test compile_fail
 
+// Compile-fail test: a zero-sized secret cannot be constructed. The guard is a `const`
+// assertion in `Fixed::new` and `Fixed::new_with` — the two bodies every other
+// constructor funnels through — so it covers a plain `type` alias and the `generic` arm
+// as well as the macros. It is a post-monomorphization error, so it fires at the first
+// concrete zero-sized construction rather than at the declaration; the diagnostic names
+// the offending type in the failing constant's path and points into `src/fixed.rs`,
+// which is why this snapshot moves if that assertion moves.
 #[test]
 #[cfg(not(miri))]
-fn fixed_alias_zero_size_compile_fail() {
+fn fixed_zero_size_compile_fail() {
     let t = trybuild::TestCases::new();
-    t.compile_fail("tests/compile-fail/fixed_alias_zero_size.rs");
+    // The `pass` case is load-bearing, not decoration: `trybuild` invokes `cargo check`
+    // unless a `pass` case is present and `cargo build` when one is, and a
+    // post-monomorphization `const` error is only raised during codegen. Without it the
+    // `compile_fail` case below compiles clean and the test reports the opposite of the
+    // truth. It doubles as the positive control that the guard rejects nothing valid.
+    t.pass("tests/compile-pass/fixed_nonzero_size.rs");
+    t.compile_fail("tests/compile-fail/fixed_zero_size.rs");
 }
 
 // Compile-fail test for SerializableSecret opt-in requirement.
@@ -156,7 +169,7 @@ fn dynamic_newtype_alias_rejected_compile_fail() {
 
 // Compile-fail test: nominal separation actually holds. Two `fixed_newtype!` types
 // of the same `N` are distinct types, so swapping key roles at a call site is
-// E0308 — the defect class the macros exist to catch, which `fixed_alias!` cannot.
+// E0308 — the defect class the macros exist to catch, which a plain `type` alias cannot.
 #[cfg(not(miri))]
 #[test]
 fn newtype_cross_role_compile_fail() {
@@ -164,7 +177,8 @@ fn newtype_cross_role_compile_fail() {
     t.compile_fail("tests/compile-fail/newtype_cross_role.rs");
 }
 
-// Compile-fail test: `fixed_newtype!` rejects `N = 0`, matching `fixed_alias!`.
+// Compile-fail test: `fixed_newtype!` rejects `N = 0` at the declaration, which is
+// earlier than `Fixed`'s own construction-time guard and so worth keeping separately.
 #[cfg(not(miri))]
 #[test]
 fn newtype_zero_size_compile_fail() {
@@ -182,8 +196,8 @@ fn newtype_manual_drop_compile_fail() {
     t.compile_fail("tests/compile-fail/newtype_manual_drop.rs");
 }
 
-// Compile-fail test (R2): no `From<Wrapper>` is generated, so an alias-typed value
-// cannot flow into a newtype through `.into()`. Base access is opt-in via
+// Compile-fail test (R2): no `From<Wrapper>` is generated, so a base-typed value (a
+// plain `type` alias here) cannot flow into a newtype through `.into()`. Base access is opt-in via
 // `derive: [WrapperAccess]`; without it the only path is a `with_secret` round trip.
 #[cfg(feature = "alloc")]
 #[cfg(not(miri))]

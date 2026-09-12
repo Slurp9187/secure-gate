@@ -5,6 +5,193 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`fixed_newtype!(pub Name, generic T)` — the `Fixed` counterpart of the `generic` arm.**
+  `dynamic_newtype!` has accepted `generic T` since rc.8, for an inner type that is neither
+  `String` nor `Vec<u8>`. `fixed_newtype!` had no such arm, for a reason that was about the
+  macro rather than the wrapper: it takes a size literal, so the token-matching ambiguity
+  that forced `dynamic_newtype!`'s explicit marker never arose, and nobody went looking for
+  the gap.
+
+  The gap is real, and it is widest exactly where `Fixed` matters most. On a `no_std` target
+  there is no allocator, so there is no `Dynamic` at all and `Fixed` is the only wrapper —
+  and a secret on such a target is frequently not a byte array. An ML-KEM secret polynomial
+  is `[i16; 256]`; Ed25519 scalar limbs are `[u64; 4]`; an AES-256 expanded key schedule is
+  `[u32; 60]`, as secret as the key it was derived from. All three are valid `Fixed<T>`
+  today, because `Fixed<T: Zeroize>` and its `RevealSecret` impl are generic over `T`. None
+  of them could be given a nominal type by macro.
+
+  ```rust
+  // An ML-KEM secret polynomial, on a target with no allocator.
+  fixed_newtype!(pub Poly, generic [i16; 256]);
+  let p = Poly::new([0i16; 256]);
+  assert_eq!(p.with_secret(|c| c.len()), 256);
+  ```
+
+  The arm emits the struct, redacted `Debug`, `RevealSecret`, `RevealSecretMut`, `Zeroize`,
+  `ZeroizeOnDrop`, any `derive:` tokens, and a `const fn new`. It deliberately omits
+  `SecretLen`, `new_with`, `From`, `TryFrom`, the encoders and the RNG constructors: none of
+  those has a meaning for an arbitrary `T`, which is the same trade `dynamic_newtype!`'s
+  generic arm already makes. Writing the word `generic` is how a caller says they know.
+
+  `fixed_newtype!` also gained a catch-all arm, so an inner type that is neither a size
+  literal nor marked `generic` is now a `compile_error!` naming both fixes instead of
+  rustc's "no rules expected this token".
+
+### Changed
+
+- **BREAKING: a zero-sized `Fixed` no longer constructs.** The rc.9 notes recorded that the
+  `N = 0` rejection lived inside `fixed_alias!` and nowhere else, so `type Name =
+  Fixed<[u8; 0]>;` written by hand bypassed it, and that `Fixed` *could* carry the check
+  itself as a post-monomorphization `const` assertion. With the alias macros now gone
+  (below), the only guard left would have been the one inside `fixed_newtype!`, so the check
+  has moved to where it covers every spelling: `Fixed::new` and `Fixed::new_with` each read
+  an associated `const` that asserts a non-zero size. Those two bodies are what every other
+  constructor, decoder, RNG entry point and the `Deserialize` impl already funnel through,
+  so one assertion each covers the whole surface.
+
+  It is spelled as an associated `const` rather than an inline `const { }` block because this
+  line's MSRV is 1.70 and inline const blocks need 1.79. That spelling was chosen on `main`
+  for this branch's benefit, so the hunk applied here unchanged; verified on 1.70 rather than
+  taken on faith. The `#[allow(clippy::let_unit_value)]` on the binding was added *because*
+  of this branch: binding the unit-valued constant is what forces it to be evaluated, and
+  clippy 1.70 rejects that binding while 1.85 accepts it. The alternatives clippy suggests —
+  a bare path statement, or `_ =` — are rejected by both versions, so the allow is the only
+  form clean on 1.70 and 1.85 alike. `main` carries the identical source.
+
+  What fires, and where: the error is post-monomorphization, so generic code still compiles
+  and the failure appears at the first concrete zero-sized construction. The diagnostic names
+  the offending type in the failing constant's path (`Fixed::<[u8; 0]>::NON_ZERO_SIZED`) and
+  a `while instantiating` note points at the construction that reached it. Naming the type
+  without ever building one still compiles, which is why no guard placed in the type could
+  ever make the type unnameable. The `size_of` form also rejects any other zero-sized inner
+  type, `Fixed<()>` included.
+
+  **One limitation, measured rather than assumed: `cargo check` does not report it.** A
+  post-monomorphization error is raised during codegen, and `cargo check` stops before
+  codegen, so an editor driven by `cargo check` stays quiet about a zero-sized secret.
+  `cargo build`, `cargo test` and any release build do report it, so such a secret cannot
+  ship — it is the fast feedback loop that misses it, not the build. Nothing on stable Rust
+  moves the check earlier for generic code: a condition on a generic parameter has nothing to
+  evaluate until that parameter is known. Three other formulations were tried — an array
+  index inside the constant, the same index inline in the function body, and
+  `[(); N - 1]` — and they are respectively equivalent, silently ineffective, and rejected
+  outright as "generic parameters may not be used in const operations". `fixed_newtype!`
+  keeps its own declaration-site guard, which does fire under `cargo check`, because at that
+  point the size is a literal.
+
+  `Dynamic` gets no equivalent and wants none: a `Dynamic` is pointer-sized whatever it
+  holds, and whether a `Vec` or `String` is empty is a runtime fact. An empty
+  `Dynamic<String>` is a legitimate value to hold before validation.
+
+  **Migration:** nothing, unless a `Fixed<[u8; 0]>` was being constructed on purpose. Tests
+  that used it as a vehicle for an empty-input decoder case move to the `Vec<u8>` decoders,
+  where a zero-length result is representable — which is what this crate's own base32 test
+  did.
+
+### Removed
+
+- **BREAKING: `fixed_alias!`, `dynamic_alias!`, `fixed_generic_alias!` and
+  `dynamic_generic_alias!` are deleted.** Three of the four expanded to a single `type` line
+  and a generated doc attribute; `fixed_alias!` added a const-eval guard rejecting `N = 0`.
+  What none of them added was a type. Two aliases over one shape were always the same
+  nominal type, freely substitutable for each other.
+
+  The problem was never what they expanded to. It was that a macro exported by a crate whose
+  pitch is "accidents must not compile" reads as a guarantee, and these guaranteed a name.
+  This repository's own README called them "typed newtype wrappers" and "Type-safe wrappers"
+  from 0.5.1 until commit `fe93540`, whose message records that downstream users had relied
+  on that reading. The measured consequence is in
+  `docs/design/secure-gate-requested-newtyping-requirements.md`: a consumer's 34 aliases
+  collapsed to 8 real types, with `FileId` (documented "never crosses IPC") and `PublicId`
+  (documented "safe to expose via IPC") the same type on adjacent lines, and five distinct
+  32-byte cryptographic keys mutually substitutable. Nobody misreads
+  `pub type FileId = Dynamic<String>;`.
+
+  With `fixed_newtype!` / `dynamic_newtype!` shipped since rc.8, the alias macros were also
+  dominated on every axis. A newtype costs nothing at runtime — `tests/asm_dse_check.rs`
+  shows byte-identical codegen — and is strictly safer, so where a role exists the newtype
+  wins; and where no role exists, one line of ordinary Rust is shorter than the macro call it
+  replaces. Keeping both left two same-shaped macros one word apart, differing only in the
+  property that matters, which is why the documentation had to carry a "Nominal?" column to
+  tell them apart.
+
+  The case *for* aliases is untouched, and rc.9's note on when an alias is the right reach
+  still stands word for word: material worth zeroize-on-drop and a redacted `Debug` that has
+  no role it could be confused with, where interchangeability with the base type is a feature
+  because it crosses into third-party APIs without ceremony. Only the spelling changes. A
+  doc comment on the `type` gives the documentation the macro's optional doc-string argument
+  used to provide.
+
+  **Migration** is mechanical and one line per alias:
+
+  | Was | Now |
+  |---|---|
+  | `fixed_alias!(pub X, N);` | `pub type X = Fixed<[u8; N]>;` |
+  | `fixed_alias!(pub X, N, "doc");` | `/// doc` above `pub type X = Fixed<[u8; N]>;` |
+  | `dynamic_alias!(pub X, T);` | `pub type X = Dynamic<T>;` |
+  | `dynamic_alias!(pub X, T, "doc");` | `/// doc` above `pub type X = Dynamic<T>;` |
+  | `fixed_generic_alias!(pub X);` | `pub type X<const N: usize> = Fixed<[u8; N]>;` |
+  | `dynamic_generic_alias!(pub X);` | `pub type X<T> = Dynamic<T>;` |
+
+  For a tree with many of them, this GNU `sed` run covers every form above, including
+  `pub(crate)`, the optional doc string, and an inner type containing a comma. Run the
+  doc-string forms first or the two-argument patterns will swallow the doc argument into the
+  type position, which compiles to something wrong rather than failing:
+
+  ```sh
+  # Doc-string forms first: the doc becomes an ordinary `///` comment.
+  sed -i -E 's#fixed_alias!\((pub(\([^)]*\))? )?([A-Za-z0-9_]+), ([0-9]+), "(.*)"\);#/// \5\n\1type \3 = Fixed<[u8; \4]>;#' $FILES
+  sed -i -E 's#dynamic_alias!\((pub(\([^)]*\))? )?([A-Za-z0-9_]+), (.+), "(.*)"\);#/// \5\n\1type \3 = Dynamic<\4>;#' $FILES
+  # Then the two-argument forms.
+  sed -i -E 's#fixed_alias!\((pub(\([^)]*\))? )?([A-Za-z0-9_]+), ([0-9]+)\);#\1type \3 = Fixed<[u8; \4]>;#' $FILES
+  sed -i -E 's#dynamic_alias!\((pub(\([^)]*\))? )?([A-Za-z0-9_]+), (.+)\);#\1type \3 = Dynamic<\4>;#' $FILES
+  ```
+
+  Then replace the macro import with `use secure_gate::{Dynamic, Fixed};`. The generic
+  aliases are rare enough to convert by hand, per the last two table rows. The `N = 0` guard
+  is not lost in the move: `Fixed` now rejects a zero-sized value at construction (above),
+  which is what covers the hand-written `type` the macro used to special-case. The last tags
+  carrying these macros are `v0.8.0-rc.12` on this line and `v0.9.0-rc.9` on `main`.
+
+### Testing
+
+- **The zero-size guard is pinned by a `trybuild` case that needed a `pass` fixture to work
+  at all.** `trybuild` runs `cargo check` unless the same `TestCases` also holds a `pass`
+  case, in which case it runs `cargo build`
+  (`trybuild/src/cargo.rs`: `.arg(if project.has_pass { "build" } else { "check" })`). A
+  post-monomorphization `const` error is only raised during codegen, so the first version of
+  `tests/compile-fail/fixed_zero_size.rs` compiled clean under `check` and the test asserted
+  the exact opposite of the truth — it reported "expected test case to fail to compile, but
+  it succeeded". `tests/compile-pass/fixed_nonzero_size.rs` is what flips the run into
+  `build` mode, and it earns its place twice over: it is also the positive control that the
+  guard rejects nothing valid, covering `new`, `new_with`, a generic constructor and a
+  `generic`-arm newtype.
+
+  Two things to know about the snapshot. Only two diagnostics appear for three bad
+  constructions, because the third routes through `Fixed::<[u8; 0]>::new` as well and a
+  failed constant is reported once. And the snapshot embeds the assertion's line number in
+  `src/fixed.rs`, so an edit to that file above the assertion moves it and the snapshot needs
+  re-blessing with `TRYBUILD=overwrite cargo test compile_fail` on the pinned toolchain.
+
+
+### Backport notes
+
+- **Mirrors the same change on `main`, re-derived against this branch rather than copied.**
+  The alias macros, the newtype macros and the `Fixed<[u8; 0]>` call sites were identical on
+  both lines, so the code hunks applied unchanged; what was re-derived is the prose. This
+  branch's README had never received rc.9's "when an alias is the right reach" paragraph, so
+  it lands here for the first time as part of the rewrite, and its `SECURITY.md` links point
+  at `release/0.8`. The workflow set differs (`fuzz-miri-0.8.yml`, not `fuzz-miri.yml`), the
+  MSRV stays 1.70 and the edition stays 2021, import ordering follows this branch's rustfmt
+  style, and the `trybuild` snapshot for the new compile-fail case is blessed on 1.70, where
+  it differs from `main`'s. The rc.12 note above that `SECURITY.md` "gained the
+  zero-length-secret entry from `main`" is superseded: that entry described a guard that lived
+  only in `fixed_alias!`, and the guard is now in `Fixed` itself.
+
 ## [0.8.0-rc.12] - 2026-09-09
 
 ### Changed

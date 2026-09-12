@@ -6,11 +6,12 @@
 
 /// Creates a distinct nominal type wrapping [`Fixed<[u8; N]>`](crate::Fixed).
 ///
-/// Mirrors [`fixed_alias!`](crate::fixed_alias) syntax, but generates a `struct`
-/// rather than a `type` alias: two `fixed_newtype!` types of the same `N` are
-/// **not** interchangeable. Use it when distinct cryptographic roles share a
-/// shape — an encryption key and a MAC key are both `Fixed<[u8; 32]>`, and
-/// under an alias the compiler cannot tell them apart.
+/// Generates a `struct` rather than a `type` alias: two `fixed_newtype!` types
+/// of the same `N` are **not** interchangeable, where two `type` aliases of
+/// that `N` are one and the same type. Use it when distinct cryptographic
+/// roles share a shape — an encryption key and a MAC key are both
+/// `Fixed<[u8; 32]>`, and under a plain alias the compiler cannot tell them
+/// apart.
 ///
 /// # Syntax
 ///
@@ -21,6 +22,8 @@
 /// fixed_newtype!(pub Name, N, "doc string");            // with custom doc
 /// fixed_newtype!(pub Name, N, derive: [ConstantTimeEq]); // with opt-in impls
 /// fixed_newtype!(pub Name, N, "doc", derive: [ConstantTimeEq]);
+/// fixed_newtype!(pub Name, generic T);                  // reduced API, opted into
+/// fixed_newtype!(pub Name, generic T, derive: [ConstantTimeEq]);
 /// ```
 ///
 /// Supported `derive:` options are `ConstantTimeEq`, `Deserialize`, `FromWrapper`, `IntoWrapper`, and `WrapperAccess` (= both directions). See
@@ -56,13 +59,44 @@
 /// seal(&mac, &enc); // E0308: roles swapped
 /// ```
 ///
-/// Zero-size is a **compile error**, exactly as with
-/// [`fixed_alias!`](crate::fixed_alias):
+/// Zero-size is a **compile error**, raised where the type is declared rather
+/// than where one is first built:
 ///
 /// ```rust,compile_fail
 /// use secure_gate::fixed_newtype;
 /// fixed_newtype!(pub Bad, 0); // compile-time error: index out of bounds
 /// ```
+///
+/// # Inner types other than bytes
+///
+/// The size-literal forms cover `Fixed<[u8; N]>`, the shape nearly every
+/// secret takes. [`Fixed<T>`](crate::Fixed) is generic over any `Zeroize`
+/// type, though, and the `generic` marker opts a newtype into that:
+///
+/// ```rust
+/// use secure_gate::{fixed_newtype, RevealSecret};
+///
+/// fixed_newtype!(pub Poly, generic [i16; 256]);
+///
+/// let poly = Poly::new([0i16; 256]);
+/// assert_eq!(poly.with_secret(|coeffs| coeffs.len()), 256);
+/// ```
+///
+/// The case this exists for is `no_std`. With no allocator there is no
+/// [`Dynamic`](crate::Dynamic), so `Fixed` is the only wrapper, and a secret on
+/// such a target is frequently not bytes: an ML-KEM secret polynomial
+/// `[i16; 256]`, Ed25519 scalar limbs `[u64; 4]`, AES-256 expanded round keys
+/// `[u32; 60]`. An inner type that does not implement `Zeroize` is a compile
+/// error reported from the expansion, where `Fixed<T>`'s own bound fails.
+///
+/// The `generic` form deliberately provides less: [`RevealSecret`](crate::RevealSecret),
+/// [`RevealSecretMut`](crate::RevealSecretMut), redacted `Debug`, `Zeroize`,
+/// `ZeroizeOnDrop`, and `new` — no [`SecretLen`](crate::SecretLen), no
+/// `new_with`, no `From` or `TryFrom`, no encoders and no RNG constructors,
+/// since none of those has a meaning for an arbitrary `T`. Writing the marker
+/// is how you say you know that. A zero-sized inner value is still refused:
+/// there is no `N` for the macro to check, so [`Fixed`](crate::Fixed) rejects
+/// it at construction instead.
 ///
 /// # Cloning and serialization are not generated
 ///
@@ -107,9 +141,14 @@
 /// `size_of::<EncKey>() == N` and delegation is `#[inline]` throughout — the
 /// newtype costs nothing at runtime.
 ///
-/// Each expansion emits `const _: () = { let _ = [(); N][0]; };`, the same
-/// zero-size guard [`fixed_alias!`](crate::fixed_alias) uses, so `N = 0`
-/// produces the identical const-evaluation diagnostic.
+/// Each size-literal expansion emits `const _: () = { let _ = [(); N][0]; };`,
+/// a declaration-site courtesy: `N = 0` fails on the line that declares the
+/// type, which is the line worth pointing at. It is not the only guard.
+/// [`Fixed::new`](crate::Fixed::new) and
+/// [`Fixed::new_with`](crate::Fixed::new_with) carry a `const` assertion
+/// rejecting a zero-sized inner value at construction, which is what covers a
+/// plain `type` alias and the `generic` arm; there the error falls at the first
+/// concrete construction instead.
 ///
 /// **Do not add your own `Drop` impl.** None is needed: the wrapped
 /// [`Fixed`](crate::Fixed) still runs its own, so zeroization is unaffected.
@@ -127,7 +166,7 @@
 ///
 /// **Nominal separation guards against mistakes, not intent** — but nothing is
 /// generated that would undo it by accident. There is no `From<Wrapper>` and
-/// no `Deref`, so an alias-typed value cannot flow into a newtype through
+/// no `Deref`, so a base-typed value cannot flow into a newtype through
 /// `.into()`, and `&Newtype` never coerces to `&Wrapper` at a call site. By
 /// default the only way material enters or leaves is the 3-tier access API —
 /// a `with_secret` round trip — which is explicit and shows up in the audit
@@ -154,8 +193,8 @@
 /// a rebuild, a reveal the job never needed.
 ///
 /// **Which direction is safe depends on the pool.** In a mixed tree the base
-/// type is not raw material: every plain alias sharing it *is* that type, so
-/// a directional token connects this role to all of them at once.
+/// type is not raw material: every plain `type` alias sharing it *is* that
+/// type, so a directional token connects this role to all of them at once.
 /// `FromWrapper` lets anything in the pool become this role — the source never
 /// opts in, because the source is just the base type — so a type that guards
 /// a boundary must never take it. `IntoWrapper` lets this role become anything
@@ -169,13 +208,38 @@
 ///
 /// # See also
 ///
-/// - [`fixed_alias!`](crate::fixed_alias) — a `type` alias instead, when
-///   readability rather than role separation is the goal
 /// - [`dynamic_newtype!`](crate::dynamic_newtype) — heap-allocated counterpart
-/// - [`fixed_generic_alias!`](crate::fixed_generic_alias) — one name across
-///   several sizes
+/// - a plain `type` alias — `pub type Aes256Key = Fixed<[u8; 32]>;` — when a
+///   readable name rather than role separation is the goal, and the name should
+///   stay interchangeable with its base; the `macros` module documentation
+///   weighs the two choices against each other
 #[macro_export]
 macro_rules! fixed_newtype {
+    // ---- explicit generic arms: caller opts in to the reduced API ----
+    //
+    // Placed first. They match the literal token `generic` in the inner-type
+    // position, so they cannot shadow a size literal, and matching the marker
+    // before any `:literal` or `:ty` fragment is parsed keeps the ordering
+    // safe: `macro_rules!` does not backtrack once a fragment has been
+    // consumed. A custom doc comes through `$(#[$attr:meta])*` as ordinary
+    // attributes, as it does for the `generic` arm of `dynamic_newtype!`.
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic $inner:ty) => {
+        $crate::fixed_newtype!($(#[$attr])* $vis $name, generic $inner, derive: []);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic $inner:ty, derive: [$($opt:ident),* $(,)?]) => {
+        $crate::__sg_newtype_base!(
+            $(#[$attr])* $vis $name($crate::Fixed<$inner>), derive: [$($opt),*]
+        );
+
+        impl $name {
+            /// Wraps a value in place. `const fn`, like `Fixed::new`.
+            #[inline(always)]
+            pub const fn new(value: $inner) -> Self {
+                Self($crate::Fixed::new(value))
+            }
+        }
+    };
+
     ($(#[$attr:meta])* $vis:vis $name:ident, $size:literal, $doc:literal, derive: [$($opt:ident),* $(,)?]) => {
         $crate::fixed_newtype!($(#[$attr])* #[doc = $doc] $vis $name, $size, derive: [$($opt),*]);
     };
@@ -402,5 +466,23 @@ macro_rules! fixed_newtype {
                 }
             }
         }
+    };
+
+    // ---- catch-all: neither a byte size nor the `generic` marker ----
+    //
+    // Uses `$($rest:tt)+` rather than `$inner:ty` so it can never itself
+    // hard-error on a malformed tail; the message names what was written.
+    ($(#[$attr:meta])* $vis:vis $name:ident, $($rest:tt)+) => {
+        ::core::compile_error!(::core::concat!(
+            "fixed_newtype!: `",
+            ::core::stringify!($($rest)+),
+            "` is neither a byte-size literal nor the `generic` marker. The \
+             shaped forms take the length of the `[u8; N]` array being wrapped, \
+             so write `fixed_newtype!(pub K, 32)` for a 32-byte secret. For any \
+             other inner type, write `generic <type>` — \
+             `fixed_newtype!(pub K, generic [i16; 256])` — to accept the reduced \
+             API (RevealSecret, RevealSecretMut, Debug, Zeroize, and `new`) on \
+             purpose."
+        ));
     };
 }

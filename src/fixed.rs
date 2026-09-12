@@ -175,6 +175,31 @@ fn drain_bech32_payload<const N: usize>(
 /// | [`from_random()`](Self::from_random) | `rand` | System RNG |
 /// | [`from_rng(rng)`](Self::from_rng) | `rand` | Custom RNG |
 ///
+/// # Zero-size
+///
+/// A value of zero size has nothing to protect, so a `Fixed` cannot be built around
+/// one. [`new`](Self::new) and [`new_with`](Self::new_with) each assert a non-zero size
+/// in a `const`, and every other constructor in the table above funnels through those
+/// two, so `Fixed<[u8; 0]>` — and any other zero-sized inner type — is a compile error
+/// however it is reached. The assertion is evaluated at monomorphization rather than at
+/// the declaration, so it fires at the first concrete zero-sized construction, including
+/// one reached through generic code; generic code that is never instantiated with a
+/// zero-sized `T` is unaffected, and naming such a type without constructing one still
+/// compiles.
+///
+/// The diagnostic names the offending type in the failing constant's path — for example
+/// `Fixed::<[u8; 0]>::NON_ZERO_SIZED` — and a `while instantiating` note points at the
+/// construction that reached it.
+///
+/// **It is raised during codegen, so `cargo check` does not report it.** A post-
+/// monomorphization error cannot be raised earlier: a check on a generic parameter has
+/// nothing to evaluate until that parameter is known. `cargo build`, `cargo test` and any
+/// release build do report it, so a zero-sized secret cannot ship — but an editor driven
+/// by `cargo check` will stay quiet about one.
+///
+/// [`Dynamic`](crate::Dynamic) has no compile-time counterpart: whether a `Vec` or
+/// `String` is empty is a runtime fact.
+///
 /// # RustCrypto integration
 ///
 /// RustCrypto's `BlockEncrypt`/`BlockDecrypt` take `&mut GenericArray<u8, U16>`, and
@@ -230,6 +255,14 @@ pub struct Fixed<T: zeroize::Zeroize> {
 }
 
 impl<T: zeroize::Zeroize> Fixed<T> {
+    // Post-monomorphization guard: a zero-sized `T` has nothing to protect. Fires at the
+    // first concrete construction, never at the declaration. An associated `const` rather
+    // than an inline `const {}` block so the same hunk builds on the 0.8 line's MSRV 1.70.
+    const NON_ZERO_SIZED: () = assert!(
+        ::core::mem::size_of::<T>() > 0,
+        "secure-gate: Fixed<T> cannot hold a zero-sized value; there is nothing to protect"
+    );
+
     /// Creates a new [`Fixed<T>`] by wrapping a value.
     ///
     /// This is a `const fn`, so it can be evaluated at compile time. However,
@@ -239,6 +272,8 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     /// For `Fixed<[u8; N]>`, prefer [`new_with`](Fixed::new_with) when minimizing
     /// stack residue matters, as `new` may leave an intermediate copy of `value`
     /// on the caller's stack frame.
+    ///
+    /// A zero-sized `T` is rejected at compile time; see [Zero-size](#zero-size).
     ///
     /// # Examples
     ///
@@ -250,6 +285,11 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     /// ```
     #[inline(always)]
     pub const fn new(value: T) -> Self {
+        // Binding the unit-valued const is what forces it to be evaluated; clippy reads
+        // that as a pointless binding. Kept explicit because the 1.70 lint (the 0.8
+        // line's MSRV) fires on every spelling that still triggers the evaluation.
+        #[allow(clippy::let_unit_value)]
+        let () = Self::NON_ZERO_SIZED;
         Fixed { inner: value }
     }
 }
@@ -311,6 +351,14 @@ impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
 
 /// Construction and ergonomic encoding helpers for `Fixed<[u8; N]>`.
 impl<const N: usize> Fixed<[u8; N]> {
+    // The byte-array counterpart to `NON_ZERO_SIZED`: `new_with` builds the array itself
+    // instead of going through `new`, so it needs its own assertion. Same associated-`const`
+    // spelling, for the same MSRV reason.
+    const NON_ZERO_LEN: () = assert!(
+        N > 0,
+        "secure-gate: Fixed<[u8; 0]> cannot be constructed; there is nothing to protect"
+    );
+
     /// Writes directly into the wrapper's storage via a user-supplied closure,
     /// eliminating the intermediate stack copy that [`new`](Self::new) may produce.
     ///
@@ -354,6 +402,11 @@ impl<const N: usize> Fixed<[u8; N]> {
     where
         F: FnOnce(&mut [u8; N]),
     {
+        // Binding the unit-valued const is what forces it to be evaluated; clippy reads
+        // that as a pointless binding. Kept explicit because the 1.70 lint (the 0.8
+        // line's MSRV) fires on every spelling that still triggers the evaluation.
+        #[allow(clippy::let_unit_value)]
+        let () = Self::NON_ZERO_LEN;
         let mut this = Self { inner: [0u8; N] };
         f(&mut this.inner);
         this

@@ -1,8 +1,8 @@
 //! macros_suite/newtype_surface.rs — full forwarded surface + derive passthrough
 use rand::SeedableRng;
 use secure_gate::{
-    dynamic_newtype, fixed_newtype, ConstantTimeEq, RevealSecret, SecretLen, ToBase32, ToBase64Url,
-    ToBech32, ToBech32m, ToHex,
+    dynamic_newtype, fixed_newtype, ConstantTimeEq, RevealSecret, RevealSecretMut, SecretLen,
+    ToBase32, ToBase64Url, ToBech32, ToBech32m, ToHex,
 };
 
 fixed_newtype!(pub EncKey, 32);
@@ -11,6 +11,9 @@ fixed_newtype!(pub MacKey, 32, "MAC key.", derive: [ConstantTimeEq]);
 dynamic_newtype!(pub Token, Vec<u8>, derive: [ConstantTimeEq]);
 dynamic_newtype!(pub ApiKey, String, "API key.", derive: [ConstantTimeEq]);
 dynamic_newtype!(pub Wide, generic Vec<u32>);
+// The `Fixed` counterpart of the same bargain: an AES-256 expanded key schedule is
+// `[u32; 60]`, as secret as the key it came from and not a byte array.
+fixed_newtype!(pub RoundKeys, generic [u32; 60]);
 
 #[test]
 fn fixed_full_surface() {
@@ -262,4 +265,19 @@ fn newtype_forwards_sized_bech32_methods() {
         wide, wide_m,
         "the two checksums must not produce the same string"
     );
+}
+
+/// `fixed_newtype!`'s `generic` arm emits the shape-independent surface and nothing more:
+/// construction, the access traits, redacted `Debug`, zeroization. No `SecretLen` and no
+/// encoders, because neither has a meaning for an arbitrary inner type — the same trade
+/// `dynamic_newtype!`'s generic arm makes, verified here rather than assumed.
+#[test]
+fn fixed_generic_arm_surface() {
+    let mut k = RoundKeys::new([7u32; 60]);
+    assert_eq!(k.with_secret(|w| w[0]), 7);
+    k.with_secret_mut(|w| w[0] = 9);
+    assert_eq!(k.expose_secret()[0], 9);
+    assert_eq!(format!("{k:?}"), "[REDACTED]");
+    // `#[repr(transparent)]` over `Fixed<[u32; 60]>`: 60 words, 4 bytes each.
+    assert_eq!(core::mem::size_of::<RoundKeys>(), 240);
 }
