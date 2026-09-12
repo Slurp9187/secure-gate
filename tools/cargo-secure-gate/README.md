@@ -6,10 +6,12 @@ tolerable on real code. It is not published and is not a dependency of the
 library; see [Placement](#placement).
 
 ```
-cargo secure-gate [--format human|json] <path>...
+cargo secure-gate [--format human|json] [--deny-routes] <path>...
 ```
 
-Exit code is 1 when any error-severity finding is reported.
+Exit code is 1 when a contradicted assertion is reported. Growth routes are an
+inventory rather than findings, so they do not fail a run unless `--deny-routes`
+says to.
 
 ## Why a source pass exists after #201
 
@@ -79,6 +81,20 @@ fills *byte by byte*. So: growth inside a loop, or two growth calls in sequence,
 is an error; a lone iterator-driven `extend`, whose reallocation count lives in a
 size hint this pass cannot read, is a warning; a lone bulk fill is clean.
 
+## Two kinds of claim, two sections
+
+A `FixedStorage` impl contradicted by its own fields is decidable from the
+source: the impl is wrong whether or not a secret ever flows through it. A
+growth route is not. Whether a `push` past capacity reallocates depends on the
+allocator and the heap at that instant, and `SECURITY.md` measures the benign
+case — a full 1008-byte buffer grown by 96 extends in place and abandons nothing.
+One `push` line has four possible outcomes and only one of them leaves residue.
+
+So the report has two sections and says which is which. Reporting both in one
+severity list invites the reader to take a route for an observed leak, and the
+summary line says "no other known shape was found in the scanned text" rather
+than anything that rounds to "clean".
+
 ## What it does not claim
 
 Nothing here observes memory. The measurements it quotes come from
@@ -92,6 +108,31 @@ a helper function, a receiver declared in a crate that was not scanned, a field
 whose type is foreign — are reported as `unresolved` rather than skipped, because
 a silent skip reads exactly like a pass. `tests/corpus.rs` pins that distinction
 in both directions.
+
+## Recall is unmeasured
+
+Precision is pinned by the fixtures below and by running over this repository:
+one finding, nothing unresolved, no false positives. **Recall is not.** A peer
+sweep of this crate measured a regex prototype at 6 of 26 against a deliberately
+evasive, allocator-verified corpus, with the misses systematic rather than
+random — anything that rebinds the exposed reference before growing it.
+
+Three of those shapes were run against this pass directly. Two it already
+handled and one it did not:
+
+| Evasion | Result |
+| --- | --- |
+| Trigger phrases in comments and string literals; unrelated `Vec::push` nearby | not flagged, correctly — parsing makes this free |
+| `impl FixedStorage for Ключ` | flagged — Rust identifiers are XID, and `syn` reads them |
+| `let alias = v;` then `alias.push(..)` | **missed, silently** — now fixed, with aliases tracked through `let` and reborrows |
+
+That third one is the reason the unresolved category exists, and it still got
+through: a miss that leaves no trace is worse than a miss that says so. The
+dataflow cases beyond a single rebinding — the buffer passed to a helper, or
+reached through a trait object — are reported as unresolved rather than followed.
+
+Getting the real number needs that evasion corpus. Until then, treat the
+precision result as measured and the recall as unknown.
 
 ## Tests
 
@@ -135,4 +176,19 @@ running it needs no toolchain switch.
   outside the `FixedStorage` bound and without `Dynamic<Vec<u8>>`'s `io::Write`
   escape.
 - Type resolution via dylint, for the cases alias and newtype tracking cannot
-  reach. Everything above is decidable without it.
+  reach. Everything above is decidable without it. A peer built and ran one:
+  receiver-aware and type-aware as hoped, 2 genuine warnings with none of
+  clippy's false positives — but 1 of 5 growth paths caught, the four misses all
+  indirect, which is a dataflow problem rather than a lint-authoring one. It
+  costs a nightly toolchain, `rustc-dev`, `clippy_utils` pinned to a git rev, and
+  a packaging bug in dylint 6.0.4. Precision is not the binding constraint here;
+  recall is, and dylint does not fix recall.
+- A manifest check. `full` does **not** include `std` (`Cargo.toml:110`), and
+  `io::Write` for `Dynamic<Vec<u8>>` is gated on `std` (`src/dynamic.rs:776`) —
+  so a consumer building with `full` has no safe growth path at all, and every
+  growth route is a raw `Vec` reallocation. That is a Cargo.toml question this
+  source pass cannot see, and it changes how a route should be read.
+- `clippy.toml` is not a delivery mechanism: a config shipped inside a library is
+  ignored, only the linted crate's own root is read, and `disallowed_methods` is
+  path-based with no notion of a receiver — it cannot say "`push` on a `Vec` that
+  came out of `expose_secret_mut`", so it fires on every `Vec::push` or none.
