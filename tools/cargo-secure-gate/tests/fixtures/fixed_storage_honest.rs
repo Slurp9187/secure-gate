@@ -18,10 +18,6 @@ impl SentinelValue for Poly {
 }
 impl FixedStorage for Poly {}
 
-// A boxed slice has a length fixed at construction, so it qualifies too.
-struct Boxed(Box<[u8]>);
-impl FixedStorage for Boxed {}
-
 // Tuples, arrays and Option payloads resolve through to their elements.
 struct Composite {
     limbs: [u64; 4],

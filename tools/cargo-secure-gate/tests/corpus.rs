@@ -129,8 +129,53 @@ fn a_buffer_handed_to_a_helper_is_unresolved_not_clean() {
 #[test]
 fn an_honest_fixed_storage_impl_is_clean() {
     // The `Poly([i16; 256])` impl from the FixedStorage module docs, plus the
-    // Box<[u8]>, array, tuple and Option shapes the crate implements for you.
+    // array, tuple and Option shapes the crate implements for you.
     assert_eq!(run("fixed_storage_honest.rs"), vec![]);
+}
+
+#[test]
+fn heap_ownership_is_the_predicate_not_resizability() {
+    // The crate's marker originally asked for a fixed capacity and so accepted
+    // `Box<[T]>`. Measured, a `Fixed<Box<[u8]>>` assigned through
+    // `with_secret_mut` released its original block with 1024 of 1024 bytes
+    // intact -- whole-value replacement abandons an allocation with no capacity
+    // change at all -- and `fe64ef8` dropped the impl. This pass treated `Box`
+    // as transparent and reported every one of these as honest, which is a false
+    // negative in the one check whose whole value is catching a false assertion.
+    let errors = rules("heap_owning_not_resizable.rs", Severity::Error);
+    assert_eq!(
+        errors,
+        vec!["SG001", "SG001", "SG001", "SG001"],
+        "Box<[u8]>, Option<Box<[u8]>>, [Box<[u8]>; 2] and Arc<[u8]> all own heap"
+    );
+    // The inline contrast from the same measurement must stay clean.
+    assert_eq!(run("heap_owning_not_resizable.rs").len(), 4);
+}
+
+#[test]
+fn the_two_checks_ask_two_different_questions() {
+    // Conflating them is the root cause rather than the `Box` entry itself: a
+    // boxed slice owns heap (so SG001 must flag it) and cannot change capacity
+    // (so the reallocation vocabulary must not claim it can).
+    use cargo_secure_gate::storage::{Resolver, Storage, TypeDef};
+    let mut resolver = Resolver::default();
+    resolver.types.insert(
+        "B".to_string(),
+        TypeDef {
+            generics: vec![],
+            fields: vec![(
+                "buf".to_string(),
+                syn::parse_str::<syn::Type>("Box<[u8]>").unwrap(),
+            )],
+        },
+    );
+    let found = resolver.classify_named("B", &[]);
+    assert!(matches!(found, Storage::HeapFixed { .. }));
+    assert!(found.owns_heap().is_some(), "FixedStorage must reject it");
+    assert!(
+        !found.capacity_can_change(),
+        "a boxed slice cannot be resized, and saying it can would be the mirror error"
+    );
 }
 
 #[test]
