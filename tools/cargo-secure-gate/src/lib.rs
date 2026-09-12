@@ -51,15 +51,29 @@ struct Source {
 /// it is called on, and because declarations routinely live in another file.
 pub fn analyze_sources(sources: &[(String, String)]) -> Result<Vec<Finding>, Error> {
     let mut parsed = Vec::new();
+    let mut unreadable = Vec::new();
     for (name, text) in sources {
-        let ast = syn::parse_file(text).map_err(|e| Error::Parse {
-            file: name.clone(),
-            message: e.to_string(),
-        })?;
-        parsed.push(Source {
-            name: name.clone(),
-            ast,
-        });
+        // A file that cannot be parsed is a file that was not checked, and it
+        // has to say so in the report rather than on stderr. One unreadable
+        // file used to abort the whole run; silently scanning less than asked
+        // is the failure mode this whole pass is built to avoid.
+        match syn::parse_file(text) {
+            Ok(ast) => parsed.push(Source {
+                name: name.clone(),
+                ast,
+            }),
+            Err(e) => unreadable.push(
+                Finding::new(
+                    "SG000",
+                    report::Kind::Assertion,
+                    report::Severity::Unresolved,
+                    name.clone(),
+                    e.span().start().line,
+                    format!("could not parse this file, so none of it was checked: {e}"),
+                )
+                .with_note("nothing in this file appears in the results above or below"),
+            ),
+        }
     }
 
     let mut index = Index::default();
@@ -68,7 +82,8 @@ pub fn analyze_sources(sources: &[(String, String)]) -> Result<Vec<Finding>, Err
         collector.visit_file(&source.ast);
     }
 
-    let mut findings = checks::fixed_storage::check(&index);
+    let mut findings = unreadable;
+    findings.extend(checks::fixed_storage::check(&index));
     for source in &parsed {
         findings.extend(checks::new_with::check(&index, &source.name, &source.ast));
     }
@@ -80,16 +95,31 @@ pub fn analyze_sources(sources: &[(String, String)]) -> Result<Vec<Finding>, Err
 /// Reads every `.rs` file under `roots` and runs both checks over the set.
 pub fn analyze_paths(roots: &[PathBuf]) -> Result<Vec<Finding>, Error> {
     let mut sources = Vec::new();
+    let mut unreadable = Vec::new();
     for root in roots {
         for file in rust_files(root)? {
-            let text = std::fs::read_to_string(&file).map_err(|e| Error::Io {
-                file: file.display().to_string(),
-                message: e.to_string(),
-            })?;
-            sources.push((file.display().to_string(), text));
+            let name = file.display().to_string();
+            match std::fs::read_to_string(&file) {
+                Ok(text) => sources.push((name, text)),
+                // Same rule as an unparseable file: reported, never silent.
+                Err(e) => unreadable.push(
+                    Finding::new(
+                        "SG000",
+                        report::Kind::Assertion,
+                        report::Severity::Unresolved,
+                        name,
+                        0,
+                        format!("could not read this file, so none of it was checked: {e}"),
+                    )
+                    .with_note("nothing in this file appears in the results above or below"),
+                ),
+            }
         }
     }
-    analyze_sources(&sources)
+    let mut findings = analyze_sources(&sources)?;
+    findings.extend(unreadable);
+    findings.sort_by(|a, b| (&a.file, a.line, a.rule).cmp(&(&b.file, b.line, b.rule)));
+    Ok(findings)
 }
 
 fn rust_files(root: &Path) -> Result<Vec<PathBuf>, Error> {

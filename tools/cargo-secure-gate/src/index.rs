@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 use syn::visit::Visit;
 
-use crate::storage::{LocalTypes, render};
+use crate::storage::{Resolver, TypeDef, render};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Wrapper {
@@ -41,6 +41,13 @@ pub struct WrapperType {
 #[derive(Debug, Clone)]
 pub struct ImplSite {
     pub type_name: String,
+    /// Concrete type arguments named at the impl site, as in
+    /// `impl FixedStorage for Gen<Vec<u8>>`. These bind the struct's own type
+    /// parameters, which is what turns an apparently unresolvable field into a
+    /// resolvable one.
+    pub args: Vec<syn::Type>,
+    /// True for a blanket impl, whose claim is conditional and discharged by
+    /// its own bounds.
     pub generic: bool,
     pub file: String,
     pub line: usize,
@@ -50,8 +57,8 @@ pub struct ImplSite {
 pub struct Index {
     /// Type name -> which wrapper it is. Covers aliases and newtype macros.
     pub wrappers: HashMap<String, WrapperType>,
-    /// Struct / enum name -> (field name, field type).
-    pub locals: LocalTypes,
+    /// Local struct, enum and alias definitions.
+    pub resolver: Resolver,
     /// Every `impl FixedStorage for _`.
     pub fixed_storage_impls: Vec<ImplSite>,
 }
@@ -75,6 +82,12 @@ impl<'a> Collector<'a> {
 
 impl<'ast> Visit<'ast> for Collector<'_> {
     fn visit_item_type(&mut self, node: &'ast syn::ItemType) {
+        // Every alias, not only the wrapper ones: `type Blob = Vec<u8>;` is what
+        // stands between a resolvable field and the unresolved pile.
+        self.index
+            .resolver
+            .aliases
+            .insert(node.ident.to_string(), (*node.ty).clone());
         if let Some((wrapper, inner)) = wrapper_from_type(&node.ty) {
             self.index.wrappers.insert(
                 node.ident.to_string(),
@@ -102,7 +115,13 @@ impl<'ast> Visit<'ast> for Collector<'_> {
                 (name, f.ty.clone())
             })
             .collect();
-        self.index.locals.insert(node.ident.to_string(), fields);
+        self.index.resolver.types.insert(
+            node.ident.to_string(),
+            TypeDef {
+                generics: type_params(&node.generics),
+                fields,
+            },
+        );
         syn::visit::visit_item_struct(self, node);
     }
 
@@ -120,7 +139,13 @@ impl<'ast> Visit<'ast> for Collector<'_> {
                 fields.push((format!("{}::{name}", variant.ident), f.ty.clone()));
             }
         }
-        self.index.locals.insert(node.ident.to_string(), fields);
+        self.index.resolver.types.insert(
+            node.ident.to_string(),
+            TypeDef {
+                generics: type_params(&node.generics),
+                fields,
+            },
+        );
         syn::visit::visit_item_enum(self, node);
     }
 
@@ -128,6 +153,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
         if let Some(seg) = fixed_storage_target(node) {
             self.index.fixed_storage_impls.push(ImplSite {
                 type_name: seg.ident.to_string(),
+                args: impl_type_args(seg),
                 // A blanket impl (`impl<T: FixedStorage> FixedStorage for [T; N]`)
                 // asserts a conditional claim this pass does not try to check.
                 generic: !node.generics.params.is_empty(),
@@ -162,6 +188,32 @@ impl<'ast> Visit<'ast> for Collector<'_> {
         }
         syn::visit::visit_macro(self, node);
     }
+}
+
+/// Type-parameter names of a generic item, in declaration order.
+fn type_params(generics: &syn::Generics) -> Vec<String> {
+    generics
+        .params
+        .iter()
+        .filter_map(|p| match p {
+            syn::GenericParam::Type(t) => Some(t.ident.to_string()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Concrete type arguments written at an impl site's `Self` type.
+fn impl_type_args(seg: &syn::PathSegment) -> Vec<syn::Type> {
+    let syn::PathArguments::AngleBracketed(args) = &seg.arguments else {
+        return Vec::new();
+    };
+    args.args
+        .iter()
+        .filter_map(|a| match a {
+            syn::GenericArgument::Type(t) => Some(t.clone()),
+            _ => None,
+        })
+        .collect()
 }
 
 /// The `Self` type of an `impl FixedStorage for _`, if that is what this is.

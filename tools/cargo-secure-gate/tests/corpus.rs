@@ -283,3 +283,94 @@ fn an_assertion_and_a_route_are_not_the_same_kind_of_claim() {
     .expect("parses");
     assert_eq!(route[0].kind, Kind::Route);
 }
+
+// ---------------------------------------------------------------------------
+// Failure modes reported by an independent adversarial pass
+//
+// That pass was run against a regex implementation of the same two rules and
+// inverted: pointed at one file with 11 measured leaks and one with none, it
+// put all ten of its findings on the clean file. The shapes below are the ones
+// that transfer to any implementation, tested here against this one.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_local_alias_and_a_bound_type_parameter_are_resolvable_not_foreign() {
+    // Reported as silent in the regex pass. They must be errors, not
+    // unresolved: both are one lookup from an answer.
+    assert_eq!(
+        rules("resolvable_not_foreign.rs", Severity::Error),
+        vec!["SG001", "SG001"]
+    );
+    assert!(
+        rules("resolvable_not_foreign.rs", Severity::Unresolved).is_empty(),
+        "a resolvable answer must not land in the unresolved pile"
+    );
+}
+
+#[test]
+fn growth_through_a_field_is_growth() {
+    // "The miss that matters most", and the most idiomatic shape in the
+    // language: for a `Dynamic<Session>` the buffer is never named alone.
+    let findings = run("field_access.rs");
+    let errors: Vec<_> = findings
+        .iter()
+        .filter(|(_, s, _)| *s == Severity::Error)
+        .collect();
+    assert_eq!(
+        errors.len(),
+        2,
+        "one per call site, including the half-sized one"
+    );
+}
+
+#[test]
+fn sizing_one_field_does_not_excuse_growing_another() {
+    // Tracking paths rather than bindings is what buys this. Keyed on the
+    // binding alone, `s.token.reserve_exact(..)` would cover `s.label.push(..)`.
+    let findings = analyze_sources(&[(
+        "f.rs".to_string(),
+        "struct S { a: Vec<u8>, b: String }\n\
+         fn f(m: &[u8]) -> Dynamic<S> { Dynamic::new_with(|s| { \
+           s.a.reserve_exact(m.len()); for x in m { s.a.push(*x); } \
+           for c in \"xy\".chars() { s.b.push(c); } }) }"
+            .to_string(),
+    )])
+    .expect("parses");
+    assert_eq!(findings.len(), 1);
+    assert!(
+        findings[0].message.contains("s.b"),
+        "the sized field was reported instead of the unsized one: {}",
+        findings[0].message
+    );
+}
+
+#[test]
+fn a_doc_comment_is_not_evidence() {
+    // The regex pass quoted a developer's own safety comment back at them as
+    // the reason for its highest-severity finding. Parsing makes this free.
+    assert_eq!(run("doc_comment_evidence.rs"), vec![]);
+}
+
+#[test]
+fn an_unparseable_file_is_reported_and_does_not_abort_the_run() {
+    // One bad file used to return Err and scan nothing. Scanning less than was
+    // asked for, silently, is the failure mode this pass exists to avoid.
+    let findings = analyze_sources(&[
+        ("broken.rs".to_string(), "fn f( {{{".to_string()),
+        (
+            "good.rs".to_string(),
+            "struct S { v: Vec<u8> }\nimpl FixedStorage for S {}".to_string(),
+        ),
+    ])
+    .expect("a bad file is a finding, not an error");
+    assert!(
+        findings
+            .iter()
+            .any(|f| f.rule == "SG000" && f.severity == Severity::Unresolved),
+        "the unparseable file was not reported"
+    );
+    assert!(
+        findings.iter().any(|f| f.rule == "SG001"),
+        "the good file was not scanned"
+    );
+}

@@ -6,9 +6,17 @@
 //! type with a `Vec` field that implements `FixedStorage` anyway will compile
 //! and will leak." This module is the second opinion.
 //!
-//! The answer is three-valued on purpose. A pass that cannot see through a
-//! foreign type has not proved the type safe, and saying so is the difference
-//! between a finding and a silence that reads like one.
+//! # Three values, and why the third one is load-bearing
+//!
+//! A pass that cannot see through a type has not proved it safe. Reporting that
+//! as silence is the one output a security auditor must never produce, so
+//! [`Storage::Unknown`] is a result and not an absence.
+//!
+//! The corollary is that `Unknown` must be rare enough to read. Two shapes that
+//! look unresolvable are not: a local `type Blob = Vec<u8>;` is one lookup away,
+//! and `impl FixedStorage for Gen<Vec<u8>>` supplies the very argument its
+//! struct is generic over. Both resolve here, so what is left in `Unknown` is
+//! genuinely foreign.
 
 use std::collections::{HashMap, HashSet};
 
@@ -20,23 +28,16 @@ pub enum Storage {
     /// Owns no buffer whose capacity can change.
     Fixed,
     /// Owns a resizable buffer. Carries the field path that reaches it, so a
-    /// finding can name `Poly.inner.buf: Vec<u8>` rather than just `Poly`.
+    /// finding can name `Outer.inner.scratch: String` rather than just `Outer`.
     Resizable { path: String, ty: String },
-    /// Not resolvable here: a foreign type, a generic parameter, or a shape
-    /// this pass does not model. Never reported as a violation.
+    /// Not resolvable here. Never reported as a violation, never as silence.
     Unknown { path: String, ty: String },
 }
 
-impl Storage {
-    pub fn is_resizable(&self) -> bool {
-        matches!(self, Storage::Resizable { .. })
-    }
-}
-
 /// Standard-library containers that reallocate. `SECURITY.md` frames the
-/// property as *capacity-changing* rather than growing, which is what makes
-/// `shrink_to_fit` and a bare `reserve` belong on the same list as `push`;
-/// at the type level the same framing just means "owns a resizable buffer".
+/// property as *capacity-changing* rather than growing, which is what puts
+/// `shrink_to_fit` and a bare `reserve` alongside `push`; at the type level the
+/// same framing just means "owns a resizable buffer".
 const RESIZABLE: &[&str] = &[
     "Vec",
     "VecDeque",
@@ -92,148 +93,209 @@ const TRANSPARENT: &[&str] = &[
     "MaybeUninit",
 ];
 
-/// Field lists for the structs and enums defined in the scanned crate.
-pub type LocalTypes = HashMap<String, Vec<(String, syn::Type)>>;
-
-/// Classifies `ty`, resolving local types through `locals`.
-pub fn classify(ty: &syn::Type, locals: &LocalTypes) -> Storage {
-    let mut seen = HashSet::new();
-    walk(ty, locals, String::new(), &mut seen)
+/// A struct or enum defined in the scanned files.
+#[derive(Debug, Clone, Default)]
+pub struct TypeDef {
+    /// Type-parameter names, in declaration order, for substitution.
+    pub generics: Vec<String>,
+    pub fields: Vec<(String, syn::Type)>,
 }
 
-/// Classifies a named local type by its fields.
-pub fn classify_named(name: &str, locals: &LocalTypes) -> Storage {
-    let mut seen = HashSet::new();
-    resolve_local(name, locals, name.to_string(), &mut seen)
+/// Everything the scanned files say about their own type names.
+#[derive(Debug, Default)]
+pub struct Resolver {
+    pub types: HashMap<String, TypeDef>,
+    /// Every `type X = ...;`, so a local alias is not mistaken for a foreign type.
+    pub aliases: HashMap<String, syn::Type>,
 }
 
-fn walk(ty: &syn::Type, locals: &LocalTypes, path: String, seen: &mut HashSet<String>) -> Storage {
-    match ty {
-        // An array never reallocates whatever its length, so it is exactly as
-        // fixed as its element type -- the crate's own `[T; N]` impl reasoning.
-        syn::Type::Array(a) => walk(&a.elem, locals, format!("{path}[_]"), seen),
-        syn::Type::Slice(s) => walk(&s.elem, locals, format!("{path}[_]"), seen),
-        syn::Type::Paren(p) => walk(&p.elem, locals, path, seen),
-        syn::Type::Group(g) => walk(&g.elem, locals, path, seen),
+/// Type parameters bound to concrete arguments at an impl site.
+type Bindings = HashMap<String, syn::Type>;
 
-        // Borrowing a `Vec` is not owning one. The contract is about owned
-        // storage, and a reference's capacity is someone else's problem.
-        syn::Type::Reference(_)
-        | syn::Type::Ptr(_)
-        | syn::Type::BareFn(_)
-        | syn::Type::Never(_) => Storage::Fixed,
+impl Resolver {
+    /// Classifies a named local type, with `args` supplying its type parameters
+    /// if the impl site named any (`impl FixedStorage for Gen<Vec<u8>>`).
+    pub fn classify_named(&self, name: &str, args: &[syn::Type]) -> Storage {
+        let bindings = match self.types.get(name) {
+            Some(def) => def
+                .generics
+                .iter()
+                .cloned()
+                .zip(args.iter().cloned())
+                .collect(),
+            None => Bindings::new(),
+        };
+        let mut seen = HashSet::new();
+        self.resolve_local(name, name.to_string(), &bindings, &mut seen)
+    }
 
-        syn::Type::Tuple(t) => {
-            for (i, elem) in t.elems.iter().enumerate() {
-                let found = walk(elem, locals, format!("{path}.{i}"), seen);
-                if !matches!(found, Storage::Fixed) {
-                    return found;
+    fn walk(
+        &self,
+        ty: &syn::Type,
+        path: String,
+        bindings: &Bindings,
+        seen: &mut HashSet<String>,
+    ) -> Storage {
+        match ty {
+            // An array never reallocates whatever its length, so it is exactly
+            // as fixed as its element type -- the crate's own `[T; N]` reasoning.
+            syn::Type::Array(a) => self.walk(&a.elem, format!("{path}[_]"), bindings, seen),
+            syn::Type::Slice(s) => self.walk(&s.elem, format!("{path}[_]"), bindings, seen),
+            syn::Type::Paren(p) => self.walk(&p.elem, path, bindings, seen),
+            syn::Type::Group(g) => self.walk(&g.elem, path, bindings, seen),
+
+            // Borrowing a `Vec` is not owning one. The contract is about owned
+            // storage; a reference's capacity is someone else's problem.
+            syn::Type::Reference(_)
+            | syn::Type::Ptr(_)
+            | syn::Type::BareFn(_)
+            | syn::Type::Never(_) => Storage::Fixed,
+
+            syn::Type::Tuple(t) => {
+                for (i, elem) in t.elems.iter().enumerate() {
+                    let found = self.walk(elem, format!("{path}.{i}"), bindings, seen);
+                    if !matches!(found, Storage::Fixed) {
+                        return found;
+                    }
                 }
+                Storage::Fixed
             }
-            Storage::Fixed
+
+            syn::Type::Path(p) => self.walk_path(p, path, bindings, seen),
+
+            other => Storage::Unknown {
+                path,
+                ty: render(other),
+            },
         }
-
-        syn::Type::Path(p) => walk_path(p, locals, path, seen),
-
-        // `impl Trait`, `dyn Trait`, inferred and macro types: not resolvable.
-        other => Storage::Unknown {
-            path,
-            ty: render(other),
-        },
     }
-}
 
-fn walk_path(
-    p: &syn::TypePath,
-    locals: &LocalTypes,
-    path: String,
-    seen: &mut HashSet<String>,
-) -> Storage {
-    let Some(last) = p.path.segments.last() else {
-        return Storage::Unknown {
-            path,
-            ty: render(p),
-        };
-    };
-    let name = last.ident.to_string();
-
-    if RESIZABLE.contains(&name.as_str()) {
-        return Storage::Resizable {
-            path,
-            ty: render(p),
-        };
-    }
-    if PRIMITIVE.contains(&name.as_str()) {
-        return Storage::Fixed;
-    }
-    if TRANSPARENT.contains(&name.as_str()) {
-        return match first_type_arg(last) {
-            Some(inner) => walk(inner, locals, path, seen),
-            // `Box` with no type argument is not a shape we can read.
-            None => Storage::Unknown {
+    fn walk_path(
+        &self,
+        p: &syn::TypePath,
+        path: String,
+        bindings: &Bindings,
+        seen: &mut HashSet<String>,
+    ) -> Storage {
+        let Some(last) = p.path.segments.last() else {
+            return Storage::Unknown {
                 path,
                 ty: render(p),
-            },
+            };
         };
-    }
-    if locals.contains_key(&name) {
-        return resolve_local(&name, locals, path, seen);
-    }
+        let name = last.ident.to_string();
 
-    // A single-uppercase-letter path with no arguments is almost always a
-    // generic parameter. Naming it as such reads better in a report than
-    // repeating the whole type expression.
-    Storage::Unknown {
-        path,
-        ty: render(p),
-    }
-}
+        // A type parameter the impl site bound to something concrete.
+        if let Some(bound) = bindings.get(&name) {
+            if p.path.segments.len() == 1 {
+                let bound = bound.clone();
+                return self.walk(&bound, path, &Bindings::new(), seen);
+            }
+        }
 
-fn resolve_local(
-    name: &str,
-    locals: &LocalTypes,
-    path: String,
-    seen: &mut HashSet<String>,
-) -> Storage {
-    // A type that reaches itself is a cycle behind a pointer; the pointer was
-    // already resolved on the way in, so stopping here loses nothing.
-    if !seen.insert(name.to_string()) {
-        return Storage::Fixed;
-    }
-    let Some(fields) = locals.get(name) else {
-        return Storage::Unknown {
+        if RESIZABLE.contains(&name.as_str()) {
+            return Storage::Resizable {
+                path,
+                ty: render(p),
+            };
+        }
+        if PRIMITIVE.contains(&name.as_str()) {
+            return Storage::Fixed;
+        }
+        if TRANSPARENT.contains(&name.as_str()) {
+            return match first_type_arg(last) {
+                Some(inner) => self.walk(inner, path, bindings, seen),
+                None => Storage::Unknown {
+                    path,
+                    ty: render(p),
+                },
+            };
+        }
+        // A local `type Blob = Vec<u8>;` is one lookup away, and treating it as
+        // foreign would put a resolvable answer in the unresolved pile.
+        if let Some(target) = self.aliases.get(&name) {
+            if seen.insert(format!("alias::{name}")) {
+                let target = target.clone();
+                return self.walk(&target, path, bindings, seen);
+            }
+        }
+        if self.types.contains_key(&name) {
+            let args = type_args(last);
+            let nested = match self.types.get(&name) {
+                Some(def) => def.generics.iter().cloned().zip(args).collect(),
+                None => Bindings::new(),
+            };
+            return self.resolve_local(&name, path, &nested, seen);
+        }
+
+        Storage::Unknown {
             path,
-            ty: name.to_string(),
-        };
-    };
-
-    let mut unknown = None;
-    for (field, ty) in fields {
-        let child = if path.is_empty() {
-            format!("{name}.{field}")
-        } else {
-            format!("{path}.{field}")
-        };
-        match walk(ty, locals, child, seen) {
-            Storage::Resizable { path, ty } => return Storage::Resizable { path, ty },
-            // Keep looking: a resizable field elsewhere in the same type is the
-            // stronger answer and should win over an unresolved one.
-            Storage::Unknown { path, ty } => unknown.get_or_insert(Storage::Unknown { path, ty }),
-            Storage::Fixed => continue,
-        };
+            ty: render(p),
+        }
     }
-    seen.remove(name);
-    unknown.unwrap_or(Storage::Fixed)
+
+    fn resolve_local(
+        &self,
+        name: &str,
+        path: String,
+        bindings: &Bindings,
+        seen: &mut HashSet<String>,
+    ) -> Storage {
+        // A type that reaches itself is a cycle behind a pointer, and the
+        // pointer was resolved on the way in, so stopping here loses nothing.
+        if !seen.insert(name.to_string()) {
+            return Storage::Fixed;
+        }
+        let Some(def) = self.types.get(name) else {
+            return Storage::Unknown {
+                path,
+                ty: name.to_string(),
+            };
+        };
+
+        let mut unknown = None;
+        for (field, ty) in &def.fields {
+            let child = if path.is_empty() {
+                format!("{name}.{field}")
+            } else {
+                format!("{path}.{field}")
+            };
+            match self.walk(ty, child, bindings, seen) {
+                Storage::Resizable { path, ty } => return Storage::Resizable { path, ty },
+                // Keep looking: a resizable field elsewhere in the same type is
+                // the stronger answer and should win over an unresolved one.
+                Storage::Unknown { path, ty } => {
+                    if unknown.is_none() {
+                        unknown = Some(Storage::Unknown { path, ty });
+                    }
+                }
+                Storage::Fixed => {}
+            }
+        }
+        seen.remove(name);
+        unknown.unwrap_or(Storage::Fixed)
+    }
 }
 
 fn first_type_arg(seg: &syn::PathSegment) -> Option<&syn::Type> {
+    type_args_ref(seg).into_iter().next()
+}
+
+fn type_args(seg: &syn::PathSegment) -> Vec<syn::Type> {
+    type_args_ref(seg).into_iter().cloned().collect()
+}
+
+fn type_args_ref(seg: &syn::PathSegment) -> Vec<&syn::Type> {
     let syn::PathArguments::AngleBracketed(args) = &seg.arguments else {
-        return None;
+        return Vec::new();
     };
-    args.args.iter().find_map(|a| match a {
-        syn::GenericArgument::Type(t) => Some(t),
-        _ => None,
-    })
+    args.args
+        .iter()
+        .filter_map(|a| match a {
+            syn::GenericArgument::Type(t) => Some(t),
+            _ => None,
+        })
+        .collect()
 }
 
 pub fn render<T: ToTokens>(t: &T) -> String {

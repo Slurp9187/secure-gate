@@ -33,6 +33,15 @@
 //!   so a single shared list of "capacity-changing calls" would flag the
 //!   mitigation as the weakness.
 //!
+//! # Naming the buffer
+//!
+//! An independent adversarial pass found field access to be the shape most
+//! often missed, and it is the most idiomatic one in the language: for a
+//! `Dynamic<Session>`, the growth is `s.token.push(b)` and the buffer is never
+//! named on its own. So the scan tracks *access paths* rather than bindings --
+//! `s`, `s.token`, `alias` after a `let` -- which also keeps `s.token.reserve_exact`
+//! from excusing a growth of `s.other`.
+//!
 //! # What it does not see
 //!
 //! A closure that hands its `&mut Vec<u8>` to a helper function. The growth then
@@ -186,14 +195,14 @@ impl SiteVisitor<'_> {
 
         let mut scan = ClosureScan {
             aliases: HashSet::from([target.clone()]),
-            presized: false,
+            presized: HashSet::new(),
             growth: Vec::new(),
             escaped: None,
             loop_depth: 0,
         };
         scan.visit_expr(&closure.body);
 
-        if let Some(escape) = scan.escaped.as_deref().filter(|_| !scan.presized) {
+        if let Some(escape) = scan.escaped.as_deref().filter(|_| scan.presized.is_empty()) {
             return Some(vec![
                 Finding::new(
                     RULE,
@@ -216,27 +225,29 @@ impl SiteVisitor<'_> {
 
         let message = if severity == Severity::Error {
             format!(
-                "`{receiver}::new_with` grows `{target}` repeatedly without sizing it (`{}`); the \
+                "`{receiver}::new_with` grows `{}` repeatedly without sizing it (`{}`); the \
                  closure starts with an empty buffer, so each growth past capacity can abandon \
                  one holding the secret",
-                growth.method
+                growth.path, growth.method
             )
         } else {
             format!(
-                "`{receiver}::new_with` fills `{target}` with `{}` without sizing it; whether that \
+                "`{receiver}::new_with` fills `{}` with `{}` without sizing it; whether that \
                  reallocates depends on the iterator's size hint, which this pass cannot see",
-                growth.method
+                growth.path, growth.method
             )
         };
 
         Some(vec![
-            Finding::new(RULE, Kind::Route, severity, self.file, growth.line, message)
-                .with_note(format!(
-                "add `{target}.reserve_exact(len)` as the first statement, or build the value and \
+            Finding::new(RULE, Kind::Route, severity, self.file, growth.line, message).with_note(
+                format!(
+                    "add `{}.reserve_exact(len)` as the first statement, or build the value and \
                  use `{receiver}::new`. Measured: 1016 secret bytes across 7 abandoned blocks for \
                  a 1008-byte secret, against 0 for either fix -- SECURITY.md, \"Heap-reallocation \
-                 residue\""
-            )),
+                 residue\"",
+                    growth.path
+                ),
+            ),
         ])
     }
 }
@@ -253,6 +264,8 @@ struct Growth {
     method: String,
     line: usize,
     shape: Shape,
+    /// The access path grown, e.g. `s.token`.
+    path: String,
     /// Inside a `for` / `while` / `loop`, so it runs an unknown number of times.
     repeated: bool,
 }
@@ -260,28 +273,38 @@ struct Growth {
 /// Walks the closure body in source order, so a `reserve_exact` counts only when
 /// it actually precedes the growth it is meant to cover.
 struct ClosureScan {
-    /// Every name that reaches the same buffer. `let alias = v;` is one
+    /// Every root name that reaches the buffer. `let alias = v;` is one
     /// statement and it used to defeat this check silently, which is the worst
     /// way to fail: a miss that reads exactly like a pass.
     aliases: HashSet<String>,
-    presized: bool,
+    /// Access paths already given their capacity, e.g. `v` or `s.token`. Keyed
+    /// by path so that sizing one field does not excuse growing another.
+    presized: HashSet<String>,
     growth: Vec<Growth>,
     escaped: Option<String>,
     loop_depth: usize,
 }
 
 impl ClosureScan {
-    /// Whether an expression names the buffer, under any of its names.
-    fn refers_to(&self, expr: &syn::Expr) -> bool {
-        base_ident(expr).is_some_and(|i| self.aliases.contains(&i))
+    /// The access path an expression names, if it reaches the buffer at all.
+    fn refers_to(&self, expr: &syn::Expr) -> Option<String> {
+        let path = access_path(expr)?;
+        let root = path.split('.').next()?;
+        self.aliases.contains(root).then_some(path)
     }
 
-    fn record(&mut self, method: String, line: usize, shape: Shape) {
+    fn record(&mut self, path: String, method: String, line: usize, shape: Shape) {
+        // Sizing has to precede the growth it covers, which the source-order
+        // traversal gives for free: a path reserved later is not in the set yet.
+        if self.presized.contains(&path) {
+            return;
+        }
         let repeated = self.loop_depth > 0;
         self.growth.push(Growth {
             method,
             line,
             shape,
+            path,
             repeated,
         });
     }
@@ -294,9 +317,6 @@ impl ClosureScan {
     /// welcome. What `SECURITY.md` measured at 1016 bytes across 7 blocks is a
     /// closure that "fills it byte by byte" -- growth that repeats.
     fn verdict(&self) -> Option<(&Growth, Severity)> {
-        if self.presized {
-            return None;
-        }
         if let Some(g) = self.growth.iter().find(|g| g.repeated) {
             return Some((g, Severity::Error));
         }
@@ -312,15 +332,15 @@ impl ClosureScan {
 
 impl<'ast> Visit<'ast> for ClosureScan {
     fn visit_expr_method_call(&mut self, node: &'ast syn::ExprMethodCall) {
-        if self.refers_to(&node.receiver) {
+        if let Some(path) = self.refers_to(&node.receiver) {
             let method = node.method.to_string();
             let line = line_of(&node.method);
             if PRESIZE.contains(&method.as_str()) {
-                self.presized = true;
+                self.presized.insert(path);
             } else if BULK.contains(&method.as_str()) {
-                self.record(method, line, Shape::Bulk);
+                self.record(path, method, line, Shape::Bulk);
             } else if INCREMENTAL.contains(&method.as_str()) {
-                self.record(method, line, Shape::Incremental);
+                self.record(path, method, line, Shape::Incremental);
             } else if ESCAPE.contains(&method.as_str()) && self.escaped.is_none() {
                 self.escaped = Some(method);
             }
@@ -331,17 +351,19 @@ impl<'ast> Visit<'ast> for ClosureScan {
     /// `*v = Vec::with_capacity(n)` and `*v = already_built` both replace the
     /// empty buffer wholesale rather than growing it, which abandons nothing.
     fn visit_expr_assign(&mut self, node: &'ast syn::ExprAssign) {
-        if self.refers_to(&node.left) {
-            self.presized = true;
+        if let Some(path) = self.refers_to(&node.left) {
+            self.presized.insert(path);
         }
         syn::visit::visit_expr_assign(self, node);
     }
 
     /// `*s += "..."` is `push_str` spelled as an operator.
     fn visit_expr_binary(&mut self, node: &'ast syn::ExprBinary) {
-        if matches!(node.op, syn::BinOp::AddAssign(_)) && self.refers_to(&node.left) {
-            let line = line_of(&node.left);
-            self.record("+=".to_string(), line, Shape::Bulk);
+        if matches!(node.op, syn::BinOp::AddAssign(_)) {
+            if let Some(path) = self.refers_to(&node.left) {
+                let line = line_of(&node.left);
+                self.record(path, "+=".to_string(), line, Shape::Bulk);
+            }
         }
         syn::visit::visit_expr_binary(self, node);
     }
@@ -357,9 +379,10 @@ impl<'ast> Visit<'ast> for ClosureScan {
         if is_write {
             if let Some(proc_macro2::TokenTree::Ident(id)) = node.tokens.clone().into_iter().next()
             {
-                if self.aliases.contains(&id.to_string()) {
+                let name = id.to_string();
+                if self.aliases.contains(&name) {
                     let line = id.span().start().line;
-                    self.record("write!".to_string(), line, Shape::Bulk);
+                    self.record(name, "write!".to_string(), line, Shape::Bulk);
                 }
             }
         }
@@ -391,9 +414,15 @@ impl<'ast> Visit<'ast> for ClosureScan {
     /// one line here and the difference between a miss and a silent miss.
     fn visit_local(&mut self, node: &'ast syn::Local) {
         if let Some(init) = &node.init {
-            if self.refers_to(&init.expr) {
+            if let Some(path) = self.refers_to(&init.expr) {
                 match pat_ident(&node.pat) {
                     Some(name) => {
+                        // A rebinding of an already-sized path inherits its
+                        // sizing; otherwise `v.reserve_exact(n); let a = v;`
+                        // would report the growth it already covered.
+                        if self.presized.contains(&path) {
+                            self.presized.insert(name.clone());
+                        }
                         self.aliases.insert(name);
                     }
                     // Destructured into a shape this pass does not model.
@@ -411,7 +440,7 @@ impl<'ast> Visit<'ast> for ClosureScan {
     /// A helper call that takes the buffer is growth this pass cannot see.
     fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
         for arg in &node.args {
-            if self.refers_to(arg) && self.escaped.is_none() {
+            if self.refers_to(arg).is_some() && self.escaped.is_none() {
                 self.escaped = Some(crate::storage::render(&*node.func));
             }
         }
@@ -432,15 +461,26 @@ fn pat_ident(pat: &syn::Pat) -> Option<String> {
     }
 }
 
-/// The binding an expression ultimately names, looking through the borrows and
-/// derefs that a `&mut` buffer collects at a call site.
-fn base_ident(expr: &syn::Expr) -> Option<String> {
+/// The access path an expression names -- `v`, `s.token`, `s.inner.0` --
+/// looking through the borrows and derefs a `&mut` buffer collects at a call
+/// site. Field access is what makes this a path rather than a name: for a
+/// `Dynamic<Session>` the growth is `s.token.push(b)` and the buffer itself is
+/// never named alone.
+fn access_path(expr: &syn::Expr) -> Option<String> {
     match expr {
         syn::Expr::Path(p) => p.path.get_ident().map(|i| i.to_string()),
-        syn::Expr::Unary(u) if matches!(u.op, syn::UnOp::Deref(_)) => base_ident(&u.expr),
-        syn::Expr::Reference(r) => base_ident(&r.expr),
-        syn::Expr::Paren(p) => base_ident(&p.expr),
-        syn::Expr::Group(g) => base_ident(&g.expr),
+        syn::Expr::Field(f) => {
+            let base = access_path(&f.base)?;
+            let member = match &f.member {
+                syn::Member::Named(id) => id.to_string(),
+                syn::Member::Unnamed(i) => i.index.to_string(),
+            };
+            Some(format!("{base}.{member}"))
+        }
+        syn::Expr::Unary(u) if matches!(u.op, syn::UnOp::Deref(_)) => access_path(&u.expr),
+        syn::Expr::Reference(r) => access_path(&r.expr),
+        syn::Expr::Paren(p) => access_path(&p.expr),
+        syn::Expr::Group(g) => access_path(&g.expr),
         _ => None,
     }
 }
