@@ -48,9 +48,11 @@
 //! [`Fixed`](crate::Fixed) itself rejects a zero-sized inner value at
 //! construction: `Fixed::new` and `Fixed::new_with` carry a `const`
 //! assertion, so a plain `type` alias and the `generic T` arm are covered too.
-//! [`dynamic_newtype!`] has no compile-time equivalent — a `Dynamic` is
-//! pointer-sized whatever it holds — so validate lengths that come from
-//! configuration in your own tests.
+//! [`dynamic_newtype!`] has no compile-time equivalent, because for `String` and
+//! `Vec<u8>` emptiness is a runtime property and an empty one is a legitimate
+//! value to hold before validation. The gap that leaves is a statically
+//! zero-sized inner type: `Dynamic<Zst>` constructs where `Fixed<Zst>` is now
+//! rejected. Validate lengths that come from configuration in your own tests.
 //!
 //! Newtypes generate no `From<Wrapper>` and no `Deref`, so a base-typed value
 //! (any plain `type` alias included) cannot become a newtype through `.into()`

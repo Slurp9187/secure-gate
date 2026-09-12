@@ -207,8 +207,11 @@ fn drain_bech32_payload<const N: usize>(
 /// choice — a condition on a generic parameter has nothing to evaluate until that parameter
 /// is known, and nothing on stable Rust moves it earlier.
 ///
-/// [`Dynamic`](crate::Dynamic) has no compile-time counterpart: whether a `Vec` or
-/// `String` is empty is a runtime fact.
+/// [`Dynamic`](crate::Dynamic) has no compile-time counterpart, for a reason about its
+/// payload rather than its own size: whether a `Vec` or `String` is empty is a runtime
+/// property, so there is nothing for a compile-time check to decide. A statically
+/// zero-sized inner type is the gap that leaves — `Dynamic<Zst>` constructs where
+/// `Fixed<Zst>` does not.
 ///
 /// # RustCrypto integration
 ///

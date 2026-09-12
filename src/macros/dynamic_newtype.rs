@@ -112,9 +112,15 @@
 /// The generated type is `#[repr(transparent)]` over the wrapper and delegates
 /// through `#[inline]` methods, so it costs nothing at runtime.
 ///
-/// Unlike [`Fixed`](crate::Fixed), there is **no compile-time zero-size
-/// check** here: a `Dynamic` is pointer-sized whatever it holds, so validate
-/// expected lengths in your own tests.
+/// Unlike [`Fixed`](crate::Fixed), there is **no compile-time zero-size check**
+/// here, and the reason is about the payload rather than the wrapper. For
+/// `String` and `Vec<u8>` emptiness is a runtime property — an empty one is a
+/// legitimate value to hold before validation — so there is nothing for a
+/// compile-time check to decide. That leaves one real gap: a statically
+/// zero-sized inner type. `Dynamic<Zst>` for a zero-sized `Zst` constructs
+/// happily, where `Fixed<Zst>` is now rejected. Validate expected lengths in
+/// your own tests, and do not reach for a zero-sized inner type expecting to be
+/// stopped.
 ///
 /// **Do not add your own `Drop` impl.** None is needed: the wrapped
 /// [`Dynamic`](crate::Dynamic) still runs its own, so zeroization is
@@ -181,8 +187,10 @@
 ///
 /// - [`fixed_newtype!`](crate::fixed_newtype) — stack-allocated counterpart,
 ///   and the reference for the `derive:` rules
-/// - [the crate root docs](crate) — the macros module section on when a
-///   plain `type` alias is the right reach instead of a newtype
+/// - a plain `type` alias — `pub type Password = Dynamic<String>;` — when a
+///   readable name is all that is wanted and interchangeability with the base
+///   type is a feature rather than a risk; the crate's README argues when that
+///   is the right reach
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! dynamic_newtype {
