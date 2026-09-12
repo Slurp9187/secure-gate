@@ -15,6 +15,20 @@
 //! hole, it is the hole a reader can check by eye, and checking it by eye does
 //! not scale past a few types. This is that check, mechanised.
 //!
+//! # The predicate is heap ownership, not resizability
+//!
+//! `fe64ef8` changed what the marker asserts. It originally asked for a fixed
+//! capacity, which blessed `Box<[T]>` -- a boxed slice cannot grow. Measured, a
+//! `Fixed<Box<[u8]>>` holding a 1024-byte secret and assigned through
+//! `with_secret_mut(|slot| *slot = other)` released the original block with
+//! 1024 of 1024 bytes intact. Replacing the whole value abandons the allocation
+//! without any capacity change at all, and the wrapper wipes what it holds at
+//! drop rather than what it used to hold.
+//!
+//! So this check asks [`Storage::owns_heap`], not whether capacity can change.
+//! Asking the other question is how an earlier version of this pass reported
+//! `struct K { buf: Box<[u8]> }` as honest while `Fixed::new` refused it.
+//!
 //! The severity is `error` because the impl is a claim about the type, the
 //! fields are the evidence, and they disagree. Nothing about intent enters into
 //! it: `Fixed<T>` is documented as having no reallocation surface, and an impl
@@ -37,52 +51,58 @@ pub fn check(index: &Index) -> Vec<Finding> {
             continue;
         }
 
-        match index.resolver.classify_named(&site.type_name, &site.args) {
-            Storage::Resizable { path, ty } => {
-                findings.push(
-                    Finding::new(
-                        RULE,
-                        Kind::Assertion,
-                        Severity::Error,
-                        &site.file,
-                        site.line,
-                        format!(
-                            "`{}` implements FixedStorage, but owns a resizable buffer at `{}: {}`",
-                            site.type_name, path, ty
-                        ),
-                    )
-                    .with_note(
-                        "FixedStorage asserts that no buffer the type owns can change capacity. \
-                         Any capacity change abandons a buffer holding the secret, and \
-                         `Fixed` has no `io::Write` growth path to wipe it -- \
-                         SECURITY.md, \"Heap-reallocation residue\". Hold the resizable part in \
-                         a `Dynamic` and pre-size it, or store it as `Box<[T]>`, whose length is \
-                         fixed at construction",
+        let found = index.resolver.classify_named(&site.type_name, &site.args);
+
+        if let Some((path, ty)) = found.owns_heap() {
+            // Naming which of the two it is matters to the fix: a resizable
+            // buffer can be pre-sized inside a `Dynamic`; an unresizable heap
+            // allocation is simply not a thing `Fixed` can hold at all.
+            let how = if found.capacity_can_change() {
+                "a resizable buffer"
+            } else {
+                "a heap allocation"
+            };
+            findings.push(
+                Finding::new(
+                    RULE,
+                    Kind::Assertion,
+                    Severity::Error,
+                    &site.file,
+                    site.line,
+                    format!(
+                        "`{}` implements FixedStorage, but owns {how} at `{path}: {ty}`",
+                        site.type_name
                     ),
-                );
-            }
-            Storage::Unknown { path, ty } => {
-                findings.push(
-                    Finding::new(
-                        RULE,
-                        Kind::Assertion,
-                        Severity::Unresolved,
-                        &site.file,
-                        site.line,
-                        format!(
-                            "`{}` implements FixedStorage; the type at `{}: {}` is not defined \
-                             in the scanned files, so the assertion was not checked",
-                            site.type_name, path, ty
-                        ),
-                    )
-                    .with_note(
-                        "the assertion may well be correct; this is a report that it was not \
-                         checked, not that it failed. Scan the crate defining that type, or \
-                         review the impl by hand",
+                )
+                .with_note(
+                    "FixedStorage asserts that the type owns no heap allocation. An allocation \
+                     can be abandoned unwiped either by a reallocation or by replacing the whole \
+                     value -- measured at 1024 of 1024 bytes for a `Box<[u8]>` assigned through \
+                     `with_secret_mut`, which is why the marker stopped accepting boxed slices \
+                     in fe64ef8. Use `Dynamic<T>` for a heap-backed secret, or \
+                     `Dynamic<[u8; N]>` for a heap-only secret of fixed size",
+                ),
+            );
+        } else if let Storage::Unknown { path, ty } = &found {
+            findings.push(
+                Finding::new(
+                    RULE,
+                    Kind::Assertion,
+                    Severity::Unresolved,
+                    &site.file,
+                    site.line,
+                    format!(
+                        "`{}` implements FixedStorage; the type at `{path}: {ty}` is not defined \
+                         in the scanned files, so the assertion was not checked",
+                        site.type_name
                     ),
-                );
-            }
-            Storage::Fixed => {}
+                )
+                .with_note(
+                    "the assertion may well be correct; this is a report that it was not \
+                     checked, not that it failed. Scan the crate defining that type, or review \
+                     the impl by hand",
+                ),
+            );
         }
     }
 

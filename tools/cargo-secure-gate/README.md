@@ -23,6 +23,15 @@ a gap a reader can check by eye on one type but not across a codebase.
 
 ### SG001 — a `FixedStorage` assertion contradicted by the type's own fields
 
+The predicate is **heap ownership**, not resizability. `fe64ef8` changed that:
+the marker originally asked for a fixed capacity and so blessed `Box<[T]>`,
+since a boxed slice cannot grow. Measured, a `Fixed<Box<[u8]>>` holding a
+1024-byte secret and assigned through `with_secret_mut(|slot| *slot = other)`
+released the original block with **1024 of 1024** bytes intact — replacing the
+whole value abandons the allocation with no capacity change at all, and the
+wrapper wipes what it holds at drop rather than what it used to hold. The inline
+contrast, `Fixed<[u8; 1024]>`, frees nothing: there is no allocation to abandon.
+
 `src/traits/fixed_storage.rs` states the limit itself:
 
 > Like `CloneableSecret`, the compiler checks that you wrote the impl, not that
@@ -35,11 +44,11 @@ That is the right trade — a closed set would be worse. SG001 reads the fields
 and says whether they agree with the impl, resolving local types transitively,
 through arrays, tuples, `Option`, `Box` and enum variants.
 
-Running it over this repository at `519e87b` finds one: `CloneKey(Vec<u8>)` in
-`tests/core_tests.rs:278`, which asserts `FixedStorage` and owns a `Vec`. It is
-test-only code and nothing ships from it, but it is exactly the documented shape,
-and it entered in `ed099f9` — the commit that introduced the bound — as one of
-ten impls added so the suite kept compiling. Nine of the ten are sound.
+Run over this repository at `519e87b` it found one: `CloneKey(Vec<u8>)` in
+`tests/core_tests.rs`, asserting `FixedStorage` while owning a `Vec`. It entered
+in `ed099f9` — the commit that introduced the bound — as one of ten impls added
+so the suite kept compiling, and `74c1838` has since removed it. At the current
+head the repository is clean on both rules.
 
 ### SG002 — a `Dynamic::new_with` closure that fills a buffer it never sized
 
@@ -80,6 +89,23 @@ repository's own tests that were not there. What was measured is a closure that
 fills *byte by byte*. So: growth inside a loop, or two growth calls in sequence,
 is an error; a lone iterator-driven `extend`, whose reallocation count lives in a
 size hint this pass cannot read, is a warning; a lone bulk fill is clean.
+
+## Two checks, two predicates
+
+They are not the same question, and sharing one answer between them is what let
+an earlier version of this pass report `struct K { buf: Box<[u8]> }` as honest
+while `Fixed::new` refused it outright:
+
+| Check | Asks | `Vec<u8>` | `Box<[u8]>` | `[u8; 32]` |
+| --- | --- | --- | --- | --- |
+| SG001, the assertion | does it own a heap allocation? | yes | **yes** | no |
+| SG002, the routes | can a buffer it owns change capacity? | yes | **no** | no |
+
+`Box<[u8]>` is the row that separates them, and getting it wrong was a false
+negative in the one check whose entire value is catching an assertion the
+compiler cannot. `Storage::owns_heap` and `Storage::capacity_can_change` are now
+distinct, so the next type to be added lands in one list without silently
+joining the other.
 
 ## Two kinds of claim, two sections
 
@@ -134,6 +160,7 @@ them clean and two of them real misses now fixed:
 | `struct Gen<T>(T); impl FixedStorage for Gen<Vec<u8>>` | **was unresolved, now an error** — the impl site supplies the argument |
 | `let alias = v;` then `alias.push(..)` | **was a silent miss, now flagged** |
 | `s.token.push(b)` on a `Dynamic<Session>` | **was a silent miss, now flagged** |
+| `struct K { buf: Box<[u8]> }` + `impl FixedStorage for K {}` | **was reported honest, now an error** — see the predicate table above |
 
 The last two were the ones that mattered. Field access is the most idiomatic
 shape in the language and it matched nothing, which is why the scan now tracks
