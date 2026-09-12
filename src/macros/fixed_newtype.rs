@@ -23,7 +23,9 @@
 /// fixed_newtype!(pub Name, N, derive: [ConstantTimeEq]); // with opt-in impls
 /// fixed_newtype!(pub Name, N, "doc", derive: [ConstantTimeEq]);
 /// fixed_newtype!(pub Name, generic T);                  // reduced API, opted into
+/// fixed_newtype!(pub Name, generic T, "doc string");
 /// fixed_newtype!(pub Name, generic T, derive: [ConstantTimeEq]);
+/// fixed_newtype!(pub Name, generic T, "doc", derive: [ConstantTimeEq]);
 /// ```
 ///
 /// Supported `derive:` options are `ConstantTimeEq`, `Deserialize`, `FromWrapper`, `IntoWrapper`, and `WrapperAccess` (= both directions). See
@@ -70,8 +72,14 @@
 /// # Inner types other than bytes
 ///
 /// The size-literal forms cover `Fixed<[u8; N]>`, the shape nearly every
-/// secret takes. [`Fixed<T>`](crate::Fixed) is generic over any `Zeroize`
-/// type, though, and the `generic` marker opts a newtype into that:
+/// secret takes. [`Fixed<T>`](crate::Fixed) holds more than that, and the
+/// `generic` marker opts a newtype into it. The requirement is
+/// `Zeroize + `[`SentinelValue`](crate::SentinelValue), checked at the
+/// declaration — slightly narrower than `Fixed<T>` itself, which needs only
+/// `Zeroize`, because the generated [`into_inner`](crate::RevealSecret::into_inner)
+/// has to leave an inert value behind. Arrays of a `Default` element, `String`
+/// and `Vec<T>` already satisfy both; a custom inner type needs its own
+/// `impl SentinelValue`, which is why that trait is public:
 ///
 /// ```rust
 /// use secure_gate::{fixed_newtype, RevealSecret};
@@ -86,8 +94,11 @@
 /// [`Dynamic`](crate::Dynamic), so `Fixed` is the only wrapper, and a secret on
 /// such a target is frequently not bytes: an ML-KEM secret polynomial
 /// `[i16; 256]`, Ed25519 scalar limbs `[u64; 4]`, AES-256 expanded round keys
-/// `[u32; 60]`. An inner type that does not implement `Zeroize` is a compile
-/// error reported from the expansion, where `Fixed<T>`'s own bound fails.
+/// `[u32; 60]`. An inner type missing either bound is a compile error reported
+/// from the expansion: `Zeroize` fails against `Fixed<T>`'s own bound, and
+/// `SentinelValue` against the one the generated `RevealSecret` restates.
+/// [`dynamic_newtype!`](crate::dynamic_newtype)'s `generic` arm carries the
+/// same pair, for the same reason.
 ///
 /// The `generic` form deliberately provides less: [`RevealSecret`](crate::RevealSecret),
 /// [`RevealSecretMut`](crate::RevealSecretMut), redacted `Debug`, `Zeroize`,
@@ -221,14 +232,14 @@ macro_rules! fixed_newtype {
     // position, so they cannot shadow a size literal, and matching the marker
     // before any `:literal` or `:ty` fragment is parsed keeps the ordering
     // safe: `macro_rules!` does not backtrack once a fragment has been
-    // consumed. A custom doc comes through `$(#[$attr:meta])*` as ordinary
-    // attributes, as it does for the `generic` arm of `dynamic_newtype!`.
-    ($(#[$attr:meta])* $vis:vis $name:ident, generic $inner:ty) => {
-        $crate::fixed_newtype!($(#[$attr])* $vis $name, generic $inner, derive: []);
-    };
-    ($(#[$attr:meta])* $vis:vis $name:ident, generic $inner:ty, derive: [$($opt:ident),* $(,)?]) => {
+    // consumed. The doc-literal forms get their own arms, exactly as
+    // `dynamic_newtype!`'s generic form does, so that the third positional
+    // argument means the same thing on both macros and on every arm of each.
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic $inner:ty
+     $(, $doc:literal)? $(, derive: [$($opt:ident),* $(,)?])?) => {
         $crate::__sg_newtype_base!(
-            $(#[$attr])* $vis $name($crate::Fixed<$inner>), derive: [$($opt),*]
+            $(#[$attr])* $(#[doc = $doc])* $vis $name($crate::Fixed<$inner>),
+            derive: [$($($opt),*)?]
         );
 
         impl $name {
@@ -474,15 +485,18 @@ macro_rules! fixed_newtype {
     // hard-error on a malformed tail; the message names what was written.
     ($(#[$attr:meta])* $vis:vis $name:ident, $($rest:tt)+) => {
         ::core::compile_error!(::core::concat!(
-            "fixed_newtype!: `",
+            "fixed_newtype!: no form matches `",
             ::core::stringify!($($rest)+),
-            "` is neither a byte-size literal nor the `generic` marker. The \
-             shaped forms take the length of the `[u8; N]` array being wrapped, \
-             so write `fixed_newtype!(pub K, 32)` for a 32-byte secret. For any \
-             other inner type, write `generic <type>` — \
-             `fixed_newtype!(pub K, generic [i16; 256])` — to accept the reduced \
+            "`. The accepted forms are `N`, `N, \"doc\"`, `N, derive: [..]` and \
+             `N, \"doc\", derive: [..]`, where N is the length of the `[u8; N]` \
+             array being wrapped; and the same four with `generic <type>` in place \
+             of N, for an inner type that is not a byte array \
+             (`fixed_newtype!(pub K, generic [i16; 256])`), which takes the reduced \
              API (RevealSecret, RevealSecretMut, Debug, Zeroize, and `new`) on \
-             purpose."
+             purpose. If the length or the marker looks right, the problem is in \
+             what follows it: a `derive:` list needs brackets, and accepts only \
+             ConstantTimeEq, Deserialize, FromWrapper, IntoWrapper and \
+             WrapperAccess."
         ));
     };
 }
