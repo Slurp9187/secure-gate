@@ -15,14 +15,22 @@
 //!
 //! # The contract
 //!
-//! Implementing `FixedStorage` for a type asserts that **the type owns no buffer whose
-//! capacity can change**. Nothing else. It says nothing about where the bytes live: a
-//! `[u8; 32]` on the stack and a `Box<[u8]>` on the heap both satisfy it, because neither
-//! can grow or shrink. `Vec<T>` and `String` do not, because both reallocate, and a
-//! reallocation abandons a buffer this crate cannot wipe.
+//! Implementing `FixedStorage` for a type asserts that **the type owns no heap
+//! allocation**. Nothing else, and note that this is stricter than "cannot be resized".
 //!
-//! The test to apply to your own type: *can any safe operation on `&mut Self` cause an
-//! allocation to be freed?* If yes, do not implement this.
+//! The first version of this trait asked only for a fixed capacity, and blessed `Box<[T]>`
+//! on the reasoning that a boxed slice has its length fixed at construction. That was
+//! wrong, and measurably so: the residue never needed a capacity change. Whole-value
+//! replacement abandons the allocation just as well, and the wrapper wipes whatever it
+//! holds at drop, not what it used to hold. On a `Fixed<Box<[u8]>>` carrying a 1024-byte
+//! secret, `with_secret_mut(|slot| *slot = other_boxed_slice)` released the original block
+//! with **1024 of 1024** bytes intact, and so did the same assignment through
+//! `expose_secret_mut`. The inline contrast, `Fixed<[u8; 1024]>` assigned the same way,
+//! freed nothing at all — there is no allocation to abandon. So `Box<[T]>` is no longer
+//! implemented, and the predicate is heap ownership rather than resizability.
+//!
+//! The test to apply to your own type: *does `Self` own a heap allocation?* If yes, do not
+//! implement this — reach for [`Dynamic`](crate::Dynamic), which documents the residue.
 //!
 //! # This is an assertion, not an enforcement
 //!
@@ -43,10 +51,12 @@
 //! - `[T; N]` for any `N`, when `T: FixedStorage` — which covers `[u8; 32]` and the
 //!   non-byte arrays the `generic` arm exists for, such as `[i16; 256]`;
 //! - tuples up to four elements of `FixedStorage` types;
-//! - `Option<T>` when `T: FixedStorage` — a discriminant adds no resizable storage;
-//! - `Box<[T]>` when `T: FixedStorage`, with `alloc` — a boxed slice has a length fixed at
-//!   construction and cannot grow. Note that `Box<[u8; N]>` never arises: `zeroize` does not
-//!   implement `Zeroize` for a `Box` of a sized type, so `Fixed` rejects it already.
+//! - `Option<T>` when `T: FixedStorage` — a discriminant adds no heap storage.
+//!
+//! Nothing heap-owning is implemented, deliberately. `Box<[T]>` was and is not: see the
+//! contract above for the measurement that removed it. `Box<[u8; N]>` never arises anyway,
+//! because `zeroize` does not implement `Zeroize` for a `Box` of a sized type. For a
+//! heap-only secret of fixed size, the supported shape is `Dynamic<[u8; N]>`.
 //!
 //! A custom inner type needs one line:
 //!
@@ -138,14 +148,7 @@ __sg_fixed_storage_tuples! {
     (A, B, C, D);
 }
 
-/// A boxed slice has a length fixed at construction and no way to grow, so it qualifies
-/// when its element type does. `Box<[u8]>` is the shape this covers; `Box<Vec<u8>>` does
-/// not qualify and cannot arise anyway, and neither can `Box<[u8; N]>` — `zeroize` does not
-/// implement `Zeroize` for a `Box` of a sized type, so `Fixed` never accepts one.
-#[cfg(feature = "alloc")]
-impl<T: FixedStorage> FixedStorage for alloc::boxed::Box<[T]> {}
-
-/// An `Option` adds a discriminant and no storage that can be resized, so it qualifies
-/// exactly when its payload does. `Option<[u8; 32]>` is a legitimate fixed-size secret;
-/// `Option<Vec<u8>>` is rejected, which is the point.
+/// An `Option` adds a discriminant and no heap storage, so it qualifies exactly when its
+/// payload does. `Option<[u8; 32]>` is a legitimate fixed-size secret; `Option<Vec<u8>>`
+/// and `Option<Box<[u8]>>` are both rejected, which is the point.
 impl<T: FixedStorage> FixedStorage for Option<T> {}

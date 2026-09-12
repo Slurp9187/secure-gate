@@ -25,4 +25,13 @@ fn main() {
     let _ = Fixed::new([vec![1u8], vec![2u8]]);
     let _ = Fixed::new(Some(vec![1u8]));
     let _ = Fixed::new(([0u8; 32], vec![1u8]));
+
+    // A boxed slice cannot be resized, which is why the first version of `FixedStorage`
+    // accepted it. It still owns a heap allocation, and replacing the whole value abandons
+    // that allocation unwiped — measured at 1024 of 1024 bytes surviving. The predicate is
+    // heap ownership, not resizability, so all three of these are refused.
+    let boxed: Box<[u8]> = vec![1u8, 2, 3].into_boxed_slice();
+    let _ = Fixed::new(boxed);
+    let _ = Fixed::new(Some(vec![1u8].into_boxed_slice()));
+    let _ = Fixed::new([vec![1u8].into_boxed_slice(), vec![2u8].into_boxed_slice()]);
 }
