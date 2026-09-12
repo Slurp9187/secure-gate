@@ -188,14 +188,24 @@ fn drain_bech32_payload<const N: usize>(
 /// compiles.
 ///
 /// The diagnostic names the offending type in the failing constant's path — for example
-/// `Fixed::<[u8; 0]>::NON_ZERO_SIZED` — and a `while instantiating` note points at the
-/// construction that reached it.
+/// `Fixed::<[u8; 0]>::NON_ZERO_SIZED` — and a `while instantiating` note repeats the span of
+/// the `new` call the monomorphization reached. It does not name the instantiation that
+/// caused it: for a generic `fn build<const N: usize>()`, calling `build::<0>()` reports
+/// against the `Fixed::new` line inside `build`, and the `::<0>` call site appears nowhere.
 ///
-/// **It is raised during codegen, so `cargo check` does not report it.** A post-
-/// monomorphization error cannot be raised earlier: a check on a generic parameter has
-/// nothing to evaluate until that parameter is known. `cargo build`, `cargo test` and any
-/// release build do report it, so a zero-sized secret cannot ship — but an editor driven
-/// by `cargo check` will stay quiet about one.
+/// **Two limits on when it fires, both measured.** It is raised during codegen, so
+/// `cargo check` does not report it. And it only fires for a *codegen root*: a non-generic
+/// `#[inline]` function in a library is not one, and every method the newtype macros
+/// generate is `#[inline(always)]`, so a library whose only zero-sized constructions sit
+/// behind `#[inline]` or generic code builds, tests and publishes clean — the error then
+/// surfaces in each downstream crate that instantiates it, blaming this crate and the
+/// dependency's macro invocation rather than the consumer's call.
+///
+/// Stated precisely: no *value* of a zero-sized `Fixed` can exist at runtime, because
+/// nothing can construct one, and a binary or test that tries fails to compile. The guard
+/// does not stop a library from exporting an unusable zero-sized API. Neither limit is a
+/// choice — a condition on a generic parameter has nothing to evaluate until that parameter
+/// is known, and nothing on stable Rust moves it earlier.
 ///
 /// [`Dynamic`](crate::Dynamic) has no compile-time counterpart: whether a `Vec` or
 /// `String` is empty is a runtime fact.
