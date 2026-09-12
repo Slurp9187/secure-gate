@@ -19,10 +19,13 @@ use secure_gate::{Dynamic, Fixed, SerializableSecret};
 #[cfg(feature = "serde-serialize")]
 #[derive(serde::Serialize, zeroize::Zeroize)]
 struct SerializableArray32([u8; 32]);
-impl secure_gate::FixedStorage for SerializableArray32 {}
 
 #[cfg(feature = "serde-serialize")]
 impl SerializableSecret for SerializableArray32 {}
+
+// Required by `Fixed::new`: asserts this type owns no buffer that can be reallocated.
+#[cfg(feature = "serde-serialize")]
+impl secure_gate::FixedStorage for SerializableArray32 {}
 
 #[cfg(feature = "serde-serialize")]
 #[derive(serde::Serialize, zeroize::Zeroize)]
