@@ -220,6 +220,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   also widened to name the two routes it omitted: `as_wrapper_mut` on a newtype declared with
   `derive: [IntoWrapper]` or `[WrapperAccess]`, and the `new_with` closure itself.
 
+  **Two more, from an adversarial pass over the safe-growth advice itself.** The
+  `std::io::Write` path this section offers as the one place the crate owns the growth needs
+  the `std` feature, and `full` does **not** enable `std` — so a consumer building with
+  `--features full`, which is what the documentation suggests everywhere else, does not have
+  that impl at all and has no safe growth path. Said plainly now. And it is the impl *on the
+  wrapper* that is safe, not `Write` in general: `d.expose_secret_mut().write_all(b"…")`
+  resolves to the standard library's `impl Write for Vec<u8>`, which grows by
+  `extend_from_slice` and abandons the old buffer unwiped. Measured on a 1000-byte secret,
+  the wrapper's own `write_all` leaves 0 surviving bytes and the reached-through form leaves
+  1000. Two lines that look alike and behave oppositely, so the difference is now documented
+  rather than implied.
+
+- **`CloneableSecret`'s docs record a rustc suggestion that would delete the gate.** Calling
+  `.clone()` on a *reference* to a wrapper whose inner type lacks the marker, with no target
+  annotation, resolves to `<&T as Clone>::clone`. It compiles, and the only diagnostic is the
+  warn-by-default `noop_method_call`, whose `help:` proposes adding `#[derive(Clone)]` to
+  `Dynamic` — that is, proposes removing the opt-in this crate exists to enforce. Nothing is
+  duplicated, so no secret escapes; the call does nothing at all. It is documented because a
+  reader who follows rustc's advice dismantles the gate, and because the real error is only
+  one receiver away: an owned value, or an annotated target, still reports the unsatisfied
+  `CloneableSecret` bound.
+
   **A fifth correction, to the escape route rather than the weakness.** `SECURITY.md` said a
   custom-allocator-parameterized `Dynamic<T, A>` "currently requires nightly Rust
   (`allocator_api`)". Nightly is needed only for the standard library's own `Vec<T, A>`; the
