@@ -27,7 +27,7 @@
 //! `dynamic_alias!`, `fixed_generic_alias!` and `dynamic_generic_alias!`
 //! macros that expanded to exactly that one `type` line; they were removed in
 //! this release, and
-//! [CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/main/CHANGELOG.md)
+//! [CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/CHANGELOG.md)
 //! carries the reasoning and a migration table.
 //!
 //! | Written as                     | Generates                     | Nominal? | Feature |
