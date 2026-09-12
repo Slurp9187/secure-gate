@@ -222,8 +222,9 @@
 /// - [`dynamic_newtype!`](crate::dynamic_newtype) — heap-allocated counterpart
 /// - a plain `type` alias — `pub type Aes256Key = Fixed<[u8; 32]>;` — when a
 ///   readable name rather than role separation is the goal, and the name should
-///   stay interchangeable with its base; the `macros` module documentation
-///   weighs the two choices against each other
+///   stay interchangeable with its base. Two aliases over one shape are the
+///   same type, so the compiler will not keep two roles apart; that is the
+///   whole of the choice, and the crate's README argues it at length
 #[macro_export]
 macro_rules! fixed_newtype {
     // ---- explicit generic arms: caller opts in to the reduced API ----

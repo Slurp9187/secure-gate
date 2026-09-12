@@ -494,7 +494,7 @@ this branch, verified by tests unless noted:
 | R3 | No `Deref` to the base | ✅ never generated; now pinned by `newtype_no_deref.rs` |
 | R4 | Preserve zeroize, `[REDACTED]` `Debug`, no `Display`, 3-tier access | ✅ struct holds the wrapper (its `Drop` runs); no `Display` is generated; `RevealSecret`/`RevealSecretMut` forwarded; `asm_dse_check` proves byte-identical codegen |
 | R5 | Opt-in `Serialize` per newtype, not per base | ✅ by §5.1 (c): hand-write `impl Serialize for PublicId` routing through `with_secret`. Siblings and the base gain nothing — `newtype_sibling_not_serializable.rs` |
-| R6 | Coexist with plain `type` aliases in one file | ✅ `newtype_conversion.rs` mixes a `type` alias with four newtypes; R2 is what makes the mix safe. (Stated as "alias macros" when written; those are gone, and a `type` alias is what they expanded to, so the requirement is unchanged) |
+| R6 | Coexist with plain `type` aliases in one file | ✅ `newtype_conversion.rs` mixes a `type` alias with five newtypes; R2 is what makes the mix safe. (Stated as "alias macros" when written; those are gone, and a `type` alias is what they expanded to, so the requirement is unchanged) |
 | R7 | Match the hand-written shape: `new(impl Into<String>)`, private field, `RevealSecret`, `[REDACTED]` | ✅ **Was mismatched** — `new` took `Into<Box<String>>`, so `new("literal")` failed. Shaped arms now take `impl Into<String>` / `impl Into<Vec<u8>>`. Note the hand-written `RevealSecret` impl in the requirements includes `len()`, which moved to `SecretLen` in #156 — adopting the macro absorbs that |
 
 Answers to Q1–Q7:

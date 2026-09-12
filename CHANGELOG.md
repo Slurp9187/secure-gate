@@ -93,9 +93,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps its own declaration-site guard, which does fire under `cargo check`, because at that
   point the size is a literal.
 
-  `Dynamic` gets no equivalent and wants none: a `Dynamic` is pointer-sized whatever it
-  holds, and whether a `Vec` or `String` is empty is a runtime fact. An empty
-  `Dynamic<String>` is a legitimate value to hold before validation.
+  `Dynamic` gets no equivalent, and the reason is about the payload rather than the
+  wrapper: for `String` and `Vec<u8>` emptiness is a runtime property, and an empty
+  `Dynamic<String>` is a legitimate value to hold before validation, so there is nothing
+  for a compile-time check to decide. That does leave one honest gap rather than a
+  non-problem: a *statically* zero-sized inner type. `Dynamic<Zst>` constructs where
+  `Fixed<Zst>` is now rejected. Guarding it would mean a separate `Sized`-only
+  constructor path, since `Dynamic<T: ?Sized>` cannot ask for `size_of::<T>()`, so it is
+  left as a documented asymmetry rather than smuggled into this change.
 
   **Migration:** nothing, unless a `Fixed<[u8; 0]>` was being constructed on purpose. Tests
   that used it as a vehicle for an empty-input decoder case move to the `Vec<u8>` decoders,
