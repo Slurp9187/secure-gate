@@ -160,6 +160,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   also widened to name the two routes it omitted: `as_wrapper_mut` on a newtype declared with
   `derive: [IntoWrapper]` or `[WrapperAccess]`, and the `new_with` closure itself.
 
+  **A fifth correction, to the escape route rather than the weakness.** `SECURITY.md` said a
+  custom-allocator-parameterized `Dynamic<T, A>` "currently requires nightly Rust
+  (`allocator_api`)". Nightly is needed only for the standard library's own `Vec<T, A>`; the
+  `allocator-api2` shim ships a stable `Allocator` trait and its own `Vec<T, A>` and declares
+  `rust-version = "1.63"`, so it is within reach of both release lines. Verified rather than
+  assumed: a twenty-line zeroize-on-free allocator parameterizing such a `Vec` compiled and ran
+  with no nightly features on both rustc 1.70 and current stable, saw the abandoned buffer with
+  1008 of 1008 bytes still live, and wiped them before release — read back inside the allocator
+  after the wipe and before the inner `deallocate`, which is the only window where that can be
+  checked, giving 0.
+
+  Getting this right matters because it moves the obstacle. The reason this crate does not do it
+  is not a toolchain channel: implementing such an allocator needs `unsafe impl Allocator` and
+  this crate is `#![forbid(unsafe_code)]`, it would add a non-optional dependency to a crate
+  that has exactly one, and it would add a type parameter to `Dynamic`, which is API-breaking.
+  Those are the real reasons, and they are better ones.
+
 ### Removed
 
 - **BREAKING: `fixed_alias!`, `dynamic_alias!`, `fixed_generic_alias!` and

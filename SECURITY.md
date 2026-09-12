@@ -116,10 +116,26 @@ so the limitation is not confined to the two tier methods named above.
 - For **deployment-level remediation**, install a zero-on-deallocate global allocator such as [`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) in the final binary, or rely on OS facilities (Linux `init_on_free=1`, hardened allocators). These are process-wide operational choices rather than a per-crate feature.
 
 A custom-allocator-parameterized `Dynamic<T, A>` (analogous to C++'s
-`std::vector<T, ZeroingAllocator<T>>`) would resolve this at the type
-level but currently requires nightly Rust (`allocator_api`) and `unsafe`
-code. `secure-gate` does not enable it; users with strict realloc-residue
-requirements should adopt the global-allocator approach above.
+`std::vector<T, ZeroingAllocator<T>>`) would resolve this at the type level. This
+document used to say that doing so "currently requires nightly Rust
+(`allocator_api`)". That is no longer true and is worth stating accurately, because
+it changes what the remaining obstacle is. Nightly is needed only for the standard
+library's own `Vec<T, A>`; the [`allocator-api2`](https://crates.io/crates/allocator-api2)
+shim provides a stable `Allocator` trait and its own `Vec<T, A>`, and it declares
+`rust-version = "1.63"`, so it is within reach of both release lines. Verified: a
+twenty-line zeroize-on-free allocator parameterizing such a `Vec` compiled and ran
+with no nightly features on both rustc 1.70 and current stable, and saw the
+abandoned buffer with 1008 of 1008 bytes still live, wiping them before release —
+read back inside the allocator after the wipe and before the inner `deallocate`, the
+only window where that can be checked, giving 0.
+
+What actually blocks it here is different, and more fundamental than a toolchain
+channel. Implementing such an allocator requires `unsafe impl Allocator`, and this
+crate is `#![forbid(unsafe_code)]`. It would also add a non-optional dependency to a
+crate that has exactly one, and add a type parameter to `Dynamic`, which is an
+API-breaking change. `secure-gate` does not do it; users with strict realloc-residue
+requirements should adopt the global-allocator approach above, which needs no change
+to this crate at all.
 
 ### 3. Swap / core dumps / external memory exposure
 
