@@ -10,8 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`fixed_newtype!(pub Name, generic T)` — the `Fixed` counterpart of the `generic` arm.**
-  `dynamic_newtype!` has accepted `generic T` since rc.8, for an inner type that is neither
-  `String` nor `Vec<u8>`. `fixed_newtype!` had no such arm, for a reason that was about the
+  `dynamic_newtype!` has accepted `generic T` since 0.8.0-rc.11 on this line, which is where
+  the newtype macros were backported, for an inner type that is neither `String` nor
+  `Vec<u8>`. `fixed_newtype!` had no such arm, for a reason that was about the
   macro rather than the wrapper: it takes a size literal, so the token-matching ambiguity
   that forced `dynamic_newtype!`'s explicit marker never arose, and nobody went looking for
   the gap.
@@ -43,10 +44,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **BREAKING: a zero-sized `Fixed` no longer constructs.** The rc.9 notes recorded that the
-  `N = 0` rejection lived inside `fixed_alias!` and nowhere else, so `type Name =
-  Fixed<[u8; 0]>;` written by hand bypassed it, and that `Fixed` *could* carry the check
-  itself as a post-monomorphization `const` assertion. With the alias macros now gone
+- **BREAKING: a zero-sized `Fixed` no longer constructs.** `main`'s 0.9.0-rc.9 notes
+  recorded that the `N = 0` rejection lived inside `fixed_alias!` and nowhere else, so
+  `type Name = Fixed<[u8; 0]>;` written by hand bypassed it, and that `Fixed` *could* carry
+  the check itself as a post-monomorphization `const` assertion. This line recorded only the
+  first half: the rc.12 `SECURITY.md` entry below notes the bypass and says nothing about a
+  post-monomorphization guard, so the second half arrives here with this entry. With the alias macros now gone
   (below), the only guard left would have been the one inside `fixed_newtype!`, so the check
   has moved to where it covers every spelling: `Fixed::new` and `Fixed::new_with` each read
   an associated `const` that asserts a non-zero size. Those two bodies are what every other
@@ -128,15 +131,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The problem was never what they expanded to. It was that a macro exported by a crate whose
   pitch is "accidents must not compile" reads as a guarantee, and these guaranteed a name.
   This repository's own README called them "typed newtype wrappers" and "Type-safe wrappers"
-  from 0.5.1 until commit `fe93540`, whose message records that downstream users had relied
-  on that reading. The measured consequence is in
+  from 0.5.1 until commit `c59d9b0` on this line (`fe93540` on `main` — same message, same
+  day, and the one reachable from this branch is `c59d9b0`), whose message records that
+  downstream users had relied on that reading. The measured consequence is in
   `docs/design/secure-gate-requested-newtyping-requirements.md`: a consumer's 34 aliases
   collapsed to 8 real types, with `FileId` (documented "never crosses IPC") and `PublicId`
   (documented "safe to expose via IPC") the same type on adjacent lines, and five distinct
   32-byte cryptographic keys mutually substitutable. Nobody misreads
   `pub type FileId = Dynamic<String>;`.
 
-  With `fixed_newtype!` / `dynamic_newtype!` shipped since rc.8, the alias macros were also
+  With `fixed_newtype!` / `dynamic_newtype!` shipped on this line since 0.8.0-rc.11, the
+  alias macros were also
   dominated on every axis. A newtype costs nothing at runtime — `tests/asm_dse_check.rs`
   proves the zeroization stores survive optimization through the extra layer — and is
   strictly safer, so where a role exists the newtype
@@ -153,8 +158,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   property that matters, which is why the documentation had to carry a "Nominal?" column to
   tell them apart.
 
-  The case *for* aliases is untouched, and rc.9's note on when an alias is the right reach
-  still stands word for word: material worth zeroize-on-drop and a redacted `Debug` that has
+  The case *for* aliases is untouched, and the note on when an alias is the right reach that
+  `main` added in its 0.9.0-rc.9 still stands word for word — it reaches this branch for the
+  first time with this entry, as the backport notes below record: material worth zeroize-on-drop and a redacted `Debug` that has
   no role it could be confused with, where interchangeability with the base type is a feature
   because it crosses into third-party APIs without ceremony. Only the spelling changes. A
   doc comment on the `type` gives the documentation the macro's optional doc-string argument
@@ -273,14 +279,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Mirrors the same change on `main`, re-derived against this branch rather than copied.**
   The alias macros, the newtype macros and the `Fixed<[u8; 0]>` call sites were identical on
   both lines, so the code hunks applied unchanged; what was re-derived is the prose. This
-  branch's README had never received rc.9's "when an alias is the right reach" paragraph, so
-  it lands here for the first time as part of the rewrite, and its `SECURITY.md` links point
-  at `release/0.8`. The workflow set differs (`fuzz-miri-0.8.yml`, not `fuzz-miri.yml`), the
-  MSRV stays 1.70 and the edition stays 2021, import ordering follows this branch's rustfmt
-  style, and the `trybuild` snapshot for the new compile-fail case is blessed on 1.70, where
-  it differs from `main`'s. The rc.12 note above that `SECURITY.md` "gained the
+  branch's README had never received the "when an alias is the right reach" paragraph that
+  `main` added in its 0.9.0-rc.9, so it lands here for the first time as part of the rewrite,
+  and its `SECURITY.md` links point at `release/0.8`. Every unqualified `rc.N` this series
+  inherited from `main`'s prose has been re-pointed: the newtype macros and the `generic`
+  marker are 0.8.0-rc.11 here, not rc.8, and the zero-size reasoning is `main`'s 0.9.0-rc.9,
+  not this line's rc.9. The workflow set differs (`fuzz-miri-0.8.yml`, not `fuzz-miri.yml`),
+  the MSRV stays 1.70 and the edition stays 2021, import ordering follows this branch's
+  rustfmt style, and the `trybuild` snapshot for the new compile-fail case is blessed on 1.70,
+  where it differs from `main`'s. The rc.12 note *below* that `SECURITY.md` "gained the
   zero-length-secret entry from `main`" is superseded: that entry described a guard that lived
   only in `fixed_alias!`, and the guard is now in `Fixed` itself.
+
+  Carried over from `main`'s disclosure, because it is equally true here and omitting it was
+  an unintended divergence: `.github/workflows/fuzz-miri-0.8.yml` still passes
+  `--skip fixed_alias_zero_size_compile_fail` for a test that no longer exists. No workflow
+  file was edited in this series on either line — the push credential lacks the scope — so the
+  stale flag remains on both and is a follow-up. It is a no-op either way, because every
+  compile-fail test is `#[cfg(not(miri))]` and so does not exist under Miri at all.
 
 ## [0.8.0-rc.12] - 2026-09-09
 

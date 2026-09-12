@@ -255,7 +255,7 @@
 //! Full discussion in
 //! [SECURITY.md § Inherent Rust Limitations](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md#inherent-rust-limitations).
 //!
-//! See the [README](https://github.com/Slurp9187/secure-gate/blob/main/README.md) and
+//! See the [README](https://github.com/Slurp9187/secure-gate/blob/release/0.8/README.md) and
 //! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) for full details.
 
 #[cfg(feature = "alloc")]
