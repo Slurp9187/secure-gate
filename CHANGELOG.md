@@ -68,11 +68,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ever make the type unnameable. The `size_of` form also rejects any other zero-sized inner
   type, `Fixed<()>` included.
 
-  **One limitation, measured rather than assumed: `cargo check` does not report it.** A
-  post-monomorphization error is raised during codegen, and `cargo check` stops before
-  codegen, so an editor driven by `cargo check` stays quiet about a zero-sized secret.
-  `cargo build`, `cargo test` and any release build do report it, so such a secret cannot
-  ship — it is the fast feedback loop that misses it, not the build. Nothing on stable Rust
+  **Two limitations, both measured rather than assumed.** First, `cargo check` does not
+  report it: a post-monomorphization error is raised during codegen, and `cargo check` stops
+  before codegen, so an editor driven by it stays quiet. Second, and more consequential, it
+  fires only for a *codegen root*. A non-generic `#[inline]` function in a library is not
+  one, and every method these macros generate is `#[inline(always)]`, so a library crate
+  that writes `fixed_newtype!(pub Empty, generic [u8; 0]);` next to
+  `#[inline] pub fn empty() -> Empty { Empty::new([]) }` passes `cargo build`,
+  `cargo build --release` and `cargo test` with exit 0 and publishes. The error then appears
+  in every downstream crate that instantiates it, pointing into `secure-gate` and at the
+  dependency's macro invocation rather than at the consumer's own call.
+
+  So the guarantee is narrower than "cannot ship", and worth stating exactly: no *value* of
+  a zero-sized `Fixed` can exist at runtime, because nothing can construct one, and a binary
+  or test that tries fails to compile. What the guard does not do is stop a library from
+  exporting an unusable zero-sized API with green CI. Nothing on stable Rust
   moves the check earlier for generic code: a condition on a generic parameter has nothing to
   evaluate until that parameter is known. Three other formulations were tried — an array
   index inside the constant, the same index inline in the function body, and
@@ -137,8 +147,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   For a tree with many of them, this GNU `sed` run covers every form above, including
   `pub(crate)`, the optional doc string, and an inner type containing a comma. Run the
-  doc-string forms first or the two-argument patterns will swallow the doc argument into the
-  type position, which compiles to something wrong rather than failing:
+  doc-string forms first. Out of order nothing is silently wrong, but you get a mess to undo
+  by hand: the `fixed_alias!` two-argument pattern ends in `, ([0-9]+)\);` so it cannot match
+  a three-argument call at all and leaves the line as a macro invocation, while the
+  `dynamic_alias!` one does consume the doc string into the type position and yields
+  `Dynamic<String, "doc">`, which fails loudly as `error[E0107]: struct takes 1 generic
+  argument but 2 generic arguments were supplied`:
 
   ```sh
   # Doc-string forms first: the doc becomes an ordinary `///` comment.

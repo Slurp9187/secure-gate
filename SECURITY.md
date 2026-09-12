@@ -247,9 +247,12 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 - For encoding: every encoder returns `EncodedSecret`, which stays wiped until it drops. Read it with `&*encoded` (it derefs to `str`); call `.into_inner()` only when an API demands an owned `String`, which is the named moment protection ends.
 - A zero-sized `Fixed` is a compile error at construction — the guard is raised at
   monomorphization, so it covers generic code too; naming the type without building one
-  still compiles. Note that a post-monomorphization error is raised during codegen, so
-  `cargo check` will not report it: rely on `cargo build` or `cargo test` to surface one,
-  not on an editor. `Dynamic` has no compile-time equivalent, so check that a
+  still compiles. Two limits on when it fires, both measured: a post-monomorphization error
+  is raised during codegen, so `cargo check` will not report it; and it fires only for a
+  codegen root, so a *library* whose zero-sized constructions sit behind `#[inline]` or
+  generic code builds and tests clean and defers the error to its consumers. No value of
+  such a type can exist at runtime, but do not treat green library CI as proof you have
+  none. `Dynamic` has no compile-time equivalent, so check that a
   variable-length secret is non-empty when its length is generic or configuration-driven.
   If an empty one reaches you anyway: it reports `len() == 0`, still prints `[REDACTED]`,
   encodes to `""`, and compares `ct_eq`-equal to any other empty.
