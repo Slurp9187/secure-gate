@@ -98,6 +98,13 @@
 ///
 /// No methods — its only purpose is to gate construction of a
 /// [`Fixed<T>`](crate::Fixed).
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` owns a heap allocation, so it cannot be the inner type of a `Fixed`",
+    label = "`Fixed` holds its secret inline; `{Self}` does not qualify",
+    note = "`Fixed<T>` exists so a secret can be held with no allocator at all, and `FixedStorage` is what keeps that true: a heap allocation can be abandoned unwiped, either by a reallocation or by replacing the whole value.",
+    note = "For a heap-backed secret use `Dynamic<T>` instead, which documents the residue and offers one safe growth path. `Dynamic` needs this crate's `alloc` feature — if you are seeing this with `alloc` off while still able to name `Vec` or `String`, enabling it is the fix.",
+    note = "For a custom inner type that genuinely owns no heap allocation, write an empty `impl FixedStorage` block for it. That is an assertion the compiler cannot check, so only write it if it is true."
+)]
 pub trait FixedStorage {}
 
 macro_rules! __sg_fixed_storage_prims {
