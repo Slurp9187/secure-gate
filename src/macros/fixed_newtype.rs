@@ -24,11 +24,11 @@
 /// fixed_newtype!(pub Name, N, "doc", derive: [ConstantTimeEq]);
 /// fixed_newtype!(pub Name, generic T);                  // reduced API, opted into
 /// fixed_newtype!(pub Name, generic T, "doc string");
-/// fixed_newtype!(pub Name, generic T, derive: [ConstantTimeEq]);
-/// fixed_newtype!(pub Name, generic T, "doc", derive: [ConstantTimeEq]);
+/// fixed_newtype!(pub Name, generic T, derive: [WrapperAccess]);
+/// fixed_newtype!(pub Name, generic T, "doc", derive: [WrapperAccess]);
 /// ```
 ///
-/// Supported `derive:` options are `ConstantTimeEq`, `Deserialize`, `FromWrapper`, `IntoWrapper`, and `WrapperAccess` (= both directions). See
+/// Supported `derive:` options are `ConstantTimeEq`, `Deserialize`, `FromWrapper`, `IntoWrapper`, and `WrapperAccess` (= both directions). The first two constrain the inner type — `ConstantTimeEq` and `Deserialize` must be implemented for it, which rules them out for most `generic` inner types (`[i16; 256]` has neither), while the three wrapper-access tokens apply to any. See
 /// *Cloning and serialization* below for the two that are deliberately absent.
 ///
 /// # Examples

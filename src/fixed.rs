@@ -189,14 +189,14 @@ fn drain_bech32_payload<const N: usize>(
 ///
 /// The diagnostic names the offending type in the failing constant's path — for example
 /// `Fixed::<[u8; 0]>::NON_ZERO_SIZED` — and a `while instantiating` note repeats the span of
-/// the `new` call the monomorphization reached. It does not name the instantiation that
-/// caused it: for a generic `fn build<const N: usize>()`, calling `build::<0>()` reports
+/// the `new` call the monomorphization reached — the error's own span is the assertion
+/// here, not in your code. The note does not name the instantiation that caused it: for a generic `fn build<const N: usize>()`, calling `build::<0>()` reports
 /// against the `Fixed::new` line inside `build`, and the `::<0>` call site appears nowhere.
 ///
 /// **Two limits on when it fires, both measured.** It is raised during codegen, so
 /// `cargo check` does not report it. And it only fires for a *codegen root*: a non-generic
 /// `#[inline]` function in a library is not one, and every method the newtype macros
-/// generate is `#[inline(always)]`, so a library whose only zero-sized constructions sit
+/// generate carries an inline attribute, so a library whose only zero-sized constructions sit
 /// behind `#[inline]` or generic code builds, tests and publishes clean — the error then
 /// surfaces in each downstream crate that instantiates it, blaming this crate and the
 /// dependency's macro invocation rather than the consumer's call.
