@@ -343,8 +343,11 @@ the discarded tail with it. The buffer the wrapper holds afterwards is still zer
 drop, spare capacity included, so the exposure is confined to the abandoned buffers — one
 per move, and whether a move happens at all depends on whether the allocator can resize
 the chunk in place. For known-size heap-only key material, prefer `Dynamic<[u8; N]>`
-(boxed array — no realloc surface). See `SECURITY.md` for the realloc threat-model note
-and operational mitigations.
+(boxed array — no realloc surface). `Fixed<T>` has no realloc surface either, and that is
+now enforced rather than assumed: `Fixed::new` requires `FixedStorage` on the inner type, so
+`Fixed<Vec<u8>>` and `fixed_newtype!(pub Name, generic Vec<u8>)` are compile errors instead
+of silent instances of the same weakness. A custom inner type asserts the property in one
+line. See `SECURITY.md` for the realloc threat-model note and operational mitigations.
 
 ### Inherent Rust limitations
 

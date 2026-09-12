@@ -45,7 +45,7 @@
 //! # Example
 //!
 //! ```rust
-//! use secure_gate::{CloneableSecret, Fixed, RevealSecret};
+//! use secure_gate::{CloneableSecret, Fixed, FixedStorage, RevealSecret};
 //! use zeroize::Zeroize;
 //!
 //! #[derive(Clone)]
@@ -57,6 +57,8 @@
 //!
 //! // Every impl is a deliberate security decision — audit all usages.
 //! impl CloneableSecret for SessionKey {}
+//! // Required by `Fixed::new`: asserts this type owns no buffer that can be reallocated.
+//! impl FixedStorage for SessionKey {}
 //!
 //! let original = Fixed::new(SessionKey([0u8; 32]));
 //! let copy = original.clone();   // Opt-in cloning: each copy is independently zeroized.

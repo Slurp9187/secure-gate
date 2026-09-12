@@ -63,6 +63,7 @@ fn fixed_wrapper_serializes_correctly() {
 
     #[derive(serde::Serialize, serde::Deserialize, zeroize::Zeroize)]
     struct SecretKey([u8; 4]);
+    impl secure_gate::FixedStorage for SecretKey {}
     impl SerializableSecret for SecretKey {}
 
     let secret = Fixed::new(SecretKey([10, 20, 30, 40]));
@@ -161,6 +162,7 @@ fn fixed_custom_type_serialize_then_deserialize_raw() {
 
     #[derive(serde::Serialize, serde::Deserialize, zeroize::Zeroize)]
     struct Key([u8; 4]);
+    impl secure_gate::FixedStorage for Key {}
     impl SerializableSecret for Key {}
 
     let secret = Fixed::new(Key([0x10, 0x20, 0x30, 0x40]));

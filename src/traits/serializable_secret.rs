@@ -58,7 +58,7 @@
 //! # Example
 //!
 //! ```rust
-//! use secure_gate::{SerializableSecret, Fixed};
+//! use secure_gate::{Dynamic, SerializableSecret};
 //! use serde::{Serialize, Deserialize};
 //! use zeroize::Zeroize;
 //!
@@ -72,7 +72,10 @@
 //! // Every impl is a deliberate security decision — audit all usages.
 //! impl SerializableSecret for BackupKey {}
 //!
-//! let key = Fixed::new(BackupKey(vec![0u8; 32]));
+//! // `Dynamic`, not `Fixed`: the payload is a `Vec`, so its capacity can change, and
+//! // `Fixed::new` now refuses it. This example used to use `Fixed` and was itself an
+//! // instance of the weakness `SECURITY.md` documents.
+//! let key = Dynamic::new(BackupKey(vec![0u8; 32]));
 //! // Serialization exposes the secret — encrypt/authenticate output before storage.
 //! // let bytes = serde_json::to_vec(&key).unwrap();
 //! let _ = key;

@@ -74,7 +74,7 @@
 /// The size-literal forms cover `Fixed<[u8; N]>`, the shape nearly every
 /// secret takes. [`Fixed<T>`](crate::Fixed) holds more than that, and the
 /// `generic` marker opts a newtype into it. The requirement is
-/// `Zeroize + `[`SentinelValue`](crate::SentinelValue), checked at the
+/// `Zeroize + `[`SentinelValue`](crate::SentinelValue)` + `[`FixedStorage`](crate::FixedStorage), checked at the
 /// declaration — slightly narrower than `Fixed<T>` itself, which needs only
 /// `Zeroize`, because the generated [`into_inner`](crate::RevealSecret::into_inner)
 /// has to leave an inert value behind. Arrays of a `Default` element, `String`
@@ -115,6 +115,20 @@
 /// newtype's *own* `len()`, not the answer. Writing the marker is how you say you
 /// know that. A zero-sized inner value is still refused: there is no `N` for the
 /// macro to check, so [`Fixed`](crate::Fixed) rejects it at construction instead.
+///
+/// **The inner type must not be able to reallocate.** This arm used to accept
+/// `generic Vec<u8>` and `generic String`, which put a growable buffer inside the
+/// wrapper the documentation calls free of any realloc surface; measured, each
+/// abandoned an unwiped buffer holding the whole secret on any capacity change, and
+/// with no `io::Write` escape of the sort [`Dynamic<Vec<u8>>`](crate::Dynamic) has.
+/// [`Fixed::new`](crate::Fixed::new) now requires
+/// [`FixedStorage`](crate::FixedStorage), so those forms are a compile error reported
+/// at this declaration. Arrays, the primitives, tuples, `Option` and boxed slices are
+/// covered for you, which is every shape this arm exists for; a custom inner type adds
+/// `impl FixedStorage for MyType {}`, which asserts that it owns no buffer whose
+/// capacity can change. For a growable payload reach for
+/// [`dynamic_newtype!`](crate::dynamic_newtype) instead, where the residue is
+/// documented and one safe growth path exists.
 ///
 /// **`new_with` is absent for a different reason, and it costs you something.**
 /// Unlike the others it is perfectly meaningful for an arbitrary `T`; it simply

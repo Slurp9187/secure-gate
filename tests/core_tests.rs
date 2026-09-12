@@ -1,5 +1,8 @@
 // Core API tests for `Fixed<T>` and `Dynamic<T>` (`RevealSecret` / `RevealSecretMut`).
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 #[cfg(feature = "cloneable")]
 use secure_gate::CloneableSecret;
 #[cfg(feature = "alloc")]
@@ -272,6 +275,7 @@ fn cloneable_secret_works() {
 
     #[derive(Clone, Zeroize, Debug)]
     struct CloneKey(Vec<u8>);
+    impl secure_gate::FixedStorage for CloneKey {}
 
     impl CloneableSecret for CloneKey {}
 
@@ -486,4 +490,37 @@ fn fixed_u8_len_unchanged() {
     let secret: Fixed<[u8; 8]> = Fixed::new([0u8; 8]);
     assert_eq!(secret.len(), 8);
     assert_eq!(secret.byte_len(), 8);
+}
+
+// === FixedStorage: what `Fixed::new` accepts, and what it no longer does ===
+
+/// A boxed slice has a length fixed at construction and no API that can grow it, so it is
+/// `FixedStorage` and `Fixed` accepts it. This shape lives here rather than in the
+/// `compile-pass` fixture because that fixture also runs under `--no-default-features`,
+/// where `Box` does not exist.
+#[cfg(feature = "alloc")]
+#[test]
+fn fixed_storage_accepts_a_boxed_slice() {
+    let boxed: alloc::boxed::Box<[u8]> = alloc::vec![7u8; 8].into_boxed_slice();
+    let secret = Fixed::new(boxed);
+    assert_eq!(secret.with_secret(|b| b[0]), 7);
+    assert_eq!(secret.with_secret(|b| b.len()), 8);
+}
+
+/// The shapes `FixedStorage` accepts without the caller writing anything. Each is a
+/// legitimate fixed-capacity secret, and each used to be accepted for the weaker reason
+/// that nothing checked the inner type at all.
+#[test]
+fn fixed_storage_accepts_the_fixed_capacity_shapes() {
+    assert_eq!(Fixed::new([1u8; 32]).with_secret(|a| a[0]), 1);
+    assert_eq!(Fixed::new([2i16; 256]).with_secret(|a| a[255]), 2);
+    assert_eq!(
+        Fixed::new(([3u8; 4], 4u32)).with_secret(|(a, n)| (a[0], *n)),
+        (3, 4)
+    );
+    assert_eq!(
+        Fixed::new(Some([5u8; 4])).with_secret(|o| o.map(|a| a[0])),
+        Some(5)
+    );
+    assert_eq!(Fixed::new([[6u8; 2]; 3]).with_secret(|a| a[2][1]), 6);
 }

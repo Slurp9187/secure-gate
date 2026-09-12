@@ -74,6 +74,7 @@ thread_local! {
 /// that was actually sitting in the wrapper's storage at the time.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Traced(u64);
+impl secure_gate::FixedStorage for Traced {}
 
 impl Zeroize for Traced {
     fn zeroize(&mut self) {

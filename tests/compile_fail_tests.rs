@@ -27,6 +27,21 @@ fn fixed_zero_size_compile_fail() {
     t.compile_fail("tests/compile-fail/fixed_zero_size.rs");
 }
 
+// Compile-fail test: `Fixed<T>` must refuse an inner type that can reallocate, which is
+// what makes `SECURITY.md`'s "no realloc surface" exemption true rather than aspirational.
+// `FixedStorage` on `Fixed::new` is a real trait bound, not a post-monomorphization `const`
+// assertion, so unlike the zero-size case above this one is reported by `cargo check` and
+// needs no `pass` fixture to be observable — the snapshot also does not embed a
+// `src/fixed.rs` line number, so it survives edits to that file.
+// `alloc`-gated because the fixture names `Vec` and `String`: without `alloc` those types
+// fail the pre-existing `Zeroize` bound first and the snapshot would record the wrong reason.
+#[test]
+#[cfg(all(feature = "alloc", not(miri)))]
+fn fixed_reallocating_inner_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/fixed_reallocating_inner.rs");
+}
+
 // Compile-fail test for SerializableSecret opt-in requirement.
 // Skipped under Miri because trybuild spawns cargo subprocesses (forbidden syscalls).
 #[cfg(all(feature = "alloc", feature = "serde-serialize"))]
