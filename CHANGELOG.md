@@ -109,6 +109,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in `tests/core_tests.rs`, because a future reader will otherwise be tempted to add the impl
   back for exactly the reason it was added the first time.
 
+  **The migration itself wrote one false assertion, found by a sweep tool and fixed.** The
+  twelve marker impls added across the test suite were placed by a script, and eleven were
+  truthful — every one wraps an array or a `u64`. The twelfth was not: `cloneable_secret_works`
+  in `tests/core_tests.rs` declares `struct CloneKey(Vec<u8>)`, and the script gave it
+  `impl FixedStorage for CloneKey {}` so the test would compile again. That is exactly the lie
+  the trait documents as possible and the compiler cannot catch — asserting that a type owning a
+  `Vec` owns no heap allocation — and it was shipped as part of the change that exists to
+  discourage it. Nothing in the test grows the buffer, so there was no live leak; the defect is
+  the false assertion sitting where a reader would copy it. The test's own comment says its
+  subject is that a clone "owns independent heap memory", which makes `Dynamic<CloneKey>` the
+  correct wrapper; it now uses that, with the false impl gone and a note recording what writing
+  one looks like. The other eleven were audited the same way.
+
   **Migration.** Nothing for byte arrays, non-byte arrays, tuples or `Option`s.
   A custom inner type adds one line, `impl FixedStorage for MyKey {}`, next to its `Zeroize`
   impl. A `Fixed<Vec<u8>>` or `Fixed<String>` must become `Dynamic`, which is the wrapper for
