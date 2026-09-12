@@ -201,6 +201,14 @@ fn drain_bech32_payload<const N: usize>(
 /// surfaces in each downstream crate that instantiates it, blaming this crate and the
 /// dependency's macro invocation rather than the consumer's call.
 ///
+/// Root-ness is a property of the compiler and the profile, not of the attribute alone, so
+/// removing `#[inline]` does not reliably restore the error. Measured: on 1.85 a library
+/// exporting a plain non-generic `pub fn empty() -> Empty { Empty::new([]) }` fails
+/// `cargo build` and `cargo test` but passes `cargo build --release`, because the
+/// cross-crate-inlining heuristic added in 1.75 drops a small function from the exported
+/// root set in an optimized build; on 1.70 the same crate fails in both profiles. Treat
+/// instantiating the type in a test or a binary as the only reliable check.
+///
 /// Stated precisely: no *value* of a zero-sized `Fixed` can exist at runtime, because
 /// nothing can construct one, and a binary or test that tries fails to compile. The guard
 /// does not stop a library from exporting an unusable zero-sized API. Neither limit is a
@@ -958,7 +966,9 @@ impl<T: zeroize::Zeroize> RevealSecret for Fixed<T> {
         Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize,
     {
         // Replace inner with the sentinel so Fixed::drop zeroizes a harmless
-        // placeholder while the caller receives the real secret. Nothing is copied.
+        // placeholder while the caller receives the real secret. The secret is stored
+        // inline, so this transfers the bytes rather than handing over an allocation;
+        // what the sentinel guarantees is that no second copy is left behind here.
         core::mem::replace(&mut self.inner, crate::SentinelValue::sentinel_value())
     }
 }

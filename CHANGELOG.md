@@ -72,12 +72,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   report it: a post-monomorphization error is raised during codegen, and `cargo check` stops
   before codegen, so an editor driven by it stays quiet. Second, and more consequential, it
   fires only for a *codegen root*. A non-generic `#[inline]` function in a library is not
-  one, and every method these macros generate is `#[inline(always)]`, so a library crate
-  that writes `fixed_newtype!(pub Empty, generic [u8; 0]);` next to
+  one, and every method these macros generate carries an inline attribute (`#[inline]` on
+  the delegating surface, `#[inline(always)]` on `new`, `new_with` and `From::from`), so a
+  library crate that writes `fixed_newtype!(pub Empty, generic [u8; 0]);` next to
   `#[inline] pub fn empty() -> Empty { Empty::new([]) }` passes `cargo build`,
   `cargo build --release` and `cargo test` with exit 0 and publishes. The error then appears
   in every downstream crate that instantiates it, pointing into `secure-gate` and at the
   dependency's macro invocation rather than at the consumer's own call.
+
+  Root-ness turned out to depend on the compiler and the profile as well as the attribute,
+  which makes the limit broader than "add `#[inline]` and CI goes quiet". Measured on 1.85:
+  the same library with a plain non-generic, non-`inline` `pub fn empty()` fails
+  `cargo build` and `cargo test` and passes `cargo build --release`, because the
+  cross-crate-inlining heuristic added in rustc 1.75 drops a small function from the
+  exported root set in an optimized build. On 1.70 it fails in both profiles, so this is the
+  compiler's decision rather than anything the crate controls. The documentation now says
+  so, and says that instantiating the type in a test or binary is the only reliable check.
 
   So the guarantee is narrower than "cannot ship", and worth stating exactly: no *value* of
   a zero-sized `Fixed` can exist at runtime, because nothing can construct one, and a binary
@@ -220,6 +230,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   glue (`drop_glue` under v0, `drop_in_place` under legacy), so it cannot credit
   an unrelated function's stores, and a negative control — `Fixed`'s `Drop` body
   emptied — still fails. The existing identical-code-folding path is unchanged.
+
+- **Two suites now trace a newtype's whole lifecycle rather than testing its methods one at
+  a time.** The existing tests check properties; these follow one secret from creation,
+  through reads, mutation and hand-off, to the end of protection, and assert at every
+  transition what happened to the material itself. They are split by what can observe a
+  secret's storage, because no single instrument reaches both.
+
+  `tests/lifecycle_trace_heap.rs` instruments the allocator, so it can watch a `Dynamic`
+  newtype's buffer. Its own `GlobalAlloc` has three modes: the asserting mode
+  `tests/heap_zeroize.rs` already used, a pointer-keyed watch mode that records how many
+  non-zero bytes a specific block still held at release (so it can assert quantities and
+  negatives, which a panicking allocator cannot), and a thread-scoped counting mode for
+  "nothing was copied". One aggregate test, as that file's header requires. Covered:
+  `dynamic_newtype!` over `String`, over `Vec<u8>`, over the `generic Vec<u32>` arm, and one
+  with `derive: [WrapperAccess]`.
+
+  `tests/lifecycle_trace_handoff.rs` is the deliberate complement: no allocator, nothing
+  process-global, so it runs in parallel with the rest of the suite and reaches the
+  stack-backed shapes the allocator cannot see at all. A `Fixed` newtype never allocates, so
+  it traces storage by address identity (every read and write tier is asked for the address
+  it reaches, and those addresses are compared as pointers, never dereferenced) and traces
+  end-of-life with an inner type that records, inside its own `Zeroize` impl, the value
+  present when the wipe happened. 19 tests over six shapes: both size-literal front ends, the
+  `generic [i16; 256]` arm, both directional tokens, and a plain `type` alias for the
+  contrast.
+
+  What the stack trace establishes that a method test does not: both write tiers mutate the
+  wrapper's own storage without moving it; `expose_secret_mut` hands back the same address
+  `expose_secret` names, so no forwarding layer is copying the secret into a temporary and
+  leaving a second unwiped copy; the README's key-rotation line overwrites the old key where
+  it sits; `into_inner` leaves the inert sentinel behind, proved by the wrapper's own `Drop`
+  later recording a wipe of the sentinel rather than the secret; `into_wrapper` is a label
+  drop and not a protection drop, with the result still `[REDACTED]`; and every shape carries
+  real drop glue, so for `[u8; 32]` — which needs no drop of its own — the wipe is scheduled
+  rather than merely available.
+
+  **Two doc claims the stack trace contradicted, both now corrected.** First, the `generic`
+  arm's stated reason for withholding `SecretLen` was that a length has no meaning for an
+  arbitrary `T`. The base wrapper implements `SecretLen for Fixed<[T; N]>` with
+  `byte_len() = N * size_of::<T>()`, which is exactly the question the doc said had no
+  answer, and `derive: [IntoWrapper]` reaches it in one call. The real reason is the macro's
+  field of view — `generic $inner:ty` is one opaque token, so the expansion cannot tell an
+  array from a struct and withholds the shape-dependent surface uniformly rather than
+  conditionally. Both macros now say that, and the `IntoWrapper` note says that the outbound
+  token reopens whatever the base implements for that inner type, the withheld surface
+  included. Second, "nothing is copied" on `into_inner` is literally true only for `Dynamic`,
+  where the allocation itself is handed over. A `Fixed` stores its secret inline, so
+  `mem::replace` must transfer the bytes into the caller's slot; what holds for both is that
+  the value is moved and not duplicated-and-kept, because the wrapper's slot receives the
+  sentinel. The trait doc, the module example and the `Fixed` comment now draw that
+  distinction instead of claiming the stronger thing.
 
 ## [0.9.0-rc.9] - 2026-09-09
 

@@ -103,12 +103,18 @@
 /// The `generic` form deliberately provides less: [`RevealSecret`](crate::RevealSecret),
 /// [`RevealSecretMut`](crate::RevealSecretMut), redacted `Debug`, `Zeroize`,
 /// `ZeroizeOnDrop`, and `new`. Absent are [`SecretLen`](crate::SecretLen), `From`
-/// and `TryFrom`, the encoders and the RNG constructors, none of which has a
-/// meaning for an arbitrary `T` — a length in elements is not the byte length
-/// callers expect, and hex over a `Vec<u32>` has no defined byte order. Writing
-/// the marker is how you say you know that. A zero-sized inner value is still
-/// refused: there is no `N` for the macro to check, so
-/// [`Fixed`](crate::Fixed) rejects it at construction instead.
+/// and `TryFrom`, the encoders and the RNG constructors. The reason is the macro's
+/// field of view, not the meaning of each method: `generic $inner:ty` is one opaque
+/// token, so the expansion cannot tell an array from a struct and withholds the
+/// shape-dependent surface uniformly rather than conditionally. For some of them
+/// no meaning exists — hex over a `Vec<u32>` has no defined byte order — but
+/// `SecretLen` is not one of those: the base wrapper implements it for every
+/// `Fixed<[T; N]>`, and its `byte_len` is correctly `N * size_of::<T>()` rather
+/// than a count of elements. So that capability exists one layer down and
+/// `derive: [IntoWrapper]` reaches it in one call; what the arm withholds is the
+/// newtype's *own* `len()`, not the answer. Writing the marker is how you say you
+/// know that. A zero-sized inner value is still refused: there is no `N` for the
+/// macro to check, so [`Fixed`](crate::Fixed) rejects it at construction instead.
 ///
 /// **`new_with` is absent for a different reason, and it costs you something.**
 /// Unlike the others it is perfectly meaningful for an arbitrary `T`; it simply
@@ -223,7 +229,11 @@
 /// in the pool, which is safe only when the role is no more sensitive than
 /// the least-sensitive alias sharing its base; on a secret role it is an
 /// explicit, greppable downgrade, not a neutral operation. The default,
-/// neither token, is sufficient more often than it looks. The exposure is
+/// neither token, is sufficient more often than it looks. `IntoWrapper` also
+/// reopens whatever the base wrapper implements for that inner type, which on a
+/// `generic` newtype includes the surface the arm withheld: `as_wrapper().len()`
+/// and `.byte_len()` answer for any `Fixed<[T; N]>`. The reduced surface is a
+/// property of the label, not a barrier. The exposure is
 /// largest during a partial migration — the regime real consumers live in —
 /// because while most aliases stay plain the base type is a universal donor.
 /// Audit these methods the way you audit `expose_secret()`.
