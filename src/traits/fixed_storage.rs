@@ -83,6 +83,25 @@
 //! assert_eq!(p.with_secret(|poly| poly.0[0]), 7);
 //! ```
 //!
+//! # If the bound rejects your type
+//!
+//! The error is the bare unsatisfied-bound form, `E0277` naming the inner type and the
+//! unsatisfied `FixedStorage` bound, followed by the list of implementors. `main` improves it
+//! with
+//! `#[diagnostic::on_unimplemented]`, which needs Rust 1.78 and so cannot be used on this
+//! line's MSRV 1.70. The guidance that attribute carries is therefore written out here:
+//!
+//! - If the inner type owns a heap allocation, reach for [`Dynamic`](crate::Dynamic), which
+//!   documents the residue and offers one safe growth path.
+//! - `Dynamic` needs this crate's `alloc` feature. If you are seeing this error with `alloc`
+//!   off while still able to name `Vec` or `String` — which happens when `zeroize`'s own
+//!   `alloc` feature is enabled elsewhere in the dependency graph — then enabling this crate's
+//!   `alloc` is the fix. In that configuration `Fixed<Vec<u8>>` is nameable while
+//!   `secure_gate::Dynamic` does not exist at all, which is the one corner where the two
+//!   wrappers do not simply substitute for each other.
+//! - If the type genuinely owns no heap allocation, write an empty `impl FixedStorage` block
+//!   for it. That is an assertion the compiler cannot check, so only write it if it is true.
+//!
 //! # Naming the type still compiles
 //!
 //! The bound is on [`Fixed::new`](crate::Fixed::new), not on the struct, which keeps the

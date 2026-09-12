@@ -123,6 +123,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   correct wrapper; it now uses that, with the false impl gone and a note recording what writing
   one looks like. The other eleven were audited the same way.
 
+  **The trait's docs name the one configuration that is easy to get wrong.** The claim that
+  `Fixed<Vec<u8>>` is dominated by `Dynamic<Vec<u8>>` "in every feature configuration" is not
+  quite true. Disable this crate's `alloc` while `zeroize`'s own `alloc` is enabled elsewhere in
+  the graph, and `Vec<u8>: Zeroize` holds, so `Fixed<Vec<u8>>` is nameable, while
+  `secure_gate::Dynamic` does not exist at all — `error[E0433]`, "the item is gated behind the
+  `alloc` feature". Measured on the commit before the bound landed. The configuration is
+  incoherent rather than useful, since it tells this crate there is no allocator while using
+  one, and the remedy is one line of `Cargo.toml`; but the error gave no hint of it. `main`
+  attaches that guidance to the error itself with `#[diagnostic::on_unimplemented]`, which needs
+  Rust 1.78 and therefore cannot be used here. On this line the same three points — reach for
+  `Dynamic`, enable `alloc` if you can still name `Vec` with it off, and only write the marker
+  if the assertion is true — are written into the trait's documentation instead.
+
   **Migration.** Nothing for byte arrays, non-byte arrays, tuples or `Option`s.
   A custom inner type adds one line, `impl FixedStorage for MyKey {}`, next to its `Zeroize`
   impl. A `Fixed<Vec<u8>>` or `Fixed<String>` must become `Dynamic`, which is the wrapper for
