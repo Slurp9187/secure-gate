@@ -131,4 +131,7 @@ harness = false
 # The nested fuzz crate declares its own `[workspace]`; excluding it here keeps
 # `cargo` from trying to pull libfuzzer into this package's graph.
 [workspace]
-exclude = ["fuzz"]
+# `sweep-handover/` holds audit corpora on this branch only: crates with their own manifests,
+# carried for transfer and never built as part of this crate. Without the exclusion cargo
+# refuses to build them ("believes it's in a workspace when it's not"), exactly as for `fuzz`.
+exclude = ["fuzz", "sweep-handover"]
