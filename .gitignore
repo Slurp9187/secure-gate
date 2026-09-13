@@ -2,7 +2,7 @@
 /code_packages*/
 /secure-gate-compat/docs
 /issues
-/target
+**/target/
 
 **/.project/
 
