@@ -1,62 +1,78 @@
-//! Convenience macros for naming secure secret wrappers.
+//! Macros for nominal newtype secret types.
 //!
-//! These macros create domain-specific secret types (e.g., `Aes256Key`,
-//! `Password`) that inherit all security guarantees from
-//! [`Fixed`](crate::Fixed) or [`Dynamic`](crate::Dynamic): zeroize on drop,
-//! redacted `Debug`, explicit access only.
+//! [`fixed_newtype!`] and [`dynamic_newtype!`] create domain-specific secret
+//! types (e.g., `Aes256Key`, `Password`) that inherit all security guarantees
+//! from [`Fixed`](crate::Fixed) or [`Dynamic`](crate::Dynamic): zeroize on
+//! drop, redacted `Debug`, explicit access only.
 //!
-//! # Aliases or newtypes?
+//! # Newtype or plain `type`?
 //!
-//! The two families differ in exactly one respect — whether the compiler can
-//! tell two same-shaped secrets apart:
+//! Naming a secret does not need a macro. A plain Rust `type` alias gives a
+//! readable name whose every guarantee is the wrapper's own, because the named
+//! type *is* the wrapper, and it stays interchangeable with its base, so it
+//! crosses into APIs you do not own without ceremony. Two such aliases over
+//! the same shape (two names for `Fixed<[u8; 32]>`, say) resolve to the
+//! **same** nominal type and are freely assignable to each other: an alias is
+//! a readability and audit-grep device, not compile-time separation between
+//! cryptographic roles.
 //!
-//! - **`*_alias!`** emits a plain Rust `type` alias. Two aliases over the same
-//!   underlying type (e.g. two `fixed_alias!` invocations with the same `N`)
-//!   resolve to the **same** nominal type and are freely assignable to each
-//!   other. Aliases improve readability and give you audit grep targets; they
-//!   provide no compile-time separation between cryptographic roles.
-//! - **`*_newtype!`** emits a `struct`. Two newtypes of the same shape are
-//!   **distinct** types, so passing an encryption key where a MAC key belongs
-//!   is a compile error rather than a silent bug. Use these when distinct
-//!   roles share a shape — the common cases being `Fixed<[u8; 32]>` for two
-//!   different keys, or `Dynamic<String>` for two different credentials.
+//! A newtype emits a `struct`, so two newtypes of the same shape are
+//! **distinct** types and passing an encryption key where a MAC key belongs is
+//! a compile error rather than a silent bug. Use these when distinct roles
+//! share a shape — the common cases being `Fixed<[u8; 32]>` for two different
+//! keys, or `Dynamic<String>` for two different credentials.
 //!
-//! Reach for an alias when a name is all you want, and a newtype when the
-//! compiler should enforce the role.
+//! Write a `type` when a name is all you want, and a newtype when the compiler
+//! should enforce the role. Earlier releases shipped `fixed_alias!`,
+//! `dynamic_alias!`, `fixed_generic_alias!` and `dynamic_generic_alias!`
+//! macros that expanded to exactly that one `type` line; they were removed in
+//! this release, and
+//! [CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/main/CHANGELOG.md)
+//! carries the reasoning and a migration table.
 //!
-//! | Macro                     | Generates                     | Nominal? | Feature |
-//! |---------------------------|-------------------------------|----------|---------|
-//! | [`fixed_alias!`]          | `Fixed<[u8; N]>` alias        | No       | Always  |
-//! | [`fixed_generic_alias!`]  | `Name<const N: usize>` alias  | No       | Always  |
-//! | [`dynamic_alias!`]        | `Dynamic<T>` alias            | No       | `alloc` |
-//! | [`dynamic_generic_alias!`]| `Name<T>` alias               | No       | `alloc` |
-//! | [`fixed_newtype!`]        | `struct` over `Fixed<[u8; N]>`| **Yes**  | Always  |
-//! | [`dynamic_newtype!`]      | `struct` over `Dynamic<T>`    | **Yes**  | `alloc` |
+//! | Written as                     | Generates                     | Nominal? | Feature |
+//! |--------------------------------|-------------------------------|----------|---------|
+//! | `type Name = Fixed<[u8; N]>;`  | a second name for the wrapper | No       | Always  |
+//! | `type Name = Dynamic<T>;`      | a second name for the wrapper | No       | `alloc` |
+//! | [`fixed_newtype!`]             | `struct` over `Fixed<[u8; N]>`, or over `Fixed<T>` with `generic T` | **Yes** | Always |
+//! | [`dynamic_newtype!`]           | `struct` over `Dynamic<T>`, or the same with `generic T` | **Yes** | `alloc` |
+//!
+//! The `generic T` form of either macro is for an inner type that is neither a
+//! byte array nor a `String` — an `[i16; 256]` polynomial, a `Vec<u32>` of
+//! counters — and emits only the surface that is meaningful for an arbitrary
+//! `T`.
 //!
 //! # Security note
 //!
-//! [`fixed_alias!`] and [`fixed_newtype!`] are the **only** macros with a
-//! compile-time zero-size guard (`N = 0` is a compile error). The others allow
-//! zero-sized inner types — validate expected sizes in tests.
+//! [`fixed_newtype!`] rejects `N = 0` at the declaration, and
+//! [`Fixed`](crate::Fixed) itself rejects a zero-sized inner value at
+//! construction: `Fixed::new` and `Fixed::new_with` carry a `const`
+//! assertion, so a plain `type` alias and the `generic T` arm are covered too.
+//! [`dynamic_newtype!`] has no compile-time equivalent, because for `String` and
+//! `Vec<u8>` emptiness is a runtime property and an empty one is a legitimate
+//! value to hold before validation. The gap that leaves is a statically
+//! zero-sized inner type: `Dynamic<Zst>` constructs where `Fixed<Zst>` is now
+//! rejected. Validate lengths that come from configuration in your own tests.
 //!
-//! Newtypes generate no `From<Wrapper>` and no `Deref`, so an alias-typed value
-//! cannot become a newtype through `.into()` and a newtype never coerces back to
-//! its base. Base-wrapper access is opt-in per newtype and split by direction:
-//! `derive: [FromWrapper]` lets a base value enter the role, `derive:
-//! [IntoWrapper]` lets material leave toward the base; `WrapperAccess` is both.
-//! In a mixed tree the base type is the pool every plain alias lives in, so
-//! `FromWrapper` on a boundary type accepts all of them, and `IntoWrapper` on
-//! a secret role downgrades it to the least-sensitive alias sharing its base.
-//! Neither token is the sufficient default more often than it looks. Audit
-//! these as you would `expose_secret()`.
+//! Newtypes generate no `From<Wrapper>` and no `Deref`, so a base-typed value
+//! (any plain `type` alias included) cannot become a newtype through `.into()`
+//! and a newtype never coerces back to its base. Base-wrapper access is opt-in
+//! per newtype and split by direction: `derive: [FromWrapper]` lets a base
+//! value enter the role, `derive: [IntoWrapper]` lets material leave toward
+//! the base; `WrapperAccess` is both. In a mixed tree the base type is the
+//! pool every plain alias lives in, so `FromWrapper` on a boundary type
+//! accepts all of them, and `IntoWrapper` on a secret role downgrades it to
+//! the least-sensitive alias sharing its base. Neither token is the sufficient
+//! default more often than it looks. Audit these as you would
+//! `expose_secret()`.
 //!
 //! # Example
 //!
 //! ```rust
-//! use secure_gate::{fixed_alias, fixed_newtype, RevealSecret, SecretLen};
+//! use secure_gate::{fixed_newtype, Fixed, RevealSecret, SecretLen};
 //!
-//! // Alias — a readable name for one shape.
-//! fixed_alias!(pub Aes256Key, 32);
+//! // A plain `type` alias — a readable name for one shape.
+//! type Aes256Key = Fixed<[u8; 32]>;
 //! let key: Aes256Key = [0u8; 32].into();
 //! key.with_secret(|b| assert_eq!(b.len(), 32));
 //!
@@ -69,10 +85,6 @@
 //! // seal(&MacKey::new(..), &EncKey::new(..)) would not compile.
 //! assert_eq!(EncKey::new([1u8; 32]).len(), 32);
 //! ```
-mod dynamic_alias;
-mod dynamic_generic_alias;
 mod dynamic_newtype;
-mod fixed_alias;
-mod fixed_generic_alias;
 mod fixed_newtype;
 mod newtype_common;

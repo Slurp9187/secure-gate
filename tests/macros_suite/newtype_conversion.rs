@@ -1,9 +1,11 @@
-//! macros_suite/newtype_conversion.rs — conversion discipline (R2/R7/Q7)
+//! macros_suite/newtype_conversion.rs — conversion discipline (R2/R6/R7/Q7)
 //! from the downstream requirements in `docs/secure-gate-requested-newtyping-requirements.md`.
 
-use secure_gate::{Dynamic, RevealSecret, dynamic_alias, dynamic_newtype, fixed_newtype};
+use secure_gate::{Dynamic, RevealSecret, dynamic_newtype, fixed_newtype};
 
-dynamic_alias!(pub FileId, String);
+// `FileId` stays a plain `type` alias: still a synonym for `Dynamic<String>`, which is
+// what makes it the right probe for R6 (a mixed tree) and R2 (no way in by `.into()`).
+pub type FileId = Dynamic<String>;
 dynamic_newtype!(pub PublicId, String);
 dynamic_newtype!(pub Opened, String, derive: [WrapperAccess]);
 dynamic_newtype!(pub Outbound, String, derive: [IntoWrapper]);

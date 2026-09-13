@@ -6,11 +6,12 @@
 
 /// Creates a distinct nominal type wrapping [`Fixed<[u8; N]>`](crate::Fixed).
 ///
-/// Mirrors [`fixed_alias!`](crate::fixed_alias) syntax, but generates a `struct`
-/// rather than a `type` alias: two `fixed_newtype!` types of the same `N` are
-/// **not** interchangeable. Use it when distinct cryptographic roles share a
-/// shape — an encryption key and a MAC key are both `Fixed<[u8; 32]>`, and
-/// under an alias the compiler cannot tell them apart.
+/// Generates a `struct` rather than a `type` alias: two `fixed_newtype!` types
+/// of the same `N` are **not** interchangeable, where two `type` aliases of
+/// that `N` are one and the same type. Use it when distinct cryptographic
+/// roles share a shape — an encryption key and a MAC key are both
+/// `Fixed<[u8; 32]>`, and under a plain alias the compiler cannot tell them
+/// apart.
 ///
 /// # Syntax
 ///
@@ -21,9 +22,13 @@
 /// fixed_newtype!(pub Name, N, "doc string");            // with custom doc
 /// fixed_newtype!(pub Name, N, derive: [ConstantTimeEq]); // with opt-in impls
 /// fixed_newtype!(pub Name, N, "doc", derive: [ConstantTimeEq]);
+/// fixed_newtype!(pub Name, generic T);                  // reduced API, opted into
+/// fixed_newtype!(pub Name, generic T, "doc string");
+/// fixed_newtype!(pub Name, generic T, derive: [WrapperAccess]);
+/// fixed_newtype!(pub Name, generic T, "doc", derive: [WrapperAccess]);
 /// ```
 ///
-/// Supported `derive:` options are `ConstantTimeEq`, `Deserialize`, `FromWrapper`, `IntoWrapper`, and `WrapperAccess` (= both directions). See
+/// Supported `derive:` options are `ConstantTimeEq`, `Deserialize`, `FromWrapper`, `IntoWrapper`, and `WrapperAccess` (= both directions). The first two constrain the inner type — `ConstantTimeEq` and `Deserialize` must be implemented for it, which rules them out for most `generic` inner types (`[i16; 256]` has neither), while the three wrapper-access tokens apply to any. See
 /// *Cloning and serialization* below for the two that are deliberately absent.
 ///
 /// # Examples
@@ -56,13 +61,84 @@
 /// seal(&mac, &enc); // E0308: roles swapped
 /// ```
 ///
-/// Zero-size is a **compile error**, exactly as with
-/// [`fixed_alias!`](crate::fixed_alias):
+/// Zero-size is a **compile error**, raised where the type is declared rather
+/// than where one is first built:
 ///
 /// ```rust,compile_fail
 /// use secure_gate::fixed_newtype;
 /// fixed_newtype!(pub Bad, 0); // compile-time error: index out of bounds
 /// ```
+///
+/// # Inner types other than bytes
+///
+/// The size-literal forms cover `Fixed<[u8; N]>`, the shape nearly every
+/// secret takes. [`Fixed<T>`](crate::Fixed) holds more than that, and the
+/// `generic` marker opts a newtype into it. The requirement is
+/// `Zeroize + `[`SentinelValue`](crate::SentinelValue)` + `[`FixedStorage`](crate::FixedStorage), checked at the
+/// declaration — slightly narrower than `Fixed<T>` itself, which needs only
+/// `Zeroize`, because the generated [`into_inner`](crate::RevealSecret::into_inner)
+/// has to leave an inert value behind. Arrays of a `Default` element, `String`
+/// and `Vec<T>` already satisfy both; a custom inner type needs its own
+/// `impl SentinelValue`, which is why that trait is public:
+///
+/// ```rust
+/// use secure_gate::{fixed_newtype, RevealSecret};
+///
+/// fixed_newtype!(pub Poly, generic [i16; 256]);
+///
+/// let poly = Poly::new([0i16; 256]);
+/// assert_eq!(poly.with_secret(|coeffs| coeffs.len()), 256);
+/// ```
+///
+/// The case this exists for is `no_std`. With no allocator there is no
+/// [`Dynamic`](crate::Dynamic), so `Fixed` is the only wrapper, and a secret on
+/// such a target is frequently not bytes: an ML-KEM secret polynomial
+/// `[i16; 256]`, Ed25519 scalar limbs `[u64; 4]`, AES-256 expanded round keys
+/// `[u32; 60]`. An inner type missing either bound is a compile error reported
+/// from the expansion: `Zeroize` fails against `Fixed<T>`'s own bound, and
+/// `SentinelValue` against the one the generated `RevealSecret` restates.
+/// [`dynamic_newtype!`](crate::dynamic_newtype)'s `generic` arm carries the
+/// same pair, for the same reason.
+///
+/// The `generic` form deliberately provides less: [`RevealSecret`](crate::RevealSecret),
+/// [`RevealSecretMut`](crate::RevealSecretMut), redacted `Debug`, `Zeroize`,
+/// `ZeroizeOnDrop`, and `new`. Absent are [`SecretLen`](crate::SecretLen), `From`
+/// and `TryFrom`, the encoders and the RNG constructors. The reason is the macro's
+/// field of view, not the meaning of each method: `generic $inner:ty` is one opaque
+/// token, so the expansion cannot tell an array from a struct and withholds the
+/// shape-dependent surface uniformly rather than conditionally. For some of them
+/// no meaning exists — hex over a `Vec<u32>` has no defined byte order — but
+/// `SecretLen` is not one of those: the base wrapper implements it for every
+/// `Fixed<[T; N]>`, and its `byte_len` is correctly `N * size_of::<T>()` rather
+/// than a count of elements. So that capability exists one layer down and
+/// `derive: [IntoWrapper]` reaches it in one call; what the arm withholds is the
+/// newtype's *own* `len()`, not the answer. Writing the marker is how you say you
+/// know that. A zero-sized inner value is still refused: there is no `N` for the
+/// macro to check, so [`Fixed`](crate::Fixed) rejects it at construction instead.
+///
+/// **The inner type must not be able to reallocate.** This arm used to accept
+/// `generic Vec<u8>` and `generic String`, which put a growable buffer inside the
+/// wrapper the documentation calls free of any realloc surface; measured, each
+/// abandoned an unwiped buffer holding the whole secret on any capacity change, and
+/// with no `io::Write` escape of the sort [`Dynamic<Vec<u8>>`](crate::Dynamic) has.
+/// [`Fixed::new`](crate::Fixed::new) now requires
+/// [`FixedStorage`](crate::FixedStorage), so those forms are a compile error reported
+/// at this declaration. Arrays, the primitives, tuples and `Option` are covered for you,
+/// which is every shape this arm exists for; a custom inner type adds
+/// `impl FixedStorage for MyType {}`, which asserts that it owns no heap
+/// allocation. For a growable payload reach for
+/// [`dynamic_newtype!`](crate::dynamic_newtype) instead, where the residue is
+/// documented and one safe growth path exists.
+///
+/// **`new_with` is absent for a different reason, and it costs you something.**
+/// Unlike the others it is perfectly meaningful for an arbitrary `T`; it simply
+/// is not generated. So the arm has no in-place constructor, and `new` takes its
+/// value by value — which is the construction the size-literal arms offer
+/// `new_with` to avoid, because a by-value argument may leave a copy of the
+/// secret on the caller's frame that nothing will wipe (see
+/// [`Fixed::new_with`](crate::Fixed::new_with)). On this arm that mitigation is
+/// unavailable: build the value as close to the call as you can, and prefer a
+/// size-literal newtype when the secret is a byte array and residue matters.
 ///
 /// # Cloning and serialization are not generated
 ///
@@ -107,9 +183,14 @@
 /// `size_of::<EncKey>() == N` and delegation is `#[inline]` throughout — the
 /// newtype costs nothing at runtime.
 ///
-/// Each expansion emits `const _: () = { let _ = [(); N][0]; };`, the same
-/// zero-size guard [`fixed_alias!`](crate::fixed_alias) uses, so `N = 0`
-/// produces the identical const-evaluation diagnostic.
+/// Each size-literal expansion emits `const _: () = { let _ = [(); N][0]; };`,
+/// a declaration-site courtesy: `N = 0` fails on the line that declares the
+/// type, which is the line worth pointing at. It is not the only guard.
+/// [`Fixed::new`](crate::Fixed::new) and
+/// [`Fixed::new_with`](crate::Fixed::new_with) carry a `const` assertion
+/// rejecting a zero-sized inner value at construction, which is what covers a
+/// plain `type` alias and the `generic` arm; there the error falls at the first
+/// concrete construction instead.
 ///
 /// **Do not add your own `Drop` impl.** None is needed: the wrapped
 /// [`Fixed`](crate::Fixed) still runs its own, so zeroization is unaffected.
@@ -127,7 +208,7 @@
 ///
 /// **Nominal separation guards against mistakes, not intent** — but nothing is
 /// generated that would undo it by accident. There is no `From<Wrapper>` and
-/// no `Deref`, so an alias-typed value cannot flow into a newtype through
+/// no `Deref`, so a base-typed value cannot flow into a newtype through
 /// `.into()`, and `&Newtype` never coerces to `&Wrapper` at a call site. By
 /// default the only way material enters or leaves is the 3-tier access API —
 /// a `with_secret` round trip — which is explicit and shows up in the audit
@@ -154,28 +235,58 @@
 /// a rebuild, a reveal the job never needed.
 ///
 /// **Which direction is safe depends on the pool.** In a mixed tree the base
-/// type is not raw material: every plain alias sharing it *is* that type, so
-/// a directional token connects this role to all of them at once.
+/// type is not raw material: every plain `type` alias sharing it *is* that
+/// type, so a directional token connects this role to all of them at once.
 /// `FromWrapper` lets anything in the pool become this role — the source never
 /// opts in, because the source is just the base type — so a type that guards
 /// a boundary must never take it. `IntoWrapper` lets this role become anything
 /// in the pool, which is safe only when the role is no more sensitive than
 /// the least-sensitive alias sharing its base; on a secret role it is an
 /// explicit, greppable downgrade, not a neutral operation. The default,
-/// neither token, is sufficient more often than it looks. The exposure is
+/// neither token, is sufficient more often than it looks. `IntoWrapper` also
+/// reopens whatever the base wrapper implements for that inner type, which on a
+/// `generic` newtype includes the surface the arm withheld: `as_wrapper().len()`
+/// and `.byte_len()` answer for any `Fixed<[T; N]>`. The reduced surface is a
+/// property of the label, not a barrier. The exposure is
 /// largest during a partial migration — the regime real consumers live in —
 /// because while most aliases stay plain the base type is a universal donor.
 /// Audit these methods the way you audit `expose_secret()`.
 ///
 /// # See also
 ///
-/// - [`fixed_alias!`](crate::fixed_alias) — a `type` alias instead, when
-///   readability rather than role separation is the goal
 /// - [`dynamic_newtype!`](crate::dynamic_newtype) — heap-allocated counterpart
-/// - [`fixed_generic_alias!`](crate::fixed_generic_alias) — one name across
-///   several sizes
+/// - a plain `type` alias — `pub type Aes256Key = Fixed<[u8; 32]>;` — when a
+///   readable name rather than role separation is the goal, and the name should
+///   stay interchangeable with its base. Two aliases over one shape are the
+///   same type, so the compiler will not keep two roles apart; that is the
+///   whole of the choice, and the crate's README argues it at length
 #[macro_export]
 macro_rules! fixed_newtype {
+    // ---- explicit generic arms: caller opts in to the reduced API ----
+    //
+    // Placed first. They match the literal token `generic` in the inner-type
+    // position, so they cannot shadow a size literal, and matching the marker
+    // before any `:literal` or `:ty` fragment is parsed keeps the ordering
+    // safe: `macro_rules!` does not backtrack once a fragment has been
+    // consumed. The doc-literal forms get their own arms, exactly as
+    // `dynamic_newtype!`'s generic form does, so that the third positional
+    // argument means the same thing on both macros and on every arm of each.
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic $inner:ty
+     $(, $doc:literal)? $(, derive: [$($opt:ident),* $(,)?])?) => {
+        $crate::__sg_newtype_base!(
+            $(#[$attr])* $(#[doc = $doc])* $vis $name($crate::Fixed<$inner>),
+            derive: [$($($opt),*)?]
+        );
+
+        impl $name {
+            /// Wraps a value in place. `const fn`, like `Fixed::new`.
+            #[inline(always)]
+            pub const fn new(value: $inner) -> Self {
+                Self($crate::Fixed::new(value))
+            }
+        }
+    };
+
     ($(#[$attr:meta])* $vis:vis $name:ident, $size:literal, $doc:literal, derive: [$($opt:ident),* $(,)?]) => {
         $crate::fixed_newtype!($(#[$attr])* #[doc = $doc] $vis $name, $size, derive: [$($opt),*]);
     };
@@ -402,5 +513,26 @@ macro_rules! fixed_newtype {
                 }
             }
         }
+    };
+
+    // ---- catch-all: neither a byte size nor the `generic` marker ----
+    //
+    // Uses `$($rest:tt)+` rather than `$inner:ty` so it can never itself
+    // hard-error on a malformed tail; the message names what was written.
+    ($(#[$attr:meta])* $vis:vis $name:ident, $($rest:tt)+) => {
+        ::core::compile_error!(::core::concat!(
+            "fixed_newtype!: no form matches `",
+            ::core::stringify!($($rest)+),
+            "`. The accepted forms are `N`, `N, \"doc\"`, `N, derive: [..]` and \
+             `N, \"doc\", derive: [..]`, where N is the length of the `[u8; N]` \
+             array being wrapped; and the same four with `generic <type>` in place \
+             of N, for an inner type that is not a byte array \
+             (`fixed_newtype!(pub K, generic [i16; 256])`), which takes the reduced \
+             API (RevealSecret, RevealSecretMut, Debug, Zeroize, and `new`) on \
+             purpose. If the length or the marker looks right, the problem is in \
+             what follows it: a `derive:` list needs brackets, and accepts only \
+             ConstantTimeEq, Deserialize, FromWrapper, IntoWrapper and \
+             WrapperAccess."
+        ));
     };
 }

@@ -7,7 +7,422 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`fixed_newtype!(pub Name, generic T)` — the `Fixed` counterpart of the `generic` arm.**
+  `dynamic_newtype!` has accepted `generic T` since rc.8, for an inner type that is neither
+  `String` nor `Vec<u8>`. `fixed_newtype!` had no such arm, for a reason that was about the
+  macro rather than the wrapper: it takes a size literal, so the token-matching ambiguity
+  that forced `dynamic_newtype!`'s explicit marker never arose, and nobody went looking for
+  the gap.
+
+  The gap is real, and it is widest exactly where `Fixed` matters most. On a `no_std` target
+  there is no allocator, so there is no `Dynamic` at all and `Fixed` is the only wrapper —
+  and a secret on such a target is frequently not a byte array. An ML-KEM secret polynomial
+  is `[i16; 256]`; Ed25519 scalar limbs are `[u64; 4]`; an AES-256 expanded key schedule is
+  `[u32; 60]`, as secret as the key it was derived from. All three are valid `Fixed<T>`
+  today, because `Fixed<T: Zeroize>` and its `RevealSecret` impl are generic over `T`. None
+  of them could be given a nominal type by macro.
+
+  ```rust
+  // An ML-KEM secret polynomial, on a target with no allocator.
+  fixed_newtype!(pub Poly, generic [i16; 256]);
+  let p = Poly::new([0i16; 256]);
+  assert_eq!(p.with_secret(|c| c.len()), 256);
+  ```
+
+  The arm emits the struct, redacted `Debug`, `RevealSecret`, `RevealSecretMut`, `Zeroize`,
+  `ZeroizeOnDrop`, any `derive:` tokens, and a `const fn new`. It deliberately omits
+  `SecretLen`, `new_with`, `From`, `TryFrom`, the encoders and the RNG constructors: none of
+  those has a meaning for an arbitrary `T`, which is the same trade `dynamic_newtype!`'s
+  generic arm already makes. Writing the word `generic` is how a caller says they know.
+
+  `fixed_newtype!` also gained a catch-all arm, so an inner type that is neither a size
+  literal nor marked `generic` is now a `compile_error!` naming both fixes instead of
+  rustc's "no rules expected this token".
+
+### Changed
+
+- **BREAKING: `Fixed::new` now requires `FixedStorage` on the inner type, which makes
+  `SECURITY.md`'s "`Fixed<T>` is exempt" true instead of aspirational.** That sentence was a
+  claim about the shape people were expected to use, not something the type system checked.
+  `Fixed<T>` was bounded only by `Zeroize`, so all of these compiled, and measured with an
+  allocator instrument, each abandoned an unwiped buffer holding the whole secret on any
+  capacity change: `Fixed<Vec<u8>>` and `Fixed<String>` at 1008 of 1008 bytes;
+  `Fixed<[Vec<u8>; 2]>`, which hides a growable container inside the very array shape the
+  document called exempt; and `fixed_newtype!(pub Name, generic Vec<u8>)`, which was the
+  documented, blessed path to all of it. Worse than the `Dynamic` equivalent, because
+  `Dynamic<Vec<u8>>` has a safe-growth `io::Write` impl that grows by hand and wipes the old
+  allocation, and `Fixed<Vec<u8>>` has nothing. Grepping the repository for `Fixed<Vec`
+  returned zero hits, so nothing warned anyone off it while `SECURITY.md` promised the
+  opposite.
+
+  `FixedStorage` is a marker with no methods, in the same family as `CloneableSecret`,
+  `SerializableSecret` and `SentinelValue`. Implementing it asserts that the type owns no
+  buffer whose capacity can change. The crate covers the primitives, `[T; N]` for any `N`
+  when the element type qualifies, tuples up to four elements, `Option<T>`, and `Box<[T]>` —
+  a boxed slice has a length fixed at construction. `Vec<T>` and `String` are deliberately
+  absent.
+
+  **Why a bound rather than another `const` assertion.** The zero-size guard is a
+  post-monomorphization `const` error: `cargo check` cannot see it, generic code defers it to
+  the instantiation site, and a release build of a library can swallow it entirely. A trait
+  bound has none of those properties. Measured against a consumer crate: `Fixed<Vec<u8>>`,
+  `Fixed<String>`, `Fixed<[Vec<u8>; 2]>`, `Fixed<Option<Vec<u8>>>` and a tuple containing a
+  `Vec` are all `cargo check` errors, and for `fixed_newtype!(pub X, generic Vec<u8>)` the
+  error lands on the declaration line rather than at the first construction. A downstream
+  generic function cannot launder a `Vec` through either, because the bound propagates to its
+  caller.
+
+  A `needs_drop` const assertion was prototyped first and rejected. It classifies every case
+  that matters correctly, but it also rejects `#[derive(Zeroize, ZeroizeOnDrop)] struct
+  Key([u8; 32])` — the shape the `zeroize` documentation recommends — along with any
+  hand-written `Drop` and `Zeroizing<[u8; 32]>`, because all three have drop glue while owning
+  nothing heap-allocated. A `const` cannot ask whether a type implements a trait, so it cannot
+  be paired with an opt-out either. The marker has no such false positives.
+
+  **Two limits, stated rather than glossed.** It is an assertion, not an enforcement: the
+  compiler checks that you wrote the impl, not that it is true, so a type with a `Vec` field
+  that implements `FixedStorage` anyway compiles and leaks — verified. The alternative, a
+  closed set of blessed types, would destroy the one thing the `generic` arm exists for,
+  holding a custom secret on a target with no allocator. And the bound is on `Fixed`, so it
+  says nothing about `dynamic_newtype!(pub Name, generic Vec<u8>)`, which has the growable
+  payload and, unlike plain `Dynamic<Vec<u8>>`, no `io::Write` escape. That is left as a
+  separate decision rather than widened into this one.
+
+  **`Box<[T]>` was blessed and then un-blessed, because the predicate was wrong.** The trait
+  first asked only that a type's capacity cannot change, and a boxed slice satisfies that — its
+  length is fixed at construction. An adversarial pass measured the consequence on a shape the
+  crate had just permitted: a `Fixed<Box<[u8]>>` holding a 1024-byte secret, mutated with
+  `with_secret_mut(|slot| *slot = other_boxed_slice)`, released the original block with **1024
+  of 1024** bytes intact, and the same assignment through `expose_secret_mut` did too.
+  `Option<Box<[u8]>>` and `[Box<[u8]>; 2]` were permitted by the same impl. The inline
+  contrast, `Fixed<[u8; 1024]>` assigned the same way, freed nothing at all, because there is
+  no allocation to abandon.
+
+  The residue never required a capacity change: replacing the whole value abandons the
+  allocation just as well, and the wrapper wipes what it holds at drop rather than what it used
+  to hold. So the contract is now **heap ownership**, not resizability, the `Box<[T]>` impl is
+  gone, and all three boxed shapes are refused. The supported shape for a heap-backed secret of
+  fixed size is `Dynamic<[u8; N]>`, which allocates once. The rejection is pinned in
+  `tests/compile-fail/fixed_reallocating_inner.rs` and the reasoning is recorded beside a test
+  in `tests/core_tests.rs`, because a future reader will otherwise be tempted to add the impl
+  back for exactly the reason it was added the first time.
+
+  **The migration itself wrote one false assertion, found by a sweep tool and fixed.** The
+  twelve marker impls added across the test suite were placed by a script, and eleven were
+  truthful — every one wraps an array or a `u64`. The twelfth was not: `cloneable_secret_works`
+  in `tests/core_tests.rs` declares `struct CloneKey(Vec<u8>)`, and the script gave it
+  `impl FixedStorage for CloneKey {}` so the test would compile again. That is exactly the lie
+  the trait documents as possible and the compiler cannot catch — asserting that a type owning a
+  `Vec` owns no heap allocation — and it was shipped as part of the change that exists to
+  discourage it. Nothing in the test grows the buffer, so there was no live leak; the defect is
+  the false assertion sitting where a reader would copy it. The test's own comment says its
+  subject is that a clone "owns independent heap memory", which makes `Dynamic<CloneKey>` the
+  correct wrapper; it now uses that, with the false impl gone and a note recording what writing
+  one looks like. The other eleven were audited the same way.
+
+  **The error now says what to do instead, and names the one configuration that is easy to
+  get wrong.** `FixedStorage` carries a `#[diagnostic::on_unimplemented]` attribute, so instead
+  of a bare unsatisfied-bound error a consumer reads why the inner type does not qualify, that
+  `Dynamic<T>` is the wrapper for a heap-backed secret, and that `Dynamic` needs this crate's
+  `alloc` feature. That last clause exists because of a real gap: the claim that `Fixed<Vec<u8>>` is
+  dominated "in every feature configuration" is not quite true. A consumer can disable this
+  crate's `alloc` while `zeroize`'s own `alloc` is enabled elsewhere in the graph, and in that
+  configuration `Vec<u8>: Zeroize` holds, `Fixed<Vec<u8>>` used to compile, and
+  `secure_gate::Dynamic` does not exist at all (`error[E0433]` with "the item is gated behind
+  the `alloc` feature"). Measured on the commit before this change. The configuration is
+  incoherent rather than useful — it says there is no allocator while using one — and the remedy
+  is one line of `Cargo.toml`, but the old diagnostic gave no hint of it. Now it does. The
+  attribute needs Rust 1.78, so it is on the 0.9 line only; the 0.8 line carries the same
+  guidance in the trait's documentation instead.
+
+  **The allow-list had to be completed, and the first version of the diagnostic told a
+  falsehood.** A positive marker bound fails closed, which is the right direction for a
+  security crate but means a type is refused for two indistinguishable reasons: it owns a heap
+  allocation, or nothing has asserted that it does not. The first version of this change only
+  blessed the primitives, `[T; N]`, tuples to four and `Option<T>` — so eight heap-free shapes
+  that compiled at `0.9.0-rc.9` stopped compiling, measured against the parent commit with a
+  consumer crate: the twelve `NonZero` integers, `Wrapping<T>`, `MaybeUninit<T>`,
+  `zeroize::Zeroizing<T>`, tuples of five to ten elements, `[NonZeroU32; 4]`, and `Fixed<T>`
+  nested in itself. None of them owns a heap allocation.
+
+  What made that a defect rather than an inconvenience is the orphan rule. Every one of those
+  types is foreign, so a consumer cannot add the missing impl: `impl secure_gate::FixedStorage
+  for core::num::NonZeroU32` in a downstream crate is `error[E0117]`. There was no workaround
+  short of changing their own type, and the diagnostic actively misdirected them — it stated as
+  fact that the type "owns a heap allocation", which for `(u8, u8, u8, u8, u8)` is simply
+  untrue, and then recommended writing the impl that E0117 forbids. Both are fixed: the impls
+  above are now present, the message says the type "is not known to be free of heap
+  allocations", and it distinguishes the two cases, naming E0117 for the foreign one. Tuples
+  stop at ten because that is `zeroize`'s own ceiling — an eleventh element fails the `Zeroize`
+  bound before this one is consulted. `tests/core_tests.rs` pins all eight shapes, and
+  `tests/compile-fail/fixed_reallocating_inner.rs` pins that `Zeroizing<T>` stays conditional,
+  so the wipe-on-drop wrapper cannot smuggle a `Vec` past the bound.
+
+  **Migration.** Nothing for byte arrays, non-byte arrays, tuples, `Option`s, `NonZero`
+  integers, `Wrapping`, `MaybeUninit` or `zeroize::Zeroizing`.
+  A custom inner type adds one line, `impl FixedStorage for MyKey {}`, next to its `Zeroize`
+  impl. A `Fixed<Vec<u8>>` or `Fixed<String>` must become `Dynamic`, which is the wrapper for
+  a growable payload. Inside this repository the change touched nine custom inner types across
+  five test files and one bench — and one doctest: `SerializableSecret`'s example wrapped a
+  `BackupKey(Vec<u8>)` in a `Fixed`, so the crate's own documentation contained an instance of
+  the weakness. It now uses `Dynamic`.
+
+
+- **BREAKING: a zero-sized `Fixed` no longer constructs.** The rc.9 notes recorded that the
+  `N = 0` rejection lived inside `fixed_alias!` and nowhere else, so `type Name =
+  Fixed<[u8; 0]>;` written by hand bypassed it, and that `Fixed` *could* carry the check
+  itself as a post-monomorphization `const` assertion. With the alias macros now gone
+  (below), the only guard left would have been the one inside `fixed_newtype!`, so the check
+  has moved to where it covers every spelling: `Fixed::new` and `Fixed::new_with` each read
+  an associated `const` that asserts a non-zero size. Those two bodies are what every other
+  constructor, decoder, RNG entry point and the `Deserialize` impl already funnel through,
+  so one assertion each covers the whole surface.
+
+  It is spelled as an associated `const` rather than an inline `const { }` block so that the
+  identical hunk builds on the 0.8 line, whose MSRV is 1.70; inline const blocks need 1.79.
+  The `#[allow(clippy::let_unit_value)]` on the binding is load-bearing for the same reason:
+  binding the unit-valued constant is what forces it to be evaluated, and clippy 1.70 rejects
+  every spelling that still triggers the evaluation — a bare path statement and `_ =` are
+  rejected by both 1.70 and 1.85, so the allow is the only form clean on both.
+
+  What fires, and where: the error is post-monomorphization, so generic code still compiles
+  and the failure appears at the first concrete zero-sized construction. The diagnostic names
+  the offending type in the failing constant's path (`Fixed::<[u8; 0]>::NON_ZERO_SIZED`) and
+  a `while instantiating` note points at the construction that reached it. Naming the type
+  without ever building one still compiles, which is why no guard placed in the type could
+  ever make the type unnameable. The `size_of` form also rejects any other zero-sized inner
+  type, `Fixed<()>` included.
+
+  **Two limitations, both measured rather than assumed.** First, `cargo check` does not
+  report it: a post-monomorphization error is raised during codegen, and `cargo check` stops
+  before codegen, so an editor driven by it stays quiet. Second, and more consequential, it
+  fires only for a *codegen root*. A non-generic `#[inline]` function in a library is not
+  one, and every method these macros generate carries an inline attribute (`#[inline]` on
+  the delegating surface, `#[inline(always)]` on `new`, `new_with` and `From::from`), so a
+  library crate that writes `fixed_newtype!(pub Empty, generic [u8; 0]);` next to
+  `#[inline] pub fn empty() -> Empty { Empty::new([]) }` passes `cargo build`,
+  `cargo build --release` and `cargo test` with exit 0 and publishes. The error then appears
+  in every downstream crate that instantiates it, pointing into `secure-gate` and at the
+  dependency's macro invocation rather than at the consumer's own call.
+
+  Root-ness turned out to depend on the compiler and the profile as well as the attribute,
+  which makes the limit broader than "add `#[inline]` and CI goes quiet". Measured on 1.85:
+  the same library with a plain non-generic, non-`inline` `pub fn empty()` fails
+  `cargo build` and `cargo test` and passes `cargo build --release`, because the
+  cross-crate-inlining heuristic added in rustc 1.75 drops a small function from the
+  exported root set in an optimized build. On 1.70 it fails in both profiles, so this is the
+  compiler's decision rather than anything the crate controls. The documentation now says
+  so, and says that instantiating the type in a test or binary is the only reliable check.
+
+  So the guarantee is narrower than "cannot ship", and worth stating exactly: no *value* of
+  a zero-sized `Fixed` can exist at runtime, because nothing can construct one, and a binary
+  or test that tries fails to compile. What the guard does not do is stop a library from
+  exporting an unusable zero-sized API with green CI. Nothing on stable Rust
+  moves the check earlier for generic code: a condition on a generic parameter has nothing to
+  evaluate until that parameter is known. Three other formulations were tried — an array
+  index inside the constant, the same index inline in the function body, and
+  `[(); N - 1]` — and they are respectively equivalent, silently ineffective, and rejected
+  outright as "generic parameters may not be used in const operations". `fixed_newtype!`
+  keeps its own declaration-site guard, which does fire under `cargo check`, because at that
+  point the size is a literal.
+
+  `Dynamic` gets no equivalent, and the reason is about the payload rather than the
+  wrapper: for `String` and `Vec<u8>` emptiness is a runtime property, and an empty
+  `Dynamic<String>` is a legitimate value to hold before validation, so there is nothing
+  for a compile-time check to decide. That does leave one honest gap rather than a
+  non-problem: a *statically* zero-sized inner type. `Dynamic<Zst>` constructs where
+  `Fixed<Zst>` is now rejected. Guarding it would mean a separate `Sized`-only
+  constructor path, since `Dynamic<T: ?Sized>` cannot ask for `size_of::<T>()`, so it is
+  left as a documented asymmetry rather than smuggled into this change.
+
+  **Migration:** nothing, unless a `Fixed<[u8; 0]>` was being constructed on purpose. Tests
+  that used it as a vehicle for an empty-input decoder case move to the `Vec<u8>` decoders,
+  where a zero-length result is representable — which is what this crate's own base32 test
+  did.
+
+- **The heap-residue threat model is corrected in four places, all by measurement.** A review
+  pass built its own allocator instruments rather than reading the prose, and the documented
+  story turned out to be wrong in one direction and incomplete in three.
+
+  **The residue is not unconditional.** `SECURITY.md` said a growth past capacity "allocates a
+  new buffer, memcpys the contents, and frees the old buffer". That is what happens when the
+  allocator *moves* the buffer. `Vec` asks for a `realloc`, and an allocator that can extend
+  the chunk in place does so, copying and abandoning nothing. Measured with the default system
+  allocator and no instrumentation: a full 1008-byte buffer grown by 96 — the exact pair
+  `check_growth_orphan_retains_secret_vec` uses — extends in place, as do a 1040-byte `String`
+  grown by 16, a 4096-byte buffer grown by 65536, and a growth with one allocated neighbour
+  immediately behind. On a fragmented heap the same growth moves and the abandoned chunk holds
+  the secret. So the exposure is real with a probabilistic trigger. The documentation now says
+  so, and says that the byte counts come from an instrument that does not override `realloc`
+  and therefore forces the copying path on every growth. That is the right choice for a threat
+  model, but it is the worst case rather than the typical one, and `lifecycle_trace_heap.rs`'s
+  header no longer claims that an in-place resize "would leave the same residue" — it leaves
+  none, because nothing is abandoned: the old bytes are inside the allocation the wrapper still
+  owns and still wipes.
+
+  **Shrinking abandons a buffer too.** Framing the weakness as growth past capacity was the
+  wrong mental model. `shrink_to_fit` and `shrink_to` reallocate downward and free the old
+  block with the secret in it, and truncate-then-shrink is the worst of the family: a pre-sized
+  4096-byte buffer truncated to 2048 and then shrunk released its old block holding **4096**
+  non-zero bytes, the live prefix and the discarded tail together, while the wrapper went on to
+  protect only the smaller replacement. A buffer that never grew can leak its entire contents
+  this way. `reserve` is the converse surprise: it abandons the old buffer while writing no
+  payload at all. The dangerous-operation list and the README both now say *capacity-changing*
+  rather than growing, and name both shrink methods.
+
+  **The bound on the exposure was never stated.** The documentation said what is not covered
+  and never said what is. The buffer the wrapper holds after the change is the currently-held
+  allocation, so it is zeroized on drop, spare capacity included — measured at 0 non-zero bytes
+  of 2016, with a positive control confirming its tail held payload going in. The exposure is
+  confined to the abandoned buffers, plural, one per move. `tests/lifecycle_trace_heap.rs`
+  already asserted this five times; only the prose was missing it.
+
+  **The recommended remedy leaked.** `SECURITY.md` advised replacing the wrapper with
+  `Dynamic::new_with(|v| …)`. That closure starts with an empty `Vec`, so filling it byte by
+  byte reallocates its way up and abandons its own intermediate buffers: 1016 secret bytes
+  across 7 blocks for a 1008-byte secret. The advice now says to pre-size inside the closure or
+  to build the value and use `Dynamic::new`, both of which measured 0. The limitation's scope is
+  also widened to name the two routes it omitted: `as_wrapper_mut` on a newtype declared with
+  `derive: [IntoWrapper]` or `[WrapperAccess]`, and the `new_with` closure itself.
+
+  **Two more, from an adversarial pass over the safe-growth advice itself.** The
+  `std::io::Write` path this section offers as the one place the crate owns the growth needs
+  the `std` feature, and `full` does **not** enable `std` — so a consumer building with
+  `--features full`, which is what the documentation suggests everywhere else, does not have
+  that impl at all and has no safe growth path. Said plainly now. And it is the impl *on the
+  wrapper* that is safe, not `Write` in general: `d.expose_secret_mut().write_all(b"…")`
+  resolves to the standard library's `impl Write for Vec<u8>`, which grows by
+  `extend_from_slice` and abandons the old buffer unwiped. Measured on a 1000-byte secret,
+  the wrapper's own `write_all` leaves 0 surviving bytes and the reached-through form leaves
+  1000. Two lines that look alike and behave oppositely, so the difference is now documented
+  rather than implied.
+
+- **`CloneableSecret`'s docs record a rustc suggestion that would delete the gate.** Calling
+  `.clone()` on a *reference* to a wrapper whose inner type lacks the marker, with no target
+  annotation, resolves to `<&T as Clone>::clone`. It compiles, and the only diagnostic is the
+  warn-by-default `noop_method_call`, whose `help:` proposes adding `#[derive(Clone)]` to
+  `Dynamic` — that is, proposes removing the opt-in this crate exists to enforce. Nothing is
+  duplicated, so no secret escapes; the call does nothing at all. It is documented because a
+  reader who follows rustc's advice dismantles the gate, and because the real error is only
+  one receiver away: an owned value, or an annotated target, still reports the unsatisfied
+  `CloneableSecret` bound.
+
+  **A fifth correction, to the escape route rather than the weakness.** `SECURITY.md` said a
+  custom-allocator-parameterized `Dynamic<T, A>` "currently requires nightly Rust
+  (`allocator_api`)". Nightly is needed only for the standard library's own `Vec<T, A>`; the
+  `allocator-api2` shim ships a stable `Allocator` trait and its own `Vec<T, A>` and declares
+  `rust-version = "1.63"`, so it is within reach of both release lines. Verified rather than
+  assumed: a twenty-line zeroize-on-free allocator parameterizing such a `Vec` compiled and ran
+  with no nightly features on both rustc 1.70 and current stable, saw the abandoned buffer with
+  1008 of 1008 bytes still live, and wiped them before release — read back inside the allocator
+  after the wipe and before the inner `deallocate`, which is the only window where that can be
+  checked, giving 0.
+
+  Getting this right matters because it moves the obstacle. The reason this crate does not do it
+  is not a toolchain channel: implementing such an allocator needs `unsafe impl Allocator` and
+  this crate is `#![forbid(unsafe_code)]`, it would add a non-optional dependency to a crate
+  that has exactly one, and it would add a type parameter to `Dynamic`, which is API-breaking.
+  Those are the real reasons, and they are better ones.
+
+### Removed
+
+- **BREAKING: `fixed_alias!`, `dynamic_alias!`, `fixed_generic_alias!` and
+  `dynamic_generic_alias!` are deleted.** Three of the four expanded to a single `type` line
+  and a generated doc attribute; `fixed_alias!` added a const-eval guard rejecting `N = 0`.
+  What none of them added was a type. Two aliases over one shape were always the same
+  nominal type, freely substitutable for each other.
+
+  The problem was never what they expanded to. It was that a macro exported by a crate whose
+  pitch is "accidents must not compile" reads as a guarantee, and these guaranteed a name.
+  This repository's own README called them "typed newtype wrappers" and "Type-safe wrappers"
+  from 0.5.1 until commit `fe93540`, whose message records that downstream users had relied
+  on that reading. The measured consequence is in
+  `docs/design/secure-gate-requested-newtyping-requirements.md`: a consumer's 34 aliases
+  collapsed to 8 real types, with `FileId` (documented "never crosses IPC") and `PublicId`
+  (documented "safe to expose via IPC") the same type on adjacent lines, and five distinct
+  32-byte cryptographic keys mutually substitutable. Nobody misreads
+  `pub type FileId = Dynamic<String>;`.
+
+  With `fixed_newtype!` / `dynamic_newtype!` shipped since rc.8, the alias macros were also
+  dominated on every axis. A newtype costs nothing at runtime — `tests/asm_dse_check.rs`
+  proves the zeroization stores survive optimization through the extra layer, and under an
+  LLVM that folds the two symbols it is byte-identical, though whether the fold happens is
+  the toolchain's call and zeroize 1.9 stopped it here — and is strictly safer, so where a
+  role exists the newtype
+  wins; and where no role exists, one line of ordinary Rust is shorter than the macro call it
+  replaces. Keeping both left two same-shaped macros one word apart, differing only in the
+  property that matters, which is why the documentation had to carry a "Nominal?" column to
+  tell them apart.
+
+  The case *for* aliases is untouched, and rc.9's note on when an alias is the right reach
+  still stands word for word: material worth zeroize-on-drop and a redacted `Debug` that has
+  no role it could be confused with, where interchangeability with the base type is a feature
+  because it crosses into third-party APIs without ceremony. Only the spelling changes. A
+  doc comment on the `type` gives the documentation the macro's optional doc-string argument
+  used to provide.
+
+  **Migration** is mechanical and one line per alias:
+
+  | Was | Now |
+  |---|---|
+  | `fixed_alias!(pub X, N);` | `pub type X = Fixed<[u8; N]>;` |
+  | `fixed_alias!(pub X, N, "doc");` | `/// doc` above `pub type X = Fixed<[u8; N]>;` |
+  | `dynamic_alias!(pub X, T);` | `pub type X = Dynamic<T>;` |
+  | `dynamic_alias!(pub X, T, "doc");` | `/// doc` above `pub type X = Dynamic<T>;` |
+  | `fixed_generic_alias!(pub X);` | `pub type X<const N: usize> = Fixed<[u8; N]>;` |
+  | `dynamic_generic_alias!(pub X);` | `pub type X<T> = Dynamic<T>;` |
+
+  For a tree with many of them, this GNU `sed` run covers every form above, including
+  `pub(crate)`, the optional doc string, and an inner type containing a comma. Run the
+  doc-string forms first. Out of order nothing is silently wrong, but you get a mess to undo
+  by hand: the `fixed_alias!` two-argument pattern ends in `, ([0-9]+)\);` so it cannot match
+  a three-argument call at all and leaves the line as a macro invocation, while the
+  `dynamic_alias!` one does consume the doc string into the type position and yields
+  `Dynamic<String, "doc">`, which fails loudly as `error[E0107]: struct takes 1 generic
+  argument but 2 generic arguments were supplied`:
+
+  ```sh
+  # Doc-string forms first: the doc becomes an ordinary `///` comment.
+  sed -i -E 's#fixed_alias!\((pub(\([^)]*\))? )?([A-Za-z0-9_]+), ([0-9]+), "(.*)"\);#/// \5\n\1type \3 = Fixed<[u8; \4]>;#' $FILES
+  sed -i -E 's#dynamic_alias!\((pub(\([^)]*\))? )?([A-Za-z0-9_]+), (.+), "(.*)"\);#/// \5\n\1type \3 = Dynamic<\4>;#' $FILES
+  # Then the two-argument forms.
+  sed -i -E 's#fixed_alias!\((pub(\([^)]*\))? )?([A-Za-z0-9_]+), ([0-9]+)\);#\1type \3 = Fixed<[u8; \4]>;#' $FILES
+  sed -i -E 's#dynamic_alias!\((pub(\([^)]*\))? )?([A-Za-z0-9_]+), (.+)\);#\1type \3 = Dynamic<\4>;#' $FILES
+  ```
+
+  Then replace the macro import with `use secure_gate::{Dynamic, Fixed};`. The generic
+  aliases are rare enough to convert by hand, per the last two table rows. The `N = 0` guard
+  is not lost in the move: `Fixed` now rejects a zero-sized value at construction (above),
+  which is what covers the hand-written `type` the macro used to special-case. The last tags
+  carrying these macros are `v0.9.0-rc.9` on this line and `v0.8.0-rc.12` on the 0.8 line,
+  which receives the same change.
+
 ### Testing
+
+- **The zero-size guard is pinned by a `trybuild` case that needed a `pass` fixture to work
+  at all.** `trybuild` runs `cargo check` unless the same `TestCases` also holds a `pass`
+  case, in which case it runs `cargo build`
+  (`trybuild/src/cargo.rs`: `.arg(if project.has_pass { "build" } else { "check" })`). A
+  post-monomorphization `const` error is only raised during codegen, so the first version of
+  `tests/compile-fail/fixed_zero_size.rs` compiled clean under `check` and the test asserted
+  the exact opposite of the truth — it reported "expected test case to fail to compile, but
+  it succeeded". `tests/compile-pass/fixed_nonzero_size.rs` is what flips the run into
+  `build` mode, and it earns its place twice over: it is also the positive control that the
+  guard rejects nothing valid, covering `new`, `new_with`, a generic constructor and a
+  `generic`-arm newtype.
+
+  Left for a follow-up with `workflow` scope: `fuzz-miri.yml` still passes
+  `--skip fixed_alias_zero_size_compile_fail` for a test that no longer exists. It is a
+  no-op either way, because every compile-fail test is `#[cfg(not(miri))]` and so does not
+  exist under Miri at all, but the line is stale and should go.
+
+  Two things to know about the snapshot. Only two diagnostics appear for three bad
+  constructions, because the third routes through `Fixed::<[u8; 0]>::new` as well and a
+  failed constant is reported once. And the snapshot embeds the assertion's line number in
+  `src/fixed.rs`, so an edit to that file above the assertion moves it and the snapshot needs
+  re-blessing with `TRYBUILD=overwrite cargo test compile_fail` on the pinned toolchain.
 
 - **The DSE guard follows the drop path instead of assuming the glue is inlined.**
   `tests/asm_dse_check.rs` extracted `make_and_drop_fixed`'s body and asserted the
@@ -26,6 +441,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   glue (`drop_glue` under v0, `drop_in_place` under legacy), so it cannot credit
   an unrelated function's stores, and a negative control — `Fixed`'s `Drop` body
   emptied — still fails. The existing identical-code-folding path is unchanged.
+
+- **Two suites now trace a newtype's whole lifecycle rather than testing its methods one at
+  a time.** The existing tests check properties; these follow one secret from creation,
+  through reads, mutation and hand-off, to the end of protection, and assert at every
+  transition what happened to the material itself. They are split by what can observe a
+  secret's storage, because no single instrument reaches both.
+
+  `tests/lifecycle_trace_heap.rs` instruments the allocator, so it can watch a `Dynamic`
+  newtype's buffer. Its own `GlobalAlloc` has three modes: the asserting mode
+  `tests/heap_zeroize.rs` already used, a pointer-keyed watch mode that records how many
+  non-zero bytes a specific block still held at release (so it can assert quantities and
+  negatives, which a panicking allocator cannot), and a thread-scoped counting mode for
+  "nothing was copied". One aggregate test, as that file's header requires. Covered:
+  `dynamic_newtype!` over `String`, over `Vec<u8>`, over the `generic Vec<u32>` arm, and one
+  with `derive: [WrapperAccess]`.
+
+  `tests/lifecycle_trace_handoff.rs` is the deliberate complement: no allocator, nothing
+  process-global, so it runs in parallel with the rest of the suite and reaches the
+  stack-backed shapes the allocator cannot see at all. A `Fixed` newtype never allocates, so
+  it traces storage by address identity (every read and write tier is asked for the address
+  it reaches, and those addresses are compared as pointers, never dereferenced) and traces
+  end-of-life with an inner type that records, inside its own `Zeroize` impl, the value
+  present when the wipe happened. 19 tests over six shapes: both size-literal front ends, the
+  `generic [i16; 256]` arm, both directional tokens, and a plain `type` alias for the
+  contrast.
+
+  What the stack trace establishes that a method test does not: both write tiers mutate the
+  wrapper's own storage without moving it; `expose_secret_mut` hands back the same address
+  `expose_secret` names, so no forwarding layer is copying the secret into a temporary and
+  leaving a second unwiped copy; the README's key-rotation line overwrites the old key where
+  it sits; `into_inner` leaves the inert sentinel behind, proved by the wrapper's own `Drop`
+  later recording a wipe of the sentinel rather than the secret; `into_wrapper` is a label
+  drop and not a protection drop, with the result still `[REDACTED]`; and every shape carries
+  real drop glue, so for `[u8; 32]` — which needs no drop of its own — the wipe is scheduled
+  rather than merely available.
+
+  **Two doc claims the stack trace contradicted, both now corrected.** First, the `generic`
+  arm's stated reason for withholding `SecretLen` was that a length has no meaning for an
+  arbitrary `T`. The base wrapper implements `SecretLen for Fixed<[T; N]>` with
+  `byte_len() = N * size_of::<T>()`, which is exactly the question the doc said had no
+  answer, and `derive: [IntoWrapper]` reaches it in one call. The real reason is the macro's
+  field of view — `generic $inner:ty` is one opaque token, so the expansion cannot tell an
+  array from a struct and withholds the shape-dependent surface uniformly rather than
+  conditionally. Both macros now say that, and the `IntoWrapper` note says that the outbound
+  token reopens whatever the base implements for that inner type, the withheld surface
+  included. Second, "nothing is copied" on `into_inner` is literally true only for `Dynamic`,
+  where the allocation itself is handed over. A `Fixed` stores its secret inline, so
+  `mem::replace` must transfer the bytes into the caller's slot; what holds for both is that
+  the value is moved and not duplicated-and-kept, because the wrapper's slot receives the
+  sentinel. The trait doc, the module example and the `Fixed` comment now draw that
+  distinction instead of claiming the stronger thing.
+
+  **CodeQL raised 13 high-severity alerts against the heap trace, and the fix is a better
+  message.** Every one was `rust/cleartext-logging` on the same assertion shape: a buffer's
+  capacity, read through `with_secret` and therefore secret-derived in the query's model,
+  interpolated into an `assert_eq!` failure message. A format argument is a logging sink for
+  that query; an operand is not, which is why the assertions comparing *against* a
+  `with_secret` result were never flagged. A capacity is a block size rather than secret
+  material, so the alerts overstate the exposure — but the interpolation was redundant in the
+  first place, because `assert_eq!` prints both operands on failure. The messages now say what
+  a mismatch means and let the macro print the numbers, which removes the sink without
+  suppressing anything and without losing a byte of diagnostic detail. Confirmed by breaking
+  one assertion on purpose: the failure still reports both sizes. The file's header says not to
+  put a `with_secret`-derived value back into a format string there.
 
 ## [0.9.0-rc.9] - 2026-09-09
 

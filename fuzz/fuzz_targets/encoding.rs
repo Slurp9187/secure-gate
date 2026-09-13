@@ -74,7 +74,7 @@ fuzz_target!(|data: &[u8]| {
         let _ = Dynamic::<Vec<u8>>::try_from_hex("0");     // odd length
         let _ = Dynamic::<Vec<u8>>::try_from_hex("xyz!");  // invalid chars
         let _ = Dynamic::<Vec<u8>>::try_from_hex("AABBCC"); // uppercase
-        let _ = Fixed::<[u8; 0]>::try_from_hex("");
+        let _ = Fixed::<[u8; 1]>::try_from_hex("");
     }
 
     // === BASE64URL ===

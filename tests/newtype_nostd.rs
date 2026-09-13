@@ -1,6 +1,11 @@
 #![cfg_attr(not(feature = "alloc"), no_std)]
 use secure_gate::{RevealSecret, SecretLen, fixed_newtype};
 fixed_newtype!(pub NoStdKey, 16);
+
+// The `generic` arm exists for exactly this target: with no allocator there is no
+// `Dynamic`, so `Fixed` is the only wrapper, and a secret here is often not a byte
+// array. `[i16; 256]` is an ML-KEM secret polynomial.
+fixed_newtype!(pub Poly, generic [i16; 256]);
 #[test]
 fn t() {
     let k = NoStdKey::new([3u8; 16]);
@@ -44,4 +49,15 @@ fn nostd_newtype_decodes_both_checksums() {
     let _ = NoAllocKey::try_from_bech32m_unchecked(S);
     let _ = NoAllocKey::try_from_bech32m_sized::<2048>(S, "bc");
     let _ = NoAllocKey::try_from_bech32m_unchecked_sized::<2048>(S);
+}
+
+// The reduced surface is the point: `Poly` gets access, redaction and zeroization, and
+// deliberately no `SecretLen` (a length in elements would not mean what callers expect
+// of a byte length) and no encoders. Read through `with_secret`, not `len()`.
+#[test]
+fn generic_arm_wraps_a_non_byte_array() {
+    let p = Poly::new([0i16; 256]);
+    assert_eq!(p.with_secret(|c| c.len()), 256);
+    // `#[repr(transparent)]` over `Fixed<[i16; 256]>`: 256 coefficients, 2 bytes each.
+    assert_eq!(core::mem::size_of::<Poly>(), 512);
 }
