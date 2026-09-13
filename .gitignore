@@ -2,7 +2,7 @@
 /code_packages*/
 /docs
 /issues
-/target
+**/target/
 
 *conflict*
 *# Name clash*
