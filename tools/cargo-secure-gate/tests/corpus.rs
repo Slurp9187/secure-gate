@@ -157,33 +157,19 @@ fn the_two_checks_ask_two_different_questions() {
     // Conflating them is the root cause rather than the `Box` entry itself: a
     // boxed slice owns heap (so SG001 must flag it) and cannot change capacity
     // (so the reallocation vocabulary must not claim it can).
-    use cargo_secure_gate::storage::{Resolver, Storage, TypeDef};
-    let mut resolver = Resolver::default();
-    resolver.types.insert(
-        "B".to_string(),
-        TypeDef {
-            generics: vec![],
-            fields: vec![(
-                "buf".to_string(),
-                syn::parse_str::<syn::Type>("Box<[u8]>").unwrap(),
-            )],
-        },
-    );
-    let found = resolver.classify_named("B", &[]);
-    assert!(matches!(found, Storage::HeapFixed { .. }));
-    assert!(found.owns_heap().is_some(), "FixedStorage must reject it");
+    let findings = analyze_sources(&[(
+        "b.rs".to_string(),
+        "struct B { buf: Box<[u8]> }\nimpl FixedStorage for B {}".to_string(),
+    )])
+    .expect("parses");
+    assert_eq!(findings.len(), 1, "FixedStorage must reject it");
+    assert_eq!(findings[0].severity, Severity::Error);
     assert!(
-        !found.capacity_can_change(),
-        "a boxed slice cannot be resized, and saying it can would be the mirror error"
+        findings[0].message.contains("a heap allocation"),
+        "a boxed slice cannot be resized, and calling it resizable would be the \
+         mirror error: {}",
+        findings[0].message
     );
-}
-
-#[test]
-fn a_contradicted_fixed_storage_impl_is_an_error() {
-    // Direct Vec field, one level down, inside an array, and in one enum
-    // variant -- four impls, four errors.
-    let errors = rules("fixed_storage_contradicted.rs", Severity::Error);
-    assert_eq!(errors, vec!["SG001", "SG001", "SG001", "SG001"]);
 }
 
 #[test]
@@ -418,4 +404,138 @@ fn an_unparseable_file_is_reported_and_does_not_abort_the_run() {
         findings.iter().any(|f| f.rule == "SG001"),
         "the good file was not scanned"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Measured results from an independent pass over this tool
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_reused_type_name_does_not_erase_or_manufacture_findings() {
+    // The worst defect this tool has had. Declarations lived in one flat map
+    // keyed by bare type name, so the last one scanned won: an unrelated file
+    // reusing a name silently erased every finding about the real type, the
+    // reverse argument order brought them back, and a name reused with a
+    // growable field manufactured a finding against a type with no impl at all.
+    // Two `Key`s in one crate is not exotic.
+    let leaks = (
+        "a_leaks.rs".to_string(),
+        "struct Key { material: Vec<u8> }\nimpl FixedStorage for Key {}".to_string(),
+    );
+    let clean = (
+        "b_clean.rs".to_string(),
+        "struct Key { material: [u8; 32] }".to_string(),
+    );
+
+    let alone = analyze_sources(&[leaks.clone()]).expect("parses");
+    assert_eq!(alone.len(), 1, "the real finding");
+
+    let both = analyze_sources(&[leaks.clone(), clean.clone()]).expect("parses");
+    assert_eq!(both.len(), 1, "an unrelated file erased it");
+
+    let reversed = analyze_sources(&[clean, leaks]).expect("parses");
+    assert_eq!(reversed.len(), 1, "the result depended on argument order");
+
+    // The mirror direction: a name reused with a growable field, no impl.
+    let honest = (
+        "c_honest.rs".to_string(),
+        "struct Tok { material: [u8; 32] }\nimpl FixedStorage for Tok {}".to_string(),
+    );
+    let decoy = (
+        "d_growable.rs".to_string(),
+        "struct Tok { material: Vec<u8> }".to_string(),
+    );
+    assert_eq!(
+        analyze_sources(&[honest, decoy]).expect("parses").len(),
+        0,
+        "a finding was manufactured against a type that has no impl"
+    );
+}
+
+#[test]
+fn a_name_defined_differently_in_two_files_is_unresolved_not_guessed() {
+    // Where same-file scoping cannot decide, the answer is "not checked".
+    let findings = analyze_sources(&[
+        ("x.rs".to_string(), "struct Amb { m: Vec<u8> }".to_string()),
+        ("y.rs".to_string(), "struct Amb { m: [u8; 8] }".to_string()),
+        (
+            "z.rs".to_string(),
+            "struct User { inner: Amb }\nimpl FixedStorage for User {}".to_string(),
+        ),
+    ])
+    .expect("parses");
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].severity, Severity::Unresolved);
+    assert!(
+        findings[0].message.contains("defined differently"),
+        "the ambiguity should be named: {}",
+        findings[0].message
+    );
+}
+
+#[test]
+fn the_three_reported_sg002_false_positives_are_clean() {
+    // Branches are mutually exclusive; two empty fields are two paths; a macro
+    // write names its real destination. The fourth function in the fixture is
+    // the contrast -- two fills of the SAME field can both run.
+    let errors = rules("sg002_precision.rs", Severity::Error);
+    assert_eq!(errors, vec!["SG002"], "only `same_field_twice` should fire");
+    let findings = run("sg002_precision.rs");
+    assert_eq!(findings.len(), 1);
+}
+
+#[test]
+fn an_unknown_call_on_the_buffer_is_not_checked_rather_than_silence() {
+    // A closed op vocabulary is a hole an author walks through by naming their
+    // own method, and resolving the receiver used to make the tool QUIETER than
+    // failing to resolve it.
+    let findings = run("unknown_op.rs");
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].1, Severity::Unresolved);
+}
+
+#[test]
+fn whole_value_assignment_is_a_mitigation_here_and_a_leak_at_a_mutation_site() {
+    // Measured whole-buffer replacements leak unconditionally -- 1584/1584,
+    // 1520/1520, 1488/1488 -- with capacity identical before and after, so no
+    // capacity-watching heuristic can see them. That is a real hazard and it is
+    // NOT this rule's: `new_with` hands over an EMPTY buffer, so `*v = built`
+    // drops an unallocated `Vec` and abandons nothing. The distinction is scope,
+    // not disagreement, and SG003 must not inherit this classification.
+    let findings = analyze_sources(&[(
+        "assign.rs".to_string(),
+        "fn f(m: Vec<u8>) -> Dynamic<Vec<u8>> { Dynamic::new_with(|v| { *v = m; }) }".to_string(),
+    )])
+    .expect("parses");
+    assert!(
+        findings.is_empty(),
+        "an empty buffer has nothing to abandon"
+    );
+}
+
+#[test]
+fn the_allow_list_matches_the_crate() {
+    // The classifier mirrors the crate's own impl list, and the list grew at
+    // 9eabeec: all twelve NonZero integers (a consumer cannot add these itself,
+    // E0117), `Zeroizing<T>`, and `Fixed<T>` nesting. Knowing only five NonZero
+    // types would put the other seven in the unresolved pile.
+    let findings = analyze_sources(&[(
+        "blessed.rs".to_string(),
+        "struct A { a: NonZeroI128, b: NonZeroIsize, c: NonZeroU128 }\n\
+         impl FixedStorage for A {}\n\
+         struct B { z: Zeroizing<[u8; 32]>, f: Fixed<[u8; 16]> }\n\
+         impl FixedStorage for B {}"
+            .to_string(),
+    )])
+    .expect("parses");
+    assert!(findings.is_empty(), "these are all blessed by the crate");
+
+    // ... and the conditional ones still refuse a heap payload.
+    let bad = analyze_sources(&[(
+        "bad.rs".to_string(),
+        "struct C { z: Zeroizing<Vec<u8>> }\nimpl FixedStorage for C {}".to_string(),
+    )])
+    .expect("parses");
+    assert_eq!(bad.len(), 1);
+    assert_eq!(bad[0].severity, Severity::Error);
 }

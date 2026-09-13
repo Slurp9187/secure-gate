@@ -48,7 +48,7 @@
 //! happens in a body this pass never connects to this buffer. Those sites are
 //! reported as unresolved rather than passed.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use syn::visit::Visit;
 
@@ -79,6 +79,56 @@ const BULK: &[&str] = &[
     "insert_str",
     "append",
     "resize",
+    // Whole-value replacement of an already-filled buffer, and a one-shot fill
+    // of an empty one. Measured as a 1008/1008 leak at a mutation site.
+    "clone_from",
+    // `io::Write` on a `&mut Vec<u8>`, and the `bytes::BufMut` family. Naming
+    // them is worth doing and is not a fix for the underlying problem: the
+    // vocabulary is closed, and UNKNOWN_OP below is what covers the rest.
+    "write_all",
+    "put",
+    "put_slice",
+    "put_u8",
+];
+
+/// Calls that read the buffer without touching its allocation. Anything on the
+/// buffer that is in none of these lists is reported as unresolved rather than
+/// ignored -- an author naming their own extension method is otherwise a hole
+/// straight through a closed vocabulary, and silence is the wrong answer to
+/// "I do not know what this call does".
+const READS: &[&str] = &[
+    "len",
+    "is_empty",
+    "capacity",
+    "iter",
+    "iter_mut",
+    "as_slice",
+    "as_str",
+    "as_ptr",
+    "as_bytes",
+    "first",
+    "last",
+    "get",
+    "get_mut",
+    "contains",
+    "starts_with",
+    "ends_with",
+    "chars",
+    "bytes",
+    "to_vec",
+    "clone",
+    "sort",
+    "sort_unstable",
+    "reverse",
+    "fill",
+    "copy_from_slice",
+    "clone_from_slice",
+    "swap",
+    // Shrink the length, never the allocation, so nothing is abandoned.
+    "truncate",
+    "clear",
+    "pop",
+    "remove",
 ];
 
 /// Calls driven by an iterator, which reserve against a size hint this pass
@@ -197,8 +247,11 @@ impl SiteVisitor<'_> {
             aliases: HashSet::from([target.clone()]),
             presized: HashSet::new(),
             growth: Vec::new(),
+            unknown_op: None,
             escaped: None,
             loop_depth: 0,
+            arm: None,
+            conditionals: 0,
         };
         scan.visit_expr(&closure.body);
 
@@ -221,6 +274,28 @@ impl SiteVisitor<'_> {
             ]);
         }
 
+        if scan.verdict().is_none() {
+            if let Some((path, method, line)) = &scan.unknown_op {
+                return Some(vec![
+                    Finding::new(
+                        RULE,
+                        Kind::Route,
+                        Severity::Unresolved,
+                        self.file,
+                        *line,
+                        format!(
+                            "`{receiver}::new_with` calls `{path}.{method}(..)`, which is not a \
+                             call this pass knows; whether it grows the buffer was not checked"
+                        ),
+                    )
+                    .with_note(
+                        "the op vocabulary is a closed list, so a trait method or an extension \
+                         method on the buffer reads as unknown rather than safe. Pre-size with \
+                         `reserve_exact` and the question does not arise",
+                    ),
+                ]);
+            }
+        }
         let (growth, severity) = scan.verdict()?;
 
         let message = if severity == Severity::Error {
@@ -266,6 +341,10 @@ struct Growth {
     shape: Shape,
     /// The access path grown, e.g. `s.token`.
     path: String,
+    /// The innermost conditional arm this sits in, as (conditional, arm). Two
+    /// growths in different arms of the same conditional cannot both run, so
+    /// they must not be counted as two.
+    arm: Option<(usize, usize)>,
     /// Inside a `for` / `while` / `loop`, so it runs an unknown number of times.
     repeated: bool,
 }
@@ -281,8 +360,14 @@ struct ClosureScan {
     /// by path so that sizing one field does not excuse growing another.
     presized: HashSet<String>,
     growth: Vec<Growth>,
+    /// A call on the buffer that is in none of the known lists.
+    unknown_op: Option<(String, String, usize)>,
     escaped: Option<String>,
     loop_depth: usize,
+    /// Innermost enclosing conditional arm, and a counter giving each
+    /// conditional a distinct identity.
+    arm: Option<(usize, usize)>,
+    conditionals: usize,
 }
 
 impl ClosureScan {
@@ -300,13 +385,41 @@ impl ClosureScan {
             return;
         }
         let repeated = self.loop_depth > 0;
+        let arm = self.arm;
         self.growth.push(Growth {
             method,
             line,
             shape,
             path,
+            arm,
             repeated,
         });
+    }
+
+    /// How many growths of `path` can actually run in one execution.
+    ///
+    /// Growths in different arms of the same conditional are mutually
+    /// exclusive, so the worst case within a conditional is its heaviest arm,
+    /// not the sum of them. Counting the sum reported
+    /// `if hex { v.extend_from_slice(m) } else { v.extend_from_slice(&m[..1]) }`
+    /// -- one bulk fill of an empty buffer on either path, the shape this check
+    /// deliberately calls clean -- as repeated growth.
+    fn reachable_count(&self, path: &str) -> usize {
+        let mine: Vec<&Growth> = self.growth.iter().filter(|g| g.path == path).collect();
+        let top = mine.iter().filter(|g| g.arm.is_none()).count();
+        let mut per_conditional: HashMap<usize, HashMap<usize, usize>> = HashMap::new();
+        for g in mine.iter().filter_map(|g| g.arm.map(|a| (a, *g))) {
+            let ((cond, arm), _) = g;
+            *per_conditional
+                .entry(cond)
+                .or_default()
+                .entry(arm)
+                .or_default() += 1;
+        }
+        top + per_conditional
+            .values()
+            .map(|arms| arms.values().copied().max().unwrap_or(0))
+            .sum::<usize>()
     }
 
     /// The verdict, and why.
@@ -320,8 +433,15 @@ impl ClosureScan {
         if let Some(g) = self.growth.iter().find(|g| g.repeated) {
             return Some((g, Severity::Error));
         }
-        if self.growth.len() > 1 {
-            return Some((&self.growth[1], Severity::Error));
+        // Per access path, not globally: `|s| { s.a.extend_from_slice(x);
+        // s.b.extend_from_slice(y); }` is one bulk fill of each of two empty
+        // fields, and counting them together reported `s.b` as grown repeatedly.
+        if let Some(g) = self
+            .growth
+            .iter()
+            .find(|g| self.reachable_count(&g.path) > 1)
+        {
+            return Some((g, Severity::Error));
         }
         match self.growth.first() {
             Some(g) if g.shape == Shape::Incremental => Some((g, Severity::Warning)),
@@ -343,6 +463,11 @@ impl<'ast> Visit<'ast> for ClosureScan {
                 self.record(path, method, line, Shape::Incremental);
             } else if ESCAPE.contains(&method.as_str()) && self.escaped.is_none() {
                 self.escaped = Some(method);
+            } else if !READS.contains(&method.as_str()) && self.unknown_op.is_none() {
+                // Resolving the receiver used to make this case quieter than
+                // failing to resolve it, which is backwards for a "not checked"
+                // tier: more information must never buy less signal.
+                self.unknown_op = Some((path, method, line));
             }
         }
         syn::visit::visit_expr_method_call(self, node);
@@ -377,12 +502,14 @@ impl<'ast> Visit<'ast> for ClosureScan {
             .last()
             .is_some_and(|s| s.ident == "write" || s.ident == "writeln");
         if is_write {
-            if let Some(proc_macro2::TokenTree::Ident(id)) = node.tokens.clone().into_iter().next()
-            {
-                let name = id.to_string();
-                if self.aliases.contains(&name) {
-                    let line = id.span().start().line;
-                    self.record(name, "write!".to_string(), line, Shape::Bulk);
+            // The destination is everything up to the first comma, so reading a
+            // single token saw `s` in `write!(s.token, ..)` -- which then missed
+            // the `s.token.reserve_exact(..)` sitting right above it, and
+            // suggested `s.reserve_exact(len)`, which would not compile.
+            if let Some(dest) = macro_first_arg(&node.tokens) {
+                if let Some(path) = self.refers_to(&dest) {
+                    let line = line_of(&dest);
+                    self.record(path, "write!".to_string(), line, Shape::Bulk);
                 }
             }
         }
@@ -392,6 +519,35 @@ impl<'ast> Visit<'ast> for ClosureScan {
     /// A growth call that runs once is not the shape that was measured; the same
     /// call in a loop is exactly it -- "fills it byte by byte", seven buffers
     /// deep. These three overrides are what tells the two apart.
+    /// Each conditional gets an identity and each of its arms an index, so
+    /// `reachable_count` can tell "twice" from "once, one way or the other".
+    fn visit_expr_if(&mut self, node: &'ast syn::ExprIf) {
+        self.conditionals += 1;
+        let id = self.conditionals;
+        let outer = self.arm;
+        // The condition itself always runs.
+        self.visit_expr(&node.cond);
+        self.arm = Some((id, 0));
+        self.visit_block(&node.then_branch);
+        if let Some((_, else_branch)) = &node.else_branch {
+            self.arm = Some((id, 1));
+            self.visit_expr(else_branch);
+        }
+        self.arm = outer;
+    }
+
+    fn visit_expr_match(&mut self, node: &'ast syn::ExprMatch) {
+        self.conditionals += 1;
+        let id = self.conditionals;
+        let outer = self.arm;
+        self.visit_expr(&node.expr);
+        for (i, arm) in node.arms.iter().enumerate() {
+            self.arm = Some((id, i));
+            self.visit_expr(&arm.body);
+        }
+        self.arm = outer;
+    }
+
     fn visit_expr_for_loop(&mut self, node: &'ast syn::ExprForLoop) {
         self.loop_depth += 1;
         syn::visit::visit_expr_for_loop(self, node);
@@ -446,6 +602,19 @@ impl<'ast> Visit<'ast> for ClosureScan {
         }
         syn::visit::visit_expr_call(self, node);
     }
+}
+
+/// The first macro argument, parsed as an expression -- `write!(s.token, ..)`
+/// hands back `s.token` rather than the bare token `s`.
+fn macro_first_arg(tokens: &proc_macro2::TokenStream) -> Option<syn::Expr> {
+    let mut head = proc_macro2::TokenStream::new();
+    for tt in tokens.clone() {
+        if matches!(&tt, proc_macro2::TokenTree::Punct(p) if p.as_char() == ',') {
+            break;
+        }
+        head.extend(std::iter::once(tt));
+    }
+    syn::parse2(head).ok()
 }
 
 fn closure_param(closure: &syn::ExprClosure) -> Option<String> {

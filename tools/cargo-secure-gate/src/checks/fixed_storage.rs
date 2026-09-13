@@ -51,7 +51,9 @@ pub fn check(index: &Index) -> Vec<Finding> {
             continue;
         }
 
-        let found = index.resolver.classify_named(&site.type_name, &site.args);
+        let found = index
+            .resolver
+            .classify_named(&site.type_name, &site.args, &site.file);
 
         if let Some((path, ty)) = found.owns_heap() {
             // Naming which of the two it is matters to the fix: a resizable
