@@ -86,8 +86,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
         // stands between a resolvable field and the unresolved pile.
         self.index
             .resolver
-            .aliases
-            .insert(node.ident.to_string(), (*node.ty).clone());
+            .add_alias(&self.file, node.ident.to_string(), (*node.ty).clone());
         if let Some((wrapper, inner)) = wrapper_from_type(&node.ty) {
             self.index.wrappers.insert(
                 node.ident.to_string(),
@@ -115,7 +114,8 @@ impl<'ast> Visit<'ast> for Collector<'_> {
                 (name, f.ty.clone())
             })
             .collect();
-        self.index.resolver.types.insert(
+        self.index.resolver.add_type(
+            &self.file,
             node.ident.to_string(),
             TypeDef {
                 generics: type_params(&node.generics),
@@ -139,7 +139,8 @@ impl<'ast> Visit<'ast> for Collector<'_> {
                 fields.push((format!("{}::{name}", variant.ident), f.ty.clone()));
             }
         }
-        self.index.resolver.types.insert(
+        self.index.resolver.add_type(
+            &self.file,
             node.ident.to_string(),
             TypeDef {
                 generics: type_params(&node.generics),

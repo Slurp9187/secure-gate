@@ -196,6 +196,55 @@ miss being the helper. That is this pass measured against cases it already knew
 about, so it is a check that the harness works and not a recall figure. The
 number that will mean something is the one from a corpus somebody else wrote.
 
+## Measured, by someone else
+
+An independent pass built this tool and ran it against allocator-verified
+corpora. The honest decomposition, which is not the raw ratio:
+
+| Scope | Result |
+| --- | --- |
+| SG001's scope | **4 of 4** caught, including a non-ASCII identifier, an alias hiding the field, a generic instantiation, and a two-level field path |
+| False positives on measured-clean code | **0** |
+| SG002's scope | **0 of 1** — `buf.put(b)`, a consumer trait method outside the op vocabulary |
+| Outside every shipped rule | 0 of 32, all in SG003's scope, which is not written |
+
+Two of the 37 sites belong in nobody's denominator: one is inside `serde_json`'s
+own doubling buffers, upstream of the wrapper, and one is code in a module doc
+comment, which `syn` parses as an attribute.
+
+Four defects that pass surfaced, all fixed and all pinned by tests:
+
+- **A reused type name erased every finding.** Declarations lived in one flat map
+  keyed by bare name, so the last scanned won. Adding one unrelated file that
+  reused four type names silenced all four catches to `0 assertion(s)`, exit 0;
+  reversing the argument order brought them back; and a name reused with a
+  growable field *manufactured* a finding against a type with no impl at all.
+  Resolution is now keyed by name and file, same-file wins, and a genuine
+  disagreement between files is unresolved rather than guessed.
+- **Growth was counted globally rather than per access path**, so two bulk fills
+  of two different empty fields read as one field grown twice.
+- **Mutually exclusive branches were summed**, so one bulk fill down either arm
+  of an `if` read as repeated growth.
+- **`write!(s.token, ..)` recorded `s`**, because only the first token tree was
+  read — so the `s.token.reserve_exact(..)` above it did not suppress it, and
+  the remedy it suggested would not have compiled.
+
+And one design hole, now closed differently than by extending a list: a call on
+the buffer that is in none of the known vocabularies is reported as **not
+checked**. Resolving the receiver used to make the tool *quieter* than failing to
+resolve it, which is backwards for a "could not check" tier. `put`, `write_all`
+and `clone_from` are named too, but naming is not the fix — the vocabulary is
+closed, and an author's own extension method walks straight through it.
+
+### One correction in the other direction
+
+`*v = built` inside `new_with` stays classified as a mitigation. The measured
+whole-value replacements that leak — 1584/1584, 1520/1520, 1488/1488, with
+capacity identical before and after, so no capacity-watching heuristic can ever
+see them — are all at **mutation** sites. `new_with` hands over an *empty*
+buffer, so the assignment drops an unallocated `Vec` and abandons nothing. The
+hazard is real and belongs to SG003, which must not inherit this rule.
+
 ## Robustness
 
 Defect classes reported against the regex implementation, and where this one
@@ -214,6 +263,7 @@ saying explicitly because it is most of the argument for parsing:
 | Rules that fire on any use of a feature and can only be suppressed | every rule has a fix; none fires on correct code |
 | Unreadable files reported on stderr and invisible in JSON | reported as `SG000`, in both outputs, and they no longer abort the run |
 | Findings keyed on line number, so a new comment churns a baseline | **still true** — no stable fingerprint yet |
+| Declarations keyed by bare type name, so a reused name decides the result | fixed — keyed by name and file, ambiguity reported |
 
 ## Tests
 
