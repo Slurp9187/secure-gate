@@ -1,8 +1,8 @@
 //! Two newtypes of the same shape must not be interchangeable.
 //!
-//! This is the entire point of `fixed_newtype!` over `fixed_alias!`: an
+//! This is the entire point of `fixed_newtype!` over a plain `type` alias: an
 //! encryption key and a MAC key are both `Fixed<[u8; 32]>`, and passing one
-//! where the other belongs compiles silently under a type alias.
+//! where the other belongs compiles silently when they are only renamed.
 use secure_gate::fixed_newtype;
 
 fixed_newtype!(pub EncKey, 32);

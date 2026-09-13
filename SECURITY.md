@@ -52,12 +52,45 @@ zero an out-of-scope stack slot.
 
 ### 2. Heap-reallocation residue (`Dynamic<Vec<T>>` / `Dynamic<String>`)
 
-When a `Vec<T>` or `String` grows past its current capacity, the
-standard library allocates a new buffer, memcpys the contents, and frees
-the old buffer **without zeroing**. `ZeroizeOnDrop` only zeros the
-*currently held* allocation. The freed bytes remain readable in heap
-memory until the allocator reuses or unmaps the page; they survive into
-core dumps and swap.
+When a `Vec<T>` or `String` changes capacity, the standard library may
+allocate a new buffer, memcpy the contents, and free the old buffer
+**without zeroing**. `ZeroizeOnDrop` only zeros the *currently held*
+allocation. The abandoned bytes remain readable in heap memory until the
+allocator reuses or unmaps the page; they survive into core dumps and swap.
+
+**"May" is load-bearing: whether a buffer is abandoned depends on the allocator
+and on heap layout at that moment.** `Vec` asks for a `realloc`, and an allocator
+that can extend the chunk where it already sits does so — nothing is copied and
+nothing is abandoned. Measured with the default system allocator and no
+instrumentation: growing a full 1008-byte buffer by 96, a full 1040-byte `String`
+by 16, and a 4096-byte buffer by 65536 all extended **in place**, as did a growth
+with one allocated neighbour immediately behind. On a fragmented heap the same
+growth **moved**, and the abandoned chunk then held the secret. So this is a real
+exposure with a probabilistic trigger, not a certainty, and a threat model should
+assume the move. Two consequences worth stating plainly: the byte counts in this
+document and in `tests/lifecycle_trace_heap.rs` come from an instrument that does
+not override `realloc`, which forces the copying path on every growth — that is
+deliberate, because the worst case is the one worth measuring, but it is the worst
+case rather than the typical one. And no amount of in-place luck is a mitigation
+you can rely on, because you do not control the heap's shape.
+
+**The exposure is bounded, and the bound is worth knowing.** The buffer the wrapper
+holds *after* the change is the currently-held allocation, so it is zeroized on
+drop, spare capacity included. Measured: after a growth, the replacement block was
+released with 0 non-zero bytes of 2016, with a positive control confirming its tail
+held payload going in. What is exposed is the set of *abandoned* buffers — plural,
+one per move, so a secret grown twice can leave two.
+
+**Shrinking abandons a buffer too, which makes "grows past its capacity" the wrong
+mental model.** `shrink_to_fit` and `shrink_to` reallocate downward and free the
+old block with the secret still in it, and the truncate-then-shrink case is the
+worst of the family: measured on a pre-sized 4096-byte buffer truncated to 2048 and
+then shrunk, the abandoned block was released holding **4096** non-zero bytes — the
+live prefix *and* the discarded tail — while the wrapper went on to protect only the
+smaller replacement. A buffer that never grew at all can leak its whole contents
+this way. `reserve` is the converse surprise: it writes no payload and still
+abandons the old buffer, so a check keyed on "bytes added" would miss it. The
+property that matters is **capacity-changing**, not growing.
 
 **What the crate now handles, and what it cannot.** Where `secure-gate` owns the
 growth it wipes the outgoing buffer: `std::io::Write` on `Dynamic<Vec<u8>>`
@@ -67,23 +100,54 @@ regression test (`tests/heap_zeroize.rs`,
 `check_write_growth_orphan_zeroed`) that inspects the freed page at the moment
 of growth rather than only at drop.
 
+**Two things to know before relying on that path.** It needs the `std` feature, and
+`full` does **not** enable `std` (`full = ["alloc", "rand", "encoding", "ct-eq",
+"cloneable", "serde"]`), so a consumer who builds with `--features full` does not have
+this impl at all and has no safe growth path. Enable `std` explicitly if you want it.
+
+And it is the impl **on the wrapper** that is safe, not `Write` in general. Reaching
+through the wrapper first defeats it: `d.expose_secret_mut().write_all(b"…")` resolves
+to the standard library's `impl Write for Vec<u8>`, which grows by `extend_from_slice`
+and abandons the old buffer unwiped. Measured on a 1000-byte secret, `d.write_all(…)`
+leaves 0 surviving bytes and `d.expose_secret_mut().write_all(…)` leaves 1000. The two
+lines look alike and differ completely, so prefer the wrapper's own `Write`.
+
 It cannot do the same for `with_secret_mut` / `expose_secret_mut`: those hand the
-caller a `&mut Vec<T>` or `&mut String`, and a `push` / `extend` / `insert` that
-grows it reallocates entirely outside this crate. **That case remains a real
-limitation**, and the patterns below are the mitigation.
+caller a `&mut Vec<T>` or `&mut String`, and any capacity-changing operation on it
+reallocates entirely outside this crate. **That case remains a real limitation**,
+and the patterns below are the mitigation. The same `&mut` is reachable through
+`as_wrapper_mut` on a newtype declared with `derive: [IntoWrapper]` or
+`[WrapperAccess]`, and through the closure `Dynamic::new_with` passes to its caller,
+so the limitation is not confined to the two tier methods named above.
 
 **Recommended patterns:**
 
 - For **known-size key material**, prefer [`Fixed<[u8; N]>`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html) (no allocation) or `Dynamic<[u8; N]>` (heap-only, fixed size — no realloc surface).
 - For **bounded-size variable-length secrets**, pre-size with `Vec::with_capacity(MAX)` / `String::with_capacity(MAX)` *before* wrapping in `Dynamic`, then only perform capacity-stable mutations through `with_secret_mut`.
-- For **infrequent updates**, replace the entire wrapper rather than mutating in place: `dyn_secret = Dynamic::new_with(|v| …)` — the old `Dynamic` zeroizes its buffer on drop.
+- For **infrequent updates**, replace the entire wrapper rather than mutating in place: `dyn_secret = Dynamic::new_with(|v| …)` — the old `Dynamic` zeroizes its buffer on drop. **Pre-size inside the closure.** `new_with` starts the closure with an empty `Vec`, so a closure that fills it byte by byte reallocates its way up and abandons its own intermediate buffers: measured at 1016 secret bytes across 7 abandoned blocks for a 1008-byte secret. Call `v.reserve_exact(len)` first, or build the value and use `Dynamic::new`, both of which measured 0.
 - For **deployment-level remediation**, install a zero-on-deallocate global allocator such as [`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) in the final binary, or rely on OS facilities (Linux `init_on_free=1`, hardened allocators). These are process-wide operational choices rather than a per-crate feature.
 
 A custom-allocator-parameterized `Dynamic<T, A>` (analogous to C++'s
-`std::vector<T, ZeroingAllocator<T>>`) would resolve this at the type
-level but currently requires nightly Rust (`allocator_api`) and `unsafe`
-code. `secure-gate` does not enable it; users with strict realloc-residue
-requirements should adopt the global-allocator approach above.
+`std::vector<T, ZeroingAllocator<T>>`) would resolve this at the type level. This
+document used to say that doing so "currently requires nightly Rust
+(`allocator_api`)". That is no longer true and is worth stating accurately, because
+it changes what the remaining obstacle is. Nightly is needed only for the standard
+library's own `Vec<T, A>`; the [`allocator-api2`](https://crates.io/crates/allocator-api2)
+shim provides a stable `Allocator` trait and its own `Vec<T, A>`, and it declares
+`rust-version = "1.63"`, so it is within reach of both release lines. Verified: a
+twenty-line zeroize-on-free allocator parameterizing such a `Vec` compiled and ran
+with no nightly features on both rustc 1.70 and current stable, and saw the
+abandoned buffer with 1008 of 1008 bytes still live, wiping them before release —
+read back inside the allocator after the wipe and before the inner `deallocate`, the
+only window where that can be checked, giving 0.
+
+What actually blocks it here is different, and more fundamental than a toolchain
+channel. Implementing such an allocator requires `unsafe impl Allocator`, and this
+crate is `#![forbid(unsafe_code)]`. It would also add a non-optional dependency to a
+crate that has exactly one, and add a type parameter to `Dynamic`, which is an
+API-breaking change. `secure-gate` does not do it; users with strict realloc-residue
+requirements should adopt the global-allocator approach above, which needs no change
+to this crate at all.
 
 ### 3. Swap / core dumps / external memory exposure
 
@@ -245,12 +309,21 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 - Audit all `CloneableSecret`/`SerializableSecret` implementations.
 - Validate inputs before encoding/decoding or using format-specific traits.
 - For encoding: every encoder returns `EncodedSecret`, which stays wiped until it drops. Read it with `&*encoded` (it derefs to `str`); call `.into_inner()` only when an API demands an owned `String`, which is the named moment protection ends.
-- Check that a secret's length is non-zero when it is generic or configuration-driven.
-  A zero-length secret is accepted everywhere and fails silently rather than loudly:
-  `Fixed<[u8; 0]>` constructs, reports `len() == 0`, still prints `[REDACTED]`, encodes
-  to `""`, and compares `ct_eq`-equal to any other empty. `fixed_alias!(Name, 0)` is a
-  compile error, but that guard is in the macro only — writing
-  `type Name = Fixed<[u8; 0]>;` bypasses it, as do the generic and dynamic alias macros.
+- A zero-sized `Fixed` is a compile error at construction — the guard is raised at
+  monomorphization, so it covers generic code too; naming the type without building one
+  still compiles. Two limits on when it fires, both measured: a post-monomorphization error
+  is raised during codegen, so `cargo check` will not report it; and it fires only for a
+  codegen root, and every method the newtype macros generate carries an inline attribute,
+  so a *library* whose zero-sized constructions sit behind `#[inline]` or generic code
+  builds and tests clean and defers the error to its consumers. Dropping the attribute is
+  not a fix: what counts as a codegen root depends on the compiler and the profile, and a
+  plain non-generic exported function that fails `cargo build` on 1.85 passes
+  `cargo build --release` on the same toolchain. No value of
+  such a type can exist at runtime, but do not treat green library CI as proof you have
+  none — only instantiating the type in a test or a binary proves that. `Dynamic` has no compile-time equivalent, so check that a
+  variable-length secret is non-empty when its length is generic or configuration-driven.
+  If an empty one reaches you anyway: it reports `len() == 0`, still prints `[REDACTED]`,
+  encodes to `""`, and compares `ct_eq`-equal to any other empty.
 - Monitor dependencies for CVEs.
 - Treat secrets as radioactive — minimize exposure surface.
 
@@ -263,7 +336,8 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 **Potential weaknesses**
 
 - Long-lived `expose_secret()` references can defeat scoping
-- Macro-generated aliases lack runtime size checks
+- `Dynamic<T>` performs no size check and empty contents are a runtime fact; `Fixed`
+  rejects a zero-sized inner value at construction.
 - Certain error variants may indirectly leak length information (e.g. wrong decoded length).
   In most real-world usage (logging, API responses), length is already public metadata anyway (e.g. key length in JWT headers, signature length). Still, contextualize or redact errors when possible.
 - `Fixed<T>` decode constructors previously used `copy_from_slice` into a separate
@@ -315,16 +389,23 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   inherent limitation of the `zeroize` ecosystem — `zeroize`, `secrecy`, and other
   crates share the same constraint. Prefer `panic = "unwind"` (the default) in
   security-sensitive builds.
-- **`Dynamic<Vec<T>>` / `Dynamic<String>` mutation via reallocation leaves the
-  *previous* heap buffer unzeroized.** `Dynamic<T>` zeroizes the *currently held*
-  allocation on drop (including `Vec` / `String` spare capacity). Mutation
-  operations through `with_secret_mut` / `expose_secret_mut` that exceed the
-  current capacity (`push`, `push_str`, `extend`, `reserve`, `resize` past
-  `capacity()`, `insert`, etc.) cause `Vec` / `String` to allocate a new buffer,
-  copy the data, and free the old one through the standard allocator — *without
-  zeroizing the old buffer first*. The freed bytes remain readable in the heap
-  until the allocator reuses or unmaps the page, and they survive into core
-  dumps and swap.
+- **`Dynamic<Vec<T>>` / `Dynamic<String>` mutation that changes capacity can leave
+  the *previous* heap buffer unzeroized.** `Dynamic<T>` zeroizes the *currently
+  held* allocation on drop (including `Vec` / `String` spare capacity), so the
+  buffer it holds after the change is protected; what is at risk is the buffer it
+  stopped holding. Any capacity-changing operation reached through
+  `with_secret_mut`, `expose_secret_mut`, `as_wrapper_mut`, or a `new_with` closure
+  can cause `Vec` / `String` to allocate a new buffer, copy the data, and free the
+  old one through the standard allocator — *without zeroizing the old buffer
+  first*. Growing is the obvious case (`push`, `push_str`, `extend`, `insert`,
+  `resize`, `splice`, `append`, `write!`), but **`reserve` alone does it while
+  writing no payload at all, and `shrink_to_fit` / `shrink_to` do it while the
+  buffer only ever got smaller** — the shrink case abandons the discarded tail
+  along with the live prefix. Whether any given operation actually abandons a
+  buffer depends on whether the allocator can resize the chunk in place, which
+  depends on heap layout; assume it cannot. The abandoned bytes remain readable in
+  the heap until the allocator reuses or unmaps the page, and they survive into
+  core dumps and swap.
 
   **If your threat model includes process-memory disclosure (heap scrape, swap,
   core dump) of secrets that have been mutated in place after construction,
@@ -338,14 +419,40 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   - use `Fixed<[u8; N]>` for known-size secrets (no realloc surface; the
     allocation is fixed and zeroized on drop); or
   - replace the wrapper with a fresh `Dynamic::new_with(...)` rather than
-    mutating in place — the old `Dynamic` zeroizes its buffer on drop.
+    mutating in place — the old `Dynamic` zeroizes its buffer on drop. Pre-size
+    inside the closure (`v.reserve_exact(len)`), or build the value first and use
+    `Dynamic::new`; otherwise the closure's own growth abandons buffers, measured at
+    1016 secret bytes across 7 blocks for a 1008-byte secret.
 
   This is a fundamental limitation of `Vec<T>` / `String` in Rust — the
   standard library exposes no allocator hook to zeroize-on-realloc. The same
   limitation applies to `secrecy`, `zeroize`-wrapped collections, and every
   other secret wrapper around the standard collections; a custom-allocator
   workaround exists but trades off significant complexity and is not enabled
-  by default in this crate. **`Fixed<T>` is exempt** — it has no realloc surface.
+  by default in this crate.
+
+  **`Fixed<T>` is exempt, and is now held to it by the compiler.** That sentence
+  used to be a claim about the shape people were expected to use rather than
+  something the type system checked. `Fixed<T>` was bounded only by `Zeroize`, so
+  `Fixed<Vec<u8>>` and `Fixed<String>` compiled, `Fixed<[Vec<u8>; 2]>` hid a growable
+  container inside the very array shape this document called exempt, and
+  `fixed_newtype!(pub Name, generic Vec<u8>)` was a documented path straight to all
+  of it. Measured, each abandoned an unwiped buffer holding the whole secret on any
+  capacity change — the same weakness as `Dynamic`, and worse, because
+  `Dynamic<Vec<u8>>` has the safe-growth `io::Write` path above and `Fixed<Vec<u8>>`
+  has none. `Fixed::new` now requires
+  [`FixedStorage`](https://docs.rs/secure-gate/latest/secure_gate/trait.FixedStorage.html)
+  on the inner type, so every one of those is a `cargo check` error, and for the macro
+  forms the error lands on the declaration.
+
+  Two limits to be precise about. The marker is an **assertion, not an
+  enforcement**: like `CloneableSecret`, the compiler checks that you wrote the impl,
+  not that it is true, so a type with a `Vec` field that implements `FixedStorage`
+  anyway will compile and will leak. What the bound buys is that the claim is written
+  at a greppable line in the crate making it. And the bound is on `Fixed`, so it says
+  nothing about `dynamic_newtype!(pub Name, generic Vec<u8>)`, which has the growable
+  payload and — unlike plain `Dynamic<Vec<u8>>` — no `io::Write` escape. Treat that
+  form the way this section treats `with_secret_mut`.
 
   For stricter deployment threat models, handle this below the library layer:
   install a zero-on-dealloc global allocator such as

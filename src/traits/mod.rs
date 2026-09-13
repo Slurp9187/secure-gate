@@ -17,6 +17,7 @@
 //! | [`SecretLen`]          | Length metadata (`len`, `byte_len`, …)       | Always available         | Only for `[T; N]`, `String`, `Vec<T>`; does not expose contents, but length can itself be sensitive — see trait docs |
 //! | [`RevealSecretMut`]    | Mutable scoped / direct access               | Always available         | Same preference: `with_secret_mut` over `expose_secret_mut`           |
 //! | [`SentinelValue`]      | Inert placeholder left by `into_inner`       | Always available         | Implemented for `[T; N]` (any `N`), `String`, `Vec<T>`                |
+//! | [`FixedStorage`]       | Asserts the inner type cannot reallocate     | Always available         | Required by `Fixed::new`. Implemented for primitives, `[T; N]`, small tuples and `Box<T>`; a custom inner type writes one line. `Vec`/`String` deliberately excluded |
 //! | [`ConstantTimeEq`]     | Deterministic constant-time equality         | `ct-eq`                  | Timing-attack resistant byte comparison                               |
 //! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) for opt-in risk details. |
 //! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) for opt-in risk details. |
@@ -59,6 +60,9 @@ pub use reveal_secret::{RevealSecret, SecretLen};
 
 pub mod reveal_secret_mut;
 pub use reveal_secret_mut::RevealSecretMut;
+
+pub mod fixed_storage;
+pub use fixed_storage::FixedStorage;
 
 pub mod sentinel_value;
 pub use sentinel_value::SentinelValue;

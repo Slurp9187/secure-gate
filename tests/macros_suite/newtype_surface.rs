@@ -1,8 +1,8 @@
 //! macros_suite/newtype_surface.rs — full forwarded surface + derive passthrough
 use rand::SeedableRng;
 use secure_gate::{
-    dynamic_newtype, fixed_newtype, ConstantTimeEq, RevealSecret, SecretLen, ToBase32, ToBase64Url,
-    ToBech32, ToBech32m, ToHex,
+    dynamic_newtype, fixed_newtype, ConstantTimeEq, RevealSecret, RevealSecretMut, SecretLen,
+    ToBase32, ToBase64Url, ToBech32, ToBech32m, ToHex,
 };
 
 fixed_newtype!(pub EncKey, 32);
@@ -11,6 +11,20 @@ fixed_newtype!(pub MacKey, 32, "MAC key.", derive: [ConstantTimeEq]);
 dynamic_newtype!(pub Token, Vec<u8>, derive: [ConstantTimeEq]);
 dynamic_newtype!(pub ApiKey, String, "API key.", derive: [ConstantTimeEq]);
 dynamic_newtype!(pub Wide, generic Vec<u32>);
+// The `Fixed` counterpart of the same bargain: an AES-256 expanded key schedule is
+// `[u32; 60]`, as secret as the key it came from and not a byte array.
+fixed_newtype!(pub RoundKeys, generic [u32; 60]);
+// All four argument shapes of the `generic` form, because two arms both opening
+// `generic $inner:ty,` cannot coexist in `macro_rules!` — the optional-group
+// formulation that makes this work is easy to regress into four arms that do not.
+fixed_newtype!(pub Documented, generic [u32; 4], "A documented generic newtype.");
+fixed_newtype!(pub Derived, generic [u32; 4], derive: [FromWrapper]);
+fixed_newtype!(
+    pub DocumentedAndDerived,
+    generic [u32; 4],
+    "Both a doc string and a derive list.",
+    derive: [IntoWrapper]
+);
 
 #[test]
 fn fixed_full_surface() {
@@ -262,4 +276,34 @@ fn newtype_forwards_sized_bech32_methods() {
         wide, wide_m,
         "the two checksums must not produce the same string"
     );
+}
+
+/// `fixed_newtype!`'s `generic` arm emits the shape-independent surface and nothing more:
+/// construction, the access traits, redacted `Debug`, zeroization. No `SecretLen` and no
+/// encoders, because neither has a meaning for an arbitrary inner type — the same trade
+/// `dynamic_newtype!`'s generic arm makes, verified here rather than assumed.
+#[test]
+fn fixed_generic_arm_surface() {
+    let mut k = RoundKeys::new([7u32; 60]);
+    assert_eq!(k.with_secret(|w| w[0]), 7);
+    k.with_secret_mut(|w| w[0] = 9);
+    assert_eq!(k.expose_secret()[0], 9);
+    assert_eq!(format!("{k:?}"), "[REDACTED]");
+    // `#[repr(transparent)]` over `Fixed<[u32; 60]>`: 60 words, 4 bytes each.
+    assert_eq!(core::mem::size_of::<RoundKeys>(), 240);
+}
+
+/// The `generic` form accepts a doc literal and a `derive:` list in any combination,
+/// matching `dynamic_newtype!`'s generic arm. Asserted by construction rather than by
+/// reading the macro: the declarations above would not compile otherwise.
+#[test]
+fn fixed_generic_arm_accepts_doc_and_derive() {
+    use secure_gate::Fixed;
+    assert_eq!(Documented::new([1u32; 4]).with_secret(|w| w[0]), 1);
+    // `FromWrapper` is inbound only: a base value can enter the role.
+    let from_base = Derived::from_wrapper(Fixed::new([2u32; 4]));
+    assert_eq!(from_base.with_secret(|w| w[0]), 2);
+    // `IntoWrapper` is outbound only: material can leave toward the base.
+    let base: Fixed<[u32; 4]> = DocumentedAndDerived::new([3u32; 4]).into_wrapper();
+    assert_eq!(base.expose_secret()[0], 3);
 }

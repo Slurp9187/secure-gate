@@ -39,6 +39,7 @@ use secure_gate::Dynamic;
 /// to demonstrate drop glue and mutation over non-primitive inner types.
 #[derive(Clone, Debug, PartialEq)]
 struct ZeroizedOnDrop(u64);
+impl secure_gate::FixedStorage for ZeroizedOnDrop {}
 
 impl Zeroize for ZeroizedOnDrop {
     fn zeroize(&mut self) {
@@ -61,6 +62,7 @@ impl Drop for ZeroizedOnDrop {
 /// byte-zeroes spare-capacity slots via `spare_capacity_mut().zeroize()`.
 #[derive(Clone)]
 struct PanicOnNonZeroDrop(u64);
+impl secure_gate::FixedStorage for PanicOnNonZeroDrop {}
 
 impl Zeroize for PanicOnNonZeroDrop {
     fn zeroize(&mut self) {

@@ -80,11 +80,12 @@ fn fixed_try_from_base32_empty_input() {
 
 #[cfg(feature = "encoding-base32")]
 #[test]
-fn fixed_try_from_base32_zero_size() {
-    // The empty string is the canonical encoding of zero bytes.
-    let result = Fixed::<[u8; 0]>::try_from_base32("");
-    assert!(result.is_ok());
-    result.unwrap().with_secret(|b| assert_eq!(b, &[0u8; 0]));
+fn base32_empty_string_decodes_to_nothing() {
+    // The empty string is the canonical encoding of zero bytes. `Fixed` cannot hold a
+    // zero-sized secret, so the property is checked where a zero-length result is
+    // representable: the `Vec<u8>` decoder.
+    let decoded: Vec<u8> = "".try_from_base32().expect("empty encodes zero bytes");
+    assert!(decoded.is_empty());
 }
 
 #[cfg(feature = "encoding-base32")]
@@ -117,8 +118,9 @@ fn fixed_try_from_base32_rejects_padding() {
     assert!(Fixed::<[u8; 2]>::try_from_base32("MZXQ====").is_err());
     assert!(Fixed::<[u8; 1]>::try_from_base32("MY").is_ok());
     assert!(Fixed::<[u8; 2]>::try_from_base32("MZXQ").is_ok());
-    // Bare padding is not a zero-length encoding of nothing.
-    assert!(Fixed::<[u8; 0]>::try_from_base32("=").is_err());
+    // Bare padding is not a zero-length encoding of nothing. Checked through the
+    // `Vec<u8>` decoder because the expected result has length zero.
+    assert!("=".try_from_base32().is_err());
 }
 
 #[cfg(feature = "encoding-base32")]
@@ -134,8 +136,10 @@ fn fixed_try_from_base32_rejects_impossible_lengths() {
     // Lengths of 1, 3 and 6 (mod 8) cannot be produced by the encoder. Each N below is
     // the byte count the string *would* yield if the length rule were not enforced
     // (1 char → 0 bytes, 3 chars → 1 byte, 6 chars → 3 bytes), so these fail on the
-    // length rule alone and not on a decoded-length mismatch.
-    assert!(Fixed::<[u8; 0]>::try_from_base32("M").is_err());
+    // length rule alone and not on a decoded-length mismatch. The one-character case
+    // goes through the `Vec<u8>` decoder: it would yield zero bytes, which `Fixed`
+    // cannot hold, so a length-rule failure is the only outcome it could have.
+    assert!("M".try_from_base32().is_err());
     assert!(Fixed::<[u8; 1]>::try_from_base32("MZX").is_err());
     assert!(Fixed::<[u8; 3]>::try_from_base32("MZXW6Y").is_err());
     // The neighbouring legal lengths (2, 4, 5, 7, 8 mod 8) are accepted.

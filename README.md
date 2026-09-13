@@ -26,10 +26,10 @@ Secure wrappers for secrets with **explicit access** and **mandatory zeroization
 ## Quick Start
 
 ```rust
-use secure_gate::{dynamic_alias, fixed_alias, RevealSecret, RevealSecretMut};
+use secure_gate::{Dynamic, Fixed, RevealSecret, RevealSecretMut};
 
-dynamic_alias!(pub Password, String);    // Dynamic<String>
-fixed_alias!(pub Aes256Key, 32);         // Fixed<[u8; 32]>
+pub type Password = Dynamic<String>;     // heap, length varies with the input
+pub type Aes256Key = Fixed<[u8; 32]>;    // on the stack, exactly 32 bytes
 
 let mut pw: Password = "hunter2".into();
 
@@ -50,7 +50,7 @@ pw.expose_secret_mut().clear();
 
 #[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
 {
-    use secure_gate::{Case, Fixed, RevealSecret, ToHex, ToBech32, FromHexStr};
+    use secure_gate::{Case, RevealSecret, ToHex, ToBech32, FromHexStr};
 
     let key: Fixed<[u8; 32]> = Fixed::new([42u8; 32]);
 
@@ -139,20 +139,26 @@ let owned: [u8; 32] = key.into_inner();
 assert_eq!(owned, [0xAB; 32]);
 ```
 
-### Macros for named secret types
+### Named secret types
 
-Two families, differing in exactly one respect — whether the compiler can tell two same-shaped secrets apart.
+Two ways to give a secret a name, differing in exactly one respect — whether the compiler can tell two same-shaped secrets apart.
 
-**Aliases** (`fixed_alias!`, `dynamic_alias!`, `fixed_generic_alias!`, `dynamic_generic_alias!`) expand to plain `pub type` aliases with full visibility control, optional doc strings, and (for `fixed_alias!`) a compile-time zero-size guard. Two aliases over the same underlying type are the **same** nominal type and assignable to each other — use them for readability and audit grep targets:
+**A plain `type` alias** over `Fixed` or `Dynamic` is a name and nothing more: the alias *is* the wrapper, so it carries every guarantee the wrapper carries — zeroize on drop, redacted `Debug`, access only through `RevealSecret` — and it stays interchangeable with its base type. Two aliases over the same underlying type are the **same** nominal type and assignable to each other — use them for readability and audit grep targets. Documentation goes on the alias as an ordinary doc comment, which is also where the doc string the removed `*_alias!` macros took now belongs:
 
 ```rust
-use secure_gate::{fixed_alias, dynamic_alias};
+use secure_gate::{Dynamic, Fixed};
 
-fixed_alias!(pub Aes256Key, 32, "32-byte AES-256 key");
+/// 32-byte AES-256 key.
+pub type Aes256Key = Fixed<[u8; 32]>;
 
 #[cfg(feature = "alloc")]
-dynamic_alias!(pub Password, String, "variable-length password");
+/// Variable-length password.
+pub type Password = Dynamic<String>;
 ```
+
+A plain `type` alias is the right reach when a value is sensitive enough to want zeroize-on-drop and a redacted `Debug`, but has no role it could be confused *with* — a session blob, a cached token, a nonce store. You get the protection and a self-documenting name, the alias stays interchangeable with its base type so it crosses into APIs you do not own without ceremony, and there is no cross-contamination to prevent because nothing else shares its shape and meaning.
+
+Reach for a newtype the moment two values of the same shape mean different things. That is the case the compiler can help with, and the only one where the extra surface pays for itself.
 
 **Newtypes** (`fixed_newtype!`, `dynamic_newtype!`) expand to `struct`s instead, so two of the same shape are **distinct** types. Reach for these when distinct cryptographic roles share a shape — an encryption key and a MAC key are both `Fixed<[u8; 32]>`, and under an alias the compiler cannot tell them apart:
 
@@ -167,13 +173,24 @@ fn seal(enc: &EncKey, mac: &MacKey) { /* … */ }
 // seal(&mac, &enc) does not compile — the roles cannot be swapped by accident.
 ```
 
+Both newtype macros also accept `generic T` in place of the byte size `fixed_newtype!` expects or the `String` / `Vec<u8>` `dynamic_newtype!` expects, for a secret whose inner type is neither bytes nor a string — `fixed_newtype!(pub Poly, generic [i16; 256]);` for an ML-KEM secret polynomial on a target with no allocator, where `Fixed` is the only wrapper there is. The `generic` arm emits exactly the surface that is meaningful for an arbitrary inner type: scoped access, redacted `Debug`, zeroize on drop and `new`, with no `SecretLen` and no encoders, since neither has a meaning without a known shape.
+
 Generated newtypes carry the same guarantees as the wrapper (zeroize on drop, redacted `Debug`, access only via `RevealSecret`), are `#[repr(transparent)]` so they cost nothing at runtime, and have no `Deref` — the separation is total, not by-value-only. No `From<Wrapper>` or `Deref` is generated, so an alias-typed value cannot become a newtype through `.into()` and a newtype never coerces back to its base; base-wrapper access is opt-in per newtype and split by direction (`derive: [FromWrapper]` to construct from the base, `derive: [IntoWrapper]` to reach it; `WrapperAccess` is both) and should be audited like `expose_secret()`. In a mixed tree the base type is the pool every plain alias lives in: `FromWrapper` on a boundary type accepts all of them, and `IntoWrapper` on a secret role downgrades it to the least-sensitive alias sharing its base — neither token is the sufficient default more often than it looks.
 
-See [`fixed_alias!`], [`dynamic_alias!`], [`fixed_generic_alias!`], [`dynamic_generic_alias!`], [`fixed_newtype!`], and [`dynamic_newtype!`] in the [API docs](https://docs.rs/secure-gate).
+See [`fixed_newtype!`] and [`dynamic_newtype!`] in the [API docs](https://docs.rs/secure-gate).
 
-**Zero-size behavior note**
-`fixed_alias!(Name, N)` rejects `N = 0` at compile time (via a const-eval index-out-of-bounds guard).
-However, `fixed_generic_alias!`, `dynamic_alias!`, and `dynamic_generic_alias!` **allow** zero-sized types (`SecretBuffer<0>`, `Dynamic<[u8; 0]>`, `Dynamic<()>` etc.). These compile successfully but have no cryptographic value and should never be used in production. Always validate that the effective size is > 0 in your unit tests when using the generic or dynamic alias macros.
+**Zero-size behavior note**  
+A zero-length `Fixed` cannot be built at all. `Fixed::new` and `Fixed::new_with` each carry a `const` assertion that the value being wrapped has a nonzero size, so `Fixed<[u8; 0]>` — and any other zero-sized inner type — is a compile error at the first construction. The assertion is a post-monomorphization error, which is what makes it cover generic code too. Where it points is worth knowing before you go looking. The error's own span is the assertion inside this crate, not your code; a separate `while instantiating` note is what names the `Fixed::new` call the monomorphization reached. That note does **not** name the instantiation that caused it. Given a generic `fn build<const N: usize>() -> Fixed<[u8; N]>`, calling `build::<0>()` reports against the `Fixed::new` line inside `build`, and neither `build::<0>()` nor its caller appears anywhere in the output. `fixed_newtype!(Name, 0)` additionally fails at the declaration, via a const-eval index-out-of-bounds guard in the macro, so that spelling reports the problem at the line you wrote rather than at the first call.
+
+**Two limits on when it fires, both measured rather than assumed.** First, a post-monomorphization error is raised during codegen, so `cargo check` does not report it, and neither does an editor driven by `cargo check`. Second, and more consequential: it only fires for a codegen root. A non-generic `#[inline]` function in a library is not one, and every method these macros generate carries an inline attribute, `#[inline]` or `#[inline(always)]`. So a library crate that writes `fixed_newtype!(pub Empty, generic [u8; 0]);` alongside `#[inline] pub fn empty() -> Empty { Empty::new([]) }` compiles, tests and publishes with `cargo build`, `cargo build --release` and `cargo test` all green. The error surfaces only when a downstream crate instantiates it, and the diagnostic points into `secure-gate` and at the dependency's macro invocation — not at the consumer's own call site, and not in the crate that wrote the bug.
+
+**What counts as a codegen root is itself a property of the compiler and the profile, so do not read the `#[inline]` above as the whole condition.** Dropping the attribute does not reliably restore the error. Measured on 1.85: a library exporting a plain, non-generic, non-`inline` `pub fn empty() -> Empty { Empty::new([]) }` does fail `cargo build` and `cargo test`, and passes `cargo build --release` with exit 0 — rustc's cross-crate-inlining heuristic (1.75 and later) drops a small function from the exported root set in an optimized build, so the release profile has no root to instantiate. The same crate on 1.70 fails in both profiles. The conclusion to carry is about the class, not the spelling: whether a library's own CI sees the error depends on attributes, generics, compiler version and optimization level together, and none of those is a guarantee. Only instantiating the type in a test or binary is.
+
+So state the guarantee precisely: no **value** of a zero-sized `Fixed` can exist at runtime, because nothing can construct one. A binary or a test that builds one fails to compile. What the guard does not do is stop a library from *exporting* an unusable zero-sized API with green CI. Neither limit is a design choice: a condition on a generic parameter has nothing to evaluate until that parameter is known, and nothing on stable Rust moves it earlier. `fixed_newtype!(Name, 0)` is the exception that does fire under `cargo check` in the declaring crate, because the size is a literal at that point — which is the argument for the macro's own guard earning its keep alongside this one.
+
+Naming the type still compiles: `type Empty = Fixed<[u8; 0]>;` is a legal type expression, and no guard placed in the type can make the type itself unnameable. What the assertion removes is every value of it — there is no way to obtain an `Empty` to hold, encode, compare or drop — which is the property that matters, and it holds for a plain `type` alias and a newtype alike because both funnel through the same two constructors.
+
+`Dynamic` has no compile-time equivalent, and the reason is about the payload rather than the wrapper: the emptiness of a `Vec` or a `String` is a runtime property, and an empty `Dynamic<String>` is a legitimate value to hold before validation, so there is nothing for a compile-time check to decide. One honest gap remains, rather than a non-problem: a *statically* zero-sized inner type. `Dynamic<Zst>` constructs where `Fixed<Zst>` is now rejected, so do not reach for a zero-sized inner type expecting to be stopped. A zero-length `Dynamic` then behaves normally rather than failing: `len()` is 0, `Debug` is still `[REDACTED]`, `ct_eq` against another empty is `true`, `to_hex()` returns `""`, and drop is clean. Nothing reports a problem, which is precisely why this is worth stating — the failure is silent and semantic, not a panic you would notice. Validate that the effective length is > 0 in your own tests whenever it comes from configuration.
 
 See also the Best Practices section in [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) for the equivalent guidance.
 
@@ -193,7 +210,7 @@ fn require_min_len<S: SecretLen>(secret: &S, min: usize) -> bool {
 
 - **Zero-cost safety** — mandatory zeroization on drop; `no_std` / `no_alloc` support.
 - **Audit-first API** — a held secret cannot leak via `Deref`: `Fixed`/`Dynamic` implement none. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch. `into_inner` hands ownership to the caller and ends protection; encoders return `EncodedSecret`, which *does* deref and stays wiped until it drops — see [Where accident-prevention ends](SECURITY.md#where-accident-prevention-ends).
-- **Named secret types** — `*_alias!` macros create `type` aliases over `Fixed` / `Dynamic` that inherit redacted `Debug` and zeroize-on-drop; same-shape aliases (e.g. two `Fixed<[u8; 32]>` aliases) are interchangeable at the type level. When distinct cryptographic roles share a shape, `fixed_newtype!` / `dynamic_newtype!` generate `struct`s instead, so the compiler rejects a swapped key role at the call site.
+- **Named secret types** — a plain `type` alias over `Fixed` / `Dynamic` (`pub type Aes256Key = Fixed<[u8; 32]>;`) inherits redacted `Debug` and zeroize-on-drop and stays interchangeable with its base type, so same-shape aliases (e.g. two `Fixed<[u8; 32]>` aliases) are one and the same type. When distinct cryptographic roles share a shape, `fixed_newtype!` / `dynamic_newtype!` generate `struct`s instead, so the compiler rejects a swapped key role at the call site.
 - **Batteries included** — optional, zero-overhead support for serde, constant-time comparison (`subtle`), and secure encoding (hex, base32, base64url, bech32/m).
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`.
 
@@ -328,10 +345,18 @@ See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for th
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
 
 For `Dynamic<Vec<_>>` and `Dynamic<String>`, avoid capacity-changing mutations
-after wrapping unless your deployment handles allocator-level residue. For
-known-size heap-only key material, prefer `Dynamic<[u8; N]>` (boxed array — no
-realloc surface). See `SECURITY.md` for the realloc threat-model note and
-operational mitigations.
+after wrapping unless your deployment handles allocator-level residue. Capacity-changing
+means more than growing: `reserve` abandons the old buffer while writing no payload, and
+`shrink_to_fit` / `shrink_to` abandon it while the buffer only ever got smaller, carrying
+the discarded tail with it. The buffer the wrapper holds afterwards is still zeroized on
+drop, spare capacity included, so the exposure is confined to the abandoned buffers — one
+per move, and whether a move happens at all depends on whether the allocator can resize
+the chunk in place. For known-size heap-only key material, prefer `Dynamic<[u8; N]>`
+(boxed array — no realloc surface). `Fixed<T>` has no realloc surface either, and that is
+now enforced rather than assumed: `Fixed::new` requires `FixedStorage` on the inner type, so
+`Fixed<Vec<u8>>` and `fixed_newtype!(pub Name, generic Vec<u8>)` are compile errors instead
+of silent instances of the same weakness. A custom inner type asserts the property in one
+line. See `SECURITY.md` for the realloc threat-model note and operational mitigations.
 
 ### Inherent Rust limitations
 

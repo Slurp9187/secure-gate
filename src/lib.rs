@@ -71,11 +71,11 @@
 //! ```
 //!
 //! ```rust
-//! use secure_gate::{fixed_alias, RevealSecret};
+//! use secure_gate::{fixed_newtype, RevealSecret};
 //!
-//! fixed_alias!(pub Aes256Key, 32);
+//! fixed_newtype!(pub Aes256Key, 32);
 //!
-//! let key: Aes256Key = [0xABu8; 32].into();
+//! let key = Aes256Key::new([0xABu8; 32]);
 //! key.with_secret(|b| assert_eq!(b.len(), 32));
 //! ```
 //!
@@ -95,7 +95,7 @@
 //! │   ├── SerializableSecret← serde-serialize feature
 //! │   ├── encoding/         ← ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m
 //! │   └── decoding/         ← FromHexStr, FromBase32Str, FromBase64UrlStr, FromBech32Str, FromBech32mStr
-//! ├── macros/               ← fixed_alias!, fixed_newtype!, dynamic_alias!, dynamic_newtype!, etc.
+//! ├── macros/               ← fixed_newtype!, dynamic_newtype!
 //! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error
 //! ```
 //!
@@ -202,14 +202,14 @@
 //!   [`Fixed::try_from_base64url`](Fixed::try_from_base64url),
 //!   [`Fixed::try_from_bech32`](Fixed::try_from_bech32), [`Fixed::try_from_bech32m`](Fixed::try_from_bech32m)
 //!   (no-alloc stack-based decoding)
-//! - [`fixed_alias!`], [`fixed_generic_alias!`] (type aliases), and
-//!   [`fixed_newtype!`] (distinct nominal types — two keys of the same size that
-//!   the compiler keeps apart)
+//! - [`fixed_newtype!`] (distinct nominal types — two keys of the same size that
+//!   the compiler keeps apart); a plain `type` alias over [`Fixed<T>`] needs nothing
+//!   at all
 //! - [`FromSliceError`]
 //!
 //! **Not** available without `alloc`: [`Dynamic<T>`], [`EncodedSecret`],
 //! encoding traits ([`ToHex`], etc.), decoding traits ([`FromHexStr`], etc.),
-//! [`dynamic_alias!`], [`dynamic_generic_alias!`], [`dynamic_newtype!`], serde support.
+//! [`dynamic_newtype!`], serde support.
 //!
 //! # `no_std`
 //!
@@ -255,7 +255,7 @@
 //! Full discussion in
 //! [SECURITY.md § Inherent Rust Limitations](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md#inherent-rust-limitations).
 //!
-//! See the [README](https://github.com/Slurp9187/secure-gate/blob/main/README.md) and
+//! See the [README](https://github.com/Slurp9187/secure-gate/blob/release/0.8/README.md) and
 //! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) for full details.
 
 #[cfg(feature = "alloc")]
@@ -437,6 +437,27 @@ pub use traits::RevealSecretMut;
 /// work. That is the safe default rather than a missing feature.
 pub use traits::SentinelValue;
 
+/// Asserts that an inner type owns no buffer whose capacity can change.
+///
+/// Required by [`Fixed::new`], which is what makes `SECURITY.md`'s claim that `Fixed<T>`
+/// "has no realloc surface" true rather than aspirational. Before this bound existed,
+/// `Fixed<Vec<u8>>`, `Fixed<String>` and `fixed_newtype!(pub Name, generic Vec<u8>)` all
+/// compiled, and measured, they abandoned an unwiped buffer holding the whole secret on
+/// any capacity change — the same weakness `Dynamic` documents, minus `Dynamic`'s
+/// safe-growth `std::io::Write` path.
+///
+/// Implemented for the primitives, `[T; N]` for any `N`, tuples up to four elements, and
+/// `Option<T>`. Nothing heap-owning is implemented: `Vec<T>`, `String` and `Box<[T]>` are
+/// all absent, because the residue does not need a capacity change — replacing the whole
+/// value abandons the allocation too, measured at 1024 of 1024 bytes through a
+/// `Fixed<Box<[u8]>>`. For a heap-backed secret use [`Dynamic`], which documents the
+/// residue and offers the one safe growth path.
+///
+/// A custom inner type writes `impl FixedStorage for MyKey {}`. Like [`CloneableSecret`],
+/// the compiler checks that you made the claim, not that it is true — see the trait docs
+/// for the test to apply and for why an assertion is the right trade here.
+pub use traits::FixedStorage;
+
 /// Encoded string **output wrapper** for zeroizing encoded output.
 ///
 /// This is an **output wrapper** — it exists *only* to keep encoded data zeroized until
@@ -487,7 +508,7 @@ pub use traits::EncodedSecret;
 #[cfg(feature = "serde-serialize")]
 pub use traits::SerializableSecret;
 
-// Type alias macros (always available)
+// Newtype macros (`dynamic_newtype!` needs `alloc`)
 mod macros;
 
 /// Decodes Base32 strings (`&str`) to `Vec<u8>`. Blanket impl for `AsRef<str>`.

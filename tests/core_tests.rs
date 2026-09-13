@@ -1,5 +1,8 @@
 // Core API tests for `Fixed<T>` and `Dynamic<T>` (`RevealSecret` / `RevealSecretMut`).
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 #[cfg(feature = "cloneable")]
 use secure_gate::CloneableSecret;
 #[cfg(feature = "alloc")]
@@ -282,11 +285,17 @@ fn cloneable_secret_works() {
     // Verify zeroization on drop works
     drop(original);
 
-    // Wrapper-level clone: Fixed<CloneKey> exposes Clone when CloneableSecret is
-    // implemented, and the clone owns independent heap memory (deep clone semantics).
-    // If the clone were shallow (shared Vec backing), one of the two sequential drops
-    // below would corrupt the other, causing UB or a panic in CloneKey::zeroize.
-    let w: Fixed<CloneKey> = Fixed::new(CloneKey(vec![0xBBu8; 4]));
+    // Wrapper-level clone: the wrapper exposes Clone when CloneableSecret is implemented,
+    // and the clone owns independent heap memory (deep clone semantics). If the clone were
+    // shallow (shared Vec backing), one of the two sequential drops below would corrupt the
+    // other, causing UB or a panic in CloneKey::zeroize.
+    //
+    // `Dynamic`, not `Fixed`: `CloneKey` owns a `Vec<u8>`, so it is not `FixedStorage` and
+    // `Fixed::new` refuses it. This test previously wrapped it in a `Fixed` with a
+    // hand-written `impl FixedStorage for CloneKey {}` — a false assertion, since the whole
+    // point of the type here is that it owns heap memory. The marker is an assertion the
+    // compiler does not check, and this is what writing a false one looks like.
+    let w: Dynamic<CloneKey> = Dynamic::new(CloneKey(vec![0xBBu8; 4]));
     let w2 = w.clone();
     drop(w); // zeroizes w's Vec<u8> backing via CloneKey::zeroize
     drop(w2); // independently zeroizes w2's backing — no UB/panic = independent
@@ -489,4 +498,98 @@ fn fixed_u8_len_unchanged() {
     let secret: Fixed<[u8; 8]> = Fixed::new([0u8; 8]);
     assert_eq!(secret.len(), 8);
     assert_eq!(secret.byte_len(), 8);
+}
+
+// === FixedStorage: what `Fixed::new` accepts, and what it no longer does ===
+
+/// A boxed slice is **not** `FixedStorage`, and the reason is worth recording because the
+/// first version of the trait accepted it. Its length is fixed at construction, so it
+/// satisfies "cannot be resized" — but that was the wrong predicate. Replacing the whole
+/// value abandons the allocation just as a reallocation would, and the wrapper wipes what it
+/// holds at drop rather than what it used to hold. Measured on a `Fixed<Box<[u8]>>` with a
+/// 1024-byte secret, `with_secret_mut(|slot| *slot = other)` released the original block
+/// with 1024 of 1024 bytes intact. The rejection is pinned in
+/// `tests/compile-fail/fixed_reallocating_inner.rs`; this comment is the rationale, since a
+/// future reader will otherwise be tempted to add the impl back.
+///
+/// For a heap-backed secret of fixed size the supported shape is `Dynamic<[u8; N]>`, which
+/// allocates once and is wiped on drop.
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_boxed_array_is_the_heap_fixed_size_shape() {
+    let secret: Dynamic<[u8; 8]> = Dynamic::new([7u8; 8]);
+    assert_eq!(secret.with_secret(|b| b[0]), 7);
+    assert_eq!(secret.with_secret(|b| b.len()), 8);
+}
+
+/// The shapes `FixedStorage` accepts without the caller writing anything. Each is a
+/// legitimate fixed-capacity secret, and each used to be accepted for the weaker reason
+/// that nothing checked the inner type at all.
+#[test]
+fn fixed_storage_accepts_the_fixed_capacity_shapes() {
+    assert_eq!(Fixed::new([1u8; 32]).with_secret(|a| a[0]), 1);
+    assert_eq!(Fixed::new([2i16; 256]).with_secret(|a| a[255]), 2);
+    assert_eq!(
+        Fixed::new(([3u8; 4], 4u32)).with_secret(|(a, n)| (a[0], *n)),
+        (3, 4)
+    );
+    assert_eq!(
+        Fixed::new(Some([5u8; 4])).with_secret(|o| o.map(|a| a[0])),
+        Some(5)
+    );
+    assert_eq!(Fixed::new([[6u8; 2]; 3]).with_secret(|a| a[2][1]), 6);
+}
+
+/// Every shape here is heap-free, was constructible before the `FixedStorage` bound
+/// existed, and is **foreign** — so if the crate withdrew these impls, no downstream crate
+/// could restore them. `impl secure_gate::FixedStorage for NonZeroU32` in a consumer is
+/// E0117, the orphan rule, and a consumer's only escape would be to change its own type.
+///
+/// That asymmetry is why this test exists. The bound is an allow-list, so a missing impl is
+/// indistinguishable to the caller from a deliberate refusal, and the cost of an accidental
+/// omission is not a worse error message — it is a shape that cannot be used at all.
+///
+/// MSRV note: `size_of` is spelled `core::mem::size_of` because it only entered the prelude
+/// in Rust 1.80, and this line's MSRV is 1.70. `main` uses the bare form.
+#[test]
+fn fixed_storage_covers_the_heap_free_foreign_shapes() {
+    use core::mem::MaybeUninit;
+    use core::num::{NonZeroU32, Wrapping};
+
+    assert_eq!(
+        Fixed::new(NonZeroU32::new(7).unwrap()).with_secret(|n| n.get()),
+        7
+    );
+    assert_eq!(
+        Fixed::new([NonZeroU32::new(9).unwrap(); 4]).with_secret(|a| a[3].get()),
+        9
+    );
+    assert_eq!(Fixed::new(Wrapping(11u32)).with_secret(|w| w.0), 11);
+    // Construction is the property under test; reading a `MaybeUninit` back would need
+    // `unsafe`, which this crate does not use and its tests should not model either.
+    assert_eq!(
+        Fixed::new(MaybeUninit::new(13u64))
+            .with_secret(|_| core::mem::size_of::<MaybeUninit<u64>>()),
+        8
+    );
+    assert_eq!(
+        Fixed::new(zeroize::Zeroizing::new([15u8; 32])).with_secret(|z| z[31]),
+        15
+    );
+
+    // Tuple arities 5 and 10: four was the old ceiling, ten is `zeroize`'s.
+    assert_eq!(
+        Fixed::new((1u8, 2u8, 3u8, 4u8, 5u8)).with_secret(|t| t.4),
+        5
+    );
+    assert_eq!(
+        Fixed::new((1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8, 9u8, 10u8)).with_secret(|t| t.9),
+        10
+    );
+
+    // The wrapper nests: `Fixed<T>` is itself heap-free when `T` is.
+    assert_eq!(
+        Fixed::new(Fixed::new([17u8; 4])).with_secret(|inner| inner.expose_secret()[0]),
+        17
+    );
 }

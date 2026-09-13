@@ -40,6 +40,30 @@
 > by `tests/compile-fail/dynamic_string_no_hex.rs`. §5.3 is therefore
 > **narrowed and made mechanical** (bounded by the trait set) rather than
 > dissolved. What remains open: finishing the macro polish (§6).
+>
+> **Amended again: the alias macros are gone, and this document outlived two of
+> its own claims.** `fixed_alias!`, `dynamic_alias!`, `fixed_generic_alias!` and
+> `dynamic_generic_alias!` were removed after the newtype macros had shipped long
+> enough to show that nothing reached for an alias macro where a plain `type`
+> line would not do. Read every reference to them below as describing the earlier
+> crate: `fixed_alias!(pub K, 32)` is now `pub type K = Fixed<[u8; 32]>;` and
+> `dynamic_alias!(pub P, String)` is now `pub type P = Dynamic<String>;`. The
+> arguments are unaffected, because they were always about `type` aliases being
+> structural — the macro was only ever a wrapper around one. R6 (§8) now reads
+> "coexist with plain `type` aliases", which `tests/macros_suite/newtype_conversion.rs`
+> still pins, and Q6's migration recipe is unchanged in substance.
+>
+> Two claims above are now false and are left in place as a record rather than
+> silently corrected. Line 14's "Not a candidate for `release/0.8` — that branch
+> is security patches only" was overtaken by events: the newtype macros were
+> backported to the 0.8 line in 0.8.0-rc.11, and the alias removal is backported
+> too. And §2's framing of the zero-size guard as something only the macros carry
+> (the `[(); $size][0]` trick, there credited to `fixed_alias!`) no longer holds:
+> `Fixed::new` and `Fixed::new_with` now assert a non-zero size themselves, so the
+> guard covers a hand-written `type` as well. `fixed_newtype!` keeps its own
+> declaration-site guard because that one fires earlier, at the macro call. That
+> assertion is a post-monomorphization error and therefore invisible to
+> `cargo check`, which is a real limit worth knowing before relying on it.
 
 > **`release/0.8` backport:** this document is carried verbatim from `main` and
 > describes that branch. On `release/0.8` the same code is built for Rust 2021 /
@@ -269,7 +293,7 @@ Each was hit during development; the fix (where applicable) is in the code.
    `with_secret` round trip — explicit, and visible in the audit sweep. Pinned
    by `tests/compile-fail/newtype_no_from_wrapper.rs`.
 
-## 5. Open questions (§5.1 and §5.2 decided; §5.3–§5.4 open)
+## 5. Open questions (all decided: §5.1, §5.2 and §5.4 below; §5.3 narrowed and completed per §6)
 
 ### 5.1 DECIDED (option (c)): `Clone` / `Serialize` are not generated
 
@@ -374,12 +398,34 @@ base64, bech32m, the `_zeroizing` bech32 variants, `from_rng`, and
 `deserialize_with_limit`. Alternatively adopt §3.3 and forward traits instead.
 Decide before writing the remaining ~25 forwarders by hand.
 
-### 5.4 Should the generic `Dynamic` arm exist at all?
+### 5.4 DECIDED: keep the generic arm, and give `Fixed` one too
 
-It yields a newtype with no constructors beyond `new` and no encoders. It may
-be better to reject non-`String`/`Vec<u8>` inner types outright with a clear
-message than to hand back a type that silently lacks most of the API — which is
-also what makes trap 6 hurt.
+The worry was that the arm hands back a type "that silently lacks most of the
+API". The `generic` marker that fixed trap 6 removed the silent part, which was
+the whole of the objection: an unrecognised inner type is now a `compile_error!`
+naming both options, so nothing degrades quietly, and writing the word `generic`
+is how a caller states that the reduced surface is what they meant.
+
+What is left is not a degraded newtype but the correct one. `SecretLen` and the
+encoders are absent because neither has a meaning for an arbitrary `T` — a length
+in `u32` elements is not the byte length callers expect, and hex over a
+`Vec<u32>` has no defined byte order. The arm is also the only macro path to any
+inner type other than `String` and `Vec<u8>`, which `Dynamic<T: ?Sized + Zeroize>`
+supports deliberately and which the trap-7 fix (`RevealSecret` covering custom
+inner types) exists to enable. Hand-rolling parity costs the ~40 lines measured
+in the status header above.
+
+Rejecting those inner types outright, the alternative this section floated, would
+undo the trap-7 fix for exactly the consumers it was made for.
+
+`fixed_newtype!` has gained the matching `generic T` arm. It had none only because
+it takes a size literal, so the token ambiguity that forced the marker never arose
+there — not because `Fixed` is less generic. The gap mattered most on `no_std`,
+where there is no allocator and therefore no `Dynamic` at all, so `Fixed` is the
+only wrapper and the secret is often not bytes: an ML-KEM secret polynomial
+`[i16; 256]`, Ed25519 scalar limbs `[u64; 4]`, an AES-256 expanded key schedule
+`[u32; 60]`. Pinned by `tests/newtype_nostd.rs` and
+`tests/macros_suite/newtype_surface.rs`.
 
 ## 6. Polish — COMPLETE
 
@@ -448,7 +494,7 @@ this branch, verified by tests unless noted:
 | R3 | No `Deref` to the base | ✅ never generated; now pinned by `newtype_no_deref.rs` |
 | R4 | Preserve zeroize, `[REDACTED]` `Debug`, no `Display`, 3-tier access | ✅ struct holds the wrapper (its `Drop` runs); no `Display` is generated; `RevealSecret`/`RevealSecretMut` forwarded; `asm_dse_check` proves byte-identical codegen |
 | R5 | Opt-in `Serialize` per newtype, not per base | ✅ by §5.1 (c): hand-write `impl Serialize for PublicId` routing through `with_secret`. Siblings and the base gain nothing — `newtype_sibling_not_serializable.rs` |
-| R6 | Coexist with alias macros in one file | ✅ `newtype_conversion.rs` mixes both families; R2 is what makes the mix safe |
+| R6 | Coexist with plain `type` aliases in one file | ✅ `newtype_conversion.rs` mixes a `type` alias with five newtypes; R2 is what makes the mix safe. (Stated as "alias macros" when written; those are gone, and a `type` alias is what they expanded to, so the requirement is unchanged) |
 | R7 | Match the hand-written shape: `new(impl Into<String>)`, private field, `RevealSecret`, `[REDACTED]` | ✅ **Was mismatched** — `new` took `Into<Box<String>>`, so `new("literal")` failed. Shaped arms now take `impl Into<String>` / `impl Into<Vec<u8>>`. Note the hand-written `RevealSecret` impl in the requirements includes `len()`, which moved to `SecretLen` in #156 — adopting the macro absorbs that |
 
 Answers to Q1–Q7:

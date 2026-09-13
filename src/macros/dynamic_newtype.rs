@@ -6,9 +6,9 @@
 
 /// Creates a distinct nominal type wrapping [`Dynamic<T>`](crate::Dynamic).
 ///
-/// Mirrors [`dynamic_alias!`](crate::dynamic_alias) syntax, but generates a
-/// `struct` rather than a `type` alias: two `dynamic_newtype!` types over the
-/// same inner type are **not** interchangeable.
+/// Generates a `struct` rather than a `type` alias: two `dynamic_newtype!`
+/// types over the same inner type are distinct, where two plain `type`
+/// aliases over [`Dynamic<T>`](crate::Dynamic) are one type.
 ///
 /// # Syntax
 ///
@@ -104,17 +104,37 @@
 /// The `generic` form deliberately provides less: [`RevealSecret`](crate::RevealSecret),
 /// [`RevealSecretMut`](crate::RevealSecretMut), redacted `Debug`, `Zeroize`,
 /// `ZeroizeOnDrop`, and `new` — no [`SecretLen`](crate::SecretLen) and no
-/// encoders, since neither is meaningful for an arbitrary inner type. Writing
-/// the marker is how you say you know that.
+/// encoders. The reason is what the macro can see rather than what each method
+/// means: the inner type arrives as one opaque token, so the expansion cannot
+/// tell a `Vec` from a struct and withholds the shape-dependent surface
+/// uniformly. An encoder genuinely has no meaning for an arbitrary inner type;
+/// `SecretLen` does, and the base wrapper implements it for every
+/// `Dynamic<Vec<T>>` with a correct `byte_len`, so `derive: [IntoWrapper]`
+/// reaches it through `as_wrapper()`. What the arm withholds is the newtype's
+/// own `len()`, not the answer. Writing the marker is how you say you know
+/// that.
+///
+/// It also has no `new_with`, which the `String` and `Vec<u8>` arms do get. That
+/// one is not a question of meaning — it is meaningful for any inner type — so
+/// the consequence is worth knowing: `new` takes its value by value, and the
+/// in-place construction that keeps a secret from ever existing outside the
+/// wrapper is unavailable here. [`fixed_newtype!`](crate::fixed_newtype) explains
+/// the same gap on its own `generic` arm at more length.
 ///
 /// # Implementation Notes
 ///
 /// The generated type is `#[repr(transparent)]` over the wrapper and delegates
 /// through `#[inline]` methods, so it costs nothing at runtime.
 ///
-/// Unlike [`fixed_newtype!`](crate::fixed_newtype) there is **no zero-size
-/// guard** — a `Dynamic` is pointer-sized whatever it holds, so the check
-/// would be meaningless. Validate expected lengths in your own tests.
+/// Unlike [`Fixed`](crate::Fixed), there is **no compile-time zero-size check**
+/// here, and the reason is about the payload rather than the wrapper. For
+/// `String` and `Vec<u8>` emptiness is a runtime property — an empty one is a
+/// legitimate value to hold before validation — so there is nothing for a
+/// compile-time check to decide. That leaves one real gap: a statically
+/// zero-sized inner type. `Dynamic<Zst>` for a zero-sized `Zst` constructs
+/// happily, where `Fixed<Zst>` is now rejected. Validate expected lengths in
+/// your own tests, and do not reach for a zero-sized inner type expecting to be
+/// stopped.
 ///
 /// **Do not add your own `Drop` impl.** None is needed: the wrapped
 /// [`Dynamic`](crate::Dynamic) still runs its own, so zeroization is
@@ -133,7 +153,7 @@
 ///
 /// **Nominal separation guards against mistakes, not intent** — but nothing is
 /// generated that would undo it by accident. There is no `From<Wrapper>` and
-/// no `Deref`, so an alias-typed value cannot flow into a newtype through
+/// no `Deref`, so a base-typed value cannot flow into a newtype through
 /// `.into()`, and `&Newtype` never coerces to `&Wrapper` at a call site. By
 /// default the only way material enters or leaves is the 3-tier access API —
 /// a `with_secret` round trip — which is explicit and shows up in the audit
@@ -160,30 +180,31 @@
 /// a rebuild, a reveal the job never needed.
 ///
 /// **Which direction is safe depends on the pool.** In a mixed tree the base
-/// type is not raw material: every plain alias sharing it *is* that type, so
-/// a directional token connects this role to all of them at once.
+/// type is not raw material: every plain `type` alias sharing it *is* that
+/// type, so a directional token connects this role to all of them at once.
 /// `FromWrapper` lets anything in the pool become this role — the source never
 /// opts in, because the source is just the base type — so a type that guards
 /// a boundary must never take it. `IntoWrapper` lets this role become anything
 /// in the pool, which is safe only when the role is no more sensitive than
-/// the least-sensitive alias sharing its base; on a secret role it is an
+/// the least-sensitive plain alias sharing its base; on a secret role it is an
 /// explicit, greppable downgrade, not a neutral operation. The default,
 /// neither token, is sufficient more often than it looks. The exposure is
 /// largest during a partial migration — the regime real consumers live in —
-/// because while most aliases stay plain the base type is a universal donor.
-/// Audit these methods the way you audit `expose_secret()`.
+/// because while most of the pool stays a plain `type` alias, the base type
+/// is a universal donor. Audit these methods the way you audit
+/// `expose_secret()`.
 ///
 /// The heap caveats of [`Dynamic`](crate::Dynamic) carry over unchanged: see
 /// `SECURITY.md` on realloc residue for `Vec`/`String` growth after wrapping.
 ///
 /// # See also
 ///
-/// - [`dynamic_alias!`](crate::dynamic_alias) — a `type` alias instead, when
-///   readability rather than role separation is the goal
 /// - [`fixed_newtype!`](crate::fixed_newtype) — stack-allocated counterpart,
 ///   and the reference for the `derive:` rules
-/// - [`dynamic_generic_alias!`](crate::dynamic_generic_alias) — one name
-///   across several inner types
+/// - a plain `type` alias — `pub type Password = Dynamic<String>;` — when a
+///   readable name is all that is wanted and interchangeability with the base
+///   type is a feature rather than a risk; the crate's README argues when that
+///   is the right reach
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! dynamic_newtype {

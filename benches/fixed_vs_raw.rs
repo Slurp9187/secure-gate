@@ -1,13 +1,13 @@
 // benches/fixed_vs_raw.rs
-// Zero-cost proof for Fixed<T> and aliases — runs on stable Rust
+// Zero-cost proof for Fixed<T> and a plain type alias over it — runs on stable Rust
 // Run with: cargo bench --all-features --bench fixed_vs_raw
 // → opens HTML report showing negligible overhead (< 0.1 cycles typical)
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use secure_gate::{fixed_alias, Fixed, RevealSecret, RevealSecretMut};
+use secure_gate::{Fixed, RevealSecret, RevealSecretMut};
 use std::hint::black_box;
 
-fixed_alias!(pub RawKey, 32); // Alias for semantic testing
+pub type RawKey = Fixed<[u8; 32]>; // Plain type alias, for semantic testing
 
 fn bench_raw_array(c: &mut Criterion) {
     let key = black_box([42u8; 32]);
@@ -84,11 +84,11 @@ fn bench_fixed_explicit(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_fixed_alias_explicit(c: &mut Criterion) {
+fn bench_type_alias_explicit(c: &mut Criterion) {
     let key = RawKey::new(black_box([42u8; 32]));
     let mut mut_key = RawKey::new(black_box([42u8; 32]));
 
-    let mut group = c.benchmark_group("fixed_alias_rawkey_32b");
+    let mut group = c.benchmark_group("type_alias_rawkey_32b");
     group.throughput(criterion::Throughput::Bytes(32));
 
     group.bench_function("single index access", |bencher| {
@@ -139,7 +139,7 @@ fn bench_drop_overhead(c: &mut Criterion) {
         })
     });
 
-    group.bench_function("fixed_alias_lifecycle", |bencher| {
+    group.bench_function("type_alias_lifecycle", |bencher| {
         bencher.iter(|| {
             let key = RawKey::new(black_box([42u8; 32]));
             black_box(key.expose_secret()[0])
@@ -153,7 +153,7 @@ criterion_group!(
     benches,
     bench_raw_array,
     bench_fixed_explicit,
-    bench_fixed_alias_explicit,
+    bench_type_alias_explicit,
     bench_drop_overhead
 );
 criterion_main!(benches);

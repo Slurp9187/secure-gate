@@ -108,8 +108,8 @@
 //! use secure_gate::{Fixed, RevealSecret};
 //!
 //! let key = Fixed::new([0xABu8; 16]);
-//! // Consumes `key` and transfers ownership of the bytes. Nothing is copied:
-//! // an inert sentinel is left for `Fixed::drop` to zeroize in their place.
+//! // Consumes `key` and transfers ownership of the bytes: they move into `owned`
+//! // and an inert sentinel is left for `Fixed::drop` to zeroize in their place.
 //! let owned: [u8; 16] = key.into_inner();
 //! assert_eq!(owned, [0xABu8; 16]);
 //! // `owned` is an ordinary array now — you own its lifetime.
@@ -194,9 +194,13 @@ pub trait RevealSecret {
     ///
     /// **Protection ends here.** The returned value is an ordinary `[u8; N]` / `String` /
     /// `Vec<T>` with no zeroize-on-drop and no redacted `Debug` — you own the secret and
-    /// its lifetime from this call onward. Nothing is copied: the value is moved out and
-    /// an inert [`SentinelValue`](crate::SentinelValue) is left for the wrapper's `Drop`
-    /// to zeroize in its place. If you want the protection to continue, do not call this
+    /// its lifetime from this call onward. The value is moved, never duplicated-and-kept:
+    /// an inert [`SentinelValue`](crate::SentinelValue) is left for the wrapper's `Drop` to
+    /// zeroize in its place, so exactly one copy survives the call and it is yours. For
+    /// `Dynamic` that move is literal — the allocation itself is handed over, nothing is
+    /// read or written. For `Fixed` the secret is stored inline, so the bytes are
+    /// transferred into your slot and the wrapper's slot receives the sentinel; there is no
+    /// indirection to hand over instead. If you want the protection to continue, do not call this
     /// — keep the wrapper, or move the value into a new one.
     ///
     /// # Availability

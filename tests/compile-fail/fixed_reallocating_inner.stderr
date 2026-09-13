@@ -1,0 +1,273 @@
+error[E0277]: the trait bound `Vec<u8>: FixedStorage` is not satisfied
+  --> tests/compile-fail/fixed_reallocating_inner.rs:19:1
+   |
+19 | fixed_newtype!(pub LeakyBytes, generic Vec<u8>);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | the trait `FixedStorage` is not implemented for `Vec<u8>`
+   | required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+note: required by a bound in `Fixed::<T>::new`
+  --> src/fixed.rs
+   |
+   |         T: crate::FixedStorage,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
+   = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `String: FixedStorage` is not satisfied
+  --> tests/compile-fail/fixed_reallocating_inner.rs:20:1
+   |
+20 | fixed_newtype!(pub LeakyText, generic String);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | the trait `FixedStorage` is not implemented for `String`
+   | required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+note: required by a bound in `Fixed::<T>::new`
+  --> src/fixed.rs
+   |
+   |         T: crate::FixedStorage,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
+   = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Vec<u8>: FixedStorage` is not satisfied
+  --> tests/compile-fail/fixed_reallocating_inner.rs:23:24
+   |
+23 |     let _ = Fixed::new(vec![1u8, 2, 3]);
+   |             ---------- ^^^^^^^^^^^^^^^ the trait `FixedStorage` is not implemented for `Vec<u8>`
+   |             |
+   |             required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+note: required by a bound in `Fixed::<T>::new`
+  --> src/fixed.rs
+   |
+   |         T: crate::FixedStorage,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
+
+error[E0277]: the trait bound `String: FixedStorage` is not satisfied
+  --> tests/compile-fail/fixed_reallocating_inner.rs:24:24
+   |
+24 |     let _ = Fixed::new(String::from("secret"));
+   |             ---------- ^^^^^^^^^^^^^^^^^^^^^^ the trait `FixedStorage` is not implemented for `String`
+   |             |
+   |             required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+note: required by a bound in `Fixed::<T>::new`
+  --> src/fixed.rs
+   |
+   |         T: crate::FixedStorage,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
+
+error[E0277]: the trait bound `Vec<u8>: FixedStorage` is not satisfied
+  --> tests/compile-fail/fixed_reallocating_inner.rs:25:24
+   |
+25 |     let _ = Fixed::new([vec![1u8], vec![2u8]]);
+   |             ---------- ^^^^^^^^^^^^^^^^^^^^^^ the trait `FixedStorage` is not implemented for `Vec<u8>`
+   |             |
+   |             required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+   = note: required for `[Vec<u8>; 2]` to implement `FixedStorage`
+note: required by a bound in `Fixed::<T>::new`
+  --> src/fixed.rs
+   |
+   |         T: crate::FixedStorage,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
+
+error[E0277]: the trait bound `Vec<u8>: FixedStorage` is not satisfied
+  --> tests/compile-fail/fixed_reallocating_inner.rs:26:29
+   |
+26 |     let _ = Fixed::new(Some(vec![1u8]));
+   |             ----------      ^^^^^^^^^ the trait `FixedStorage` is not implemented for `Vec<u8>`
+   |             |
+   |             required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+   = note: required for `Option<Vec<u8>>` to implement `FixedStorage`
+note: required by a bound in `Fixed::<T>::new`
+  --> src/fixed.rs
+   |
+   |         T: crate::FixedStorage,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
+
+error[E0277]: the trait bound `Vec<u8>: FixedStorage` is not satisfied
+  --> tests/compile-fail/fixed_reallocating_inner.rs:27:36
+   |
+27 |     let _ = Fixed::new(([0u8; 32], vec![1u8]));
+   |             ----------             ^^^^^^^^^ the trait `FixedStorage` is not implemented for `Vec<u8>`
+   |             |
+   |             required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+   = note: required for `([u8; 32], Vec<u8>)` to implement `FixedStorage`
+note: required by a bound in `Fixed::<T>::new`
+  --> src/fixed.rs
+   |
+   |         T: crate::FixedStorage,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
+
+error[E0277]: the trait bound `Box<[u8]>: FixedStorage` is not satisfied
+  --> tests/compile-fail/fixed_reallocating_inner.rs:34:24
+   |
+34 |     let _ = Fixed::new(boxed);
+   |             ---------- ^^^^^ the trait `FixedStorage` is not implemented for `Box<[u8]>`
+   |             |
+   |             required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+note: required by a bound in `Fixed::<T>::new`
+  --> src/fixed.rs
+   |
+   |         T: crate::FixedStorage,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
+
+error[E0277]: the trait bound `Box<[u8]>: FixedStorage` is not satisfied
+  --> tests/compile-fail/fixed_reallocating_inner.rs:35:29
+   |
+35 |     let _ = Fixed::new(Some(vec![1u8].into_boxed_slice()));
+   |             ----------      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `FixedStorage` is not implemented for `Box<[u8]>`
+   |             |
+   |             required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+   = note: required for `Option<Box<[u8]>>` to implement `FixedStorage`
+note: required by a bound in `Fixed::<T>::new`
+  --> src/fixed.rs
+   |
+   |         T: crate::FixedStorage,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
+
+error[E0277]: the trait bound `Box<[u8]>: FixedStorage` is not satisfied
+  --> tests/compile-fail/fixed_reallocating_inner.rs:36:24
+   |
+36 |     let _ = Fixed::new([vec![1u8].into_boxed_slice(), vec![2u8].into_boxed_slice()]);
+   |             ---------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `FixedStorage` is not implemented for `Box<[u8]>`
+   |             |
+   |             required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+   = note: required for `[Box<[u8]>; 2]` to implement `FixedStorage`
+note: required by a bound in `Fixed::<T>::new`
+  --> src/fixed.rs
+   |
+   |         T: crate::FixedStorage,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
+
+error[E0277]: the trait bound `Vec<u8>: FixedStorage` is not satisfied
+  --> tests/compile-fail/fixed_reallocating_inner.rs:41:24
+   |
+41 |     let _ = Fixed::new(zeroize::Zeroizing::new(vec![1u8, 2, 3]));
+   |             ---------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `FixedStorage` is not implemented for `Vec<u8>`
+   |             |
+   |             required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+   = note: required for `Zeroizing<Vec<u8>>` to implement `FixedStorage`
+note: required by a bound in `Fixed::<T>::new`
+  --> src/fixed.rs
+   |
+   |         T: crate::FixedStorage,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`

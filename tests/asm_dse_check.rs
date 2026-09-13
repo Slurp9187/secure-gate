@@ -143,7 +143,11 @@ fn fixed_drop_emits_volatile_zero_stores() {
     // `fixed_newtype!`-generated newtype over it. The newtype is
     // `#[repr(transparent)]` and adds no `Drop` of its own, so an extra
     // nominal layer must not cost the zeroization guarantee.
-    for symbol in ["make_and_drop_fixed", "make_and_drop_newtype"] {
+    for symbol in [
+        "make_and_drop_fixed",
+        "make_and_drop_newtype",
+        "make_and_drop_generic_newtype",
+    ] {
         assert_zero_stores_present(&asm, &asm_path, symbol);
     }
 }

@@ -175,6 +175,68 @@ fn drain_bech32_payload<const N: usize>(
 /// | [`from_random()`](Self::from_random) | `rand` | System RNG |
 /// | [`from_rng(rng)`](Self::from_rng) | `rand` | Custom RNG |
 ///
+/// # What `T` may be
+///
+/// [`Fixed::new`] requires [`FixedStorage`](crate::FixedStorage) on the inner type: a
+/// type that owns no buffer whose capacity can change. This is what makes the documented
+/// claim that `Fixed` has no reallocation surface true rather than aspirational. It used
+/// to be bounded only by `Zeroize`, so `Fixed<Vec<u8>>`, `Fixed<String>` and even
+/// `Fixed<[Vec<u8>; 2]>` compiled and abandoned an unwiped buffer holding the whole
+/// secret on any capacity change. Arrays, the primitives, tuples, `Option` and boxed
+/// slices satisfy the marker already; a custom inner type writes one line. For a
+/// growable payload use [`Dynamic`](crate::Dynamic), which documents the residue and
+/// offers one safe growth path.
+///
+/// The bound is on the constructor rather than on the struct, so naming
+/// `Fixed<Vec<u8>>` still compiles and no value of it can exist — the same shape as the
+/// zero-size guard below.
+///
+/// # Zero-size
+///
+/// A value of zero size has nothing to protect, so a `Fixed` cannot be built around
+/// one. [`new`](Self::new) and [`new_with`](Self::new_with) each assert a non-zero size
+/// in a `const`, and every other constructor in the table above funnels through those
+/// two, so `Fixed<[u8; 0]>` — and any other zero-sized inner type — is a compile error
+/// however it is reached. The assertion is evaluated at monomorphization rather than at
+/// the declaration, so it fires at the first concrete zero-sized construction, including
+/// one reached through generic code; generic code that is never instantiated with a
+/// zero-sized `T` is unaffected, and naming such a type without constructing one still
+/// compiles.
+///
+/// The diagnostic names the offending type in the failing constant's path — for example
+/// `Fixed::<[u8; 0]>::NON_ZERO_SIZED` — and a `while instantiating` note repeats the span of
+/// the `new` call the monomorphization reached — the error's own span is the assertion
+/// here, not in your code. The note does not name the instantiation that caused it: for a generic `fn build<const N: usize>()`, calling `build::<0>()` reports
+/// against the `Fixed::new` line inside `build`, and the `::<0>` call site appears nowhere.
+///
+/// **Two limits on when it fires, both measured.** It is raised during codegen, so
+/// `cargo check` does not report it. And it only fires for a *codegen root*: a non-generic
+/// `#[inline]` function in a library is not one, and every method the newtype macros
+/// generate carries an inline attribute, so a library whose only zero-sized constructions sit
+/// behind `#[inline]` or generic code builds, tests and publishes clean — the error then
+/// surfaces in each downstream crate that instantiates it, blaming this crate and the
+/// dependency's macro invocation rather than the consumer's call.
+///
+/// Root-ness is a property of the compiler and the profile, not of the attribute alone, so
+/// removing `#[inline]` does not reliably restore the error. Measured: on 1.85 a library
+/// exporting a plain non-generic `pub fn empty() -> Empty { Empty::new([]) }` fails
+/// `cargo build` and `cargo test` but passes `cargo build --release`, because the
+/// cross-crate-inlining heuristic added in 1.75 drops a small function from the exported
+/// root set in an optimized build; on 1.70 the same crate fails in both profiles. Treat
+/// instantiating the type in a test or a binary as the only reliable check.
+///
+/// Stated precisely: no *value* of a zero-sized `Fixed` can exist at runtime, because
+/// nothing can construct one, and a binary or test that tries fails to compile. The guard
+/// does not stop a library from exporting an unusable zero-sized API. Neither limit is a
+/// choice — a condition on a generic parameter has nothing to evaluate until that parameter
+/// is known, and nothing on stable Rust moves it earlier.
+///
+/// [`Dynamic`](crate::Dynamic) has no compile-time counterpart, for a reason about its
+/// payload rather than its own size: whether a `Vec` or `String` is empty is a runtime
+/// property, so there is nothing for a compile-time check to decide. A statically
+/// zero-sized inner type is the gap that leaves — `Dynamic<Zst>` constructs where
+/// `Fixed<Zst>` does not.
+///
 /// # RustCrypto integration
 ///
 /// RustCrypto's `BlockEncrypt`/`BlockDecrypt` take `&mut GenericArray<u8, U16>`, and
@@ -230,6 +292,14 @@ pub struct Fixed<T: zeroize::Zeroize> {
 }
 
 impl<T: zeroize::Zeroize> Fixed<T> {
+    // Post-monomorphization guard: a zero-sized `T` has nothing to protect. Fires at the
+    // first concrete construction, never at the declaration. An associated `const` rather
+    // than an inline `const {}` block so the same hunk builds on the 0.8 line's MSRV 1.70.
+    const NON_ZERO_SIZED: () = assert!(
+        ::core::mem::size_of::<T>() > 0,
+        "secure-gate: Fixed<T> cannot hold a zero-sized value; there is nothing to protect"
+    );
+
     /// Creates a new [`Fixed<T>`] by wrapping a value.
     ///
     /// This is a `const fn`, so it can be evaluated at compile time. However,
@@ -240,6 +310,8 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     /// stack residue matters, as `new` may leave an intermediate copy of `value`
     /// on the caller's stack frame.
     ///
+    /// A zero-sized `T` is rejected at compile time; see [Zero-size](#zero-size).
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -249,7 +321,15 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     /// assert_eq!(secret.len(), 32);
     /// ```
     #[inline(always)]
-    pub const fn new(value: T) -> Self {
+    pub const fn new(value: T) -> Self
+    where
+        T: crate::FixedStorage,
+    {
+        // Binding the unit-valued const is what forces it to be evaluated; clippy reads
+        // that as a pointless binding. Kept explicit because the 1.70 lint (the 0.8
+        // line's MSRV) fires on every spelling that still triggers the evaluation.
+        #[allow(clippy::let_unit_value)]
+        let () = Self::NON_ZERO_SIZED;
         Fixed { inner: value }
     }
 }
@@ -311,6 +391,14 @@ impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
 
 /// Construction and ergonomic encoding helpers for `Fixed<[u8; N]>`.
 impl<const N: usize> Fixed<[u8; N]> {
+    // The byte-array counterpart to `NON_ZERO_SIZED`: `new_with` builds the array itself
+    // instead of going through `new`, so it needs its own assertion. Same associated-`const`
+    // spelling, for the same MSRV reason.
+    const NON_ZERO_LEN: () = assert!(
+        N > 0,
+        "secure-gate: Fixed<[u8; 0]> cannot be constructed; there is nothing to protect"
+    );
+
     /// Writes directly into the wrapper's storage via a user-supplied closure,
     /// eliminating the intermediate stack copy that [`new`](Self::new) may produce.
     ///
@@ -354,6 +442,11 @@ impl<const N: usize> Fixed<[u8; N]> {
     where
         F: FnOnce(&mut [u8; N]),
     {
+        // Binding the unit-valued const is what forces it to be evaluated; clippy reads
+        // that as a pointless binding. Kept explicit because the 1.70 lint (the 0.8
+        // line's MSRV) fires on every spelling that still triggers the evaluation.
+        #[allow(clippy::let_unit_value)]
+        let () = Self::NON_ZERO_LEN;
         let mut this = Self { inner: [0u8; N] };
         f(&mut this.inner);
         this
@@ -902,7 +995,9 @@ impl<T: zeroize::Zeroize> RevealSecret for Fixed<T> {
         Self::Inner: Sized + crate::SentinelValue + zeroize::Zeroize,
     {
         // Replace inner with the sentinel so Fixed::drop zeroizes a harmless
-        // placeholder while the caller receives the real secret. Nothing is copied.
+        // placeholder while the caller receives the real secret. The secret is stored
+        // inline, so this transfers the bytes rather than handing over an allocation;
+        // what the sentinel guarantees is that no second copy is left behind here.
         core::mem::replace(&mut self.inner, crate::SentinelValue::sentinel_value())
     }
 }
@@ -1048,7 +1143,7 @@ impl<T: zeroize::Zeroize> core::fmt::Debug for Fixed<T> {
 /// marker on the inner type. Each clone is independently zeroized on drop, but cloning
 /// increases the in-memory exposure surface. Use sparingly.
 #[cfg(feature = "cloneable")]
-impl<T: zeroize::Zeroize + crate::CloneableSecret> Clone for Fixed<T> {
+impl<T: zeroize::Zeroize + crate::CloneableSecret + crate::FixedStorage> Clone for Fixed<T> {
     fn clone(&self) -> Self {
         Self::new(self.inner.clone())
     }

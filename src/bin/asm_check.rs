@@ -9,6 +9,7 @@
 use secure_gate::{fixed_newtype, Fixed};
 
 fixed_newtype!(pub NewtypeKey, 32);
+fixed_newtype!(pub GenericKey, generic [i16; 256]);
 
 /// Creates a `Fixed<[u8; 32]>` initialized with non-zero data, then drops it.
 ///
@@ -39,7 +40,24 @@ pub fn make_and_drop_newtype() {
     drop(secret);
 }
 
+/// Same again, but through the `generic` arm over a non-byte inner type.
+///
+/// `[i16; 256]` is an ML-KEM secret polynomial, and the shape the `generic` arm
+/// exists for. It is worth its own symbol rather than assuming the byte case
+/// generalizes: `zeroize` emits its barrier per element, so the element type
+/// decides how many barriers there are and what instruction widths the stores
+/// use, and 512 bytes is past the size where LLVM switches strategy. What is
+/// asserted is unchanged — that the volatile writes survive optimization.
+#[inline(never)]
+#[no_mangle]
+pub fn make_and_drop_generic_newtype() {
+    let secret = GenericKey::new([0x5A5Ai16; 256]);
+    std::hint::black_box(&secret);
+    drop(secret);
+}
+
 fn main() {
     make_and_drop_fixed();
     make_and_drop_newtype();
+    make_and_drop_generic_newtype();
 }

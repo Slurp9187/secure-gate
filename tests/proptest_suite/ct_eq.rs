@@ -3,11 +3,11 @@
 #[cfg(all(feature = "ct-eq", feature = "alloc"))]
 mod tests {
     use proptest::prelude::*;
-    use secure_gate::{dynamic_alias, fixed_alias, ConstantTimeEq};
+    use secure_gate::{ConstantTimeEq, Dynamic, Fixed};
 
-    dynamic_alias!(TestDynamic, Vec<u8>);
-    dynamic_alias!(TestDynamicStr, String);
-    fixed_alias!(TestFixed, 32);
+    type TestDynamic = Dynamic<Vec<u8>>;
+    type TestDynamicStr = Dynamic<String>;
+    type TestFixed = Fixed<[u8; 32]>;
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(512))]
