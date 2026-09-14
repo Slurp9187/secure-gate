@@ -13,7 +13,9 @@ actual `git show origin/release/0.8:<path> | grep` result.
 
 ## Constraints that override a straight cherry-pick
 
-- 0.8 is an **LTS on MSRV 1.70, edition 2021**. Never port a dependency or toolchain bump.
+- 0.8 is the **MSRV 1.70 line, edition 2021** — the same API as `main` on an older compiler,
+  finished in lockstep until both lines have a stable release. Never port a dependency or
+  toolchain bump.
 - 0.8's rustdoc job is pinned to **1.70** because of the grouped-`use` ICE; main's is
   `stable`. CI changes need re-deriving, not copying.
 - 0.8 keeps `#[cfg(feature = "std")] impl std::error::Error`; main uses unconditional
