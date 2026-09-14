@@ -147,6 +147,45 @@ fn fixed_try_from_base32_rejects_impossible_lengths() {
     assert!(Fixed::<[u8; 3]>::try_from_base32("MZXW6").is_ok());
 }
 
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
+#[test]
+fn base32_impossible_block_lengths_error_and_never_panic() {
+    // The rule is on `len % 8`, not on the three shortest cases, so walk several
+    // congruence classes. `base32ct` 0.3.0 panicked with an out-of-bounds index on
+    // exactly these lengths (RustCrypto/formats#2242) rather than returning an
+    // error; the `0.3.1` floor in Cargo.toml is what keeps that version out, and
+    // this test is what fails if the floor is ever loosened back to a bare "0.3".
+    for len in [1usize, 3, 6, 9, 11, 14, 17, 19, 22] {
+        assert!(
+            !matches!(len % 8, 0 | 2 | 4 | 5 | 7),
+            "test vector {len} must be an impossible length"
+        );
+        let s = "A".repeat(len);
+        // The alloc path: `&str` -> `Vec<u8>`, which is the one that reached the
+        // panicking decoder directly.
+        assert!(
+            s.try_from_base32().is_err(),
+            "str must reject impossible length {len} without panicking"
+        );
+        // The no-alloc path writes into a caller-supplied buffer and panicked too,
+        // so disabling `alloc` was never a mitigation.
+        assert!(
+            Fixed::<[u8; 4]>::try_from_base32(&s).is_err(),
+            "Fixed must reject impossible length {len} without panicking"
+        );
+    }
+
+    // The legal trailing blocks must still round-trip, so the check above is not
+    // simply rejecting everything.
+    for len in [2usize, 4, 5, 7, 8] {
+        let s = "A".repeat(len);
+        assert!(
+            s.try_from_base32().is_ok(),
+            "str must accept legal length {len}"
+        );
+    }
+}
+
 #[cfg(feature = "encoding-base32")]
 #[test]
 fn fixed_try_from_base32_rejects_whitespace() {

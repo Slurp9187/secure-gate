@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- **Raised the `base32ct` floor to `0.3.1`; `0.3.0` panics on attacker-supplied input.**
+  The requirement was a bare `"0.3"`, which admits `0.3.0`. That version sizes its output
+  buffer from the decoded length but indexes it from the encoded remainder, so an unpadded
+  input whose trailing block is 1, 3 or 6 characters long — exactly the block lengths
+  unpadded Base32 cannot represent — indexes out of bounds and panics instead of returning
+  `Err`. `try_from_base32` hands caller-supplied strings straight to that decoder, and the
+  no-alloc path that writes into a caller-supplied buffer panics as well, so disabling
+  `alloc` was not a mitigation. Upstream fixed it in `0.3.1` ([RustCrypto/formats#2242](https://github.com/RustCrypto/formats/issues/2242)).
+
+  Our own builds were never affected: `Cargo.lock` has resolved `0.3.1` throughout. A
+  lockfile does not travel to dependents, though, so a downstream crate resolving
+  `base32ct` for itself could land on `0.3.0` — most plausibly from a lockfile written
+  during the two days that version was the newest release. The floor is what prevents
+  that; it costs no MSRV, because `0.3.0` and `0.3.1` declare the same `rust-version`.
+
+  `tests/encoding_suite/base32.rs` now walks several `len % 8` congruence classes rather
+  than the three shortest cases, so the property is pinned if the floor is ever loosened.
+
+  Note that no RUSTSEC advisory exists for this, so `cargo audit` does not flag it.
+
 ## [0.9.0-rc.9] - 2026-09-13
 
 > Tagged, **not yet published to crates.io**; everything in this section ships when rc.9
