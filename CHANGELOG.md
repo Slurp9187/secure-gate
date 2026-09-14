@@ -7,9 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.0-rc.12] - 2026-09-13
 
-> Tagged, **not yet published to crates.io**. `0.8.0-rc.11` is the newest version of this
-> line available there, so everything in this section ships when rc.12 does. Only
-> `secure-gate` has ever been published — `secure-gate-compat` never was.
+> Published to crates.io on the `v0.8.0-rc.12` tag. Only `secure-gate` has ever been
+> published — `secure-gate-compat` never was.
 >
 > This section previously stopped short of a version heading, on the reasoning that a dated
 > heading claims a release that did not happen. It now carries one because the entries below
