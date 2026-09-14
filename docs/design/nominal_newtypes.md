@@ -121,10 +121,22 @@ R2/R3): base-wrapper access is opt-in per newtype and split by direction —
 `FromWrapper` adds `from_wrapper` (inbound), `IntoWrapper` adds `as_wrapper` /
 `as_wrapper_mut` / `into_wrapper` (outbound), `WrapperAccess` is both.
 
-`fixed_newtype!` adds: the `N = 0` guard, `const fn new`, `new_with`,
-`From<[u8; N]>`, `TryFrom<&[u8]>`, `from_random`, `try_from_hex`, `to_hex`,
-`to_hex_upper`, `to_hex_zeroizing`, `to_hex_upper_zeroizing`, `try_to_bech32`,
-`try_from_bech32`.
+`fixed_newtype!` adds, on the size-literal arm: the `N = 0` guard, `const fn
+new`, `new_with`, `From<[u8; N]>`, `TryFrom<&[u8]>`, `from_random`,
+`try_from_hex`, `to_hex`, `to_hex_upper`, `to_hex_zeroizing`,
+`to_hex_upper_zeroizing`, `try_to_bech32`, `try_from_bech32`.
+
+Its `generic` marker resolves to **two** arms, and the split is drawn by what
+the macro can see rather than by what it is told. An array written out —
+`generic [$t:ty; $n:literal]`, which is `generic [i16; 256]` but not
+`generic [i16; KEY_LEN]` — takes a shaped arm that also emits `SecretLen` and
+re-uses the size-literal arm's `[(); $n][0]` guard, so `generic [i16; 0]` is a
+declaration-site error under `cargo check`. A genuinely opaque inner type takes
+the arm below it and gets the reduced surface: no `SecretLen`, no declaration
+guard, and `Fixed::new`'s post-monomorphization assertion as its only zero-size
+check. `generic [u8; N]` is rejected ahead of both — the reject arms must
+precede any arm that consumes a `:ty`. Encoders and the RNG constructors are on
+neither generic arm (§5.4).
 
 `dynamic_newtype!` arms: `String` and `Vec<u8>` are matched as **literal
 tokens** and get the full API for their shape; any other inner type requires an
@@ -450,7 +462,9 @@ in `u32` elements is not the byte length callers expect, and hex over a
 inner type other than `String` and `Vec<u8>`, which `Dynamic<T: ?Sized + Zeroize>`
 supports deliberately and which the trap-7 fix (`RevealSecret` covering custom
 inner types) exists to enable. Hand-rolling parity costs the ~40 lines measured
-in the status header above.
+in the status header above. **The `SecretLen` half of that first sentence has
+since been overturned; it is left standing as written and corrected at the end
+of this section.**
 
 Rejecting those inner types outright, the alternative this section floated, would
 undo the trap-7 fix for exactly the consumers it was made for.
@@ -463,6 +477,56 @@ only wrapper and the secret is often not bytes: an ML-KEM secret polynomial
 `[i16; 256]`, Ed25519 scalar limbs `[u64; 4]`, an AES-256 expanded key schedule
 `[u32; 60]`. Pinned by `tests/newtype_nostd.rs` and
 `tests/macros_suite/newtype_surface.rs`.
+
+**Amendment — decision reversed for arrays: `fixed_newtype!` now forwards
+`SecretLen`.** The paragraph above gave one reason for two absences, and only
+one of the two survived contact with the three examples this section itself
+lists. The encoder half stands (below). The `SecretLen` half did not, and the
+sentence is kept rather than edited because the way it was wrong is the useful
+part: it argued from *meaning* when the actual obstacle was *visibility*.
+
+`Fixed<[T; N]>` answers both `SecretLen` questions, and answers them correctly —
+`len` is the element count, `byte_len` is `N * size_of::<T>()`: 256 / 512 for an
+ML-KEM polynomial, 4 / 32 for Ed25519 limbs, 60 / 240 for an AES round-key
+schedule. So "a length in `u32` elements is not the byte length callers expect"
+was never a fact about `SecretLen` on an array; it described an implementation
+that does not exist here. The real obstacle was narrower and purely syntactic:
+`generic $inner:ty` arrives as one opaque token, so the expansion could not tell
+an array from a struct and withheld the shape-dependent surface uniformly rather
+than conditionally.
+
+That obstacle is absent whenever the array is written out. `generic [$t:ty;
+$n:literal]` is a pattern `macro_rules!` matches, so the macro **can** tell an
+array from a struct — for arrays spelled literally, which is every array anyone
+writes at a declaration. `fixed_newtype!` therefore carries a third arm, between
+the `[u8; N]` rejects and the opaque arm: it forwards `SecretLen` and re-uses the
+size-literal arm's `[(); $n][0]` guard, so `generic [i16; 0]` is a
+declaration-site `cargo check` error rather than a post-monomorphization one. A
+struct inner type still lands on the opaque arm and still gets the reduced
+surface — not because `SecretLen` is meaningless there, but because the macro has
+nothing to read. What was stated as a claim about semantics is now correctly
+stated as a claim about field of view, and it costs an arm rather than a
+principle. The remainder is the same one trap 6 documents: `generic [i16;
+KEY_LEN]` has no literal in the length slot, so it falls through to the opaque
+arm — a named constant is a different token sequence, and a pattern does not
+become type-level by getting cleverer. The declaration-site guard is pinned by
+`tests/compile-fail/fixed_newtype_generic_array_zero.rs`, across the bare, doc
+and `derive:` tails, because the arm is one arm with optional groups and a
+regression that split it would take the guard with it on every tail but one.
+
+**The encoder half stands, and on firmer ground than it was first given.** Byte
+order is the lesser objection. The larger one is that these secrets already have
+a canonical encoding and it is domain-specific — an ML-KEM secret key is
+bit-packed 12-bit coefficients, not a 16-bit dump — so a `to_hex` emitted here
+would round-trip against itself and agree with nothing outside this crate. No
+choice of byte order repairs that. The RNG constructors are absent for a third
+reason and are tracked separately as #219: the byte-level fill is well defined,
+and that is the trap — uniform bits are not a valid ML-KEM coefficient, a reduced
+scalar, or a derived round key.
+
+`dynamic_newtype!`'s generic arm is untouched by all of this, and wants no array
+arm of its own: the `no_std` case that motivated the shaped array is exactly the
+one with no allocator and therefore no `Dynamic` to newtype.
 
 ## 6. Polish — COMPLETE
 
