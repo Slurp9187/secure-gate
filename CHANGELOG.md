@@ -5,11 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0-rc.13] - Unreleased
+
+> Open for work; nothing has landed since the `v0.8.0-rc.12` tag. The version moved off
+> rc.12 because that tag is published, so the branch had nowhere for new commits to go.
+>
+> The `base32ct` floor raised on `main` is **not** ported here and will not be. This is the
+> MSRV 1.70 line and `base32ct` 0.3 requires 1.85, so the 0.2 pin stays — gated by
+> `encoded_len_is_decodable`, which remains load-bearing and must not be removed while the
+> pin stands. Dependency and toolchain bumps are never ported across (see the branch table
+> in `README.md` and `docs/audits/pr-182-backport-ledger.md`).
+
 ## [0.8.0-rc.12] - 2026-09-13
 
-> Tagged, **not yet published to crates.io**. `0.8.0-rc.11` is the newest version of this
-> line available there, so everything in this section ships when rc.12 does. Only
-> `secure-gate` has ever been published — `secure-gate-compat` never was.
+> Published to crates.io on the `v0.8.0-rc.12` tag. Only `secure-gate` has ever been
+> published — `secure-gate-compat` never was.
 >
 > This section previously stopped short of a version heading, on the reasoning that a dated
 > heading claims a release that did not happen. It now carries one because the entries below
