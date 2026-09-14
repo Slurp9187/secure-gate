@@ -58,6 +58,8 @@ fn nostd_newtype_decodes_both_checksums() {
 fn generic_arm_wraps_a_non_byte_array() {
     let p = Poly::new([0i16; 256]);
     assert_eq!(p.with_secret(|c| c.len()), 256);
+    let q = Poly::new_with(|c| c.fill(1));
+    assert_eq!(q.with_secret(|c| c[0]), 1);
     // `#[repr(transparent)]` over `Fixed<[i16; 256]>`: 256 coefficients, 2 bytes each.
     assert_eq!(core::mem::size_of::<Poly>(), 512);
 }

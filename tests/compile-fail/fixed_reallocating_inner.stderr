@@ -24,6 +24,29 @@ note: required by a bound in `Fixed::<T>::new`
    |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
    = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
 
+error[E0277]: the trait bound `Vec<u8>: FixedStorage` is not satisfied
+  --> tests/compile-fail/fixed_reallocating_inner.rs:19:1
+   |
+19 | fixed_newtype!(pub LeakyBytes, generic Vec<u8>);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `FixedStorage` is not implemented for `Vec<u8>`
+   |
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+note: required by a bound in `Fixed::<T>::new_with`
+  --> src/fixed.rs
+   |
+   |         T: crate::FixedStorage + crate::SentinelValue,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new_with`
+   = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
 error[E0277]: the trait bound `String: FixedStorage` is not satisfied
   --> tests/compile-fail/fixed_reallocating_inner.rs:20:1
    |
@@ -48,6 +71,29 @@ note: required by a bound in `Fixed::<T>::new`
    |
    |         T: crate::FixedStorage,
    |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
+   = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `String: FixedStorage` is not satisfied
+  --> tests/compile-fail/fixed_reallocating_inner.rs:20:1
+   |
+20 | fixed_newtype!(pub LeakyText, generic String);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `FixedStorage` is not implemented for `String`
+   |
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+note: required by a bound in `Fixed::<T>::new_with`
+  --> src/fixed.rs
+   |
+   |         T: crate::FixedStorage + crate::SentinelValue,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new_with`
    = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: the trait bound `Vec<u8>: FixedStorage` is not satisfied
