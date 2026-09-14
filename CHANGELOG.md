@@ -29,6 +29,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Note that no RUSTSEC advisory exists for this, so `cargo audit` does not flag it.
 
+### Changed
+
+- **BREAKING: `Fixed<T>::new_with` is no longer `[u8; N]`-only, and existing call
+  sites may need a type annotation.** It moves to the generic impl, bounded by
+  `FixedStorage + SentinelValue`, so a non-byte array (`[i16; 256]`, `[u32; 60]`)
+  gets the same in-place constructor the byte arm already had: the slot starts as
+  `T::sentinel_value()` and the closure writes into the wrapper's own storage.
+  `fixed_newtype!`'s `generic` arm forwards it. The specialised `NON_ZERO_LEN`
+  assertion on `Fixed<[u8; N]>` is gone; both `new` and `new_with` now read
+  `NON_ZERO_SIZED`. Tracking: #215.
+
+  **Migration.** The closure's parameter type is now only known once `T` is, and
+  a return type alone does not resolve it in time — the closure body is checked
+  first. So `fn k() -> Fixed<[u8; 32]> { Fixed::new_with(|a| a.fill(1)) }`, which
+  compiled through rc.9, now fails with **E0282**, `type annotations needed for
+  &mut _`. Name the type in either position:
+
+  ```rust
+  Fixed::<[u8; 32]>::new_with(|x| x.fill(1))   // on the type
+  Fixed::new_with(|x: &mut [u8; 32]| x.fill(1)) // or on the closure parameter
+  ```
+
+  Only bare `Fixed::new_with` is affected. Newtypes built by `fixed_newtype!` are
+  not: their generated `new_with` has a concrete parameter type on both arms. A
+  closure whose body needs no method resolution on the parameter also still
+  infers. This is a source break with no runtime or codegen change.
+
+- **BREAKING: `fixed_newtype!(pub K, generic [u8; N])` is a compile error at the
+  declaration.** It was strictly dominated by `fixed_newtype!(pub K, N)`: same
+  payload, no `SecretLen`, no `From`/`TryFrom`, no encoders, no `from_random`.
+  `dynamic_newtype!` already refused the analogous spellings (`generic Vec<u8>`,
+  `generic String`). Write the size literal. All four tails are pinned by
+  `tests/compile-fail/fixed_newtype_generic_bytes_rejected.rs`. The zero-size
+  trybuild moves from `generic [u8; 0]` to `generic [i16; 0]`, because the
+  former now dies at the domination check and would never reach `Fixed::new`.
+  Tracking: #215.
+
 ## [0.9.0-rc.9] - 2026-09-13
 
 > Published to crates.io on the `v0.9.0-rc.9` tag. Only `secure-gate` has ever been

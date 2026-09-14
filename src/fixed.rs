@@ -306,9 +306,9 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     /// **do not** use it to initialize `static` items — `Drop` does not run on
     /// statics, so zeroization would be skipped.
     ///
-    /// For `Fixed<[u8; N]>`, prefer [`new_with`](Fixed::new_with) when minimizing
-    /// stack residue matters, as `new` may leave an intermediate copy of `value`
-    /// on the caller's stack frame.
+    /// Prefer [`new_with`](Fixed::new_with) when `T: `[`SentinelValue`](crate::SentinelValue)
+    /// and minimizing stack residue matters: `new` may leave an intermediate copy
+    /// of `value` on the caller's stack frame.
     ///
     /// A zero-sized `T` is rejected at compile time; see [Zero-size](#zero-size).
     ///
@@ -331,6 +331,101 @@ impl<T: zeroize::Zeroize> Fixed<T> {
         #[allow(clippy::let_unit_value)]
         let () = Self::NON_ZERO_SIZED;
         Fixed { inner: value }
+    }
+
+    /// Writes directly into the wrapper's storage via a user-supplied closure,
+    /// eliminating the intermediate stack copy that [`new`](Self::new) may produce.
+    ///
+    /// The slot is initialized to [`T::sentinel_value()`](crate::SentinelValue::sentinel_value)
+    /// before the closure runs (zeros for arrays). Prefer this over
+    /// [`new(value)`](Self::new) when minimizing stack residue matters
+    /// (long-lived keys, high-assurance environments).
+    ///
+    /// Requires [`FixedStorage`](crate::FixedStorage) and
+    /// [`SentinelValue`](crate::SentinelValue) on `T`. Arrays of a `Default`
+    /// element already have both; a custom inner type needs the same pair
+    /// `into_inner` already asks for.
+    ///
+    /// # `T` must be inferable at the call site
+    ///
+    /// This constructor is generic over `T`, so the closure's parameter type is
+    /// not known until `T` is. A return type alone does not resolve it in time:
+    /// `fn k() -> Fixed<[u8; 32]> { Fixed::new_with(|a| a.fill(1)) }` fails with
+    /// **E0282**, `type annotations needed for &mut _`, because the closure body
+    /// is checked before the expected return type reaches `T`. Name the type in
+    /// either position — both compile, pick whichever reads better:
+    ///
+    /// ```rust
+    /// use secure_gate::Fixed;
+    ///
+    /// // On the type:
+    /// let a = Fixed::<[u8; 32]>::new_with(|x| x.fill(1));
+    /// // Or on the closure parameter:
+    /// let b = Fixed::new_with(|x: &mut [u8; 32]| x.fill(1));
+    /// # let _ = (a, b);
+    /// ```
+    ///
+    /// Before 0.9.0-rc.10 this method was inherent to `Fixed<[u8; N]>`, where the
+    /// parameter was always a byte array and inference had nothing to resolve. A
+    /// newtype built by [`fixed_newtype!`](crate::fixed_newtype) is unaffected in
+    /// both arms: its generated `new_with` has a concrete parameter type.
+    ///
+    /// # Security rationale
+    ///
+    /// With [`Fixed::new(value)`](Self::new), the caller first builds `value` on
+    /// its own stack frame, then moves it into the wrapper. The compiler *may*
+    /// elide the copy, but this is not guaranteed — leaving a plaintext residue
+    /// on the stack. `new_with` avoids this by giving the closure a mutable
+    /// reference to the wrapper's *own* storage, so the secret is never placed
+    /// anywhere else.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use secure_gate::{Fixed, RevealSecret};
+    ///
+    /// // Fill from a closure — no intermediate stack copy.
+    /// let secret = Fixed::<[u8; 4]>::new_with(|arr| arr.fill(0xAB));
+    /// assert_eq!(secret.expose_secret(), &[0xAB; 4]);
+    ///
+    /// // Copy from an existing slice.
+    /// let src = [1u8, 2, 3, 4];
+    /// let secret = Fixed::<[u8; 4]>::new_with(|arr| arr.copy_from_slice(&src));
+    /// ```
+    ///
+    /// A non-byte array uses the same constructor:
+    ///
+    /// ```rust
+    /// use secure_gate::{Fixed, RevealSecret};
+    ///
+    /// let poly = Fixed::<[i16; 4]>::new_with(|c| c.fill(7));
+    /// assert_eq!(poly.expose_secret(), &[7i16; 4]);
+    /// ```
+    ///
+    /// # See also
+    ///
+    /// - [`Dynamic::new_with`](crate::Dynamic::new_with) — the heap-allocated
+    ///   equivalent (requires `alloc`).
+    ///
+    /// If the secret will outlive the current function, prefer
+    /// [`Dynamic<T>`](crate::Dynamic) over moving `Fixed<T>` around — each
+    /// move-by-value leaves residue in the previous stack slot.
+    #[inline(always)]
+    pub fn new_with<F>(f: F) -> Self
+    where
+        T: crate::FixedStorage + crate::SentinelValue,
+        F: FnOnce(&mut T),
+    {
+        // Binding the unit-valued const is what forces it to be evaluated; clippy reads
+        // that as a pointless binding. Kept explicit because the 1.70 lint (the 0.8
+        // line's MSRV) fires on every spelling that still triggers the evaluation.
+        #[allow(clippy::let_unit_value)]
+        let () = Self::NON_ZERO_SIZED;
+        let mut this = Self {
+            inner: <T as crate::SentinelValue>::sentinel_value(),
+        };
+        f(&mut this.inner);
+        this
     }
 }
 
@@ -386,70 +481,6 @@ impl<const N: usize> core::convert::TryFrom<&[u8]> for Fixed<[u8; N]> {
             });
         }
         Ok(Self::new_with(|arr| arr.copy_from_slice(slice)))
-    }
-}
-
-/// Construction and ergonomic encoding helpers for `Fixed<[u8; N]>`.
-impl<const N: usize> Fixed<[u8; N]> {
-    // The byte-array counterpart to `NON_ZERO_SIZED`: `new_with` builds the array itself
-    // instead of going through `new`, so it needs its own assertion. Same associated-`const`
-    // spelling, for the same MSRV reason.
-    const NON_ZERO_LEN: () = assert!(
-        N > 0,
-        "secure-gate: Fixed<[u8; 0]> cannot be constructed; there is nothing to protect"
-    );
-
-    /// Writes directly into the wrapper's storage via a user-supplied closure,
-    /// eliminating the intermediate stack copy that [`new`](Self::new) may produce.
-    ///
-    /// The array is zero-initialized before the closure runs. Prefer this over
-    /// [`new(value)`](Self::new) when minimizing stack residue matters
-    /// (long-lived keys, high-assurance environments).
-    ///
-    /// # Security rationale
-    ///
-    /// With [`Fixed::new(value)`](Self::new), the caller first builds `value` on
-    /// its own stack frame, then moves it into the wrapper. The compiler *may*
-    /// elide the copy, but this is not guaranteed — leaving a plaintext residue
-    /// on the stack. `new_with` avoids this by giving the closure a mutable
-    /// reference to the wrapper's *own* storage, so the secret is never placed
-    /// anywhere else.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use secure_gate::{Fixed, RevealSecret};
-    ///
-    /// // Fill from a closure — no intermediate stack copy.
-    /// let secret = Fixed::<[u8; 4]>::new_with(|arr| arr.fill(0xAB));
-    /// assert_eq!(secret.expose_secret(), &[0xAB; 4]);
-    ///
-    /// // Copy from an existing slice.
-    /// let src = [1u8, 2, 3, 4];
-    /// let secret = Fixed::<[u8; 4]>::new_with(|arr| arr.copy_from_slice(&src));
-    /// ```
-    ///
-    /// # See also
-    ///
-    /// - [`Dynamic::new_with`](crate::Dynamic::new_with) — the heap-allocated
-    ///   equivalent (requires `alloc`).
-    ///
-    /// If the secret will outlive the current function, prefer
-    /// [`Dynamic<T>`](crate::Dynamic) over moving `Fixed<T>` around — each
-    /// move-by-value leaves residue in the previous stack slot.
-    #[inline(always)]
-    pub fn new_with<F>(f: F) -> Self
-    where
-        F: FnOnce(&mut [u8; N]),
-    {
-        // Binding the unit-valued const is what forces it to be evaluated; clippy reads
-        // that as a pointless binding. Kept explicit because the 1.70 lint (the 0.8
-        // line's MSRV) fires on every spelling that still triggers the evaluation.
-        #[allow(clippy::let_unit_value)]
-        let () = Self::NON_ZERO_LEN;
-        let mut this = Self { inner: [0u8; N] };
-        f(&mut this.inner);
-        this
     }
 }
 
@@ -1195,7 +1226,7 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
                 if vec.len() != M {
                     return Err(serde::de::Error::invalid_length(vec.len(), &self));
                 }
-                Ok(Fixed::new_with(|arr| arr.copy_from_slice(&vec)))
+                Ok(Fixed::<[u8; M]>::new_with(|arr| arr.copy_from_slice(&vec)))
             }
             fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
             where
@@ -1204,7 +1235,7 @@ impl<'de, const N: usize> serde::Deserialize<'de> for Fixed<[u8; N]> {
                 if v.len() != M {
                     return Err(serde::de::Error::invalid_length(v.len(), &self));
                 }
-                Ok(Fixed::new_with(|arr| arr.copy_from_slice(v)))
+                Ok(Fixed::<[u8; M]>::new_with(|arr| arr.copy_from_slice(v)))
             }
             fn visit_byte_buf<E>(self, v: alloc::vec::Vec<u8>) -> Result<Self::Value, E>
             where

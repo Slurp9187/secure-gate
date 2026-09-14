@@ -129,12 +129,13 @@
 /// own `len()`, not the answer. Writing the marker is how you say you know
 /// that.
 ///
-/// It also has no `new_with`, which the `String` and `Vec<u8>` arms do get. That
-/// one is not a question of meaning — it is meaningful for any inner type — so
-/// the consequence is worth knowing: `new` takes its value by value, and the
-/// in-place construction that keeps a secret from ever existing outside the
-/// wrapper is unavailable here. [`fixed_newtype!`](crate::fixed_newtype) explains
-/// the same gap on its own `generic` arm at more length.
+/// It also has no `new_with`, which the `String` and `Vec<u8>` arms do get.
+/// [`fixed_newtype!`](crate::fixed_newtype)'s generic arm *does* forward
+/// [`Fixed::new_with`](crate::Fixed::new_with), because that constructor now
+/// exists for any `T: SentinelValue`. `Dynamic::new_with` is still shaped —
+/// `FnOnce(&mut String)` / `FnOnce(&mut Vec<u8>)` — so there is nothing here
+/// to forward for an arbitrary inner type. `new` takes its value by value;
+/// build it as close to the call as you can.
 ///
 /// # Implementation Notes
 ///
