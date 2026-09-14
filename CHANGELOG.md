@@ -7,8 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.0-rc.13] - 2026-09-14
 
-> Open for work. The version moved off rc.12 because that tag is published, so the branch
-> had nowhere for new commits to go.
+> Published to crates.io on the `v0.8.0-rc.13` tag.
 >
 > The `base32ct` floor raised on `main` is **not** ported here and will not be. This is the
 > MSRV 1.70 line and `base32ct` 0.3 requires 1.85, so the 0.2 pin stays — gated by
