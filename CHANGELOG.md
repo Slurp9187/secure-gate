@@ -5,7 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0-rc.12] - 2026-09-13
+
+> Tagged, **not yet published to crates.io**. `0.8.0-rc.11` is the newest version of this
+> line available there, so everything in this section ships when rc.12 does. Only
+> `secure-gate` has ever been published — `secure-gate-compat` never was.
+>
+> This section previously stopped short of a version heading, on the reasoning that a dated
+> heading claims a release that did not happen. It now carries one because the entries below
+> settle what the alias macros are, and that answer should not sit under "Unreleased" while
+> the macros themselves are already gone from the code.
 
 ### Added
 
@@ -566,8 +575,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stale flag remains on both and is a follow-up. It is a no-op either way, because every
   compile-fail test is `#[cfg(not(miri))]` and so does not exist under Miri at all.
 
-## [0.8.0-rc.12] - 2026-09-09
-
 ### Changed
 
 - **`SECURITY.md` gained the zero-length-secret entry from `main`.** A zero-length secret
@@ -604,11 +611,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The old root `README.md` and `CHANGELOG.md` were workspace summaries of a workspace
   that no longer exists; the crate's own supersede them and are what ships. Their content
   remains in git history.
-
-> Everything below is unreleased. `0.8.0-rc.11` is the newest version of this line on
-> crates.io; `0.8.0-rc.12` was tagged but never published, so its entries live here
-> rather than under a heading claiming a release that did not happen. Only
-> `secure-gate` has ever been published.
 
 ### Added
 
