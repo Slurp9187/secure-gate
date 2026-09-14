@@ -346,6 +346,30 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     /// element already have both; a custom inner type needs the same pair
     /// `into_inner` already asks for.
     ///
+    /// # `T` must be inferable at the call site
+    ///
+    /// This constructor is generic over `T`, so the closure's parameter type is
+    /// not known until `T` is. A return type alone does not resolve it in time:
+    /// `fn k() -> Fixed<[u8; 32]> { Fixed::new_with(|a| a.fill(1)) }` fails with
+    /// **E0282**, `type annotations needed for &mut _`, because the closure body
+    /// is checked before the expected return type reaches `T`. Name the type in
+    /// either position — both compile, pick whichever reads better:
+    ///
+    /// ```rust
+    /// use secure_gate::Fixed;
+    ///
+    /// // On the type:
+    /// let a = Fixed::<[u8; 32]>::new_with(|x| x.fill(1));
+    /// // Or on the closure parameter:
+    /// let b = Fixed::new_with(|x: &mut [u8; 32]| x.fill(1));
+    /// # let _ = (a, b);
+    /// ```
+    ///
+    /// Before 0.9.0-rc.10 this method was inherent to `Fixed<[u8; N]>`, where the
+    /// parameter was always a byte array and inference had nothing to resolve. A
+    /// newtype built by [`fixed_newtype!`](crate::fixed_newtype) is unaffected in
+    /// both arms: its generated `new_with` has a concrete parameter type.
+    ///
     /// # Security rationale
     ///
     /// With [`Fixed::new(value)`](Self::new), the caller first builds `value` on

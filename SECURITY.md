@@ -48,7 +48,7 @@ zero an out-of-scope stack slot.
 - Use [`Fixed::new_with`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html#method.new_with) instead of [`Fixed::new`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html#method.new) to write secret material directly into the wrapper's storage — eliminates the construction-site stack temporary.
 - Pass `&Fixed<T>` / `&mut Fixed<T>` by reference rather than `Fixed<T>` by value. Keep the wrapper short-scope.
 - For long-lived secrets, prefer [`Dynamic<T>`](https://docs.rs/secure-gate/latest/secure_gate/struct.Dynamic.html) built with `new_with` or a decode constructor — the buffer is heap-only and never passes through a stack temporary. (`Dynamic::new(v)` still moves `v` in by value.)
-- For address-stability needs (FFI, self-referential structs), users may pin the wrapper at the call site: `let key = core::pin::pin!(Fixed::new_with(|a| …));`. This is opt-in; the crate does not impose pinning by default because it would break idiomatic use (returning, storing).
+- For address-stability needs (FFI, self-referential structs), users may pin the wrapper at the call site: `let key = core::pin::pin!(Fixed::<[u8; N]>::new_with(|a| …));`. This is opt-in; the crate does not impose pinning by default because it would break idiomatic use (returning, storing).
 
 ### 2. Heap-reallocation residue (`Dynamic<Vec<T>>` / `Dynamic<String>`)
 
@@ -480,7 +480,7 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
 - **For accessing secrets:** prefer the scoped `with_secret()` / `with_secret_mut()` closures
   over `expose_secret()` / `expose_secret_mut()` — they keep the exposed reference tightly
   bound and make accidental long-lived borrows visible at the call site.
-- **For constructing secrets:** prefer `Fixed::new_with(|arr| { ... })` or
+- **For constructing secrets:** prefer `Fixed::<[u8; N]>::new_with(|arr| { ... })` or
   `Dynamic::<Vec<u8>>::new_with(|v| { ... })` / `Dynamic::<String>::new_with(|s| { ... })`
   over `Fixed::new(value)` / `Dynamic::new(value)` when constructing from computed data
   inline — these write directly into the wrapper's storage and avoid any intermediate copy.
@@ -506,7 +506,7 @@ If stack residue is a concern, `Dynamic<T>` remains the strictest overall choice
 
 For high-assurance `Fixed` construction, prefer:
 
-- `Fixed::new_with(|arr| { … })` over `Fixed::new(value)`
+- `Fixed::<[u8; N]>::new_with(|arr| { … })` over `Fixed::new(value)`
 
 The regular `new(value)` constructors and `expose_secret` / `expose_secret_mut` remain
 available as convenient defaults and auditable escape hatches respectively. This mirrors a
