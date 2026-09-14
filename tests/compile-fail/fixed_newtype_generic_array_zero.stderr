@@ -1,0 +1,36 @@
+error[E0080]: evaluation of constant value failed
+  --> tests/compile-fail/fixed_newtype_generic_array_zero.rs:17:1
+   |
+17 | fixed_newtype!(pub ZeroPoly, generic [i16; 0]);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ index out of bounds: the length is 0 but the index is 0
+   |
+   = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation of constant value failed
+  --> tests/compile-fail/fixed_newtype_generic_array_zero.rs:18:1
+   |
+18 | fixed_newtype!(pub ZeroPolyDoc, generic [i16; 0], "a zero-length polynomial");
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ index out of bounds: the length is 0 but the index is 0
+   |
+   = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation of constant value failed
+  --> tests/compile-fail/fixed_newtype_generic_array_zero.rs:19:1
+   |
+19 | fixed_newtype!(pub ZeroPolyDerive, generic [i16; 0], derive: [IntoWrapper]);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ index out of bounds: the length is 0 but the index is 0
+   |
+   = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation of constant value failed
+  --> tests/compile-fail/fixed_newtype_generic_array_zero.rs:20:1
+   |
+20 | / fixed_newtype!(
+21 | |     pub ZeroPolyBoth,
+22 | |     generic [u32; 0],
+23 | |     "doc and derive",
+24 | |     derive: [FromWrapper]
+25 | | );
+   | |_^ index out of bounds: the length is 0 but the index is 0
+   |
+   = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)

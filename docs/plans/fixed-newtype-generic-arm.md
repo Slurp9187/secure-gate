@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Implemented** on `docs/fixed-newtype-generic-arm` (workstreams A and B). C is not in this change. Tracking [#215](https://github.com/Slurp9187/secure-gate/issues/215) |
+| **Status** | **Implemented.** A and B on `docs/fixed-newtype-generic-arm` ([#216](https://github.com/Slurp9187/secure-gate/pull/216)); C on `claude/fixed-newtype-array-arm`. All three workstreams are done. Tracking [#215](https://github.com/Slurp9187/secure-gate/issues/215); RNG on the generic arm was split out to [#219](https://github.com/Slurp9187/secure-gate/issues/219) |
 | **Written against** | `main` at `e504fd1` (`0.9.0-rc.10` unreleased) |
 | **Tracking issue** | [#215](https://github.com/Slurp9187/secure-gate/issues/215) |
 | **Branch** | `docs/fixed-newtype-generic-arm` |
@@ -127,6 +127,8 @@ Leave true opaques (`struct Poly([i16; 256])`, a custom field) on the reduced re
 A1 already rejects `generic [u8; $n]`, so this arm is only non-`u8` arrays. Order: A1 rejects, then `generic [$t; $n]`, then opaque `generic $inner:ty`.
 
 Skip C if A+B are enough and nobody is asking for `len()` on `Poly`. It is a convenience, not a safety fix.
+
+**Done.** The convenience framing undersold it: the only route to `len()` was `derive: [IntoWrapper]`, which the docs call a downgrade to the pool's least-sensitive alias — so the arm removes a standing reason to grant the outbound token, which is a safety argument and not a convenience one. Implemented as a single arm with optional tail groups (the pattern consumes a `:ty` for the element type, so four tails cannot coexist), inserted between the `[u8; N]` rejects and the opaque arm. Two consequences worth recording: `tests/compile-fail/fixed_zero_size.rs` moved to `generic [(); 4]`, the one spelling that clears the new declaration-site guard and is still zero-sized, so the post-monomorphization path stays pinned; and the opaque arm's four-tail coverage had to be re-established through a type alias, because every literal array in the test tree migrated to the new arm.
 
 ---
 

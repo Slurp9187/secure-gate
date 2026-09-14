@@ -47,12 +47,20 @@
 //! also `new_with`). `fixed_newtype!(.., generic [u8; N])` is a compile error:
 //! write the size literal, which is the full API for that payload.
 //!
+//! On `fixed_newtype!` a *literal* array — `generic [i16; 256]` — gets two things
+//! more, because the element type and the length are both still tokens the expansion
+//! can read: `SecretLen` (`len` in elements, `byte_len` in bytes) and the
+//! declaration-site `N = 0` guard. A name for that array, or a non-literal length,
+//! hides the shape again and lands on the reduced arm.
+//!
 //! # Security note
 //!
-//! [`fixed_newtype!`] rejects `N = 0` at the declaration, and
-//! [`Fixed`](crate::Fixed) itself rejects a zero-sized inner value at
-//! construction: `Fixed::new` and `Fixed::new_with` carry a `const`
-//! assertion, so a plain `type` alias and the `generic T` arm are covered too.
+//! [`fixed_newtype!`] rejects `N = 0` at the declaration — for a size literal and for
+//! a literal array alike — and [`Fixed`](crate::Fixed) itself rejects a zero-sized
+//! inner value at construction: `Fixed::new` and `Fixed::new_with` carry a `const`
+//! assertion, so a plain `type` alias and the opaque `generic T` arm are covered too.
+//! The two are complementary, not redundant: the macro counts a length, the wrapper
+//! measures a size, and `generic [(); 4]` is caught only by the second.
 //! [`dynamic_newtype!`] has no compile-time equivalent, because for `String` and
 //! `Vec<u8>` emptiness is a runtime property and an empty one is a legitimate
 //! value to hold before validation. The gap that leaves is a statically
