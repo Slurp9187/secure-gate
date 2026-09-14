@@ -137,6 +137,14 @@
 /// to forward for an arbitrary inner type. `new` takes its value by value;
 /// build it as close to the call as you can.
 ///
+/// The two macros are also asymmetric about `SecretLen`, deliberately.
+/// `fixed_newtype!` has a third arm for a *literal* array — `generic [i16; 256]` —
+/// which forwards `SecretLen` because the element type and the length are both
+/// visible as tokens. There is no equivalent here and none is wanted: a `Dynamic`
+/// payload carries its length at runtime rather than in the type, so there is no
+/// token for an arm to read, and `derive: [IntoWrapper]` remains the way to reach
+/// the base wrapper's own `len()`.
+///
 /// # Implementation Notes
 ///
 /// The generated type is `#[repr(transparent)]` over the wrapper and delegates

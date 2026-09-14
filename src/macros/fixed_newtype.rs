@@ -22,6 +22,7 @@
 /// fixed_newtype!(pub Name, N, "doc string");            // with custom doc
 /// fixed_newtype!(pub Name, N, derive: [ConstantTimeEq]); // with opt-in impls
 /// fixed_newtype!(pub Name, N, "doc", derive: [ConstantTimeEq]);
+/// fixed_newtype!(pub Name, generic [T; N]);             // array: adds SecretLen
 /// fixed_newtype!(pub Name, generic T);                  // reduced API, opted into
 /// fixed_newtype!(pub Name, generic T, "doc string");
 /// fixed_newtype!(pub Name, generic T, derive: [WrapperAccess]);
@@ -100,22 +101,37 @@
 /// [`dynamic_newtype!`](crate::dynamic_newtype)'s `generic` arm carries the
 /// same pair, for the same reason.
 ///
-/// The `generic` form deliberately provides less: [`RevealSecret`](crate::RevealSecret),
+/// Every `generic` form emits [`RevealSecret`](crate::RevealSecret),
 /// [`RevealSecretMut`](crate::RevealSecretMut), redacted `Debug`, `Zeroize`,
-/// `ZeroizeOnDrop`, `new`, and [`new_with`](crate::Fixed::new_with). Absent are
-/// [`SecretLen`](crate::SecretLen), `From` and `TryFrom`, the encoders and the RNG
-/// constructors. The reason is the macro's field of view, not the meaning of each
-/// method: `generic $inner:ty` is one opaque token, so the expansion cannot tell an
-/// array from a struct and withholds the shape-dependent surface uniformly rather
-/// than conditionally. For some of them no meaning exists — hex over a `Vec<u32>`
-/// has no defined byte order — but `SecretLen` is not one of those: the base wrapper
-/// implements it for every `Fixed<[T; N]>`, and its `byte_len` is correctly
-/// `N * size_of::<T>()` rather than a count of elements. So that capability exists
-/// one layer down and `derive: [IntoWrapper]` reaches it in one call; what the arm
-/// withholds is the newtype's *own* `len()`, not the answer. Writing the marker is
-/// how you say you know that. A zero-sized inner value is still refused: there is
-/// no `N` for the macro to check, so [`Fixed`](crate::Fixed) rejects it at
-/// construction instead.
+/// `ZeroizeOnDrop`, `new`, and [`new_with`](crate::Fixed::new_with). What sits on top
+/// of that depends on how much shape the macro can read off the tokens you wrote, and
+/// there are two answers.
+///
+/// **A literal array — `generic [i16; 256]` — takes the array arm.** The element type
+/// and the length are both still tokens there, so the expansion can see the shape and
+/// emits two more things: [`SecretLen`](crate::SecretLen), and the declaration-site
+/// `N = 0` guard the size-literal arm has always carried. `len()` counts elements and
+/// `byte_len()` multiplies by `size_of::<T>()`, because that is what
+/// `Fixed<[T; N]>`'s own impl computes — 256 and 512 for a polynomial. The arm needs a
+/// *literal* length: `generic [i16; KEY_LEN]` is a different token sequence and falls
+/// through to the opaque arm, the same remainder a path-qualified spelling has.
+///
+/// **A true opaque inner type — `generic Poly`, a struct, an alias — takes the reduced
+/// arm.** `SecretLen` is absent there, and so is the declaration-site guard; a
+/// zero-sized inner value is refused by [`Fixed`](crate::Fixed) at construction
+/// instead. That is a limit on the macro's field of view rather than a verdict on the
+/// type: the base wrapper still implements `SecretLen` for every `Fixed<[T; N]>`, so
+/// the capability is one layer down and `derive: [IntoWrapper]` reaches it in one call.
+/// What the arm withholds is the newtype's *own* `len()`, not the answer.
+///
+/// **`From`, `TryFrom`, the encoders and the RNG constructors are absent from both.**
+/// The encoders have no defined byte order over `[i16]`, and byte order is not the
+/// whole of it: the canonical encoding of these secrets is domain-specific — ML-KEM
+/// serialises as bit-packed 12-bit coefficients, not a 16-bit dump — so an encoder here
+/// would round-trip inside this crate and disagree with every implementation outside
+/// it. RNG is a separate question with a separate answer: the byte-level fill is well
+/// defined, but uniform bits are not a valid ML-KEM coefficient, a reduced scalar, or a
+/// derived round key. It is tracked in #219 rather than settled here.
 ///
 /// **`generic [u8; N]` is a compile error**, not a reduced byte array. It is the
 /// same payload as `fixed_newtype!(pub K, N)` with strictly less API, and
@@ -188,14 +204,20 @@
 /// `size_of::<EncKey>() == N` and delegation is `#[inline]` throughout — the
 /// newtype costs nothing at runtime.
 ///
-/// Each size-literal expansion emits `const _: () = { let _ = [(); N][0]; };`,
-/// a declaration-site courtesy: `N = 0` fails on the line that declares the
-/// type, which is the line worth pointing at. It is not the only guard.
+/// The size-literal and array expansions both emit
+/// `const _: () = { let _ = [(); N][0]; };`, a declaration-site courtesy: `N = 0`
+/// fails on the line that declares the type, which is the line worth pointing at.
+/// Whether the length arrives as the size argument or inside a literal array, it is
+/// a literal the macro can count at expansion.
+///
+/// It is not the only guard, and the two are not redundant.
 /// [`Fixed::new`](crate::Fixed::new) and
-/// [`Fixed::new_with`](crate::Fixed::new_with) carry a `const` assertion
-/// rejecting a zero-sized inner value at construction, which is what covers a
-/// plain `type` alias and the `generic` arm; there the error falls at the first
-/// concrete construction instead.
+/// [`Fixed::new_with`](crate::Fixed::new_with) carry a `const` assertion rejecting a
+/// zero-sized inner value at construction, which is what covers a plain `type` alias
+/// and the opaque `generic` arm; there the error falls at the first concrete
+/// construction instead. The macro guard checks a *length*, the wrapper's checks a
+/// *size* — so `generic [(); 4]` passes the first and is caught by the second, which
+/// is exactly the case `tests/compile-fail/fixed_zero_size.rs` pins.
 ///
 /// **Do not add your own `Drop` impl.** None is needed: the wrapped
 /// [`Fixed`](crate::Fixed) still runs its own, so zeroization is unaffected.
@@ -252,7 +274,10 @@
 /// reopens whatever the base wrapper implements for that inner type, which on a
 /// `generic` newtype includes the surface the arm withheld: `as_wrapper().len()`
 /// and `.byte_len()` answer for any `Fixed<[T; N]>`. The reduced surface is a
-/// property of the label, not a barrier. The exposure is
+/// property of the label, not a barrier. This is now worth granting less often than
+/// it was — a literal array gets its own `len()` from the array arm, so reaching for
+/// the outbound token merely to measure a secret is no longer the trade it used to
+/// be. Where it is still the only route is the opaque arm. The exposure is
 /// largest during a partial migration — the regime real consumers live in —
 /// because while most aliases stay plain the base type is a universal donor.
 /// Audit these methods the way you audit `expose_secret()`.
@@ -290,11 +315,59 @@ macro_rules! fixed_newtype {
         $crate::__sg_fixed_generic_is_bytes!($n);
     };
 
+    // ---- `generic` applied to a non-byte array: the shaped array arm ----
+    //
+    // `[i16; 256]` is an array and the macro can see that it is, so it should not
+    // have to pretend it is an opaque struct. The no_std case the `generic` marker
+    // exists for is exactly this shape. This arm emits what is meaningful for any
+    // `[T; N]` and nothing that is not: the declaration-site `N = 0` guard the
+    // size-literal arm already carries, and `SecretLen`, whose answers
+    // `Fixed<[T; N]>` already computes correctly — `len` in elements, `byte_len`
+    // multiplied by `size_of::<T>()`.
+    //
+    // Still withheld: `From`/`TryFrom`, the encoders and the RNG constructors. Hex
+    // over `[i16]` has no defined byte order, and for the structured secrets this
+    // arm exists for the canonical encoding is bit-packed rather than a raw element
+    // dump, so an encoder here would round-trip inside this crate and disagree with
+    // every implementation outside it. RNG is a different question — the byte-level
+    // fill is well defined, but uniform bits are not a valid ML-KEM coefficient, a
+    // reduced scalar, or a derived round key — and is tracked separately in #219.
+    //
+    // One arm, not four. The pattern consumes a `:ty` fragment for the element
+    // type, so two arms both opening `generic [$t:ty; ...` cannot coexist: the
+    // same no-backtracking rule that forces the opaque arm below into the
+    // optional-group form. The `[u8; N]` rejects above still win, because they
+    // precede this arm and match `u8` as a literal token.
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic [$t:ty; $n:literal]
+     $(, $doc:literal)? $(, derive: [$($opt:ident),* $(,)?])?) => {
+        const _: () = { let _ = [(); $n][0]; };
+
+        $crate::__sg_newtype_base!(
+            $(#[$attr])* $(#[doc = $doc])* $vis $name($crate::Fixed<[$t; $n]>),
+            derive: [$($($opt),*)?]
+        );
+        $crate::__sg_newtype_len!($name);
+
+        impl $name {
+            /// Wraps an array in place. `const fn`, like `Fixed::new`.
+            #[inline(always)]
+            pub const fn new(value: [$t; $n]) -> Self {
+                Self($crate::Fixed::new(value))
+            }
+            /// Scoped construction — writes directly into the wrapper's storage.
+            #[inline(always)]
+            pub fn new_with<F>(f: F) -> Self
+            where F: ::core::ops::FnOnce(&mut [$t; $n]) {
+                Self($crate::Fixed::new_with(f))
+            }
+        }
+    };
+
     // ---- explicit generic arms: caller opts in to the reduced API ----
     //
-    // Placed next. They match the literal token `generic` in the inner-type
-    // position, so they cannot shadow a size literal, and matching the marker
-    // before any `:literal` or `:ty` fragment is parsed keeps the ordering
+    // Placed after the array arm. They match the literal token `generic` in the
+    // inner-type position, so they cannot shadow a size literal, and matching the
+    // marker before any `:literal` or `:ty` fragment is parsed keeps the ordering
     // safe: `macro_rules!` does not backtrack once a fragment has been
     // consumed. The doc-literal forms get their own arms, exactly as
     // `dynamic_newtype!`'s generic form does, so that the third positional
@@ -561,9 +634,11 @@ macro_rules! fixed_newtype {
              `N, \"doc\", derive: [..]`, where N is the length of the `[u8; N]` \
              array being wrapped; and the same four with `generic <type>` in place \
              of N, for an inner type that is not a byte array \
-             (`fixed_newtype!(pub K, generic [i16; 256])`), which takes the reduced \
-             API (RevealSecret, RevealSecretMut, Debug, Zeroize, `new`, and `new_with`) \
-             on purpose. `generic [u8; N]` is not one of those: write the size literal. \
+             (`fixed_newtype!(pub K, generic [i16; 256])`). A literal array there \
+             also gets `SecretLen` and the declaration-site `N = 0` guard; any other \
+             inner type takes the reduced API (RevealSecret, RevealSecretMut, Debug, \
+             Zeroize, `new`, `new_with`) on purpose. `generic [u8; N]` is not one of \
+             those: write the size literal. \
              If the length or the marker looks right, the problem is in what follows \
              it: a `derive:` list needs brackets, and accepts only ConstantTimeEq, \
              Deserialize, FromWrapper, IntoWrapper and WrapperAccess."

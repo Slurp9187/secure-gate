@@ -26,12 +26,28 @@ fixed_newtype!(pub RoundKeys, generic [u32; 60]);
 // All four argument shapes of the `generic` form, because two arms both opening
 // `generic $inner:ty,` cannot coexist in `macro_rules!` — the optional-group
 // formulation that makes this work is easy to regress into four arms that do not.
+// These are literal arrays, so they exercise the *array* arm's tails.
 fixed_newtype!(pub Documented, generic [u32; 4], "A documented generic newtype.");
 fixed_newtype!(pub Derived, generic [u32; 4], derive: [FromWrapper]);
 fixed_newtype!(
     pub DocumentedAndDerived,
     generic [u32; 4],
     "Both a doc string and a derive list.",
+    derive: [IntoWrapper]
+);
+// And the same four tails on the *opaque* arm, which otherwise has none: every literal
+// array above now matches the array arm, so without these a regression splitting the
+// opaque arm's optional groups into four arms would pass every test. `generic Schedule`
+// is a single ident rather than a `[...]` token group, so it lands on the opaque arm
+// even though `Schedule` resolves to the very same array.
+type Schedule = [u32; 4];
+fixed_newtype!(pub Opaque, generic Schedule);
+fixed_newtype!(pub OpaqueDocumented, generic Schedule, "An opaque generic newtype.");
+fixed_newtype!(pub OpaqueDerived, generic Schedule, derive: [FromWrapper]);
+fixed_newtype!(
+    pub OpaqueDocumentedAndDerived,
+    generic Schedule,
+    "Both a doc string and a derive list, opaque.",
     derive: [IntoWrapper]
 );
 
@@ -287,9 +303,11 @@ fn newtype_forwards_sized_bech32_methods() {
     );
 }
 
-/// `fixed_newtype!`'s `generic` arm emits the shape-independent surface:
-/// construction (`new` and `new_with`), the access traits, redacted `Debug`,
-/// zeroization. No `SecretLen` and no encoders.
+/// `fixed_newtype!`'s array arm emits the shape-independent surface — construction
+/// (`new` and `new_with`), the access traits, redacted `Debug`, zeroization — plus
+/// `SecretLen`, which an array shape gives a correct answer for in both units. Still
+/// no encoders: hex over `[u32]` has no defined byte order, and the canonical encoding
+/// of a key schedule is not a raw word dump anyway.
 #[test]
 fn fixed_generic_arm_surface() {
     let mut k = RoundKeys::new([7u32; 60]);
@@ -301,6 +319,10 @@ fn fixed_generic_arm_surface() {
     assert_eq!(format!("{k:?}"), "[REDACTED]");
     // `#[repr(transparent)]` over `Fixed<[u32; 60]>`: 60 words, 4 bytes each.
     assert_eq!(core::mem::size_of::<RoundKeys>(), 240);
+    // The array arm's own `SecretLen`, reached without `IntoWrapper`. `len` counts
+    // elements and `byte_len` multiplies by `size_of::<u32>()`; for a byte array the
+    // two coincide, which is why only a non-byte element type pins the distinction.
+    assert_eq!((k.len(), k.byte_len()), (60, 240));
 }
 
 /// The `generic` form accepts a doc literal and a `derive:` list in any combination,
@@ -316,4 +338,21 @@ fn fixed_generic_arm_accepts_doc_and_derive() {
     // `IntoWrapper` is outbound only: material can leave toward the base.
     let base: Fixed<[u32; 4]> = DocumentedAndDerived::new([3u32; 4]).into_wrapper();
     assert_eq!(base.expose_secret()[0], 3);
+}
+
+/// The opaque arm accepts the same four tails, and keeps the reduced surface while doing
+/// it. Spelled through an alias so the tokens are a single ident: the array arm matches
+/// on shape, and a name hides the shape from it.
+#[test]
+fn fixed_opaque_arm_accepts_doc_and_derive() {
+    use secure_gate::Fixed;
+    assert_eq!(Opaque::new([1u32; 4]).with_secret(|w| w[0]), 1);
+    assert_eq!(OpaqueDocumented::new([2u32; 4]).with_secret(|w| w[0]), 2);
+    let from_base = OpaqueDerived::from_wrapper(Fixed::new([3u32; 4]));
+    assert_eq!(from_base.with_secret(|w| w[0]), 3);
+    let base: Fixed<Schedule> = OpaqueDocumentedAndDerived::new([4u32; 4]).into_wrapper();
+    assert_eq!(base.expose_secret()[0], 4);
+    // The reduced surface is still reduced: no `len()` of its own, but the same answer
+    // is one audited `as_wrapper()` away, because `Fixed<Schedule>` *is* `Fixed<[u32; 4]>`.
+    assert_eq!(base.len(), 4);
 }

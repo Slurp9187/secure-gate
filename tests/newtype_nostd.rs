@@ -51,9 +51,11 @@ fn nostd_newtype_decodes_both_checksums() {
     let _ = NoAllocKey::try_from_bech32m_unchecked_sized::<2048>(S);
 }
 
-// The reduced surface is the point: `Poly` gets access, redaction and zeroization, and
-// deliberately no `SecretLen` (a length in elements would not mean what callers expect
-// of a byte length) and no encoders. Read through `with_secret`, not `len()`.
+// `Poly` gets access, redaction, zeroization — and, because `[i16; 256]` is an array
+// the macro can see the shape of, `SecretLen` too. The old objection to forwarding it
+// was that "a length in elements is not the byte length callers expect"; the answer is
+// that `SecretLen` has both, and `Fixed<[T; N]>` already computes both correctly. What
+// stays absent is the encoders: hex over `[i16]` has no defined byte order.
 #[test]
 fn generic_arm_wraps_a_non_byte_array() {
     let p = Poly::new([0i16; 256]);
@@ -62,4 +64,15 @@ fn generic_arm_wraps_a_non_byte_array() {
     assert_eq!(q.with_secret(|c| c[0]), 1);
     // `#[repr(transparent)]` over `Fixed<[i16; 256]>`: 256 coefficients, 2 bytes each.
     assert_eq!(core::mem::size_of::<Poly>(), 512);
+}
+
+// The array arm's own `len()`, with no `IntoWrapper` and no trip through `with_secret`.
+// The two answers differ for a non-byte element type, which is the whole reason the
+// element-count objection did not survive: both questions have an answer and they are
+// not the same number.
+#[test]
+fn the_array_arm_forwards_secret_len_in_both_units() {
+    let p = Poly::new([0i16; 256]);
+    assert_eq!((p.len(), p.byte_len()), (256, 512));
+    assert!(!p.is_empty());
 }

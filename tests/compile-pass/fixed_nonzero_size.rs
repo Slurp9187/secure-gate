@@ -15,7 +15,7 @@
 //! shape here is heap-free, which is the predicate `FixedStorage` actually asserts — nothing
 //! heap-owning qualifies, not even a boxed slice, whose rejection is pinned in
 //! `tests/compile-fail/fixed_reallocating_inner.rs`.
-use secure_gate::{Fixed, FixedStorage, RevealSecret, SentinelValue, fixed_newtype};
+use secure_gate::{Fixed, FixedStorage, RevealSecret, SecretLen, SentinelValue, fixed_newtype};
 use zeroize::Zeroize;
 
 fixed_newtype!(pub Poly, generic [i16; 4]);
@@ -54,6 +54,10 @@ fn main() {
 
     let e = Poly::new_with(|p| p.fill(5));
     assert_eq!(e.with_secret(|p| p[0]), 5);
+
+    // Positive control for the array arm's `SecretLen` forward: a non-zero length is
+    // accepted, and the two units differ because `i16` is two bytes wide.
+    assert_eq!((e.len(), e.byte_len()), (4, 8));
 
     let i = Fixed::<[i16; 4]>::new_with(|c| c.fill(6));
     assert_eq!(i.expose_secret(), &[6i16; 4]);

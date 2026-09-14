@@ -51,8 +51,14 @@ fixed_newtype!(pub Opened, 32, derive: [WrapperAccess]);
 fixed_newtype!(pub Inbound, 32, derive: [FromWrapper]);
 fixed_newtype!(pub Outbound, 32, derive: [IntoWrapper]);
 // The generic arm again, this time with the outbound token, for the one test below that
-// needs to reach the base wrapper of a non-byte inner type.
-fixed_newtype!(pub PolyOut, generic [i16; 256], derive: [IntoWrapper]);
+// needs to reach the base wrapper of a non-byte inner type. Spelled through an alias on
+// purpose: `generic Coeffs` is a single ident rather than a `[...]` token group, so it
+// lands on the *opaque* arm and keeps the reduced surface the test below is about. That
+// is also a live pin on the token-versus-type remainder — a macro matches tokens, not
+// resolved types, so naming an array hides its shape from the expansion even though
+// `Fixed<Coeffs>` and `Fixed<[i16; 256]>` are the same type to everything downstream.
+type Coeffs = [i16; 256];
+fixed_newtype!(pub PolyOut, generic Coeffs, derive: [IntoWrapper]);
 
 /// A plain `type` alias over the same base wrapper — a synonym, not a new type.
 type Alias = Fixed<[u8; 32]>;
@@ -182,12 +188,13 @@ fn every_byte_array_constructor_agrees_on_the_material_it_stores() {
 /// The generic arm gives a non-byte inner type the whole access model and nothing
 /// shape-specific, and the access it does give reaches the wrapper's storage.
 ///
-/// This is the documented bargain of `generic T`: `new`, both read tiers, both write
-/// tiers, redacted `Debug`, `Zeroize`. Deliberately absent are `SecretLen`, `new_with`,
-/// `From`/`TryFrom`, the encoders and the RNG constructors — so the length here is
-/// read with `with_secret(|c| c.len())` and never with `len()`, which does not exist on
-/// this arm. The absence is pinned by the trybuild cases; what is pinned here is that
-/// everything the docs promise *is* present works on the real storage.
+/// This is the documented bargain of `generic T`: `new`, `new_with`, both read tiers,
+/// both write tiers, redacted `Debug`, `Zeroize`. `Poly` is written as a literal array,
+/// so it also carries `SecretLen` from the array arm. Deliberately absent on every
+/// `generic` arm are `From`/`TryFrom`, the encoders and the RNG constructors. The length
+/// below is still read through `with_secret`, because what this test is about is that
+/// the access tiers reach the real storage — `len()` is exercised where it belongs, in
+/// `tests/newtype_nostd.rs` and `tests/macros_suite/newtype_surface.rs`.
 #[test]
 fn the_generic_arm_carries_the_access_model_for_a_non_byte_inner_type() {
     let poly = Poly::new([7i16; 256]);
@@ -698,20 +705,24 @@ fn every_shape_carries_real_drop_glue() {
 /// a newtype that also holds `IntoWrapper` reaches `SecretLen` through its base wrapper
 /// in one call.
 ///
-/// This is worth pinning because the two facts are easy to state as one. `fixed_newtype!`
-/// withholds `SecretLen` from the `generic` arm on the grounds that "a length in elements
-/// is not the byte length callers expect" — but `impl SecretLen for Fixed<[T; N]>` exists
+/// This is worth pinning because the two facts are easy to state as one. The opaque arm
+/// withholds `SecretLen` because it cannot see the shape of its inner type — one `:ty`
+/// fragment could be an array or a struct — but `impl SecretLen for Fixed<[T; N]>` exists
 /// and answers both questions correctly (`len()` in elements, `byte_len()` in bytes), so
 /// the capability is present one layer down and `IntoWrapper` is enough to reach it.
-/// Anyone treating the reduced surface as a guarantee that a `generic` newtype cannot be
-/// measured should grant the outbound token with that in mind. See the note in the final
-/// report: the macro's stated rationale does not match what the base wrapper provides,
-/// though the forwarding behaviour itself is exactly as documented.
+/// Anyone treating the reduced surface as a guarantee that an opaque newtype cannot be
+/// measured should grant the outbound token with that in mind.
+///
+/// `PolyOut` reaches the opaque arm only because it is declared through the `Coeffs`
+/// alias. Written as `generic [i16; 256]` it would match the array arm and get its own
+/// `len()` directly — the argument above is exactly why that arm was added. What survives
+/// here is the narrower and still-true claim: where the macro cannot see the shape, the
+/// reduced surface is a label, not a barrier.
 #[test]
 fn the_reduced_surface_is_a_label_property_that_intowrapper_reopens() {
     let poly = PolyOut::new([1i16; 256]);
 
-    // `poly.len()` does not compile — `SecretLen` is not forwarded by this arm.
+    // `poly.len()` does not compile — the opaque arm does not forward `SecretLen`.
     // One audited step down, it is there, and it is not even wrong about bytes:
     assert_eq!(poly.as_wrapper().len(), 256, "elements");
     assert_eq!(

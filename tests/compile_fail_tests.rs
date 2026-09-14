@@ -84,6 +84,17 @@ fn fixed_newtype_generic_bytes_rejected_compile_fail() {
     t.compile_fail("tests/compile-fail/fixed_newtype_generic_bytes_rejected.rs");
 }
 
+// The array arm carries the same declaration-site `N = 0` guard as the size-literal
+// arm, so `generic [i16; 0]` fails under `cargo check` on the declaring line instead of
+// waiting for codegen. Pins the bare tail and the doc-plus-`derive:` tail, because the
+// arm is one arm with optional groups and a split would drop the guard from most tails.
+#[cfg(not(miri))]
+#[test]
+fn fixed_newtype_generic_array_zero_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/fixed_newtype_generic_array_zero.rs");
+}
+
 // Compile-fail tests: the secret wrappers must not implement `Deref` or `AsRef`.
 //
 // This is the crate's load-bearing "no implicit access" claim, so it is enforced by the
