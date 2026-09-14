@@ -1,6 +1,6 @@
 [package]
 name = "secure-gate"
-version = "0.9.0-rc.9"
+version = "0.9.0-rc.10"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -21,8 +21,14 @@ include = [
 [dependencies]
 base16ct = { version = "1", optional = true, default-features = false }
 # `default-features = false` is a no-op for base32ct (it has none), but keeps the
-# three `*ct` lines uniform.
-base32ct = { version = "0.3", optional = true, default-features = false }
+# three `*ct` lines uniform. The `0.3.1` floor is load-bearing rather than
+# cosmetic: `0.3.0` panics with an out-of-bounds index when an unpadded input's
+# trailing block is 1, 3 or 6 chars long (RustCrypto/formats#2242), and
+# `try_from_base32` hands caller-supplied strings straight to that decoder. A
+# bare "0.3" admits `0.3.0`, so the floor is what keeps a dependent's own
+# resolution off it; our lockfile alone does not travel downstream. `0.3.1`
+# declares the same `rust-version` as `0.3.0`, so the floor costs no MSRV.
+base32ct = { version = "0.3.1", optional = true, default-features = false }
 base64ct = { version = "1", optional = true, default-features = false }
 bech32 = { version = "0.11", default-features = false, optional = true }
 # `sys_rng` provides `rngs::SysRng` without pulling `std`; the `TryRng` /

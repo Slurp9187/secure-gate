@@ -213,19 +213,19 @@ fn require_min_len<S: SecretLen>(secret: &S, min: usize) -> bool {
 
 ```toml
 [dependencies]
-secure-gate = "0.9.0-rc.9"
+secure-gate = "0.9.0-rc.10"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.9.0-rc.9", default-features = false }
+secure-gate = { version = "0.9.0-rc.10", default-features = false }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.9.0-rc.9", features = ["full"] }
+secure-gate = { version = "0.9.0-rc.10", features = ["full"] }
 ```
 
 ## Encoding & Decoding
