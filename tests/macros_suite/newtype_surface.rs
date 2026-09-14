@@ -287,14 +287,15 @@ fn newtype_forwards_sized_bech32_methods() {
     );
 }
 
-/// `fixed_newtype!`'s `generic` arm emits the shape-independent surface and nothing more:
-/// construction, the access traits, redacted `Debug`, zeroization. No `SecretLen` and no
-/// encoders, because neither has a meaning for an arbitrary inner type — the same trade
-/// `dynamic_newtype!`'s generic arm makes, verified here rather than assumed.
+/// `fixed_newtype!`'s `generic` arm emits the shape-independent surface:
+/// construction (`new` and `new_with`), the access traits, redacted `Debug`,
+/// zeroization. No `SecretLen` and no encoders.
 #[test]
 fn fixed_generic_arm_surface() {
     let mut k = RoundKeys::new([7u32; 60]);
     assert_eq!(k.with_secret(|w| w[0]), 7);
+    let filled = RoundKeys::new_with(|w| w.fill(3));
+    assert_eq!(filled.with_secret(|w| w[0]), 3);
     k.with_secret_mut(|w| w[0] = 9);
     assert_eq!(k.expose_secret()[0], 9);
     assert_eq!(format!("{k:?}"), "[REDACTED]");

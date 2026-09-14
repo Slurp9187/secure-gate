@@ -7,14 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.0-rc.13] - Unreleased
 
-> Open for work; nothing has landed since the `v0.8.0-rc.12` tag. The version moved off
-> rc.12 because that tag is published, so the branch had nowhere for new commits to go.
+> Open for work. The version moved off rc.12 because that tag is published, so the branch
+> had nowhere for new commits to go.
 >
 > The `base32ct` floor raised on `main` is **not** ported here and will not be. This is the
 > MSRV 1.70 line and `base32ct` 0.3 requires 1.85, so the 0.2 pin stays — gated by
 > `encoded_len_is_decodable`, which remains load-bearing and must not be removed while the
 > pin stands. Dependency and toolchain bumps are never ported across (see the branch table
 > in `README.md` and `docs/audits/pr-182-backport-ledger.md`).
+
+### Changed
+
+- **BREAKING: `Fixed<T>::new_with` is no longer `[u8; N]`-only, and existing call
+  sites may need a type annotation.** Mirrors the same change on `main`, re-derived
+  against this branch rather than copied. It moves to the generic impl, bounded by
+  `FixedStorage + SentinelValue`, so a non-byte array (`[i16; 256]`, `[u32; 60]`)
+  gets the same in-place constructor the byte arm already had: the slot starts as
+  `T::sentinel_value()` and the closure writes into the wrapper's own storage.
+  `fixed_newtype!`'s `generic` arm forwards it. The specialised `NON_ZERO_LEN`
+  assertion on `Fixed<[u8; N]>` is gone; both `new` and `new_with` now read
+  `NON_ZERO_SIZED`. Tracking: #215 on `main`.
+
+  **Migration.** The closure's parameter type is now only known once `T` is, and a
+  return type alone does not resolve it in time — the closure body is checked
+  first. So `fn k() -> Fixed<[u8; 32]> { Fixed::new_with(|a| a.fill(1)) }`, which
+  compiled through rc.12, now fails with **E0282**, `type annotations needed for
+  &mut _`. Name the type in either position:
+
+  ```rust
+  Fixed::<[u8; 32]>::new_with(|x| x.fill(1))   // on the type
+  Fixed::new_with(|x: &mut [u8; 32]| x.fill(1)) // or on the closure parameter
+  ```
+
+  Only bare `Fixed::new_with` is affected. Newtypes built by `fixed_newtype!` are
+  not: their generated `new_with` has a concrete parameter type on both arms. A
+  closure whose body needs no method resolution on the parameter also still
+  infers. This is a source break with no runtime or codegen change.
+
+- **BREAKING: `fixed_newtype!(pub K, generic [u8; N])` is a compile error at the
+  declaration.** Mirrors the same change on `main`, re-derived against this branch.
+  It was strictly dominated by `fixed_newtype!(pub K, N)`: same payload, no
+  `SecretLen`, no `From`/`TryFrom`, no encoders, no `from_random`.
+  `dynamic_newtype!` already refused the analogous spellings (`generic Vec<u8>`,
+  `generic String`). Write the size literal. All four tails are pinned by
+  `tests/compile-fail/fixed_newtype_generic_bytes_rejected.rs`. The zero-size
+  trybuild moves from `generic [u8; 0]` to `generic [i16; 0]`, because the former
+  now dies at the domination check and would never reach `Fixed::new`. Tracking:
+  #215 on `main`.
+
+  The compile-fail snapshots here are blessed on 1.70 and differ from `main`'s in
+  wording and line spans; they were regenerated on this branch, not copied.
 
 ## [0.8.0-rc.12] - 2026-09-13
 

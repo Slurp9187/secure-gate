@@ -52,6 +52,12 @@ fn main() {
     let d = Poly::new([4i16; 4]);
     assert_eq!(d.with_secret(|p| p[0]), 4);
 
+    let e = Poly::new_with(|p| p.fill(5));
+    assert_eq!(e.with_secret(|p| p[0]), 5);
+
+    let i = Fixed::<[i16; 4]>::new_with(|c| c.fill(6));
+    assert_eq!(i.expose_secret(), &[6i16; 4]);
+
     let f = Fixed::new(([6u8; 4], 7u32));
     assert_eq!(f.with_secret(|(arr, n)| (arr[0], *n)), (6, 7));
 
