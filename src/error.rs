@@ -31,7 +31,7 @@
 //!   fields, which is not enough work to justify putting a proc-macro (and `syn`,
 //!   `quote`, `proc-macro2`) in the dependency graph of every downstream build.
 //!
-//! # 0.8 LTS note: `std::error::Error`, not `core::error::Error`
+//! # 0.8 (MSRV 1.70) note: `std::error::Error`, not `core::error::Error`
 //!
 //! The 0.9 line implements [`Error`] unconditionally against `core::error::Error`,
 //! which is stable only from Rust 1.81 — above this branch's MSRV of 1.70. Here
@@ -63,7 +63,7 @@ use core::fmt;
 /// type still exists and still implements [`Display`](core::fmt::Display), but
 /// it is not an `Error`, so `?` into `Box<dyn Error>` and `std::io::Error::other`
 /// will not compile. This is an MSRV consequence, not a policy: `core::error::Error`
-/// needs Rust 1.81 and this LTS line targets 1.70. On 0.9.x the impl is
+/// needs Rust 1.81 and this line targets 1.70. On 0.9.x the impl is
 /// unconditional and available in `no_std`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -103,7 +103,7 @@ impl std::error::Error for FromSliceError {}
 /// type still exists and still implements [`Display`](core::fmt::Display), but
 /// it is not an `Error`, so `?` into `Box<dyn Error>` and `std::io::Error::other`
 /// will not compile. This is an MSRV consequence, not a policy: `core::error::Error`
-/// needs Rust 1.81 and this LTS line targets 1.70. On 0.9.x the impl is
+/// needs Rust 1.81 and this line targets 1.70. On 0.9.x the impl is
 /// unconditional and available in `no_std`.
 #[cfg(feature = "encoding-bech32")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -160,7 +160,7 @@ impl std::error::Error for Bech32Error {}
 /// type still exists and still implements [`Display`](core::fmt::Display), but
 /// it is not an `Error`, so `?` into `Box<dyn Error>` and `std::io::Error::other`
 /// will not compile. This is an MSRV consequence, not a policy: `core::error::Error`
-/// needs Rust 1.81 and this LTS line targets 1.70. On 0.9.x the impl is
+/// needs Rust 1.81 and this line targets 1.70. On 0.9.x the impl is
 /// unconditional and available in `no_std`.
 #[cfg(feature = "encoding-base32")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -205,7 +205,7 @@ impl std::error::Error for Base32Error {}
 /// type still exists and still implements [`Display`](core::fmt::Display), but
 /// it is not an `Error`, so `?` into `Box<dyn Error>` and `std::io::Error::other`
 /// will not compile. This is an MSRV consequence, not a policy: `core::error::Error`
-/// needs Rust 1.81 and this LTS line targets 1.70. On 0.9.x the impl is
+/// needs Rust 1.81 and this line targets 1.70. On 0.9.x the impl is
 /// unconditional and available in `no_std`.
 #[cfg(feature = "encoding-base64")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -249,7 +249,7 @@ impl std::error::Error for Base64Error {}
 /// type still exists and still implements [`Display`](core::fmt::Display), but
 /// it is not an `Error`, so `?` into `Box<dyn Error>` and `std::io::Error::other`
 /// will not compile. This is an MSRV consequence, not a policy: `core::error::Error`
-/// needs Rust 1.81 and this LTS line targets 1.70. On 0.9.x the impl is
+/// needs Rust 1.81 and this line targets 1.70. On 0.9.x the impl is
 /// unconditional and available in `no_std`.
 #[cfg(feature = "encoding-hex")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

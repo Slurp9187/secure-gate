@@ -1,20 +1,24 @@
 # secure-gate
 
-[![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate/0.8.0/secure_gate/)
+[![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate/0.8.0-rc.12/secure_gate/)
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci-0.8.yml/badge.svg?branch=release%2F0.8)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci-0.8.yml?query=branch%3Arelease%2F0.8)
 [![MSRV: 1.70](https://img.shields.io/badge/msrv-1.70-blue)](https://github.com/Slurp9187/secure-gate/blob/release/0.8/Cargo.toml)
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
 > [!NOTE]
-> **Note:** This is the **LTS (Long-Term Support) branch** for secure-gate 0.8.x (`release/0.8`).
-> It targets **Rust Edition 2021** and **MSRV 1.70**, making it the right choice for projects
-> that cannot yet move to Rust 1.85+. For the latest features see the `main` branch (v0.9.x).
+> **Note:** This is the **MSRV 1.70 line** of secure-gate — the 0.8.x series on `release/0.8`.
+> It targets **Rust Edition 2021** and **MSRV 1.70** for projects that cannot yet move to
+> Rust 1.85+, and carries the **same API as `main`** (0.9.x, Rust 1.85 / edition 2024). The
+> lines split when `rand` 0.10 landed mid-development, and until both reach a stable release
+> every change on `main` is re-derived here — everything except dependency and toolchain
+> bumps, which are never ported. After the stable releases this becomes mostly a maintenance
+> line, with a feature worth having still eligible for backport.
 
 | Aspect  |      **0.8.x**       |     **0.9.x**      |
 | ------- | :------------------: | :----------------: |
 | Edition |         2021         |        2024        |
 | MSRV    |         1.70         |        1.85        |
-| Status  | LTS / stable patches | Active development |
+| Status  | Lockstep with `main` | Active development |
 | Branch  |    `release/0.8`     |       `main`       |
 
 Secure wrappers for secrets with **explicit access** and **mandatory zeroization** — a `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
@@ -429,8 +433,9 @@ For Rust < 1.85, pin `secure-gate = "0.8"` — the `release/0.8` branch (Edition
 The `secure-gate-compat` shim crate, which provided drop-in replacements for `secrecy`
 v0.8 and v0.10, has been removed. It was experimental and never published to crates.io.
 If you need it, it is recoverable from git history —
-`git checkout v0.8.0-rc.12 -- secure-gate-compat` restores the last version on this
-branch, along with its migration guide.
+`git checkout v0.8.0-rc.11 -- secure-gate-compat` restores the last version on this
+branch, along with its migration guide. (`v0.8.0-rc.11` is the last tag on this line
+that carries it; the crate was deleted before `rc.12`.)
 
 ## Features
 
@@ -440,7 +445,7 @@ Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = 
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                                                                                                           |
 | `std`               | Full `std` support (implies `alloc`). Enables `std::io::Read`/`Write` for `Dynamic<Vec<u8>>` via `as_reader()` and direct `Write` impl. Use `default-features = false` for no-heap builds. |
-| `rand`              | `from_random()` (system `OsRng`) and fallible `from_rng()` for any `CryptoRng + RngCore`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` / `from_rng()` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
+| `rand`              | `from_random()` (system `OsRng`) and fallible `from_rng()` for any `TryRngCore + TryCryptoRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` / `from_rng()` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
 | `ct-eq`             | `ConstantTimeEq` — timing-safe comparison via `expose_secret()` (`subtle`)                                                                                                                                                                                |
 | `encoding`          | Meta: all encoding sub-features (hex, base32, base64url, bech32). Encoding traits require `alloc`; `Fixed::try_from_*` decoding is no-alloc.                                                                                                     |
 | `encoding-hex`      | `ToHex` / `FromHexStr` — constant-time via `base16ct`                                                                                                                                                                                                     |
