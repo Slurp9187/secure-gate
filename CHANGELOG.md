@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.0-rc.9] - 2026-09-13
+
+> Tagged, **not yet published to crates.io**; everything in this section ships when rc.9
+> does. Only `secure-gate` has ever been published — `secure-gate-compat` never was.
+>
+> The heading carries a date because the entries below settle what the alias macros are,
+> and that answer should not sit under "Unreleased" while the macros themselves are
+> already gone from the code.
 
 ### Added
 
@@ -566,8 +573,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suppressing anything and without losing a byte of diagnostic detail. Confirmed by breaking
   one assertion on purpose: the failure still reports both sizes. The file's header says not to
   put a `with_secret`-derived value back into a format string there.
-
-## [0.9.0-rc.9] - 2026-09-09
 
 ### Changed
 
