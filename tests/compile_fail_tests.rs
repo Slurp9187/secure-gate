@@ -62,6 +62,18 @@ fn dynamic_string_no_hex_compile_fail() {
     t.compile_fail("tests/compile-fail/dynamic_string_no_hex.rs");
 }
 
+// `generic Vec<u8>` / `generic String` are refused at the declaration: both are
+// the same growable payload as the shaped arm with strictly less API, including
+// no safe growth path. Pins all four tails, so a bare-only reject or an
+// arm-order slip is visible here rather than downstream.
+#[cfg(feature = "alloc")]
+#[cfg(not(miri))]
+#[test]
+fn dynamic_newtype_generic_shaped_rejected_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/dynamic_newtype_generic_shaped_rejected.rs");
+}
+
 // Compile-fail tests: the secret wrappers must not implement `Deref` or `AsRef`.
 //
 // This is the crate's load-bearing "no implicit access" claim, so it is enforced by the

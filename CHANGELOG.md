@@ -44,6 +44,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING: `dynamic_newtype!(pub Name, generic Vec<u8>)` and `generic String` are now a
+  compile error at the declaration.** Both were strictly dominated spellings. The `generic`
+  arm emits only the shape-independent surface, so either one took the same growable payload
+  as the shaped arm and then withheld the methods that handle it: `SecretLen`, `From`,
+  `new_with`, the encoders, `from_random`, and — for `Vec<u8>` under `std` — the
+  `std::io::Write` impl, which is the only growth path that wipes the buffer it abandons.
+  Same payload, less API, and for bytes no safe way to grow at all. The fix is to delete one
+  word: write `Vec<u8>` or `String` and the shaped arm gives the full surface.
+
+  **This is not the `FixedStorage` move, and should not be read as one.** That bound closed a
+  *wrong wrapper* — `Fixed` claims to own no heap and a `Vec` owns one — and it lives in the
+  type system, so it catches aliases. This is a *wrong arm of the right wrapper*:
+  `Dynamic<Vec<u8>>` is exactly the type you should be holding, and no bound, marker or
+  deny-list is added to `Dynamic`. The precedent is the one the `generic` marker itself set:
+  when a spelling produces a strictly worse API than a same-crate alternative, fail at the
+  declaration and name the alternative.
+
+  **What it does not catch, stated plainly rather than implied.** The reject matches literal
+  tokens, exactly as the shaped `String` and `Vec<u8>` arms always have. `type MyBytes =
+  Vec<u8>` and path-qualified spellings such as `alloc::vec::Vec<u8>` are different token
+  sequences and still land on the reduced arm. That remainder is documented, not chased: a
+  token deny-list does not become type-level by getting longer, and `std::`-qualified,
+  `Vec<u8, A>`, turbofish and re-exported spellings would each need their own arm while still
+  leaving others out. `tests/macros_suite/newtype_surface.rs` pins the remainder as compiling,
+  so closing it later has to be a deliberate decision rather than a drive-by.
+
+  The catch-all message changed too, and that part is a bug fix. It previously told anyone
+  who wrote a path-qualified inner type to "write `generic <type>` to accept the reduced API
+  on purpose" — advice that *manufactured* the very form this entry rejects. It now says to
+  write the literal token, and warns that reaching for `generic` to silence the error lands
+  you on the reduced arm with the growable payload and none of the methods that handle it.
+
+  **Migration.** Delete the word `generic`. No in-tree caller used either form. Non-byte,
+  non-string inner types — `generic Vec<u32>`, `generic [u32; 60]`, a custom struct — are
+  untouched, which is what the `generic` arm exists for.
+
+  Mirrors the same change on `main`, re-derived against this branch rather than copied: the
+  macro arms and the fixture are identical because `src/macros/` is, but the snapshot is
+  blessed on this line's pinned 1.70, and the prose additions avoid the em-dash characters
+  that this file's `dynamic_newtype.rs` already carries as mojibake in three places.
+
 - **BREAKING: `Fixed::new` now requires `FixedStorage` on the inner type, which makes
   `SECURITY.md`'s "`Fixed<T>` is exempt" true instead of aspirational.** That sentence was a
   claim about the shape people were expected to use, not something the type system checked.
@@ -88,8 +129,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   closed set of blessed types, would destroy the one thing the `generic` arm exists for,
   holding a custom secret on a target with no allocator. And the bound is on `Fixed`, so it
   says nothing about `dynamic_newtype!(pub Name, generic Vec<u8>)`, which has the growable
-  payload and, unlike plain `Dynamic<Vec<u8>>`, no `io::Write` escape. That is left as a
-  separate decision rather than widened into this one.
+  payload and, unlike plain `Dynamic<Vec<u8>>`, no `io::Write` escape. That was left as a
+  separate decision rather than widened into this one; it is settled below, and settled
+  differently — as a macro-arm reject, not a bound on `Dynamic`.
 
   **`Box<[T]>` was blessed and then un-blessed, because the predicate was wrong.** The trait
   first asked only that a type's capacity cannot change, and a boxed slice satisfies that — its
