@@ -88,6 +88,21 @@
 /// before type resolution. Rather than silently hand back a newtype missing
 /// half its API, such input is a **compile error** naming the fix.
 ///
+/// `generic` is **not** a way to get past that error. `generic Vec<u8>` and
+/// `generic String` are themselves a compile error, because each is the same
+/// growable payload as the shaped arm with strictly less API — for `Vec<u8>`,
+/// no `io::Write`, which is the only growth path that wipes the buffer it
+/// abandons. Delete the word and the safe surface comes with it.
+///
+/// That reject matches literal tokens too, so it is a guard on the *spelling*,
+/// not on the type: `generic MyBytes` and `generic alloc::vec::Vec<u8>` are
+/// different token sequences and still land on the reduced arm, carrying a
+/// growable payload with no safe way to grow it. The macro cannot see through
+/// an alias or a path — that is the same limitation as above, not a separate
+/// one — and a token deny-list does not become type-level by getting longer.
+/// If the inner type is a `String` or a `Vec<u8>` under any spelling, write the
+/// literal token.
+///
 /// When the inner type genuinely is something else, opt in with `generic`:
 ///
 /// ```rust
@@ -208,6 +223,48 @@
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! dynamic_newtype {
+    // ---- `generic` applied to a shape that has its own arm: rejected ----
+    //
+    // `generic Vec<u8>` and `generic String` are strictly dominated spellings.
+    // They take a payload this crate already knows how to grow safely and then
+    // withhold the method that does it: the `generic` arm emits only
+    // `__sg_newtype_base!` plus a constructor, so the shaped arms' `SecretLen`,
+    // `From`, `new_with`, encoders, and — for `Vec<u8>` under `std` — the
+    // `io::Write` impl that wipes the buffer it abandons, are all absent. Same
+    // payload, strictly less API, and no reason to write it.
+    //
+    // These must precede every `generic $inner:ty` arm, for the reason the
+    // comment below gives: once a `:ty` fragment is parsed there is no
+    // backtracking. They match literal tokens only, exactly as the shaped arms
+    // do, so a type alias or a path-qualified spelling
+    // (`alloc::vec::Vec<u8>`) is a different token sequence and is NOT caught.
+    // That remainder is documented rather than chased; a token deny-list does
+    // not become type-level by getting longer.
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic Vec<u8>, $doc:literal, derive: [$($opt:ident),* $(,)?]) => {
+        $crate::__sg_dynamic_generic_is_shaped!(@bytes);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic Vec<u8>, $doc:literal) => {
+        $crate::__sg_dynamic_generic_is_shaped!(@bytes);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic Vec<u8>, derive: [$($opt:ident),* $(,)?]) => {
+        $crate::__sg_dynamic_generic_is_shaped!(@bytes);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic Vec<u8>) => {
+        $crate::__sg_dynamic_generic_is_shaped!(@bytes);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic String, $doc:literal, derive: [$($opt:ident),* $(,)?]) => {
+        $crate::__sg_dynamic_generic_is_shaped!(@string);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic String, $doc:literal) => {
+        $crate::__sg_dynamic_generic_is_shaped!(@string);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic String, derive: [$($opt:ident),* $(,)?]) => {
+        $crate::__sg_dynamic_generic_is_shaped!(@string);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic String) => {
+        $crate::__sg_dynamic_generic_is_shaped!(@string);
+    };
+
     // ---- doc-string forms, one per shape ----
     //
     // These must be matched by literal tokens *before* any arm that opens with
@@ -513,11 +570,47 @@ macro_rules! dynamic_newtype {
             ::core::stringify!($($rest)+),
             "` is not one of the shaped inner types. `String` and `Vec<u8>` are \
              matched as literal tokens, so a type alias (e.g. `type MyStr = String`) \
-             or a fully-qualified path (e.g. `std::string::String`) does NOT match \
-             them. Write `String` or `Vec<u8>` literally to get the full API for \
-             that shape, or write `generic <type>` to accept the reduced API \
-             (RevealSecret, RevealSecretMut, Debug, Zeroize, and `new`) on purpose."
+             or a fully-qualified path (e.g. `alloc::vec::Vec<u8>`) does NOT match \
+             them. If what you wrote IS a `String` or a `Vec<u8>` under another \
+             spelling, write the literal token to get the full API for that shape — \
+             do NOT reach for `generic` to silence this, because the macro cannot \
+             see through a path or an alias either, and you would land on the \
+             reduced arm with the growable payload and none of the methods that \
+             handle it safely. `generic <type>` is for an inner type that is \
+             genuinely neither `String` nor `Vec<u8>`; it gives RevealSecret, \
+             RevealSecretMut, Debug, Zeroize, and `new`."
         ));
+    };
+}
+
+/// Rejects `generic` applied to a shape that has its own arm.
+///
+/// One helper rather than the message inline in eight arms, so the wording
+/// cannot drift between the doc-string and `derive:` tails.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __sg_dynamic_generic_is_shaped {
+    (@bytes) => {
+        ::core::compile_error!(
+            "dynamic_newtype!: write `Vec<u8>`, not `generic Vec<u8>`. The `generic` \
+             arm emits only the shape-independent surface, so this spelling withholds \
+             `SecretLen`, `From<&[u8]>`, `new_with`, the encoders, `from_random`, and \
+             — under `std` — the `std::io::Write` impl, which is the one growth path \
+             that wipes the buffer it abandons. It is the same growable payload with \
+             strictly less API and no safe way to grow it. `generic` is for inner \
+             types that are neither `String` nor `Vec<u8>`."
+        );
+    };
+    (@string) => {
+        ::core::compile_error!(
+            "dynamic_newtype!: write `String`, not `generic String`. The `generic` arm \
+             emits only the shape-independent surface, so this spelling withholds \
+             `SecretLen`, `From<&str>` and `new_with` — the in-place constructor that \
+             builds the secret inside the protected buffer rather than in an \
+             unprotected one first. It is the same growable payload with strictly \
+             less API. `generic` is for inner types that are neither `String` nor \
+             `Vec<u8>`."
+        );
     };
 }
 

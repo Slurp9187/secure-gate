@@ -450,9 +450,18 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   not that it is true, so a type with a `Vec` field that implements `FixedStorage`
   anyway will compile and will leak. What the bound buys is that the claim is written
   at a greppable line in the crate making it. And the bound is on `Fixed`, so it says
-  nothing about `dynamic_newtype!(pub Name, generic Vec<u8>)`, which has the growable
-  payload and — unlike plain `Dynamic<Vec<u8>>` — no `io::Write` escape. Treat that
-  form the way this section treats `with_secret_mut`.
+  nothing about `dynamic_newtype!`. That macro handles its own case: `generic Vec<u8>`
+  and `generic String` are now a compile error at the declaration, because each is the
+  same growable payload as the shaped arm with strictly less API — for `Vec<u8>`, no
+  `io::Write`, which is the only growth path that wipes the buffer it abandons. Write
+  `Vec<u8>` or `String` literally and the safe surface comes with it.
+
+  That reject matches literal tokens, so it is a spelling guard rather than a type-level
+  one. `type MyBytes = Vec<u8>` and path-qualified spellings such as
+  `alloc::vec::Vec<u8>` are different token sequences and still reach the reduced arm
+  with the growable payload and no safe growth path — treat those the way this section
+  treats `with_secret_mut`. The macro cannot see through an alias or a path, and a token
+  deny-list does not become type-level by getting longer.
 
   For stricter deployment threat models, handle this below the library layer:
   install a zero-on-dealloc global allocator such as
