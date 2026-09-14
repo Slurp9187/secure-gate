@@ -15,10 +15,11 @@ Secure wrappers for secrets with **explicit access** and **mandatory zeroization
 ## Quick Start
 
 ```rust
-use secure_gate::{Dynamic, Fixed, RevealSecret, RevealSecretMut};
+use secure_gate::{RevealSecret, RevealSecretMut, dynamic_newtype, fixed_newtype};
 
-pub type Password = Dynamic<String>;     // heap, length varies with the input
-pub type Aes256Key = Fixed<[u8; 32]>;    // on the stack, exactly 32 bytes
+// A secret type is a visibility, a name, a size (or an inner type), and a doc string.
+fixed_newtype!(pub Aes256Key, 32, "AES-256 key. On the stack, exactly 32 bytes.");
+dynamic_newtype!(pub Password, String, "User password. On the heap, length varies with the input.");
 
 let mut pw: Password = "hunter2".into();
 
@@ -42,7 +43,7 @@ pw.expose_secret_mut().clear();
 {
     use secure_gate::{Case, RevealSecret, ToHex, ToBech32, FromHexStr};
 
-    let key: Fixed<[u8; 32]> = Fixed::new([42u8; 32]);
+    let key = Aes256Key::new([42u8; 32]);
 
     // Encode to hex (scoped borrow — no long-lived reference)
     let hex = key.with_secret(|bytes| bytes.to_hex()); // EncodedSecret
@@ -132,26 +133,9 @@ assert_eq!(owned, [0xAB; 32]);
 
 ### Named secret types
 
-Two ways to give a secret a name, differing in exactly one respect — whether the compiler can tell two same-shaped secrets apart.
+Two ways to give a secret a name, differing in exactly one respect — whether the compiler can tell two same-shaped secrets apart. If you are choosing for the first time, start with a newtype: it is the safer of the two, and its declaration asks for nothing but a visibility, a name, a size and a doc string — no `Fixed` / `Dynamic` and no `[u8; N]` to spell.
 
-**A plain `type` alias** over `Fixed` or `Dynamic` is a name and nothing more: the alias *is* the wrapper, so it carries every guarantee the wrapper carries — zeroize on drop, redacted `Debug`, access only through `RevealSecret` — and it stays interchangeable with its base type. Two aliases over the same underlying type are the **same** nominal type and assignable to each other — use them for readability and audit grep targets. Documentation goes on the alias as an ordinary doc comment, which is also where the doc string the removed `*_alias!` macros took now belongs:
-
-```rust
-use secure_gate::{Dynamic, Fixed};
-
-/// 32-byte AES-256 key.
-pub type Aes256Key = Fixed<[u8; 32]>;
-
-#[cfg(feature = "alloc")]
-/// Variable-length password.
-pub type Password = Dynamic<String>;
-```
-
-A plain `type` alias is the right reach when a value is sensitive enough to want zeroize-on-drop and a redacted `Debug`, but has no role it could be confused *with* — a session blob, a cached token, a nonce store. You get the protection and a self-documenting name, the alias stays interchangeable with its base type so it crosses into APIs you do not own without ceremony, and there is no cross-contamination to prevent because nothing else shares its shape and meaning.
-
-Reach for a newtype the moment two values of the same shape mean different things. That is the case the compiler can help with, and the only one where the extra surface pays for itself.
-
-**Newtypes** (`fixed_newtype!`, `dynamic_newtype!`) expand to `struct`s instead, so two of the same shape are **distinct** types. Reach for these when distinct cryptographic roles share a shape — an encryption key and a MAC key are both `Fixed<[u8; 32]>`, and under an alias the compiler cannot tell them apart:
+**Newtypes** (`fixed_newtype!`, `dynamic_newtype!`) expand to `struct`s, so two of the same shape are **distinct** types. Reach for these when distinct cryptographic roles share a shape — an encryption key and a MAC key are both `Fixed<[u8; 32]>`, and giving each a plain `type` alias (below) leaves the compiler unable to tell them apart:
 
 ```rust
 use secure_gate::fixed_newtype;
@@ -171,6 +155,23 @@ Both newtype macros also accept `generic T` in place of the byte size `fixed_new
 Generated newtypes carry the same guarantees as the wrapper (zeroize on drop, redacted `Debug`, access only via `RevealSecret`), are `#[repr(transparent)]` so they cost nothing at runtime, and have no `Deref` — the separation is total, not by-value-only. No `From<Wrapper>` or `Deref` is generated, so an alias-typed value cannot become a newtype through `.into()` and a newtype never coerces back to its base; base-wrapper access is opt-in per newtype and split by direction (`derive: [FromWrapper]` to construct from the base, `derive: [IntoWrapper]` to reach it; `WrapperAccess` is both) and should be audited like `expose_secret()`. In a mixed tree the base type is the pool every plain alias lives in: `FromWrapper` on a boundary type accepts all of them, and `IntoWrapper` on a secret role downgrades it to the least-sensitive alias sharing its base — neither token is the sufficient default more often than it looks.
 
 See [`fixed_newtype!`] and [`dynamic_newtype!`] in the [API docs](https://docs.rs/secure-gate).
+
+**A plain `type` alias** over `Fixed` or `Dynamic` is a name and nothing more: the alias *is* the wrapper, so it carries every guarantee the wrapper carries — zeroize on drop, redacted `Debug`, access only through `RevealSecret` — and it stays interchangeable with its base type. Two aliases over the same underlying type are the **same** nominal type and assignable to each other — use them for readability and audit grep targets. Documentation goes on the alias as an ordinary doc comment, which is also where the doc string the removed `*_alias!` macros took now belongs:
+
+```rust
+use secure_gate::{Dynamic, Fixed};
+
+/// 32-byte AES-256 key.
+pub type Aes256Key = Fixed<[u8; 32]>;
+
+#[cfg(feature = "alloc")]
+/// Variable-length password.
+pub type Password = Dynamic<String>;
+```
+
+A plain `type` alias is the right reach when a value is sensitive enough to want zeroize-on-drop and a redacted `Debug`, but has no role it could be confused *with* — a session blob, a cached token, a nonce store. You get the protection and a self-documenting name, the alias stays interchangeable with its base type so it crosses into APIs you do not own without ceremony, and there is no cross-contamination to prevent because nothing else shares its shape and meaning.
+
+Reach for a newtype the moment two values of the same shape mean different things. That is the case the compiler can help with, and the only one where the extra surface pays for itself.
 
 **Zero-size behavior note**  
 A zero-length `Fixed` cannot be built at all. `Fixed::new` and `Fixed::new_with` each carry a `const` assertion that the value being wrapped has a nonzero size, so `Fixed<[u8; 0]>` — and any other zero-sized inner type — is a compile error at the first construction. The assertion is a post-monomorphization error, which is what makes it cover generic code too. Where it points is worth knowing before you go looking. The error's own span is the assertion inside this crate, not your code; a separate `while instantiating` note is what names the `Fixed::new` call the monomorphization reached. That note does **not** name the instantiation that caused it. Given a generic `fn build<const N: usize>() -> Fixed<[u8; N]>`, calling `build::<0>()` reports against the `Fixed::new` line inside `build`, and neither `build::<0>()` nor its caller appears anywhere in the output. `fixed_newtype!(Name, 0)` additionally fails at the declaration, via a const-eval index-out-of-bounds guard in the macro, so that spelling reports the problem at the line you wrote rather than at the first call.
@@ -203,7 +204,7 @@ fn require_min_len<S: SecretLen>(secret: &S, min: usize) -> bool {
 
 - **Zero-cost safety** — mandatory zeroization on drop; `no_std` / `no_alloc` support.
 - **Audit-first API** — a held secret cannot leak via `Deref`: `Fixed`/`Dynamic` implement none. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch. `into_inner` hands ownership to the caller and ends protection; encoders return `EncodedSecret`, which *does* deref and stays wiped until it drops — see [Where accident-prevention ends](SECURITY.md#where-accident-prevention-ends).
-- **Named secret types** — a plain `type` alias over `Fixed` / `Dynamic` (`pub type Aes256Key = Fixed<[u8; 32]>;`) inherits redacted `Debug` and zeroize-on-drop and stays interchangeable with its base type, so same-shape aliases (e.g. two `Fixed<[u8; 32]>` aliases) are one and the same type. When distinct cryptographic roles share a shape, `fixed_newtype!` / `dynamic_newtype!` generate `struct`s instead, so the compiler rejects a swapped key role at the call site.
+- **Named secret types** — `fixed_newtype!(pub Aes256Key, 32, "…")` and `dynamic_newtype!(pub Password, String, "…")` generate `struct`s from a visibility, a name, a size and a doc string, so two secrets of the same shape are distinct types and the compiler rejects a swapped key role at the call site. A plain `type` alias over `Fixed` / `Dynamic` (`pub type Aes256Key = Fixed<[u8; 32]>;`) inherits the same redacted `Debug` and zeroize-on-drop but adds no type: same-shape aliases (e.g. two `Fixed<[u8; 32]>` aliases) are one and the same type, which is what makes an alias the right reach when interchangeability with the base type is the point.
 - **Batteries included** — optional, zero-overhead support for serde, constant-time comparison (`subtle`), and secure encoding (hex, base32, base64url, bech32/m).
 - **No unsafe code** — enforced with `#![forbid(unsafe_code)]`.
 
