@@ -3,7 +3,7 @@
 ## TL;DR
 
 - **No independent audit** — review the source code yourself before production use.
-- **No unsafe code** — `#![forbid(unsafe_code)]` enforced unconditionally.
+- **No unsafe code** — `#![forbid(unsafe_code)]` enforced in the library crate.
 - **3-tier access model** — explicit hierarchy (prefer Tier 1 scoped methods). Audit Tier 2/3 calls separately.
 - **Explicit exposure while held** — while a secret is inside `Fixed`/`Dynamic`, all external access requires `with_secret`/`expose_secret` (or mutable equivalents); those two types implement no `Deref`/`AsRef`. Internal impls (`Clone`, `Serialize`) access `.inner` directly by design — they require opt-in marker traits and do not expose secrets to callers.
 - **Extraction is a hand-off** — `into_inner` transfers ownership of the plain value and **ends protection**: what you get back is an ordinary `[u8; N]` / `String` / `Vec<T>` with no zeroize-on-drop and no redacted `Debug`. Encoding is the exception: every encoder returns `EncodedSecret`, which keeps zeroize-on-drop and a redacted `Debug` for the buffer it owns, because an encoded secret is a second full copy of the secret. Copies you make through its `Deref` are ordinary values. See [Where accident-prevention ends](#where-accident-prevention-ends).
@@ -596,7 +596,7 @@ What errors may and may not carry:
 - **Numeric length metadata** (`InvalidLength { expected, got }`) is present in all builds. Expected lengths are compile-time protocol parameters (key sizes, nonce sizes) and actual lengths derive from the caller's own input — neither is secret in this crate's threat model.
 - **Input-derived strings are never captured**, in any build: no received-HRP text, no encoding "hints", no payload bytes. All error types are heap-free and `Copy`.
 - All error enums (and their struct variants) are `#[non_exhaustive]`, so variants and fields can be added without a semver-major bump.
-- **0.8 LTS note:** `std::error::Error` impls are gated behind the `std` feature — this branch's MSRV (1.70) predates `core::error::Error`, so the error types themselves stay `no_std` while trait-object integration requires `std`.
+- **0.8 (MSRV 1.70) note:** `std::error::Error` impls are gated behind the `std` feature — this branch's MSRV (1.70) predates `core::error::Error`, so the error types themselves stay `no_std` while trait-object integration requires `std`.
 
 If even coarse error categories or length metadata are sensitive in your deployment (attacker fingerprinting, strict oracle avoidance), redact errors at the logging/response boundary — the library deliberately does not vary its behavior by build profile.
 
