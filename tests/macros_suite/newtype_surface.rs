@@ -11,6 +11,15 @@ fixed_newtype!(pub MacKey, 32, "MAC key.", derive: [ConstantTimeEq]);
 dynamic_newtype!(pub Token, Vec<u8>, derive: [ConstantTimeEq]);
 dynamic_newtype!(pub ApiKey, String, "API key.", derive: [ConstantTimeEq]);
 dynamic_newtype!(pub Wide, generic Vec<u32>);
+// The documented remainder of the `generic Vec<u8>` / `generic String` reject.
+//
+// Those two are refused by literal token, which is a *spelling* guard and not a
+// type-level one: a path-qualified `Vec<u8>` is a different token sequence, so it
+// still reaches the reduced arm. That is pinned here rather than left as a claim
+// in prose, so anyone who later closes the gap has to change a test and make the
+// decision deliberately. A token deny-list does not become type-level by getting
+// longer, which is why this is documented instead of chased.
+dynamic_newtype!(pub QualifiedBytes, generic std::vec::Vec<u8>);
 // The `Fixed` counterpart of the same bargain: an AES-256 expanded key schedule is
 // `[u32; 60]`, as secret as the key it came from and not a byte array.
 fixed_newtype!(pub RoundKeys, generic [u32; 60]);
