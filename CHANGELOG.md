@@ -31,8 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0-rc.9] - 2026-09-13
 
-> Tagged, **not yet published to crates.io**; everything in this section ships when rc.9
-> does. Only `secure-gate` has ever been published — `secure-gate-compat` never was.
+> Published to crates.io on the `v0.9.0-rc.9` tag. Only `secure-gate` has ever been
+> published — `secure-gate-compat` never was.
 >
 > The heading carries a date because the entries below settle what the alias macros are,
 > and that answer should not sit under "Unreleased" while the macros themselves are
