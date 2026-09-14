@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0-rc.10] - 2026-09-14
 
+> Published to crates.io on the `v0.9.0-rc.10` tag.
+
 ### Security
 
 - **Raised the `base32ct` floor to `0.3.1`; `0.3.0` panics on attacker-supplied input.**
