@@ -79,6 +79,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-string inner types — `generic Vec<u32>`, `generic [u32; 60]`, a custom struct — are
   untouched, which is what the `generic` arm exists for.
 
+- **`CloneableSecret` carries `#[diagnostic::on_unimplemented]`, so the error explains itself.**
+  Cloning a secret wrapper has always required this marker on the inner type, and the gate
+  always held — but the message was a bare `the trait bound `[u8; 32]: CloneableSecret` is not
+  satisfied`, naming a marker the caller had likely never heard of and saying nothing about
+  what to do with it. It now explains that cloning makes a second copy every one of which must
+  be zeroized, that the fix for a type you define is an empty `impl CloneableSecret` block next
+  to its `Zeroize` impl, that for a foreign type the orphan rule rejects that with E0117 and a
+  local newtype is the way round it, and that arriving here from `#[derive(Clone)]` means the
+  derive forwarded to the wrapper's `Clone`.
+
+  The route that made this worth doing is `#[derive(Clone)]` in the attribute slot. Both
+  newtype macros accept `$(#[$attr:meta])*` before the name so ordinary `///` comments work, and
+  a derive smuggled in there never reaches the friendly `derive: [Clone]` guard — a `:meta`
+  fragment is opaque once captured, so the macro cannot inspect it and refuse. That path is now
+  pinned by `tests/compile-fail/newtype_derive_clone_attr_slot.rs`.
+
+  **What this does not cover, measured rather than assumed.** With the `cloneable` feature
+  **off**, both the trait and the wrapper's `Clone` impl cease to exist, so the failure is
+  `Fixed<[u8; 32]>: Clone` and no crate trait appears in the bound chain for a diagnostic to
+  attach to. That case keeps the bare message. Reaching it would mean either ungating the trait
+  or shipping an always-present `Clone` impl with an unsatisfiable bound, and both make the
+  public API worse than the message is bad. The attribute needs Rust 1.78, so this is the 0.9
+  line only; the 0.8 line's MSRV is 1.70.
+
 - **BREAKING: `Fixed::new` now requires `FixedStorage` on the inner type, which makes
   `SECURITY.md`'s "`Fixed<T>` is exempt" true instead of aspirational.** That sentence was a
   claim about the shape people were expected to use, not something the type system checked.
