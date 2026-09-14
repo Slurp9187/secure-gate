@@ -16,7 +16,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > pin stands. Dependency and toolchain bumps are never ported across (see the branch table
 > in `README.md` and `docs/audits/pr-182-backport-ledger.md`).
 
+### Added
+
+- **`fixed_newtype!` gained an arm for literal arrays, which forwards `SecretLen`.**
+  Mirrors the same change on `main`, re-derived against this branch rather than copied.
+  `generic [i16; 256]` now matches a dedicated `generic [$t:ty; $n:literal]` arm instead
+  of falling through to the opaque one, so the newtype carries its own `len()` and
+  `byte_len()`: the element count and `N * size_of::<T>()` respectively — 256 and 512 for
+  an ML-KEM secret polynomial, 60 and 240 for an AES-256 key schedule.
+
+  The capability was never missing, only unforwarded. `impl SecretLen for Fixed<[T; N]>`
+  is bounded on `T: Zeroize` alone, so the base wrapper has always answered both questions
+  correctly. What the arm removes is a standing reason to grant `derive: [IntoWrapper]`:
+  that token is the documented downgrade toward the base type, to be audited like
+  `expose_secret()`, and reaching for it merely to measure a secret was a nominal-safety
+  cost paid for a length. The earlier rationale — that "a length in elements is not the
+  byte length callers expect" — argued from meaning when the real obstacle was visibility;
+  `SecretLen` has both units and the macro can tell an array from a struct whenever the
+  array is written out.
+
+  The arm needs a *literal* length. `generic [i16; KEY_LEN]`, and any array named through
+  a type alias, are different token sequences and still take the opaque arm — the same
+  token-versus-type remainder `dynamic_newtype!` already documents for paths. `generic
+  [u8; N]` is still refused ahead of both arms: write the size literal.
+
+  `From`, `TryFrom`, the encoders and the RNG constructors remain absent from every
+  `generic` arm. The encoders have no defined byte order over `[i16]`, and byte order is
+  not the whole of it — the canonical encoding of these secrets is domain-specific, so a
+  raw element dump would round-trip in this crate and disagree with every implementation
+  outside it. RNG is a separate question, tracked in #219 on `main`.
+
 ### Changed
+
+- **BREAKING: `fixed_newtype!(pub Z, generic [T; 0])` is now rejected at the declaration.**
+  Mirrors the same change on `main`, re-derived against this branch.
+  A zero-length secret was already impossible to *construct* — `Fixed::new` and
+  `Fixed::new_with` carry a `const` assertion rejecting a zero-sized inner value — but that
+  is a post-monomorphization error: `cargo check` does not see it, and a library whose only
+  such construction sits behind an `#[inline]` function builds, tests and publishes green.
+  The array arm emits the same `const _: () = { let _ = [(); N][0]; };` guard the
+  size-literal arm has always carried, so the error now lands on the declaring line. Code
+  that declared such a newtype without ever constructing one compiled before and does not
+  now; nothing that could run has changed.
+
+  The two guards are complementary rather than redundant, because they measure different
+  things: the macro counts a *length*, the wrapper measures a *size*. `generic [(); 4]` has
+  a non-zero length and is still zero-sized, so it clears the declaration-site guard and is
+  caught at construction — which is what `tests/compile-fail/fixed_zero_size.rs` now pins,
+  having moved off `generic [i16; 0]` for exactly this reason. The compile-fail snapshots
+  here are blessed on 1.70 and were regenerated on this branch, not copied from `main`.
 
 - **BREAKING: `Fixed<T>::new_with` is no longer `[u8; N]`-only, and existing call
   sites may need a type annotation.** Mirrors the same change on `main`, re-derived
