@@ -173,6 +173,25 @@ A plain `type` alias is the right reach when a value is sensitive enough to want
 
 Reach for a newtype the moment two values of the same shape mean different things. That is the case the compiler can help with, and the only one where the extra surface pays for itself.
 
+**Finding those cases in a tree you already have.** The rule is easy to state and hard to apply by eye, because the collapse is only visible in aggregate: `pub type FileId = Dynamic<String>;` reads correctly on its own line, and nothing on that line says another name resolves to the same type. Aliases do not announce their neighbours. This lists every plain alias over a wrapper, groups them by base type, and prints only the groups with more than one member — those are the names the compiler will not keep apart:
+
+```sh
+grep -rhoE '\btype +[A-Za-z0-9_]+ *= *(Fixed|Dynamic)<.*>;' src/ \
+ | sed -E 's/type +([A-Za-z0-9_]+) *= *(.+);/\2\t\1/' \
+ | sort \
+ | awk -F'\t' '{ a[$1] = a[$1] " " $2; n[$1]++ }
+                END { for (b in a) if (n[b] > 1) printf "%-24s %d names:%s\n", b, n[b], a[b] }'
+```
+
+```text
+Dynamic<String>          2 names: FileId PublicId
+Fixed<[u8; 32]>          3 names: AesKey ChaChaKey MacKey
+```
+
+A group is not automatically a defect — three names for one key type may be genuinely interchangeable, which is the case an alias is *for*. It is the list worth reading, and each group asks one question: do these mean different things? Every name for which the answer is yes is a `fixed_newtype!` / `dynamic_newtype!` candidate, and the conversion is one line each.
+
+This matters most right after a migration. Replacing the removed `*_alias!` macros with `type` lines is an identity-preserving rewrite — the macros only ever expanded to exactly those lines — so a tree that migrates cleanly has the same number of real types afterwards as before, and a `FileId` that was interchangeable with a `PublicId` still is. What the removal bought is legibility, not separation; the separation is this second step, and nothing performs it for you.
+
 **Zero-size behavior note**  
 A zero-length `Fixed` cannot be built at all. `Fixed::new` and `Fixed::new_with` each carry a `const` assertion that the value being wrapped has a nonzero size, so `Fixed<[u8; 0]>` — and any other zero-sized inner type — is a compile error at the first construction. The assertion is a post-monomorphization error, which is what makes it cover generic code too. Where it points is worth knowing before you go looking. The error's own span is the assertion inside this crate, not your code; a separate `while instantiating` note is what names the `Fixed::new` call the monomorphization reached. That note does **not** name the instantiation that caused it. Given a generic `fn build<const N: usize>() -> Fixed<[u8; N]>`, calling `build::<0>()` reports against the `Fixed::new` line inside `build`, and neither `build::<0>()` nor its caller appears anywhere in the output. `fixed_newtype!(Name, 0)` additionally fails at the declaration, via a const-eval index-out-of-bounds guard in the macro, so that spelling reports the problem at the line you wrote rather than at the first call.
 
