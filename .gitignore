@@ -16,7 +16,19 @@
 *.log
 *.results
 .project/
-.claude/
+# .claude/: commit `skills/`, drop everything else (worktrees, local settings,
+# session state).
+#
+# The leading negation is defensive, not redundant. Git prunes an excluded
+# *directory* before reading any re-include inside it, so if a clone-local
+# `.git/info/exclude` or a global core.excludesFile lists `.claude/`, the two
+# lines below are never evaluated and `skills/` silently stays invisible --
+# tracked here, absent there, with no error either way. Those files are
+# per-clone and unshared, so this repo cannot know whether one applies; this
+# line makes the outcome the same either way.
+!/.claude/
+/.claude/*
+!/.claude/skills/
 
 # Agent internal docs (keep local/private)
 architecture.md
