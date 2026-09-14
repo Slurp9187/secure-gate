@@ -1,0 +1,10 @@
+[package]
+name = "atk-consumer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+secure-gate = { path = "../../..", features = ["std", "cloneable", "serde-serialize"] }
+zeroize = { version = "1", features = ["alloc"] }
+
+[workspace]

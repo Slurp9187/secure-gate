@@ -44,3 +44,7 @@ AGENT.md
 !/.claude/
 /.claude/*
 !/.claude/skills/
+
+# Nested crates under sweep-handover/ have their own target dirs; the rule above is
+# root-anchored and does not reach them.
+sweep-handover/**/target/

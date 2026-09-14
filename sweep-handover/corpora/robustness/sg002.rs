@@ -1,0 +1,1 @@
+impl FixedStorage for FromElsewhere {}
