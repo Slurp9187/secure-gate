@@ -4,7 +4,7 @@
 [![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate)
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
 [![MSRV: 1.85](https://img.shields.io/badge/msrv-1.85-blue)](https://github.com/Slurp9187/secure-gate/blob/main/Cargo.toml)
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
 Secure wrappers for secrets with **explicit access** and **mandatory zeroization** — a `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
 
@@ -399,21 +399,31 @@ Full details in [CHANGELOG.md](CHANGELOG.md). Users on Rust < 1.85: pin `secure-
 | Branch | Version | Rust edition | MSRV | Status |
 |---|---|---|---|---|
 | `main` | 0.9.x | 2024 | 1.85 | Active development |
-| `release/0.8` | 0.8.x | 2021 | 1.70 | LTS — security patches only |
+| `release/0.8` | 0.8.x | 2021 | 1.70 | Lockstep with `main`; no dependency or toolchain bumps |
 
 **Rust ≥ 1.85**: use `secure-gate = "0.9"`.  
 **Rust < 1.85**: pin `secure-gate = "0.8"`.
 
-Security fixes and important bug fixes may be backported from `main` to `release/0.8` as
-patch releases. The 0.8 line will receive patches for as long as the dependencies it
-relies on remain compatible with Rust 1.70.
+The two lines exist because `rand` 0.10 landed mid-development, and rather than raise the
+toolchain floor for everyone the crate split: `main` on Rust 1.85 / edition 2024,
+`release/0.8` on 1.70 / edition 2021. They are the **same API on two compilers** — the
+`0.8.x` / `0.9.x` split *is* the MSRV split — and until both reach a stable release they are
+finished **in parallel**: every change on `main` is re-derived onto `release/0.8` (the
+ledger in `docs/audits/pr-182-backport-ledger.md` records how), with one standing
+exclusion — dependency and toolchain bumps that would break 1.70 are never ported.
+
+After the stable releases, `release/0.8` becomes mostly a maintenance line — security and
+important bug fixes as patch releases — though a feature worth having may still be
+backported. It will receive patches for as long as the dependencies it relies on remain
+compatible with Rust 1.70.
 
 ## Migrating from secrecy
 
 The `secure-gate-compat` shim crate, which provided drop-in replacements for `secrecy`
 v0.8 and v0.10, has been removed. It was experimental and never published. If you need
-it, it is recoverable from git history — `git checkout v0.9.0-rc.9 -- secure-gate-compat`
-restores the last version, along with its migration guide.
+it, it is recoverable from git history — `git checkout v0.9.0-rc.8 -- secure-gate-compat`
+restores the last version, along with its migration guide. (`v0.9.0-rc.8` is the last tag
+that carries it; the crate was deleted before `rc.9`.)
 
 ## Features
 

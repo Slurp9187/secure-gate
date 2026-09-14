@@ -50,7 +50,7 @@ use core::fmt;
 /// public protocol parameters, not secret material.
 ///
 /// Implements [`core::error::Error`] unconditionally — no `std` feature is
-/// required, and the impl is present in `no_std` builds. (On the 0.8 LTS line
+/// required, and the impl is present in `no_std` builds. (On the 0.8 line
 /// this impl is `std`-gated, because `core::error::Error` needs Rust 1.81 and
 /// that branch targets 1.70. Code that must build against both should not
 /// assume the trait is available without `std`.)
@@ -88,7 +88,7 @@ impl core::error::Error for FromSliceError {}
 /// holds the input and the expected HRP.
 ///
 /// Implements [`core::error::Error`] unconditionally — no `std` feature is
-/// required, and the impl is present in `no_std` builds. (On the 0.8 LTS line
+/// required, and the impl is present in `no_std` builds. (On the 0.8 line
 /// this impl is `std`-gated, because `core::error::Error` needs Rust 1.81 and
 /// that branch targets 1.70. Code that must build against both should not
 /// assume the trait is available without `std`.)
@@ -144,7 +144,7 @@ impl core::error::Error for Bech32Error {}
 /// length metadata is carried.
 ///
 /// Implements [`core::error::Error`] unconditionally — no `std` feature is
-/// required, and the impl is present in `no_std` builds. (On the 0.8 LTS line
+/// required, and the impl is present in `no_std` builds. (On the 0.8 line
 /// this impl is `std`-gated, because `core::error::Error` needs Rust 1.81 and
 /// that branch targets 1.70. Code that must build against both should not
 /// assume the trait is available without `std`.)
@@ -188,7 +188,7 @@ impl core::error::Error for Base32Error {}
 /// length metadata is carried.
 ///
 /// Implements [`core::error::Error`] unconditionally — no `std` feature is
-/// required, and the impl is present in `no_std` builds. (On the 0.8 LTS line
+/// required, and the impl is present in `no_std` builds. (On the 0.8 line
 /// this impl is `std`-gated, because `core::error::Error` needs Rust 1.81 and
 /// that branch targets 1.70. Code that must build against both should not
 /// assume the trait is available without `std`.)
@@ -231,7 +231,7 @@ impl core::error::Error for Base64Error {}
 /// length metadata is carried.
 ///
 /// Implements [`core::error::Error`] unconditionally — no `std` feature is
-/// required, and the impl is present in `no_std` builds. (On the 0.8 LTS line
+/// required, and the impl is present in `no_std` builds. (On the 0.8 line
 /// this impl is `std`-gated, because `core::error::Error` needs Rust 1.81 and
 /// that branch targets 1.70. Code that must build against both should not
 /// assume the trait is available without `std`.)

@@ -8,10 +8,10 @@ Alerts: code-scanning #9, #11, #12, #13 (`actions/cache-poisoning/poisonable-ste
 
 GitHub raises `schedule` events **only from the default branch**. A `schedule:`
 block committed to `release/0.8` never fires. This is not a configuration
-mistake that can be corrected on the LTS branch; it is how the event source
+mistake that can be corrected on the 0.8 branch; it is how the event source
 works.
 
-So the LTS branch cannot schedule its own weekly audit, DSE check, or Miri run.
+So the 0.8 branch cannot schedule its own weekly audit, DSE check, or Miri run.
 Before #169 it therefore had none: `cargo audit` never ran against its
 dependency tree, and the zeroization and UB guards never ran against its code.
 
@@ -65,7 +65,7 @@ The rule's premise is *untrusted code*. Here it is not:
 - `release/0.8` is a branch of this repository, and is branch-protected.
 - The repository has **one** collaborator with push access and **zero** forks.
   Exploiting this requires an actor who can write to `release/0.8` but not to
-  `main`. That set is empty; anyone able to poison the LTS branch can push to
+  `main`. That set is empty; anyone able to poison the 0.8 branch can push to
   the default branch directly and skip the cache entirely.
 - All three workflows declare `permissions: contents: read`.
 
@@ -80,7 +80,7 @@ The rule's premise is *untrusted code*. Here it is not:
 
 Dismissed as **won't fix** rather than false positive: the pattern is real and
 correctly identified, and the risk is accepted on the threat model above, not
-disputed. If the repository ever gains contributors who can write to the LTS
+disputed. If the repository ever gains contributors who can write to the 0.8
 branch without default-branch access, this decision must be revisited.
 
 ## Known gap: CodeQL does not scan `release/0.8`
