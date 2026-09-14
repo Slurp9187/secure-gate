@@ -32,6 +32,37 @@ note: required by a bound in `Fixed::<T>::new`
    |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
    = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
 
+error[E0277]: `Vec<u8>` is not known to be free of heap allocations, so it cannot be the inner type of a `Fixed`
+  --> tests/compile-fail/fixed_reallocating_inner.rs:19:1
+   |
+19 | fixed_newtype!(pub LeakyBytes, generic Vec<u8>);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Fixed` holds its secret inline; `Vec<u8>` does not implement `FixedStorage`
+   |
+   = help: the trait `FixedStorage` is not implemented for `Vec<u8>`
+   = note: `Fixed<T>` exists so a secret can be held with no allocator at all, and `FixedStorage` is what keeps that true: a heap allocation can be abandoned unwiped, either by a reallocation or by replacing the whole value. The bound is an allow-list, so there are two reasons to land here — `Vec<u8>` owns a heap allocation, or nothing has asserted that it does not.
+   = note: If `Vec<u8>` does own one — a `Vec`, a `String`, a `Box<[T]>`, a collection, or a struct holding any of those — then this is the bound doing its job: reach for `Dynamic<T>`, which documents the residue and offers one safe growth path. `Dynamic` needs this crate's `alloc` feature, so if you are seeing this with `alloc` off while still able to name `Vec`, enabling it is the fix.
+   = note: If `Vec<u8>` owns no heap allocation, it is only missing the assertion. For a type you define, add an empty `impl FixedStorage` block for it. For a type you do not own, the orphan rule makes that impossible and rejects the impl with E0117 — wrap it in a newtype of your own and implement the marker for that, or ask for an impl upstream.
+   = note: Already covered: the primitives, `[T; N]`, tuples up to ten elements, `Option<T>`, the twelve `NonZero` integers, `Wrapping<T>`, `MaybeUninit<T>`, `zeroize::Zeroizing<T>`, and `Fixed<T>` itself — each when its payload qualifies.
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+note: required by a bound in `Fixed::<T>::new_with`
+  --> src/fixed.rs
+   |
+   |     pub fn new_with<F>(f: F) -> Self
+   |            -------- required by a bound in this associated function
+   |     where
+   |         T: crate::FixedStorage + crate::SentinelValue,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new_with`
+   = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
 error[E0277]: `String` is not known to be free of heap allocations, so it cannot be the inner type of a `Fixed`
   --> tests/compile-fail/fixed_reallocating_inner.rs:20:1
    |
@@ -64,6 +95,37 @@ note: required by a bound in `Fixed::<T>::new`
    |     where
    |         T: crate::FixedStorage,
    |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new`
+   = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `String` is not known to be free of heap allocations, so it cannot be the inner type of a `Fixed`
+  --> tests/compile-fail/fixed_reallocating_inner.rs:20:1
+   |
+20 | fixed_newtype!(pub LeakyText, generic String);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Fixed` holds its secret inline; `String` does not implement `FixedStorage`
+   |
+   = help: the trait `FixedStorage` is not implemented for `String`
+   = note: `Fixed<T>` exists so a secret can be held with no allocator at all, and `FixedStorage` is what keeps that true: a heap allocation can be abandoned unwiped, either by a reallocation or by replacing the whole value. The bound is an allow-list, so there are two reasons to land here — `String` owns a heap allocation, or nothing has asserted that it does not.
+   = note: If `String` does own one — a `Vec`, a `String`, a `Box<[T]>`, a collection, or a struct holding any of those — then this is the bound doing its job: reach for `Dynamic<T>`, which documents the residue and offers one safe growth path. `Dynamic` needs this crate's `alloc` feature, so if you are seeing this with `alloc` off while still able to name `Vec`, enabling it is the fix.
+   = note: If `String` owns no heap allocation, it is only missing the assertion. For a type you define, add an empty `impl FixedStorage` block for it. For a type you do not own, the orphan rule makes that impossible and rejects the impl with E0117 — wrap it in a newtype of your own and implement the marker for that, or ask for an impl upstream.
+   = note: Already covered: the primitives, `[T; N]`, tuples up to ten elements, `Option<T>`, the twelve `NonZero` integers, `Wrapping<T>`, `MaybeUninit<T>`, `zeroize::Zeroizing<T>`, and `Fixed<T>` itself — each when its payload qualifies.
+   = help: the following other types implement trait `FixedStorage`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+note: required by a bound in `Fixed::<T>::new_with`
+  --> src/fixed.rs
+   |
+   |     pub fn new_with<F>(f: F) -> Self
+   |            -------- required by a bound in this associated function
+   |     where
+   |         T: crate::FixedStorage + crate::SentinelValue,
+   |            ^^^^^^^^^^^^^^^^^^^ required by this bound in `Fixed::<T>::new_with`
    = note: this error originates in the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: `Vec<u8>` is not known to be free of heap allocations, so it cannot be the inner type of a `Fixed`

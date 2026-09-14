@@ -102,19 +102,25 @@
 ///
 /// The `generic` form deliberately provides less: [`RevealSecret`](crate::RevealSecret),
 /// [`RevealSecretMut`](crate::RevealSecretMut), redacted `Debug`, `Zeroize`,
-/// `ZeroizeOnDrop`, and `new`. Absent are [`SecretLen`](crate::SecretLen), `From`
-/// and `TryFrom`, the encoders and the RNG constructors. The reason is the macro's
-/// field of view, not the meaning of each method: `generic $inner:ty` is one opaque
-/// token, so the expansion cannot tell an array from a struct and withholds the
-/// shape-dependent surface uniformly rather than conditionally. For some of them
-/// no meaning exists — hex over a `Vec<u32>` has no defined byte order — but
-/// `SecretLen` is not one of those: the base wrapper implements it for every
-/// `Fixed<[T; N]>`, and its `byte_len` is correctly `N * size_of::<T>()` rather
-/// than a count of elements. So that capability exists one layer down and
-/// `derive: [IntoWrapper]` reaches it in one call; what the arm withholds is the
-/// newtype's *own* `len()`, not the answer. Writing the marker is how you say you
-/// know that. A zero-sized inner value is still refused: there is no `N` for the
-/// macro to check, so [`Fixed`](crate::Fixed) rejects it at construction instead.
+/// `ZeroizeOnDrop`, `new`, and [`new_with`](crate::Fixed::new_with). Absent are
+/// [`SecretLen`](crate::SecretLen), `From` and `TryFrom`, the encoders and the RNG
+/// constructors. The reason is the macro's field of view, not the meaning of each
+/// method: `generic $inner:ty` is one opaque token, so the expansion cannot tell an
+/// array from a struct and withholds the shape-dependent surface uniformly rather
+/// than conditionally. For some of them no meaning exists — hex over a `Vec<u32>`
+/// has no defined byte order — but `SecretLen` is not one of those: the base wrapper
+/// implements it for every `Fixed<[T; N]>`, and its `byte_len` is correctly
+/// `N * size_of::<T>()` rather than a count of elements. So that capability exists
+/// one layer down and `derive: [IntoWrapper]` reaches it in one call; what the arm
+/// withholds is the newtype's *own* `len()`, not the answer. Writing the marker is
+/// how you say you know that. A zero-sized inner value is still refused: there is
+/// no `N` for the macro to check, so [`Fixed`](crate::Fixed) rejects it at
+/// construction instead.
+///
+/// **`generic [u8; N]` is a compile error**, not a reduced byte array. It is the
+/// same payload as `fixed_newtype!(pub K, N)` with strictly less API, and
+/// [`dynamic_newtype!`](crate::dynamic_newtype) already refuses the analogous
+/// spellings (`generic Vec<u8>`, `generic String`). Write the size literal.
 ///
 /// **The inner type must not be able to reallocate.** This arm used to accept
 /// `generic Vec<u8>` and `generic String`, which put a growable buffer inside the
@@ -130,15 +136,14 @@
 /// [`dynamic_newtype!`](crate::dynamic_newtype) instead, where the residue is
 /// documented and one safe growth path exists.
 ///
-/// **`new_with` is absent for a different reason, and it costs you something.**
-/// Unlike the others it is perfectly meaningful for an arbitrary `T`; it simply
-/// is not generated. So the arm has no in-place constructor, and `new` takes its
-/// value by value — which is the construction the size-literal arms offer
-/// `new_with` to avoid, because a by-value argument may leave a copy of the
-/// secret on the caller's frame that nothing will wipe (see
-/// [`Fixed::new_with`](crate::Fixed::new_with)). On this arm that mitigation is
-/// unavailable: build the value as close to the call as you can, and prefer a
-/// size-literal newtype when the secret is a byte array and residue matters.
+/// **`new_with` is forwarded.** [`Fixed::new_with`](crate::Fixed::new_with) is an
+/// inherent on every `T: `[`FixedStorage`](crate::FixedStorage)` + `[`SentinelValue`](crate::SentinelValue),
+/// not only `[u8; N]`: the slot starts as `T::sentinel_value()` and the closure
+/// writes into the wrapper's own storage. The generic arm emits it, so a
+/// polynomial does not have to take the secret by value the way `new` does.
+/// Prefer a size-literal newtype when the secret *is* a byte array — that arm
+/// is the full API, and `generic [u8; N]` is refused rather than quietly
+/// reduced.
 ///
 /// # Cloning and serialization are not generated
 ///
@@ -262,9 +267,32 @@
 ///   whole of the choice, and the crate's README argues it at length
 #[macro_export]
 macro_rules! fixed_newtype {
+    // ---- `generic` applied to a byte array: rejected ----
+    //
+    // `generic [u8; N]` is strictly dominated by the size-literal arm. It takes
+    // the payload this crate already specialises and then withholds `SecretLen`,
+    // `From`, `TryFrom`, the encoders and `from_random`. Same bytes, strictly
+    // less API, and no reason to write it. These must precede every
+    // `generic $inner:ty` arm: once a `:ty` fragment is parsed there is no
+    // backtracking. They match literal tokens only, so `generic [u8; KEY_LEN]`
+    // with an ident in the length slot is a different sequence and is NOT
+    // caught — the same remainder `dynamic_newtype!` documents for paths.
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic [u8; $n:literal], $doc:literal, derive: [$($opt:ident),* $(,)?]) => {
+        $crate::__sg_fixed_generic_is_bytes!($n);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic [u8; $n:literal], $doc:literal) => {
+        $crate::__sg_fixed_generic_is_bytes!($n);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic [u8; $n:literal], derive: [$($opt:ident),* $(,)?]) => {
+        $crate::__sg_fixed_generic_is_bytes!($n);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident, generic [u8; $n:literal]) => {
+        $crate::__sg_fixed_generic_is_bytes!($n);
+    };
+
     // ---- explicit generic arms: caller opts in to the reduced API ----
     //
-    // Placed first. They match the literal token `generic` in the inner-type
+    // Placed next. They match the literal token `generic` in the inner-type
     // position, so they cannot shadow a size literal, and matching the marker
     // before any `:literal` or `:ty` fragment is parsed keeps the ordering
     // safe: `macro_rules!` does not backtrack once a fragment has been
@@ -283,6 +311,12 @@ macro_rules! fixed_newtype {
             #[inline(always)]
             pub const fn new(value: $inner) -> Self {
                 Self($crate::Fixed::new(value))
+            }
+            /// Scoped construction — writes directly into the wrapper's storage.
+            #[inline(always)]
+            pub fn new_with<F>(f: F) -> Self
+            where F: ::core::ops::FnOnce(&mut $inner) {
+                Self($crate::Fixed::new_with(f))
             }
         }
     };
@@ -528,11 +562,30 @@ macro_rules! fixed_newtype {
              array being wrapped; and the same four with `generic <type>` in place \
              of N, for an inner type that is not a byte array \
              (`fixed_newtype!(pub K, generic [i16; 256])`), which takes the reduced \
-             API (RevealSecret, RevealSecretMut, Debug, Zeroize, and `new`) on \
-             purpose. If the length or the marker looks right, the problem is in \
-             what follows it: a `derive:` list needs brackets, and accepts only \
-             ConstantTimeEq, Deserialize, FromWrapper, IntoWrapper and \
-             WrapperAccess."
+             API (RevealSecret, RevealSecretMut, Debug, Zeroize, `new`, and `new_with`) \
+             on purpose. `generic [u8; N]` is not one of those: write the size literal. \
+             If the length or the marker looks right, the problem is in what follows \
+             it: a `derive:` list needs brackets, and accepts only ConstantTimeEq, \
+             Deserialize, FromWrapper, IntoWrapper and WrapperAccess."
+        ));
+    };
+}
+
+/// Rejects `generic [u8; N]`, which is strictly dominated by the size-literal arm.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __sg_fixed_generic_is_bytes {
+    ($n:literal) => {
+        ::core::compile_error!(::core::concat!(
+            "fixed_newtype!: write `",
+            ::core::stringify!($n),
+            "`, not `generic [u8; ",
+            ::core::stringify!($n),
+            "]`. The size-literal arm is the full API for a byte array (`new_with`, \
+             `SecretLen`, `From`, `TryFrom`, the encoders, `from_random`). The \
+             `generic` arm emits only the shape-independent surface, so this \
+             spelling is the same payload with strictly less API. `generic` is \
+             for an inner type that is not `[u8; N]`."
         ));
     };
 }

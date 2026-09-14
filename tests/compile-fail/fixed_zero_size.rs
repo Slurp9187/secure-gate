@@ -5,9 +5,13 @@
 //! `""`, and compares `ct_eq`-equal to any other empty. The guard is a `const` assertion
 //! in `Fixed::new` and `Fixed::new_with`, the two bodies every other constructor funnels
 //! through, so all three constructions below are rejected: the byte array, the scoped
-//! constructor, and a newtype over a zero-sized inner type via the `generic` arm. Only
-//! two diagnostics appear, because the third routes through `Fixed::<[u8; 0]>::new` as
-//! well and a failed constant is reported once.
+//! constructor, and a newtype over a zero-sized inner type via the `generic` arm. The
+//! newtype uses `generic [i16; 0]` rather than `generic [u8; 0]`: the latter is now a
+//! declaration-site `compile_error!` (dominated by the size-literal arm) and would never
+//! reach this guard. Two `E0080`s appear: `Fixed<[u8; 0]>` from `new` in `main` (with a
+//! second "erroneous constant" note for the `new_with` line, which reads the same
+//! `NON_ZERO_SIZED`), and `Fixed<[i16; 0]>` from the generated `const fn new`, whose
+//! span is the macro invocation.
 //!
 //! The error is post-monomorphization, so it fires here at the construction rather than
 //! where the type was named — `type Name = Fixed<[u8; 0]>;` on its own still compiles —
@@ -21,7 +25,7 @@
 //! until a downstream crate instantiates them — see the `# Zero-size` section on `Fixed`.
 use secure_gate::{Fixed, fixed_newtype};
 
-fixed_newtype!(pub ZeroSized, generic [u8; 0]);
+fixed_newtype!(pub ZeroSized, generic [i16; 0]);
 
 fn main() {
     let _ = Fixed::new([0u8; 0]);

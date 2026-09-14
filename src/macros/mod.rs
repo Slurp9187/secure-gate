@@ -39,8 +39,10 @@
 //!
 //! The `generic T` form of either macro is for an inner type that is neither a
 //! byte array nor a `String` — an `[i16; 256]` polynomial, a `Vec<u32>` of
-//! counters — and emits only the surface that is meaningful for an arbitrary
-//! `T`.
+//! counters — and emits the surface that is meaningful for an arbitrary `T`
+//! (`RevealSecret`, redacted `Debug`, zeroize, `new`, and on `fixed_newtype!`
+//! also `new_with`). `fixed_newtype!(.., generic [u8; N])` is a compile error:
+//! write the size literal, which is the full API for that payload.
 //!
 //! # Security note
 //!

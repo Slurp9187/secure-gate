@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed — not started |
+| **Status** | **Implemented** on `docs/fixed-newtype-generic-arm` (workstreams A and B). C is not in this change. Tracking [#215](https://github.com/Slurp9187/secure-gate/issues/215) |
 | **Written against** | `main` at `e504fd1` (`0.9.0-rc.10` unreleased) |
 | **Tracking issue** | [#215](https://github.com/Slurp9187/secure-gate/issues/215) |
 | **Branch** | `docs/fixed-newtype-generic-arm` |

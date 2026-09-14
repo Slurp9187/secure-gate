@@ -1,0 +1,36 @@
+error: fixed_newtype!: write `32`, not `generic [u8; 32]`. The size-literal arm is the full API for a byte array (`new_with`, `SecretLen`, `From`, `TryFrom`, the encoders, `from_random`). The `generic` arm emits only the shape-independent surface, so this spelling is the same payload with strictly less API. `generic` is for an inner type that is not `[u8; N]`.
+  --> tests/compile-fail/fixed_newtype_generic_bytes_rejected.rs:15:1
+   |
+15 | fixed_newtype!(pub Bytes, generic [u8; 32]);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `$crate::__sg_fixed_generic_is_bytes` which comes from the expansion of the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: fixed_newtype!: write `16`, not `generic [u8; 16]`. The size-literal arm is the full API for a byte array (`new_with`, `SecretLen`, `From`, `TryFrom`, the encoders, `from_random`). The `generic` arm emits only the shape-independent surface, so this spelling is the same payload with strictly less API. `generic` is for an inner type that is not `[u8; N]`.
+  --> tests/compile-fail/fixed_newtype_generic_bytes_rejected.rs:16:1
+   |
+16 | fixed_newtype!(pub BytesWithDoc, generic [u8; 16], "a documented secret");
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `$crate::__sg_fixed_generic_is_bytes` which comes from the expansion of the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: fixed_newtype!: write `32`, not `generic [u8; 32]`. The size-literal arm is the full API for a byte array (`new_with`, `SecretLen`, `From`, `TryFrom`, the encoders, `from_random`). The `generic` arm emits only the shape-independent surface, so this spelling is the same payload with strictly less API. `generic` is for an inner type that is not `[u8; N]`.
+  --> tests/compile-fail/fixed_newtype_generic_bytes_rejected.rs:17:1
+   |
+17 | fixed_newtype!(pub BytesWithDerive, generic [u8; 32], derive: [IntoWrapper]);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `$crate::__sg_fixed_generic_is_bytes` which comes from the expansion of the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: fixed_newtype!: write `8`, not `generic [u8; 8]`. The size-literal arm is the full API for a byte array (`new_with`, `SecretLen`, `From`, `TryFrom`, the encoders, `from_random`). The `generic` arm emits only the shape-independent surface, so this spelling is the same payload with strictly less API. `generic` is for an inner type that is not `[u8; N]`.
+  --> tests/compile-fail/fixed_newtype_generic_bytes_rejected.rs:18:1
+   |
+18 | / fixed_newtype!(
+19 | |     pub BytesWithBoth,
+20 | |     generic [u8; 8],
+21 | |     "doc and derive",
+22 | |     derive: [FromWrapper]
+23 | | );
+   | |_^
+   |
+   = note: this error originates in the macro `$crate::__sg_fixed_generic_is_bytes` which comes from the expansion of the macro `fixed_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
