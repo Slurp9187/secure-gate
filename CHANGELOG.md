@@ -7,8 +7,192 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0-rc.12] - Unreleased
 
-> The line is open and nothing has landed on it yet. `v0.9.0-rc.12` is not tagged
-> and not published.
+> The line is open. `v0.9.0-rc.12` is not tagged and not published.
+
+### Changed
+
+- **BREAKING: `Dynamic::<Vec<u8>>::new_with` takes the length and hands its closure a sized,
+  pre-zeroed `&mut [u8]` — `new_with(len, |slot| …)` — and gains a fallible twin,
+  `try_new_with(len, |slot| …)`.** The closure used to receive an empty `Vec<u8>` to grow.
+  It now receives exactly `len` bytes, every one of them zero, living inside the wrapper's
+  own allocation. Capacity equals length, so the wrapper never holds slack, and because the
+  closure holds a slice rather than a container, growth is not something it can spell.
+
+  **The old signature was the defect its own documentation warned about.** A `Vec` that
+  outgrows its capacity asks the allocator for a new block, copies the secret across, and
+  frees the old block **without wiping it**. `new_with` handed the closure a zero-capacity
+  `Vec`, so any fill that grew it did exactly that, inside the constructor whose entire
+  reason to exist was to write the secret where it would live and nowhere else. The number
+  is already in this file, under rc.9: a byte-by-byte fill of a 1008-byte secret abandoned
+  **1016 secret bytes across 7 blocks**. rc.9's response was advice — pre-size inside the
+  closure with `reserve_exact`, or build the value first and use `Dynamic::new` — which
+  fixed the recommendation and left the constructor. The constructor's own module docs
+  meanwhile said it existed "for consistent API idiom, not for stack-residue avoidance", and
+  that framing is how the hazard read as a footnote rather than a bug: a method offered for
+  symmetry is not one anybody audits for what it does with the heap.
+
+  A real consumer shipped the growing form and it survived review, and that is the finding
+  worth recording, because three properties made this a trap rather than a sharp edge. The
+  failure mode is precisely the one the API is there to prevent, so a reader who reached for
+  `new_with` had already decided to care about copies and was rewarded with one. It is
+  silent in every direction: the wrapper still zeroizes whatever it ends up holding — rc.9
+  measured 0 non-zero bytes of 2016 after growth — so drop-time instrumentation, the
+  `Debug` redaction and every test that looks at the finished value all report success,
+  while the abandoned copy sits in a block nothing will ever name again. And it is
+  *inconsistently* unsafe. One `extend_from_slice` into an empty `Vec` performs its first
+  and only allocation and frees nothing, because there is no earlier block to free; the
+  second push past that capacity is the one that abandons a buffer. The crate's own
+  `from_random` sat on the safe side of that line — a single `resize` from empty — so the
+  in-tree usage taught that the pattern was fine, and it was, right up to the second call.
+  An API that works the first time and leaks the second is one that trains its callers into
+  the failure.
+
+  Making the length part of the signature removes the hazard instead of documenting it. The
+  slot is a `&mut [u8]`: `push`, `extend_from_slice`, `reserve` and `shrink_to_fit` do not
+  exist on it, so the abandoned-block count inside the closure is 0 by construction, not by
+  remembering the rc.9 advice. That is why the change is to the type and not to a doc
+  comment — and why `SECURITY.md`'s list of routes to a growable `&mut` no longer names
+  the `new_with` closure, while it still names `with_secret_mut`, `expose_secret_mut` and
+  `as_wrapper_mut`, which hand out a container.
+
+  **The zero fill is a guarantee, not an implementation detail.** A slot arriving zeroed
+  is the obvious way to build one, and it would have been easy to leave it as a property a
+  reader could notice and quietly depend on. The reason to promise it instead is that
+  callers use the tail as real input. A 40-bit RC4 key is five bytes of derived material
+  followed by eleven zeros, and the key schedule consumes those eleven bytes exactly as it
+  consumes the first five: they are input, not padding. A slot that merely *happened* to be
+  zero would produce a different cipher on the day it was not, and produce it silently — a
+  wrong key, not an error, with no assertion anywhere in a position to notice. So the
+  rustdoc states the zero tail as a contract, and `SlotWriter` (below) leans on it for the
+  short-write case.
+
+  **`try_new_with(len, f)` is the same constructor for a fill that can fail.** `f` returns
+  `Result<(), E>`, `E` is free — not pinned to any error type of this crate's, not bounded
+  at all, so a consumer returns their own error straight out of the closure — and **on
+  `Err` the partial write is zeroized before the error is returned**, because the slot
+  lives in a `Zeroizing` that drops on the way out.
+
+  That last property is the one worth arguing for, and the argument comes from an
+  upstream decoder rather than from symmetry with `Fixed::try_new_with`. Decoders that
+  write into a caller-supplied buffer routinely leave real output in it when they fail.
+  `miniz_oxide`'s `decompress_slice_iter_to_slice` documents precisely that: *"This will
+  fail if the output buffer is not large enough, but in that case the output buffer will
+  still contain the partial decompression."* Feed that decoder a slot, and a failed decode
+  leaves real plaintext — the prefix that decompressed before the bad byte — sitting in
+  it. The obvious implementation, fill a buffer and wrap it only on success, would abandon
+  that prefix unwiped on every malformed input, and malformed input is the case an attacker
+  chooses. A guarantee the upstream documentation makes necessary argues better than one
+  made for tidiness, so the rustdoc quotes it.
+
+  It is pinned by what it wipes, not by what it returns. `tests/heap_zeroize.rs` adds
+  `check_try_new_with_err_zeroed_vec`, which poison-fills the slot, writes a partial
+  prefix, pins the slot's pointer, returns `Err`, and has the allocator proxy assert that
+  the block reached `dealloc` holding all zeros. Asserting only that `Err` came back would
+  pass against a constructor that leaked the entire partial write, because a freed buffer is
+  not something a test can name afterwards — unless it watches the free. The error type in
+  that test implements nothing at all, not `Debug`, not `Error`, so any bound later added
+  to `E` stops the file compiling, which is the cheapest alarm available for that promise.
+
+  **`from_random(len)` and `from_rng(len, rng)` are rewritten onto the new constructors,
+  and the first thing the new API did was delete the workarounds written for the old one.**
+  `from_rng` carried the captured-local shape — `let mut result = Ok(()); … result.map(|_|
+  this)` — that rc.11 retired from `Fixed::from_rng`, because `new_with` could not report
+  failure. It is now `Self::try_new_with(len, |slot| rng.try_fill_bytes(slot))`. Both
+  constructors also lose a `v.resize(len, 0)` that only ever existed to size a buffer that
+  now arrives sized. Same observable behaviour, and the strongest evidence available that
+  the signature is the right one.
+
+  **`dynamic_newtype!`'s `Vec<u8>` arm forwards both.** `new_with(len, f)` and
+  `try_new_with(len, f)` are emitted on any `Vec<u8>` newtype, the way the arm already
+  forwarded the old `new_with`. The `generic` arm still forwards neither, and the reason is
+  sharper than it was: a sized byte slot is meaningless for an arbitrary inner type, so
+  there is nothing to forward.
+
+  **Migration.** There is no deprecation. Every existing call fails with
+  `error[E0061]: this function takes 2 arguments but 1 was supplied`, and since that
+  diagnostic carries no `note =` text, the rustdoc on `new_with` opens with a section
+  addressed to whoever arrives from it. A deprecation window was considered and declined:
+  this is a release-candidate line, a consumer on an RC has signed up for breaking changes,
+  and a deprecated constructor that keeps abandoning secret bytes for a release is not a
+  softer landing than a compile error that stops it today.
+
+  | Was | Now |
+  |---|---|
+  | `new_with(\|v\| { v.extend_from_slice(&m); v.resize(16, 0); })` | `new_with(16, \|slot\| slot[..m.len()].copy_from_slice(&m))` |
+  | `new_with(\|v\| v.resize(len, 0)); …` then fill via `with_secret_mut` | `new_with(len, \|slot\| …)` — fill in place |
+  | `let mut r = Ok(()); let s = new_with(\|v\| { …; r = fill(v); }); r.map(\|_\| s)` | `try_new_with(len, \|slot\| fill(slot))` |
+  | length not known before the fill | `Dynamic::new(Vec::new())` then `std::io::Write` (needs `std`) |
+
+  The last row is not a gap. The `io::Write` impl is the sanctioned path for a secret of
+  unknown length and wipes every buffer it abandons, and its rustdoc now leads with that
+  rather than with its carve-outs. The pair is complete — length known, `new_with`; length
+  not known, `Write` — and there is no third case that needs a growable closure.
+
+  **What this does not close.** This removes the reallocation hazard from *inside*
+  `new_with`. It does nothing about a value you grew yourself before handing it over:
+  `Dynamic::new(v)` moves `v`'s current allocation in and wipes that one, but every block
+  `v` abandoned while you built it is already on the heap and already unwiped, and
+  `From<&[u8]>` copies and leaves your source where it was. A reader who migrates their
+  `new_with` calls and stops will believe they are done, and for one consumer surveyed the
+  `new_with` site was one of five wrapper constructions and the only one this change
+  reaches. The other four are governed by how the value was built — `with_capacity` at the
+  final size, or one `resize`, then a move — which is the guidance `SECURITY.md`'s
+  constructor table now gives, and which no signature can enforce.
+
+- **New: `SlotWriter`, an append cursor over a fixed slot.** A sized slot fixes the
+  reallocation hazard by taking away growth, and the price is that concatenation becomes
+  offset arithmetic: `slot[..7].copy_from_slice(LABEL); slot[7..7 + id.len()]
+  .copy_from_slice(suite_id);` and so on, by hand. That trades a reallocation hazard for an
+  **offset hazard**, and in byte-exact wire-format code the second is the worse of the two.
+  A wrong bound in an HPKE-style labelled concatenation derives the wrong key and then
+  runs, and nothing downstream is in a position to say so; a realloc at least leaves the
+  right bytes in the right place.
+
+  `SlotWriter::new(slot)` keeps the slot as the primitive and restores the append shape on
+  top of it: `push_slice`, `push_byte`, `position`, `remaining`, `is_full`. **Overrun
+  panics**, and the message names the shortfall — how many bytes were wanted and how many
+  were left — because the useful question when it fires is which length calculation was
+  wrong. Running past the end of a secret's buffer is a bug, not a condition to recover
+  from. Anything left unwritten keeps the slot's zeros, which is the 40-bit-key case above
+  and is why the zero fill had to be a contract for this type to be sound. The writer owns
+  nothing and zeroizes nothing; borrowed from inside `new_with`, it inherits the wrapper's
+  panic-safety, since unwinding drops the `Zeroizing` and wipes whatever was written.
+
+  Under `std` it also implements `io::Write`, and there the overrun is
+  `ErrorKind::WriteZero` rather than a panic. That path exists so a slot can be handed to
+  foreign code — a serializer, an encoder, a hasher's output sink — that cannot be asked to
+  respect a length, and for which an error is the only way to say stop. Available with no
+  features; exported at the crate root as `secure_gate::SlotWriter`.
+
+### Removed
+
+- **BREAKING: `Dynamic::<String>::new_with` is deleted outright, with no replacement.** It
+  had the identical defect: an empty `String` handed to a closure, every growth past
+  capacity abandoning the previous block unwiped. Unlike the `Vec<u8>` form, it cannot be
+  fixed by the same move, because no sized slot is possible for text. A `String` must hold
+  valid UTF-8 and characters have variable byte widths, so a fixed window of `len` bytes
+  is not somewhere arbitrary text can be written — a closure given `&mut [u8]` could
+  produce a byte sequence that is not a `String`, and one given `&mut str` cannot write at
+  all. A version that kept the growable `String` would keep the leak; a version with a byte
+  slot would not be a `String` constructor. Neither is worth a method, so there is none.
+
+  The `dynamic_newtype!` `String` arm no longer emits a `new_with` either, and its rustdoc
+  says why rather than leaving the asymmetry with the `Vec<u8>` arm unexplained. The
+  `generic String` compile error, which used to list `new_with` among what that spelling
+  withholds and called it "the in-place constructor that builds the secret inside the
+  protected buffer", now lists only `SecretLen` and `From<&str>` — the description was
+  true of neither arm, and there is no longer anything to withhold.
+
+  **Migration.** There is no deprecation, for the reason given above. A call fails with
+  ``error[E0599]: no function or associated item named `new_with` found for struct
+  `Dynamic<String>` ``. The replacement is to build the `String` pre-sized yourself —
+  `String::with_capacity(len)`, filled once — and pass it to `Dynamic::new`, which
+  **moves** that buffer in rather than copying it, so the allocation you filled is the
+  allocation the wrapper wipes. `From<&str>` is the convenient spelling and the leaky one:
+  it copies, and your original is left behind. The caveat above applies with full force
+  here, since the `String` path now has no in-wrapper construction at all: `new` is only
+  as safe as how the value was built, and a `String` grown by `push_str` before the move
+  has already abandoned its intermediates.
 
 ## [0.9.0-rc.11] - 2026-09-15
 

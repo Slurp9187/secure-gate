@@ -272,6 +272,8 @@ extern crate alloc;
 #[cfg(feature = "alloc")]
 mod dynamic;
 
+mod slot_writer;
+
 /// Fixed-size secret wrapper types - always available with zero dependencies.
 /// These provide fundamental secure storage abstractions for fixed-size data.
 mod fixed;
@@ -326,6 +328,14 @@ pub use dynamic::Dynamic;
 /// Cursor-like reader over [`Dynamic<Vec<u8>>`] — see [`Dynamic::as_reader`].
 #[cfg(feature = "std")]
 pub use dynamic::DynamicReader;
+
+/// Append-shaped writing into the fixed slot handed to a sized `new_with`.
+///
+/// The sized constructors hand out a slot whose length is already decided, which is what
+/// makes growth — and therefore the reallocation hazard — inexpressible. `SlotWriter`
+/// restores the append shape on top of that, so concatenating a wire format does not mean
+/// writing offsets by hand. Overrun panics rather than truncating.
+pub use slot_writer::SlotWriter;
 
 #[cfg(all(feature = "alloc", feature = "serde-deserialize"))]
 /// Default maximum byte length for `Dynamic<Vec<u8>>` / `Dynamic<String>` deserialization (1 MiB).

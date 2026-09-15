@@ -39,12 +39,28 @@
 //!
 //! | Constructor | Notes |
 //! |---|---|
-//! | [`Dynamic::new(value)`](Dynamic::new) | Ergonomic default; accepts `String`, `Vec<u8>`, `&str`, `Box<T>`, etc. |
-//! | [`Dynamic::<Vec<u8>>::new_with(f)`](Dynamic::new_with) | Scoped; for API symmetry with [`Fixed::new_with`](crate::Fixed::new_with) |
-//! | [`Dynamic::<String>::new_with(f)`](Dynamic::new_with) | Scoped; for API symmetry |
+//! | [`Dynamic::<Vec<u8>>::new_with(len, f)`](Dynamic::new_with) | **Preferred.** Writes into a sized, pre-zeroed slot inside the wrapper; growth is not expressible |
+//! | [`Dynamic::<Vec<u8>>::try_new_with(len, f)`](Dynamic::try_new_with) | The same, for a fill that can fail; wipes the partial write on `Err` |
+//! | [`Dynamic::new(value)`](Dynamic::new) | **Moves** the buffer in — no copy. Only as safe as how you built the value |
+//! | [`From<&str>`](Dynamic::from) / [`From<&[u8]>`](Dynamic::from) | **Copies**; your source buffer is left unwiped |
 //!
-//! Unlike [`Fixed::new_with`](crate::Fixed::new_with), `Dynamic` is already heap-only so
-//! `new_with` exists for consistent API idiom, not for stack-residue avoidance.
+//! Choosing between them is about where the bytes are written, not convenience:
+//!
+//! - **Length known before the fill** — use `new_with(len, …)`. One allocation of exactly
+//!   `len`, so capacity equals length and the wrapper never holds slack.
+//! - **Length not known** — use `Dynamic::new(Vec::new())` and write through the
+//!   [`std::io::Write`] impl, which grows by hand and **zeroizes each abandoned buffer**
+//!   before releasing it. It is the one growth path here that does. Requires `std`.
+//! - **You already own the value** — `new(owned)` moves the allocation rather than
+//!   copying it, so the buffer you filled becomes the buffer the wrapper protects. That
+//!   is necessary but not sufficient: if you *grew* the value to build it, those
+//!   reallocations already happened and the copies are already on the heap. Build without
+//!   growth — `with_capacity` at the exact final size, or one `resize` — then move it in.
+//!
+//! `Dynamic<String>` has no closure constructor. It cannot: `String` must hold valid
+//! UTF-8 and characters have variable byte widths, so a fixed byte window is not a place
+//! you can write arbitrary text. Build a pre-sized `String` and move it in with
+//! [`Dynamic::new`].
 //!
 //! # 3-tier access model
 //!
@@ -164,8 +180,9 @@ use crate::traits::decoding::hex::FromHexStr;
 ///
 /// | Constructor | Feature | Notes |
 /// |---|---|---|
-/// | [`new(value)`](Self::new) | — | Accepts `Vec<u8>`, `&[u8]`, `Box<Vec<u8>>` |
-/// | [`new_with(f)`](Self::new_with) | — | Scoped closure construction |
+/// | [`new_with(len, f)`](Self::new_with) | — | **Preferred.** Sized, pre-zeroed slot inside the wrapper |
+/// | [`try_new_with(len, f)`](Self::try_new_with) | — | The same, fallible; wipes the partial write on `Err` |
+/// | [`new(value)`](Self::new) | — | **Moves** the buffer in. Accepts `Vec<u8>`, `&[u8]`, `Box<Vec<u8>>` |
 /// | [`try_from_hex(s)`](Self::try_from_hex) | `encoding-hex` | Constant-time hex decoding |
 /// | [`try_from_base32(s)`](Self::try_from_base32) | `encoding-base32` | Constant-time Base32 decoding |
 /// | [`try_from_base64url(s)`](Self::try_from_base64url) | `encoding-base64` | Constant-time Base64url decoding |
@@ -206,7 +223,20 @@ impl<T: ?Sized + zeroize::Zeroize> Dynamic<T> {
     }
 }
 
-/// Zero-copy wrapping of an already-boxed value.
+/// Moves an already-boxed value in — zero-copy, no allocation at all. The box the caller
+/// already owns becomes the box the wrapper owns, so whatever buffer sits behind `T` never
+/// moves and never gets a second copy taken of it.
+///
+/// "Already boxed" describes the shape of the value at the moment it arrives here, not how
+/// it was built. A `Vec<u8>` pushed onto in a loop and later turned into a `Box<[u8]>`, or a
+/// `String` grown with `push_str` before being boxed, already paid for every one of those
+/// reallocations before this impl runs — and each reallocation frees the old block without
+/// zeroizing it, the same mechanism
+/// `tests/lifecycle_trace_heap.rs::check_growth_orphan_retains_secret_vec` (and its
+/// `_string` sibling) measures happening to a value already *inside* the wrapper. Nothing
+/// this impl does can reach backward and clean that up; it only ever protects the buffer it
+/// ends up holding. Build without growth — `with_capacity` at the exact final size, or one
+/// `resize` — before boxing, then move the box in.
 impl<T: ?Sized + zeroize::Zeroize> From<Box<T>> for Dynamic<T> {
     #[inline(always)]
     fn from(boxed: Box<T>) -> Self {
@@ -214,7 +244,16 @@ impl<T: ?Sized + zeroize::Zeroize> From<Box<T>> for Dynamic<T> {
     }
 }
 
-/// Copies a byte slice to the heap and wraps it.
+/// Copies a byte slice to the heap and wraps the copy. The source slice is left exactly as
+/// it was — this impl protects the copy it makes, not the memory it copied from, and leaving
+/// that memory unwiped is the caller's problem to solve.
+///
+/// `tests/lifecycle_trace_heap.rs::check_str_and_slice_conversions_copy_then_wipe` measures
+/// both halves of that: converting `&[u8]` costs two allocations (the fresh `Vec<u8>` buffer
+/// plus the `Box<Vec<u8>>` header, against one for a move) and the source slice's bytes are
+/// unchanged after the wrapper is built and dropped. If the bytes are already in an owned
+/// `Vec<u8>` you control, [`Dynamic::new`] moves it in for one allocation and nothing of
+/// yours left behind to wipe.
 impl From<&[u8]> for Dynamic<Vec<u8>> {
     #[inline(always)]
     fn from(slice: &[u8]) -> Self {
@@ -222,7 +261,22 @@ impl From<&[u8]> for Dynamic<Vec<u8>> {
     }
 }
 
-/// Copies a string to the heap and wraps it.
+/// Copies a string to the heap and wraps the copy, leaving the source `&str` exactly as it
+/// was — measured the same way as the `&[u8]` conversion above, by
+/// `tests/lifecycle_trace_heap.rs::check_str_and_slice_conversions_copy_then_wipe`: two
+/// allocations (the copied `String` buffer plus the `Box<String>` header, against one for a
+/// move) and a caller-side buffer whose bytes are provably unchanged once the wrapper is
+/// built and dropped.
+///
+/// This is the impl a caller now reaches for after `Dynamic::<String>::new_with` was removed
+/// outright in 0.9.0-rc.12 — an `&str` is what's already on hand, so `From<&str>` reads as
+/// the drop-in replacement. It is the **worse** one: whatever plaintext the `&str` borrows
+/// from — a literal, an owned `String`, a line read off stdin — is untouched by this call and
+/// stays live and unprotected for as long as its own scope does. If you own the `String`,
+/// size it once — `String::with_capacity` at the exact final length — and move it in with
+/// [`Dynamic::new`], which `check_string_new_moves_callers_buffer` measures as exactly one
+/// allocation (the `Box<String>` header) with the secret staying at the caller's original
+/// buffer address.
 impl From<&str> for Dynamic<String> {
     #[inline(always)]
     fn from(input: &str) -> Self {
@@ -230,7 +284,24 @@ impl From<&str> for Dynamic<String> {
     }
 }
 
-/// Boxes the value and wraps it.
+/// Moves an owned value onto the heap by boxing it — the impl behind [`Dynamic::new`]'s
+/// "moves the buffer in, no copy" guarantee for `Vec<u8>`, `String`, and every other `Sized`
+/// `T`. `Box::new(value)` only relocates `value`'s own stack representation (for a `Vec<u8>`,
+/// the pointer/length/capacity triple); the heap buffer that pointer already points at is
+/// never touched, so it lands inside the wrapper at the address it already had.
+///
+/// That is necessary for "no copy" to hold, but not sufficient for it to matter: if `value`
+/// was grown to build it — pushed onto, extended, `push_str`'d past its original capacity —
+/// each of those reallocations already ran *before* this impl ever sees the value, and each
+/// one freed a heap block holding the secret, unwiped, somewhere this wrapper will never
+/// look. `check_growth_orphan_retains_secret_vec` / `_string` in
+/// `tests/lifecycle_trace_heap.rs` measure exactly that allocator behavior for growth
+/// happening *after* the value is wrapped; the same allocator runs the same way one step
+/// earlier when the growth happens during construction instead.
+/// `check_string_new_moves_callers_buffer` measures the guarantee this impl does deliver
+/// when construction is growth-free: one allocation (the `Box` header) and the secret
+/// staying at the caller's original buffer address. Build without growth — `with_capacity`
+/// at the exact final size, or one `resize` — then move the value in.
 impl<T: 'static + zeroize::Zeroize> From<T> for Dynamic<T> {
     #[inline(always)]
     fn from(value: T) -> Self {
@@ -407,24 +478,145 @@ impl Dynamic<Vec<u8>> {
         Self::from(boxed)
     }
 
-    /// Closure-based constructor that protects against closure panics.
+    /// Writes into a **sized, pre-zeroed slot** inside the wrapper's own storage.
     ///
-    /// The intermediate `Vec<u8>` is held inside a `Zeroizing` wrapper for the
-    /// entire duration of the closure, so any bytes the closure writes are
-    /// zeroed during stack unwinding if `f` panics. Constructed via the same
-    /// `Zeroizing` + swap pattern used by `from_protected_bytes`.
+    /// The closure receives exactly `len` bytes, **every one of them zero**. That is a
+    /// guarantee, not an implementation detail: callers rely on the tail being zero as
+    /// real input — a 40-bit RC4 key is five bytes of derived material followed by
+    /// eleven zeros, and those zeros are key-schedule input rather than padding, so a
+    /// slot that merely happened to be zeroed would produce a different cipher the day
+    /// it was not.
+    ///
+    /// One allocation, of exactly `len`, so capacity equals length and the wrapper never
+    /// holds slack. The slot is a slice, so **growth is not expressible** and the
+    /// reallocation hazard cannot arise.
+    ///
+    /// # Changed in 0.9.0-rc.12 — this took no `len` before
+    ///
+    /// If you are here from `E0061: this function takes 2 arguments but 1 was supplied`,
+    /// this is why. The previous signature handed the closure a **zero-capacity
+    /// `Vec<u8>`**, so filling it reallocated — and a `Vec` reallocation frees the old
+    /// block **without zeroizing it**, abandoning a copy of the secret on the heap that
+    /// nothing would ever wipe. A constructor whose entire purpose was to avoid an
+    /// unprotected copy created one, silently, in the common case of two pushes.
+    ///
+    /// Pass the final length and fill the slot:
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "alloc")] {
+    /// use secure_gate::{Dynamic, RevealSecret};
+    ///
+    /// // was: new_with(|v| { v.extend_from_slice(&material); v.resize(16, 0); })
+    /// let key = Dynamic::<Vec<u8>>::new_with(16, |slot| {
+    ///     slot[..4].copy_from_slice(&[1, 2, 3, 4]);
+    /// });
+    /// assert_eq!(key.expose_secret().len(), 16);
+    /// key.with_secret(|b| assert_eq!(&b[4..], &[0u8; 12]));
+    /// # }
+    /// ```
+    ///
+    /// # When the length is not known in advance
+    ///
+    /// Use [`Dynamic::new`] with an empty `Vec` and write through the
+    /// [`std::io::Write`] impl, which grows by hand and **zeroizes each abandoned
+    /// buffer** before releasing it — the one growth path in this crate that does.
+    /// See the [`Write`](#impl-Write-for-Dynamic<Vec<u8>>) impl for what it does and
+    /// does not cover. It requires the `std` feature.
+    ///
+    /// # Panics
+    ///
+    /// Nothing here panics, but a panic *inside* `f` is safe: the slot lives in a
+    /// [`zeroize::Zeroizing`] for the whole call, so partially written bytes are wiped
+    /// during unwinding.
+    ///
+    /// # See also
+    ///
+    /// - [`try_new_with`](Self::try_new_with) — when the fill can fail.
+    /// - [`SlotWriter`](crate::SlotWriter) — append to the slot without writing offsets
+    ///   by hand.
     #[inline(always)]
-    pub fn new_with<F>(f: F) -> Self
+    pub fn new_with<F>(len: usize, f: F) -> Self
     where
-        F: FnOnce(&mut alloc::vec::Vec<u8>),
+        F: FnOnce(&mut [u8]),
     {
         let mut v: zeroize::Zeroizing<alloc::vec::Vec<u8>> =
-            zeroize::Zeroizing::new(alloc::vec::Vec::new());
-        f(&mut v);
+            zeroize::Zeroizing::new(alloc::vec![0u8; len]);
+        f(&mut v[..]);
         Self::from_protected_bytes(v)
+    }
+
+    /// [`new_with`](Self::new_with) for a fill that can fail.
+    ///
+    /// Identical in every respect but the closure's return type. On `Err` the
+    /// partially written slot is **zeroized before the error is returned** — the
+    /// `Zeroizing` holding it is dropped on the way out, so a failed fill leaves
+    /// nothing behind.
+    ///
+    /// That is not defensive tidiness. Decoders that write into a caller-supplied
+    /// buffer routinely leave real plaintext in it when they fail; `miniz_oxide`'s
+    /// `decompress_slice_iter_to_slice` documents exactly that ("in that case the
+    /// output buffer will still contain the partial decompression"). Wrapping only on
+    /// success would leave that partial secret in an unprotected buffer on every
+    /// malformed input.
+    ///
+    /// # Errors
+    ///
+    /// Returns whatever the closure returns. The error type is the caller's; this
+    /// method neither inspects nor wraps it.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "alloc", feature = "std"))] {
+    /// use secure_gate::{Dynamic, RevealSecret};
+    /// use std::io::Read;
+    ///
+    /// fn read_exact_secret<R: Read>(r: &mut R, len: usize) -> std::io::Result<Dynamic<Vec<u8>>> {
+    ///     Dynamic::<Vec<u8>>::try_new_with(len, |slot| r.read_exact(slot))
+    /// }
+    ///
+    /// let secret = read_exact_secret(&mut [7u8; 32].as_slice(), 32).unwrap();
+    /// assert_eq!(secret.expose_secret().len(), 32);
+    ///
+    /// // A short read fails, and yields no secret at all.
+    /// assert!(read_exact_secret(&mut [7u8; 8].as_slice(), 32).is_err());
+    /// # }
+    /// ```
+    #[inline(always)]
+    pub fn try_new_with<F, E>(len: usize, f: F) -> Result<Self, E>
+    where
+        F: FnOnce(&mut [u8]) -> Result<(), E>,
+    {
+        let mut v: zeroize::Zeroizing<alloc::vec::Vec<u8>> =
+            zeroize::Zeroizing::new(alloc::vec![0u8; len]);
+        // On the error path `v` is dropped here, so `Zeroizing` wipes whatever the
+        // closure wrote before it gave up. That is why the buffer is built before the
+        // fill rather than assembled after it.
+        f(&mut v[..])?;
+        Ok(Self::from_protected_bytes(v))
     }
 }
 
+// `new_with` was removed here in 0.9.0-rc.12, deliberately and with no replacement.
+//
+// It handed the closure a zero-capacity `String`, so filling it reallocated and each
+// reallocation freed the old buffer unwiped — the same defect the `Vec<u8>` arm had,
+// in the arm most likely to hold a password. The `Vec` arm was fixed by handing a
+// sized slot instead; no such slot exists for text. A `&mut str` cannot be usefully
+// filled: `String` must hold valid UTF-8 and characters have variable byte widths, so
+// a fixed byte window is not a place you can write arbitrary text into.
+//
+// The replacement is to build a pre-sized `String` yourself and move it in with
+// `Dynamic::new`, which transfers the buffer rather than copying it — so the
+// allocation you filled is the allocation the wrapper protects. `From<&str>` copies
+// and leaves your source unwiped; prefer `new` for secret material.
+//
+// That leaves this impl block with no unconditional member: `from_protected_bytes`
+// below exists solely for `deserialize_with_limit`, so — unlike the `Vec<u8>` arm's
+// copy of the same helper, which `new_with`/`try_new_with` keep alive unconditionally
+// — it is `#[cfg]`-gated on `serde-deserialize` rather than left to go dead under
+// `alloc` alone.
+#[cfg(feature = "serde-deserialize")]
 impl Dynamic<alloc::string::String> {
     /// Heap-only construction from a `Zeroizing<String>`. Swaps the protected
     /// buffer into a default-initialized `Box<String>` and returns the
@@ -436,23 +628,6 @@ impl Dynamic<alloc::string::String> {
         let mut boxed = Box::<alloc::string::String>::default();
         core::mem::swap(&mut *boxed, &mut *protected);
         Self::from(boxed)
-    }
-
-    /// Closure-based constructor that protects against closure panics.
-    ///
-    /// The intermediate `String` is held inside a `Zeroizing` wrapper for the
-    /// entire duration of the closure, so any bytes the closure writes are
-    /// zeroed during stack unwinding if `f` panics. Constructed via the same
-    /// `Zeroizing` + swap pattern used by `from_protected_bytes`.
-    #[inline(always)]
-    pub fn new_with<F>(f: F) -> Self
-    where
-        F: FnOnce(&mut alloc::string::String),
-    {
-        let mut s: zeroize::Zeroizing<alloc::string::String> =
-            zeroize::Zeroizing::new(alloc::string::String::new());
-        f(&mut s);
-        Self::from_protected_bytes(s)
     }
 }
 
@@ -663,10 +838,9 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// ```
     #[inline]
     pub fn from_random(len: usize) -> Self {
-        Self::new_with(|v| {
-            v.resize(len, 0u8);
+        Self::new_with(len, |slot| {
             SysRng
-                .try_fill_bytes(v)
+                .try_fill_bytes(slot)
                 .expect("SysRng failure is a program error");
         })
     }
@@ -696,12 +870,11 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// ```
     #[inline]
     pub fn from_rng<R: TryRng + TryCryptoRng>(len: usize, rng: &mut R) -> Result<Self, R::Error> {
-        let mut result = Ok(());
-        let this = Self::new_with(|v| {
-            v.resize(len, 0u8);
-            result = rng.try_fill_bytes(v);
-        });
-        result.map(|_| this)
+        // This body was the captured-local workaround `try_new_with` exists to retire:
+        // `new_with` could not report failure, so the error was written to a local and
+        // checked afterwards. Same behaviour, one expression. The `resize` is gone too —
+        // it only ever existed to size a buffer that now arrives sized.
+        Self::try_new_with(len, |slot| rng.try_fill_bytes(slot))
     }
 }
 
@@ -768,11 +941,37 @@ impl<T: zeroize::Zeroize + crate::CloneableSecret> Clone for Dynamic<T> {
 /// # }
 /// ```
 ///
-/// This addresses only the buffer this impl owns. A caller who grows the `Vec`
-/// themselves through [`with_secret_mut`](crate::RevealSecretMut::with_secret_mut)
-/// or [`expose_secret_mut`](crate::RevealSecretMut::expose_secret_mut) holds
-/// `&mut Vec<u8>` directly, and their reallocation is outside this crate's
-/// control — see the heap-reallocation residue section in `SECURITY.md`.
+/// # This is the sanctioned path for a secret whose length you do not know
+///
+/// **Every buffer this impl abandons is zeroized before it is released.** Growth is done
+/// by hand — allocate, copy, wipe the old buffer including its spare capacity, and only
+/// then drop it — rather than through `Vec`'s own reallocation, which would free the old
+/// block still holding plaintext. Doubling is amortized, so streaming stays linear.
+///
+/// That makes the pair complete: **length known before the fill, use
+/// [`new_with(len, …)`](Dynamic::new_with); length not known, use `Write`.** Neither
+/// leaves an unwiped copy behind, and there is no third case that needs one.
+///
+/// ## What it does not cover
+///
+/// The guarantee is about the buffer this impl owns, and three things sit outside it:
+///
+/// - **A caller who grows the `Vec` themselves**, through
+///   [`with_secret_mut`](crate::RevealSecretMut::with_secret_mut) or
+///   [`expose_secret_mut`](crate::RevealSecretMut::expose_secret_mut), holds
+///   `&mut Vec<u8>` directly and their reallocation is `Vec`'s, not this one's. See the
+///   heap-reallocation residue section in `SECURITY.md`.
+/// - **Whatever fed the bytes in.** Driving this with [`std::io::copy`] passes every byte
+///   through `copy`'s own transfer buffer, and [`std::io::Stdin`] keeps a
+///   process-lifetime internal buffer. Nothing here can reach either. To close the
+///   transfer buffer too, read into a [`Fixed<[u8; N]>`](crate::Fixed) chunk and
+///   `write_all` each chunk through this impl.
+/// - **The `std` feature**, which gates this impl. Without it the recommended path for
+///   unknown-length secrets is simply absent, and the growable alternatives are not.
+///
+/// What it eliminates is the **unbounded chain** of unwiped reallocations — the residue
+/// that scales with input size, leaving an intermediate copy on the heap for every
+/// growth. That is the defect; the buffers above are bounded and do not accumulate.
 #[cfg(feature = "std")]
 impl std::io::Write for Dynamic<alloc::vec::Vec<u8>> {
     #[inline]
@@ -929,8 +1128,10 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// are attacker-controlled (the malformed payload they sent), so the practical
     /// disclosure surface is bounded; but if your threat model includes deserialization
     /// of trusted-but-corruptible secret material, treat the deserialize step as
-    /// outside the zeroization boundary and use `from_protected_bytes` (private API)
-    /// or `new_with` for in-process construction instead.
+    /// outside the zeroization boundary and build in-process instead:
+    /// [`new_with(len, …)`](Dynamic::new_with) (or [`try_new_with`](Dynamic::try_new_with)
+    /// for a fill that can fail) writes straight into the wrapper's own pre-zeroed slot,
+    /// so there is no separate buffer for a visitor to accumulate into and abandon unwiped.
     ///
     /// **Important:** this limit is enforced *after* the upstream deserializer has fully
     /// materialized the payload. It is a **result-length acceptance bound**, not a
@@ -974,8 +1175,12 @@ impl Dynamic<String> {
     /// are attacker-controlled (the malformed payload they sent), so the practical
     /// disclosure surface is bounded; but if your threat model includes deserialization
     /// of trusted-but-corruptible secret material, treat the deserialize step as
-    /// outside the zeroization boundary and use `from_protected_bytes` (private API)
-    /// or `new_with` for in-process construction instead.
+    /// outside the zeroization boundary and build in-process instead. `String` has no
+    /// sized-slot constructor of its own — it must hold valid UTF-8 and characters are
+    /// variable-width, so there is no fixed byte window arbitrary text can be written
+    /// into. Size a `String` to its exact final length yourself (`String::with_capacity`,
+    /// filled without triggering a reallocation) and move it in with
+    /// [`Dynamic::new`](Dynamic::new), which moves the buffer rather than copying it.
     ///
     /// **Important:** this limit is enforced *after* the upstream deserializer has fully
     /// materialized the payload. It is a **result-length acceptance bound**, not a
@@ -985,7 +1190,7 @@ impl Dynamic<String> {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut buf: zeroize::Zeroizing<alloc::string::String> =
+        let buf: zeroize::Zeroizing<alloc::string::String> =
             zeroize::Zeroizing::new(serde::Deserialize::deserialize(deserializer)?);
         if buf.len() > limit {
             // buf drops here → Zeroizing zeros the oversized buffer before deallocation
@@ -993,10 +1198,7 @@ impl Dynamic<String> {
                 "deserialized secret exceeds maximum size",
             ));
         }
-        // Only fallible allocation; protected stays live across it for panic-safety
-        let mut boxed = Box::<alloc::string::String>::default();
-        core::mem::swap(&mut *boxed, &mut *buf);
-        Ok(Self::from(boxed))
+        Ok(Self::from_protected_bytes(buf))
     }
 }
 
