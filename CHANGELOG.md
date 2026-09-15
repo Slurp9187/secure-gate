@@ -101,7 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `RevealSecret::expose_secret` gains a "Coming from `secrecy`" note. The two crates share
-  this spelling deliberately — this one kept the vocabulary when it forked — but not the
+  this spelling deliberately — this one kept the vocabulary when it went its own way — but not the
   posture: as of `secrecy` 0.10.3 a plain reference is documented there as "the only method
   providing access to a secret", whereas here it is the auditable escape hatch and
   `with_secret` is the recommended path. The habit transfers silently, because reaching for
