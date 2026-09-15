@@ -66,6 +66,67 @@
 //! purpose*, and sweep for it during an encoding audit. What the type is actually for
 //! is `&*encoded` into the drivers that bind `&str`. See
 //! [Where accident-prevention ends](crate#where-accident-prevention-ends).
+//!
+//! # Every `str` method reached through `Deref` exits protection, not just `.to_string()`
+//!
+//! The table above singles out `.to_string()` / `.to_owned()` because those are the
+//! obvious copies. They are not the only ones. `Deref<Target = str>` exposes *every*
+//! method `str` has, and a good many of them — `to_ascii_uppercase`,
+//! `to_ascii_lowercase`, `to_lowercase`, `to_uppercase`, `replace`, `repeat`, `trim()`
+//! followed by an owning call, and more — return a freshly allocated, ordinary `String`.
+//! Each one ends protection the instant it runs, and nothing at the call site marks the
+//! exit:
+//!
+//! ```rust
+//! # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))] {
+//! use secure_gate::{Fixed, ToBech32m, Case};
+//!
+//! let key = Fixed::new([0xABu8; 32]);
+//! let encoded = key.try_to_bech32m("key", Case::Lower).unwrap(); // EncodedSecret -- protected
+//! let shouted = encoded.to_ascii_uppercase();                    // plain String -- escaped, unwiped
+//! # let _ = shouted;
+//! # }
+//! ```
+//!
+//! `shouted` is a second full copy of the key material: no zeroize-on-drop, no redacted
+//! `Debug`, and the receiver reads exactly like the `EncodedSecret` it was called on one
+//! line up. Nothing in the syntax distinguishes this call from one that stayed inside
+//! protection.
+//!
+//! This is not hypothetical. A consumer of this crate hit it twice in one codebase, on
+//! the same idiom, with opposite outcomes. One call site piped `try_to_bech32m(..)`
+//! straight into `.to_ascii_uppercase()` and shipped it, leaking a database key twice
+//! over — once as the lowercase encoding, once as the uppercased copy neither wrapper
+//! ever touched. A second call site, reaching for the same encoder, re-wrapped the
+//! result before using it: `Zeroizing::new(encoded.to_ascii_uppercase())`. Same crate,
+//! same method chain, two different outcomes in one tree — which is what makes this a
+//! trap and not carelessness. Both call sites compile. Both type-check. Only one of them
+//! is safe, and nothing in the types says which.
+//!
+//! Two ways to stay inside protection:
+//!
+//! - **Do the transform inside the encoder, where one exists.**
+//!   [`to_hex_upper`](crate::ToHex::to_hex_upper) exists precisely so callers never need
+//!   `.to_hex().to_ascii_uppercase()`, and the bech32 / bech32m encoders take a
+//!   [`Case`](crate::Case) argument for the same reason — ask the encoder for the case
+//!   you want instead of asking `str` to convert it afterward.
+//! - **Re-wrap the result yourself** when no such parameter exists:
+//!   `Zeroizing::new(encoded.some_str_method())`. That is one allocation you chose and
+//!   can account for, in place of one the type system quietly declined to track.
+//!
+//! This is the same shape of hole as the one already closed for this exact type in
+//! [`EncodableBytes`](crate::EncodableBytes#why-the-extra-bound-exists): there, an
+//! `AsRef<[u8]>`-only blanket let `encoded.to_hex()` compile on an `EncodedSecret` and
+//! hex-encode the encoded *text* — a 32-byte key came back as 124 hex characters, with
+//! nothing to flag it as wrong. That hole was closed with a trait bound, because the
+//! encoders are this crate's own API and a bound can gate them. This one cannot close
+//! the same way: `str`'s inherent methods are not a trait this crate can add a bound to,
+//! so the deref stays reachable by construction — see
+//! [No `Display`](crate::EncodedSecret#no-display) above for why the deref itself stays.
+//! The boundary here is not a compile error; it is knowing it precisely — any `str`
+//! method reached through this type's `Deref` produces unprotected output, full stop —
+//! and giving every one of them the scrutiny the table above already asks for
+//! `.to_string()`.
 
 #[cfg(feature = "alloc")]
 /// Owned wrapper for encoded secret strings: zeroizes on drop, redacts `Debug`, and

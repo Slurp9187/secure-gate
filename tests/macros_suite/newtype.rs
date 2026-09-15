@@ -48,7 +48,7 @@ fn dynamic_arms_pick_the_right_api() {
     let api: ApiKey = "sk_live_xyz".into(); // From<&str> on the String arm
     assert_eq!(api.expose_secret(), "sk_live_xyz");
 
-    let tok = SessionToken::new_with(|v| v.extend_from_slice(b"abc"));
+    let tok = SessionToken::new_with(3, |v| v.copy_from_slice(b"abc"));
     assert_eq!(tok.len(), 3);
 
     let hook = WebhookSecret::new(String::from("whsec_1"));

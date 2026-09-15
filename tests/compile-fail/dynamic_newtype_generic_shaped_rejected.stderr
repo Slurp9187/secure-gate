@@ -6,7 +6,7 @@ error: dynamic_newtype!: write `Vec<u8>`, not `generic Vec<u8>`. The `generic` a
    |
    = note: this error originates in the macro `$crate::__sg_dynamic_generic_is_shaped` which comes from the expansion of the macro `dynamic_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: dynamic_newtype!: write `String`, not `generic String`. The `generic` arm emits only the shape-independent surface, so this spelling withholds `SecretLen`, `From<&str>` and `new_with` — the in-place constructor that builds the secret inside the protected buffer rather than in an unprotected one first. It is the same growable payload with strictly less API. `generic` is for inner types that are neither `String` nor `Vec<u8>`.
+error: dynamic_newtype!: write `String`, not `generic String`. The `generic` arm emits only the shape-independent surface, so this spelling withholds `SecretLen` and `From<&str>`. It is the same payload with strictly less API. `generic` is for inner types that are neither `String` nor `Vec<u8>`.
   --> tests/compile-fail/dynamic_newtype_generic_shaped_rejected.rs:20:1
    |
 20 | dynamic_newtype!(pub Text, generic String);
@@ -22,7 +22,7 @@ error: dynamic_newtype!: write `Vec<u8>`, not `generic Vec<u8>`. The `generic` a
    |
    = note: this error originates in the macro `$crate::__sg_dynamic_generic_is_shaped` which comes from the expansion of the macro `dynamic_newtype` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: dynamic_newtype!: write `String`, not `generic String`. The `generic` arm emits only the shape-independent surface, so this spelling withholds `SecretLen`, `From<&str>` and `new_with` — the in-place constructor that builds the secret inside the protected buffer rather than in an unprotected one first. It is the same growable payload with strictly less API. `generic` is for inner types that are neither `String` nor `Vec<u8>`.
+error: dynamic_newtype!: write `String`, not `generic String`. The `generic` arm emits only the shape-independent surface, so this spelling withholds `SecretLen` and `From<&str>`. It is the same payload with strictly less API. `generic` is for inner types that are neither `String` nor `Vec<u8>`.
   --> tests/compile-fail/dynamic_newtype_generic_shaped_rejected.rs:22:1
    |
 22 | dynamic_newtype!(pub TextWithDerive, generic String, derive: [IntoWrapper]);
