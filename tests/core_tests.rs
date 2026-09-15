@@ -516,9 +516,16 @@ fn dynamic_vec_new_with_partial_fill() {
 fn dynamic_vec_new_with_capacity_equals_len() {
     use secure_gate::Dynamic;
     // No slack: capacity equals length, so the wrapper never holds a spare block
-    // beyond what the caller asked for.
+    // beyond what the caller asked for. Checked against `len()`, not a repeated
+    // literal, so a constructor that returned capacity 24 backing a shorter length
+    // would fail this. The closure is empty, which makes this the cheapest place to
+    // also pin an all-zero slot at a second size (16 is already covered above).
     let secret = Dynamic::<Vec<u8>>::new_with(24, |_slot| {});
-    secret.with_secret(|s| assert_eq!(s.capacity(), 24));
+    secret.with_secret(|s| {
+        assert_eq!(s.len(), 24);
+        assert_eq!(s.capacity(), s.len());
+        assert!(s.iter().all(|&b| b == 0));
+    });
 }
 
 #[cfg(feature = "alloc")]
@@ -533,6 +540,27 @@ fn dynamic_vec_try_new_with_ok_fills_correctly() {
     secret.with_secret(|s| assert_eq!(s.as_slice(), &[10u8, 20, 30]));
 }
 
+// Mirrors `dynamic_vec_new_with_partial_fill` on the fallible path. `try_new_with` is a
+// separate body in `src/dynamic.rs` — its own `Zeroizing::new(vec![0u8; len])`, not a
+// delegation to `new_with` — so the sized, pre-zeroed slot contract needs its own proof
+// here rather than borrowing the infallible test's coverage.
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_vec_try_new_with_partial_fill() {
+    use secure_gate::Dynamic;
+    let secret = Dynamic::<Vec<u8>>::try_new_with(16, |slot| {
+        slot[..5].copy_from_slice(&[1, 2, 3, 4, 5]);
+        Ok::<(), ()>(())
+    })
+    .expect("closure succeeded");
+    secret.with_secret(|s| {
+        assert_eq!(s.len(), 16);
+        assert_eq!(&s[..5], &[1u8, 2, 3, 4, 5]);
+        assert_eq!(&s[5..], &[0u8; 11]); // untouched tail: zero, not garbage
+        assert_eq!(s.capacity(), 16);
+    });
+}
+
 #[cfg(feature = "alloc")]
 #[test]
 fn dynamic_vec_try_new_with_err_propagates() {
@@ -541,12 +569,20 @@ fn dynamic_vec_try_new_with_err_propagates() {
     #[derive(Debug, PartialEq, Eq)]
     struct ShortRead(usize);
 
+    // The partial write staged below (slot[0] = 0xFF) is wiped before the buffer is
+    // released on the `Err` path — that half is measured in `tests/heap_zeroize.rs`'s
+    // `check_try_new_with_err_zeroed_vec`, the only instrument that can watch the
+    // dealloc and confirm it lands all zeros. This test only has the error value left
+    // to check once the closure returns, so that is all the assertion below covers.
     let result = Dynamic::<Vec<u8>>::try_new_with(4, |slot| {
+        // Observed from inside the closure, not after construction: an implementation
+        // that zeroed the slot only after the closure returned would still satisfy
+        // every assertion elsewhere in this file.
+        assert!(slot.iter().all(|&b| b == 0), "slot must arrive zeroed");
         slot[0] = 0xFF;
         Err(ShortRead(1))
     });
-    // E is free — the caller's own error type arrives intact, neither inspected nor
-    // wrapped.
+    // The caller's error type arrives intact — neither inspected nor wrapped.
     assert_eq!(result.unwrap_err(), ShortRead(1));
 }
 

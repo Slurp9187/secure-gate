@@ -252,13 +252,25 @@
 macro_rules! dynamic_newtype {
     // ---- `generic` applied to a shape that has its own arm: rejected ----
     //
-    // `generic Vec<u8>` and `generic String` are strictly dominated spellings.
-    // They take a payload this crate already knows how to grow safely and then
-    // withhold the method that does it: the `generic` arm emits only
-    // `__sg_newtype_base!` plus a constructor, so the shaped arms' `SecretLen`,
-    // `From`, `new_with`, encoders, and — for `Vec<u8>` under `std` — the
-    // `io::Write` impl that wipes the buffer it abandons, are all absent. Same
-    // payload, strictly less API, and no reason to write it.
+    // `generic Vec<u8>` and `generic String` are strictly dominated spellings,
+    // but not for the same reason — the two shaped arms no longer offer the
+    // same growth story, so what each `generic` spelling gives up differs too.
+    //
+    // `generic Vec<u8>` takes a payload this crate already knows how to grow
+    // safely and then withholds the method that does it: the `generic` arm
+    // emits only `__sg_newtype_base!` plus a constructor, so the shaped arm's
+    // `SecretLen`, `From`, `new_with`, `try_new_with`, encoders, and — under
+    // `std` — the `io::Write` impl that wipes the buffer it abandons, are all
+    // absent. Same payload, strictly less API, and no reason to write it.
+    //
+    // `generic String` is dominated for a narrower reason, because there is
+    // less for it to withhold: the shaped `String` arm has no `new_with` of
+    // its own, as of 0.9.0-rc.12, and cannot — a `String` must hold valid
+    // UTF-8 and characters have variable byte widths, so there is no sized
+    // byte slot that arbitrary text can be written into. What the `generic`
+    // arm withholds is `SecretLen` and `From<&str>` only. The crate has no
+    // safe growth path for `Dynamic<String>` at all; pre-size the value and
+    // move it in with `Dynamic::new`.
     //
     // These must precede every `generic $inner:ty` arm, for the reason the
     // comment below gives: once a `:ty` fragment is parsed there is no
@@ -624,11 +636,11 @@ macro_rules! __sg_dynamic_generic_is_shaped {
         ::core::compile_error!(
             "dynamic_newtype!: write `Vec<u8>`, not `generic Vec<u8>`. The `generic` \
              arm emits only the shape-independent surface, so this spelling withholds \
-             `SecretLen`, `From<&[u8]>`, `new_with`, the encoders, `from_random`, and \
-             — under `std` — the `std::io::Write` impl, which is the one growth path \
-             that wipes the buffer it abandons. It is the same growable payload with \
-             strictly less API and no safe way to grow it. `generic` is for inner \
-             types that are neither `String` nor `Vec<u8>`."
+             `SecretLen`, `From<&[u8]>`, `new_with`, `try_new_with`, the encoders, \
+             `from_random`, and — under `std` — the `std::io::Write` impl, which is \
+             the one growth path that wipes the buffer it abandons. It is the same \
+             growable payload with strictly less API and no safe way to grow it. \
+             `generic` is for inner types that are neither `String` nor `Vec<u8>`."
         );
     };
     (@string) => {

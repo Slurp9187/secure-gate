@@ -46,8 +46,14 @@
 //!
 //! Choosing between them is about where the bytes are written, not convenience:
 //!
-//! - **Length known before the fill** — use `new_with(len, …)`. One allocation of exactly
-//!   `len`, so capacity equals length and the wrapper never holds slack.
+//! - **Length known before the fill** — use `new_with(len, …)`. That is two allocations,
+//!   not one: the slot, of exactly `len` bytes, plus the `Box<Vec<u8>>` header every
+//!   `Dynamic<Vec<u8>>` is built around. `tests/lifecycle_trace_heap.rs` measures
+//!   `from_random(len)` — this constructor with an RNG in the closure — at exactly two,
+//!   and `Dynamic::new(owned)` at exactly one, because a move brings its buffer with it.
+//!   So the recommendation is not about allocation count; it is about the slot's shape.
+//!   Capacity equals length, so the wrapper never holds slack, and the closure is handed a
+//!   slice, so growth is not expressible at all.
 //! - **Length not known** — use `Dynamic::new(Vec::new())` and write through the
 //!   [`std::io::Write`] impl, which grows by hand and **zeroizes each abandoned buffer**
 //!   before releasing it. It is the one growth path here that does. Requires `std`.
@@ -487,9 +493,15 @@ impl Dynamic<Vec<u8>> {
     /// slot that merely happened to be zeroed would produce a different cipher the day
     /// it was not.
     ///
-    /// One allocation, of exactly `len`, so capacity equals length and the wrapper never
-    /// holds slack. The slot is a slice, so **growth is not expressible** and the
-    /// reallocation hazard cannot arise.
+    /// Two allocations, not one: the slot of exactly `len` bytes, plus the `Box<Vec<u8>>`
+    /// header the bytes are swapped into on the way out. `tests/lifecycle_trace_heap.rs`
+    /// measures `from_random(len)` — this constructor with an RNG in the closure — at
+    /// exactly two, "the payload buffer and the `Box<Vec<u8>>` header", and measures
+    /// `Dynamic::new(owned)` at exactly one, since a move carries its buffer along. By
+    /// allocation count this is therefore the joint most expensive constructor here, tied
+    /// with `From<&[u8]>`; the count is not what recommends it. What does is the shape of
+    /// the slot: capacity equals length, so the wrapper never holds slack, and the slot is
+    /// a slice, so **growth is not expressible** and the reallocation hazard cannot arise.
     ///
     /// # Changed in 0.9.0-rc.12 — this took no `len` before
     ///
@@ -525,9 +537,22 @@ impl Dynamic<Vec<u8>> {
     ///
     /// # Panics
     ///
-    /// Nothing here panics, but a panic *inside* `f` is safe: the slot lives in a
-    /// [`zeroize::Zeroizing`] for the whole call, so partially written bytes are wiped
-    /// during unwinding.
+    /// Allocating the slot is `alloc::vec![0u8; len]`, so `len` is not a hint — it is an
+    /// allocation request, and both allocator failure modes are reachable through it. A
+    /// `len` above `isize::MAX` panics with `"capacity overflow"` before anything is
+    /// allocated. A `len` the allocator cannot satisfy reaches `handle_alloc_error`, which
+    /// **aborts** rather than unwinding: no destructor runs anywhere, so no `Zeroizing` on
+    /// this stack or any frame above it gets the chance to wipe anything.
+    ///
+    /// `len` is caller-supplied, and the worked example on the fallible sibling is
+    /// `try_new_with(len, |slot| r.read_exact(slot))` — precisely the shape where `len`
+    /// arrives off the wire, out of a frame header or a manifest. Bound it before passing
+    /// it here, for the same reason `deserialize_with_limit` on this type takes a ceiling
+    /// instead of trusting the payload: a length field is attacker-controlled input until
+    /// something checks it.
+    ///
+    /// A panic *inside* `f` is safe: the slot lives in a [`zeroize::Zeroizing`] for the
+    /// whole call, so partially written bytes are wiped during unwinding.
     ///
     /// # See also
     ///
@@ -563,6 +588,49 @@ impl Dynamic<Vec<u8>> {
     ///
     /// Returns whatever the closure returns. The error type is the caller's; this
     /// method neither inspects nor wraps it.
+    ///
+    /// # A short fill is not an error, and its tail is the zero fill
+    ///
+    /// The closure returns `Result<(), E>`, which carries no bytes-written count. A closure
+    /// that writes fewer than `len` bytes and returns `Ok` therefore yields a full-length
+    /// secret whose untouched tail is the pre-zeroing. Nothing here can catch that, because
+    /// nothing here is ever told how far the fill got.
+    ///
+    /// Whether that is the right answer or silent corruption depends on what is in the
+    /// slot, and the two shapes differ completely:
+    ///
+    /// - **Fixed-width key material** — the 40-bit RC4 key from [`new_with`](Self::new_with):
+    ///   five bytes of derived material followed by eleven zeros that are key-schedule
+    ///   input. The short fill *is* the intended fill, and the zero guarantee is what makes
+    ///   it reproducible.
+    /// - **A variable-content payload** — a decoded document, a decompressed record, a frame
+    ///   whose `len` came from a header that is only an upper bound or is simply wrong (a
+    ///   truncated archive, a manifest that disagrees with its contents). Here the zero tail
+    ///   is not input. It is missing plaintext in the shape of real data, and whatever
+    ///   parses the result downstream will read it as real.
+    ///
+    /// For the second shape the closure has to check its own coverage and fail, since this
+    /// method cannot do it: write through a [`SlotWriter`](crate::SlotWriter) and return
+    /// `Err` unless [`is_full()`](crate::SlotWriter::is_full) holds at the end, or keep the
+    /// count by hand and compare `bytes_written == slot.len()` before returning `Ok`. The
+    /// `read_exact` example below does not demonstrate this and cannot be read as the
+    /// pattern to copy — [`read_exact`](std::io::Read::read_exact) surfaces under-fill as
+    /// `Err` by construction, so that closure gets the check for free and never writes one.
+    ///
+    /// # Panics
+    ///
+    /// The same two allocator failures as [`new_with`](Self::new_with), for the same
+    /// reason: the body allocates the slot with the identical `alloc::vec![0u8; len]`. A
+    /// `len` above `isize::MAX` panics with `"capacity overflow"`; a `len` the allocator
+    /// cannot satisfy reaches `handle_alloc_error`, which aborts without unwinding, so no
+    /// `Zeroizing` anywhere on the stack runs. The `# Errors` section above describes the
+    /// closure's failures only — an oversized `len` never reaches the closure and never
+    /// arrives as `Err`, so a caller treating `Result` as the complete failure channel is
+    /// wrong about this one. Bound `len` before passing it; the example below takes it
+    /// straight from its caller, which in real code means straight from a frame header.
+    ///
+    /// A panic *inside* `f` is safe, exactly as in `new_with`: the slot is held in a
+    /// [`zeroize::Zeroizing`] for the whole call and is wiped during unwinding.
     ///
     /// # Examples
     ///
@@ -872,8 +940,24 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     pub fn from_rng<R: TryRng + TryCryptoRng>(len: usize, rng: &mut R) -> Result<Self, R::Error> {
         // This body was the captured-local workaround `try_new_with` exists to retire:
         // `new_with` could not report failure, so the error was written to a local and
-        // checked afterwards. Same behaviour, one expression. The `resize` is gone too —
-        // it only ever existed to size a buffer that now arrives sized.
+        // checked afterwards. One expression now — and one observable behaviour change,
+        // not none.
+        //
+        // The old body was `Vec::new()` followed by `v.resize(len, 0u8)`, and `resize`
+        // grows through `RawVec::grow_amortized`, which floors capacity at
+        // `MIN_NON_ZERO_CAP` — 8 for one-byte elements. So `from_rng(4, ..)` used to return
+        // a buffer of length 4 with capacity 8, while `alloc::vec![0u8; len]` allocates the
+        // exact size and returns capacity 4. That is visible through
+        // `with_secret(Vec::capacity)`, which this crate's tests read directly, and it
+        // tightens the `io::Write` impl's spare-room branch
+        // (`buf.len() > v.capacity() - v.len()`): a short random secret no longer carries
+        // up to four free bytes that could absorb a small write without growing. Holding no
+        // slack is the whole point of the new constructor, so the change stays — it is just
+        // not behaviour-neutral, and a 0.8 backport that assumes it is will be wrong about
+        // any capacity assertion below 8.
+        //
+        // Everything else is unchanged: same `R::Error`, same wipe-on-`Err` (the
+        // `Zeroizing` drops on the way out), same allocation count.
         Self::try_new_with(len, |slot| rng.try_fill_bytes(slot))
     }
 }

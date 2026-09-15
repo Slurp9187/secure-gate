@@ -19,7 +19,9 @@
 //! Secrets are **automatically zeroized on drop** (the inner type must implement
 //! [`Zeroize`](zeroize::Zeroize)). While a secret is held in [`Fixed`] or [`Dynamic`],
 //! there is no `Deref` and no `AsRef`: callers reach the inner secret only via
-//! [`RevealSecret`] / [`RevealSecretMut`], and `Debug` always prints `[REDACTED]`.
+//! [`RevealSecret`] / [`RevealSecretMut`], and `Debug` on a wrapper always prints
+//! `[REDACTED]`. [`SlotWriter`], which borrows a wrapper's storage rather than holding it,
+//! prints its cursor instead — position, remaining, length — and never the bytes.
 //! Access has two shapes: **borrow** it, or **take** it.
 //! [`with_secret()`](RevealSecret::with_secret) and
 //! [`expose_secret()`](RevealSecret::expose_secret) lend you a reference while the
@@ -116,6 +118,7 @@
 //! |----------|-------|-------------------|---------|
 //! | **Secret wrappers** | [`Fixed<T>`], [`Dynamic<T>`] | No — use [`RevealSecret`] | Hold live secrets; `Debug` → `[REDACTED]` |
 //! | **Output wrapper** | [`EncodedSecret`] | Yes — yields `&str`; copies you make are yours, the buffer stays the wrapper's | Holds encoded output, wiped on drop |
+//! | **Borrowed slot cursor** | [`SlotWriter`] | No — it writes, it does not read out | Appends into a slot a sized `new_with` handed out; `Debug` → cursor state only, never bytes |
 //! | **Opt-in markers** | [`CloneableSecret`], [`SerializableSecret`] | — (no methods) | Implement on inner type `T` to unlock gated impls |
 //!
 //! `CloneableSecret` and `SerializableSecret` are implemented on the **inner type `T`**,
@@ -334,7 +337,10 @@ pub use dynamic::DynamicReader;
 /// The sized constructors hand out a slot whose length is already decided, which is what
 /// makes growth — and therefore the reallocation hazard — inexpressible. `SlotWriter`
 /// restores the append shape on top of that, so concatenating a wire format does not mean
-/// writing offsets by hand. Overrun panics rather than truncating.
+/// writing offsets by hand. [`push_slice`](SlotWriter::push_slice) panics on overrun and
+/// leaves the slot untouched; the `std`-gated [`Write`](std::io::Write) path cannot do that
+/// and stay inside `Write`'s contract, so it truncates and reports the refusal on a later
+/// call. `Debug` shows the cursor — position, remaining, length — and never the bytes.
 pub use slot_writer::SlotWriter;
 
 #[cfg(all(feature = "alloc", feature = "serde-deserialize"))]
