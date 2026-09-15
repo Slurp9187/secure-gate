@@ -100,6 +100,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `RevealSecret::expose_secret` gains a "Coming from `secrecy`" note. The two crates share
+  this spelling deliberately — this one kept the vocabulary when it forked — but not the
+  posture: as of `secrecy` 0.10.3 a plain reference is documented there as "the only method
+  providing access to a secret", whereas here it is the auditable escape hatch and
+  `with_secret` is the recommended path. The habit transfers silently, because reaching for
+  the familiar name compiles, works, and protects the secret exactly as before, so nothing
+  signals that the narrower tool exists. Named on `expose_secret` rather than `with_secret`
+  because that is where a migrating reader actually lands.
 - **Automatic `ConstantTimeEq` on every nominal arm whose payload implements it.**
   Backported from 0.9.0-rc.11 (both halves). `Fixed<T>` and `Dynamic<T>` implement
   `ConstantTimeEq` for any `T` that does, so `pub type MacTag = Fixed<[u8; 32]>;` — and
