@@ -39,13 +39,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   It remains a genuine opt-in everywhere else. On the `generic` arms the inner type may or
   may not implement `ConstantTimeEq` — `[i16; 256]` does not — so nothing the macro can
-  read off the tokens decides it and the declaration still must. `dynamic_newtype!` is
-  unchanged in this release, though the same argument applies to its `String` and `Vec<u8>`
-  arms and is worth making separately.
+  read off the tokens decides it and the declaration still must. The same argument applies
+  to `dynamic_newtype!`'s `String` and `Vec<u8>` arms, which follow in the entry below.
 
   Reported by a downstream consumer (aescrypt-rs) migrating a full AES Crypt v0–v3
   implementation onto the newtype macros, whose three HMAC-tag comparison sites were the
   ones that would have silently lost `ct_eq` in the move from plain aliases.
+
+- **`dynamic_newtype!`'s `String` and `Vec<u8>` arms implement `ConstantTimeEq` without being
+  asked, matching `fixed_newtype!`.** The heap arms carried the identical asymmetry the
+  size-literal arm did, for the identical reason: `Dynamic<T>` implements `ConstantTimeEq`
+  for any `T` that does, so `pub type ApiKey = Dynamic<String>;` always had `ct_eq` and
+  `dynamic_newtype!(pub ApiKey, String)` did not. Correcting one and not the other would
+  have left the crate recommending newtypes while two of its four nominal arms still
+  charged an extra token for constant-time comparison.
+
+  The shared helper is renamed `__sg_newtype_base_ct_eq!` — it was `__sg_newtype_base_bytes!`
+  when the size-literal arm was its only caller, and that name stopped describing it the
+  moment `Dynamic<String>` became one. It is `#[doc(hidden)]` and internal; no caller
+  outside this crate names it, and 0.9.0-rc.11 is unpublished.
+
+  As on the size-literal arm, `derive: [ConstantTimeEq]` stays accepted and inert, so no
+  declaration written against an earlier release candidate changes meaning. The `generic`
+  arm is untouched: an arbitrary inner type may or may not implement the trait.
+
+  One property does *not* transfer from the fixed arms, and the rustdoc now says so where
+  the token used to be documented: `ct_eq` on a variable-length secret short-circuits when
+  the lengths differ, so only the equal-length comparison runs in constant time. Where the
+  length itself is sensitive, `fixed_newtype!` is the answer.
 
 ### Testing
 
@@ -54,6 +75,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   32-element ceiling `Default` would impose), and the pre-rc.11 spelling stays inert rather
   than becoming a duplicate impl. A third case puts the redundant token *between* two live
   options and asserts both survive it.
+
+  A parallel test does the same for the `String` and `Vec<u8>` arms, and adds the one
+  assertion that has no fixed-arm counterpart: two secrets of differing length compare
+  unequal rather than panicking, which is the documented short-circuit and the reason the
+  constant-time guarantee covers contents but not length.
 
 ## [0.9.0-rc.10] - 2026-09-14
 

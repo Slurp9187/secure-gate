@@ -123,28 +123,31 @@ macro_rules! __sg_newtype_base {
 }
 
 /// Internal: the base surface plus an automatic
-/// [`ConstantTimeEq`](crate::ConstantTimeEq), for arms whose payload is a byte
-/// array.
+/// [`ConstantTimeEq`](crate::ConstantTimeEq), for the arms whose payload is
+/// known to implement it.
 ///
-/// `fixed_newtype!`'s size-literal arm wraps `Fixed<[u8; N]>`, which implements
-/// `ConstantTimeEq` unconditionally under the `ct-eq` feature. A plain
-/// `type Name = Fixed<[u8; N]>;` therefore gets `ct_eq` for free, and before
-/// 0.9.0-rc.11 the newtype — the spelling this crate recommends as the safer
-/// of the two — did not, unless the declaration also carried
-/// `derive: [ConstantTimeEq]`. That put the extra token on the side the
+/// Four arms qualify, and they qualify for one reason: their wrapper implements
+/// `ConstantTimeEq` unconditionally under the `ct-eq` feature, so a plain
+/// `type Name = Fixed<[u8; N]>;` — or `= Dynamic<String>`, or
+/// `= Dynamic<Vec<u8>>` — has always had `ct_eq` for free. The newtype, the
+/// spelling this crate recommends as the safer of the two, did not: it wanted
+/// `derive: [ConstantTimeEq]` as well. That put the extra token on the side the
 /// documentation steers people toward, which is the wrong way round for a
-/// comparison whose alternative is a timing leak.
+/// comparison whose alternative is a timing leak. `fixed_newtype!`'s
+/// size-literal arm was corrected in 0.9.0-rc.11; `dynamic_newtype!`'s `String`
+/// and `Vec<u8>` arms followed in the same release.
 ///
-/// The token is now redundant here rather than removed: emitting the impl twice
-/// is `E0119`, so the derive list is scanned and `ConstantTimeEq` dropped from
-/// it before reaching [`__sg_newtype_base!`]. Declarations written against
+/// The token is redundant on those arms rather than removed: emitting the impl
+/// twice is `E0119`, so the derive list is scanned and `ConstantTimeEq` dropped
+/// from it before reaching [`__sg_newtype_base!`]. Declarations written against
 /// earlier release candidates keep compiling and mean exactly what they say.
-/// Every other arm still routes the token through `__sg_newtype_opt!`, where it
-/// remains a genuine opt-in: `generic T` can hold an inner type that implements
-/// `ConstantTimeEq`, and nothing here can know whether it does.
+///
+/// Every `generic` arm still routes the token through `__sg_newtype_opt!`, where
+/// it remains a genuine opt-in — an arbitrary inner type may or may not
+/// implement `ConstantTimeEq`, and nothing readable off the tokens decides it.
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __sg_newtype_base_bytes {
+macro_rules! __sg_newtype_base_ct_eq {
     // Scan complete — expand with the tokens that survived.
     (@scan [] [$($kept:ident)*] $(#[$attr:meta])* $vis:vis $name:ident($wrapper:ty)) => {
         $crate::__sg_newtype_base!($(#[$attr])* $vis $name($wrapper), derive: [$($kept),*]);
@@ -160,14 +163,14 @@ macro_rules! __sg_newtype_base_bytes {
     };
     // Redundant on this arm: drop it rather than duplicate the impl.
     (@scan [ConstantTimeEq $($rest:ident)*] [$($kept:ident)*] $($tail:tt)*) => {
-        $crate::__sg_newtype_base_bytes!(@scan [$($rest)*] [$($kept)*] $($tail)*);
+        $crate::__sg_newtype_base_ct_eq!(@scan [$($rest)*] [$($kept)*] $($tail)*);
     };
     // Anything else is a real option; keep it in order.
     (@scan [$first:ident $($rest:ident)*] [$($kept:ident)*] $($tail:tt)*) => {
-        $crate::__sg_newtype_base_bytes!(@scan [$($rest)*] [$($kept)* $first] $($tail)*);
+        $crate::__sg_newtype_base_ct_eq!(@scan [$($rest)*] [$($kept)* $first] $($tail)*);
     };
     ($(#[$attr:meta])* $vis:vis $name:ident($wrapper:ty), derive: [$($opt:ident),* $(,)?]) => {
-        $crate::__sg_newtype_base_bytes!(@scan [$($opt)*] [] $(#[$attr])* $vis $name($wrapper));
+        $crate::__sg_newtype_base_ct_eq!(@scan [$($opt)*] [] $(#[$attr])* $vis $name($wrapper));
     };
 }
 
