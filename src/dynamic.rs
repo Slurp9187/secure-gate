@@ -551,6 +551,17 @@ impl Dynamic<Vec<u8>> {
     /// instead of trusting the payload: a length field is attacker-controlled input until
     /// something checks it.
     ///
+    /// For some callers that bound is not a check that *moves* — it is a check that changes
+    /// *shape*, and the difference decides whether there is any work to do. If your length
+    /// previously flowed into a decompressor or a comparison further down, a ceiling
+    /// enforced after the fact was enough: an overstated length failed a check and you
+    /// returned an error. Here the length **is** the allocation, and
+    /// `alloc::vec![0u8; 9_000_000_000]` does not fail a comparison — it asks the allocator
+    /// for nine gigabytes before any of your code runs. A caller whose length comes from a
+    /// trusted source has nothing to do. A caller whose length comes from the file format
+    /// has acquired an allocation-sized surface where it previously had a comparison, and
+    /// needs a bound it may never have written.
+    ///
     /// A panic *inside* `f` is safe: the slot lives in a [`zeroize::Zeroizing`] for the
     /// whole call, so partially written bytes are wiped during unwinding.
     ///
