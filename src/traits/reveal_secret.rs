@@ -221,6 +221,23 @@ pub trait RevealSecret {
     /// how far the reference travels first, which is why this is the auditable spelling
     /// rather than the recommended one.
     ///
+    /// # Coming from `secrecy`
+    ///
+    /// This is the closest analogue to `secrecy`'s `ExposeSecret::expose_secret`, and the
+    /// spelling is the same on purpose — this crate kept that vocabulary when it went its
+    /// own way. What differs is that it is not the only door. As of `secrecy` 0.10.3,
+    /// `fn expose_secret(&self) -> &S` is documented there as *"the only method providing
+    /// access to a secret"*; here it is the auditable escape hatch, and
+    /// [`with_secret`](Self::with_secret) is the recommended path.
+    ///
+    /// That matters because the habit transfers silently. Reaching for the familiar name
+    /// compiles, works, and protects the secret exactly as it did before — so nothing
+    /// signals that the narrower tool exists. `with_secret` confines the borrow to a
+    /// closure, which this method cannot do; neither one stops the body from *copying* the
+    /// secret out. Prefer `with_secret` unless a long-lived reference is genuinely
+    /// unavoidable, and see `SECURITY.md` § "Copying the secret out of a reveal borrow"
+    /// for what neither of them can prevent.
+    ///
     /// # Examples
     ///
     /// ```rust
