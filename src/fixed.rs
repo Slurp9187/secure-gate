@@ -28,6 +28,7 @@
 //! |---|---|
 //! | [`Fixed::new(value)`](Fixed::new) | Ergonomic default; `const fn`. |
 //! | [`Fixed::new_with(f)`](Fixed::new_with) | Scoped — preferred for stack-residue minimization. |
+//! | [`Fixed::try_new_with(f)`](Fixed::try_new_with) | Scoped, for a fill that can fail; wipes on `Err`. |
 //!
 //! Prefer [`new_with`](Fixed::new_with) in high-assurance code: it writes directly
 //! into the wrapper's storage, avoiding the intermediate stack copy that `new` may
@@ -163,6 +164,7 @@ fn drain_bech32_payload<const N: usize>(
 /// |---|---|---|
 /// | [`new(value)`](Self::new) | — | `const fn`, ergonomic default |
 /// | [`new_with(f)`](Self::new_with) | — | Scoped; preferred for stack-residue minimization |
+/// | [`try_new_with(f)`](Self::try_new_with) | — | Scoped, fallible fill; zeroizes the partial write on `Err` |
 /// | [`From<[u8; N]>`](#impl-From<%5Bu8;+N%5D>-for-Fixed<%5Bu8;+N%5D>) | — | Equivalent to `new` |
 /// | [`TryFrom<&[u8]>`](#impl-TryFrom<%26%5Bu8%5D>-for-Fixed<%5Bu8;+N%5D>) | — | Length-checked slice conversion |
 /// | [`try_from_hex`](Self::try_from_hex) | `encoding-hex` | Constant-time hex decoding |
@@ -404,6 +406,8 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     ///
     /// # See also
     ///
+    /// - [`try_new_with`](Self::try_new_with) — the same thing when the fill can
+    ///   fail, rather than routing the error out through a captured local.
     /// - [`Dynamic::new_with`](crate::Dynamic::new_with) — the heap-allocated
     ///   equivalent (requires `alloc`).
     ///
@@ -426,6 +430,101 @@ impl<T: zeroize::Zeroize> Fixed<T> {
         };
         f(&mut this.inner);
         this
+    }
+
+    /// Writes directly into the wrapper's storage via a closure that may fail.
+    ///
+    /// The fallible sibling of [`new_with`](Self::new_with), and identical to it in
+    /// every respect but the closure's return type. Reach for it whenever filling the
+    /// secret can fail — reading from a file, a socket, a device — so that writing in
+    /// place and handling the error stay one expression.
+    ///
+    /// On `Err` the partially written slot is **zeroized before the error is
+    /// returned**: the wrapper exists for the whole of the closure's run, so
+    /// [`Drop`](Fixed#impl-Drop-for-Fixed<T>) wipes whatever the closure managed to
+    /// write. A failed fill leaves nothing behind, in memory or in the return value.
+    ///
+    /// Requires [`FixedStorage`](crate::FixedStorage) and
+    /// [`SentinelValue`](crate::SentinelValue) on `T`, exactly as `new_with` does.
+    ///
+    /// # Why `try_`, given the rest of this type
+    ///
+    /// Elsewhere here `try_` marks a constructor that *parses* untrusted input —
+    /// [`try_from_hex`](Self::try_from_hex), [`try_from_base32`](Self::try_from_base32),
+    /// `TryFrom<&[u8]>` — while [`from_rng`](Self::from_rng) is fallible and keeps
+    /// `from_`. This method widens the prefix to its ordinary Rust meaning, the one
+    /// `try_reserve` and `try_lock` carry: **`try_` marks a constructor that can fail**,
+    /// whether because it validates input or because the caller's fill can.
+    ///
+    /// # `T` must be inferable at the call site
+    ///
+    /// Generic over `T`, so the closure's parameter type is not known until `T` is —
+    /// the same constraint [`new_with`](Self::new_with) documents, with the same
+    /// **E0282** if nothing names it. A return type alone does not resolve it. Name
+    /// the type in either position:
+    ///
+    /// ```rust
+    /// use secure_gate::Fixed;
+    /// # #[derive(Debug)] struct ShortRead;
+    ///
+    /// // On the type:
+    /// let a = Fixed::<[u8; 32]>::try_new_with(|x| { x.fill(1); Ok::<(), ShortRead>(()) })?;
+    /// // Or on the closure parameter:
+    /// let b = Fixed::try_new_with(|x: &mut [u8; 32]| { x.fill(1); Ok::<(), ShortRead>(()) })?;
+    /// # let _ = (a, b);
+    /// # Ok::<(), ShortRead>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns whatever the closure returns. The error type is the caller's; this
+    /// method neither inspects nor wraps it.
+    ///
+    /// # Examples
+    ///
+    /// Filling from a reader, which is the case this exists for — the bytes land in
+    /// the wrapper's own storage and never occupy a caller-owned buffer:
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "std")] {
+    /// use secure_gate::{Fixed, RevealSecret};
+    /// use std::io::Read;
+    ///
+    /// fn read_key<R: Read>(r: &mut R) -> std::io::Result<Fixed<[u8; 32]>> {
+    ///     Fixed::<[u8; 32]>::try_new_with(|slot| r.read_exact(slot))
+    /// }
+    ///
+    /// let key = read_key(&mut [7u8; 32].as_slice()).unwrap();
+    /// assert_eq!(key.expose_secret(), &[7u8; 32]);
+    ///
+    /// // A short read fails, and yields no secret at all.
+    /// assert!(read_key(&mut [7u8; 8].as_slice()).is_err());
+    /// # }
+    /// ```
+    ///
+    /// # See also
+    ///
+    /// - [`new_with`](Self::new_with) — the infallible form; prefer it when the fill
+    ///   cannot fail.
+    #[inline(always)]
+    pub fn try_new_with<F, E>(f: F) -> Result<Self, E>
+    where
+        T: crate::FixedStorage + crate::SentinelValue,
+        F: FnOnce(&mut T) -> Result<(), E>,
+    {
+        // Binding the unit-valued const is what forces it to be evaluated; clippy reads
+        // that as a pointless binding. Kept explicit because the 1.70 lint (the 0.8
+        // line's MSRV) fires on every spelling that still triggers the evaluation.
+        #[allow(clippy::let_unit_value)]
+        let () = Self::NON_ZERO_SIZED;
+        let mut this = Self {
+            inner: <T as crate::SentinelValue>::sentinel_value(),
+        };
+        // On the error path `this` is dropped here, so `Fixed::drop` zeroizes whatever
+        // the closure wrote before it gave up. That is the whole reason the wrapper is
+        // built before the fill rather than after it.
+        f(&mut this.inner)?;
+        Ok(this)
     }
 }
 
@@ -1110,11 +1209,10 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// ```
     #[inline]
     pub fn from_rng<R: TryRng + TryCryptoRng>(rng: &mut R) -> Result<Self, R::Error> {
-        let mut result = Ok(());
-        let this = Self::new_with(|arr| {
-            result = rng.try_fill_bytes(arr);
-        });
-        result.map(|_| this) // on Err, `this` drops → zeroizes any partial fill
+        // This body was the captured-local workaround `try_new_with` exists to retire:
+        // `new_with` could not report failure, so the error was written to a local and
+        // checked afterwards. Same behaviour, one expression.
+        Self::try_new_with(|arr| rng.try_fill_bytes(arr))
     }
 }
 

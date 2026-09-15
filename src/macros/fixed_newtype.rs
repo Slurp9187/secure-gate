@@ -370,6 +370,14 @@ macro_rules! fixed_newtype {
             where F: ::core::ops::FnOnce(&mut [$t; $n]) {
                 Self($crate::Fixed::new_with(f))
             }
+
+            /// Scoped construction from a fill that can fail. On `Err` the partial
+            /// write is zeroized before the error is returned.
+            #[inline(always)]
+            pub fn try_new_with<F, E>(f: F) -> ::core::result::Result<Self, E>
+            where F: ::core::ops::FnOnce(&mut [$t; $n]) -> ::core::result::Result<(), E> {
+                ::core::result::Result::Ok(Self($crate::Fixed::try_new_with(f)?))
+            }
         }
     };
 
@@ -400,6 +408,14 @@ macro_rules! fixed_newtype {
             pub fn new_with<F>(f: F) -> Self
             where F: ::core::ops::FnOnce(&mut $inner) {
                 Self($crate::Fixed::new_with(f))
+            }
+
+            /// Scoped construction from a fill that can fail. On `Err` the partial
+            /// write is zeroized before the error is returned.
+            #[inline(always)]
+            pub fn try_new_with<F, E>(f: F) -> ::core::result::Result<Self, E>
+            where F: ::core::ops::FnOnce(&mut $inner) -> ::core::result::Result<(), E> {
+                ::core::result::Result::Ok(Self($crate::Fixed::try_new_with(f)?))
             }
         }
     };
@@ -432,6 +448,14 @@ macro_rules! fixed_newtype {
             pub fn new_with<F>(f: F) -> Self
             where F: ::core::ops::FnOnce(&mut [u8; $size]) {
                 Self($crate::Fixed::new_with(f))
+            }
+
+            /// Scoped construction from a fill that can fail. On `Err` the partial
+            /// write is zeroized before the error is returned.
+            #[inline(always)]
+            pub fn try_new_with<F, E>(f: F) -> ::core::result::Result<Self, E>
+            where F: ::core::ops::FnOnce(&mut [u8; $size]) -> ::core::result::Result<(), E> {
+                ::core::result::Result::Ok(Self($crate::Fixed::try_new_with(f)?))
             }
         }
 

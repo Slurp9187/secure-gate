@@ -489,6 +489,14 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   and `From<T>` take `v` by value, and `into_inner` returns it by value, so those three
   do put the secret on the stack briefly. The `new_with` and decode constructors
   (`from_protected_bytes` + `mem::swap`) are the paths with no stack step at all.
+- **When the fill can fail**, which covers every secret read from a file, socket or
+  device: use `Fixed::<[u8; N]>::try_new_with(|arr| ...)`, whose closure returns
+  `Result<(), E>`. Reading into a plain `[u8; N]` and then wrapping it is the shape to
+  avoid — it copies twice and abandons the first copy unwiped, and no amount of care
+  afterwards recovers those bytes. On `Err`, `try_new_with` zeroizes whatever the closure
+  wrote before returning. Do not hand-roll the older workaround of capturing an error out
+  of a `new_with` closure and checking it afterwards: it is correct only if the check is
+  never forgotten.
 
 **Security-first construction and access patterns**
 

@@ -9,6 +9,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > The line is open. `v0.9.0-rc.11` is not tagged and not published.
 
+### Added
+
+- **`Fixed::try_new_with` — in-place construction from a fill that can fail.**
+  [`new_with`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html#method.new_with)
+  hands a closure the wrapper's own storage, so a secret is written where it will live and
+  never occupies a caller-owned buffer. It is the constructor `SECURITY.md` tells people to
+  prefer. Its closure could not fail — and the most common way to obtain a secret is to read
+  it from a file, a socket or a device, which can. The safe shape and the fallible shape did
+  not compose.
+
+  What callers did instead was route the error out of the closure through a captured local:
+
+  ```rust
+  let mut result = Ok(());
+  let this = Self::new_with(|arr| { result = rng.try_fill_bytes(arr); });
+  result.map(|_| this)
+  ```
+
+  That is not a hypothetical. It was `Fixed::from_rng`'s own body, written that way because
+  there was no alternative, and it is correct only for as long as nobody deletes the last
+  line — do that and a failed fill yields a half-written secret that looks fine. `from_rng`
+  is now `Self::try_new_with(|arr| rng.try_fill_bytes(arr))`, which is the same behaviour and
+  the strongest evidence available that the signature is the right one: the first thing the
+  new API did was delete the workaround it was designed to retire.
+
+  **On `Err` the partial write is zeroized before the error is returned.** The wrapper is
+  constructed *before* the closure runs, so it is a live local for the whole fill and `Drop`
+  wipes whatever the closure managed to write. This is the half that the obvious
+  implementation — fill a buffer, wrap it only on success — gets backwards, so it is pinned
+  by a test that records the actual value wiped rather than asserting the `Result`.
+
+  Forwarded by every `fixed_newtype!` arm that already forwards `new_with`: the size-literal
+  arm, the literal-array `generic [T; N]` arm, and the opaque `generic T` arm. Outside the
+  feature relays, so it resolves with no features at all — which matters most on the targets
+  where `Fixed` is the only wrapper there is.
+
+  `Dynamic` does not get a counterpart yet. `Dynamic::new_with` hands its closure an empty
+  `Vec`/`String` to grow rather than a sized slot, which puts it directly against the
+  reallocation-residue guidance in `SECURITY.md`; that deserves answering on its own rather
+  than in passing.
+
+  **On the name.** Elsewhere on `Fixed`, `try_` marks a constructor that *parses* untrusted
+  input — `try_from_hex`, `try_from_base32`, `TryFrom<&[u8]>` — while `from_rng` is fallible
+  and keeps `from_`. Read strictly, that argued for a different name here. It loses to the
+  wider convention: across Rust `try_x` is the fallible form of `x` (`try_reserve`,
+  `try_lock`), and that is the meaning a reader arrives with. A name nobody guesses is worse
+  than a prefix carrying two related senses, so the rustdoc states both rather than leaving
+  an unstated rule with an exception in it.
+
+  Requested by a downstream consumer (aescrypt-rs) whose AES Crypt v0–v3 reader fills
+  `[u8; N]` spans from a stream.
+
 ### Changed
 
 - **`fixed_newtype!`'s size-literal arm implements `ConstantTimeEq` without being asked.**
@@ -69,6 +121,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   length itself is sensitive, `fixed_newtype!` is the answer.
 
 ### Testing
+
+- **The fallible constructor's error path is pinned by what it wipes, not by what it
+  returns.** `tests/lifecycle_trace_handoff.rs` is the only instrument here that can watch a
+  `Fixed` being cleared — the secret lives on the stack, so the allocator-proxy suite never
+  sees it, and reading the slot after drop is unavailable under `#![forbid(unsafe_code)]`.
+  Its recording inner type reports the value present at each wipe, so the test asserts that
+  `0x0BAD_F00D` specifically was written and then cleared. Asserting only that an `Err` came
+  back would pass against an implementation that leaked the whole partial write.
+
+  A second case runs the same thing through a `generic` newtype, which pins that the macro's
+  forwarded `try_new_with` reaches `Fixed::try_new_with` instead of reimplementing it: a
+  forward that rebuilt the value would not wipe, and would satisfy any test that only looked
+  at the `Result`.
+
+- **Both `trybuild` snapshots moved, for different reasons, and only one of them is
+  noise.** `fixed_zero_size.stderr` embeds the line of the `NON_ZERO_SIZED` assertion in
+  `src/fixed.rs`, so the doc rows added above it shifted `298` to `300` — the known
+  fragility, re-blessed with no meaning.
+
+  `fixed_reallocating_inner.stderr` grew by sixty lines, and that part is evidence.
+  Its fixture declares `fixed_newtype!(pub LeakyBytes, generic Vec<u8>)`, and the
+  compiler now reports the `FixedStorage` violation once per forwarded constructor
+  rather than twice — `new`, `new_with`, and `try_new_with`. The snapshot getting longer
+  is the guard demonstrating it covers the new constructor too, which is worth more than
+  a separate fixture asserting the same thing would have been.
 
 - `tests/macros_suite/newtype_surface.rs` pins both halves: the impl arrives on a
   declaration with no `derive:` list at all (including at `N = 900`, well past the
