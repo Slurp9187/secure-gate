@@ -338,16 +338,31 @@ fn count_allocs<F: FnOnce()>(f: F) -> usize {
 //
 // Every trace below needs `capacity == len`, so that `layout.size()` at release
 // equals a number the test knows and a partial inspection cannot pass unnoticed.
-// `reserve_exact` / `with_capacity` give that; each helper asserts it rather than
-// assuming it, because an allocator is free to round up.
+// The three helpers now get it from two different places, and the difference is
+// worth naming because it decides what a failure of each assertion would mean:
+// `exact_tok` is handed the exactness by `new_with(len, …)`, which allocates
+// exactly `len` bytes, so its assertion is a check on the constructor's contract.
+// `exact_pw` and `exact_wide` have to arrange it themselves with `with_capacity`
+// and move the result in, so theirs is a check on this file's own setup. Both
+// kinds are asserted rather than assumed — an allocator is free to round up, and
+// a helper that quietly stopped producing exact capacities would make every size
+// assertion downstream vacuous rather than failing.
 // ---------------------------------------------------------------------------
 
 /// A `Tok` holding `size` bytes of `PAYLOAD` in a buffer of capacity exactly `size`.
+///
+/// The exact capacity is no longer something this helper arranges. `new_with(len, f)` hands
+/// the closure a slice over a buffer it has already allocated at exactly `len` bytes, so
+/// `capacity == len` is a guarantee the constructor owes — where the previous signature made
+/// it the payoff of a `reserve_exact` the closure had to remember, and a forgotten one would
+/// have grown the buffer instead. The assertion stays for that reason: it now pins the
+/// constructor's promise, which every `layout.size()` comparison below is downstream of.
+///
+/// Every byte of the slot is written, not a prefix. The zero tail `new_with` guarantees is a
+/// feature at real call sites, but here it would read as "already wiped" at every check that
+/// counts surviving non-zero bytes in a freed block.
 fn exact_tok(size: usize) -> Tok {
-    let tok = Tok::new_with(|v| {
-        v.reserve_exact(size);
-        v.extend(std::iter::repeat(PAYLOAD).take(size));
-    });
+    let tok = Tok::new_with(size, |slot| slot.fill(PAYLOAD));
     assert_eq!(
         tok.with_secret(Vec::capacity),
         size,
@@ -357,11 +372,27 @@ fn exact_tok(size: usize) -> Tok {
 }
 
 /// A `Pw` holding `size` ASCII bytes in a buffer of capacity exactly `size`.
+///
+/// Built outside the wrapper and moved in, because as of 0.8.0-rc.14 there is no other way:
+/// `Dynamic<String>` has no closure constructor and cannot have one — a sized byte slot is not
+/// somewhere arbitrary text can be written, since `String` must hold valid UTF-8 and characters
+/// have variable byte widths. So the exactness this helper's name promises is its own doing,
+/// not a constructor's: `Pw::new` guarantees only that the buffer is **moved** rather than
+/// copied, and says nothing about its capacity.
+///
+/// Both halves are therefore asserted. The first pins the build (a `String::with_capacity(size)`
+/// filled to exactly `size` single-byte characters, which does not reallocate); the second pins
+/// that the move preserved it, so a future `new` that rebuilt the value would fail here rather
+/// than silently hand every downstream size comparison a different allocation to measure.
 fn exact_pw(size: usize) -> Pw {
-    let pw = Pw::new_with(|s| {
-        s.reserve_exact(size);
-        s.extend(std::iter::repeat('q').take(size));
-    });
+    let mut source = String::with_capacity(size);
+    source.extend(std::iter::repeat('q').take(size));
+    assert_eq!(
+        source.capacity(),
+        size,
+        "String::with_capacity over-allocated; every size assertion below would be vacuous"
+    );
+    let pw = Pw::new(source);
     assert_eq!(
         pw.with_secret(String::capacity),
         size,
@@ -480,8 +511,8 @@ fn check_str_and_slice_conversions_copy_then_wipe(size: usize) {
     );
 
     // The source is still the caller's problem. Measured, not assumed: wrapping a copy protects
-    // the copy only, and the mitigation is to build into the wrapper (`new_with`) or to move the
-    // owned value in (`new`).
+    // the copy only, and the mitigation is to build into the wrapper (`new_with(len, …)`) or to
+    // move the owned value in (`new`).
     assert!(
         plaintext.bytes().all(|b| b == b'p'),
         "the conversion mutated the caller's string"
@@ -518,18 +549,30 @@ fn check_str_and_slice_conversions_copy_then_wipe(size: usize) {
     );
 }
 
-/// Pins that `new_with` hands the closure's own buffer to the wrapper — the address the closure
-/// wrote into is the address the wrapper later wipes, with no intervening copy.
+/// Pins that `new_with` hands the closure the wrapper's own storage — the address the closure
+/// wrote into is the address the wrapper later wipes, with no intervening copy — and that the slot
+/// is exactly `len` bytes, so there is no slack the closure could have grown into.
 ///
 /// `new_with` exists so that secret bytes are written once, into the buffer that will be protected.
 /// If the construction swapped in a copy, the closure's buffer would be freed unwiped at exactly
-/// the moment the wrapper was built, which is the failure this address comparison would catch.
+/// the moment the wrapper was built, which is the failure this address comparison would catch. The
+/// route the address has to survive is not trivial: the slot is a slice over a `Zeroizing<Vec<u8>>`
+/// whose buffer is swapped into a `Box` after the fill, and a swap that turned into a copy would
+/// show up here as two different addresses.
+///
+/// The capacity assertion is the other half, and it is what the pre-0.8.0-rc.14 signature could not
+/// offer: a closure handed a growable `Vec` could reallocate mid-fill and abandon an unwiped copy,
+/// and `capacity == len` afterwards is the observable that says no growth was even expressible.
+///
+/// There is no `String` half any more. `Pw::new_with` was removed rather than resized, because a
+/// fixed byte window is not somewhere arbitrary text can be written — see `exact_pw`, which builds
+/// a pre-sized `String` and moves it in, and `check_string_new_moves_callers_buffer`, which is where
+/// the String arm's "written once, never copied" claim is now measured.
 fn check_new_with_keeps_the_closures_buffer(size: usize) {
     let mut written = 0usize;
-    let tok = Tok::new_with(|v| {
-        v.reserve_exact(size);
-        v.extend(std::iter::repeat(PAYLOAD).take(size));
-        written = v.as_ptr() as usize;
+    let tok = Tok::new_with(size, |slot| {
+        slot.fill(PAYLOAD);
+        written = slot.as_ptr() as usize;
     });
     assert_eq!(
         tok.expose_secret().as_ptr() as usize,
@@ -537,28 +580,12 @@ fn check_new_with_keeps_the_closures_buffer(size: usize) {
         "Tok::new_with moved the secret into a different buffer than the closure filled"
     );
     let cap = tok.with_secret(Vec::capacity);
+    assert_eq!(
+        cap, size,
+        "the slot's capacity is not exactly the requested length; new_with documents one \
+         allocation of exactly `len`, so slack here would mean growth was expressible after all"
+    );
     let w = watch_block(written as *const u8, move || drop(tok));
-    assert!(w.freed, "the closure's buffer was never released");
-    assert_eq!(
-        w.size, cap,
-        "the watched block's size is not the buffer's capacity, so this check covered only part \
-         of the allocation"
-    );
-    assert_eq!(w.nonzero, 0, "{} bytes survived the drop", w.nonzero);
-
-    let mut written = 0usize;
-    let pw = Pw::new_with(|s| {
-        s.reserve_exact(size);
-        s.extend(std::iter::repeat('q').take(size));
-        written = s.as_ptr() as usize;
-    });
-    assert_eq!(
-        pw.expose_secret().as_ptr() as usize,
-        written,
-        "Pw::new_with moved the secret into a different buffer than the closure filled"
-    );
-    let cap = pw.with_secret(String::capacity);
-    let w = watch_block(written as *const u8, move || drop(pw));
     assert!(w.freed, "the closure's buffer was never released");
     assert_eq!(
         w.size, cap,
@@ -867,18 +894,38 @@ fn check_truncating_mutation_wipes_the_abandoned_tail(size: usize) {
 /// the uninitialized tail is exactly where an earlier, longer value would still be sitting after a
 /// shorter one replaced it. The allocator is the only witness — `layout.size()` is the whole
 /// allocation, so asserting it against `capacity()` is what makes the tail part of the measurement.
+///
+/// # Why the dirty tail is manufactured outside the wrapper now
+///
+/// It used to be built with `Pw::new_with(|s| { … s.truncate(len) })`, and that spelling is not
+/// merely unavailable since 0.8.0-rc.14 — the shape it produced is *deliberately inexpressible*
+/// through a sized slot, where capacity equals length by construction and a wrapper never holds
+/// slack. That is precisely why this check must not follow the constructor out of the file: a
+/// secret with spare capacity still arrives routinely through `new(owned)`, which moves whatever
+/// buffer the caller built — a `with_capacity` over-estimate, a `truncate`, a shorter value
+/// assigned over a longer one — and the guarantee that the wipe covers the slack is independent of
+/// how the slack got there. So the `String` is built and shortened here, then moved in, and the
+/// move is asserted: a copying `new` would leave this dirtied allocation behind and the
+/// measurement below would be reading a different block that never held the tail at all.
 fn check_spare_capacity_wiped_string(len: usize, capacity: usize) {
     assert!(
         capacity > len,
         "this check is only meaningful with spare capacity to wipe"
     );
-    let pw = Pw::new_with(|s| {
-        s.reserve_exact(capacity);
-        // Write the full capacity first, then shorten, so the tail holds real bytes rather than
-        // whatever the allocator handed back.
-        s.extend(std::iter::repeat('q').take(capacity));
-        s.truncate(len);
-    });
+    let mut source = String::with_capacity(capacity);
+    // Write the full capacity first, then shorten, so the tail holds real bytes rather than
+    // whatever the allocator handed back.
+    source.extend(std::iter::repeat('q').take(capacity));
+    source.truncate(len);
+    assert_eq!(
+        source.capacity(),
+        capacity,
+        "the source buffer's capacity is not exactly {capacity}; truncate is documented to leave \
+         capacity alone, and without the slack this check has nothing to measure"
+    );
+    let source_buffer = source.as_ptr();
+
+    let pw = Pw::new(source);
     assert_eq!(pw.len(), len, "the payload is not the expected length");
     assert_eq!(
         pw.with_secret(String::capacity),
@@ -887,6 +934,11 @@ fn check_spare_capacity_wiped_string(len: usize, capacity: usize) {
     );
 
     let buffer = pw.expose_secret().as_ptr();
+    assert_eq!(
+        buffer, source_buffer,
+        "Pw::new copied instead of moving, so the dirty tail measured below is in the abandoned \
+         source buffer rather than in the one the wrapper wipes"
+    );
     // Positive control: the tail really is dirty going into the drop, so `nonzero == 0` below is a
     // measurement of the wipe rather than of memory that was never written. Reading `len`..`capacity`
     // is reading initialized bytes inside a live allocation the test wrote itself; no reference to

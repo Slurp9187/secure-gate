@@ -489,32 +489,92 @@ fn fixed_from_rng_error_returns_err() {
 #[test]
 fn dynamic_vec_new_with_fills_correctly() {
     use secure_gate::Dynamic;
-    let secret = Dynamic::<Vec<u8>>::new_with(|v| v.extend_from_slice(&[10, 20, 30]));
+    let secret = Dynamic::<Vec<u8>>::new_with(3, |slot| slot.copy_from_slice(&[10, 20, 30]));
     secret.with_secret(|s| assert_eq!(s.as_slice(), &[10u8, 20, 30]));
 }
 
+// The slot arrives at exactly `len`, every byte zero — callers rely on an untouched
+// tail as real key material, not padding (a 40-bit RC4 key is 5 derived bytes followed
+// by 11 zeros of key-schedule input). A partial fill plus a zero tail pins both halves
+// of that guarantee at once.
 #[cfg(feature = "alloc")]
 #[test]
-fn dynamic_vec_new_with_empty_closure() {
+fn dynamic_vec_new_with_partial_fill() {
     use secure_gate::Dynamic;
-    let secret = Dynamic::<Vec<u8>>::new_with(|_v| {});
-    secret.with_secret(|s| assert!(s.is_empty()));
+    let secret =
+        Dynamic::<Vec<u8>>::new_with(16, |slot| slot[..5].copy_from_slice(&[1, 2, 3, 4, 5]));
+    secret.with_secret(|s| {
+        assert_eq!(s.len(), 16);
+        assert_eq!(&s[..5], &[1u8, 2, 3, 4, 5]);
+        assert_eq!(&s[5..], &[0u8; 11]); // untouched tail: zero, not garbage
+    });
+}
+
+// No slack: capacity equals length. Checked against `len()`, not a repeated literal, so
+// a constructor that returned a larger capacity backing a shorter length would fail
+// this.
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_vec_new_with_capacity_equals_len() {
+    use secure_gate::Dynamic;
+    let secret = Dynamic::<Vec<u8>>::new_with(24, |_slot| {});
+    secret.with_secret(|s| {
+        assert_eq!(s.len(), 24);
+        assert_eq!(s.capacity(), s.len());
+        assert!(s.iter().all(|&b| b == 0));
+    });
 }
 
 #[cfg(feature = "alloc")]
 #[test]
-fn dynamic_string_new_with_fills_correctly() {
+fn dynamic_vec_try_new_with_ok_fills_correctly() {
     use secure_gate::Dynamic;
-    let secret = Dynamic::<String>::new_with(|s| s.push_str("hunter2"));
-    secret.with_secret(|s| assert_eq!(s.as_str(), "hunter2"));
+    let secret = Dynamic::<Vec<u8>>::try_new_with(3, |slot| {
+        slot.copy_from_slice(&[10, 20, 30]);
+        Ok::<(), ()>(())
+    })
+    .expect("closure succeeded");
+    secret.with_secret(|s| assert_eq!(s.as_slice(), &[10u8, 20, 30]));
+}
+
+// Mirrors `dynamic_vec_new_with_partial_fill` on the fallible path. `try_new_with` is
+// its own body in `src/dynamic.rs` — not a delegation to `new_with` — so the sized,
+// pre-zeroed slot contract needs its own proof here.
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_vec_try_new_with_partial_fill() {
+    use secure_gate::Dynamic;
+    let secret = Dynamic::<Vec<u8>>::try_new_with(16, |slot| {
+        slot[..5].copy_from_slice(&[1, 2, 3, 4, 5]);
+        Ok::<(), ()>(())
+    })
+    .expect("closure succeeded");
+    secret.with_secret(|s| {
+        assert_eq!(s.len(), 16);
+        assert_eq!(&s[..5], &[1u8, 2, 3, 4, 5]);
+        assert_eq!(&s[5..], &[0u8; 11]); // untouched tail: zero, not garbage
+        assert_eq!(s.capacity(), s.len());
+    });
 }
 
 #[cfg(feature = "alloc")]
 #[test]
-fn dynamic_string_new_with_empty_closure() {
+fn dynamic_vec_try_new_with_err_propagates() {
     use secure_gate::Dynamic;
-    let secret = Dynamic::<String>::new_with(|_s| {});
-    secret.with_secret(|s| assert!(s.is_empty()));
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct ShortRead(usize);
+
+    let result = Dynamic::<Vec<u8>>::try_new_with(4, |slot| {
+        // Observed from inside the closure, not after construction: an implementation
+        // that zeroed the slot only after the closure returned would still pass every
+        // other assertion in this file.
+        assert!(slot.iter().all(|&b| b == 0), "slot must arrive zeroed");
+        slot[0] = 0xFF;
+        Err(ShortRead(1))
+    });
+    // The caller's error type arrives intact — neither inspected nor wrapped.
+    assert_eq!(result.unwrap_err(), ShortRead(1));
 }
 
 #[cfg(feature = "rand")]

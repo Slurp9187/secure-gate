@@ -267,6 +267,11 @@ secure-gate = { version = "0.8.0-rc", default-features = false }
 secure-gate = { version = "0.8.0-rc", features = ["full"] }
 ```
 
+`"0.8.0-rc"` tracks this line rather than a version: it selects the newest `0.8.0-rc.N`
+today and keeps resolving once `0.8.0` ships, so nothing here moves when the next
+candidate lands. [Branch support](#branch-support) explains why the requirement has to
+spell the candidate out at all, and how to pin exactly when `cargo update` must stay put.
+
 ## Encoding & Decoding
 
 `secure-gate` provides symmetric, zero-overhead encoding and decoding for five formats: hex, base32 (RFC 4648 §6), base64url, bech32 (BIP-173), and bech32m (BIP-350). All operations are explicit. Decoding is always fallible; on the encode side only bech32 and bech32m return a `Result`, because they can reject an invalid HRP or an over-long payload — `to_hex`, `to_hex_upper`, `to_base32` and `to_base64url` cannot fail.
@@ -448,6 +453,33 @@ Every encoder returns [`EncodedSecret`] (wrapping `Zeroizing<String>` with a red
 - **`DecodingError` and `Bech32Error::ConversionFailed` are gone** — the wrapper enum
   had no producer, and the variant was unreachable (bit-conversion failures surface as
   `OperationFailed`). Backported from the 0.9 line (#171).
+- **`Dynamic::<Vec<u8>>::new_with` now takes a length** — `new_with(len, |slot| …)`
+  hands the closure a sized, pre-zeroed `&mut [u8]` instead of an empty `Vec` to fill.
+  The old signature handed a zero-capacity `Vec`, so a fill that outgrew it reallocated
+  and abandoned an unwiped copy of the secret on the heap — inside the constructor whose
+  whole purpose was to write the secret where it would live and nowhere else. A slice
+  cannot be grown, so that route is gone rather than discouraged. The zero fill is a
+  **documented guarantee**, not an incidental property: a caller deriving fewer than
+  `len` bytes consumes the remaining zeros as real input (a 40-bit RC4 key is five
+  derived bytes and eleven zeros of key-schedule input, not padding). Backported from
+  the 0.9 line (#233).
+- **`Dynamic::<Vec<u8>>::try_new_with` is new** — the same constructor for a fill that
+  can fail: the closure returns `Result<(), E>` with `E` unbounded, so your own error
+  type passes straight through, and on `Err` the partial write is zeroized before the
+  error returns. Backported from the 0.9 line (#233).
+- **`Dynamic::<String>::new_with` removed, with no replacement** — it carried the
+  identical defect and cannot be fixed the same way, because no sized slot is possible
+  for text: a `String` must hold valid UTF-8 and characters vary in byte width, so a
+  fixed window of `len` bytes is not somewhere arbitrary text can be written. Build the
+  `String` pre-sized yourself — `String::with_capacity(len)`, filled once — and move it
+  in with `Dynamic::new`, which takes that buffer rather than copying it. Backported
+  from the 0.9 line (#233).
+- **New `SlotWriter` type** — an append cursor over a slot (`push_slice`, `push_byte`,
+  `position`, `remaining`, `is_full`), so a multi-part fill is not offset arithmetic
+  written by hand. Overrun panics, and the message names the shortfall; anything left
+  unwritten keeps the slot's zeros. Under `std` it also implements `io::Write`, where
+  `write_all` reports an overrun as `ErrorKind::WriteZero`. Exported at the crate root,
+  available with no features. Backported from the 0.9 line (#233).
 
 ## Branch support
 
@@ -464,6 +496,13 @@ stable on crates.io is `0.6.1` — and a caret matches a pre-release only when t
 requirement itself carries one for the same `major.minor.patch`. So `"0.8"` means
 `>=0.8.0, <0.9.0`, `0.8.0-rc.13` sorts *below* `0.8.0`, and nothing satisfies it: `"0.8"`
 and `"0.9"` are not shorthands here, they are resolve failures.
+
+<!-- The exact-pin example below names the newest PUBLISHED candidate, not the manifest
+     version. It moves at PUBLISH time, not at bump time -- the same rule the versioned
+     docs.rs badge at the top of this file follows. Pointing it at an open, unpublished
+     version tells readers to write a requirement that cannot resolve, which is the defect
+     this section was re-derived to fix. The three install snippets above are the tracking
+     form and never move. -->
 
 `"0.8.0-rc"` is the form that tracks this line rather than a version. `^0.8.0-rc` is
 `>=0.8.0-rc, <0.9.0`, so it selects the newest `0.8.0-rc.N` today and keeps resolving once

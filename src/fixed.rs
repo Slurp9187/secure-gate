@@ -339,9 +339,27 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     /// eliminating the intermediate stack copy that [`new`](Self::new) may produce.
     ///
     /// The slot is initialized to [`T::sentinel_value()`](crate::SentinelValue::sentinel_value)
-    /// before the closure runs (zeros for arrays). Prefer this over
-    /// [`new(value)`](Self::new) when minimizing stack residue matters
-    /// (long-lived keys, high-assurance environments).
+    /// before the closure runs. Prefer this over [`new(value)`](Self::new) when
+    /// minimizing stack residue matters (long-lived keys, high-assurance environments).
+    ///
+    /// # The slot's starting content is a contract, not an accident
+    ///
+    /// For `T = [E; N]` with `E: Default` — every array this crate ever hands you —
+    /// [`SentinelValue`](crate::SentinelValue)'s own contract fixes that starting value
+    /// at `[E::default(); N]`, all-zero for the byte and integer arrays this type is
+    /// built around. That is a promise `SentinelValue` makes on purpose (see its
+    /// "Provided implementations" contract), not a side effect of how the sentinel
+    /// happens to be built today, so a caller may depend on it exactly as it depends on
+    /// any other documented behavior.
+    ///
+    /// Concretely: a closure that writes fewer than `N` elements — a
+    /// [`SlotWriter`](crate::SlotWriter) doing RFC 9180-style concatenation that falls
+    /// short of the slot, a key derivation shorter than its buffer — leaves the
+    /// untouched tail at zero rather than at whatever bytes happened to be on the
+    /// stack. Code that treats that tail as zero-padding, instead of re-zeroing it
+    /// itself before returning, is relying on this guarantee; the
+    /// [`SlotWriter`](crate::SlotWriter) documentation's "40-bit key, zero-padded to
+    /// 16" example is exactly that reliance, asserted in a doctest.
     ///
     /// Requires [`FixedStorage`](crate::FixedStorage) and
     /// [`SentinelValue`](crate::SentinelValue) on `T`. Arrays of a `Default`
@@ -443,6 +461,15 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     /// returned**: the wrapper exists for the whole of the closure's run, so
     /// [`Drop`](Fixed#impl-Drop-for-Fixed<T>) wipes whatever the closure managed to
     /// write. A failed fill leaves nothing behind, in memory or in the return value.
+    ///
+    /// On `Ok`, the slot the closure saw started at the same value
+    /// [`new_with`](Self::new_with)'s does —
+    /// [`T::sentinel_value()`](crate::SentinelValue::sentinel_value), which for `T =
+    /// [E; N]` with `E: Default` is `[E::default(); N]`, all-zero for the byte and
+    /// integer arrays this type is built around. That starting value is a contract of
+    /// [`SentinelValue`](crate::SentinelValue)'s, documented on `new_with` above, not an
+    /// incidental one — so a closure here that only partially fills the slot before
+    /// returning `Ok` leaves the same reliable zero tail behind, on the same guarantee.
     ///
     /// Requires [`FixedStorage`](crate::FixedStorage) and
     /// [`SentinelValue`](crate::SentinelValue) on `T`, exactly as `new_with` does.

@@ -27,9 +27,47 @@
 ///
 /// | Type | Sentinel | Notes |
 /// |------|----------|-------|
-/// | `[T; N]` where `T: Default` | `[T::default(); N]` | Any `N` — not limited to 32 like `Default` |
+/// | `[T; N]` where `T: Default` | `[T::default(); N]` | Any `N` — not limited to 32 like `Default`. **Contract, not description** — see below |
 /// | `String` | `String::new()` | Requires `alloc`; no allocation |
 /// | `Vec<T>` | `Vec::new()` | Requires `alloc`; no allocation |
+///
+/// ## The `[T; N]` row is a contract
+///
+/// Every other row is free to change its sentinel later without breaking anyone —
+/// `String::new()` and `Vec::new()` are the only allocation-free values either type
+/// has, so there is nothing to tighten. `[T; N]` is different: `T::default()` is one
+/// of many values that satisfy the trait-level contract above ("cheap to construct,
+/// never secret"), and this crate's own
+/// [`Fixed::new_with`](crate::Fixed::new_with) and
+/// [`Fixed::try_new_with`](crate::Fixed::try_new_with) reuse this same
+/// implementation to fill the wrapper's storage *before* the caller's closure runs —
+/// not only to build the post-`into_inner` placeholder this trait was written for. A
+/// closure passed to either constructor that writes fewer than `N` elements leaves
+/// the rest of the array at whatever `sentinel_value()` produced, so callers of those
+/// constructors read that remainder as the sentinel, not just callers of
+/// `into_inner`.
+///
+/// This implementation therefore promises, as part of its contract rather than as a
+/// description of today's code: for `[T; N]` with `T: Default`, `sentinel_value()`
+/// is `[T::default(); N]` element-for-element — all-zero for every integer type,
+/// `bool`, and any other `T` whose `Default` is its zero value. A caller may rely on
+/// an untouched array element or tail being `T::default()`, specifically zero for
+/// byte and integer arrays, the same way it relies on any other documented API
+/// surface. Replacing this with a poison-fill pattern — plausible-sounding for
+/// something named "sentinel", and permitted by the trait-level contract alone,
+/// which only rules out secret material — would be a **breaking change** to this
+/// implementation, not a hardening of it, because it would silently corrupt every
+/// zero-padded value [`Fixed::new_with`](crate::Fixed::new_with) or
+/// [`Fixed::try_new_with`](crate::Fixed::try_new_with) produces through their
+/// pre-fill, not only values that pass through `into_inner`.
+///
+/// [`Dynamic::new_with`](crate::Dynamic::new_with) does not go through this trait for
+/// its own pre-fill — it zero-fills its heap slot directly (`vec![0u8; len]`, always
+/// zero, independent of any `SentinelValue` impl) rather than asking `Vec<T>`'s
+/// sentinel for a length it cannot produce (`Vec::new()` is empty, not zeroed to a
+/// given length). This contract binds the `[T; N]` row read through
+/// [`Fixed`](crate::Fixed) and through `into_inner` on any wrapper around a `[T; N]`;
+/// it does not extend to `Dynamic`'s unrelated, and separately guaranteed, zero-fill.
 ///
 /// Implement this for your own inner types to make `into_inner` available on
 /// wrappers around them. For inner types where every representable value is
