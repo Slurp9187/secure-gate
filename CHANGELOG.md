@@ -329,6 +329,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   constructor rather than twice — `new`, `new_with`, `try_new_with`. That growth is the
   guard demonstrating it covers the new constructor.
 
+### Security
+
+- **Documented a limitation of `with_secret` / `expose_secret`: they govern access, not
+  what the closure body does with the bytes.** Any expression producing an owned value
+  from the lent `&T` leaves a copy in ordinary memory that the wrapper never learns about
+  and therefore never wipes. This is the only limitation in `SECURITY.md` that occurs
+  *while the secret is still held*, inside the method provided for reading it safely —
+  nothing is extracted, nothing is named `into_inner`, and the code reads as protected.
+
+  The scoping is the load-bearing part, because consumers act on it. `*p` and the `&p`
+  binding form need `Inner: Copy`, so the borrow checker rejects them for
+  `Dynamic<Vec<u8>>` and `Dynamic<String>` with `E0507` — and, for the opposite reason,
+  for `Fixed<Fixed<T>>` and `Fixed<Zeroizing<T>>`, since a type with a destructor cannot
+  be `Copy` (`E0184`). **That immunity does not extend to a method that copies**:
+  `to_vec`, `clone`, `to_string`, `<[u8; N]>::try_from` copy *through* the borrow rather
+  than moving out of it, so no rule applies and no operator appears in the source. The
+  copying form reaches every wrapper and is the one that occurs in practice.
+
+  `Copy` is the only discriminator. `FixedStorage` covers tuples, `Option`, `Wrapping`,
+  `MaybeUninit`, `Zeroizing` and `Fixed` as well as `[T; N]`, and that list contains both
+  hazardous and immune members, so reasoning from the shape of the storage type gives the
+  wrong answer in both directions. No lint detects any of it: `clippy::all`, `pedantic`,
+  `nursery` and `restriction` were pointed at code leaking a key in all three forms and
+  returned twelve diagnostics, every one cosmetic. Documentation is the only mitigation
+  that exists, which is the argument for `SECURITY.md` rather than rustdoc alone.
+
+  Found by downstream consumers upgrading to `0.9.0-rc.12`; three crates examined, two
+  carrying live instances, one of them a v0 master key. The most useful figure is not a
+  defect count but a detection failure: an audit run deliberately, by someone who had just
+  been told the hazard existed, with a pattern requiring the `*` adjacent to the closure
+  parameter, missed six sites spelled `from(*bytes)` and was reported clean with a count
+  of one against a real count of seven. The entry therefore frames its grep patterns as a
+  way of deciding what to *read*, never as a way of deciding what is clean, and asks
+  audits to record their coverage rather than their verdict.
+
+- Three touch points rather than one, because two existing claims had become too strong.
+  The **What secure-gate does NOT protect against** bullet on caller copies did not
+  mention copies made *inside* a closure. And the **Where accident-prevention ends** table
+  promises that "accidents must not compile while the secret is held in `Fixed`/`Dynamic`"
+  — this is an accident that compiles inside exactly that window, so the row now carries a
+  carve-out rather than standing as a false claim in the document's most load-bearing
+  table. `RevealSecret::with_secret` and `expose_secret` also gain a note at the point of
+  use: the existing sentence "the closure receives a reference that cannot escape" is true
+  of the reference and invites the wrong conclusion about the secret.
+
+- Added `tests/compile-fail/with_secret_no_move_out.rs` and `tests/reveal_copy_out.rs`, a
+  pair pinning the two halves of that scoping from opposite sides: that moving a secret out
+  of a reveal borrow does *not* compile for a non-`Copy` inner type, and that copying one
+  out *does*. A test demonstrating a leak looks strange until you notice the second claim
+  is otherwise prose, and prose about what a compiler permits is exactly what rots
+  silently. An earlier draft of this guidance said `Dynamic` was immune outright — wrong
+  in the direction that retires an audit — and these exist so the corrected version cannot
+  quietly drift back.
+
+- **Diverges from the 0.9 line on one paragraph, deliberately.** `main` states flatly that
+  the compiler suggests the leak, because `E0507` on rustc 1.85 offers *"consider cloning
+  the value if the performance cost is acceptable"* — advice that is correct about types
+  and wrong about secrets, since it converts a compile error into a silent copy. **Rust
+  1.70 does not print that help**, as this line's freshly blessed
+  `with_secret_no_move_out.stderr` shows: its only `help:` is "consider removing the
+  dereference here". Porting `main`'s wording verbatim would have asserted a diagnostic
+  this line's MSRV never emits, so the paragraph is scoped to the toolchain instead —
+  the nudge depends on what a consumer builds with rather than on the crate, and a
+  consumer on current stable will see it.
+
 ## [0.8.0-rc.13] - 2026-09-14
 
 > Published to crates.io on the `v0.8.0-rc.13` tag.
