@@ -416,7 +416,7 @@ macro_rules! fixed_newtype {
     ($(#[$attr:meta])* $vis:vis $name:ident, $size:literal, derive: [$($opt:ident),* $(,)?]) => {
         const _: () = { let _ = [(); $size][0]; };
 
-        $crate::__sg_newtype_base_bytes!(
+        $crate::__sg_newtype_base_ct_eq!(
             $(#[$attr])* $vis $name($crate::Fixed<[u8; $size]>), derive: [$($opt),*]
         );
         $crate::__sg_newtype_len!($name);
