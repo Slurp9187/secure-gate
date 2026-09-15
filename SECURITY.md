@@ -340,6 +340,11 @@ diagnostics returned were single-char idents, missing `return`, integer suffixes
 like. `rustc` under `-D warnings` says nothing. Documentation is the only mitigation that
 exists for this one.
 
+Worse than silence, in fact. The one place the toolchain does speak about these
+expressions, it points the wrong way: the `E0507` suggestion above moves a caller off the
+form the compiler blocks and onto the form nothing does. So this is not a gap where no
+tool has an opinion — it is a gap where the only opinion available is the wrong one.
+
 **Detection — read the closure bodies; searching is how you choose which ones.**
 
 ```sh
