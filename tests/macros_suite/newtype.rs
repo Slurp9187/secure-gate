@@ -48,11 +48,47 @@ fn dynamic_arms_pick_the_right_api() {
     let api: ApiKey = "sk_live_xyz".into(); // From<&str> on the String arm
     assert_eq!(api.expose_secret(), "sk_live_xyz");
 
-    let tok = SessionToken::new_with(|v| v.extend_from_slice(b"abc"));
-    assert_eq!(tok.len(), 3);
+    // Partial fill, both halves read back: a closure that fills the whole slot would
+    // only prove the newtype echoes the `len` the test itself passed in — an arm that
+    // ignored `f` would still pass that. Reading the payload back pins the fill to the
+    // wrapper's own storage, and the untouched tail pins it as pre-zeroing.
+    let tok = SessionToken::new_with(8, |v| v[..3].copy_from_slice(b"abc"));
+    assert_eq!(tok.len(), 8);
+    assert_eq!(&tok.expose_secret()[..3], b"abc");
+    assert_eq!(&tok.expose_secret()[3..], &[0u8; 5]);
 
     let hook = WebhookSecret::new(String::from("whsec_1"));
     assert_eq!(format!("{hook:?}"), "[REDACTED]");
+}
+
+/// `try_new_with` on the `Vec<u8>` arm: the macro re-wraps with
+/// `Ok(Self(<Dynamic<Vec<u8>>>::try_new_with(len, f)?))`, so both the success payload
+/// and the caller's own error type need to be pinned through the newtype, not just
+/// through the `Dynamic` it wraps.
+#[test]
+fn session_token_try_new_with_reads_back_and_propagates_errors() {
+    #[derive(Debug, PartialEq, Eq)]
+    struct ReadError(&'static str);
+
+    // Success: same partial-fill shape as `new_with` above, read back through the
+    // newtype.
+    let tok = SessionToken::try_new_with(8, |v| {
+        v[..3].copy_from_slice(b"abc");
+        Ok::<(), ReadError>(())
+    })
+    .expect("closure succeeded");
+    assert_eq!(tok.len(), 8);
+    assert_eq!(&tok.expose_secret()[..3], b"abc");
+    assert_eq!(&tok.expose_secret()[3..], &[0u8; 5]);
+
+    // Failure: the caller's error type comes back out unchanged, not mapped or
+    // discarded in favor of `()`.
+    let err = SessionToken::try_new_with(8, |v| {
+        v[..3].copy_from_slice(b"bad");
+        Err(ReadError("device error"))
+    })
+    .unwrap_err();
+    assert_eq!(err, ReadError("device error"));
 }
 
 #[cfg(all(feature = "encoding-hex", feature = "std"))]

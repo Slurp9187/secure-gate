@@ -141,13 +141,18 @@
 /// own `len()`, not the answer. Writing the marker is how you say you know
 /// that.
 ///
-/// It also has no `new_with`, which the `String` and `Vec<u8>` arms do get.
-/// [`fixed_newtype!`](crate::fixed_newtype)'s generic arm *does* forward
-/// [`Fixed::new_with`](crate::Fixed::new_with), because that constructor now
-/// exists for any `T: SentinelValue`. `Dynamic::new_with` is still shaped —
-/// `FnOnce(&mut String)` / `FnOnce(&mut Vec<u8>)` — so there is nothing here
-/// to forward for an arbitrary inner type. `new` takes its value by value;
-/// build it as close to the call as you can.
+/// It also has no `new_with`, which the `Vec<u8>` arm does get, and the reason is
+/// sharper than it used to be. [`fixed_newtype!`](crate::fixed_newtype)'s generic arm
+/// *does* forward [`Fixed::new_with`](crate::Fixed::new_with), because that constructor
+/// is generic over any `T: SentinelValue` — it hands the closure the inner value itself.
+/// `Dynamic::new_with` hands a sized **byte slot**, `FnOnce(&mut [u8])`, which is what
+/// makes growth inexpressible and the reallocation hazard impossible. A byte slot is
+/// meaningless for an arbitrary inner type, so there is nothing here to forward. `new`
+/// takes its value by value; build it as close to the call as you can.
+///
+/// The `String` arm has no `new_with` either, as of 0.9.0-rc.12, and cannot: a `String`
+/// must hold valid UTF-8 and characters have variable byte widths, so a fixed byte
+/// window is not somewhere arbitrary text can be written.
 ///
 /// The two macros are also asymmetric about `SecretLen`, deliberately.
 /// `fixed_newtype!` has a third arm for a *literal* array — `generic [i16; 256]` —
@@ -246,13 +251,25 @@
 macro_rules! dynamic_newtype {
     // ---- `generic` applied to a shape that has its own arm: rejected ----
     //
-    // `generic Vec<u8>` and `generic String` are strictly dominated spellings.
-    // They take a payload this crate already knows how to grow safely and then
-    // withhold the method that does it: the `generic` arm emits only
-    // `__sg_newtype_base!` plus a constructor, so the shaped arms' `SecretLen`,
-    // `From`, `new_with`, encoders, and -- for `Vec<u8>` under `std` -- the
-    // `io::Write` impl that wipes the buffer it abandons, are all absent. Same
-    // payload, strictly less API, and no reason to write it.
+    // `generic Vec<u8>` and `generic String` are strictly dominated spellings,
+    // but not for the same reason -- the two shaped arms no longer offer the
+    // same growth story, so what each `generic` spelling gives up differs too.
+    //
+    // `generic Vec<u8>` takes a payload this crate already knows how to grow
+    // safely and then withholds the method that does it: the `generic` arm
+    // emits only `__sg_newtype_base!` plus a constructor, so the shaped arm's
+    // `SecretLen`, `From`, `new_with`, `try_new_with`, encoders, and -- under
+    // `std` -- the `io::Write` impl that wipes the buffer it abandons, are all
+    // absent. Same payload, strictly less API, and no reason to write it.
+    //
+    // `generic String` is dominated for a narrower reason, because there is
+    // less for it to withhold: the shaped `String` arm has no `new_with` of
+    // its own, as of 0.9.0-rc.12, and cannot -- a `String` must hold valid
+    // UTF-8 and characters have variable byte widths, so there is no sized
+    // byte slot that arbitrary text can be written into. What the `generic`
+    // arm withholds is `SecretLen` and `From<&str>` only. The crate has no
+    // safe growth path for `Dynamic<String>` at all; pre-size the value and
+    // move it in with `Dynamic::new`.
     //
     // These must precede every `generic $inner:ty` arm, for the reason the
     // comment below gives: once a `:ty` fragment is parsed there is no
@@ -327,14 +344,6 @@ macro_rules! dynamic_newtype {
             #[inline]
             fn from(s: &str) -> Self { Self(<$crate::Dynamic<$crate::__private::String>>::from(s)) }
         }
-        impl $name {
-            /// Scoped construction into a protected `String` buffer.
-            #[inline]
-            pub fn new_with<F>(f: F) -> Self
-            where F: ::core::ops::FnOnce(&mut $crate::__private::String) {
-                Self(<$crate::Dynamic<$crate::__private::String>>::new_with(f))
-            }
-        }
     };
 
     // ---- Vec<u8> arm ----
@@ -353,11 +362,22 @@ macro_rules! dynamic_newtype {
             fn from(s: &[u8]) -> Self { Self(<$crate::Dynamic<$crate::__private::Vec<u8>>>::from(s)) }
         }
         impl $name {
-            /// Scoped construction into a protected `Vec<u8>` buffer.
+            /// Writes into a sized, pre-zeroed slot inside the wrapper's own storage.
+            /// Growth is not expressible, so no reallocation can abandon the secret.
             #[inline]
-            pub fn new_with<F>(f: F) -> Self
-            where F: ::core::ops::FnOnce(&mut $crate::__private::Vec<u8>) {
-                Self(<$crate::Dynamic<$crate::__private::Vec<u8>>>::new_with(f))
+            pub fn new_with<F>(len: usize, f: F) -> Self
+            where F: ::core::ops::FnOnce(&mut [u8]) {
+                Self(<$crate::Dynamic<$crate::__private::Vec<u8>>>::new_with(len, f))
+            }
+
+            /// The same, for a fill that can fail. On `Err` the partial write is
+            /// zeroized before the error is returned.
+            #[inline]
+            pub fn try_new_with<F, E>(len: usize, f: F) -> ::core::result::Result<Self, E>
+            where F: ::core::ops::FnOnce(&mut [u8]) -> ::core::result::Result<(), E> {
+                ::core::result::Result::Ok(Self(
+                    <$crate::Dynamic<$crate::__private::Vec<u8>>>::try_new_with(len, f)?
+                ))
             }
         }
 
@@ -615,21 +635,19 @@ macro_rules! __sg_dynamic_generic_is_shaped {
         ::core::compile_error!(
             "dynamic_newtype!: write `Vec<u8>`, not `generic Vec<u8>`. The `generic` \
              arm emits only the shape-independent surface, so this spelling withholds \
-             `SecretLen`, `From<&[u8]>`, `new_with`, the encoders, `from_random`, and \
-             -- under `std` -- the `std::io::Write` impl, which is the one growth path \
-             that wipes the buffer it abandons. It is the same growable payload with \
-             strictly less API and no safe way to grow it. `generic` is for inner \
-             types that are neither `String` nor `Vec<u8>`."
+             `SecretLen`, `From<&[u8]>`, `new_with`, `try_new_with`, the encoders, \
+             `from_random`, and — under `std` — the `std::io::Write` impl, which is \
+             the one growth path that wipes the buffer it abandons. It is the same \
+             growable payload with strictly less API and no safe way to grow it. \
+             `generic` is for inner types that are neither `String` nor `Vec<u8>`."
         );
     };
     (@string) => {
         ::core::compile_error!(
             "dynamic_newtype!: write `String`, not `generic String`. The `generic` arm \
              emits only the shape-independent surface, so this spelling withholds \
-             `SecretLen`, `From<&str>` and `new_with` -- the in-place constructor that \
-             builds the secret inside the protected buffer rather than in an \
-             unprotected one first. It is the same growable payload with strictly \
-             less API. `generic` is for inner types that are neither `String` nor \
+             `SecretLen` and `From<&str>`. It is the same payload with strictly less \
+             API. `generic` is for inner types that are neither `String` nor \
              `Vec<u8>`."
         );
     };

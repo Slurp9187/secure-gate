@@ -11,7 +11,9 @@
 //! Secrets are **automatically zeroized on drop** (the inner type must implement
 //! [`Zeroize`](zeroize::Zeroize)). While a secret is held in [`Fixed`] or [`Dynamic`],
 //! there is no `Deref` and no `AsRef`: callers reach the inner secret only via
-//! [`RevealSecret`] / [`RevealSecretMut`], and `Debug` always prints `[REDACTED]`.
+//! [`RevealSecret`] / [`RevealSecretMut`], and `Debug` on a wrapper always prints
+//! `[REDACTED]`. [`SlotWriter`], which borrows a wrapper's storage rather than holding it,
+//! prints its cursor instead — position, remaining, length — and never the bytes.
 //! Access has two shapes: **borrow** it, or **take** it.
 //! [`with_secret()`](RevealSecret::with_secret) and
 //! [`expose_secret()`](RevealSecret::expose_secret) lend you a reference while the
@@ -108,6 +110,7 @@
 //! |----------|-------|-------------------|----------|
 //! | **Secret wrappers** | [`Fixed<T>`], [`Dynamic<T>`] | No — use [`RevealSecret`] | Hold live secrets; `Debug` → `[REDACTED]` |
 //! | **Output wrapper** | [`EncodedSecret`] | Yes — yields `&str`; copies you make are yours, the buffer stays the wrapper's | Holds encoded output, wiped on drop |
+//! | **Borrowed slot cursor** | [`SlotWriter`] | No — it writes, it does not read out | Appends into a slot a sized `new_with` handed out; `Debug` → cursor state only, never bytes |
 //! | **Opt-in markers** | [`CloneableSecret`], [`SerializableSecret`] | — (no methods) | Implement on inner type `T` to unlock gated impls |
 //!
 //! `CloneableSecret` and `SerializableSecret` are implemented on the **inner type `T`**,
@@ -261,8 +264,22 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+// Documentation-only. Several doc comments link to `std` items that this crate touches
+// through gated impls (`io::Write` on `Dynamic<Vec<u8>>` and on `SlotWriter`, `io::Read`
+// on `DynamicReader`). Those links are correct and resolve on docs.rs, which builds with
+// `all-features`. They do not resolve under `--features=full`, which this branch's rustdoc
+// job builds and which does *not* enable `std`, because without that feature the name
+// `std` is not in scope at all and rustdoc has nothing to point at. This brings it into
+// scope for doc builds only: it is `cfg(doc)`, so it affects no real build, `no_std` or
+// otherwise, and it makes the links resolve in every feature combination rather than only
+// the one docs.rs happens to use.
+#[cfg(doc)]
+extern crate std;
+
 #[cfg(feature = "alloc")]
 mod dynamic;
+
+mod slot_writer;
 
 /// Fixed-size secret wrapper types - always available with zero dependencies.
 /// These provide fundamental secure storage abstractions for fixed-size data.
@@ -318,6 +335,17 @@ pub use dynamic::Dynamic;
 /// Cursor-like reader over [`Dynamic<Vec<u8>>`] — see [`Dynamic::as_reader`].
 #[cfg(feature = "std")]
 pub use dynamic::DynamicReader;
+
+/// Append-shaped writing into the fixed slot handed to a sized `new_with`.
+///
+/// The sized constructors hand out a slot whose length is already decided, which is what
+/// makes growth, and therefore the reallocation hazard, inexpressible. `SlotWriter`
+/// restores the append shape on top of that, so concatenating a wire format does not mean
+/// writing offsets by hand. [`push_slice`](SlotWriter::push_slice) panics on overrun and
+/// leaves the slot untouched; the `std`-gated `std::io::Write` path cannot do that and
+/// stay inside `Write`'s contract, so it truncates and reports the refusal on a later
+/// call. `Debug` shows the cursor — position, remaining, length — and never the bytes.
+pub use slot_writer::SlotWriter;
 
 #[cfg(all(feature = "alloc", feature = "serde-deserialize"))]
 /// Default maximum byte length for `Dynamic<Vec<u8>>` / `Dynamic<String>` deserialization (1 MiB).

@@ -27,6 +27,13 @@
 //! after `catch_unwind` returns — safe because `dealloc` must never panic (allocator contract).
 //! Size 8192 is used to avoid collision with small Rust panic-machinery allocations (message
 //! formatting, backtrace, TLS) that may occur during unwind.
+//!
+//! The `PANIC_CHECK_*` name is now narrower than the mechanism it gates.
+//! `check_try_new_with_err_zeroed_vec` uses the same recording mode on a path that never
+//! unwinds: the buffer is released by an ordinary early return out of `try_new_with`. What the
+//! mode records is the fate of *one pinned pointer*, whichever way its scope is left. The names
+//! are kept because the allocator hook and this file's prose all refer to them, and a rename
+//! buys nothing that this paragraph does not.
 
 // NOTE ON MIRI: the `not(miri)` gate below compiles this entire file away under `cargo miri
 // test`, which `.github/workflows/fuzz-miri.yml` is the only job to run. The gate is necessary --
@@ -53,15 +60,18 @@ static CHECKING: AtomicBool = AtomicBool::new(false);
 static TARGET_SIZE: AtomicUsize = AtomicUsize::new(0);
 
 // ---------------------------------------------------------------------------
-// Recording-mode gate — used by the panic-path positive-control test
+// Recording-mode gate — used by the checks that follow one specific buffer to its grave
 //
 // Unlike the asserting mode, the recording mode never panics inside `dealloc`
 // (which would be UB per the allocator contract). Instead it silently records
 // whether the first matching deallocation was fully zeroed, then the test
-// checks the result after `catch_unwind` returns.
+// checks the result once the scope that owned the buffer has been left — by an
+// unwind for the three panic checks, by an ordinary `?` for the `try_new_with`
+// error-path check.
 // ---------------------------------------------------------------------------
 
-/// Set to `true` before `catch_unwind`; cleared by `dealloc` on first match.
+/// Set to `true` before entering the region under test — a `catch_unwind` for the panic
+/// checks, a plain call for the `Err`-path one; cleared by `dealloc` on first match.
 static PANIC_CHECK_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 /// The exact backing-buffer pointer of the allocation being tracked in recording mode.
@@ -748,7 +758,15 @@ fn check_panic_path_bytes_zeroed(size: usize) {
 // zeroization. After the fix, the intermediate buffer is `Zeroizing<Vec<u8>>`
 // for the entire lifetime of the closure, so unwind triggers zeroize → dealloc.
 //
-// Test shape mirrors `check_panic_path_bytes_zeroed`: poison-fill the buffer,
+// The 0.8.0-rc.14 signature change moved the allocation earlier without moving the
+// protection. `new_with(len, f)` allocates and zeroes the slot *before* calling `f`, and
+// `f` sees it as a `&mut [u8]` rather than as a `Vec` it fills itself — but the slot still
+// lives inside one `Zeroizing<Vec<u8>>` for the whole call, so the property under test is
+// word-for-word the one above. Only the pin changes shape, from `Vec::as_ptr` to the slot
+// slice's `as_ptr`; both name the same address, and under the new signature that address
+// cannot move mid-closure because there is no growth to reallocate it.
+//
+// Test shape mirrors `check_panic_path_bytes_zeroed`: poison-fill the slot,
 // pin its backing-buffer pointer in `PANIC_CHECK_PTR`, then panic. The
 // proxy allocator records whether the matching dealloc saw all-zero bytes.
 // ---------------------------------------------------------------------------
@@ -759,12 +777,14 @@ fn check_new_with_panic_zeroed_vec(size: usize) {
     PANIC_CHECK_ACTIVE.store(true, Ordering::SeqCst);
 
     let result = std::panic::catch_unwind(|| {
-        let _secret: Dynamic<Vec<u8>> = Dynamic::<Vec<u8>>::new_with(|v: &mut Vec<u8>| {
-            v.reserve_exact(size);
-            // MSRV 1.70: use repeat().take() (repeat_n stabilized in 1.82).
-            v.extend(std::iter::repeat(0xAAu8).take(size));
-            // Pin the backing-buffer pointer before panicking.
-            PANIC_CHECK_PTR.store(v.as_ptr() as usize, Ordering::SeqCst);
+        let _secret: Dynamic<Vec<u8>> = Dynamic::<Vec<u8>>::new_with(size, |slot: &mut [u8]| {
+            // Poison every byte. The slot arrives all-zero by contract, so without this
+            // the recorded dealloc would read as "clean" against a constructor that
+            // protected nothing at all — the oracle needs something to have wiped.
+            slot.fill(0xAAu8);
+            // Pin the slot's own pointer before panicking. The slot *is* the wrapper's
+            // storage here, so there is no second buffer to confuse it with.
+            PANIC_CHECK_PTR.store(slot.as_ptr() as usize, Ordering::SeqCst);
             panic!("simulated closure failure after writing secret bytes");
         });
         // Unreachable: closure always panics. Reference the binding so the
@@ -779,24 +799,138 @@ fn check_new_with_panic_zeroed_vec(size: usize) {
     );
     assert!(
         PANIC_CHECK_ZEROED.load(Ordering::SeqCst),
-        "Dynamic::<Vec<u8>>::new_with must zero its intermediate buffer on closure panic"
+        "Dynamic::<Vec<u8>>::new_with must zero its slot on closure panic"
     );
 }
 
-fn check_new_with_panic_zeroed_string(size: usize) {
+// ---------------------------------------------------------------------------
+// `Dynamic::<Vec<u8>>::try_new_with` — the partial write is wiped on `Err`
+//
+// This is a claim only the allocator proxy can settle. Every other route to the error
+// path observes the same two facts from outside: `Err` came back, and no `Dynamic` was
+// produced. Those hold just as well for a constructor that dropped a half-written secret
+// un-wiped, because a freed buffer is not something a test can name afterwards — unless
+// it watches the free itself, which is what this file exists to do.
+//
+// The claim is load-bearing rather than tidiness. Decoders that write into a
+// caller-supplied buffer routinely leave real plaintext in it when they fail:
+// `miniz_oxide`'s `decompress_slice_iter_to_slice` documents precisely that ("in that
+// case the output buffer will still contain the partial decompression"). A constructor
+// that wrapped only on success would therefore abandon a partial secret on every
+// malformed input — and malformed input is the case an attacker picks.
+//
+// Shape mirrors the panic check above, minus the unwind: poison the slot, pin its
+// pointer, return `Err`. `try_new_with`'s `?` drops the `Zeroizing` on the way out, so
+// the recorded dealloc must see all zeros. Nothing panics here, so `catch_unwind` would
+// only blur where a failure came from; the recording mode, matching by pointer, does not
+// care which way the scope was left.
+// ---------------------------------------------------------------------------
+
+fn check_try_new_with_err_zeroed_vec(size: usize) {
+    /// A caller's own error type, implementing nothing at all — not `Debug`, not `Error`.
+    ///
+    /// `E` being free is part of what `try_new_with` promises: a consumer returns their own
+    /// error straight out of the closure. A bound added to `E` later would stop this file
+    /// compiling, which is the cheapest alarm available for an API promise of that shape.
+    struct CallerGaveUp;
+
+    PANIC_CHECK_PTR.store(0, Ordering::SeqCst);
+    PANIC_CHECK_ZEROED.store(false, Ordering::SeqCst);
+    PANIC_CHECK_ACTIVE.store(true, Ordering::SeqCst);
+
+    let result: Result<Dynamic<Vec<u8>>, CallerGaveUp> =
+        Dynamic::<Vec<u8>>::try_new_with(size, |slot: &mut [u8]| {
+            // A *partial* fill, because that is the realistic failure shape: the decoder
+            // got some way in and then hit a bad byte. The tail stays at the slot's zeros,
+            // so the only bytes this can catch are the ones the closure actually wrote —
+            // which is exactly the leak being guarded against.
+            slot[..size / 2].fill(0xC7u8);
+            PANIC_CHECK_PTR.store(slot.as_ptr() as usize, Ordering::SeqCst);
+            Err(CallerGaveUp)
+        });
+
+    PANIC_CHECK_ACTIVE.store(false, Ordering::SeqCst); // defensive cleanup
+    assert!(
+        result.is_err(),
+        "the closure returned Err, so try_new_with must not have produced a Dynamic"
+    );
+    assert!(
+        PANIC_CHECK_ZEROED.load(Ordering::SeqCst),
+        "Dynamic::<Vec<u8>>::try_new_with must zero the partially written slot before \
+         releasing it on the Err path"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// `Dynamic::<Vec<u8>>::try_new_with` — the partial write is wiped on closure PANIC
+//
+// `try_new_with`'s rustdoc inherits `new_with`'s "# Panics" promise by declaring the two
+// "identical in every respect but the closure's return type". In src/dynamic.rs that is a
+// statement about two *duplicated bodies*, not about a call: `try_new_with` allocates its
+// own `Zeroizing<Vec<u8>>` and runs its own `f(&mut v[..])?` rather than routing through
+// `new_with`. Nothing makes the two move together, so the inherited promise is the one
+// guarantee here that rests on prose alone.
+//
+// The `Err` check above is not a substitute, and the concrete rewrite that separates them
+// is short enough to spell out:
+//
+//     let mut v = alloc::vec![0u8; len];
+//     if let Err(e) = f(&mut v) { v.zeroize(); return Err(e); }
+//
+// A plain `Vec` wiped by hand on the error branch. `check_try_new_with_err_zeroed_vec`
+// passes against that body exactly as it passes against the real one — it only ever leaves
+// through the `Err` branch, where the hand-written wipe is. A closure that *unwinds*
+// instead of returning skips that branch entirely, and a plain `Vec` has no destructor
+// that zeroes, so the whole partial write reaches `dealloc` intact. One check apart, two
+// implementations that are indistinguishable from outside.
+//
+// The unwind is not a hypothetical either, and it is worst precisely where `try_new_with`
+// is recommended: the fills its own rustdoc names are a foreign decoder and
+// `Read::read_exact`. A `Read` impl may panic anywhere it likes — the trait forbids
+// nothing — and a decoder that indexes into its output buffer panics on exactly the
+// malformed input it was handed to reject, after having written the part it understood.
+//
+// Shape mirrors `check_new_with_panic_zeroed_vec`: poison the slot, pin its pointer, panic
+// under `catch_unwind`, then read what the allocator recorded. The closure body names no
+// error value of its own, so `E` is fixed by the binding's type annotation instead.
+// ---------------------------------------------------------------------------
+
+fn check_try_new_with_panic_zeroed_vec(size: usize) {
+    /// The closure's error type, never constructed: the body panics before it can return
+    /// anything at all.
+    ///
+    /// It implements nothing, for the same reason `CallerGaveUp` above implements nothing —
+    /// a bound appearing on `E` would break this file's compile, which is the cheapest
+    /// available alarm for an API promise of that shape. Here it also pins the promise on
+    /// the *diverging* path, where `E` is inferred from the signature rather than from any
+    /// value the closure produces.
+    struct NeverReturned;
+
     PANIC_CHECK_PTR.store(0, Ordering::SeqCst);
     PANIC_CHECK_ZEROED.store(false, Ordering::SeqCst);
     PANIC_CHECK_ACTIVE.store(true, Ordering::SeqCst);
 
     let result = std::panic::catch_unwind(|| {
-        let _secret: Dynamic<String> = Dynamic::<String>::new_with(|s: &mut String| {
-            s.reserve_exact(size);
-            // MSRV 1.70: use repeat().take() (repeat_n stabilized in 1.82).
-            s.extend(std::iter::repeat('A').take(size));
-            PANIC_CHECK_PTR.store(s.as_ptr() as usize, Ordering::SeqCst);
-            panic!("simulated closure failure after writing secret bytes");
-        });
-        core::hint::black_box(&_secret);
+        let outcome: Result<Dynamic<Vec<u8>>, NeverReturned> =
+            Dynamic::<Vec<u8>>::try_new_with(size, |slot: &mut [u8]| {
+                // Poison every byte. The slot arrives all-zero by contract, so a
+                // constructor that protected nothing would still hand the recorder a
+                // clean-looking block unless something non-zero was written first.
+                //
+                // A *full* fill rather than the half-fill the `Err` check uses: there the
+                // untouched tail was the point (it proves only written bytes are being
+                // caught), here the point is that an unwind must not leave any of it, and a
+                // whole-slot poison is the strictest version of that.
+                slot.fill(0x9Eu8);
+                // Pin the slot's own pointer before panicking. Under this signature the
+                // slot cannot be reallocated mid-closure — there is no growth to move it —
+                // so this address is the one the unwind has to wipe.
+                PANIC_CHECK_PTR.store(slot.as_ptr() as usize, Ordering::SeqCst);
+                panic!("simulated closure panic after writing secret bytes");
+            });
+        // Unreachable: the closure always panics. Referencing the binding keeps the
+        // optimizer from lifting the call out of the protected region.
+        core::hint::black_box(&outcome);
     });
 
     PANIC_CHECK_ACTIVE.store(false, Ordering::SeqCst);
@@ -806,7 +940,8 @@ fn check_new_with_panic_zeroed_string(size: usize) {
     );
     assert!(
         PANIC_CHECK_ZEROED.load(Ordering::SeqCst),
-        "Dynamic::<String>::new_with must zero its intermediate buffer on closure panic"
+        "Dynamic::<Vec<u8>>::try_new_with must zero its slot when the closure unwinds, not \
+         only when it returns Err"
     );
 }
 
@@ -860,8 +995,9 @@ fn check_into_zeroizing_string_zeroed<const N: usize>() {
 // ---------------------------------------------------------------------------
 
 /// Verifies `Dynamic<[u8; N]>`, `Dynamic<Vec<u8>>`, `Dynamic<String>`, all
-/// decode paths, all deserialize paths, and the panic-path positive control
-/// all zeroize heap memory before deallocation.
+/// decode paths, all deserialize paths, the panic-path positive control, and both
+/// of `try_new_with`'s failure paths — an `Err` return and a closure unwind — all
+/// zeroize heap memory before deallocation.
 ///
 /// This stays as one aggregate test by design to avoid parallel test interleaving
 /// with the global ProxyAllocator state.
@@ -943,8 +1079,28 @@ fn all_heap_zeroed() {
 
     // Finding 1 regression: Dynamic::new_with closure-panic leak.
     // Verifies that a closure panicking after writing secret bytes does not
-    // leak those bytes — the intermediate buffer must be Zeroizing-protected
-    // for the entire lifetime of the closure. Same size rationale as above.
+    // leak those bytes — the slot must be Zeroizing-protected for the entire
+    // lifetime of the closure. Same size rationale as above.
     check_new_with_panic_zeroed_vec(8192);
-    check_new_with_panic_zeroed_string(8192);
+
+    // try_new_with wipes the partial write when the fill returns Err. This allocator
+    // proxy is the only instrument in the repo that can watch a buffer being wiped, so
+    // it is the only place the guarantee can be tested at all: from outside, a
+    // constructor that wiped and one that abandoned a half-written secret both just
+    // return Err. Guards against "wrap only on success", which would leak partial
+    // plaintext on every malformed input — the routine behaviour of decoders that write
+    // into a caller-supplied buffer.
+    //
+    // 8192 again, though nothing unwinds on this path: the pin is by pointer, so the
+    // size only keeps the check clear of the 16/32/64/128 classes used above.
+    check_try_new_with_err_zeroed_vec(8192);
+
+    // The same constructor's *panic* path, which the `Err` check immediately above cannot
+    // reach. `try_new_with` is a duplicated body in src/dynamic.rs rather than a call into
+    // `new_with`, so it does not inherit `new_with`'s panic-safety by construction — only
+    // by the rustdoc calling the two identical. Rewrite it to hold a plain `Vec` and wipe
+    // it by hand on the error branch and the `Err` check stays green while an unwinding
+    // closure leaks the entire partial write, which is the failure shape the fills that
+    // rustdoc recommends (a foreign decoder, `read_exact`) can actually produce.
+    check_try_new_with_panic_zeroed_vec(8192);
 }
