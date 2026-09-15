@@ -10,7 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > The line is open. `v0.9.0-rc.13` is not tagged and not published.
 
 ### Security
-
 - **Documented a limitation of `with_secret` / `expose_secret`: they govern access, not
   what the closure body does with the bytes.** Any expression producing an owned value
   from the lent `&T` leaves a copy in ordinary memory that the wrapper never learns about
@@ -52,7 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   audits to record their coverage rather than their verdict.
 
 ### Added
-
 - `tests/compile-fail/with_secret_no_move_out.rs` and `tests/reveal_copy_out.rs`, a pair
   pinning the two halves of that scoping from opposite sides: that moving a secret out of
   a reveal borrow does *not* compile for a non-`Copy` inner type, and that copying one out
@@ -63,7 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version cannot quietly drift back.
 
 ### Changed
-
 - `SECURITY.md` gains "4. Copying the secret out of a reveal borrow" under **Inherent Rust
   Limitations**, whose preamble now counts four rather than three and distinguishes the
   first three (residue the machine leaves behind) from the fourth (a copy your own code
@@ -79,6 +76,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing sentence "the closure receives a reference that cannot escape" is true of the
   reference and invites the wrong conclusion about the secret, so it is now followed by
   what can escape, and by the wrapper-to-wrapper form to use instead.
+
+
+- `docs/design/nominal_newtypes.md`: the rc.12 amendment covered half of what rc.12
+  invalidated. Trap 4's residue — the generated call it quotes as
+  `<Dynamic<String>>::new_with(…)`, and its warning about an `E0034` ambiguity that a later
+  forwarder could reintroduce — was left standing, as was §1's `Vec<u8>` list, which is
+  stale in the *other* direction: the `new_with` it names now takes a length, and
+  `try_new_with` is forwarded beside it and missing from the list entirely. The amendment
+  now says so, and notes that the list was an abbreviation before this release too (it
+  names neither `from_rng` nor the base32/base64 encoders), so a reader takes it as the
+  shape of each arm rather than its full surface. Amended rather than rewritten, per this
+  document's own convention for superseded claims.
+- `tests/compile-fail/dynamic_newtype_alias_rejected.rs`: its header described the
+  pre-`generic`-marker fallthrough as producing "a newtype missing `new_with`,
+  `SecretLen`, and the encoders". Two thirds of that is now wrong — `Dynamic<String>` has
+  no `new_with` at all since rc.12, and the shaped `String` arm has never had encoders
+  (pinned by `dynamic_string_no_hex.rs`), so the generic arm withholds none from it. It
+  now reads `SecretLen` and `From<&str>`, matching the macro. The header keeps its exact
+  line count so the `.stderr` anchor at line 11 does not move.
+
+  Both corrections were made on `release/0.8` while backporting rc.12 and are re-derived
+  here. The staleness was inherited on both lines, not introduced by that backport.
+
+### Fixed
+- **`cargo doc --features=full` did not build.** Three doc comments link to `std` items
+  this crate touches through gated impls — `io::Write` on `Dynamic<Vec<u8>>` and on
+  `SlotWriter`, `io::Read` on `DynamicReader` — and `full` does not enable `std`. Without
+  that feature the name `std` is not in scope at all, so rustdoc had nothing to resolve
+  against and `-D warnings` turned each link into an error.
+
+  The links are correct and are left alone: they resolve on docs.rs, which builds with
+  `all-features`, so published documentation was never affected. `#[cfg(doc)] extern crate
+  std;` brings the name into scope for doc builds only — `cfg(doc)` is set by rustdoc and
+  nothing else, so no real build is touched, `no_std` or otherwise — and the links now
+  resolve in every feature combination rather than only the one docs.rs happens to use.
+
+  CI could not have caught this: the rustdoc job runs `--all-features`, which enables
+  `std`. What broke was a plain `cargo doc --features full`, which a contributor runs and
+  no job does. Found on `release/0.8`, whose rustdoc job builds `--features=full` and
+  therefore did fail; that line has carried the fix since 0.8.0-rc.14, so this brings the
+  0.9 line level rather than introducing anything.
 
 ## [0.9.0-rc.12] - 2026-09-15
 
