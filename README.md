@@ -418,7 +418,9 @@ Two breaking changes are worth reading before you upgrade. Every encoder now ret
 `EncodedSecret` and the `*_zeroizing` twins are gone, so the short name is the safe one.
 And `into_inner` returns the plain value rather than a wrapper that kept wiping —
 **protection now ends at that call**, where earlier release candidates continued it.  
-Full details in [CHANGELOG.md](CHANGELOG.md). Users on Rust < 1.85: pin `secure-gate = "0.8"`.
+Full details in [CHANGELOG.md](CHANGELOG.md). Users on Rust < 1.85: use
+`secure-gate = "0.8.0-rc"`, and see [Branch support](#branch-support) for why the
+requirement has to carry a pre-release tag.
 
 ## Branch support
 
@@ -427,8 +429,21 @@ Full details in [CHANGELOG.md](CHANGELOG.md). Users on Rust < 1.85: pin `secure-
 | `main` | 0.9.x | 2024 | 1.85 | Active development |
 | `release/0.8` | 0.8.x | 2021 | 1.70 | Lockstep with `main`; no dependency or toolchain bumps |
 
-**Rust ≥ 1.85**: use `secure-gate = "0.9"`.  
-**Rust < 1.85**: pin `secure-gate = "0.8"`.
+**Rust ≥ 1.85**: use `secure-gate = "0.9.0-rc"`.  
+**Rust < 1.85**: use `secure-gate = "0.8.0-rc"`.
+
+The requirement has to carry a pre-release tag. Both lines are pre-release only — the
+newest stable on crates.io is `0.6.1` — and a caret matches a pre-release only when the
+requirement itself carries one for the same `major.minor.patch`. So `"0.9"` means
+`>=0.9.0, <0.10.0`, `0.9.0-rc.10` sorts *below* `0.9.0`, and nothing satisfies it: `"0.9"`
+and `"0.8"` are not shorthands here, they are resolve failures.
+
+`"0.9.0-rc"` is the form that tracks a line rather than a version. `^0.9.0-rc` is
+`>=0.9.0-rc, <0.10.0`, so it selects the newest `0.9.0-rc.N` today and keeps resolving
+once `0.9.0` ships — nothing to update when the next candidate lands. It floats, though,
+and candidates on these lines have carried breaking changes: pin `"=0.9.0-rc.10"` when
+`cargo update` must stay put. The pre-release tag is also matched against exactly one
+`major.minor.patch`, so `"0.9.0-rc"` will not pick up a later `0.9.1-rc.1`.
 
 The two lines exist because `rand` 0.10 landed mid-development, and rather than raise the
 toolchain floor for everyone the crate split: `main` on Rust 1.85 / edition 2024,
