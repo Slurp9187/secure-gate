@@ -239,20 +239,24 @@ fn require_min_len<S: SecretLen>(secret: &S, min: usize) -> bool {
 
 ```toml
 [dependencies]
-secure-gate = "0.9.0-rc.11"
+secure-gate = "0.9.0-rc"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.9.0-rc.11", default-features = false }
+secure-gate = { version = "0.9.0-rc", default-features = false }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.9.0-rc.11", features = ["full"] }
+secure-gate = { version = "0.9.0-rc", features = ["full"] }
 ```
+
+`"0.9.0-rc"` tracks the newest release candidate on this line and keeps resolving once
+`0.9.0` ships; [Branch support](#branch-support) explains why the requirement has to carry
+a pre-release tag at all, and how to pin exactly if you need `cargo update` to stay put.
 
 ## Encoding & Decoding
 
