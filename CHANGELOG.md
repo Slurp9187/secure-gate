@@ -5,6 +5,90 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0-rc.14] - Unreleased
+
+> The line is open. `v0.8.0-rc.14` is not tagged and not published.
+
+### Added
+
+- **`Fixed::try_new_with` — in-place construction from a fill that can fail.** Backported
+  from the 0.9 line (0.9.0-rc.11). `new_with` hands a closure the wrapper's own storage so
+  a secret is written where it will live, but its closure could not fail — and the usual
+  way to obtain a secret is to read it from a file, socket or device, which can. Callers
+  bridged that by routing the error out through a captured local, a shape that is correct
+  only until someone deletes the line that checks it.
+
+  On `Err` the partial write is zeroized before the error returns: the wrapper is built
+  before the closure runs, so it is a live local for the whole fill and `Drop` wipes
+  whatever was written. Forwarded by all three `fixed_newtype!` arms that already forward
+  `new_with`, outside the feature relays.
+
+  **One deliberate divergence from the 0.9 line.** There, `Fixed::from_rng` was rewritten
+  through the new constructor and its bound reads `R: TryRng + TryCryptoRng`. Here the
+  rewrite is the same but the bound stays `R: TryRngCore + TryCryptoRng`, because this line
+  is pinned to `rand` 0.9 where that is the trait's name. The 0.9 spelling is a
+  rand-0.10-ism and porting it verbatim would not compile — it is the kind of substitution
+  a mechanical backport makes silently, so it is recorded rather than left to be
+  rediscovered.
+
+### Changed
+
+- **Automatic `ConstantTimeEq` on every nominal arm whose payload implements it.**
+  Backported from 0.9.0-rc.11 (both halves). `Fixed<T>` and `Dynamic<T>` implement
+  `ConstantTimeEq` for any `T` that does, so `pub type MacTag = Fixed<[u8; 32]>;` — and
+  `Dynamic<String>`, and `Dynamic<Vec<u8>>` — always had `ct_eq` for free. The newtype, the
+  spelling this crate recommends as the safer of the two, did not unless the declaration
+  also named `derive: [ConstantTimeEq]`. A reader who took the documented advice got
+  *fewer* security properties than one who ignored it, and the missing one was
+  constant-time comparison.
+
+  Nothing was silently weak: with no impl, no `Deref`, and `==` deliberately unimplemented
+  on every wrapper here, `ct_eq` on a newtype missing the derive was `E0599`. The defect
+  was the incentive, not a vulnerability.
+
+  **No migration.** `derive: [ConstantTimeEq]` stays accepted and inert on those arms — the
+  derive list is scanned and the redundant token dropped before the rest reach the base
+  expansion, so neighbouring options are unaffected in either order. The `generic` arms
+  keep the real opt-in, since an arbitrary inner type may or may not implement the trait.
+
+  `ct_eq` on a variable-length secret short-circuits when the lengths differ, so only the
+  equal-length comparison is constant-time; where the length itself is sensitive,
+  `fixed_newtype!` is the answer.
+
+### Fixed
+
+- **The version requirements in `README.md` did not resolve.** Backported in substance
+  from the 0.9 line, and re-derived rather than copied because this branch's Branch support
+  section was worded differently and was shorter.
+
+  It told readers to `pin secure-gate = "0.8"`. A caret matches a pre-release only when the
+  requirement itself carries one for the same `major.minor.patch`, so `^0.8` is
+  `>=0.8.0, <0.9.0` while `0.8.0-rc.13` sorts below `0.8.0` — and with no stable `0.8.x`
+  published, nothing satisfies it. The reader got `failed to select a version`, not a
+  version.
+
+  Both statements now use the tracking form `"0.8.0-rc"` / `"0.9.0-rc"`, which selects the
+  newest candidate on a line and keeps resolving once the stable ships. The three
+  Installation snippets move to the same form, which takes them out of the version-bump
+  checklist: naming an exact version there meant that opening a line pointed every new
+  reader at something unpublished.
+
+  The same section also still described this branch as receiving "security patches and
+  important backports". That framing was retired on the 0.9 line and is retired here: this
+  is the **MSRV 1.70 line**, not a maintenance branch, carrying the same API as `main` for
+  an older compiler, and it has taken 75 commits since `v0.8.0-rc.11`.
+
+### Testing
+
+- **Both `trybuild` snapshots were re-blessed on 1.70, not copied from `main`.** They are a
+  standing divergence between the branches: the diagnostics differ by toolchain and by
+  `trybuild` version (1.0.81 here, 1.0.119 there), so a copied snapshot fails in a way that
+  looks like a real regression. `fixed_zero_size.stderr` moved two lines because the new
+  rustdoc shifted the `NON_ZERO_SIZED` assertion; `fixed_reallocating_inner.stderr` grew,
+  because the fixture now reports the `FixedStorage` violation once per forwarded
+  constructor rather than twice — `new`, `new_with`, `try_new_with`. That growth is the
+  guard demonstrating it covers the new constructor.
+
 ## [0.8.0-rc.13] - 2026-09-14
 
 > Published to crates.io on the `v0.8.0-rc.13` tag.

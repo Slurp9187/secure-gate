@@ -252,19 +252,19 @@ fn require_min_len<S: SecretLen>(secret: &S, min: usize) -> bool {
 
 ```toml
 [dependencies]
-secure-gate = "0.8.0-rc.13"
+secure-gate = "0.8.0-rc"
 ```
 
 **No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
 
 ```toml
-secure-gate = { version = "0.8.0-rc.13", default-features = false }
+secure-gate = { version = "0.8.0-rc", default-features = false }
 ```
 
 **Batteries-included**:
 
 ```toml
-secure-gate = { version = "0.8.0-rc.13", features = ["full"] }
+secure-gate = { version = "0.8.0-rc", features = ["full"] }
 ```
 
 ## Encoding & Decoding
@@ -451,8 +451,33 @@ Every encoder returns [`EncodedSecret`] (wrapping `Zeroizing<String>` with a red
 
 ## Branch support
 
-Version **0.9.x** (`main`) targets Rust Edition 2024 and MSRV 1.85.
-For Rust < 1.85, pin `secure-gate = "0.8"` — the `release/0.8` branch (Edition 2021, MSRV 1.70) receives security patches and important backports.
+| Branch | Version | Rust edition | MSRV | Status |
+|---|---|---|---|---|
+| `main` | 0.9.x | 2024 | 1.85 | Active development |
+| `release/0.8` | 0.8.x | 2021 | 1.70 | Lockstep with `main`; no dependency or toolchain bumps |
+
+**Rust ≥ 1.85**: use `secure-gate = "0.9.0-rc"`.  
+**Rust < 1.85**: use `secure-gate = "0.8.0-rc"`.
+
+Write the release candidate out in full. Both lines are pre-release only — the newest
+stable on crates.io is `0.6.1` — and a caret matches a pre-release only when the
+requirement itself carries one for the same `major.minor.patch`. So `"0.8"` means
+`>=0.8.0, <0.9.0`, `0.8.0-rc.13` sorts *below* `0.8.0`, and nothing satisfies it: `"0.8"`
+and `"0.9"` are not shorthands here, they are resolve failures.
+
+`"0.8.0-rc"` is the form that tracks this line rather than a version. `^0.8.0-rc` is
+`>=0.8.0-rc, <0.9.0`, so it selects the newest `0.8.0-rc.N` today and keeps resolving once
+`0.8.0` ships — nothing to update when the next candidate lands. It floats, though, and
+candidates on these lines have carried breaking changes: pin `"=0.8.0-rc.13"` when
+`cargo update` must stay put. The pre-release tag is also matched against exactly one
+`major.minor.patch`, so `"0.8.0-rc"` will not pick up a later `0.8.1-rc.1`.
+
+This line is **not** a maintenance branch yet, and describing it as one was retired: it is
+the **MSRV 1.70 line**, carrying the same API as `main` built for an older compiler. Since
+`v0.8.0-rc.11` it has taken 75 commits, nine of them breaking. Until both lines reach a
+stable release they are finished in parallel, and every change on `main` is re-derived
+here — with one standing exclusion: dependency and toolchain bumps that would break 1.70
+are never ported. After the stable releases this becomes mostly a maintenance line.
 
 ## Migrating from secrecy
 

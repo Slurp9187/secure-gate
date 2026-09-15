@@ -13,6 +13,32 @@ fn t() {
     assert_eq!((k.len(), k2.expose_secret()[0]), (16, 1));
 }
 
+// `try_new_with` is forwarded outside every `__sg_if_*!` relay, like `new_with`, so it
+// must resolve with no features at all. That matters more here than for most of this
+// surface: on a target with no allocator, `Fixed` is the only wrapper there is, and
+// filling one from a fallible source (a hardware RNG, a flash read) is the ordinary
+// case rather than an exotic one. Both arms are named — the size-literal and the
+// `generic` one — because they are separate emissions and a regression could drop
+// either alone.
+#[test]
+fn try_new_with_is_forwarded_without_alloc() {
+    let k = NoStdKey::try_new_with(|b| {
+        b[0] = 9;
+        Ok::<(), ()>(())
+    })
+    .expect("ok");
+    assert_eq!(k.expose_secret()[0], 9);
+
+    let p = Poly::try_new_with(|c| {
+        c[0] = -1;
+        Ok::<(), ()>(())
+    })
+    .expect("ok");
+    assert_eq!(p.expose_secret()[0], -1);
+
+    assert!(NoStdKey::try_new_with(|_| Err::<(), ()>(())).is_err());
+}
+
 // The Base32 decode constructor is forwarded *outside* `__sg_if_alloc!`, so a
 // newtype exposes it whether or not `alloc` is on. This pins that forwarding.
 // It does NOT exercise the alloc-free code path: libtest needs `std`, so this test

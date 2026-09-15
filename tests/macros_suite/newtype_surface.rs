@@ -8,8 +8,15 @@ use secure_gate::{
 fixed_newtype!(pub EncKey, 32);
 fixed_newtype!(pub Big, 900, "A secret larger than the default bech32 code length admits.");
 fixed_newtype!(pub MacKey, 32, "MAC key.", derive: [ConstantTimeEq]);
+// The token between two live neighbours: dropping it must not disturb either.
+fixed_newtype!(pub SessionTag, 32, derive: [FromWrapper, ConstantTimeEq, IntoWrapper]);
 dynamic_newtype!(pub Token, Vec<u8>, derive: [ConstantTimeEq]);
 dynamic_newtype!(pub ApiKey, String, "API key.", derive: [ConstantTimeEq]);
+// The `dynamic_newtype!` counterparts of the automatic-`ct_eq` pins below: no
+// `derive:` list at all, and the redundant token between two live neighbours.
+dynamic_newtype!(pub BareToken, Vec<u8>);
+dynamic_newtype!(pub BareApiKey, String, "No derive list.");
+dynamic_newtype!(pub MixedToken, Vec<u8>, derive: [FromWrapper, ConstantTimeEq, IntoWrapper]);
 dynamic_newtype!(pub Wide, generic Vec<u32>);
 // The documented remainder of the `generic Vec<u8>` / `generic String` reject.
 //
@@ -158,6 +165,67 @@ fn derive_passthrough_reaches_front_ends() {
     let a: ApiKey = "x".into();
     assert!(a.ct_eq(&ApiKey::new(String::from("x"))));
     assert_eq!(Wide::new(vec![1u32]).with_secret(|v| v.len()), 1);
+}
+
+/// `ct_eq` is automatic on the size-literal arm, and the old token is inert.
+///
+/// A plain `type Name = Fixed<[u8; N]>;` has always carried `ConstantTimeEq`, from
+/// the wrapper's own impl. Until 0.9.0-rc.11 the newtype did not, so the spelling
+/// this crate recommends as the safer of the two offered *less* unless the
+/// declaration also named `derive: [ConstantTimeEq]` — the extra token sat on the
+/// side the documentation steers people toward. Both halves of the fix are pinned
+/// here: the impl arrives unasked, and the old spelling stays a no-op rather than
+/// becoming a duplicate impl (`E0119`).
+#[test]
+fn ct_eq_is_automatic_for_byte_array_newtypes() {
+    // `EncKey` is declared with no `derive:` list at all.
+    assert!(EncKey::new([7u8; 32]).ct_eq(&EncKey::new([7u8; 32])));
+    assert!(!EncKey::new([7u8; 32]).ct_eq(&EncKey::new([8u8; 32])));
+
+    // A length well past the 32-element ceiling `Default` would have imposed.
+    assert!(Big::new([3u8; 900]).ct_eq(&Big::new([3u8; 900])));
+    assert!(!Big::new([3u8; 900]).ct_eq(&Big::new([4u8; 900])));
+
+    // The pre-rc.11 spelling still compiles and still means what it says.
+    assert!(MacKey::new([1u8; 32]).ct_eq(&MacKey::new([1u8; 32])));
+
+    // Neighbours of the dropped token survive it, in both directions.
+    assert!(SessionTag::new([2u8; 32]).ct_eq(&SessionTag::new([2u8; 32])));
+    let wrapped = SessionTag::from_wrapper(secure_gate::Fixed::new([2u8; 32]));
+    assert!(wrapped.ct_eq(&SessionTag::new([2u8; 32])));
+    assert_eq!(wrapped.into_wrapper().expose_secret(), &[2u8; 32]);
+}
+
+/// The same, for `dynamic_newtype!`'s `String` and `Vec<u8>` arms.
+///
+/// `Dynamic<T>` implements `ConstantTimeEq` for any `T` that does, so
+/// `type Name = Dynamic<String>;` always had `ct_eq` and the newtype did not. The
+/// heap arms carried the identical asymmetry to the size-literal one and were
+/// corrected in the same release.
+#[test]
+fn ct_eq_is_automatic_for_string_and_vec_newtypes() {
+    // No derive list at all.
+    let a: BareApiKey = "x".into();
+    assert!(a.ct_eq(&BareApiKey::new(String::from("x"))));
+    assert!(!a.ct_eq(&BareApiKey::new(String::from("y"))));
+
+    let t = BareToken::try_from_hex("00ff").unwrap();
+    assert!(t.ct_eq(&BareToken::try_from_hex("00ff").unwrap()));
+    assert!(!t.ct_eq(&BareToken::try_from_hex("00fe").unwrap()));
+
+    // Differing lengths compare unequal rather than panicking — the documented
+    // short-circuit, and the reason length is not covered by the guarantee.
+    assert!(!t.ct_eq(&BareToken::try_from_hex("00").unwrap()));
+
+    // The pre-rc.11 spelling still compiles and still means what it says.
+    assert!(Token::try_from_hex("00")
+        .unwrap()
+        .ct_eq(&Token::try_from_hex("00").unwrap()));
+
+    // Neighbours of the dropped token survive it, in both directions.
+    let m = MixedToken::from_wrapper(secure_gate::Dynamic::new(vec![9u8, 9]));
+    assert!(m.ct_eq(&MixedToken::new(vec![9u8, 9])));
+    assert_eq!(m.into_wrapper().expose_secret(), &vec![9u8, 9]);
 }
 
 /// The `_sized` bech32 / bech32m DECODE constructors forwarded by the newtype macros.

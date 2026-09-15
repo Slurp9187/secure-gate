@@ -122,6 +122,58 @@ macro_rules! __sg_newtype_base {
     };
 }
 
+/// Internal: the base surface plus an automatic
+/// [`ConstantTimeEq`](crate::ConstantTimeEq), for the arms whose payload is
+/// known to implement it.
+///
+/// Four arms qualify, and they qualify for one reason: their wrapper implements
+/// `ConstantTimeEq` unconditionally under the `ct-eq` feature, so a plain
+/// `type Name = Fixed<[u8; N]>;` — or `= Dynamic<String>`, or
+/// `= Dynamic<Vec<u8>>` — has always had `ct_eq` for free. The newtype, the
+/// spelling this crate recommends as the safer of the two, did not: it wanted
+/// `derive: [ConstantTimeEq]` as well. That put the extra token on the side the
+/// documentation steers people toward, which is the wrong way round for a
+/// comparison whose alternative is a timing leak. `fixed_newtype!`'s
+/// size-literal arm was corrected in 0.9.0-rc.11; `dynamic_newtype!`'s `String`
+/// and `Vec<u8>` arms followed in the same release.
+///
+/// The token is redundant on those arms rather than removed: emitting the impl
+/// twice is `E0119`, so the derive list is scanned and `ConstantTimeEq` dropped
+/// from it before reaching [`__sg_newtype_base!`]. Declarations written against
+/// earlier release candidates keep compiling and mean exactly what they say.
+///
+/// Every `generic` arm still routes the token through `__sg_newtype_opt!`, where
+/// it remains a genuine opt-in — an arbitrary inner type may or may not
+/// implement `ConstantTimeEq`, and nothing readable off the tokens decides it.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __sg_newtype_base_ct_eq {
+    // Scan complete — expand with the tokens that survived.
+    (@scan [] [$($kept:ident)*] $(#[$attr:meta])* $vis:vis $name:ident($wrapper:ty)) => {
+        $crate::__sg_newtype_base!($(#[$attr])* $vis $name($wrapper), derive: [$($kept),*]);
+
+        $crate::__sg_if_ct_eq! {
+            impl $crate::ConstantTimeEq for $name {
+                #[inline]
+                fn ct_eq(&self, other: &Self) -> bool {
+                    $crate::ConstantTimeEq::ct_eq(&self.0, &other.0)
+                }
+            }
+        }
+    };
+    // Redundant on this arm: drop it rather than duplicate the impl.
+    (@scan [ConstantTimeEq $($rest:ident)*] [$($kept:ident)*] $($tail:tt)*) => {
+        $crate::__sg_newtype_base_ct_eq!(@scan [$($rest)*] [$($kept)*] $($tail)*);
+    };
+    // Anything else is a real option; keep it in order.
+    (@scan [$first:ident $($rest:ident)*] [$($kept:ident)*] $($tail:tt)*) => {
+        $crate::__sg_newtype_base_ct_eq!(@scan [$($rest)*] [$($kept)* $first] $($tail)*);
+    };
+    ($(#[$attr:meta])* $vis:vis $name:ident($wrapper:ty), derive: [$($opt:ident),* $(,)?]) => {
+        $crate::__sg_newtype_base_ct_eq!(@scan [$($opt)*] [] $(#[$attr])* $vis $name($wrapper));
+    };
+}
+
 /// Opt-in impls, selected by name in the `derive:` list.
 #[doc(hidden)]
 #[macro_export]
