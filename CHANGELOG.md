@@ -100,6 +100,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `Dynamic::new_with`'s `# Panics` section told callers to bound an attacker-supplied `len`
+  before passing it, which is right but assumes the check already existed somewhere. A
+  downstream consumer found by building against it that the sized slot does not merely
+  *move* their bound — it changes its *shape*. Under a grown `Vec` their ceiling was the
+  decompressor's, and an overstated `manifest:size` failed a comparison downstream; under
+  the slot that size **is** the allocation length, and `vec![0u8; 9_000_000_000]` does not
+  fail a comparison. A caller whose length comes from a trusted source has nothing to do; a
+  caller whose length comes from the file format has acquired an allocation-sized surface
+  where it previously had a comparison. Said so.
 - `RevealSecret::expose_secret` gains a "Coming from `secrecy`" note. The two crates share
   this spelling deliberately — this one kept the vocabulary when it went its own way — but not the
   posture: as of `secrecy` 0.10.3 a plain reference is documented there as "the only method
