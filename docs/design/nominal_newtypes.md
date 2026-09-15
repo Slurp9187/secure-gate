@@ -65,6 +65,14 @@
 > assertion is a post-monomorphization error and therefore invisible to
 > `cargo check`, which is a real limit worth knowing before relying on it.
 
+> **Amended for 0.8.0-rc.14: constructors were refined in 0.9.0-rc.12.** Trap 4 (§4) describes
+> `Dynamic::new_with` as ambiguous across two inherent impls; that ambiguity is now gone.
+> `new_with` is defined only on `Dynamic<Vec<u8>>`, with signature `new_with(len, f)`
+> where `F: FnOnce(&mut [u8])` — a sized, pre-zeroed slot. And §1's description of
+> `dynamic_newtype!`'s String arm claims it generates `new_with`, but that impl was removed
+> in this same release — a String must hold valid UTF-8 and characters have variable byte
+> widths, so a fixed byte window cannot be a valid place to write text.
+
 > **`release/0.8` backport:** this document is carried verbatim from `main` and
 > describes that branch. On `release/0.8` the same code is built for Rust 2021 /
 > MSRV 1.70 with `rand` 0.9 (`TryRngCore` in the generated `from_rng`), and the
