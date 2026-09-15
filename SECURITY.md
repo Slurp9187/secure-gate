@@ -19,7 +19,7 @@ This document outlines the security model, design choices, strengths, limitation
 - **OS swap, page files, core dumps** — secrets may be paged to disk; use `mlock` or encrypted swap at the OS level. Applying `mlock` naively is unsound — see [If swap residue is in your threat model](#if-swap-residue-is-in-your-threat-model).
 - **`panic = "abort"` / SIGKILL / hard crash** — `Drop` impls do not run; secrets are not cleared.
 - **`static` secrets** — Rust does not invoke `Drop` on statics; `Fixed::new` in a `static` is never zeroized.
-- **Copies made by caller code** — after `expose_secret()` or serialization, the caller holds ordinary non-zeroized memory.
+- **Copies made by caller code** — after `expose_secret()` or serialization, the caller holds ordinary non-zeroized memory. This includes copies made **inside** a `with_secret` closure, where the wrapper is still holding the secret and the code reads as protected: `|p| *p` on `Copy` storage, and `to_vec` / `clone` / `to_string` on any inner type that offers one. No lint detects either. See [4. Copying the secret out of a reveal borrow](#4-copying-the-secret-out-of-a-reveal-borrow).
 - **Anything past `into_inner()`** — extraction hands you the plain value and ends protection. It is not wiped for you, and its `Debug` is not redacted.
 - **Encoded/serialized output** — every encoder (`to_hex()`, `to_base32()`, `to_base64url()`, `try_to_bech32()`, `try_to_bech32m()`) returns `EncodedSecret`: `Zeroizing<String>` with a redacted `Debug` and no `Display`, so the encoded copy is wiped on drop. serde `Serialize`, by contrast, produces full secrets in ordinary non-zeroizing buffers that this crate cannot reach. `EncodedSecret::into_inner()` is the named call that hands you an unprotected `String`.
 - **All side channels beyond equality timing** — cache, power, EM, and branch-predictor attacks are out of scope.
@@ -73,11 +73,16 @@ absorbing it would cost `no_std` support, the single-dependency property, and
 
 ## Inherent Rust Limitations
 
-These three limitations are inherent to systems languages with a stack, a
-growable heap, and an OS that pages memory. They are **not unique to
-`secure-gate`** — `secrecy`, `zeroize`-wrapped collections, C/C++ secret
-crates, and Go's `memguard` all share the same threat model. The crate
-documents them honestly rather than overclaiming.
+These four limitations are inherent to systems languages with a stack, a
+growable heap, an OS that pages memory, and a type system in which reading a
+value can copy it. They are **not unique to `secure-gate`** — `secrecy`,
+`zeroize`-wrapped collections, C/C++ secret crates, and Go's `memguard` all
+share the same threat model. The crate documents them honestly rather than
+overclaiming.
+
+The first three are about residue the machine leaves behind. The fourth is a
+copy your own code makes, and it is the only one that happens inside the API
+this crate provides for safe access.
 
 ### 1. Stack-move residue (`Fixed<T>`)
 
@@ -256,6 +261,140 @@ and outside any in-process library's reach.
 configuration. The crate does not call `mlock` or set process flags
 itself.
 
+### 4. Copying the secret out of a reveal borrow
+
+[`with_secret`](https://docs.rs/secure-gate/latest/secure_gate/trait.RevealSecret.html#tymethod.with_secret)
+and [`expose_secret`](https://docs.rs/secure-gate/latest/secure_gate/trait.RevealSecret.html#tymethod.expose_secret)
+lend you `&T`. They govern **access** — they cannot govern what the body does with the
+bytes once it can see them. Any expression that produces an owned value from that borrow
+hands you a copy in ordinary memory, and the wrapper will wipe its own buffer without
+ever learning about yours.
+
+This is the only limitation in this document that occurs **while the secret is still
+held**, inside the method provided for reading it safely. Nothing is extracted, nothing
+is named `into_inner`, and the wrapper is still doing its job.
+
+**Start with the form nothing stops.** A method taking `self` by value copies *through*
+the borrow rather than moving out of it, so no borrow-checker rule applies and there is
+no operator in the source to notice:
+
+```rust,ignore
+let escaped = secret.with_secret(|b| b.to_vec());      // Vec<u8> — no `*` anywhere
+let escaped = secret.with_secret(|s| s.to_string());   // String  — via Display
+let escaped = secret.with_secret(|b| <[u8; 16]>::try_from(b.as_slice()));
+```
+
+Any inner type offering such a method is affected — `Vec::to_vec`, `String::to_string`,
+`clone`, `to_owned`, `<[u8; N]>::try_from`, a `collect` over the bytes. This form reaches
+**every** wrapper, `Fixed` and `Dynamic` alike.
+
+The two deref forms are more obvious and more limited. They require `T: Copy`:
+
+```rust,ignore
+let escaped: [u8; 32] = key.with_secret(|p| *p);   // owned array on the stack
+let escaped: [u8; 32] = key.with_secret(|&p| p);   // identical, no `*` in the source
+```
+
+**The scoping, in the order that matters:**
+
+| Form | Where it applies |
+| ---- | ---------------- |
+| Copying method (`to_vec`, `clone`, `to_string`, `try_from`) | **Everywhere.** No language rule prevents it. |
+| `*p` and the `&p` binding | Only where `T: Copy` — in practice `Fixed<T>` over `Copy` storage. |
+
+Where `T` is not `Copy`, the deref forms are `E0507: cannot move out of ... behind a
+shared reference`. That covers `Dynamic<Vec<u8>>` and `Dynamic<String>`, and also
+`Fixed<Fixed<T>>` and `Fixed<zeroize::Zeroizing<T>>` — for the opposite reason, since a
+type with a destructor cannot implement `Copy` (`E0184`), and a destructor is precisely
+what those two exist for. Both halves are pinned by
+`tests/compile-fail/with_secret_no_move_out.rs` and `tests/reveal_copy_out.rs`.
+
+**Read that table in full before acting on it.** "The borrow checker protects `Dynamic`"
+is true of the deref forms and false of the copying form — and the copying form is both
+the one no search can find *and* the one that occurs in practice. A reader who stops at
+the immunity retires the audit for the wrapper most likely to hold bulk plaintext.
+
+**Do not reason from the shape of the storage type.**
+[`FixedStorage`](https://docs.rs/secure-gate/latest/secure_gate/trait.FixedStorage.html)
+covers `[T; N]`, tuples, `Option<T>`, `Wrapping<T>`, `MaybeUninit<T>`, `Zeroizing<T>`,
+`Fixed<T>` and the primitives. That list does **not** partition by hazard:
+`Fixed<(u64, u64)>`, `Fixed<Option<[u8; 32]>>` and `Fixed<Wrapping<u64>>` deref-leak
+exactly like `Fixed<[u8; 16]>`, while `Fixed<Zeroizing<[u8; 32]>>` cannot. Nothing about
+membership predicts which. `Copy` is the discriminator, and it is the only one.
+
+**The compiler suggests the leak.** When `E0507` blocks a move it offers this:
+
+```text
+help: consider cloning the value if the performance cost is acceptable
+-     let key = secret.with_secret(|v| *v);
++     let key = secret.with_secret(|v| v.clone());
+```
+
+That advice is correct about types and wrong about secrets: it converts a compile error
+into a silent copy. It is a plausible account of how the copying form arrives in code
+nobody wrote carelessly.
+
+**No lint detects any of this.** `clippy::all`, `clippy::pedantic`, `clippy::nursery` and
+`clippy::restriction` were pointed at code leaking a key in all three forms; the twelve
+diagnostics returned were single-char idents, missing `return`, integer suffixes and the
+like. `rustc` under `-D warnings` says nothing. Documentation is the only mitigation that
+exists for this one.
+
+**Detection — read the closure bodies; searching is how you choose which ones.**
+
+```sh
+grep -rnE 'with_secret(_mut)?\(\|[a-z_]+\|[^)]*\*'   # deref, including inside a call
+grep -rnE 'with_secret(_mut)?\(\|&'                  # pattern binding
+```
+
+Neither finds the copying form, because it has no syntax to match on. Treat these as a way
+of deciding what to read, never as a way of deciding what is clean — a grep offered without
+its blind spot converts *"I should audit this"* into *"I ran the check."* Two consequences
+worth adopting:
+
+- **Prefer an over-broad pattern.** Thirteen hits you read one by one is a reading list,
+  and it finds things. A pattern precise enough to be trusted is a pattern that gets
+  trusted.
+- **Record coverage, not a verdict.** Write down which spellings you searched and how many
+  bodies you read. "Audited, clean" cannot be corrected by someone who later learns the
+  rule was scoped wrong; "I checked these four spellings and read fifteen of sixty bodies"
+  can — and that is how one of the defects below was eventually found.
+
+The question that finds this hazard is not *"is this value wrapped?"* — it usually is, one
+line later. It is **"wrapped where, relative to the closure?"**
+
+**Incidence.** Three consumer crates examined, two carrying live instances:
+
+- In `aescrypt-rs`, three derefs corrected across commits `443371b` and `38c0c74`
+  (verified from public source); two carried secret material, one of them the v0 setup
+  key — which for a v0 file *is* the master key.
+- In `msoffice-crypto`, reported: one live site among 76, where a SHA-1 verifier hash
+  escaped its closure as an owned `Vec` **and** reallocated on the next line — see
+  limitation 2; the two stack. The file's own comment said the value "gets no more
+  exposure than the key."
+- In `age-pq`, reported: an audit run deliberately, by someone who had just been told the
+  hazard existed, using the pattern `\|[a-z_]+\| ?\*` — which requires the `*` adjacent to
+  the parameter and so missed six sites spelled `from(*bytes)`. Reported clean with a count
+  of one; the real count was seven, and it stood for hours.
+
+That last figure is the most useful one here. The first two show code failing; it shows
+*the check* failing, which is the likelier outcome for a reader who reaches for a grep.
+
+**Recommended patterns:**
+
+- Copy wrapper-to-wrapper, so the bytes never exist outside something that wipes them:
+  `src.with_secret(|s| dst.with_secret_mut(|d| d.copy_from_slice(s)))`.
+- Build the destination with a sized constructor and fill it in place —
+  [`Fixed::new_with`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html#method.new_with)
+  or `Dynamic::new_with(len, |slot| …)`. This closes limitation 2 at the same site, which
+  is what the `msoffice-crypto` fix did: one sized slot removed both the escape and the
+  reallocation.
+- Do the work *inside* the closure and let only a non-secret out — a `bool` from a
+  constant-time comparison, a length, or a wrapper constructed in place.
+- Where a boundary genuinely requires an owned plain value (an FFI call, an upstream API
+  taking `Box<[u8; 16]>` with no closure form), that is a decision rather than an oversight.
+  Record it where the next reader will look, as this crate does for `into_inner`.
+
 ## Audit Status
 
 `secure-gate` has **not** undergone an independent security audit.
@@ -307,7 +446,7 @@ the crate makes two different promises on either side of it.
 
 | Obligation | Scope |
 | ---------- | ----- |
-| Accidents must not compile | While the secret is held in `Fixed`/`Dynamic`. Ends at the named extraction. |
+| Accidents must not compile | While the secret is held in `Fixed`/`Dynamic`. Ends at the named extraction — and see the carve-out below, which is inside that window. |
 | Documented behavior must be accurate | Everywhere, forever. |
 
 `into_inner` and `EncodedSecret::into_inner` are the named exits that transfer ownership:
@@ -345,6 +484,14 @@ Two specific consequences:
 
 An encoded secret is still the whole secret in a different alphabet. `EncodedSecret` is a
 zeroizing `String` buffer with redacted `Debug` — not a redaction of the value.
+
+**The carve-out: one accident does compile, and it compiles inside the window above.**
+`with_secret` lends `&T`, so any expression in the closure body that produces an owned
+value copies the secret into ordinary memory while the wrapper still holds it — `*p` where
+the inner type is `Copy`, and `to_vec` / `clone` / `to_string` on any inner type at all.
+The first row of that table is a design goal the type system delivers for `Deref`, `AsRef`
+and extraction; it does not reach inside the closure, and no lint covers the gap. This is
+limitation 4 above, and it is the reason that row reads "must not" rather than "cannot".
 
 ## Core Security Model
 
