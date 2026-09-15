@@ -61,6 +61,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version cannot quietly drift back.
 
 ### Changed
+- `RevealSecret::expose_secret` gains a "Coming from `secrecy`" note. The two crates share
+  this spelling deliberately — this one kept the vocabulary when it went its own way — but not the
+  posture: as of `secrecy` 0.10.3 a plain reference is documented there as "the only method
+  providing access to a secret", whereas here it is the auditable escape hatch and
+  `with_secret` is the recommended path. The habit transfers silently, because reaching for
+  the familiar name compiles, works, and protects the secret exactly as before, so nothing
+  signals that the narrower tool exists. Named on `expose_secret` rather than `with_secret`
+  because that is where a migrating reader actually lands.
 - `SECURITY.md` gains "4. Copying the secret out of a reveal borrow" under **Inherent Rust
   Limitations**, whose preamble now counts four rather than three and distinguishes the
   first three (residue the machine leaves behind) from the fourth (a copy your own code
