@@ -95,13 +95,14 @@
 //!
 //! This is not hypothetical. A consumer of this crate hit it twice in one codebase, on
 //! the same idiom, with opposite outcomes. One call site piped `try_to_bech32m(..)`
-//! straight into `.to_ascii_uppercase()` and shipped it, leaking a database key twice
-//! over — once as the lowercase encoding, once as the uppercased copy neither wrapper
-//! ever touched. A second call site, reaching for the same encoder, re-wrapped the
-//! result before using it: `Zeroizing::new(encoded.to_ascii_uppercase())`. Same crate,
-//! same method chain, two different outcomes in one tree — which is what makes this a
-//! trap and not carelessness. Both call sites compile. Both type-check. Only one of them
-//! is safe, and nothing in the types says which.
+//! straight into `.to_ascii_uppercase()` and shipped it, leaking a database key as the
+//! uppercased copy neither wrapper ever touched — the `EncodedSecret` it was called on
+//! wiped itself on drop, which is what makes the surviving copy so easy to miss. A
+//! second call site, reaching for the same encoder, re-wrapped the result before using
+//! it: `Zeroizing::new(encoded.to_ascii_uppercase())`. Same crate, same method chain,
+//! two different outcomes in one tree — which is what makes this a trap and not
+//! carelessness. Both call sites compile. Both type-check. Only one of them is safe, and
+//! nothing in the types says which.
 //!
 //! Two ways to stay inside protection:
 //!

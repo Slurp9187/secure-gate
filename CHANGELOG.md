@@ -12,9 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING: `Dynamic::<Vec<u8>>::new_with` takes the length and hands its closure a sized,
   pre-zeroed `&mut [u8]` — `new_with(len, |slot| …)` — and gains a fallible twin,
   `try_new_with(len, |slot| …)`.** The closure used to receive an empty `Vec<u8>` to grow.
-  It now receives exactly `len` bytes, every one of them zero, living inside the wrapper's
-  own allocation. Capacity equals length, so the wrapper never holds slack, and because the
-  closure holds a slice rather than a container, growth is not something it can spell.
+  It now receives exactly `len` bytes, every one of them zero, living in the payload buffer
+  the constructor allocates to hold them. That buffer is one of two allocations the call
+  makes, not the whole cost of it — `Dynamic<Vec<u8>>` is a `Box<Vec<u8>>`, so there is a
+  second, small allocation for the `Box` header no matter how the `Vec` inside it was
+  built. What the signature buys is not a lower count but a fixed shape: the payload
+  allocation is exactly `len` bytes, so capacity equals length and the wrapper never holds
+  slack, and because the closure holds a slice rather than a container, growth is not
+  something it can spell.
 
   **The old signature was the defect its own documentation warned about.** A `Vec` that
   outgrows its capacity asks the allocator for a new block, copies the secret across, and
@@ -45,13 +50,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   An API that works the first time and leaks the second is one that trains its callers into
   the failure.
 
-  Making the length part of the signature removes the hazard instead of documenting it. The
-  slot is a `&mut [u8]`: `push`, `extend_from_slice`, `reserve` and `shrink_to_fit` do not
-  exist on it, so the abandoned-block count inside the closure is 0 by construction, not by
-  remembering the rc.9 advice. That is why the change is to the type and not to a doc
-  comment — and why `SECURITY.md`'s list of routes to a growable `&mut` no longer names
-  the `new_with` closure, while it still names `with_secret_mut`, `expose_secret_mut` and
-  `as_wrapper_mut`, which hand out a container.
+  Making the length part of the signature removes the hazard from the slot, not from
+  everything the closure touches. The slot itself is a `&mut [u8]`: `push`,
+  `extend_from_slice`, `reserve` and `shrink_to_fit` do not exist on it, so *that*
+  allocation — the one the wrapper owns and will protect — cannot be grown and abandoned.
+  It says nothing about the closure body, which is ordinary Rust and can allocate whatever
+  it likes. The natural migration for a multi-part fill builds the pieces into a `Vec` —
+  call it `material` — right there in the closure, then copies the result into the slot;
+  that `Vec` grows and abandons its own intermediate blocks exactly as the old `new_with`
+  argument did, and the new signature neither sees it nor stops it, because it is a local,
+  not the slot. Temporaries the closure grows are still the caller's problem. The way to
+  avoid building one is `SlotWriter::push_slice` (below): appending each piece straight
+  into the slot instead of into a scratch buffer leaves no `material` to abandon. That is
+  why the change is to the type and not to a doc comment — and why `SECURITY.md`'s list of
+  routes to a growable `&mut` no longer names the `new_with` closure, while it still names
+  `with_secret_mut`, `expose_secret_mut` and `as_wrapper_mut`, which hand out a container.
 
   **The zero fill is a guarantee, not an implementation detail.** A slot arriving zeroed
   is the obvious way to build one, and it would have been easy to leave it as a property a
@@ -156,11 +169,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing and zeroizes nothing; borrowed from inside `new_with`, it inherits the wrapper's
   panic-safety, since unwinding drops the `Zeroizing` and wipes whatever was written.
 
-  Under `std` it also implements `io::Write`, and there the overrun is
-  `ErrorKind::WriteZero` rather than a panic. That path exists so a slot can be handed to
-  foreign code — a serializer, an encoder, a hasher's output sink — that cannot be asked to
-  respect a length, and for which an error is the only way to say stop. Available with no
-  features; exported at the crate root as `secure_gate::SlotWriter`.
+  Under `std` it also implements `io::Write`, and there an overrun is reported as
+  `ErrorKind::WriteZero` — but that is `write_all`'s doing, not a property of every call.
+  `write` follows the trait's ordinary contract: it errors only once `remaining()` is
+  already 0, and a call that arrives before then with more bytes than fit does not fail —
+  it writes `min(buf.len(), remaining())` and returns `Ok(n)`, a valid short write. What
+  turns that into an error is `write_all` looping on the `Ok(n)` and handing the leftover
+  back to `write` on the next pass, which is the call that finds `remaining() == 0` and
+  fails. A caller that invokes `write` directly and does not check the count it returns
+  gets a silent short write, not an error — the slot's zero tail again, this time from an
+  interface that had a chance to report it and, for that call, does not. That path exists
+  so a slot can be handed to foreign code — a serializer, an encoder, a hasher's output
+  sink — that cannot be asked to respect a length, and for which `write_all`'s error is
+  the way to say stop. Available with no features; exported at the crate root as
+  `secure_gate::SlotWriter`.
 
 ### Removed
 

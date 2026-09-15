@@ -146,6 +146,104 @@ fn exact_fit_via_push_byte_does_not_panic() {
     assert!(w.is_full());
 }
 
+// === Zero-length slot ===
+//
+// Constructing a zero-length `Fixed` is a compile error, but not because the type is
+// refused. `impl<T: FixedStorage, const N: usize> FixedStorage for [T; N]` in
+// `src/traits/fixed_storage.rs` accepts `N = 0` like any other `N`, and naming the type on
+// its own -- `type Name = Fixed<[u8; 0]>;` -- still compiles. The guard is the
+// `NON_ZERO_SIZED` `const` assertion evaluated in the bodies of `Fixed::new`, `new_with`
+// and `try_new_with`, the constructors every other one funnels through, so it is
+// post-monomorphization: it fires at the construction site, during codegen, and `cargo
+// check` never reaches it. That is why `tests/compile-fail/fixed_zero_size.rs` has a
+// compile-pass companion -- it puts `trybuild` into `cargo build` mode, without which the
+// compile-fail case passes clean.
+//
+// `Dynamic::<Vec<u8>>::new_with(0, ..)` has no counterpart to that guard: `len` is a
+// runtime value, and neither `new_with` nor `try_new_with` rejects 0 -- both just build a
+// `vec![0u8; len]` and hand the closure `&mut v[..]`, which at `len == 0` is an empty
+// slice. So the call is legal and the empty slot is reachable only through `Dynamic`, and
+// only at this cursor layer does it get direct coverage: a zero-length slice is "full" the
+// instant it exists, with nothing to write and nothing to remain.
+
+#[test]
+fn zero_length_slot_is_full_immediately() {
+    let mut buf: [u8; 0] = [];
+    let mut w = SlotWriter::new(&mut buf);
+
+    assert!(
+        w.is_full(),
+        "a slot with no bytes has nothing left to write"
+    );
+    assert_eq!(w.remaining(), 0);
+    assert_eq!(w.position(), 0);
+
+    // An empty push asks for no room, so it is accepted even though the slot is already
+    // "full" -- same reasoning as the empty io::Write case below: `is_full` means no
+    // room for anything, not that further zero-sized writes are refused.
+    w.push_slice(&[]);
+    assert!(w.is_full());
+    assert_eq!(w.position(), 0);
+}
+
+#[test]
+#[should_panic(expected = "SlotWriter overrun")]
+fn zero_length_slot_panics_on_push_byte() {
+    let mut buf: [u8; 0] = [];
+    let mut w = SlotWriter::new(&mut buf);
+    w.push_byte(1); // one byte wanted, zero capacity to put it in
+}
+
+// === Debug redaction ===
+//
+// `SlotWriter` borrows the live secret buffer for the duration of `new_with`, so a naive
+// `#[derive(Debug)]` over `slot: &mut [u8]` prints the bytes themselves -- the whole secret,
+// in plaintext, into whatever the caller passes the formatted value to (a log line, a panic
+// message, an assertion failure from a test harness). `Debug` must instead redact the slot
+// while still reporting the cursor state (`pos` / how much is written vs. remaining), since
+// that state is what makes the output useful for debugging a length mismatch without ever
+// being useful for recovering the secret.
+
+#[test]
+fn debug_redacts_slot_bytes_but_reports_cursor_state() {
+    // A recognisable, non-zero payload -- if any of these four bytes show up in the
+    // formatted output, in either decimal or hex, the Debug impl is leaking the secret.
+    let mut buf = [0u8; 6];
+    let mut w = SlotWriter::new(&mut buf);
+    w.push_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
+    assert_eq!(w.position(), 4);
+    assert_eq!(w.remaining(), 2);
+
+    let out = format!("{w:?}");
+
+    // Decimal renderings of the four bytes: 0xDE=222, 0xAD=173, 0xBE=190, 0xEF=239.
+    for decimal in ["222", "173", "190", "239"] {
+        assert!(
+            !out.contains(decimal),
+            "Debug output leaks a secret byte as decimal {decimal}: {out}"
+        );
+    }
+    // Hex renderings, upper- and lower-case, with no assumption of a `0x` prefix.
+    for hex in ["de", "DE", "ad", "AD", "be", "BE", "ef", "EF"] {
+        assert!(
+            !out.contains(hex),
+            "Debug output leaks a secret byte as hex {hex}: {out}"
+        );
+    }
+
+    // The cursor state is not secret and must still be legible: 4 bytes written, 2
+    // remaining. These numbers do not collide with any of the excluded byte renderings
+    // above, so their presence here is a positive signal, not a coincidence.
+    assert!(
+        out.contains(&w.position().to_string()),
+        "Debug output should report the position (4): {out}"
+    );
+    assert!(
+        out.contains(&w.remaining().to_string()),
+        "Debug output should report what remains (2): {out}"
+    );
+}
+
 // === io::Write (std) ===
 //
 // This path exists for foreign code that writes through `std::io::Write` and cannot be
@@ -200,6 +298,32 @@ fn write_empty_buf_on_a_full_slot_is_ok_not_write_zero() {
     w.write_all(&[1, 2]).unwrap();
     assert!(w.is_full());
     assert_eq!(w.write(&[]).unwrap(), 0);
+}
+
+#[cfg(feature = "std")]
+#[test]
+fn write_all_on_overrun_commits_the_prefix_before_returning_write_zero() {
+    use std::io::{ErrorKind, Write};
+
+    // `write_all`'s default impl loops calling `write` until the buffer is exhausted or
+    // an error surfaces, advancing past whatever each `write` accepted. It is not
+    // transactional: it has no way to undo the bytes a prior `write` already copied into
+    // the slot before a later call fails. Here the first `write` accepts the 4 bytes
+    // that fit and copies them in; the second call, for the 2 leftover bytes against a
+    // now-full slot, is what returns `WriteZero`. `write_all` surfaces that error as its
+    // own -- but the first call's 4 bytes are already sitting in `buf`, committed.
+    //
+    // This is the state a caller inherits if it treats the `Err` as "nothing happened":
+    // real secret material landed in the slot, alongside an error that looks like a
+    // clean refusal.
+    let mut buf = [0u8; 4];
+    let mut w = SlotWriter::new(&mut buf);
+
+    let err = w.write_all(&[1, 2, 3, 4, 5, 6]).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::WriteZero);
+
+    // The prefix that did fit is not rolled back on the error path.
+    assert_eq!(buf, [1, 2, 3, 4]);
 }
 
 // === Composition: SlotWriter driving a real sized constructor ===

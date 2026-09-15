@@ -48,11 +48,74 @@ fn dynamic_arms_pick_the_right_api() {
     let api: ApiKey = "sk_live_xyz".into(); // From<&str> on the String arm
     assert_eq!(api.expose_secret(), "sk_live_xyz");
 
-    let tok = SessionToken::new_with(3, |v| v.copy_from_slice(b"abc"));
-    assert_eq!(tok.len(), 3);
+    // `len` is fixed by the caller up front and the slot is pre-zeroed, so a
+    // closure that fills the *whole* slot (`new_with(3, |v| v.copy_from_slice(b"abc"))`,
+    // asserting only `len() == 3`) only ever proves the newtype echoes back the
+    // `len` the test itself passed in — an arm that ignored `f`, or built the
+    // wrapper from a throwaway scratch buffer and a separate `vec![0u8; len]`,
+    // would still report `len() == 3` and pass. Filling just the first 3 of 8
+    // bytes and reading both halves back is what pins the fill to the
+    // wrapper's own storage: the payload has to be read back (not just its
+    // length), and the untouched tail has to still be the pre-zeroing, not
+    // whatever a scratch buffer happened to hold.
+    let tok = SessionToken::new_with(8, |v| v[..3].copy_from_slice(b"abc"));
+    assert_eq!(tok.len(), 8);
+    assert_eq!(&tok.expose_secret()[..3], b"abc");
+    assert_eq!(&tok.expose_secret()[3..], &[0u8; 5]);
 
     let hook = WebhookSecret::new(String::from("whsec_1"));
     assert_eq!(format!("{hook:?}"), "[REDACTED]");
+}
+
+/// `try_new_with` on the `Vec<u8>` arm, exercised end to end.
+///
+/// `dynamic_newtype!` does not forward this constructor transparently — it
+/// re-wraps with `Ok(Self(<Dynamic<Vec<u8>>>::try_new_with(len, f)?))`, and its
+/// own rustdoc makes a security claim about the partial write being wiped on
+/// `Err`. Nothing in this suite called it before this test, on either the
+/// success or the failure path. That gap matters for the same reason
+/// `tests/lifecycle_trace_handoff.rs` gives the `Fixed` side a dedicated test
+/// (`newtype_try_new_with_wipes_on_error_and_not_on_success`): a forward that
+/// silently rebuilt the value on `Err`, or dropped the caller's error type for
+/// its own, would still pass a test that only checked `is_err()`.
+///
+/// The success half mirrors the partial-fill check above — length, payload,
+/// and zero tail all read back through the newtype, not just through the
+/// inner `Dynamic` the macro wraps. The failure half pins that the caller's
+/// own error type comes back out unchanged, byte for byte, rather than being
+/// mapped, boxed, or discarded in favor of `()`.
+///
+/// What this test cannot see: whether the `Err` path actually *wipes* the
+/// partial write before returning. That needs the allocator proxy
+/// `tests/heap_zeroize.rs` already uses for exactly this claim on `Dynamic`
+/// itself — a `SessionToken`-level equivalent belongs there, not here.
+#[test]
+fn session_token_try_new_with_reads_back_and_propagates_errors() {
+    #[derive(Debug, PartialEq, Eq)]
+    struct ReadError(&'static str);
+
+    // Success: the fill reaches the wrapper's own storage (length and payload
+    // both read back through the newtype), and a short fill leaves the
+    // untouched tail as the pre-zeroing, exactly as `new_with` does above.
+    let tok = SessionToken::try_new_with(8, |v| {
+        v[..3].copy_from_slice(b"abc");
+        Ok::<(), ReadError>(())
+    })
+    .expect("closure succeeded");
+    assert_eq!(tok.len(), 8);
+    assert_eq!(&tok.expose_secret()[..3], b"abc");
+    assert_eq!(&tok.expose_secret()[3..], &[0u8; 5]);
+
+    // Failure: the caller's error type comes back out unchanged. A forward
+    // that rebuilt `Self` regardless of the closure's result, or that mapped
+    // the error away, would fail this even though `is_err()` alone would not
+    // have caught it.
+    let err = SessionToken::try_new_with(8, |v| {
+        v[..3].copy_from_slice(b"bad");
+        Err(ReadError("device error"))
+    })
+    .unwrap_err();
+    assert_eq!(err, ReadError("device error"));
 }
 
 #[cfg(all(feature = "encoding-hex", feature = "std"))]

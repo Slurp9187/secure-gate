@@ -170,19 +170,49 @@ above.
 `Vec<u8>`**, so filling it reallocated, and every reallocation freed the old block
 unwiped — inside a constructor whose entire purpose was to avoid an unprotected copy.
 Since 0.9.0-rc.12 the signature carries the length: `new_with(len, |slot: &mut [u8]| …)`
-performs one allocation of exactly `len`, every byte zero, capacity equal to length. A
-slice has no capacity to change, so `push`, `reserve` and `shrink_to_fit` are not
-spellable on it and no reallocation can happen inside the closure at all. This is the
-one member of the family closed by making the hazard **inexpressible** rather than by
-documenting it; what the tier methods hand out is still a growable container, which is
-why they stay on the list and the closure does not.
+allocates the payload buffer once, at exactly `len`, every byte zero, capacity equal to
+length — so the wrapper holds no slack and no growth is needed to reach the final size.
+The construction costs **two** allocations, not one: that `len`-byte buffer, and the
+`Box<Vec<u8>>` header (24 bytes on 64-bit) that `from_protected_bytes` allocates so the
+filled buffer can be handed to the wrapper by pointer rather than copied into it. The
+crate's instrumented trace (`tests/lifecycle_trace_heap.rs`) counts the allocations of
+the constructors built on this path and asserts exactly two, because the count is the
+observable that separates filling the protected buffer from filling a scratch buffer and
+copying it — a third allocation would *be* that second copy. For residue the load-bearing
+half of the count is the first: one payload buffer, sized once, never resized.
+
+**No reallocation *of the slot* is expressible — the closure's own temporaries are still
+yours.** `push`, `reserve` and `shrink_to_fit` are not spellable on a `&mut [u8]`, so the
+constructor cannot abandon a buffer the way the old empty-`Vec` shape did. That is a
+guarantee about the slot and about nothing else. The closure body is ordinary code and may
+allocate and grow whatever it likes, and the natural migration walks straight into it:
+`new_with(|v| v.extend_from_slice(&material))` becomes `new_with(len, |slot|
+slot.copy_from_slice(&material))`, and `material` is usually a `Vec` the caller
+concatenates in that same closure — every growth of *it* abandons an unwiped block holding
+the secret, which is the defect this release is about, at the same call site it was always
+at. Assemble a multi-part fill with
+[`SlotWriter`](https://docs.rs/secure-gate/latest/secure_gate/struct.SlotWriter.html)
+rather than with a staging buffer: `push_slice` appends each part straight into the slot,
+so the parts are never concatenated anywhere else and there is no intermediate buffer to
+grow.
+
+This is the one member of the family closed by making the hazard **inexpressible** rather
+than by documenting it; what the tier methods hand out is still a growable container, which
+is why they stay on the list and the closure does not. "Inexpressible" scopes to the slot,
+though — not to everything the closure touches.
 
 **Recommended patterns:**
 
 - For **known-size key material**, prefer [`Fixed<[u8; N]>`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html) (no allocation) or `Dynamic<[u8; N]>` (heap-only, fixed size — no realloc surface).
 - For **bounded-size variable-length secrets**, pre-size with `Vec::with_capacity(MAX)` / `String::with_capacity(MAX)` *before* wrapping in `Dynamic`, then only perform capacity-stable mutations through `with_secret_mut`.
 - For **infrequent updates**, replace the entire wrapper rather than mutating in place: `dyn_secret = Dynamic::<Vec<u8>>::new_with(len, |slot| …)` — the old `Dynamic` zeroizes its buffer on drop, and the replacement is filled in a slot of exactly `len` zeroed bytes that cannot grow. **The pre-sizing this used to require is now the signature's job.** The guidance here was "call `v.reserve_exact(len)` first", because `new_with` started the closure with an empty `Vec` and a fill that pushed its way up abandoned its own intermediate buffers: measured at 1016 secret bytes across 7 abandoned blocks for a 1008-byte secret. That measurement is the reason the constructor changed rather than advice you still have to follow — the closure now receives `&mut [u8]`, on which `reserve_exact` does not exist and neither does any other capacity change, so the count is 0 by construction rather than by remembering. Use `try_new_with(len, |slot| …)` when the fill can fail; it zeroizes the partial write before returning the error.
-- For **construction in general**, the length decides the shape, and the two cases cover everything: length known before the fill → `Dynamic::<Vec<u8>>::new_with(len, |slot| …)`; length not known → `Dynamic::new(Vec::new())` plus the `std`-gated `io::Write` impl, which grows by hand and zeroizes each abandoned buffer before releasing it. Neither leaves an unwiped copy behind, and there is no third case that needs one. [`SlotWriter`](https://docs.rs/secure-gate/latest/secure_gate/struct.SlotWriter.html) restores the append shape on top of a slot (`push_slice` / `push_byte`, panicking on overrun) so that a multi-part fill is not hand-written offset arithmetic — a fixed slot trades the reallocation hazard for an offset one, and in wire-format code a wrong offset derives the wrong key and still runs.
+
+  For a **`Dynamic<String>`** there is no constructor to reach for: `Dynamic::<String>::new_with` was removed in 0.9.0-rc.12 with no replacement, because no sized slot is possible for text — a `String` must hold valid UTF-8 and characters have variable byte widths, so a fixed byte window is not somewhere arbitrary text can be written. Build the replacement yourself: `String::with_capacity(len)`, filled once, then `dyn_secret = Dynamic::new(s)`, which **moves** that allocation in, so the buffer you filled is the buffer the wrapper wipes. `From<&str>` is the convenient spelling and the leaky one — it **copies**, and your source string stays where it was, unwiped and out of this crate's reach. Note what is missing next to the `Vec<u8>` arm: nothing in `Dynamic::new`'s signature enforces the pre-sizing. A `String` you grew into by pushing is accepted exactly like one you sized correctly, and by the time you wrap it the buffers that growth abandoned are already on the heap. The `String` hazard is unchanged by this release; only the `Vec<u8>` one was closed.
+- For **construction in general**, the length decides the shape, and **under `std`** the two cases cover everything: length known before the fill → `Dynamic::<Vec<u8>>::new_with(len, |slot| …)`; length not known → `Dynamic::new(Vec::new())` plus the `std`-gated `io::Write` impl, which grows by hand and zeroizes each abandoned buffer before releasing it. Neither leaves an unwiped copy behind, and under `std` there is no third case that needs one.
+
+  **Without `std` the second case does not exist.** As the note above on that impl spells out, `full` does not enable `std`, and neither does `default = ["alloc"]` — so the default build and the batteries-included build both land here, and alloc-without-std is the ordinary configuration rather than an exotic one. For such a consumer, a secret whose length is not known before the fill has **no** non-leaking construction path in this crate: growing the `Vec` through `with_secret_mut` abandons unwiped buffers inside the wrapper, and growing one outside and moving it in with `Dynamic::new` abandons the same buffers outside it — `new` protects the allocation it is handed and says nothing about the ones you discarded getting there. Two ways out, both of which have to be chosen deliberately: enable `std` and write through the wrapper's `Write` impl; or find a bound on the length — a protocol maximum, a fixed field width, the size of the frame you are reading — and use `new_with(bound, |slot| …)`, carrying the real length yourself, since the unused tail is zeros the wrapper still considers part of the secret.
+
+  [`SlotWriter`](https://docs.rs/secure-gate/latest/secure_gate/struct.SlotWriter.html) restores the append shape on top of a slot (`push_slice` / `push_byte`, panicking on overrun) so that a multi-part fill is not hand-written offset arithmetic — a fixed slot trades the reallocation hazard for an offset one, and in wire-format code a wrong offset derives the wrong key and still runs.
 - For **deployment-level remediation**, install a zero-on-deallocate global allocator such as [`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) in the final binary, or rely on OS facilities (Linux `init_on_free=1`, hardened allocators). These are process-wide operational choices rather than a per-crate feature.
 
 A custom-allocator-parameterized `Dynamic<T, A>` (analogous to C++'s
@@ -468,7 +498,11 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
   A `new_with` closure was on that list through 0.9.0-rc.11 and is not on it now:
   the closure receives a fixed `&mut [u8]` slot rather than a `Vec`, and none of
   the operations named above is spellable on a slice. What remains listed is what
-  hands out a growable container.
+  hands out a growable container — including any container the closure itself
+  builds. A `Vec` assembled inside the closure and then copied into the slot
+  abandons its own buffers exactly as before; `SlotWriter` exists so that a
+  multi-part fill needs no such container (see
+  [Heap-reallocation residue](#2-heap-reallocation-residue-dynamicvect--dynamicstring)).
 
   **If your threat model includes process-memory disclosure (heap scrape, swap,
   core dump) of secrets that have been mutated in place after construction,
@@ -491,8 +525,26 @@ zeroizing `String` buffer with redacted `Debug` — not a redaction of the value
     for a 1008-byte secret; that measurement is why the length moved into the
     signature. `try_new_with(len, |slot| …)` is the same constructor for a fill that
     can fail, and wipes the partial write on `Err`. If the length is not known
-    before the fill, `Dynamic::new(Vec::new())` plus the `std`-gated `io::Write`
-    impl is the path that wipes every buffer it abandons.
+    before the fill, `Dynamic::new(Vec::new())` plus the `io::Write` impl is the
+    path that wipes every buffer it abandons — but that impl needs `std`, which
+    `full` does not enable, so an `alloc`-only build has no safe path for the
+    unknown-length case at all and must either add the feature or bound the length
+    and use `new_with(bound, …)`.
+
+    **For `Dynamic<String>` the replacement is hand-built.** There is no
+    `Dynamic::<String>::new_with` to call — it was removed in 0.9.0-rc.12, because a
+    `String` must hold valid UTF-8 and characters have variable byte widths, so no
+    fixed byte slot can be handed out for text. Write
+    `String::with_capacity(len)`, fill it once, and move it in with
+    `Dynamic::new(s)`, which transfers that allocation rather than copying it;
+    `From<&str>` **copies** and leaves the source string behind unwiped. Unlike the
+    `Vec<u8>` arm, nothing in the signature enforces the pre-sizing here: `new`
+    accepts a `String` you grew into just as readily as one you sized, and the
+    buffers that growth abandoned are already unwiped on the heap before `new` sees
+    anything. This is why `Dynamic<String>` stays on the list above while the
+    `Vec<u8>` closure came off it — 0.9.0-rc.12 changed nothing about the `String`
+    hazard, and `with_secret_mut` still hands out a growable `String` in the arm
+    most likely to hold a password.
 
   This is a fundamental limitation of `Vec<T>` / `String` in Rust — the
   standard library exposes no allocator hook to zeroize-on-realloc. The same
