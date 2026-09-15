@@ -8,8 +8,9 @@
 //   TRYBUILD=overwrite cargo test compile_fail
 
 // Compile-fail test: a zero-sized secret cannot be constructed. The guard is a `const`
-// assertion in `Fixed::new` and `Fixed::new_with` — the two bodies every other
-// constructor funnels through — so it covers a plain `type` alias and the `generic` arm
+// assertion in `Fixed::new`, `Fixed::new_with` and `Fixed::try_new_with` — the three
+// bodies every other constructor funnels through — so it covers a plain `type` alias
+// and the `generic` arm
 // as well as the macros. It is a post-monomorphization error, so it fires at the first
 // concrete zero-sized construction rather than at the declaration; the diagnostic names
 // the offending type in the failing constant's path and points into `src/fixed.rs`,

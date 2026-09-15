@@ -408,6 +408,70 @@ fn dropping_a_newtype_wipes_the_material_it_still_holds() {
     );
 }
 
+/// A failed `try_new_with` wipes whatever the closure managed to write.
+///
+/// The claim in `try_new_with`'s rustdoc — "a failed fill leaves nothing behind" — is
+/// the kind that is easy to assert in prose and easy to get wrong in code, because the
+/// obvious implementation (fill a buffer, wrap it only on success) does exactly the
+/// opposite. This is the only instrument in the suite that can observe it: a `Fixed`
+/// lives on the stack, so `heap_zeroize.rs` never sees it, and reading the slot after
+/// drop is out of the question under `#![forbid(unsafe_code)]`.
+///
+/// The recorded value is what makes it a real test. An empty record would prove only
+/// that nothing was wiped; seeing `0x0BAD_F00D` specifically proves the *partial write*
+/// reached the wrapper's storage and was then cleared, which is the property claimed.
+#[test]
+fn a_failed_try_new_with_wipes_the_partial_write() {
+    assert!(wipes().is_empty(), "precondition: nothing recorded yet");
+
+    let err = Fixed::<Traced>::try_new_with(|slot| {
+        slot.0 = 0x0BAD_F00D; // the closure gets part-way, then gives up
+        Err("short read")
+    });
+
+    assert_eq!(
+        err.unwrap_err(),
+        "short read",
+        "the closure's error reaches us"
+    );
+    assert_eq!(
+        wipes(),
+        vec![0x0BAD_F00D],
+        "the partial write was zeroized on the error path, once"
+    );
+}
+
+/// The same through a newtype, and the success path for contrast.
+///
+/// `Handoff` is a `generic` newtype, so this also pins that the macro's forwarded
+/// `try_new_with` reaches `Fixed::try_new_with` rather than reimplementing it — a
+/// forward that rebuilt the value would not wipe, and would pass a test that only
+/// checked the returned `Result`.
+#[test]
+fn newtype_try_new_with_wipes_on_error_and_not_on_success() {
+    assert!(wipes().is_empty(), "precondition: nothing recorded yet");
+
+    // Success: nothing is wiped while the secret is still held.
+    let held = Handoff::try_new_with(|slot| {
+        slot.0 = 0xFEED_FACE;
+        Ok::<(), &str>(())
+    })
+    .expect("closure succeeded");
+    assert_eq!(held.with_secret(|t| t.0), 0xFEED_FACE);
+    assert!(wipes().is_empty(), "a successful fill wipes nothing");
+
+    drop(held);
+    assert_eq!(wipes(), vec![0xFEED_FACE], "and the drop wipes it as usual");
+
+    // Failure: wiped immediately, and no wrapper comes back to hold it.
+    let err = Handoff::try_new_with(|slot| {
+        slot.0 = 0x0BAD_F00D;
+        Err("device error")
+    });
+    assert!(err.is_err());
+    assert_eq!(wipes(), vec![0x0BAD_F00D]);
+}
+
 /// After `into_inner`, the wrapper's own storage holds the inert sentinel — so what its
 /// `Drop` wipes is the placeholder, not the secret the caller now owns.
 ///
