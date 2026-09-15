@@ -10,7 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > The line is open. `v0.9.0-rc.13` is not tagged and not published.
 
 ### Security
-
 - **Documented a limitation of `with_secret` / `expose_secret`: they govern access, not
   what the closure body does with the bytes.** Any expression producing an owned value
   from the lent `&T` leaves a copy in ordinary memory that the wrapper never learns about
@@ -52,7 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   audits to record their coverage rather than their verdict.
 
 ### Added
-
 - `tests/compile-fail/with_secret_no_move_out.rs` and `tests/reveal_copy_out.rs`, a pair
   pinning the two halves of that scoping from opposite sides: that moving a secret out of
   a reveal borrow does *not* compile for a non-`Copy` inner type, and that copying one out
@@ -63,7 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version cannot quietly drift back.
 
 ### Changed
-
 - `SECURITY.md` gains "4. Copying the secret out of a reveal borrow" under **Inherent Rust
   Limitations**, whose preamble now counts four rather than three and distinguishes the
   first three (residue the machine leaves behind) from the fourth (a copy your own code
@@ -80,27 +77,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reference and invites the wrong conclusion about the secret, so it is now followed by
   what can escape, and by the wrapper-to-wrapper form to use instead.
 
-### Fixed
-
-- **`cargo doc --features=full` did not build.** Three doc comments link to `std` items
-  this crate touches through gated impls — `io::Write` on `Dynamic<Vec<u8>>` and on
-  `SlotWriter`, `io::Read` on `DynamicReader` — and `full` does not enable `std`. Without
-  that feature the name `std` is not in scope at all, so rustdoc had nothing to resolve
-  against and `-D warnings` turned each link into an error.
-
-  The links are correct and are left alone: they resolve on docs.rs, which builds with
-  `all-features`, so published documentation was never affected. `#[cfg(doc)] extern crate
-  std;` brings the name into scope for doc builds only — `cfg(doc)` is set by rustdoc and
-  nothing else, so no real build is touched, `no_std` or otherwise — and the links now
-  resolve in every feature combination rather than only the one docs.rs happens to use.
-
-  CI could not have caught this: the rustdoc job runs `--all-features`, which enables
-  `std`. What broke was a plain `cargo doc --features full`, which a contributor runs and
-  no job does. Found on `release/0.8`, whose rustdoc job builds `--features=full` and
-  therefore did fail; that line has carried the fix since 0.8.0-rc.14, so this brings the
-  0.9 line level rather than introducing anything.
-
-### Changed
 
 - `docs/design/nominal_newtypes.md`: the rc.12 amendment covered half of what rc.12
   invalidated. Trap 4's residue — the generated call it quotes as
@@ -122,6 +98,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Both corrections were made on `release/0.8` while backporting rc.12 and are re-derived
   here. The staleness was inherited on both lines, not introduced by that backport.
+
+### Fixed
+- **`cargo doc --features=full` did not build.** Three doc comments link to `std` items
+  this crate touches through gated impls — `io::Write` on `Dynamic<Vec<u8>>` and on
+  `SlotWriter`, `io::Read` on `DynamicReader` — and `full` does not enable `std`. Without
+  that feature the name `std` is not in scope at all, so rustdoc had nothing to resolve
+  against and `-D warnings` turned each link into an error.
+
+  The links are correct and are left alone: they resolve on docs.rs, which builds with
+  `all-features`, so published documentation was never affected. `#[cfg(doc)] extern crate
+  std;` brings the name into scope for doc builds only — `cfg(doc)` is set by rustdoc and
+  nothing else, so no real build is touched, `no_std` or otherwise — and the links now
+  resolve in every feature combination rather than only the one docs.rs happens to use.
+
+  CI could not have caught this: the rustdoc job runs `--all-features`, which enables
+  `std`. What broke was a plain `cargo doc --features full`, which a contributor runs and
+  no job does. Found on `release/0.8`, whose rustdoc job builds `--features=full` and
+  therefore did fail; that line has carried the fix since 0.8.0-rc.14, so this brings the
+  0.9 line level rather than introducing anything.
 
 ## [0.9.0-rc.12] - 2026-09-15
 
