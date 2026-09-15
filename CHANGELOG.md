@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0-rc.11] - Unreleased
+
+> The line is open. `v0.9.0-rc.11` is not tagged and not published.
+
+### Changed
+
+- **`fixed_newtype!`'s size-literal arm implements `ConstantTimeEq` without being asked.**
+  A `[u8; N]` newtype now carries `ct_eq` whenever the `ct-eq` feature is on, the way
+  `Fixed<[u8; N]>` itself always has.
+
+  The asymmetry this removes ran the wrong way. `Fixed<T>` implements `ConstantTimeEq` for
+  any `T` that does, so `pub type MacTag = Fixed<[u8; 32]>;` has had `ct_eq` for free since
+  the trait existed. The newtype — the spelling this crate's README teaches first and calls
+  the safer of the two — did not, unless the declaration also named
+  `derive: [ConstantTimeEq]`. A reader who took the documented advice got *fewer* security
+  properties than one who ignored it, and the missing one was constant-time comparison,
+  whose alternative is a timing leak. An extra token on the recommended side is the wrong
+  way round for that trait in particular.
+
+  Nothing was silently weak, and the distinction matters for how this is classified. With
+  no impl, no `Deref`, and `==` deliberately unimplemented on every wrapper here,
+  `tag_a.ct_eq(&tag_b)` on a newtype missing the derive is
+  `error[E0599]: no method named ct_eq` — not a variable-time fallback. There was nothing
+  for it to degrade *to*. The defect was an incentive, not a vulnerability, which is why
+  this sits under `Changed` rather than `Security`.
+
+  **No migration.** `derive: [ConstantTimeEq]` on a size-literal newtype still compiles and
+  still means what it says: the token is redundant there now, not removed. Emitting the
+  impl twice would be `E0119`, so the derive list is scanned and that one token dropped
+  before the rest reach the base expansion — neighbouring options are unaffected, in either
+  order. Deleting it from existing declarations is optional tidying.
+
+  It remains a genuine opt-in everywhere else. On the `generic` arms the inner type may or
+  may not implement `ConstantTimeEq` — `[i16; 256]` does not — so nothing the macro can
+  read off the tokens decides it and the declaration still must. `dynamic_newtype!` is
+  unchanged in this release, though the same argument applies to its `String` and `Vec<u8>`
+  arms and is worth making separately.
+
+  Reported by a downstream consumer (aescrypt-rs) migrating a full AES Crypt v0–v3
+  implementation onto the newtype macros, whose three HMAC-tag comparison sites were the
+  ones that would have silently lost `ct_eq` in the move from plain aliases.
+
+### Testing
+
+- `tests/macros_suite/newtype_surface.rs` pins both halves: the impl arrives on a
+  declaration with no `derive:` list at all (including at `N = 900`, well past the
+  32-element ceiling `Default` would impose), and the pre-rc.11 spelling stays inert rather
+  than becoming a duplicate impl. A third case puts the redundant token *between* two live
+  options and asserts both survive it.
+
 ## [0.9.0-rc.10] - 2026-09-14
 
 > Published to crates.io on the `v0.9.0-rc.10` tag.
