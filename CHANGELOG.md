@@ -80,6 +80,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reference and invites the wrong conclusion about the secret, so it is now followed by
   what can escape, and by the wrapper-to-wrapper form to use instead.
 
+### Fixed
+
+- **`cargo doc --features=full` did not build.** Three doc comments link to `std` items
+  this crate touches through gated impls — `io::Write` on `Dynamic<Vec<u8>>` and on
+  `SlotWriter`, `io::Read` on `DynamicReader` — and `full` does not enable `std`. Without
+  that feature the name `std` is not in scope at all, so rustdoc had nothing to resolve
+  against and `-D warnings` turned each link into an error.
+
+  The links are correct and are left alone: they resolve on docs.rs, which builds with
+  `all-features`, so published documentation was never affected. `#[cfg(doc)] extern crate
+  std;` brings the name into scope for doc builds only — `cfg(doc)` is set by rustdoc and
+  nothing else, so no real build is touched, `no_std` or otherwise — and the links now
+  resolve in every feature combination rather than only the one docs.rs happens to use.
+
+  CI could not have caught this: the rustdoc job runs `--all-features`, which enables
+  `std`. What broke was a plain `cargo doc --features full`, which a contributor runs and
+  no job does. Found on `release/0.8`, whose rustdoc job builds `--features=full` and
+  therefore did fail; that line has carried the fix since 0.8.0-rc.14, so this brings the
+  0.9 line level rather than introducing anything.
+
+### Changed
+
+- `docs/design/nominal_newtypes.md`: the rc.12 amendment covered half of what rc.12
+  invalidated. Trap 4's residue — the generated call it quotes as
+  `<Dynamic<String>>::new_with(…)`, and its warning about an `E0034` ambiguity that a later
+  forwarder could reintroduce — was left standing, as was §1's `Vec<u8>` list, which is
+  stale in the *other* direction: the `new_with` it names now takes a length, and
+  `try_new_with` is forwarded beside it and missing from the list entirely. The amendment
+  now says so, and notes that the list was an abbreviation before this release too (it
+  names neither `from_rng` nor the base32/base64 encoders), so a reader takes it as the
+  shape of each arm rather than its full surface. Amended rather than rewritten, per this
+  document's own convention for superseded claims.
+- `tests/compile-fail/dynamic_newtype_alias_rejected.rs`: its header described the
+  pre-`generic`-marker fallthrough as producing "a newtype missing `new_with`,
+  `SecretLen`, and the encoders". Two thirds of that is now wrong — `Dynamic<String>` has
+  no `new_with` at all since rc.12, and the shaped `String` arm has never had encoders
+  (pinned by `dynamic_string_no_hex.rs`), so the generic arm withholds none from it. It
+  now reads `SecretLen` and `From<&str>`, matching the macro. The header keeps its exact
+  line count so the `.stderr` anchor at line 11 does not move.
+
+  Both corrections were made on `release/0.8` while backporting rc.12 and are re-derived
+  here. The staleness was inherited on both lines, not introduced by that backport.
+
 ## [0.9.0-rc.12] - 2026-09-15
 
 > Published to crates.io on the `v0.9.0-rc.12` tag.
