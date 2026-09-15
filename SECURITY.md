@@ -344,6 +344,12 @@ diagnostics returned were single-char idents, missing `return`, integer suffixes
 like. `rustc` under `-D warnings` says nothing. Documentation is the only mitigation that
 exists for this one.
 
+Worse than silence, on the toolchains that say anything at all. Where `E0507` carries the
+cloning suggestion above — not at this line's MSRV, but on the current stable a consumer is
+likely building with — it moves a caller off the form the compiler blocks and onto the form
+nothing does. So the gap is not that no tool has an opinion; it is that the only opinion
+available points the wrong way.
+
 **Detection — read the closure bodies; searching is how you choose which ones.**
 
 ```sh
