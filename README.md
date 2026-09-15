@@ -415,13 +415,19 @@ Every encoder returns [`EncodedSecret`] (wrapping `Zeroizing<String>` with a red
 Edition 2024, MSRV 1.85, `rand` 0.10 (`OsRng` → `SysRng`), dep bumps.  
 Across the release candidates: `SecretLen` split out of `RevealSecret` (which now covers
 every inner type); Base32 (RFC 4648 §6) added behind `encoding-base32`; wrapper encoders
-are `ToHex` / `ToBase32` / `ToBase64Url` / `ToBech32` / `ToBech32m` trait impls; `fixed_newtype!` / `dynamic_newtype!` for nominal secret roles; no `Display`
+are `ToHex` / `ToBase32` / `ToBase64Url` / `ToBech32` / `ToBech32m` trait impls; `fixed_newtype!` / `dynamic_newtype!` for nominal secret roles, which now get `ConstantTimeEq`
+without asking for it; `try_new_with` on both wrappers, for a fill that can fail; `SlotWriter`; no `Display`
 on `EncodedSecret`.
 
-Two breaking changes are worth reading before you upgrade. Every encoder now returns
+Three breaking changes are worth reading before you upgrade. Every encoder now returns
 `EncodedSecret` and the `*_zeroizing` twins are gone, so the short name is the safe one.
-And `into_inner` returns the plain value rather than a wrapper that kept wiping —
-**protection now ends at that call**, where earlier release candidates continued it.  
+`into_inner` returns the plain value rather than a wrapper that kept wiping —
+**protection now ends at that call**, where earlier release candidates continued it.
+And `Dynamic::<Vec<u8>>::new_with` now takes a length and hands the closure a sized,
+pre-zeroed `&mut [u8]`; the old signature handed a zero-capacity `Vec`, so filling it
+reallocated and abandoned an unwiped copy of the secret on the heap.
+`Dynamic::<String>::new_with` is removed outright — build a pre-sized `String` and move it
+in with `Dynamic::new`, which transfers the buffer rather than copying it.  
 Full details in [CHANGELOG.md](CHANGELOG.md). Users on Rust < 1.85: use
 `secure-gate = "0.8.0-rc"`, and see [Branch support](#branch-support) for why the
 requirement has to carry a pre-release tag.
@@ -439,13 +445,13 @@ requirement has to carry a pre-release tag.
 The requirement has to carry a pre-release tag. Both lines are pre-release only — the
 newest stable on crates.io is `0.6.1` — and a caret matches a pre-release only when the
 requirement itself carries one for the same `major.minor.patch`. So `"0.9"` means
-`>=0.9.0, <0.10.0`, `0.9.0-rc.10` sorts *below* `0.9.0`, and nothing satisfies it: `"0.9"`
+`>=0.9.0, <0.10.0`, `0.9.0-rc.12` sorts *below* `0.9.0`, and nothing satisfies it: `"0.9"`
 and `"0.8"` are not shorthands here, they are resolve failures.
 
 `"0.9.0-rc"` is the form that tracks a line rather than a version. `^0.9.0-rc` is
 `>=0.9.0-rc, <0.10.0`, so it selects the newest `0.9.0-rc.N` today and keeps resolving
 once `0.9.0` ships — nothing to update when the next candidate lands. It floats, though,
-and candidates on these lines have carried breaking changes: pin `"=0.9.0-rc.10"` when
+and candidates on these lines have carried breaking changes: pin `"=0.9.0-rc.12"` when
 `cargo update` must stay put. The pre-release tag is also matched against exactly one
 `major.minor.patch`, so `"0.9.0-rc"` will not pick up a later `0.9.1-rc.1`.
 
