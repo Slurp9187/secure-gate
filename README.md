@@ -451,6 +451,11 @@ and `"0.8"` are not shorthands here, they are resolve failures.
 `"0.9.0-rc"` is the form that tracks a line rather than a version. `^0.9.0-rc` is
 `>=0.9.0-rc, <0.10.0`, so it selects the newest `0.9.0-rc.N` today and keeps resolving
 once `0.9.0` ships — nothing to update when the next candidate lands. It floats, though,
+<!-- The exact-pin example below names the newest PUBLISHED candidate, not the manifest
+     version. It moves at PUBLISH time, not at bump time -- pointing it at an open,
+     unpublished version tells readers to write a requirement that cannot resolve, which
+     is the defect #226 fixed in this section. The three install snippets above are the
+     tracking form and never move. -->
 and candidates on these lines have carried breaking changes: pin `"=0.9.0-rc.12"` when
 `cargo update` must stay put. The pre-release tag is also matched against exactly one
 `major.minor.patch`, so `"0.9.0-rc"` will not pick up a later `0.9.1-rc.1`.
