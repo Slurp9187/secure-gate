@@ -381,6 +381,64 @@ fn fixed_new_with_is_zero_cost() {
     assert_eq!(core::mem::size_of_val(&key), 32);
 }
 
+// === try_new_with Construction ===
+//
+// The error path's *wiping* is pinned in `lifecycle_trace_handoff.rs`, which is the
+// only instrument that can observe a stack-resident secret being cleared. What lives
+// here is the ordinary contract: fills, propagates, costs nothing.
+
+#[test]
+fn fixed_try_new_with_ok_fills_correctly() {
+    let key = Fixed::<[u8; 4]>::try_new_with(|arr| {
+        arr.copy_from_slice(&[1, 2, 3, 4]);
+        Ok::<(), ()>(())
+    })
+    .expect("closure succeeded");
+    key.with_secret(|s| assert_eq!(s, &[1u8, 2, 3, 4]));
+}
+
+#[test]
+fn fixed_try_new_with_zero_initialized_before_closure() {
+    // Same sentinel pre-fill as `new_with`: a closure that writes nothing still
+    // yields zeros rather than garbage.
+    let key = Fixed::<[u8; 8]>::try_new_with(|_arr| Ok::<(), ()>(())).expect("ok");
+    key.with_secret(|s| assert_eq!(s, &[0u8; 8]));
+}
+
+#[test]
+fn fixed_try_new_with_err_propagates() {
+    #[derive(Debug, PartialEq, Eq)]
+    struct ShortRead(usize);
+
+    let result = Fixed::<[u8; 4]>::try_new_with(|arr| {
+        arr[0] = 0xFF;
+        Err(ShortRead(1))
+    });
+    // The caller's error type arrives intact — neither inspected nor wrapped.
+    assert_eq!(result.unwrap_err(), ShortRead(1));
+}
+
+#[test]
+fn fixed_try_new_with_is_zero_cost() {
+    let key = Fixed::<[u8; 32]>::try_new_with(|arr| {
+        arr.fill(0xAB);
+        Ok::<(), ()>(())
+    })
+    .expect("ok");
+    assert_eq!(core::mem::size_of_val(&key), 32);
+}
+
+#[test]
+fn fixed_try_new_with_accepts_a_non_byte_array() {
+    // Generic over `T`, exactly as `new_with` is.
+    let poly = Fixed::<[i16; 4]>::try_new_with(|c| {
+        c.fill(7);
+        Ok::<(), ()>(())
+    })
+    .expect("ok");
+    poly.with_secret(|c| assert_eq!(c, &[7i16; 4]));
+}
+
 // Shared failing RNG for error-propagation tests.
 #[cfg(feature = "rand")]
 struct FailingRng;

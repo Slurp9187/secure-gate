@@ -20,8 +20,8 @@
 /// fixed_newtype!(pub(crate) Name, N);                   // crate-visible
 /// fixed_newtype!(Name, N);                              // private
 /// fixed_newtype!(pub Name, N, "doc string");            // with custom doc
-/// fixed_newtype!(pub Name, N, derive: [ConstantTimeEq]); // with opt-in impls
-/// fixed_newtype!(pub Name, N, "doc", derive: [ConstantTimeEq]);
+/// fixed_newtype!(pub Name, N, derive: [FromWrapper]);   // with opt-in impls
+/// fixed_newtype!(pub Name, N, "doc", derive: [FromWrapper]);
 /// fixed_newtype!(pub Name, generic [T; N]);             // array: adds SecretLen
 /// fixed_newtype!(pub Name, generic T);                  // reduced API, opted into
 /// fixed_newtype!(pub Name, generic T, "doc string");
@@ -31,6 +31,16 @@
 ///
 /// Supported `derive:` options are `ConstantTimeEq`, `Deserialize`, `FromWrapper`, `IntoWrapper`, and `WrapperAccess` (= both directions). The first two constrain the inner type — `ConstantTimeEq` and `Deserialize` must be implemented for it, which rules them out for most `generic` inner types (`[i16; 256]` has neither), while the three wrapper-access tokens apply to any. See
 /// *Cloning and serialization* below for the two that are deliberately absent.
+///
+/// **`ConstantTimeEq` is not one of them on the size-literal arm.** A `[u8; N]`
+/// payload gets [`ct_eq`](crate::ConstantTimeEq::ct_eq) automatically whenever the
+/// `ct-eq` feature is on, because the wrapper it forwards to always has it and a
+/// plain `type Name = Fixed<[u8; N]>;` therefore always did. Requiring the token
+/// here put the extra word on the spelling this crate recommends as the safer of
+/// the two, for the one comparison whose alternative is a timing leak. Naming it
+/// anyway is accepted and inert, so declarations written before 0.9.0-rc.11 keep
+/// their meaning; it remains a real opt-in on the `generic` arms, where the inner
+/// type may or may not implement the trait.
 ///
 /// # Examples
 ///
@@ -360,6 +370,14 @@ macro_rules! fixed_newtype {
             where F: ::core::ops::FnOnce(&mut [$t; $n]) {
                 Self($crate::Fixed::new_with(f))
             }
+
+            /// Scoped construction from a fill that can fail. On `Err` the partial
+            /// write is zeroized before the error is returned.
+            #[inline(always)]
+            pub fn try_new_with<F, E>(f: F) -> ::core::result::Result<Self, E>
+            where F: ::core::ops::FnOnce(&mut [$t; $n]) -> ::core::result::Result<(), E> {
+                ::core::result::Result::Ok(Self($crate::Fixed::try_new_with(f)?))
+            }
         }
     };
 
@@ -391,6 +409,14 @@ macro_rules! fixed_newtype {
             where F: ::core::ops::FnOnce(&mut $inner) {
                 Self($crate::Fixed::new_with(f))
             }
+
+            /// Scoped construction from a fill that can fail. On `Err` the partial
+            /// write is zeroized before the error is returned.
+            #[inline(always)]
+            pub fn try_new_with<F, E>(f: F) -> ::core::result::Result<Self, E>
+            where F: ::core::ops::FnOnce(&mut $inner) -> ::core::result::Result<(), E> {
+                ::core::result::Result::Ok(Self($crate::Fixed::try_new_with(f)?))
+            }
         }
     };
 
@@ -406,7 +432,7 @@ macro_rules! fixed_newtype {
     ($(#[$attr:meta])* $vis:vis $name:ident, $size:literal, derive: [$($opt:ident),* $(,)?]) => {
         const _: () = { let _ = [(); $size][0]; };
 
-        $crate::__sg_newtype_base!(
+        $crate::__sg_newtype_base_ct_eq!(
             $(#[$attr])* $vis $name($crate::Fixed<[u8; $size]>), derive: [$($opt),*]
         );
         $crate::__sg_newtype_len!($name);
@@ -422,6 +448,14 @@ macro_rules! fixed_newtype {
             pub fn new_with<F>(f: F) -> Self
             where F: ::core::ops::FnOnce(&mut [u8; $size]) {
                 Self($crate::Fixed::new_with(f))
+            }
+
+            /// Scoped construction from a fill that can fail. On `Err` the partial
+            /// write is zeroized before the error is returned.
+            #[inline(always)]
+            pub fn try_new_with<F, E>(f: F) -> ::core::result::Result<Self, E>
+            where F: ::core::ops::FnOnce(&mut [u8; $size]) -> ::core::result::Result<(), E> {
+                ::core::result::Result::Ok(Self($crate::Fixed::try_new_with(f)?))
             }
         }
 
