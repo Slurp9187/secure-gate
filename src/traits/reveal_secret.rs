@@ -154,6 +154,48 @@ pub trait RevealSecret {
     /// the closure returns, minimizing the lifetime of the exposed secret.
     /// Prefer this over [`expose_secret`](Self::expose_secret) in all application code.
     ///
+    /// # The reference cannot escape. A copy of what it points at can.
+    ///
+    /// This method governs *access*. It does not — and cannot — constrain what the
+    /// closure body does with the bytes once it can see them. Every line below compiles,
+    /// and each leaves an owned copy in ordinary memory that this wrapper will never
+    /// wipe, because it does not know the copy exists:
+    ///
+    /// ```rust
+    /// use secure_gate::{Fixed, RevealSecret};
+    ///
+    /// let key = Fixed::new([0xABu8; 32]);
+    ///
+    /// let escaped: [u8; 32] = key.with_secret(|p| *p);  // `[u8; N]` is `Copy`
+    /// let also:    [u8; 32] = key.with_secret(|&p| p);  // same, with no `*` to notice
+    /// assert_eq!(escaped, also);                        // both outlived the closure
+    /// ```
+    ///
+    /// The deref forms need `Self::Inner: Copy`, so the borrow checker rejects them for
+    /// `Dynamic<Vec<u8>>` and `Dynamic<String>` (`E0507`). **That immunity does not extend
+    /// to a method that copies**, and every inner type has one — `to_vec`, `clone`,
+    /// `to_string`, `<[u8; N]>::try_from`. Those copy *through* the borrow instead of
+    /// moving out of it, so no rule applies and no operator appears in the source. No
+    /// `rustc` or `clippy` lint detects any of it.
+    ///
+    /// Copy wrapper-to-wrapper instead, so the bytes never exist outside something that
+    /// wipes them:
+    ///
+    /// ```rust
+    /// use secure_gate::{Fixed, RevealSecret, RevealSecretMut};
+    ///
+    /// let src = Fixed::new([0x5Au8; 32]);
+    /// let mut dst = Fixed::new([0u8; 32]);
+    ///
+    /// src.with_secret(|s| dst.with_secret_mut(|d| d.copy_from_slice(s)));
+    /// assert!(dst.with_secret(|d| d.iter().all(|&b| b == 0x5A)));
+    /// ```
+    ///
+    /// Where the destination is new, prefer a sized constructor and fill it in place —
+    /// [`Fixed::new_with`](crate::Fixed::new_with) or `Dynamic::new_with(len, |slot| …)`.
+    /// See `SECURITY.md` § "Copying the secret out of a reveal borrow" for the full
+    /// scoping, the detection patterns and what they cannot catch.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -172,6 +214,12 @@ pub trait RevealSecret {
     /// Long-lived `expose_secret()` references can defeat scoping — prefer
     /// [`with_secret`](Self::with_secret) in application code. Use this only when
     /// a long-lived reference is unavoidable (e.g. FFI, third-party APIs).
+    ///
+    /// Everything in [`with_secret`](Self::with_secret)'s note on copying applies here
+    /// with a wider window: `*secret.expose_secret()` copies a `Copy` inner value, and
+    /// `secret.expose_secret().to_vec()` copies any of them. There is no closure to bound
+    /// how far the reference travels first, which is why this is the auditable spelling
+    /// rather than the recommended one.
     ///
     /// # Examples
     ///
