@@ -7,8 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0-rc.13] - Unreleased
 
-> The line is open and nothing has landed on it yet. `v0.9.0-rc.13` is not tagged
-> and not published.
+> The line is open. `v0.9.0-rc.13` is not tagged and not published.
+
+### Security
+
+- **Documented a limitation of `with_secret` / `expose_secret`: they govern access, not
+  what the closure body does with the bytes.** Any expression producing an owned value
+  from the lent `&T` leaves a copy in ordinary memory that the wrapper never learns about
+  and therefore never wipes. This is the only limitation in `SECURITY.md` that occurs
+  *while the secret is still held*, inside the method provided for reading it safely —
+  nothing is extracted, nothing is named `into_inner`, and the code reads as protected.
+
+  Three spellings, and the scoping is the load-bearing part because consumers act on it.
+  `*p` and the `&p` binding form need `Inner: Copy`, so the borrow checker rejects them
+  for `Dynamic<Vec<u8>>` and `Dynamic<String>` with `E0507` — and, for the opposite
+  reason, for `Fixed<Fixed<T>>` and `Fixed<Zeroizing<T>>`, since a type with a destructor
+  cannot be `Copy` (`E0184`). **That immunity does not extend to a method that copies**:
+  `to_vec`, `clone`, `to_string`, `<[u8; N]>::try_from` copy *through* the borrow rather
+  than moving out of it, so no rule applies, and there is no operator in the source to
+  notice. The copying form reaches every wrapper, and it is the one that occurs in
+  practice.
+
+  Two things the entry says that are worth repeating here. `Copy` is the only
+  discriminator — `FixedStorage` covers tuples, `Option`, `Wrapping`, `MaybeUninit`,
+  `Zeroizing` and `Fixed` as well as `[T; N]`, and that list contains both hazardous and
+  immune members, so reasoning from the shape of the storage type gives the wrong answer
+  in both directions. And no lint detects any of it: `clippy::all`, `pedantic`, `nursery`
+  and `restriction` were pointed at code leaking a key in all three forms and returned
+  twelve diagnostics, every one cosmetic. `rustc` under `-D warnings` says nothing.
+  Documentation is the only mitigation that exists.
+
+  The compiler actively suggests the leak: `E0507`'s own help is *"consider cloning the
+  value if the performance cost is acceptable"*, which converts the rejected move into a
+  silent copy. That is a plausible account of how the copying form arrives in code nobody
+  wrote carelessly.
+
+  Found by downstream consumers upgrading to `0.9.0-rc.12`; three crates examined, two
+  carrying live instances, one of them a v0 master key. The most useful figure is not a
+  defect count but a detection failure: an audit run deliberately, by someone who had just
+  been told the hazard existed, with a pattern requiring the `*` adjacent to the closure
+  parameter, missed six sites spelled `from(*bytes)` and was reported clean with a count
+  of one against a real count of seven. The entry therefore frames its grep patterns as a
+  way of deciding what to *read*, never as a way of deciding what is clean, and asks for
+  audits to record their coverage rather than their verdict.
+
+### Added
+
+- `tests/compile-fail/with_secret_no_move_out.rs` and `tests/reveal_copy_out.rs`, a pair
+  pinning the two halves of that scoping from opposite sides: that moving a secret out of
+  a reveal borrow does *not* compile for a non-`Copy` inner type, and that copying one out
+  *does*. A test demonstrating a leak looks strange until you notice that the second claim
+  is otherwise prose — and prose about what a compiler permits is exactly what rots
+  silently. An earlier draft of the guidance said `Dynamic` was immune outright; that was
+  wrong in the direction that retires an audit, and these tests exist so the corrected
+  version cannot quietly drift back.
+
+### Changed
+
+- `SECURITY.md` gains "4. Copying the secret out of a reveal borrow" under **Inherent Rust
+  Limitations**, whose preamble now counts four rather than three and distinguishes the
+  first three (residue the machine leaves behind) from the fourth (a copy your own code
+  makes). The **What secure-gate does NOT protect against** bullet on caller copies now
+  says the hazard includes copies made *inside* a `with_secret` closure.
+- **Where accident-prevention ends** gains a carve-out. Its table promises that "accidents
+  must not compile while the secret is held in `Fixed`/`Dynamic`", and this is an accident
+  that compiles inside exactly that window. The promise is real for `Deref`, `AsRef` and
+  extraction, and it does not reach inside the closure — which is why the row reads "must
+  not" rather than "cannot". Left unqualified it would have been a false claim in the
+  document's most load-bearing table.
+- `RevealSecret::with_secret` and `expose_secret` gain a note at the point of use. The
+  existing sentence "the closure receives a reference that cannot escape" is true of the
+  reference and invites the wrong conclusion about the secret, so it is now followed by
+  what can escape, and by the wrapper-to-wrapper form to use instead.
 
 ## [0.9.0-rc.12] - 2026-09-15
 

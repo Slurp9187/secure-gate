@@ -300,3 +300,18 @@ fn newtype_directional_access_compile_fail() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/newtype_directional_access.rs");
 }
+
+// Compile-fail test: moving a secret out of a reveal borrow. `with_secret` and
+// `expose_secret` lend `&T`; for a `Copy` inner type `*p` copies the secret out and
+// nothing diagnoses it. Where `T` is not `Copy` the borrow checker refuses the move,
+// and SECURITY.md scopes its guidance on that. The scoping is the load-bearing part —
+// it tells a `Dynamic` consumer which forms they need not audit — so it is pinned here
+// rather than asserted in prose. Its counterpart, `tests/reveal_copy_out.rs`, pins that
+// the copy-through forms *do* compile on the same types.
+#[cfg(feature = "alloc")]
+#[cfg(not(miri))]
+#[test]
+fn with_secret_no_move_out_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/with_secret_no_move_out.rs");
+}
