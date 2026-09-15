@@ -264,6 +264,18 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+// Documentation-only. Several doc comments link to `std` items that this crate touches
+// through gated impls (`io::Write` on `Dynamic<Vec<u8>>` and on `SlotWriter`, `io::Read`
+// on `DynamicReader`). Those links are correct and resolve on docs.rs, which builds with
+// `all-features`. They do not resolve under `--features=full`, which this branch's rustdoc
+// job builds and which does *not* enable `std`, because without that feature the name
+// `std` is not in scope at all and rustdoc has nothing to point at. This brings it into
+// scope for doc builds only: it is `cfg(doc)`, so it affects no real build, `no_std` or
+// otherwise, and it makes the links resolve in every feature combination rather than only
+// the one docs.rs happens to use.
+#[cfg(doc)]
+extern crate std;
+
 #[cfg(feature = "alloc")]
 mod dynamic;
 
