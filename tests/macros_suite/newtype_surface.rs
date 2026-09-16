@@ -7,16 +7,15 @@ use secure_gate::{
 
 fixed_newtype!(pub EncKey, 32);
 fixed_newtype!(pub Big, 900, "A secret larger than the default bech32 code length admits.");
-fixed_newtype!(pub MacKey, 32, "MAC key.", derive: [ConstantTimeEq]);
-// The token between two live neighbours: dropping it must not disturb either.
-fixed_newtype!(pub SessionTag, 32, derive: [FromWrapper, ConstantTimeEq, IntoWrapper]);
-dynamic_newtype!(pub Token, Vec<u8>, derive: [ConstantTimeEq]);
-dynamic_newtype!(pub ApiKey, String, "API key.", derive: [ConstantTimeEq]);
-// The `dynamic_newtype!` counterparts of the automatic-`ct_eq` pins below: no
-// `derive:` list at all, and the redundant token between two live neighbours.
+fixed_newtype!(pub MacKey, 32, "MAC key.");
+// A derive list either side of where the `ConstantTimeEq` token used to sit.
+fixed_newtype!(pub SessionTag, 32, derive: [FromWrapper, IntoWrapper]);
+dynamic_newtype!(pub Token, Vec<u8>);
+dynamic_newtype!(pub ApiKey, String, "API key.");
+// The `dynamic_newtype!` counterparts of the automatic-`ct_eq` pins below.
 dynamic_newtype!(pub BareToken, Vec<u8>);
 dynamic_newtype!(pub BareApiKey, String, "No derive list.");
-dynamic_newtype!(pub MixedToken, Vec<u8>, derive: [FromWrapper, ConstantTimeEq, IntoWrapper]);
+dynamic_newtype!(pub MixedToken, Vec<u8>, derive: [FromWrapper, IntoWrapper]);
 dynamic_newtype!(pub Wide, generic Vec<u32>);
 // The documented remainder of the `generic Vec<u8>` / `generic String` reject.
 //
@@ -157,7 +156,9 @@ fn dynamic_vec_full_surface() {
 
 #[test]
 fn derive_passthrough_reaches_front_ends() {
-    // Previously the derive: list was reachable only via the base macro.
+    // The derive: list reaches the front-end arms, not only the base macro.
+    // `ConstantTimeEq` is no longer among the options it can carry — the shaped
+    // arms emit that themselves — so these pin the automatic impl instead.
     assert!(MacKey::new([1u8; 32]).ct_eq(&MacKey::new([1u8; 32])));
     assert!(Token::try_from_hex("00")
         .unwrap()
@@ -167,15 +168,16 @@ fn derive_passthrough_reaches_front_ends() {
     assert_eq!(Wide::new(vec![1u32]).with_secret(|v| v.len()), 1);
 }
 
-/// `ct_eq` is automatic on the size-literal arm, and the old token is inert.
+/// `ct_eq` is automatic on the size-literal arm, and cannot be asked for.
 ///
 /// A plain `type Name = Fixed<[u8; N]>;` has always carried `ConstantTimeEq`, from
 /// the wrapper's own impl. Until 0.9.0-rc.11 the newtype did not, so the spelling
 /// this crate recommends as the safer of the two offered *less* unless the
 /// declaration also named `derive: [ConstantTimeEq]` — the extra token sat on the
-/// side the documentation steers people toward. Both halves of the fix are pinned
-/// here: the impl arrives unasked, and the old spelling stays a no-op rather than
-/// becoming a duplicate impl (`E0119`).
+/// side the documentation steers people toward. The impl now arrives unasked, and
+/// naming the token is a hard error rather than a no-op: the shaped arms emit it
+/// themselves, so a second one from the `derive:` list is `E0119`. Nothing below
+/// spells it.
 #[test]
 fn ct_eq_is_automatic_for_byte_array_newtypes() {
     // `EncKey` is declared with no `derive:` list at all.
@@ -186,10 +188,10 @@ fn ct_eq_is_automatic_for_byte_array_newtypes() {
     assert!(Big::new([3u8; 900]).ct_eq(&Big::new([3u8; 900])));
     assert!(!Big::new([3u8; 900]).ct_eq(&Big::new([4u8; 900])));
 
-    // The pre-rc.11 spelling still compiles and still means what it says.
+    // A doc string and no derive list: still automatic.
     assert!(MacKey::new([1u8; 32]).ct_eq(&MacKey::new([1u8; 32])));
 
-    // Neighbours of the dropped token survive it, in both directions.
+    // Automatic alongside an unrelated derive list, in both directions.
     assert!(SessionTag::new([2u8; 32]).ct_eq(&SessionTag::new([2u8; 32])));
     let wrapped = SessionTag::from_wrapper(secure_gate::Fixed::new([2u8; 32]));
     assert!(wrapped.ct_eq(&SessionTag::new([2u8; 32])));
@@ -217,12 +219,12 @@ fn ct_eq_is_automatic_for_string_and_vec_newtypes() {
     // short-circuit, and the reason length is not covered by the guarantee.
     assert!(!t.ct_eq(&BareToken::try_from_hex("00").unwrap()));
 
-    // The pre-rc.11 spelling still compiles and still means what it says.
+    // No derive list on the `Vec<u8>` arm either.
     assert!(Token::try_from_hex("00")
         .unwrap()
         .ct_eq(&Token::try_from_hex("00").unwrap()));
 
-    // Neighbours of the dropped token survive it, in both directions.
+    // Automatic alongside an unrelated derive list, in both directions.
     let m = MixedToken::from_wrapper(secure_gate::Dynamic::new(vec![9u8, 9]));
     assert!(m.ct_eq(&MixedToken::new(vec![9u8, 9])));
     assert_eq!(m.into_wrapper().expose_secret(), &vec![9u8, 9]);

@@ -2,6 +2,8 @@
 mod newtype;
 #[cfg(feature = "alloc")]
 mod newtype_conversion;
+#[cfg(all(feature = "alloc", feature = "ct-eq"))]
+mod newtype_generic_ct_eq;
 #[cfg(all(
     feature = "alloc",
     feature = "encoding",
