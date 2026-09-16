@@ -62,6 +62,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Two historical entries carried publication claims with a shelf life, and both had rotted:
+  `0.9.0-rc.11`'s *"0.9.0-rc.11 is unpublished"* and `0.9.0-rc.9`'s *"this unpublished
+  release"*. Both were true when written and false the day each shipped. Restated so they
+  cannot rot again — the reasoning each recorded is preserved, only the tense that made it
+  perishable is gone. This is the failure mode the changelog protocol names as the one that
+  actually breaks here, and it had reached two sections.
+
 - `SECURITY.md` §4 described the copying form as "a method taking `self` by value" and
   enumerated the methods — `to_vec`, `clone`, `to_string`, `try_from`. Too narrow, and the
   gap was found by a consumer auditing their tree against it: the copy can equally be made
@@ -501,7 +508,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The shared helper is renamed `__sg_newtype_base_ct_eq!` — it was `__sg_newtype_base_bytes!`
   when the size-literal arm was its only caller, and that name stopped describing it the
   moment `Dynamic<String>` became one. It is `#[doc(hidden)]` and internal; no caller
-  outside this crate names it, and 0.9.0-rc.11 is unpublished.
+  outside this crate names it, and rc.11 was unpublished when the rename landed.
 
   As on the size-literal arm, `derive: [ConstantTimeEq]` stays accepted and inert, so no
   declaration written against an earlier release candidate changes meaning. The `generic`
@@ -1289,7 +1296,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING: the four bech32 encoders take a `Case`.** `try_to_bech32(hrp)` becomes
   `try_to_bech32(hrp, Case::Lower)`, and likewise for `try_to_bech32m` and both
   `_sized::<N>` forms, on `Fixed`, `Dynamic` and the newtype macros. Every one of these
-  call sites is already being edited in this unpublished release: rc.8 returned
+  call sites is already being edited in this same release: rc.8 returned
   `Result<String, _>` and rc.9 returns `Result<EncodedSecret, _>`, with the
   `*_zeroizing` twins removed. The parameter makes an edit callers are already making
   slightly larger rather than adding a migration of its own.
