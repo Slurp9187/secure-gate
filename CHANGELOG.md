@@ -366,6 +366,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- `SECURITY.md` §4 described the copying form as "a method taking `self` by value" and
+  enumerated the methods. Too narrow: the copy can equally be made *for* you by whatever
+  you hand the reference to — `json!({ "k": &*encoded })` stores an owned `String` holding
+  the secret, with no copying method at the call site to notice. The section now asks what
+  the receiver does with the `&str`, not only what you called on the secret. Identical to
+  the 0.9 line's wording: the hazard is a property of `Deref` and the borrow, so nothing
+  here is MSRV- or toolchain-sensitive.
+
 - **Documented a limitation of `with_secret` / `expose_secret`: they govern access, not
   what the closure body does with the bytes.** Any expression producing an owned value
   from the lent `&T` leaves a copy in ordinary memory that the wrapper never learns about

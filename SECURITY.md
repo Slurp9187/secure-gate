@@ -288,6 +288,21 @@ Any inner type offering such a method is affected — `Vec::to_vec`, `String::to
 `clone`, `to_owned`, `<[u8; N]>::try_from`, a `collect` over the bytes. This form reaches
 **every** wrapper, `Fixed` and `Dynamic` alike.
 
+**And it does not need a method call on the secret at all.** The copy can equally be made
+*for* you, by whatever you hand the reference to:
+
+```rust,ignore
+let encoded = key.to_base64url();                    // EncodedSecret — protected
+let body = serde_json::json!({ "key": &*encoded });  // Value::String — owned, unwiped
+```
+
+Nothing there is spelled `to_string`. `json!` accepts `&str` and stores it owned, so the
+copy is made by the callee through a shared reference and the call site carries no token
+that any search for copying *methods* would match. The same shape reaches `insert`, `push`,
+a struct field typed `String`, a `params![]` binding, and every `impl Into<String>`
+parameter in the ecosystem. Ask what the receiver does with the `&str`, not only what you
+called on the secret.
+
 The two deref forms are more obvious and more limited. They require `T: Copy`:
 
 ```rust,ignore
@@ -357,8 +372,10 @@ grep -rnE 'with_secret(_mut)?\(\|[a-z_]+\|[^)]*\*'   # deref, including inside a
 grep -rnE 'with_secret(_mut)?\(\|&'                  # pattern binding
 ```
 
-Neither finds the copying form, because it has no syntax to match on. Treat these as a way
-of deciding what to read, never as a way of deciding what is clean — a grep offered without
+Neither finds the copying form, because it has no syntax to match on — and neither finds
+the case above, where the token is not on the secret's side at all but in what the receiving
+API does with a `&str`. Treat these as a way of deciding what to read, never as a way of
+deciding what is clean — a grep offered without
 its blind spot converts *"I should audit this"* into *"I ran the check."* Two consequences
 worth adopting:
 
