@@ -494,20 +494,21 @@ Every encoder returns [`EncodedSecret`] (wrapping `Zeroizing<String>` with a red
 Write the release candidate out in full. Both lines are pre-release only — the newest
 stable on crates.io is `0.6.1` — and a caret matches a pre-release only when the
 requirement itself carries one for the same `major.minor.patch`. So `"0.8"` means
-`>=0.8.0, <0.9.0`, `0.8.0-rc.13` sorts *below* `0.8.0`, and nothing satisfies it: `"0.8"`
+`>=0.8.0, <0.9.0`, `0.8.0-rc.14` sorts *below* `0.8.0`, and nothing satisfies it: `"0.8"`
 and `"0.9"` are not shorthands here, they are resolve failures.
 
-<!-- The exact-pin example below names the newest PUBLISHED candidate, not the manifest
-     version. It moves at PUBLISH time, not at bump time -- the same rule the versioned
-     docs.rs badge at the top of this file follows. Pointing it at an open, unpublished
-     version tells readers to write a requirement that cannot resolve, which is the defect
-     this section was re-derived to fix. The three install snippets above are the tracking
-     form and never move. -->
+<!-- Every concrete version in this file moves together, as one step of the publish:
+     the docs.rs badge at the top, the sort-order example above, and the exact pin below.
+     They all name the release being published, never an open one left open -- a pin at a
+     version that is not on crates.io tells readers to write a requirement that cannot
+     resolve, and a badge at one 404s. Between the cut and the upload they are briefly
+     ahead of the registry; do not leave them there. The three install snippets above are
+     the tracking form and carry no version, so they never move. -->
 
 `"0.8.0-rc"` is the form that tracks this line rather than a version. `^0.8.0-rc` is
 `>=0.8.0-rc, <0.9.0`, so it selects the newest `0.8.0-rc.N` today and keeps resolving once
 `0.8.0` ships — nothing to update when the next candidate lands. It floats, though, and
-candidates on these lines have carried breaking changes: pin `"=0.8.0-rc.13"` when
+candidates on these lines have carried breaking changes: pin `"=0.8.0-rc.14"` when
 `cargo update` must stay put. The pre-release tag is also matched against exactly one
 `major.minor.patch`, so `"0.8.0-rc"` will not pick up a later `0.8.1-rc.1`.
 
