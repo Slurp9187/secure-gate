@@ -130,10 +130,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on every wrapper here, `ct_eq` on a newtype missing the derive was `E0599`. The defect
   was the incentive, not a vulnerability.
 
-  **No migration.** `derive: [ConstantTimeEq]` stays accepted and inert on those arms — the
-  derive list is scanned and the redundant token dropped before the rest reach the base
-  expansion, so neighbouring options are unaffected in either order. The `generic` arms
-  keep the real opt-in, since an arbitrary inner type may or may not implement the trait.
+  **`derive: [ConstantTimeEq]` is rejected on those arms**, not accepted-and-inert. An
+  earlier revision of this entry promised the latter, and the accommodation that delivered
+  it — a recursive token-muncher that scanned the derive list and dropped the redundant
+  token — was deleted before this line shipped. Naming it now emits a second impl and fails
+  with `E0119: conflicting implementations`; the fix is to delete the token. Nothing about
+  the generated type changes: `ct_eq` is still emitted automatically, gated only on `ct-eq`.
+
+  This is not a break for anyone. Both the automatic impl and the accommodation landed in
+  this same unreleased `0.8.0-rc.14`, so no published version of this line ever accepted the
+  token on a shaped arm — unlike the 0.9 line, where it shipped in `0.9.0-rc.11` and
+  `0.9.0-rc.12` and its removal is a genuine breaking change against a released surface.
+  That difference is why this entry is revised in place rather than carrying a `Removed`
+  section: there is nothing here to migrate from.
+
+  The `generic` arms keep the real opt-in, since an arbitrary inner type may or may not
+  implement the trait — and it is now tested, by `tests/macros_suite/newtype_generic_ct_eq.rs`,
+  which pins a caller-defined payload plus a second newtype over the same payload declared
+  without the token. Removing the shaped-arm accommodation had left that opt-in with no
+  coverage anywhere, because every declaration naming the token was on a shaped arm.
+
+  With `ct-eq` off — it is not a default feature — both impls are discarded, so an offending
+  declaration still compiles and the rejection only surfaces once the feature is enabled.
 
   `ct_eq` on a variable-length secret short-circuits when the lengths differ, so only the
   equal-length comparison is constant-time; where the length itself is sensitive,

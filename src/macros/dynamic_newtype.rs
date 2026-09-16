@@ -23,18 +23,19 @@
 /// dynamic_newtype!(pub Name, String, "doc", derive: [FromWrapper]);
 /// ```
 ///
-/// Supported `derive:` options are `ConstantTimeEq`, `Deserialize`, `FromWrapper`, `IntoWrapper`, and `WrapperAccess` (= both directions);
+/// Supported `derive:` options are `Deserialize`, `FromWrapper`, `IntoWrapper`, and `WrapperAccess` (= both directions), plus `ConstantTimeEq` **on the `generic` arm only**;
 /// `Clone` and `Serialize` are deliberately absent — see
 /// [`fixed_newtype!`](crate::fixed_newtype) for the reasoning and the
 /// hand-written pattern, which applies identically here.
 ///
-/// **`ConstantTimeEq` is not one of them on the `String` and `Vec<u8>` arms.**
-/// Both wrappers implement it whenever the `ct-eq` feature is on, so a plain
-/// `type Name = Dynamic<String>;` always had [`ct_eq`](crate::ConstantTimeEq::ct_eq)
-/// and the newtype — the spelling this crate recommends as the safer of the two —
-/// did not. Naming the token anyway is accepted and inert, so declarations written
-/// before 0.9.0-rc.11 keep their meaning. It stays a real opt-in on the `generic`
-/// arm, where the inner type may or may not implement the trait.
+/// **`ConstantTimeEq` is not an option on the `String` and `Vec<u8>` arms, and
+/// naming it is an error.** Both wrappers implement it whenever the `ct-eq` feature
+/// is on, so a plain `type Name = Dynamic<String>;` always had
+/// [`ct_eq`](crate::ConstantTimeEq::ct_eq) and the newtype — the spelling this crate
+/// recommends as the safer of the two — did not. Since these arms now emit the impl
+/// themselves, a second one from the `derive:` list is `E0119: conflicting
+/// implementations` — delete the token. It stays a real opt-in on the `generic` arm,
+/// where the inner type may or may not implement the trait.
 ///
 /// Note that `ct_eq` on a variable-length secret short-circuits when the two
 /// lengths differ, so only the equal-length comparison is constant-time. Where the
@@ -334,9 +335,10 @@ macro_rules! dynamic_newtype {
         $crate::dynamic_newtype!($(#[$attr])* $vis $name, String, derive: []);
     };
     ($(#[$attr:meta])* $vis:vis $name:ident, String, derive: [$($opt:ident),* $(,)?]) => {
-        $crate::__sg_newtype_base_ct_eq!(
+        $crate::__sg_newtype_base!(
             $(#[$attr])* $vis $name($crate::Dynamic<$crate::__private::String>), derive: [$($opt),*]
         );
+        $crate::__sg_newtype_ct_eq!($name);
         $crate::__sg_newtype_len!($name);
         $crate::__sg_dynamic_ctor!(@into $name, $crate::__private::String);
 
@@ -351,9 +353,10 @@ macro_rules! dynamic_newtype {
         $crate::dynamic_newtype!($(#[$attr])* $vis $name, Vec<u8>, derive: []);
     };
     ($(#[$attr:meta])* $vis:vis $name:ident, Vec<u8>, derive: [$($opt:ident),* $(,)?]) => {
-        $crate::__sg_newtype_base_ct_eq!(
+        $crate::__sg_newtype_base!(
             $(#[$attr])* $vis $name($crate::Dynamic<$crate::__private::Vec<u8>>), derive: [$($opt),*]
         );
+        $crate::__sg_newtype_ct_eq!($name);
         $crate::__sg_newtype_len!($name);
         $crate::__sg_dynamic_ctor!(@into $name, $crate::__private::Vec<u8>);
 
