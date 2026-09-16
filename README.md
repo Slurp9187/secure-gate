@@ -497,13 +497,13 @@ requirement itself carries one for the same `major.minor.patch`. So `"0.8"` mean
 `>=0.8.0, <0.9.0`, `0.8.0-rc.14` sorts *below* `0.8.0`, and nothing satisfies it: `"0.8"`
 and `"0.9"` are not shorthands here, they are resolve failures.
 
-<!-- Every concrete version in this file moves together, as one step of the publish:
-     the docs.rs badge at the top, the sort-order example above, and the exact pin below.
-     They all name the release being published, never an open one left open -- a pin at a
-     version that is not on crates.io tells readers to write a requirement that cannot
-     resolve, and a badge at one 404s. Between the cut and the upload they are briefly
-     ahead of the registry; do not leave them there. The three install snippets above are
-     the tracking form and carry no version, so they never move. -->
+<!-- Every concrete version in this file equals the version in Cargo.toml. There is no
+     staged rule and nothing moves on its own schedule: bump the manifest, bump these in the
+     same commit. Between that commit and the upload they are briefly ahead of crates.io,
+     which is the cost of the simple rule and is measured in minutes. The three install
+     snippets above are the tracking form and carry no version, so they are not part of
+     this. References to a *past* release -- which tag last carried a deleted crate, when a
+     behaviour changed -- are history and never move. -->
 
 `"0.8.0-rc"` is the form that tracks this line rather than a version. `^0.8.0-rc` is
 `>=0.8.0-rc, <0.9.0`, so it selects the newest `0.8.0-rc.N` today and keeps resolving once
