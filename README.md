@@ -453,8 +453,9 @@ and `"0.8"` are not shorthands here, they are resolve failures.
 once `0.9.0` ships — nothing to update when the next candidate lands. It floats, though,
 <!-- Every concrete version in this file equals the version in Cargo.toml. There is no
      staged rule and nothing moves on its own schedule: bump the manifest, bump these in the
-     same commit. Between that commit and the upload they are briefly ahead of crates.io,
-     which is the cost of the simple rule and is measured in minutes. The three install
+     same commit. Between that commit and the upload they name a version crates.io does not
+     have yet: minutes on a line that publishes promptly, and as long as the candidate stays
+     open on one that does not. That is the cost of the simple rule. The three install
      snippets above are the tracking form and carry no version, so they are not part of
      this. References to a *past* release -- which tag last carried a deleted crate, when a
      behaviour changed -- are history and never move. -->
