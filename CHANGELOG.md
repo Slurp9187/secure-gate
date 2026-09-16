@@ -62,6 +62,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `SECURITY.md` §4 described the copying form as "a method taking `self` by value" and
+  enumerated the methods — `to_vec`, `clone`, `to_string`, `try_from`. Too narrow, and the
+  gap was found by a consumer auditing their tree against it: the copy can equally be made
+  *for* you by whatever you hand the reference to. `json!({ "k": &*encoded })` stores an
+  owned `String` holding the secret, and the call site contains no copying method to
+  notice — the same shape reaches `insert`, `push`, a `String` struct field, a `params![]`
+  binding, and every `impl Into<String>` parameter. The section now asks what the receiver
+  does with the `&str`, not only what you called on the secret, and the detection note
+  records that this case carries no token on the secret's side at all.
+
 - `Dynamic::new_with`'s `# Panics` section told callers to bound an attacker-supplied `len`
   before passing it, which is right but assumes the check already existed somewhere. A
   downstream consumer found by building against it that the sized slot does not merely
