@@ -445,18 +445,21 @@ requirement has to carry a pre-release tag.
 The requirement has to carry a pre-release tag. Both lines are pre-release only — the
 newest stable on crates.io is `0.6.1` — and a caret matches a pre-release only when the
 requirement itself carries one for the same `major.minor.patch`. So `"0.9"` means
-`>=0.9.0, <0.10.0`, `0.9.0-rc.12` sorts *below* `0.9.0`, and nothing satisfies it: `"0.9"`
+`>=0.9.0, <0.10.0`, `0.9.0-rc.13` sorts *below* `0.9.0`, and nothing satisfies it: `"0.9"`
 and `"0.8"` are not shorthands here, they are resolve failures.
 
 `"0.9.0-rc"` is the form that tracks a line rather than a version. `^0.9.0-rc` is
 `>=0.9.0-rc, <0.10.0`, so it selects the newest `0.9.0-rc.N` today and keeps resolving
 once `0.9.0` ships — nothing to update when the next candidate lands. It floats, though,
-<!-- The exact-pin example below names the newest PUBLISHED candidate, not the manifest
-     version. It moves at PUBLISH time, not at bump time -- pointing it at an open,
-     unpublished version tells readers to write a requirement that cannot resolve, which
-     is the defect #226 fixed in this section. The three install snippets above are the
-     tracking form and never move. -->
-and candidates on these lines have carried breaking changes: pin `"=0.9.0-rc.12"` when
+<!-- Every concrete version in this file equals the version in Cargo.toml. There is no
+     staged rule and nothing moves on its own schedule: bump the manifest, bump these in the
+     same commit. Between that commit and the upload they name a version crates.io does not
+     have yet: minutes on a line that publishes promptly, and as long as the candidate stays
+     open on one that does not. That is the cost of the simple rule. The three install
+     snippets above are the tracking form and carry no version, so they are not part of
+     this. References to a *past* release -- which tag last carried a deleted crate, when a
+     behaviour changed -- are history and never move. -->
+and candidates on these lines have carried breaking changes: pin `"=0.9.0-rc.13"` when
 `cargo update` must stay put. The pre-release tag is also matched against exactly one
 `major.minor.patch`, so `"0.9.0-rc"` will not pick up a later `0.9.1-rc.1`.
 
