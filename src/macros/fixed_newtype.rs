@@ -29,18 +29,19 @@
 /// fixed_newtype!(pub Name, generic T, "doc", derive: [WrapperAccess]);
 /// ```
 ///
-/// Supported `derive:` options are `ConstantTimeEq`, `Deserialize`, `FromWrapper`, `IntoWrapper`, and `WrapperAccess` (= both directions). The first two constrain the inner type — `ConstantTimeEq` and `Deserialize` must be implemented for it, which rules them out for most `generic` inner types (`[i16; 256]` has neither), while the three wrapper-access tokens apply to any. See
+/// Supported `derive:` options are `Deserialize`, `FromWrapper`, `IntoWrapper`, and `WrapperAccess` (= both directions), plus `ConstantTimeEq` **on the `generic` arms only**. `Deserialize` and `ConstantTimeEq` constrain the inner type — it must implement them, which rules them out for most `generic` inner types (`[i16; 256]` has neither) — while the three wrapper-access tokens apply to any. See
 /// *Cloning and serialization* below for the two that are deliberately absent.
 ///
-/// **`ConstantTimeEq` is not one of them on the size-literal arm.** A `[u8; N]`
-/// payload gets [`ct_eq`](crate::ConstantTimeEq::ct_eq) automatically whenever the
-/// `ct-eq` feature is on, because the wrapper it forwards to always has it and a
-/// plain `type Name = Fixed<[u8; N]>;` therefore always did. Requiring the token
-/// here put the extra word on the spelling this crate recommends as the safer of
-/// the two, for the one comparison whose alternative is a timing leak. Naming it
-/// anyway is accepted and inert, so declarations written before 0.9.0-rc.11 keep
-/// their meaning; it remains a real opt-in on the `generic` arms, where the inner
-/// type may or may not implement the trait.
+/// **`ConstantTimeEq` is not an option on the size-literal arm, and naming it is an
+/// error.** A `[u8; N]` payload gets [`ct_eq`](crate::ConstantTimeEq::ct_eq)
+/// automatically whenever the `ct-eq` feature is on, because the wrapper it forwards
+/// to always has it and a plain `type Name = Fixed<[u8; N]>;` therefore always did.
+/// Requiring the token here put the extra word on the spelling this crate recommends
+/// as the safer of the two, for the one comparison whose alternative is a timing
+/// leak. Since the arm now emits the impl itself, a second one from the `derive:`
+/// list is `E0119: conflicting implementations` — delete the token. It remains a
+/// real opt-in on the `generic` arms, where the inner type may or may not implement
+/// the trait.
 ///
 /// # Examples
 ///
@@ -432,9 +433,10 @@ macro_rules! fixed_newtype {
     ($(#[$attr:meta])* $vis:vis $name:ident, $size:literal, derive: [$($opt:ident),* $(,)?]) => {
         const _: () = { let _ = [(); $size][0]; };
 
-        $crate::__sg_newtype_base_ct_eq!(
+        $crate::__sg_newtype_base!(
             $(#[$attr])* $vis $name($crate::Fixed<[u8; $size]>), derive: [$($opt),*]
         );
+        $crate::__sg_newtype_ct_eq!($name);
         $crate::__sg_newtype_len!($name);
 
         impl $name {
@@ -674,8 +676,9 @@ macro_rules! fixed_newtype {
              Zeroize, `new`, `new_with`) on purpose. `generic [u8; N]` is not one of \
              those: write the size literal. \
              If the length or the marker looks right, the problem is in what follows \
-             it: a `derive:` list needs brackets, and accepts only ConstantTimeEq, \
-             Deserialize, FromWrapper, IntoWrapper and WrapperAccess."
+             it: a `derive:` list needs brackets, and accepts only Deserialize, \
+             FromWrapper, IntoWrapper and WrapperAccess — plus ConstantTimeEq on the \
+             `generic` arms, where it is not automatic."
         ));
     };
 }
