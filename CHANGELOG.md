@@ -5,10 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.0-rc.14] - Unreleased
+## [0.8.0-rc.14] - 2026-09-15
 
-> The line is open. `v0.8.0-rc.14` is not tagged and not published.
->
 > This one section carries **two** upstream releases — 0.9.0-rc.11 and 0.9.0-rc.12 — because
 > the 0.9 line cut both before this one was tagged. A reader comparing the two changelogs
 > should therefore look for 0.9.0-rc.12's entries here rather than expecting a
