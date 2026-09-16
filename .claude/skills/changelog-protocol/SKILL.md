@@ -45,9 +45,14 @@ about tags. **Never write a publication claim from memory or inference** — a t
 existing is not evidence, and neither is a changelog section that said so last
 month.
 
-Prefer notes with no shelf life. `> Published to crates.io on the v0.9.0-rc.9
-tag.` stays true forever; `> not yet published` is true for days and then rots
-silently, because nothing re-reads it.
+The rule that follows from this is simply: **write no publication note at all.**
+The heading already carries the state — `Unreleased` or an ISO date, one
+separator, two possible values — and a prose sentence restating it adds nothing
+while being the only thing in the file with a shelf life. Notes of the form
+`> Published to crates.io on the v0.9.0-rc.9 tag.` are accurate and harmless, but
+they are not worth writing; `> not yet published` is true for days and then rots,
+which is what happened twice. Existing notes in historical sections are left
+alone.
 
 ### 2. The top heading's version matches the manifest
 
@@ -134,11 +139,15 @@ falsify **historical statements**.
   0.8.0-rc.11", "released as 0.8.0-rc.11", the `v0.8.0-rc.11` /
   `v0.9.0-rc.8` references naming the last tag that carried
   `secure-gate-compat`.
-- On `release/0.8`, the versioned docs.rs badge and `Cargo.toml`'s
-  `documentation` field. 0153d60 set these to *"the version this README ships
-  with"* specifically to fix a 404 against an unpublished version; pointing them
-  at an unpublished version again recreates that defect. They move at **publish**
-  time, not at bump time. (`main` uses unversioned docs.rs URLs and has neither.)
+**Moved, and in the same commit as the manifest:** every concrete version in
+`README.md` — the versioned docs.rs badge on `release/0.8`, the exact-pin
+example, any sort-order example. They equal `Cargo.toml`, always. The staged
+rule that once had the badge moving at *publish* time rather than *bump* time is
+retired: it kept the README and the manifest deliberately out of step and relied
+on someone remembering to close the gap. The cost of the simple rule is that
+between the bump and the upload they name a version crates.io does not have yet,
+which is stated in a comment in the README rather than hidden. `main` uses
+unversioned docs.rs URLs and has no badge to move.
 
 ## The release flow
 
@@ -148,14 +157,19 @@ falsify **historical statements**.
 2. **Accumulate.** Entries under that heading, grouped `### Added` /
    `### Changed` / `### Fixed` / `### Removed` / `### Security`. No dates unless
    the date is evidence.
-3. **Cut.** Replace `Unreleased` with the ISO date, commit, tag from that commit.
-4. **Publish**, then update the section's note to say so — and on
-   `release/0.8`, move the docs.rs badge and `documentation` field now.
-5. **Repeat.** Never leave a standing empty section.
+3. **Cut.** Replace `Unreleased` with the ISO date. Tag *after* the dry run,
+   not before — see `publish-prep`.
+4. **Publish.** Then nothing: no publication note, no badge move. The date in the
+   heading is the release marker, and the README versions already match the
+   manifest. This step used to carry three edits and they were missed twice,
+   which is what produced the rotted claims described under invariant 1.
+5. **Do not open the next line until work arrives.** A manifest equal to the
+   published version is the correct resting state. Open the next version in the
+   same commit as the first change that lands on it.
 
-An opened section with **no entries** is correct and expected at step 1 — it
-means the line is open and nothing has landed. Say that in its note so the
-emptiness reads as deliberate.
+There is no step at which an empty section is expected, because the line is not
+opened until something lands on it. If you find one — from an older cycle — it
+is not an error, but do not create another.
 
 ## Checks to run when cutting a release
 
