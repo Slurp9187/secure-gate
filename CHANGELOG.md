@@ -117,6 +117,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Both corrections were made on `release/0.8` while backporting rc.12 and are re-derived
   here. The staleness was inherited on both lines, not introduced by that backport.
 
+### Removed
+
+- **BREAKING: `derive: [ConstantTimeEq]` is rejected on the shaped newtype arms.** It was
+  accepted-and-inert in 0.9.0-rc.11 and 0.9.0-rc.12, both of which are published; this is a
+  break against a released surface, not tidying of an unreleased one.
+
+  Constant-time equality became automatic on those arms in rc.11 — `fixed_newtype!`'s
+  size-literal arm and `dynamic_newtype!`'s `String` and `Vec<u8>` arms — because the token
+  had put the extra word on the spelling this crate recommends as the safer of the two, for
+  the one comparison whose alternative is a timing leak. To keep older declarations
+  compiling, rc.11 shipped a tt-muncher that scanned the `derive:` list and silently dropped
+  the redundant token before it could produce a second impl.
+
+  That accommodation is gone, and nothing replaces it: no deprecation, no `compile_error!`,
+  no warning. A declaration still naming the token now fails with
+  `E0119: conflicting implementations of trait ConstantTimeEq`, pointing at the macro
+  expansion. **Migration is to delete the token.** Nothing about the generated type changes
+  — `ct_eq` is still emitted automatically on every shaped arm, gated only on the `ct-eq`
+  feature as before.
+
+  One caveat worth knowing before you go looking: with `ct-eq` **off** (it is not a default
+  feature) both impls are discarded, so an offending declaration still compiles and the
+  break only surfaces when someone enables the feature.
+
+  The machinery removed is `__sg_newtype_base_ct_eq!` — four arms of recursive token
+  munching, replaced by `__sg_newtype_ct_eq!($name)`, a flat emitter modelled on the
+  `__sg_newtype_len!` that already sat beside it at all three call sites. Net −62/+46 lines
+  across the macro layer, and one less recursive expansion for anyone reading `cargo expand`
+  output.
+
+- **`ConstantTimeEq` remains a real `derive:` option on the `generic` arms, and is now
+  actually tested.** It cannot be automatic there: an arbitrary inner type may or may not
+  implement the trait, and nothing readable off the tokens decides it. Removing the shaped
+  arms' accommodation left that opt-in with no coverage anywhere in the suite — every
+  declaration that named the token was on a shaped arm — so
+  `tests/macros_suite/newtype_generic_ct_eq.rs` now pins it with a caller-defined payload
+  that implements `Zeroize`, `FixedStorage`, `SentinelValue` and `ConstantTimeEq`, alongside
+  a second newtype over the same payload declared *without* the token. The pair fails loudly
+  if the `generic` arm ever starts emitting the impl on its own.
+
 ### Fixed
 - **`cargo doc --features=full` did not build.** Three doc comments link to `std` items
   this crate touches through gated impls — `io::Write` on `Dynamic<Vec<u8>>` and on

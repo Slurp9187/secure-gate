@@ -122,36 +122,23 @@ macro_rules! __sg_newtype_base {
     };
 }
 
-/// Internal: the base surface plus an automatic
-/// [`ConstantTimeEq`](crate::ConstantTimeEq), for the arms whose payload is
-/// known to implement it.
+/// Internal: emits an automatic [`ConstantTimeEq`](crate::ConstantTimeEq) for the
+/// arms whose payload implements it unconditionally under the `ct-eq` feature —
+/// `Fixed<[u8; N]>`, `Dynamic<String>`, `Dynamic<Vec<u8>>`.
 ///
-/// Four arms qualify, and they qualify for one reason: their wrapper implements
-/// `ConstantTimeEq` unconditionally under the `ct-eq` feature, so a plain
-/// `type Name = Fixed<[u8; N]>;` — or `= Dynamic<String>`, or
-/// `= Dynamic<Vec<u8>>` — has always had `ct_eq` for free. The newtype, the
-/// spelling this crate recommends as the safer of the two, did not: it wanted
-/// `derive: [ConstantTimeEq]` as well. That put the extra token on the side the
-/// documentation steers people toward, which is the wrong way round for a
-/// comparison whose alternative is a timing leak. `fixed_newtype!`'s
-/// size-literal arm was corrected in 0.9.0-rc.11; `dynamic_newtype!`'s `String`
-/// and `Vec<u8>` arms followed in the same release.
+/// Those three shapes have always had `ct_eq` for free as a plain `type` alias.
+/// The newtype — the spelling this crate recommends as the safer of the two —
+/// used to charge an extra `derive: [ConstantTimeEq]` token for it, putting the
+/// cost on the side the documentation steers people toward, for a comparison
+/// whose alternative is a timing leak. Corrected in 0.9.0-rc.11.
 ///
-/// The token is redundant on those arms rather than removed: emitting the impl
-/// twice is `E0119`, so the derive list is scanned and `ConstantTimeEq` dropped
-/// from it before reaching [`__sg_newtype_base!`]. Declarations written against
-/// earlier release candidates keep compiling and mean exactly what they say.
-///
-/// Every `generic` arm still routes the token through `__sg_newtype_opt!`, where
-/// it remains a genuine opt-in — an arbitrary inner type may or may not
-/// implement `ConstantTimeEq`, and nothing readable off the tokens decides it.
+/// Every `generic` arm routes `ConstantTimeEq` through [`__sg_newtype_opt!`]
+/// instead, where it remains a genuine opt-in: an arbitrary inner type may or may
+/// not implement the trait, and nothing readable off the tokens decides it.
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __sg_newtype_base_ct_eq {
-    // Scan complete — expand with the tokens that survived.
-    (@scan [] [$($kept:ident)*] $(#[$attr:meta])* $vis:vis $name:ident($wrapper:ty)) => {
-        $crate::__sg_newtype_base!($(#[$attr])* $vis $name($wrapper), derive: [$($kept),*]);
-
+macro_rules! __sg_newtype_ct_eq {
+    ($name:ident) => {
         $crate::__sg_if_ct_eq! {
             impl $crate::ConstantTimeEq for $name {
                 #[inline]
@@ -160,17 +147,6 @@ macro_rules! __sg_newtype_base_ct_eq {
                 }
             }
         }
-    };
-    // Redundant on this arm: drop it rather than duplicate the impl.
-    (@scan [ConstantTimeEq $($rest:ident)*] [$($kept:ident)*] $($tail:tt)*) => {
-        $crate::__sg_newtype_base_ct_eq!(@scan [$($rest)*] [$($kept)*] $($tail)*);
-    };
-    // Anything else is a real option; keep it in order.
-    (@scan [$first:ident $($rest:ident)*] [$($kept:ident)*] $($tail:tt)*) => {
-        $crate::__sg_newtype_base_ct_eq!(@scan [$($rest)*] [$($kept)* $first] $($tail)*);
-    };
-    ($(#[$attr:meta])* $vis:vis $name:ident($wrapper:ty), derive: [$($opt:ident),* $(,)?]) => {
-        $crate::__sg_newtype_base_ct_eq!(@scan [$($opt)*] [] $(#[$attr])* $vis $name($wrapper));
     };
 }
 
@@ -291,8 +267,10 @@ macro_rules! __sg_newtype_opt {
         ::core::compile_error!(::core::concat!(
             "secure_newtype: unknown `derive:` option `",
             ::core::stringify!($other),
-            "`. Supported: ConstantTimeEq, Deserialize, FromWrapper, IntoWrapper, WrapperAccess. `Clone` and \
-             `Serialize` are deliberately unsupported — write them by hand."
+            "`. Supported: Deserialize, FromWrapper, IntoWrapper, WrapperAccess, and \
+             ConstantTimeEq on the `generic` arms only (the shaped arms emit it \
+             automatically). `Clone` and `Serialize` are deliberately unsupported — \
+             write them by hand."
         ));
     };
 }
