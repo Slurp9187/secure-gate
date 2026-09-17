@@ -7,9 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0-rc.13] - Unreleased
 
-> The line is open. `v0.9.0-rc.13` is not tagged and not published.
-
 ### Security
+- **Said what a zero-on-deallocate allocator has to do, instead of naming one.** All three
+  sites that recommended a specific crate now give the property to check. Such an allocator's
+  wipe sits immediately before a deallocation, which makes it a dead store the optimizer is
+  entitled to delete, and the deletion is silent. An implementation that defends the wipe by
+  routing it through a function pointer is defeated by profile-guided optimization with LTO:
+  indirect-call promotion turns the indirect call direct, inlining follows, and dead-store
+  elimination removes the fill while the pointer load it was hiding behind still executes.
+  Volatile stores are safe from that removal because LLVM's language reference forbids it; a
+  fill held by an inline-assembly barrier taking the block's own pointer also holds.
+
+  Naming no crate is what lets this text be identical on both lines. Every version that names
+  one forces `release/0.8` to answer a question property-based wording never asks, since that
+  line pins MSRV 1.70.
+
+- **The hazard is now a number rather than a claim.** A 4 KiB secret grown one byte past its
+  capacity through `with_secret_mut`, with an allocated neighbour behind it so the reallocation
+  has to move, leaves **4032 of 4032 payload bytes** readable in the abandoned block — x86-64
+  Linux/glibc and Windows alike. Taken with no allocator installed, so it measures this crate's
+  hazard and not any allocator's behaviour, and it reproduces in about fifteen lines.
+
+  The readout window starts at byte 64 deliberately, and the section says so: a freed glibc
+  chunk carries the allocator's free-list links in its first bytes — two words in a small bin,
+  four once sorted into a large bin — so sampling below that reads pointers, finds no pattern,
+  and looks like proof the hazard is imaginary.
+
+- **`#[global_allocator]` in `src/main.rs` does not reach integration tests.** Each file under
+  `tests/` compiles to its own binary linking the library target, so it gets the default
+  allocator. A test written to confirm secret handling then runs without the mitigation it was
+  written to confirm — a green result about the wrong binary. If your crate has a library
+  target, declare the allocator there.
 - **Documented a limitation of `with_secret` / `expose_secret`: they govern access, not
   what the closure body does with the bytes.** Any expression producing an owned value
   from the lent `&T` leaves a copy in ordinary memory that the wrapper never learns about
