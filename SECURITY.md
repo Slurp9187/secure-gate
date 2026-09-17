@@ -218,7 +218,13 @@ though — not to everything the closure touches.
   **Without `std` the second case does not exist.** As the note above on that impl spells out, `full` does not enable `std`, and neither does `default = ["alloc"]` — so the default build and the batteries-included build both land here, and alloc-without-std is the ordinary configuration rather than an exotic one. For such a consumer, a secret whose length is not known before the fill has **no** non-leaking construction path in this crate: growing the `Vec` through `with_secret_mut` abandons unwiped buffers inside the wrapper, and growing one outside and moving it in with `Dynamic::new` abandons the same buffers outside it — `new` protects the allocation it is handed and says nothing about the ones you discarded getting there. Two ways out, both of which have to be chosen deliberately: enable `std` and write through the wrapper's `Write` impl; or find a bound on the length — a protocol maximum, a fixed field width, the size of the frame you are reading — and use `new_with(bound, |slot| …)`, carrying the real length yourself, since the unused tail is zeros the wrapper still considers part of the secret.
 
   [`SlotWriter`](https://docs.rs/secure-gate/latest/secure_gate/struct.SlotWriter.html) restores the append shape on top of a slot (`push_slice` / `push_byte`, panicking on overrun) so that a multi-part fill is not hand-written offset arithmetic — a fixed slot trades the reallocation hazard for an offset one, and in wire-format code a wrong offset derives the wrong key and still runs.
-- For **deployment-level remediation**, install a zero-on-deallocate global allocator such as [`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) in the final binary, or rely on OS facilities (Linux `init_on_free=1`, hardened allocators). These are process-wide operational choices rather than a per-crate feature.
+- For **deployment-level remediation**, install a zero-on-deallocate global allocator in the final binary, or rely on OS facilities (Linux `init_on_free=1`, hardened allocators). These are process-wide operational choices rather than a per-crate feature, and only the final binary can make them: a library cannot install an allocator for the applications that depend on it, which is why this sits outside `secure-gate` entirely.
+
+  **How much this is worth is measurable, and worth measuring.** In the shape described above — a 4 KiB secret grown one byte past its capacity through `with_secret_mut`, with an allocated neighbour behind it so the reallocation has to move rather than extend in place — the abandoned block was requested straight back from the allocator and read: **4032 of 4032 payload bytes still present**, on x86-64 Linux/glibc and on Windows. That is this section's hazard as a number rather than a claim, and it is what a zero-on-deallocate allocator removes. The readout window starts at byte 64 because a freed glibc chunk carries the allocator's own free-list links in its first bytes — two words in a small bin, four once it has been sorted into a large bin — and reading those instead of the payload is an easy way to measure nothing and conclude there is no hazard.
+
+  **If your crate has a library target, declare the allocator there.** A `#[global_allocator]` in `src/main.rs` reaches the shipped binary but not the integration tests under `tests/`, each of which links the library and gets the default allocator — so a test written to confirm your secret handling runs without the mitigation it was written to confirm.
+
+  **What to check before trusting any such allocator.** Its wipe sits immediately before a deallocation, which makes it a dead store the optimizer is entitled to delete, and the deletion is silent. An implementation that defends the wipe by routing it through a function pointer is defeated by profile-guided optimization combined with link-time optimization: indirect-call promotion turns the indirect call direct, inlining follows, and dead-store elimination removes the fill while the pointer load it was hiding behind still executes. Prefer an implementation whose wipe is volatile stores, which LLVM's language reference forbids the optimizer from removing, or a fill held in place by an inline-assembly barrier that receives the block's own pointer as an operand. Ask whether the project demonstrates that under PGO and LTO rather than asserting it.
 
 A custom-allocator-parameterized `Dynamic<T, A>` (analogous to C++'s
 `std::vector<T, ZeroingAllocator<T>>`) would resolve this at the type level. This
@@ -755,16 +761,17 @@ limitation 4 above, and it is the reason that row reads "must not" rather than "
   deny-list does not become type-level by getting longer.
 
   For stricter deployment threat models, handle this below the library layer:
-  install a zero-on-dealloc global allocator such as
-  [`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) in the final
-  binary (the recommended approach when downstream code controls the global
-  allocator), use OS or allocator zero-on-free facilities where available
-  (for example Linux `init_on_free=1` or hardened allocators), disable core
-  dumps for secret-holding processes, and ensure swap / hibernation storage is
-  encrypted. These are process-wide operational choices, so `secure-gate` treats
+  install a zero-on-dealloc global allocator in the final binary (the
+  recommended approach when downstream code controls the global allocator), use
+  OS or allocator zero-on-free facilities where available (for example Linux
+  `init_on_free=1` or hardened allocators), disable core dumps for
+  secret-holding processes, and ensure swap / hibernation storage is encrypted.
+  These are process-wide operational choices, so `secure-gate` treats
   allocator-level zeroization as deployment configuration rather than a crate
-  feature. See the "Inherent Rust Limitations" section above for the broader
-  context.
+  feature. **Not every zero-on-dealloc allocator actually wipes**, and the
+  failure is silent: see the "Inherent Rust Limitations" section above for what
+  to check before trusting one, for where to declare it, and for the measured
+  size of the hazard.
 
 **Mitigations**
 
