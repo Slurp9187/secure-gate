@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.9.0-rc.13] - Unreleased
 
 ### Security
+- **Recommended `zeroizing-alloc` for the heap-reallocation hazard, with the install snippet.**
+  It meets the criteria the section states and was measured against them under profile-guided
+  optimization with link-time optimization. Install it in the application: only the crate that
+  produces the executable can install a global allocator, so a library points its consumers at
+  this section instead.
+
 - **Said what a zero-on-deallocate allocator has to do, instead of naming one.** All three
   sites that recommended a specific crate now give the property to check. Such an allocator's
   wipe sits immediately before a deallocation, which makes it a dead store the optimizer is
