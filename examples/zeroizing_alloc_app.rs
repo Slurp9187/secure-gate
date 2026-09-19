@@ -16,7 +16,7 @@
 //! shape the allocator protects: the reallocation happens outside `secure-gate`, and the
 //! abandoned block is what a zero-on-deallocate allocator wipes on the way to being freed.
 
-use secure_gate::{Dynamic, RevealSecretMut};
+use secure_gate::{Dynamic, RevealSecretMut, SecretLen};
 use zeroizing_alloc::ZeroAlloc;
 
 #[global_allocator]
@@ -36,7 +36,9 @@ fn main() {
         bytes.extend_from_slice(b"more-secret-bytes-after-the-move");
     });
 
-    secret.with_secret_mut(|bytes| {
-        println!("secret is {} bytes", bytes.len());
-    });
+    // Length metadata lives on `SecretLen` and needs no reveal at all, so nothing here opens
+    // the secret just to report on it. Doing I/O inside a `with_secret*` closure is the shape
+    // to avoid: the closure is the one place the secret is exposed, and the less that happens
+    // in there the better.
+    println!("secret is {} bytes", secret.len());
 }
