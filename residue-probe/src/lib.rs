@@ -37,7 +37,7 @@
 //! ```ignore
 //! // tests/residue_support/mod.rs — shared by all three binaries, so the subject and its
 //! // controls cannot drift apart. (A subdirectory is not built as a test target.)
-//! use secure_gate_residue_probe::{plant, planted_hits, Measurement};
+//! use secure_gate_residue_probe::plant;
 //!
 //! pub const SECRET_LEN: usize = 4096;
 //!
@@ -55,78 +55,55 @@
 //!     std::hint::black_box(&buf);
 //! }
 //!
-//! /// Every configuration checks this much, so only the final expectation differs.
-//! pub fn sanity(m: &Measurement) {
-//!     assert!(m.blocks > 0, "no block released -- the workload did not run");
-//!     assert_eq!(m.foreign_deallocs, 0, "another thread deallocated during the window");
-//! }
-//!
-//! pub fn expected_hits() -> usize {
-//!     planted_hits(SECRET_LEN)
-//! }
+//! /// Every workload, labelled, so the three binaries run the same list.
+//! pub const WORKLOADS: [(&str, fn()); 1] = [("push", workload as fn())];
 //! ```
+//!
+//! Each of the three test files is then `mod residue_support;` and one [`residue_binary!`]
+//! invocation. The three differ in exactly one argument — the role — which is the
+//! `#[global_allocator]` each installs and the assertion its one `#[test]` makes:
 //!
 //! ```ignore
 //! // tests/residue_control.rs — CONTROL 1: there is something to find.
 //! mod residue_support;
-//! use residue_support::{expected_hits, sanity, workload};
-//! use secure_gate_residue_probe::{measure, Spy};
-//! use std::alloc::System;
 //!
-//! #[global_allocator]
-//! static ALLOC: Spy<System> = Spy(System);
-//!
-//! #[test]
-//! fn the_pattern_is_released() {
-//!     let m = measure("control", workload);
-//!     sanity(&m);
-//!     assert!(
-//!         m.pattern_hits >= expected_hits(),
-//!         "the probe is not observing what it believes it is"
-//!     );
+//! secure_gate_residue_probe::residue_binary! {
+//!     control,
+//!     workloads: residue_support::WORKLOADS,
+//!     planted_len: residue_support::SECRET_LEN,
 //! }
 //! ```
 //!
 //! ```ignore
 //! // tests/residue_nowipe.rs — CONTROL 2: the probe sees it in the composed position.
+//! // MUST report dirty. If this ever goes quiet, residue_subject.rs proves nothing.
 //! mod residue_support;
-//! use residue_support::{expected_hits, sanity, workload};
-//! use secure_gate_residue_probe::{measure, NoWipe, Spy};
-//! use std::alloc::System;
 //!
-//! #[global_allocator]
-//! static ALLOC: NoWipe<Spy<System>> = NoWipe(Spy(System));
-//!
-//! #[test]
-//! fn the_composed_position_still_sees_the_pattern_when_nothing_wipes() {
-//!     let m = measure("no-wipe", workload);
-//!     sanity(&m);
-//!     // MUST be dirty. If this ever goes quiet, residue_subject.rs proves nothing.
-//!     assert!(
-//!         m.pattern_hits >= expected_hits(),
-//!         "clean here means the subject's zero is untested, not that anything was wiped"
-//!     );
+//! secure_gate_residue_probe::residue_binary! {
+//!     nowipe,
+//!     workloads: residue_support::WORKLOADS,
+//!     planted_len: residue_support::SECRET_LEN,
 //! }
 //! ```
 //!
 //! ```ignore
 //! // tests/residue_subject.rs — SUBJECT: your allocator, in the same position.
 //! mod residue_support;
+//!
 //! use my_alloc::WipeOnFree; // whatever you are measuring
-//! use residue_support::{sanity, workload};
-//! use secure_gate_residue_probe::{measure, Spy};
+//! use secure_gate_residue_probe::Spy;
 //! use std::alloc::System;
 //!
-//! #[global_allocator]
-//! static ALLOC: WipeOnFree<Spy<System>> = WipeOnFree(Spy(System));
-//!
-//! #[test]
-//! fn nothing_the_workload_abandons_survives() {
-//!     let m = measure("subject", workload);
-//!     sanity(&m); // blocks > 0, or this is a blind probe rather than a clean one
-//!     assert_eq!(m.pattern_hits, 0);
+//! secure_gate_residue_probe::residue_binary! {
+//!     subject: WipeOnFree<Spy<System>> = WipeOnFree(Spy::new(System)),
+//!     workloads: residue_support::WORKLOADS,
 //! }
 //! ```
+//!
+//! What each invocation expands to — the allocator `static` and the hand-written test it
+//! replaces — is under [`residue_binary!`]. Nothing stops you writing that form yourself
+//! against [`measure`] and [`Measurement`] if your layout differs; the macro exists so the
+//! three files cannot drift.
 //!
 //! Read all three or none. A subject binary quoted on its own is not a result.
 //!
@@ -613,6 +590,274 @@ pub fn measure(label: &str, f: impl FnOnce()) -> Measurement {
     );
 
     out
+}
+
+// ---------------------------------------------------------------------------
+// residue_binary! — one invocation per configuration
+// ---------------------------------------------------------------------------
+
+/// Generates the body of one residue binary: the `#[global_allocator]` for its role and the
+/// single aggregate `#[test]` carrying that role's assertions.
+///
+/// A `#[global_allocator]` is process-wide, so no macro can turn one file into three
+/// binaries: Cargo builds one test binary per `tests/*.rs` file, and that is what lets three
+/// allocator declarations coexist in one crate. You still write three files. What this
+/// removes is everything *inside* them — each becomes `mod residue_support;` and one
+/// invocation, and the three differ in exactly one argument, the role, so nothing else about
+/// them can drift.
+///
+/// | invocation | installs | the generated `#[test]` asserts |
+/// |---|---|---|
+/// | `residue_binary!(control, …)` | [`Spy`]`<System>` | `pattern_hits >= planted_hits(len)` — there is something to find |
+/// | `residue_binary!(nowipe, …)` | [`NoWipe`]`<`[`Spy`]`<System>>` | `pattern_hits >= planted_hits(len)` — the probe sees it in the composed position |
+/// | `residue_binary!(subject: …)` | the allocator you name | `pattern_hits == 0` |
+///
+/// Every role also asserts, per workload, `blocks > 0` (zero hits with nothing inspected is
+/// a blind probe, not a clean one) and `foreign_deallocs == 0` (another thread deallocated
+/// inside the window, so the count is not trustworthy), and asserts `!`[`is_armed`]`()` once
+/// the loop is done.
+///
+/// # Arguments
+///
+/// - `workloads:` — an expression that iterates `(&str, fn())` pairs, one per workload. A
+///   `const` array in the shared support module is the intended shape. Each workload must
+///   [`plant`] the pattern, abandon the buffer, and assert that the abandonment happened,
+///   so that a capacity change which declined to reallocate fails the run instead of
+///   reporting a clean count for a run in which nothing happened.
+/// - `planted_len:` — control and no-wipe only: the number of bytes each workload hands to
+///   [`plant`]. The floor [`planted_hits`]`(planted_len)` is what the generated test
+///   requires, compared with `>=`, never `==`.
+/// - `inner:` — control and no-wipe only, optional: `Type = initializer` for the allocator
+///   the spy sits on, when it is not `std::alloc::System`. Name the same one inside the
+///   subject's type. Defaults to `::std::alloc::System = ::std::alloc::System`.
+/// - `subject:` — `Type = initializer` for the allocator under test with the spy beneath
+///   it, exactly as it would be written in a `static`:
+///   `ZeroAlloc<Spy<System>> = ZeroAlloc(Spy::new(System))`. It is written out rather than
+///   derived so the composition — and the fact that the spy is *beneath* the subject — is
+///   visible at the call site.
+///
+/// # The three files
+///
+/// ```ignore
+/// // tests/residue_control.rs — CONTROL 1: there is something to find.
+/// mod residue_support;
+///
+/// secure_gate_residue_probe::residue_binary! {
+///     control,
+///     workloads: residue_support::WORKLOADS,
+///     planted_len: residue_support::SECRET_LEN,
+/// }
+/// ```
+///
+/// ```ignore
+/// // tests/residue_nowipe.rs — CONTROL 2: the probe sees it in the composed position.
+/// mod residue_support;
+///
+/// secure_gate_residue_probe::residue_binary! {
+///     nowipe,
+///     workloads: residue_support::WORKLOADS,
+///     planted_len: residue_support::SECRET_LEN,
+/// }
+/// ```
+///
+/// ```ignore
+/// // tests/residue_subject.rs — SUBJECT: your allocator, in the same position.
+/// mod residue_support;
+///
+/// use my_alloc::WipeOnFree; // whatever you are measuring
+/// use secure_gate_residue_probe::Spy;
+/// use std::alloc::System;
+///
+/// secure_gate_residue_probe::residue_binary! {
+///     subject: WipeOnFree<Spy<System>> = WipeOnFree(Spy::new(System)),
+///     workloads: residue_support::WORKLOADS,
+/// }
+/// ```
+///
+/// A self-contained invocation, so the shape can be checked without the support module:
+///
+/// ```
+/// use secure_gate_residue_probe::{plant, residue_binary};
+///
+/// fn workload() {
+///     let mut buf = vec![0u8; 64];
+///     plant(&mut buf);
+///     let before = buf.as_ptr().addr();
+///     buf.push(0); // a capacity change: the old block is abandoned outside your control
+///     assert_ne!(before, buf.as_ptr().addr(), "nothing was abandoned");
+///     std::hint::black_box(&buf);
+/// }
+///
+/// residue_binary! {
+///     control,
+///     workloads: [("push", workload as fn())],
+///     planted_len: 64,
+/// }
+/// # fn main() { workload(); }
+/// ```
+///
+/// # What it expands to
+///
+/// The control arm, written out; the no-wipe arm differs in the allocator and in the
+/// message, and the subject arm asserts `== 0` where these assert `>=`. This is the
+/// hand-written form the macro replaces, and the reasons behind each assertion are in the
+/// crate-level documentation.
+///
+/// ```ignore
+/// #[global_allocator]
+/// static ALLOC: Spy<System> = Spy::new(System);
+///
+/// #[test]
+/// fn planted_pattern_is_released_with_no_wiping_allocator() {
+///     let expected_hits = planted_hits(SECRET_LEN);
+///     for (label, workload) in WORKLOADS {
+///         let m = measure(label, workload);
+///         assert!(m.blocks > 0, "no block released -- the workload did not run");
+///         assert!(m.pattern_hits >= expected_hits, "the probe is not observing what it believes it is");
+///         assert_eq!(m.foreign_deallocs, 0, "another thread deallocated during the window");
+///     }
+///     assert!(!is_armed(), "gate left armed after the loop");
+/// }
+/// ```
+///
+/// The expansion defines an item named `ALLOC` and one test function, so nothing else in
+/// the file may use those names. A file that is `mod residue_support;` and one invocation
+/// has nothing to collide with, which is the intended shape.
+#[macro_export]
+macro_rules! residue_binary {
+    // ---- public arms -------------------------------------------------------------------
+    (
+        control,
+        workloads: $workloads:expr,
+        planted_len: $planted_len:expr $(,)?
+    ) => {
+        $crate::residue_binary!(
+            @control ::std::alloc::System, ::std::alloc::System, $workloads, $planted_len
+        );
+    };
+    (
+        control,
+        workloads: $workloads:expr,
+        planted_len: $planted_len:expr,
+        inner: $inner_ty:ty = $inner:expr $(,)?
+    ) => {
+        $crate::residue_binary!(@control $inner_ty, $inner, $workloads, $planted_len);
+    };
+    (
+        nowipe,
+        workloads: $workloads:expr,
+        planted_len: $planted_len:expr $(,)?
+    ) => {
+        $crate::residue_binary!(
+            @nowipe ::std::alloc::System, ::std::alloc::System, $workloads, $planted_len
+        );
+    };
+    (
+        nowipe,
+        workloads: $workloads:expr,
+        planted_len: $planted_len:expr,
+        inner: $inner_ty:ty = $inner:expr $(,)?
+    ) => {
+        $crate::residue_binary!(@nowipe $inner_ty, $inner, $workloads, $planted_len);
+    };
+    (
+        subject: $alloc_ty:ty = $alloc:expr,
+        workloads: $workloads:expr $(,)?
+    ) => {
+        $crate::residue_binary!(@subject $alloc_ty, $alloc, $workloads);
+    };
+
+    // ---- one arm per role --------------------------------------------------------------
+    //
+    // The role decides the composition. That is the point of taking a role rather than a
+    // type: a control that could be handed a wiping allocator, or a subject that could be
+    // handed the bare spy, would let the three binaries differ in something other than the
+    // one thing they are supposed to differ in.
+    (@control $inner_ty:ty, $inner:expr, $workloads:expr, $planted_len:expr) => {
+        #[global_allocator]
+        static ALLOC: $crate::Spy<$inner_ty> = $crate::Spy::new($inner);
+
+        #[test]
+        fn planted_pattern_is_released_with_no_wiping_allocator() {
+            $crate::residue_binary!(
+                @dirty $workloads, $planted_len,
+                "this probe is no longer observing what it believes it is, so a clean result \
+                 from the subject binary would be UNTESTED"
+            );
+        }
+    };
+    (@nowipe $inner_ty:ty, $inner:expr, $workloads:expr, $planted_len:expr) => {
+        #[global_allocator]
+        static ALLOC: $crate::NoWipe<$crate::Spy<$inner_ty>> =
+            $crate::NoWipe::new($crate::Spy::new($inner));
+
+        #[test]
+        fn the_composed_position_still_sees_the_pattern_when_nothing_wipes() {
+            $crate::residue_binary!(
+                @dirty $workloads, $planted_len,
+                "composed under a non-wiping wrapper, the probe is not observing the position \
+                 it claims to, so a clean result from the subject binary proves nothing"
+            );
+        }
+    };
+    (@subject $alloc_ty:ty, $alloc:expr, $workloads:expr) => {
+        #[global_allocator]
+        static ALLOC: $alloc_ty = $alloc;
+
+        #[test]
+        fn nothing_the_workload_abandons_survives() {
+            for (label, workload) in $workloads {
+                let m = $crate::measure(label, workload);
+                assert_eq!(
+                    m.pattern_hits, 0,
+                    "{label}: {} of {} released blocks still carried the planted pattern ({} \
+                     occurrences)",
+                    m.blocks_with_pattern, m.blocks, m.pattern_hits
+                );
+                assert!(
+                    m.blocks > 0,
+                    "{label}: zero pattern hits with zero blocks inspected is a blind probe, \
+                     not a wipe"
+                );
+                assert_eq!(
+                    m.foreign_deallocs, 0,
+                    "{label}: {} deallocations arrived from a thread other than the one that \
+                     armed the gate; the measurement above is not trustworthy",
+                    m.foreign_deallocs
+                );
+            }
+            assert!(!$crate::is_armed(), "gate left armed after the loop");
+        }
+    };
+
+    // ---- the assertions both controls share --------------------------------------------
+    //
+    // A control must report dirty. `$why` is the sentence that says what a clean result
+    // here would mean, because the failure is not "the control failed" but "the subject's
+    // zero is now untested", and the message is where that has to be said.
+    (@dirty $workloads:expr, $planted_len:expr, $why:literal) => {
+        let expected_hits = $crate::planted_hits($planted_len);
+        for (label, workload) in $workloads {
+            let m = $crate::measure(label, workload);
+            assert!(
+                m.blocks > 0,
+                "{label}: no block released -- the workload did not run"
+            );
+            assert!(
+                m.pattern_hits >= expected_hits,
+                "{label}: {} blocks released and only {} occurrences of the planted pattern \
+                 were recovered (expected at least {expected_hits}): {}",
+                m.blocks, m.pattern_hits, $why
+            );
+            assert_eq!(
+                m.foreign_deallocs, 0,
+                "{label}: {} deallocations arrived from a thread other than the one that \
+                 armed the gate; the measurement above is not trustworthy",
+                m.foreign_deallocs
+            );
+        }
+        assert!(!$crate::is_armed(), "gate left armed after the loop");
+    };
 }
 
 #[cfg(test)]

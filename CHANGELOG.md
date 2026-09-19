@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this section instead.
 
 - **The measurement behind that recommendation now lives in this repository, with its controls.**
-  Three test binaries differing from one another in exactly one line — the
-  `#[global_allocator]` — run §2's own shapes: a 4 KiB secret grown one byte past its capacity
+  Three test binaries differing from one another only in the `#[global_allocator]` they
+  install run §2's own shapes: a 4 KiB secret grown one byte past its capacity
   through `with_secret_mut` with a neighbour behind it, and a pre-sized 4096-byte buffer
   truncated to 2048 and then shrunk. Each counts occurrences of a pattern planted in the secret
   among the bytes of every block released while the workload runs. `tests/heap_residue.rs`

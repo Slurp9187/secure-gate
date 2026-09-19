@@ -39,10 +39,46 @@ worthless.
 | `tests/residue_nowipe.rs` | `NoWipe<Spy<System>>` | the pattern is still found **in the composed position** |
 | `tests/residue_subject.rs` | `YourAlloc<Spy<System>>` | whatever you are measuring |
 
-Put the workload and the shared assertions in `tests/residue_support/mod.rs` — a subdirectory
-is not built as a test target, so all three binaries include the same file and cannot drift
-apart. The crate-level rustdoc has all four files written out; `cargo doc --open` and copy
-them.
+Put the workload in `tests/residue_support/mod.rs` — a subdirectory is not built as a test
+target, so all three binaries include the same file and cannot drift apart. Each binary is
+then that `mod` line and one `residue_binary!` invocation, which generates the
+`#[global_allocator]` for its role and the single `#[test]` with that role's assertions. The
+three differ in exactly one argument:
+
+```rust
+// tests/residue_control.rs
+mod residue_support;
+secure_gate_residue_probe::residue_binary! {
+    control,
+    workloads: residue_support::WORKLOADS,
+    planted_len: residue_support::SECRET_LEN,
+}
+
+// tests/residue_nowipe.rs
+mod residue_support;
+secure_gate_residue_probe::residue_binary! {
+    nowipe,
+    workloads: residue_support::WORKLOADS,
+    planted_len: residue_support::SECRET_LEN,
+}
+
+// tests/residue_subject.rs
+mod residue_support;
+use secure_gate_residue_probe::Spy;
+use std::alloc::System;
+secure_gate_residue_probe::residue_binary! {
+    subject: YourAlloc<Spy<System>> = YourAlloc(Spy::new(System)),
+    workloads: residue_support::WORKLOADS,
+}
+```
+
+`workloads` is anything that iterates `(&str, fn())` pairs; `planted_len` is the byte length
+you hand to `plant`, from which the floor the controls must reach is derived. A spy on an
+allocator other than `System` takes `inner: Type = initializer` on the two controls. The
+crate-level rustdoc has the support module written out and the macro's documentation shows
+the hand-written form each invocation expands to; `cargo doc --open` and copy them. The
+macro cannot make the three files one file — nothing can, for the reason above — it makes
+each of them two lines.
 
 ### Why three and not two
 
@@ -115,7 +151,11 @@ separate sentences.
 - `Spy<A: GlobalAlloc>` — the probe. Generic, so `Spy(System)`, `Spy(Jemalloc)` and
   `Spy(MyArena)` all work. Install it **beneath** the allocator under test.
 - `NoWipe<A: GlobalAlloc>` — the second control's composition, with no behaviour of its own.
+- `residue_binary!` — one invocation per test file: `control`, `nowipe`, or
+  `subject: Type = initializer`, plus `workloads:` and, for the controls, `planted_len:`.
+  Generates that role's `#[global_allocator]` and its one `#[test]`.
 - `measure(label, f) -> Measurement` — runs `f` with the probe counting and prints a line.
+  What the macro calls; use it directly if your layout differs.
 - `Measurement { blocks, blocks_with_pattern, pattern_hits, bytes_inspected, foreign_deallocs }`
 - `PATTERN`, `plant(&mut [u8])`, `planted_hits(len)`, `count_pattern(&[u8])`, `is_armed()`
 

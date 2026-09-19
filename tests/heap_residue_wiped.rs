@@ -8,8 +8,9 @@
 //! `heap_residue.rs` establishes the pattern exists to find; `heap_residue_nowipe.rs`
 //! establishes the probe sees it in *this* position. Read all three or none.
 //!
-//! See `tests/residue_support/mod.rs` for the spy, the workloads and why each binary is
-//! exactly one aggregate `#[test]`.
+//! See `tests/residue_support/mod.rs` for the workloads, and `residue_binary!`'s own
+//! documentation for what the invocation expands to and why each binary is exactly one
+//! aggregate `#[test]`.
 //!
 //! # What this does not test
 //!
@@ -24,35 +25,11 @@
 
 mod residue_support;
 
-use residue_support::WORKLOADS;
-use secure_gate_residue_probe::{Spy, is_armed, measure};
+use secure_gate_residue_probe::Spy;
 use std::alloc::System;
 use zeroizing_alloc::ZeroAlloc;
 
-#[global_allocator]
-static ALLOC: ZeroAlloc<Spy<System>> = ZeroAlloc(Spy::new(System));
-
-#[test]
-fn nothing_the_hazard_abandons_survives_the_wipe() {
-    for (label, workload) in WORKLOADS {
-        let m = measure(label, workload);
-        assert_eq!(
-            m.pattern_hits, 0,
-            "{label}: {} of {} released blocks still carried the planted pattern ({} \
-             occurrences)",
-            m.blocks_with_pattern, m.blocks, m.pattern_hits
-        );
-        assert!(
-            m.blocks > 0,
-            "{label}: zero pattern hits with zero blocks inspected is a blind probe, not a \
-             wipe"
-        );
-        assert_eq!(
-            m.foreign_deallocs, 0,
-            "{label}: {} deallocations arrived from a thread other than the one that armed \
-             the gate; the measurement above is not trustworthy",
-            m.foreign_deallocs
-        );
-    }
-    assert!(!is_armed(), "gate left armed after the loop");
+secure_gate_residue_probe::residue_binary! {
+    subject: ZeroAlloc<Spy<System>> = ZeroAlloc(Spy::new(System)),
+    workloads: residue_support::WORKLOADS,
 }

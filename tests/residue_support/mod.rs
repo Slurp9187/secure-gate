@@ -1,8 +1,9 @@
 //! secure-gate's own workloads for the three residue tests, so the subject and its controls
 //! cannot drift apart.
 //!
-//! `heap_residue.rs`, `heap_residue_nowipe.rs` and `heap_residue_wiped.rs` differ from each
-//! other in exactly one line — the `#[global_allocator]` — and everything measured here is
+//! `heap_residue.rs`, `heap_residue_nowipe.rs` and `heap_residue_wiped.rs` are each one
+//! `residue_binary!` invocation and differ from each other in exactly one argument — the
+//! role, which is the `#[global_allocator]` each installs — and everything measured here is
 //! secure-gate's own shape. A `#[global_allocator]` is process-wide, so each is its own
 //! binary; Cargo builds one per `tests/*.rs`, and a subdirectory like this one is not built
 //! as a test.
@@ -14,7 +15,8 @@
 //! global allocator, installed the way an application installs one, covers it. This file
 //! doubles as the worked example a consumer copies.
 //!
-//! The spy allocator, the planted pattern, the foreign-thread guard and `measure()` all now
+//! The spy allocator, the planted pattern, the foreign-thread guard, `measure()` and the
+//! `residue_binary!` macro that generates each binary's allocator and its single test all
 //! live in `secure-gate-residue-probe` (`residue-probe/`), a dev-dependency of this crate.
 //! That crate's own docs cover why the spy reads from offset 0, why it must not allocate,
 //! and what a probe of this shape structurally cannot prove (dead-store elimination under an
