@@ -1,0 +1,170 @@
+# rustc rustc 1.85.1 (4eb161250 2025-03-15), Thu Sep 17 16:59:12 UTC 2026
+
+=========== A: wipe shape in the binary crate, lto = "fat"
+  CONTROL (no PGO):   recover: 64B pattern bytes 0/16 same_block=false; 4096B pattern bytes 0/16 same_block=true
+  remarks:
+      2     pgo-icall-prom (success): Promote indirect call to _ZN7probe_a11clear_bytes17hdb8fa6906e0873e4E with count 600000 out of 600000
+      2     pgo-icall-prom (success): Promote indirect call to _ZN7probe_a11clear_bytes17hdb8fa6906e0873e4E with count 6000000 out of 6000000
+  OPTIMIZED PGO:      recover: 64B pattern bytes 16/16 same_block=true; 4096B pattern bytes 16/16 same_block=true
+    7recover: zero-memsets=2 guards=3 direct=0 indirect=2 free=2
+          %20 = icmp eq ptr %19, @_ZN7probe_a11clear_bytes17hdb8fa6906e0873e4E
+          call void %19(ptr noundef nonnull %_10.i.i, i64 noundef %size) #53
+          call void @free(ptr noundef nonnull %_10.i.i) #53
+          call void @llvm.memset.p0.i64(ptr noundef nonnull align 1 dereferenceable(64) %_10.i.i12, i8 0, i64 64, i1 false), !prof !166
+          %26 = icmp eq ptr %25, @_ZN7probe_a11clear_bytes17hdb8fa6906e0873e4E
+          call void @llvm.memset.p0.i64(ptr nonnull align 1 %_10.i.i12, i8 0, i64 %size, i1 false), !prof !166
+          %28 = icmp eq ptr %27, @_ZN7probe_a11clear_bytes17hdb8fa6906e0873e4E
+          call void %29(ptr noundef nonnull %_10.i.i12, i64 noundef %size) #53
+    10churn_bulk: zero-memsets=0 guards=1 direct=0 indirect=1 free=1
+          %3 = icmp eq ptr %2, @_ZN7probe_a11clear_bytes17hdb8fa6906e0873e4E
+          call void %2(ptr noundef nonnull %self2.i.i.i.i4.i, i64 noundef %_5.i.i.i.i1.i) #53, !noalias !160
+          call void @free(ptr noundef nonnull %self2.i.i.i.i4.i) #53, !noalias !160
+
+=========== A: wipe shape in the binary crate, lto = "thin"
+  CONTROL (no PGO):   recover: 64B pattern bytes 0/16 same_block=false; 4096B pattern bytes 0/16 same_block=true
+  remarks:
+      2     pgo-icall-prom (success): Promote indirect call to _ZN7probe_a11clear_bytes17hbfb47c05bee918b6E with count 600000 out of 600000
+      2     pgo-icall-prom (success): Promote indirect call to _ZN7probe_a11clear_bytes17hbfb47c05bee918b6E with count 6000000 out of 6000000
+  OPTIMIZED PGO:      recover: 64B pattern bytes 0/16 same_block=false; 4096B pattern bytes 0/16 same_block=true
+    7recover: zero-memsets=0 guards=4 direct=0 indirect=4 free=4
+          %4 = icmp eq ptr %3, @_ZN7probe_a11clear_bytes17hbfb47c05bee918b6E
+          call void %3(ptr noundef nonnull %_10.i.i.us, i64 noundef 64) #23
+          call void @free(ptr noundef nonnull %_10.i.i.us) #23
+          %10 = icmp eq ptr %9, @_ZN7probe_a11clear_bytes17hbfb47c05bee918b6E
+          call void %9(ptr noundef nonnull %calloc, i64 noundef 64) #23
+          call void @free(ptr noundef nonnull %calloc) #23
+          %30 = icmp eq ptr %29, @_ZN7probe_a11clear_bytes17hbfb47c05bee918b6E
+          call void %29(ptr noundef nonnull %_10.i.i, i64 noundef %size) #23
+    10churn_bulk: zero-memsets=0 guards=1 direct=0 indirect=1 free=1
+          %3 = icmp eq ptr %2, @_ZN7probe_a11clear_bytes17hbfb47c05bee918b6E
+          call void %2(ptr noundef nonnull %self2.i.i.i.i4.i, i64 noundef %_5.i.i.i.i1.i) #23, !noalias !164
+          call void @free(ptr noundef nonnull %self2.i.i.i.i4.i) #23, !noalias !164
+
+=========== A: wipe shape in the binary crate, lto = false
+  CONTROL (no PGO):   recover: 64B pattern bytes 0/16 same_block=false; 4096B pattern bytes 0/16 same_block=true
+  remarks:
+      2     pgo-icall-prom (success): Promote indirect call to _ZN7probe_a11clear_bytes17ha266b42228e83e83E with count 600000 out of 600000
+      2     pgo-icall-prom (success): Promote indirect call to _ZN7probe_a11clear_bytes17ha266b42228e83e83E with count 6000000 out of 6000000
+  OPTIMIZED PGO:      recover: 64B pattern bytes 16/16 same_block=true; 4096B pattern bytes 16/16 same_block=true
+    7recover: zero-memsets=2 guards=3 direct=0 indirect=2 free=3
+          %21 = icmp eq ptr %20, @_ZN7probe_a11clear_bytes17ha266b42228e83e83E
+          call void @free(ptr noundef nonnull %_0.sroa.0.0.i.i) #22
+          call void %20(ptr noundef nonnull %_0.sroa.0.0.i.i, i64 noundef %size) #22
+          call void @free(ptr noundef nonnull %_0.sroa.0.0.i.i) #22
+          call void @llvm.memset.p0.i64(ptr noundef nonnull align 1 dereferenceable(64) %_0.sroa.0.0.i.i13, i8 0, i64 64, i1 false), !prof !139
+          %29 = icmp eq ptr %28, @_ZN7probe_a11clear_bytes17ha266b42228e83e83E
+          call void @llvm.memset.p0.i64(ptr nonnull align 1 %_0.sroa.0.0.i.i13, i8 0, i64 %size, i1 false), !prof !139
+          %31 = icmp eq ptr %30, @_ZN7probe_a11clear_bytes17ha266b42228e83e83E
+    10churn_bulk: zero-memsets=0 guards=1 direct=0 indirect=1 free=1
+          %3 = icmp eq ptr %2, @_ZN7probe_a11clear_bytes17ha266b42228e83e83E
+          call void %2(ptr noundef nonnull %self2.i.i.i.i4.i, i64 noundef %_5.i.i.i.i1.i) #22, !noalias !128
+          call void @free(ptr noundef nonnull %self2.i.i.i.i4.i) #22, !noalias !128
+
+=========== B: cross-crate, callee exported, lto = "fat"
+  CONTROL (no PGO):   recover: 64B pattern bytes 0/16 same_block=false; 4096B pattern bytes 0/16 same_block=true
+  remarks:
+      2     pgo-icall-prom (missed): Cannot promote indirect call: target with md5sum 4425839764928533017 not found
+  OPTIMIZED PGO:      recover: 64B pattern bytes 16/16 same_block=true; 4096B pattern bytes 16/16 same_block=true
+    7recover: zero-memsets=2 guards=3 direct=0 indirect=2 free=2
+          %20 = icmp eq ptr %19, @wiper_clear_bytes
+          call void %19(ptr noundef nonnull %_10.i.i, i64 noundef %size) #52
+          call void @free(ptr noundef nonnull %_10.i.i) #52
+          call void @llvm.memset.p0.i64(ptr nonnull align 1 %_10.i.i9, i8 0, i64 %size, i1 false), !prof !162
+          %26 = icmp eq ptr %25, @wiper_clear_bytes
+          call void @llvm.memset.p0.i64(ptr noundef nonnull align 1 dereferenceable(64) %_10.i.i9, i8 0, i64 64, i1 false), !prof !162
+          %28 = icmp eq ptr %27, @wiper_clear_bytes
+          call void %29(ptr noundef nonnull %_10.i.i9, i64 noundef %size) #52
+    10churn_bulk: zero-memsets=0 guards=1 direct=0 indirect=1 free=1
+          %3 = icmp eq ptr %2, @wiper_clear_bytes
+          call void %2(ptr noundef nonnull %self2.i.i.i.i4.i, i64 noundef %_5.i.i.i.i1.i) #52, !noalias !156
+          call void @free(ptr noundef nonnull %self2.i.i.i.i4.i) #52, !noalias !156
+
+=========== B: cross-crate, callee exported, lto = "thin"
+  CONTROL (no PGO):   recover: 64B pattern bytes 0/16 same_block=false; 4096B pattern bytes 0/16 same_block=true
+  remarks:
+      2     pgo-icall-prom (missed): Cannot promote indirect call: target with md5sum 4425839764928533017 not found
+  OPTIMIZED PGO:      recover: 64B pattern bytes 0/16 same_block=false; 4096B pattern bytes 0/16 same_block=true
+    7recover: zero-memsets=0 guards=4 direct=0 indirect=4 free=4
+          %4 = icmp eq ptr %3, @wiper_clear_bytes
+          call void %3(ptr noundef nonnull %_10.i.i.us, i64 noundef 64) #23
+          call void @free(ptr noundef nonnull %_10.i.i.us) #23
+          %10 = icmp eq ptr %9, @wiper_clear_bytes
+          call void %9(ptr noundef nonnull %calloc, i64 noundef 64) #23
+          call void @free(ptr noundef nonnull %calloc) #23
+          %30 = icmp eq ptr %29, @wiper_clear_bytes
+          call void %29(ptr noundef nonnull %_10.i.i, i64 noundef %size) #23
+    10churn_bulk: zero-memsets=0 guards=1 direct=0 indirect=1 free=1
+          %3 = icmp eq ptr %2, @wiper_clear_bytes
+          call void %2(ptr noundef nonnull %self2.i.i.i.i4.i, i64 noundef %_5.i.i.i.i1.i) #23, !noalias !160
+          call void @free(ptr noundef nonnull %self2.i.i.i.i4.i) #23, !noalias !160
+
+=========== B: cross-crate, callee exported, lto = false
+  CONTROL (no PGO):   recover: 64B pattern bytes 0/16 same_block=false; 4096B pattern bytes 0/16 same_block=true
+  remarks:
+      2     pgo-icall-prom (missed): Cannot promote indirect call: target with md5sum 4425839764928533017 not found
+  OPTIMIZED PGO:      recover: 64B pattern bytes 0/16 same_block=true; 4096B pattern bytes 0/16 same_block=true
+    7recover: zero-memsets=2 guards=0 direct=0 indirect=2 free=2
+          call void %20(ptr noundef nonnull %_0.sroa.0.0.i.i, i64 noundef %size) #21, !prof !135
+          call void @free(ptr noundef nonnull %_0.sroa.0.0.i.i) #21
+          call void @llvm.memset.p0.i64(ptr noundef nonnull align 1 dereferenceable(64) %_0.sroa.0.0.i.i10, i8 0, i64 64, i1 false), !prof !134
+          call void @llvm.memset.p0.i64(ptr nonnull align 1 %_0.sroa.0.0.i.i10, i8 0, i64 %size, i1 false), !prof !134
+          call void %26(ptr noundef nonnull %_0.sroa.0.0.i.i10, i64 noundef %size) #21, !prof !135
+          call void @free(ptr noundef nonnull %_0.sroa.0.0.i.i10) #21
+    10churn_bulk: zero-memsets=0 guards=0 direct=0 indirect=1 free=1
+          call void %2(ptr noundef nonnull %self2.i.i.i.i4.i, i64 noundef %_5.i.i.i.i1.i) #21, !prof !93, !noalias !123
+          call void @free(ptr noundef nonnull %self2.i.i.i.i4.i) #21, !noalias !123
+
+=========== C: cross-crate, callee private, lto = "fat"
+  CONTROL (no PGO):   recover: 64B pattern bytes 0/16 same_block=false; 4096B pattern bytes 0/16 same_block=true
+  remarks:
+      2     pgo-icall-prom (missed): Cannot promote indirect call: target with md5sum 12943098207881436745 not found
+  OPTIMIZED PGO:      recover: 64B pattern bytes 16/16 same_block=true; 4096B pattern bytes 16/16 same_block=true
+    7recover: zero-memsets=2 guards=3 direct=0 indirect=2 free=2
+          %20 = icmp eq ptr %19, @_ZN7wiper_C11clear_bytes17h5401c86da41cedecE
+          call void %19(ptr noundef nonnull %_10.i.i, i64 noundef %size) #52
+          call void @free(ptr noundef nonnull %_10.i.i) #52
+          call void @llvm.memset.p0.i64(ptr nonnull align 1 %_10.i.i9, i8 0, i64 %size, i1 false), !prof !162
+          %26 = icmp eq ptr %25, @_ZN7wiper_C11clear_bytes17h5401c86da41cedecE
+          call void @llvm.memset.p0.i64(ptr noundef nonnull align 1 dereferenceable(64) %_10.i.i9, i8 0, i64 64, i1 false), !prof !162
+          %28 = icmp eq ptr %27, @_ZN7wiper_C11clear_bytes17h5401c86da41cedecE
+          call void %29(ptr noundef nonnull %_10.i.i9, i64 noundef %size) #52
+    10churn_bulk: zero-memsets=0 guards=1 direct=0 indirect=1 free=1
+          %3 = icmp eq ptr %2, @_ZN7wiper_C11clear_bytes17h5401c86da41cedecE
+          call void %2(ptr noundef nonnull %self2.i.i.i.i4.i, i64 noundef %_5.i.i.i.i1.i) #52, !noalias !156
+          call void @free(ptr noundef nonnull %self2.i.i.i.i4.i) #52, !noalias !156
+
+=========== C: cross-crate, callee private, lto = "thin"
+  CONTROL (no PGO):   recover: 64B pattern bytes 0/16 same_block=false; 4096B pattern bytes 0/16 same_block=true
+  remarks:
+      2     pgo-icall-prom (missed): Cannot promote indirect call: target with md5sum 1271865038667819105 not found
+  OPTIMIZED PGO:      recover: 64B pattern bytes 0/16 same_block=false; 4096B pattern bytes 0/16 same_block=true
+    7recover: zero-memsets=0 guards=4 direct=0 indirect=4 free=4
+          %4 = icmp eq ptr %3, @_ZN7wiper_C11clear_bytes17h31f34b2bc98e9e14E
+          call void %3(ptr noundef nonnull %_10.i.i.us, i64 noundef 64) #23
+          call void @free(ptr noundef nonnull %_10.i.i.us) #23
+          %10 = icmp eq ptr %9, @_ZN7wiper_C11clear_bytes17h31f34b2bc98e9e14E
+          call void %9(ptr noundef nonnull %calloc, i64 noundef 64) #23
+          call void @free(ptr noundef nonnull %calloc) #23
+          %30 = icmp eq ptr %29, @_ZN7wiper_C11clear_bytes17h31f34b2bc98e9e14E
+          call void %29(ptr noundef nonnull %_10.i.i, i64 noundef %size) #23
+    10churn_bulk: zero-memsets=0 guards=1 direct=0 indirect=1 free=1
+          %3 = icmp eq ptr %2, @_ZN7wiper_C11clear_bytes17h31f34b2bc98e9e14E
+          call void %2(ptr noundef nonnull %self2.i.i.i.i4.i, i64 noundef %_5.i.i.i.i1.i) #23, !noalias !160
+          call void @free(ptr noundef nonnull %self2.i.i.i.i4.i) #23, !noalias !160
+
+=========== C: cross-crate, callee private, lto = false
+  CONTROL (no PGO):   recover: 64B pattern bytes 0/16 same_block=false; 4096B pattern bytes 0/16 same_block=true
+  remarks:
+      2     pgo-icall-prom (missed): Cannot promote indirect call: target with md5sum 16327564401977359894 not found
+  OPTIMIZED PGO:      recover: 64B pattern bytes 0/16 same_block=true; 4096B pattern bytes 0/16 same_block=true
+    7recover: zero-memsets=2 guards=0 direct=0 indirect=2 free=2
+          call void %20(ptr noundef nonnull %_0.sroa.0.0.i.i, i64 noundef %size) #21, !prof !135
+          call void @free(ptr noundef nonnull %_0.sroa.0.0.i.i) #21
+          call void @llvm.memset.p0.i64(ptr noundef nonnull align 1 dereferenceable(64) %_0.sroa.0.0.i.i10, i8 0, i64 64, i1 false), !prof !134
+          call void @llvm.memset.p0.i64(ptr nonnull align 1 %_0.sroa.0.0.i.i10, i8 0, i64 %size, i1 false), !prof !134
+          call void %26(ptr noundef nonnull %_0.sroa.0.0.i.i10, i64 noundef %size) #21, !prof !135
+          call void @free(ptr noundef nonnull %_0.sroa.0.0.i.i10) #21
+    10churn_bulk: zero-memsets=0 guards=0 direct=0 indirect=1 free=1
+          call void %2(ptr noundef nonnull %self2.i.i.i.i4.i, i64 noundef %_5.i.i.i.i1.i) #21, !prof !93, !noalias !123
+          call void @free(ptr noundef nonnull %self2.i.i.i.i4.i) #21, !noalias !123
+FINAL DONE

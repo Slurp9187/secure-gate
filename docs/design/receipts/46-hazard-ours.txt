@@ -1,0 +1,44 @@
+b186c53 Merge pull request #10 from Slurp9187/claude/pgo-threshold-coupling
+
+=========== D: secure-gate-zalloc (main b186c53), lto = "fat"
+  CONTROL (no PGO):   recover: 64B pattern bytes 0/16 same_block=true; 4096B pattern bytes 0/16 same_block=true
+  remarks: 0 icall-prom lines (nothing to promote in this design)
+  OPTIMIZED PGO:      recover: 64B pattern bytes 0/16 same_block=true; 4096B pattern bytes 0/16 same_block=true
+    recover: volatile_stores=18 zero-memsets=2 asm=4 free=3
+          call void asm sideeffect "", "r,~{memory}"(ptr nonnull %0) #54, !srcloc !78
+          call void asm sideeffect "", "r,~{memory}"(ptr nonnull %0) #54, !srcloc !78
+          call void @llvm.memset.p0.i64(ptr nonnull align 1 %_10.i.i, i8 0, i64 %size, i1 false), !prof !170
+          call void asm sideeffect inteldialect "/* ${0:q} */", "r,~{memory}"(ptr nonnull %_10.i.i) #54, !srcloc !124
+          call void @free(ptr noundef nonnull %_10.i.i) #54
+          store volatile i64 0, ptr %_16.i.i, align 8
+          call void @free(ptr noundef %_10.i.i) #54
+          call void @llvm.memset.p0.i64(ptr nonnull align 1 %_10.i.i10, i8 0, i64 %size, i1 false), !prof !170
+
+=========== D: secure-gate-zalloc (main b186c53), lto = "thin"
+  CONTROL (no PGO):   recover: 64B pattern bytes 0/16 same_block=true; 4096B pattern bytes 0/16 same_block=true
+  remarks: 0 icall-prom lines (nothing to promote in this design)
+  OPTIMIZED PGO:      recover: 64B pattern bytes 0/16 same_block=true; 4096B pattern bytes 0/16 same_block=true
+    recover: volatile_stores=20 zero-memsets=2 asm=4 free=3
+          call void asm sideeffect "", "r,~{memory}"(ptr nonnull %0) #23, !srcloc !64
+          call void asm sideeffect "", "r,~{memory}"(ptr nonnull %0) #23, !srcloc !64
+          call void @llvm.memset.p0.i64(ptr nonnull align 1 %_10.i.i, i8 0, i64 %size, i1 false), !prof !174
+          call void asm sideeffect inteldialect "/* ${0:q} */", "r,~{memory}"(ptr nonnull %_10.i.i) #23, !srcloc !127
+          call void @free(ptr noundef nonnull %_10.i.i) #23
+          store volatile i64 0, ptr %_16.i.i, align 8
+          call void @free(ptr noundef %_10.i.i) #23
+          call void @llvm.memset.p0.i64(ptr nonnull align 1 %_10.i.i10, i8 0, i64 %size, i1 false), !prof !174
+
+=========== D: secure-gate-zalloc (main b186c53), lto = false
+  CONTROL (no PGO):   recover: 64B pattern bytes 0/16 same_block=true; 4096B pattern bytes 0/16 same_block=true
+  remarks: 0 icall-prom lines (nothing to promote in this design)
+  OPTIMIZED PGO:      recover: 64B pattern bytes 0/16 same_block=true; 4096B pattern bytes 0/16 same_block=true
+    recover: volatile_stores=20 zero-memsets=2 asm=4 free=3
+          call void asm sideeffect "", "r,~{memory}"(ptr nonnull %0) #23, !srcloc !57
+          call void asm sideeffect "", "r,~{memory}"(ptr nonnull %0) #23, !srcloc !57
+          call void @llvm.memset.p0.i64(ptr nonnull align 1 %_0.sroa.0.0.i.i, i8 0, i64 %size, i1 false), !prof !144
+          call void asm sideeffect inteldialect "/* ${0:q} */", "r,~{memory}"(ptr nonnull %_0.sroa.0.0.i.i) #23, !srcloc !95
+          call void @free(ptr noundef nonnull %_0.sroa.0.0.i.i) #23
+          store volatile i64 0, ptr %_16.i.i, align 8
+          call void @free(ptr noundef %_0.sroa.0.0.i.i) #23
+          call void @llvm.memset.p0.i64(ptr nonnull align 1 %_0.sroa.0.0.i.i11, i8 0, i64 %size, i1 false), !prof !144
+OURS DONE

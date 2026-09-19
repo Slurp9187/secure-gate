@@ -1,0 +1,20 @@
+5ef4f5a docs: the residue test is written, and what it measured
+Thu Sep 17 19:43:16 UTC 2026
+=== subject + control
+buffer 0x799618000ce0 -> 0x799618002d20 (moved: true); pinned block at the inner allocator: seen, all zero; readout: 0/4032 pattern bytes, 8 non-zero of 4096, same block back: true
+test the_buffer_abandoned_by_growth_through_with_secret_mut_reaches_the_inner_allocator_wiped ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+buffer 0x76c7d0000ce0 -> 0x76c7d0002d20 (moved: true); readout: 4032/4032 pattern bytes, 4072 non-zero of 4096, same block back: true
+test without_the_allocator_the_abandoned_buffer_still_holds_the_secret ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+=== full suite
+      2 test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      2 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+      1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.84s
+      1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.10s
+      1 test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+      1 test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+      1 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+=== clippy: 0; fmt: ok

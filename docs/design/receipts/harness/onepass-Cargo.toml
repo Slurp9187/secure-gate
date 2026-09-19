@@ -1,0 +1,11 @@
+[package]
+name = "p_onepass"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+zeroizing-alloc = "0.1.1"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
