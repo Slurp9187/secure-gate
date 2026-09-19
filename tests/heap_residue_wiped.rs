@@ -24,12 +24,13 @@
 
 mod residue_support;
 
-use residue_support::{ARMED, Spy, WORKLOADS, measure};
-use std::sync::atomic::Ordering;
+use residue_support::WORKLOADS;
+use secure_gate_residue_probe::{Spy, is_armed, measure};
+use std::alloc::System;
 use zeroizing_alloc::ZeroAlloc;
 
 #[global_allocator]
-static ALLOC: ZeroAlloc<Spy> = ZeroAlloc(Spy);
+static ALLOC: ZeroAlloc<Spy<System>> = ZeroAlloc(Spy::new(System));
 
 #[test]
 fn nothing_the_hazard_abandons_survives_the_wipe() {
@@ -39,7 +40,7 @@ fn nothing_the_hazard_abandons_survives_the_wipe() {
             m.pattern_hits, 0,
             "{label}: {} of {} released blocks still carried the planted pattern ({} \
              occurrences)",
-            m.pattern_blocks, m.blocks, m.pattern_hits
+            m.blocks_with_pattern, m.blocks, m.pattern_hits
         );
         assert!(
             m.blocks > 0,
@@ -53,8 +54,5 @@ fn nothing_the_hazard_abandons_survives_the_wipe() {
             m.foreign_deallocs
         );
     }
-    assert!(
-        !ARMED.load(Ordering::SeqCst),
-        "gate left armed after the loop"
-    );
+    assert!(!is_armed(), "gate left armed after the loop");
 }

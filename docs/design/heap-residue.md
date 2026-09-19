@@ -2,7 +2,7 @@
 
 Status: accepted
 Section it serves: [`SECURITY.md`](../../SECURITY.md) §2, *Heap-reallocation residue*
-Artifacts: `tests/residue_support/mod.rs`, `tests/heap_residue.rs`,
+Artifacts: `residue-probe/` (the reusable probe crate), `tests/residue_support/mod.rs`, `tests/heap_residue.rs`,
 `tests/heap_residue_nowipe.rs`, `tests/heap_residue_wiped.rs`,
 `examples/zeroizing_alloc_app.rs`, `tools/pgo_allocator_compare.sh`,
 `docs/design/receipts/`
@@ -25,8 +25,10 @@ choice.
 
 Each file under `tests/` compiles to its own binary, which is what lets three
 `#[global_allocator]` declarations coexist in one crate. The three binaries differ from one
-another in exactly one line — the allocator — and everything they measure lives in the shared
-`tests/residue_support/mod.rs`.
+another in exactly one line — the allocator. The probe mechanism itself — the spy, the
+non-wiping wrapper, the pattern counting — lives in the `secure-gate-residue-probe` crate so a
+downstream application can run the same three configurations against its own workload;
+`tests/residue_support/mod.rs` holds only this crate's §2 workload shapes.
 
 | Binary | Allocator | What it proves |
 |---|---|---|

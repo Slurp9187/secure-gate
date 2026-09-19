@@ -416,3 +416,40 @@ jobs:
           --test heap_residue_wiped
           -Z build-std
           --target x86_64-unknown-linux-gnu
+
+  # ---------------------------------------------------------------------------
+  # Residue-probe job — test support crate
+  #
+  # The residue-probe crate is excluded from the root workspace and therefore
+  # not touched by any of the main jobs. This job independently builds, tests,
+  # lints, and fmt-checks the crate to ensure it remains valid.
+  # ---------------------------------------------------------------------------
+  residue-probe:
+    name: Residue-probe – build, test, lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: residue-probe
+
+      - name: cargo build
+        run: cargo build --manifest-path residue-probe/Cargo.toml
+
+      - name: cargo test
+        run: cargo test --manifest-path residue-probe/Cargo.toml
+
+      - name: cargo clippy
+        run: cargo clippy --manifest-path residue-probe/Cargo.toml --all-targets -- -D warnings
+
+      - name: cargo fmt --check
+        run: cargo fmt --manifest-path residue-probe/Cargo.toml --check

@@ -1,0 +1,21 @@
+# Its own `[workspace]` table: this crate installs a `#[global_allocator]` in its
+# consumers' test binaries and depends on nothing, so it has no business being pulled
+# into the parent package's dependency graph. The parent excludes it in turn.
+[workspace]
+
+[package]
+name = "secure-gate-residue-probe"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Slurp9187/secure-gate"
+description = "A GlobalAlloc probe that reports whether a planted byte pattern is still present in heap blocks at the moment they are released, for measuring allocator-level residue under a three-configuration discipline."
+keywords = ["allocator", "memory", "zeroize", "testing", "security"]
+categories = ["development-tools::testing", "memory-management", "cryptography"]
+readme = "README.md"
+
+# Deliberately empty. This is a `GlobalAlloc` probe; anything it pulled in would
+# allocate inside the window it is measuring, and a consumer measuring their own crate
+# should not have to adopt someone else's dependency tree to do it.
+[dependencies]

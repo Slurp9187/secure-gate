@@ -14,14 +14,16 @@
 
 mod residue_support;
 
-use residue_support::{ARMED, NoWipe, PLANTED_HITS, Spy, WORKLOADS, measure};
-use std::sync::atomic::Ordering;
+use residue_support::{SECRET_LEN, WORKLOADS};
+use secure_gate_residue_probe::{NoWipe, Spy, is_armed, measure, planted_hits};
+use std::alloc::System;
 
 #[global_allocator]
-static ALLOC: NoWipe<Spy> = NoWipe(Spy);
+static ALLOC: NoWipe<Spy<System>> = NoWipe::new(Spy::new(System));
 
 #[test]
 fn the_composed_position_still_sees_the_pattern_when_nothing_wipes() {
+    let expected_hits = planted_hits(SECRET_LEN);
     for (label, workload) in WORKLOADS {
         let m = measure(label, workload);
         assert!(
@@ -29,10 +31,10 @@ fn the_composed_position_still_sees_the_pattern_when_nothing_wipes() {
             "{label}: no block released -- the workload did not run"
         );
         assert!(
-            m.pattern_hits >= PLANTED_HITS,
+            m.pattern_hits >= expected_hits,
             "{label}: composed under a non-wiping wrapper, {} blocks released and only {} \
              occurrences of the planted pattern were recovered (expected at least \
-             {PLANTED_HITS}). The probe is not observing the position it claims to, so a \
+             {expected_hits}). The probe is not observing the position it claims to, so a \
              clean result from heap_residue_wiped.rs proves nothing",
             m.blocks,
             m.pattern_hits
@@ -44,8 +46,5 @@ fn the_composed_position_still_sees_the_pattern_when_nothing_wipes() {
             m.foreign_deallocs
         );
     }
-    assert!(
-        !ARMED.load(Ordering::SeqCst),
-        "gate left armed after the loop"
-    );
+    assert!(!is_armed(), "gate left armed after the loop");
 }

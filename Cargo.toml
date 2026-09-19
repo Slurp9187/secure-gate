@@ -72,6 +72,11 @@ trybuild = "1.0"
 # that added the `read_volatile(&raw const ptr)` pointer barrier in `dealloc`; `"0.1"` resolves
 # `0.1.0`, which lacks it, just as happily.
 zeroizing-alloc = "0.1.1"
+# The spy allocator, planted pattern and `measure()` behind the three `heap_residue*`
+# binaries, factored out so this crate and the harness it was ported from share one copy of
+# the mechanism instead of two that can drift. A path-only dev-dependency: it is dropped from
+# the published manifest, and `tests/` does not ship, so it cannot reach a consumer's build.
+secure-gate-residue-probe = { path = "residue-probe" }
 
 [package.metadata.docs.rs]
 all-features = true
@@ -151,7 +156,8 @@ harness = false
 name = "serde"
 harness = false
 
-# The nested fuzz crate declares its own `[workspace]`; excluding it here keeps
-# `cargo` from trying to pull libfuzzer into this package's graph.
+# The nested `fuzz` and `residue-probe` crates each declare their own `[workspace]`;
+# excluding them here keeps `cargo` from trying to pull libfuzzer -- or a crate whose whole
+# job is to install a `#[global_allocator]` -- into this package's graph.
 [workspace]
-exclude = ["fuzz"]
+exclude = ["fuzz", "residue-probe"]
