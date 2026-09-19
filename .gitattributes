@@ -7,3 +7,8 @@
 *.js text eol=lf
 *.ts text eol=lf
 # Add more extensions as needed for your project
+
+# Captured evidence: byte-for-byte custody. Never normalise these. The SHA-256 values
+# recorded in docs/design/receipts/README.md are of these exact bytes, so a line-ending
+# conversion on checkout would silently break verification on the platform that did it.
+docs/design/receipts/** -text

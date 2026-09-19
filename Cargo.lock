@@ -721,12 +721,18 @@ dependencies = [
  "criterion",
  "proptest",
  "rand 0.10.2",
+ "secure-gate-residue-probe",
  "serde",
  "serde_json",
  "subtle",
  "trybuild",
  "zeroize",
+ "zeroizing-alloc",
 ]
+
+[[package]]
+name = "secure-gate-residue-probe"
+version = "0.1.0"
 
 [[package]]
 name = "serde"
@@ -1088,6 +1094,12 @@ dependencies = [
  "quote",
  "syn 2.0.119",
 ]
+
+[[package]]
+name = "zeroizing-alloc"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b5564c80013ee0edbfc4e4d7d66d1a5a44b8adaffbf0103069f51ce0efc5031"
 
 [[package]]
 name = "zmij"

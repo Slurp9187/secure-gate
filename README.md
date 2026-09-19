@@ -386,9 +386,8 @@ line. See `SECURITY.md` for the realloc threat-model note and operational mitiga
 Three universal in-memory-secret limits apply (same across C, C++, Go, and
 Rust): **stack-move residue** (mitigated by `Fixed::new_with`, pass-by-reference,
 or switching to `Dynamic<T>`), **heap-reallocation residue** (mitigated by
-pre-sizing, `Dynamic<[u8; N]>`, or a zero-on-deallocate global allocator — but
-SECURITY.md states what to check before trusting one, because the common way of
-writing that wipe is removed by the optimizer and says nothing when it is),
+pre-sizing, `Dynamic<[u8; N]>`, or installing the `zeroizing-alloc` global
+allocator in your application — see SECURITY.md),
 and **swap / core dumps** (OS-level — `mlock`, encrypted swap, disabled core
 dumps).
 

@@ -222,9 +222,24 @@ though — not to everything the closure touches.
 
   **How much this is worth is measurable, and worth measuring.** In the shape described above — a 4 KiB secret grown one byte past its capacity through `with_secret_mut`, with an allocated neighbour behind it so the reallocation has to move rather than extend in place — the abandoned block was requested straight back from the allocator and read: **4032 of 4032 payload bytes still present**, on x86-64 Linux/glibc and on Windows. That is this section's hazard as a number rather than a claim, and it is what a zero-on-deallocate allocator removes. The readout window starts at byte 64 because a freed glibc chunk carries the allocator's own free-list links in its first bytes — two words in a small bin, four once it has been sorted into a large bin — and reading those instead of the payload is an easy way to measure nothing and conclude there is no hazard.
 
-  **If your crate has a library target, declare the allocator there.** A `#[global_allocator]` in `src/main.rs` reaches the shipped binary but not the integration tests under `tests/`, each of which links the library and gets the default allocator — so a test written to confirm your secret handling runs without the mitigation it was written to confirm.
+  **What to check before trusting any such allocator.** Its wipe sits immediately before a deallocation, which makes it a dead store the optimizer is entitled to delete, and the deletion is silent. An implementation that defends the wipe by routing it through a function pointer is defeated by profile-guided optimization combined with link-time optimization: indirect-call promotion turns the indirect call direct, inlining follows, and dead-store elimination removes the fill while the pointer load it was hiding behind still executes. Prefer an implementation whose wipe is volatile stores, which LLVM's language reference forbids the optimizer from removing, or a fill held in place by an inline-assembly barrier that receives the block's own pointer as an operand. Ask whether the project demonstrates that under PGO and LTO rather than asserting it — and ask it of this section too, rather than taking its word for it. The comparison is in this repository: `tools/pgo_allocator_compare.sh` builds the same program under `-Cprofile-use` with fat LTO and `codegen-units = 1` and then reads a freed block back, and a captured run of a four-configuration variant of that comparison — with the controls that fired in it, its own provenance stated in its header, and the scope limits that go with them — is kept verbatim in `docs/design/receipts/`. **`zeroizing-alloc` does — use it.**
 
-  **What to check before trusting any such allocator.** Its wipe sits immediately before a deallocation, which makes it a dead store the optimizer is entitled to delete, and the deletion is silent. An implementation that defends the wipe by routing it through a function pointer is defeated by profile-guided optimization combined with link-time optimization: indirect-call promotion turns the indirect call direct, inlining follows, and dead-store elimination removes the fill while the pointer load it was hiding behind still executes. Prefer an implementation whose wipe is volatile stores, which LLVM's language reference forbids the optimizer from removing, or a fill held in place by an inline-assembly barrier that receives the block's own pointer as an operand. Ask whether the project demonstrates that under PGO and LTO rather than asserting it.
+  ```toml
+  zeroizing-alloc = "0.1.1"
+  ```
+
+  ```rust
+  use zeroizing_alloc::ZeroAlloc;
+
+  #[global_allocator]
+  static ALLOC: ZeroAlloc<std::alloc::System> = ZeroAlloc(std::alloc::System);
+  ```
+
+  **It has to go in a binary, and here is why.** `#[global_allocator]` may appear once in a program. A library that declared one would impose it on every application that depends on it, and two libraries each declaring one will not link at all — so the language does not let a library make this choice, by design. If you are writing a library that handles secrets, you cannot install this on your consumers' behalf: point them at this section instead, and let the application decide.
+
+  **Where to put it in that binary.** If your crate is a binary only, `src/main.rs` is the place. If it has a library target too — the common `src/lib.rs` plus a thin `src/main.rs` shape — declare it in `src/lib.rs`. A `#[global_allocator]` in `main.rs` reaches the shipped binary but not the integration tests under `tests/`, each of which links the library and gets the default allocator, so a test written to confirm your secret handling would run without the mitigation it was written to confirm.
+
+  Nothing else is required: it is installed for the whole process from that one declaration, including every dependency, `secure-gate` among them.
 
 A custom-allocator-parameterized `Dynamic<T, A>` (analogous to C++'s
 `std::vector<T, ZeroingAllocator<T>>`) would resolve this at the type level. This
