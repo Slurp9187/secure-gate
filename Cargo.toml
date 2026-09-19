@@ -10,12 +10,15 @@ description = "Secure wrappers for secrets with explicit access and mandatory ze
 documentation = "https://docs.rs/secure-gate"
 keywords = ["crypto", "no-std", "security", "zeroize"]
 categories = ["cryptography", "no-std", "data-structures"]
+# Anchored with a leading `/` so each entry matches only at the package root. Unanchored,
+# "README.md" also matched docs/design/receipts/README.md, which shipped a checksum index
+# whose files are not in the tarball -- an index a consumer cannot verify is worse than none.
 include = [
-    "src/**/*.rs",
-    "CHANGELOG.md",
-    "LICENSE*",
-    "README.md",
-    "SECURITY.md",
+    "/src/**/*.rs",
+    "/CHANGELOG.md",
+    "/LICENSE*",
+    "/README.md",
+    "/SECURITY.md",
 ]
 
 [dependencies]
