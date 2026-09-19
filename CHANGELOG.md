@@ -14,6 +14,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   produces the executable can install a global allocator, so a library points its consumers at
   this section instead.
 
+- **The measurement behind that recommendation now lives in this repository, with its controls.**
+  Three test binaries differing from one another in exactly one line — the
+  `#[global_allocator]` — run §2's own shapes: a 4 KiB secret grown one byte past its capacity
+  through `with_secret_mut` with a neighbour behind it, and a pre-sized 4096-byte buffer
+  truncated to 2048 and then shrunk. Each counts occurrences of a pattern planted in the secret
+  among the bytes of every block released while the workload runs. `tests/heap_residue.rs`
+  (bare spy) establishes the pattern is released at all; `tests/heap_residue_nowipe.rs` (the same
+  composition, no wipe) establishes the probe sees it in that position;
+  `tests/heap_residue_wiped.rs` is the subject.
+
+  Two configurations cannot tell a working wipe from a probe looking in the wrong place — a spy
+  reading the wrong memory reports clean under the subject and nothing contradicts it. The
+  non-wiping leg is what contradicts it, because it must report the pattern. The subject
+  asserts both that no pattern byte survived *and* that blocks were inspected at all. Two more
+  false passes are closed by construction: no configuration forwards `realloc` to the system
+  allocator, since libc would then release the abandoned block inside C where the probe can
+  never see it; and each workload asserts that the buffer's address moved, so a capacity change
+  that declined to reallocate fails the run instead of reporting a clean count for a run in
+  which nothing happened.
+
+  What this establishes is bounded, and `docs/design/heap-residue.md` states the bound with the
+  rest of the record: a zeroizing global allocator covers the blocks §2's hazard abandons,
+  including the reallocation-abandoned ones. Heap only — nothing here measures stack-move
+  residue, swap or core dumps. And whether a given `Vec` is covered is a property of the build
+  rather than of the source, which is why the assertions are `>=` and `> 0` rather than equality
+  against a remembered figure.
+
+- **Whether such a wipe survives an optimizing build is a separate question, answered by a
+  separate artifact — and its output is captured rather than transcribed.** The volatile read
+  that makes the runtime observation possible is exactly what keeps the store it observes live,
+  so a probe of that shape cannot detect dead-store elimination, and `cargo test` is opt-level 0
+  besides. `tools/pgo_allocator_compare.sh` builds the same program under `-Cprofile-use` with
+  fat LTO and `codegen-units = 1` and reads a freed block back; it is hand-run, wired into no CI
+  job, and refuses to run outside Linux/glibc, where the readout would mean nothing.
+  `docs/design/receipts/` holds the raw stdout, indexed per file with its toolchain, whether a
+  control fired in the same output, and the outcome.
+
+  The figures §2 quotes were typed from output that was then discarded, and a transcribed number
+  cannot be told apart from one typed wrong; that is what the directory fixes. In the captured
+  run of 2026-09-18 on rustc 1.96.1, under PGO with fat LTO, a no-allocator control and a
+  synthetic control written to be recoverable each returned the full planted pattern, and the
+  row recorded as `zeroizing-alloc` 0.1.1 returned none of it, with `same=true` on every
+  row; the receipt states that row's mapping and the source it rests on. Two reading rules
+  travel with the directory: a run in which the optimization never engaged is recorded as
+  **inconclusive** rather than as a pass, and a synthetic control's result is a property of that
+  control and composes with nothing else.
+
+- **Pinned the install snippet to `zeroizing-alloc = "0.1.1"` rather than `"0.1"`.** The pointer
+  barrier in `dealloc` that the captured run exercises arrived in 0.1.1, and `"0.1"` resolves
+  0.1.0 just as happily. The same exact pin is in `[dev-dependencies]`, where it backs
+  `examples/zeroizing_alloc_app.rs` — §2's copy-paste application shape made executable, so the
+  one piece of that advice CI could not otherwise check is reached by the `msrv` job's
+  `cargo +1.85 check --workspace --all-features --all-targets`. Nothing new ships: `include`
+  lists only `src/**/*.rs` and the top-level documents, so the tests, the example, the script
+  and the receipts stay out of the published tarball.
+
 - **Said what a zero-on-deallocate allocator has to do, instead of naming one.** All three
   sites that recommended a specific crate now give the property to check. Such an allocator's
   wipe sits immediately before a deallocation, which makes it a dead store the optimizer is

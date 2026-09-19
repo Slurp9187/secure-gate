@@ -1,0 +1,21 @@
+2434dfa tests: the readout sampled the allocator's own bookkeeping
+Thu Sep 17 19:26:44 UTC 2026
+=== subject + control
+buffer 0x723f7c000ce0 -> 0x723f7c002d20 (moved: true); pinned block at the inner allocator: seen, all zero; readout: 0/4032 pattern bytes, 8 non-zero of 4096, same block back: true
+test the_buffer_abandoned_by_growth_through_with_secret_mut_reaches_the_inner_allocator_wiped ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+buffer 0x7a1d24000ce0 -> 0x7a1d24002d20 (moved: true); readout: 4032/4032 pattern bytes, 4072 non-zero of 4096, same block back: true
+test without_the_allocator_the_abandoned_buffer_still_holds_the_secret ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+exit=0
+=== full suite
+      2 test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      2 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+      1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+      1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.11s
+      1 test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+      1 test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+      1 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+=== clippy: 0 ; fmt: ok

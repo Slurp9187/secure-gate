@@ -1,0 +1,105 @@
+Captured run: PGO (-Cprofile-use) + fat LTO + codegen-units=1, rustc 1.96.1, 2026-09-18.
+
+PROVENANCE
+  Produced by a FOUR-CONFIGURATION VARIANT of the msoffice-crypto comparison
+  harness, on branch experiment/zeroizing-alloc (PR #19, closed unmerged on
+  2026-09-18). That variant's script is held in no tree available here: not in
+  this repository, not in the msoffice-crypto worktree at d2b0f25, and not in
+  secure-gate-zalloc. The row names used below (none / strawman / onepass /
+  sgza) and the "RECOVER size=... hits=... same=..." line format appear in no
+  file in any of those trees; "onepass" in particular appears in none of them.
+  The raw stdout is reproduced below verbatim; it is held here because the
+  script and the branch's working tree are gone, and a transcribed number
+  cannot be told apart from a number typed wrong.
+
+  tools/pgo_allocator_compare.sh in this repository is the THREE-CONFIGURATION
+  form of the same method. Its rows are none / fnptr_no_ptr_barrier /
+  zeroizing_alloc and it prints them as
+  "size=64    recovered=16/16  same_block=true". It is NOT the script that
+  produced the output below, and re-running it will not reproduce these rows
+  line for line. Cite it as the method, not as the origin of this capture.
+
+  THE onepass -> zeroizing-alloc 0.1.1 MAPPING: reported, and not checkable
+  against anything held here. The source is a message in the orchestrating
+  session, relaying the msoffice-crypto session's report that the harness
+  script declared zeroizing-alloc = "0.1.1" as the 'onepass' dependency. That
+  is a session message rather than a captured artifact, and the script it
+  describes is in none of the trees named above, so the mapping cannot be
+  re-verified from any file. It is recorded here with its source attached
+  rather than asserted bare; read every 'onepass' row below as carrying that
+  qualification.
+
+  Two output blocks follow, and they are one result. The second is NOT
+  optional: cite them together. The first block alone reads as a four-row
+  table with a hole where a control should be.
+
+WHAT THE ROWS ARE
+  none      no allocator installed - the no-allocator control. Nothing wipes
+            the block, so this row must recover the planted pattern. If it
+            does not, the run measured nothing.
+  strawman  a SYNTHETIC fn-pointer construct written for this comparison.
+            It is not a released crate and is nobody's shipped code. It is the
+            second control: a wipe reached through a function pointer, with no
+            volatile read of the pointer, which is the shape indirect-call
+            promotion is expected to defeat.
+  onepass   zeroizing-alloc 0.1.1, per the reported mapping recorded under
+            PROVENANCE above, with the qualification stated there.
+  sgza      secure-gate-zalloc.
+
+  The row mapping is recorded here rather than inferred from the row names.
+
+HOW TO READ 'strawman: BUILD FAILED (gen)' IN THE FIRST BLOCK
+  That line is a HARNESS DEFECT, not a result. The probe's Cargo.toml was
+  written into the strawman library's directory and clobbered it, so the
+  profile-generation build had no library to build. It says nothing about any
+  allocator. The second block is that same configuration re-run correctly,
+  which is why the second block exists.
+
+WHY 'same=true' ON EVERY ROW IS LOAD-BEARING
+  same=true means the same block came back: the allocator handed back the
+  block that was just freed, so the bytes read are the bytes that were in it.
+  A hits=0 with same=false would mean a DIFFERENT block was read and would
+  prove nothing. Every row below is same=true, in both blocks.
+
+WHAT THIS RUN DOES AND DOES NOT SHOW
+  It shows that under this configuration the planted pattern was recovered
+  from a freed block with no allocator installed (16/16) and from the
+  synthetic fn-pointer construct (16/16), and was not recovered from either
+  zeroizing-alloc 0.1.1 or secure-gate-zalloc (0/16, both block sizes).
+  The synthetic construct is a control for the measurement. Its behaviour is a
+  property of that construct alone and says nothing about any released crate.
+
+--- captured output, block 1 of 2 (verbatim) -----------------------------------
+
+llvm-profdata: /home/dev/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-profdata
+toolchain: release: 1.96.1
+
+### PGO (-Cprofile-use) + fat LTO + codegen-units=1
+### hits = pattern bytes recovered out of 16 from a freed block
+
+none:
+    RECOVER size=64 hits=16 same=true
+    RECOVER size=4096 hits=16 same=true
+strawman: BUILD FAILED (gen)
+onepass:
+    RECOVER size=64 hits=0 same=true
+    RECOVER size=4096 hits=0 same=true
+sgza:
+    RECOVER size=64 hits=0 same=true
+    RECOVER size=4096 hits=0 same=true
+
+--- captured output, block 2 of 2 (verbatim) -----------------------------------
+--- the strawman leg of the same configuration, re-run after the harness ------
+--- defect above was repaired --------------------------------------------------
+
+strawman (secure-gate-zalloc's own control: fn-pointer, NO volatile read of ptr):
+    RECOVER size=64 hits=16 same=true
+    RECOVER size=4096 hits=16 same=true
+
+--- end of captured output -----------------------------------------------------
+
+COUNT OF INDEPENDENT RUNS
+  Two, not three: this msoffice-crypto harness, and the secure-gate-zalloc
+  author's reproduction, which was written from a description of the method
+  rather than by reusing this harness. The second is worth citing precisely
+  because the harnesses differed. See 48-recover-linux.txt in this directory.

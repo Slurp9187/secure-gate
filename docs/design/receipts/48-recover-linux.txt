@@ -1,0 +1,11 @@
+13fe5e2 tests: hold the recover CI gate until it has gone green on Linux
+Thu Sep 17 18:13:26 UTC 2026
+running 1 test
+pattern bytes recovered out of 16, 4096-byte block (64-byte block in parentheses)
+  control, no PGO        0/16 same_block=true  ( 0/16 same_block=false)
+  control, PGO+fat LTO  16/16 same_block=true  (16/16 same_block=true)
+  this crate, no PGO     0/16 same_block=true  ( 0/16 same_block=true)
+  this crate, PGO+fat    0/16 same_block=true  ( 0/16 same_block=true)
+test the_freed_block_keeps_its_bytes_under_pgo_with_a_function_pointer_wipe_and_not_with_this_one ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.53s
+exit=0

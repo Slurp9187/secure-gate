@@ -61,6 +61,14 @@ proptest = "1.10"
 rand = { version = "0.10", default-features = false, features = ["std_rng", "sys_rng"] }
 serde_json = "1.0"
 trybuild = "1.0"
+# Backs `examples/zeroizing_alloc_app.rs`, the executable form of the SECURITY.md §2 remedy.
+# Dev-dependency only: a library must never declare a `#[global_allocator]` itself, because only
+# one may exist per program and a second one anywhere in the dependency graph is a hard compile
+# error naming a crate the consumer never chose. Keeping it here means it is reachable only from
+# examples/tests, never from `src/`. Pin `0.1.1` exactly, not `"0.1"` — `0.1.1` is the release
+# that added the `read_volatile(&raw const ptr)` pointer barrier in `dealloc`; `"0.1"` resolves
+# `0.1.0`, which lacks it, just as happily.
+zeroizing-alloc = "0.1.1"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -121,6 +129,12 @@ name = "asm_check"
 # `required-features` keeps this std-using binary out of no_std target builds
 # (e.g. `cargo build --target thumbv7em-none-eabihf --no-default-features`).
 required-features = ["std"]
+
+[[example]]
+name = "zeroizing_alloc_app"
+# Not itself a user-facing tool; it is the SECURITY.md §2 remedy made executable, so it stays
+# out of `--no-default-features` builds the same way `asm_check` does for `std` above.
+required-features = ["alloc"]
 
 [[bench]]
 name = "fixed_vs_raw"

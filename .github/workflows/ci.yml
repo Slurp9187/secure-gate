@@ -380,8 +380,9 @@ jobs:
   # ---------------------------------------------------------------------------
   # AddressSanitizer job — heap zeroization oracle
   #
-  # Runs only the `heap_zeroize` integration test binary with ASan + LeakSanitizer
-  # enabled. Requires nightly + `-Z build-std` to rebuild std with instrumentation.
+  # Runs the `heap_zeroize`, `heap_residue`, `heap_residue_nowipe` and `heap_residue_wiped`
+  # integration test binaries with ASan + LeakSanitizer enabled. Requires nightly +
+  # `-Z build-std` to rebuild std with instrumentation.
   # This job catches heap-use-after-free, buffer overflows, and memory leaks that
   # Miri and the ProxyAllocator approach might miss at the allocator level.
   # ---------------------------------------------------------------------------
@@ -402,7 +403,7 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Run heap_zeroize with AddressSanitizer
+      - name: Run heap_zeroize and heap_residue tests with AddressSanitizer
         env:
           RUSTFLAGS: "-Zsanitizer=address -Zsanitizer=leak -C debuginfo=2"
           ASAN_OPTIONS: "detect_leaks=1:abort_on_error=1:symbolize=1"
@@ -410,5 +411,8 @@ jobs:
           cargo +nightly test
           --features alloc,encoding-hex,encoding-base32,encoding-base64,encoding-bech32
           --test heap_zeroize
+          --test heap_residue
+          --test heap_residue_nowipe
+          --test heap_residue_wiped
           -Z build-std
           --target x86_64-unknown-linux-gnu

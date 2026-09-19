@@ -1,0 +1,13 @@
+Thu Sep 17 07:51:59 UTC 2026
+Linux 6.18.33.2-microsoft-standard-WSL2 x86_64
+ldd (Ubuntu GLIBC 2.39-0ubuntu8.8) 2.39
+rustc 1.85.1 (4eb161250 2025-03-15)
+binary: rustc
+commit-hash: 4eb161250e340c8f48f66e2b929ef4a5bed7c181
+commit-date: 2025-03-15
+host: x86_64-unknown-linux-gnu
+release: 1.85.1
+LLVM version: 19.1.7
+cargo 1.85.1 (d73d2caf9 2024-12-31)
+8
+model name	: Intel(R) Core(TM) i7-10510U CPU @ 1.80GHz
