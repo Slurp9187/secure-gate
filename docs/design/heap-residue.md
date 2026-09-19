@@ -24,10 +24,12 @@ choice.
 ## The three configurations
 
 Each file under `tests/` compiles to its own binary, which is what lets three
-`#[global_allocator]` declarations coexist in one crate. The three binaries differ from one
-another in exactly one line — the allocator. The probe mechanism itself — the spy, the
-non-wiping wrapper, the pattern counting — lives in the `secure-gate-residue-probe` crate so a
-downstream application can run the same three configurations against its own workload;
+`#[global_allocator]` declarations coexist in one crate. Each binary is one
+`residue_binary!` invocation, and the three differ from one another in exactly one argument
+— the role, which is the allocator the macro installs and the assertion its single test
+makes. The probe mechanism itself — the spy, the non-wiping wrapper, the pattern counting,
+and that macro — lives in the `secure-gate-residue-probe` crate so a downstream application
+can run the same three configurations against its own workload;
 `tests/residue_support/mod.rs` holds only this crate's §2 workload shapes.
 
 | Binary | Allocator | What it proves |
@@ -124,7 +126,8 @@ allocating inside the armed window. The usual answer is `--test-threads=1`, and 
 does not pass it: neither the `test` job nor `test-release` gives `cargo test` that flag, and
 `.cargo/config.toml` does not set it. So the requirement is structural — one `#[test]` per
 binary, the same convention and the same reason as `all_heap_zeroed` in
-`tests/heap_zeroize.rs`.
+`tests/heap_zeroize.rs`. `residue_binary!` generates exactly one, which is how the convention
+is kept rather than remembered.
 
 That alone is not sufficient, and it should not be recorded as if it were. libtest's default
 harness runs even a single test body on a *spawned* thread with the main thread parked, so the
