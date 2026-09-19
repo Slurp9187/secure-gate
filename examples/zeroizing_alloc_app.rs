@@ -16,7 +16,7 @@
 //! shape the allocator protects: the reallocation happens outside `secure-gate`, and the
 //! abandoned block is what a zero-on-deallocate allocator wipes on the way to being freed.
 
-use secure_gate::{Dynamic, RevealSecretMut, SecretLen};
+use secure_gate::{Dynamic, RevealSecretMut};
 use zeroizing_alloc::ZeroAlloc;
 
 #[global_allocator]
@@ -36,9 +36,11 @@ fn main() {
         bytes.extend_from_slice(b"more-secret-bytes-after-the-move");
     });
 
-    // Length metadata lives on `SecretLen` and needs no reveal at all, so nothing here opens
-    // the secret just to report on it. Doing I/O inside a `with_secret*` closure is the shape
-    // to avoid: the closure is the one place the secret is exposed, and the less that happens
-    // in there the better.
-    println!("secret is {} bytes", secret.len());
+    // Nothing here prints anything derived from the secret -- not its contents, not its
+    // length. The example exists to show the declaration at the top of this file and the
+    // capacity change above; a figure about the secret would be noise, and in a file written
+    // to be copied, "print something about the secret" is not a habit worth teaching. The
+    // `black_box` keeps the work from being optimized away now that nothing observes it.
+    std::hint::black_box(&secret);
+    println!("grew a Dynamic<Vec<u8>> past its capacity; the abandoned block was wiped on free");
 }
