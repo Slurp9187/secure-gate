@@ -36,7 +36,7 @@ output either by a `pgo-icall-prom (success)` remark or by a control actually re
 planted pattern. **An attempt where promotion never fired is INCONCLUSIVE, not a pass, and is
 labelled that way.** A clean subject counts only when the same run has shown the attack works.
 
-Two reading notes that apply throughout:
+Three reading notes that apply throughout:
 
 - `same_block=true` / `same=true` is **load-bearing**. It says the allocator handed back the
   block that had just been freed, so the bytes read are the bytes that were in it. A `0/16`
@@ -48,6 +48,14 @@ Two reading notes that apply throughout:
   **section-2-shape probes sample 4032 bytes starting at offset 64**. Each number is a
   **window size chosen by that probe**, and nothing else. They are not two readings of one
   block, and no arithmetic relates one to the other.
+- **A synthetic control's result carries no causal explanation of any other row.** It is
+  tempting to read a defeated control beside a clean subject and conclude *why* the subject
+  behaved as it did — that some particular line in it is what made the difference. No run held
+  here supports a claim of that shape. Establishing one would need a **different run**: the
+  subject crate itself with that line removed, measured against the same crate unmodified, in
+  the same configuration. **That run was not performed.** Until it is, a control's result and a
+  subject's result are two separate measurements that sit side by side and do not explain each
+  other.
 
 ---
 
@@ -70,28 +78,46 @@ Two reading notes that apply throughout:
 - **What it measured:** four allocator configurations under PGO (`-Cprofile-use`) + fat LTO +
   `codegen-units=1`, each planting a pattern in a block, freeing it, requesting it straight
   back and counting how many of 16 pattern bytes survived. Rows: `none` (no allocator),
-  `strawman` (a **synthetic** fn-pointer construct written for this comparison — not a
-  released crate), `onepass` (reported as `zeroizing-alloc` 0.1.1 — see the mapping bullet
-  below), `sgza` (`secure-gate-zalloc`). The row mapping is stated in the file's header
+  `strawman` (a **synthetic** fn-pointer control construct built by the harness — not a
+  released crate; see the scoping bullet below), `onepass` (`zeroizing-alloc` 0.1.1 — see the
+  mapping bullet below), `sgza` (`secure-gate-zalloc`). The row mapping is stated in the file's header
   rather than inferred from the row names.
 - **Date:** 2026-09-18. Produced by a **four-configuration variant** of the msoffice-crypto
   comparison harness, on branch `experiment/zeroizing-alloc` (PR #19, closed unmerged the
-  same day). **That variant's script is held in no tree available here** — not in this
-  repository, not in the msoffice-crypto worktree at `d2b0f25`, and not in
-  `secure-gate-zalloc`: the row names above and the `RECOVER size=… hits=… same=…` line
-  format appear in no file in any of those trees, `onepass` least of all.
-  `tools/pgo_allocator_compare.sh` in this repository is the **three-configuration** form of
-  the same method — rows `none` / `fnptr_no_ptr_barrier` / `zeroizing_alloc`, printed as
-  `size=64    recovered=16/16  same_block=true`. It is the method, not the origin of this
-  capture, and re-running it will not reproduce these rows line for line. The stdout is held
-  here because the script and the branch's working tree are both gone.
-- **The `onepass` → `zeroizing-alloc` 0.1.1 mapping is reported, and cannot be checked
-  against anything held here.** Its source is a message in the orchestrating session,
-  relaying the msoffice-crypto session's report that the harness script declared
-  `zeroizing-alloc = "0.1.1"` as the `onepass` dependency. That is a session message rather
-  than a captured artifact, and the script it describes is in none of the trees named above,
-  so the mapping cannot be re-verified from any file. It is recorded here with its source
-  attached rather than asserted bare, and every `onepass` row carries that qualification.
+  same day). **That variant's script is no longer unheld.** It was recovered from the WSL
+  machine that ran it and is held in this directory as `harness/pgo_compare.sh`
+  (`fa4b4c923a7a2a771daa87a9409bfe0dfc887ca09db37fa2928af3361f75ee85`) and
+  `harness/pgo_strawman.sh`
+  (`770b2022ce22a8b98a699433b426d4b28c4d46f4af04c26cc45a349b0f9783c0`). Both digests were
+  computed at the source and recomputed after copying, and match. `pgo_compare.sh` line 80
+  prints the `RECOVER size=… hits=… same=…` format the capture uses, and its four
+  configurations are declared at lines 103–108 as `none` / `strawman` / `onepass` / `sgza`.
+  The stdout is still the artifact for *what the run produced*: the script says how the run
+  was built, and only the capture says what came out of it.
+  `tools/pgo_allocator_compare.sh` in this repository remains the **three-configuration**
+  form of the same method — rows `none` / `fnptr_no_ptr_barrier` / `zeroizing_alloc`, printed
+  as `size=64    recovered=16/16  same_block=true`. It **did not produce this capture**: it is
+  the method, not the origin, and re-running it will not reproduce these rows line for line.
+- **This entry previously recorded a provenance gap; it now records that gap's closure.** The
+  earlier text here said the variant's script was held in no tree available, and that the
+  `onepass` mapping was reported and could not be checked. Both were accurate when written and
+  are false now. The correction is stated rather than quietly swapped in: a receipts directory
+  that silently upgrades its own claims is worse than one that shows where it was corrected,
+  because a reader of the first has no way to tell an upgrade from an overreach.
+- **The `onepass` → `zeroizing-alloc` 0.1.1 mapping is now checkable against a held file**,
+  where it was previously only reported. `harness/pgo_compare.sh` line 106 declares the
+  `onepass` configuration's dependency as
+
+      measure onepass   "zeroizing-alloc = \"0.1.1\""
+
+  and the project that line generates is held beside it: `harness/onepass-Cargo.toml` pins
+  `zeroizing-alloc = "0.1.1"` under `[profile.release]` with `lto = "fat"` and
+  `codegen-units = 1`, and `harness/onepass-main.rs` declares
+  `#[global_allocator] static A: ZeroAlloc<std::alloc::System>`. So the `onepass` rows are
+  upstream `zeroizing-alloc` 0.1.1 from crates.io, and that no longer rests on a session
+  message. **What this does not widen:** it is still that one upstream version, measured in
+  **one run** in **one configuration**. Checkable provenance makes the row citable; it does
+  not make it a general property of the crate.
 - **Toolchain:** `release: 1.96.1`, `llvm-profdata` from the matching stable sysroot.
 - **Control in the same output:** **yes, two.** `none` recovered 16/16 at both block sizes,
   `same=true`. `strawman` recovered 16/16 at both sizes, `same=true`, in the second block.
@@ -104,6 +130,14 @@ Two reading notes that apply throughout:
   strawman library's directory and clobbered it. The second block is that leg re-run correctly.
   **Cite both blocks together**; the first alone reads as a table with a hole where a control
   should be.
+- **What the `strawman` construct is, precisely.** Per the harness author, and as
+  `harness/pgo_strawman.sh` records in the comment above the library it writes, it is a **copy
+  of `secure-gate-zalloc`'s `CONTROL_LIB`** — not any released crate, and **not** any released
+  crate with a line removed. It is close to `zeroizing-alloc` in shape (same `clear_bytes`, same
+  `#[used] static WIPER`, same volatile load, the same three `GlobalAlloc` methods), but *close*
+  is not *differs by exactly one edit*, and nothing here should be read as claiming a one-line
+  difference between the two. The `strawman` row is a control for the measurement, and its
+  result is a property of that construct alone.
 
 ### `48-recover-linux.txt`
 
@@ -231,9 +265,10 @@ What these receipts support, stated at the width the measurements actually cover
   fn-pointer wipe with no barrier: 16/16 recovered, with promotion remarks and IR to show for
   it (`45`, and the `strawman` and `none` controls in the 1.96.1 run).
 - In the PGO + fat LTO + `cgu=1` configuration where those controls fired, neither the
-  `onepass` row (reported as `zeroizing-alloc` 0.1.1) nor the `sgza` row
-  (`secure-gate-zalloc`) left the pattern behind: **0/16**, `same=true`, at both block sizes
-  (`2026-09-18-pgo-fat-lto-rustc-1.96.1.txt`). `48` reproduces that independently through
+  `onepass` row (`zeroizing-alloc` 0.1.1, the mapping now checkable in `harness/`) nor the
+  `sgza` row (`secure-gate-zalloc`) left the pattern behind: **0/16**, `same=true`, at both block sizes
+  (`2026-09-18-pgo-fat-lto-rustc-1.96.1.txt`) — **one run, one configuration**, for the
+  upstream 0.1.1 that `harness/` pins. `48` reproduces that independently through
   the cargo fat-LTO flow **for `secure-gate-zalloc` only** — its subject row is labelled
   `this crate`, which is `secure-gate-zalloc` at `13fe5e2`, not `zeroizing-alloc`. No run
   held in this directory measures `zeroizing-alloc` a second time.
@@ -241,9 +276,12 @@ What these receipts support, stated at the width the measurements actually cover
 What they do not support, and must not be stretched to:
 
 - **A synthetic control being defeated says nothing about any released crate.** The `strawman`
-  row and `45`'s `probe_a` / `wiper_C` constructs were written to be defeated, to prove the
-  measurement can detect residue at all. Their results are a property of those constructs. They
-  do not compose with any other row into a claim about a crate.
+  row and `45`'s `probe_a` / `wiper_C` constructs stand in for a wipe the measurement should be
+  able to defeat, to prove it can detect residue at all. Their results are a property of those
+  constructs. They **do not compose with any other row** into a claim about a crate — neither
+  about how a crate behaved nor about why it behaved that way. `strawman` in particular is a
+  copy of `secure-gate-zalloc`'s `CONTROL_LIB`, not a released crate edited down, so no
+  difference between it and any crate is established here at all.
 - **Fat LTO through cargo is not every LTO mode through cargo** (`48`).
 - **A run where promotion did not fire is inconclusive** — five of `45`'s nine configurations,
   and any hand-rolled `rustc` recipe whose remarks read `Cannot promote indirect call`. It is
@@ -297,20 +335,33 @@ either tree.
 | `49-secure-gate-shape-linux.txt` | 1,766 | `90ca29b2890224c14740a2258e1f046d8737c8c634d5d04319fabc2316edcb33` |
 | `50-rebased-branch-linux.txt` | 1,755 | `6143f45e0e9e5dd2fed036e6f8e81037c558fc5fd88cdd78d4d847a38ca09b42` |
 
-`2026-09-18-pgo-fat-lto-rustc-1.96.1.txt` is a header plus two verbatim output blocks; the
-branch that produced the stdout is closed and the working tree is gone, so the blocks are the
-artifact.
+`2026-09-18-pgo-fat-lto-rustc-1.96.1.txt` is a header plus two verbatim output blocks. The
+branch that produced the stdout is closed and its working tree is gone, so the blocks remain the
+artifact for what the run produced; the scripts that built it were recovered separately from the
+machine that ran them and are held in `harness/`, listed in the Checksums manifest below.
 
 ## Checksums
 
-Verification of all files present in this directory:
+Verification of all files present in this directory. Every digest below was recomputed
+from the file on disk at the time this table was written.
 
 | Filename | Bytes | SHA-256 |
 |---|---|---|
 | `00-env-linux.txt` | 405 | `5965f0ad87b14a17efc95025c37782df8409d662f489d1ca618725092a4504f1` |
-| `2026-09-18-pgo-fat-lto-rustc-1.96.1.txt` | 5579 | `20758ec01c5d9c6da811fa1a4d4225913ce2bc60471d24af23c023afabca53ea` |
+| `2026-09-18-pgo-fat-lto-rustc-1.96.1.txt` | 6470 | `f8aa6589006ae2e46609508425e7556913a45caa1949aa61d85ada64e110a5b2` |
 | `45-hazard-final.txt` | 13332 | `91f271fe268d903b7692582cd2aa15964f77a9525d7b25664e5868a4d9261514` |
 | `46-hazard-ours.txt` | 3393 | `d43fd87000944b3f1f65da9edf453455e256715bc7ce62b271b98c7b0d37de38` |
 | `48-recover-linux.txt` | 691 | `0850e8c3478e5f83b52238b9ff9d2abeacce8442962d3c672959fed925df032f` |
 | `49-secure-gate-shape-linux.txt` | 1766 | `90ca29b2890224c14740a2258e1f046d8737c8c634d5d04319fabc2316edcb33` |
 | `50-rebased-branch-linux.txt` | 1755 | `6143f45e0e9e5dd2fed036e6f8e81037c558fc5fd88cdd78d4d847a38ca09b42` |
+| `harness/onepass-Cargo.toml` | 155 | `c040dbfae46cfbfc131e5291be97a3fdd346d8644ce46dec6c5a157dff9274af` |
+| `harness/onepass-main.rs` | 1498 | `46dd24a0bdaa6da5efa67bdbc427acc35038926e961121a74f18954c395a7b49` |
+| `harness/pgo_compare.sh` | 4878 | `fa4b4c923a7a2a771daa87a9409bfe0dfc887ca09db37fa2928af3361f75ee85` |
+| `harness/pgo_strawman.sh` | 3481 | `770b2022ce22a8b98a699433b426d4b28c4d46f4af04c26cc45a349b0f9783c0` |
+
+The six `.txt` rows other than `2026-09-18-pgo-fat-lto-rustc-1.96.1.txt` are unchanged and
+re-verified. **The row for `2026-09-18-pgo-fat-lto-rustc-1.96.1.txt` was refreshed:** that
+file’s `PROVENANCE` block was rewritten when the harness was recovered, so the digest recorded
+here before this edit (`20758ec0…`, 5579 bytes) described the superseded text and no longer
+matched the file. It is restated rather than left stale, since a manifest that disagrees with
+its own directory is the failure this directory exists to prevent.

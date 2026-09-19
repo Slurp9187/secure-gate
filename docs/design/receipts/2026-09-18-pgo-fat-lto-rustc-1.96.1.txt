@@ -3,14 +3,19 @@ Captured run: PGO (-Cprofile-use) + fat LTO + codegen-units=1, rustc 1.96.1, 202
 PROVENANCE
   Produced by a FOUR-CONFIGURATION VARIANT of the msoffice-crypto comparison
   harness, on branch experiment/zeroizing-alloc (PR #19, closed unmerged on
-  2026-09-18). That variant's script is held in no tree available here: not in
-  this repository, not in the msoffice-crypto worktree at d2b0f25, and not in
-  secure-gate-zalloc. The row names used below (none / strawman / onepass /
-  sgza) and the "RECOVER size=... hits=... same=..." line format appear in no
-  file in any of those trees; "onepass" in particular appears in none of them.
-  The raw stdout is reproduced below verbatim; it is held here because the
-  script and the branch's working tree are gone, and a transcribed number
-  cannot be told apart from a number typed wrong.
+  2026-09-18). That variant's script was NOT in either source repository, and
+  this file previously recorded it as unheld. It has since been recovered from
+  the machine that ran it and is now held here:
+
+      harness/pgo_compare.sh    sha256 fa4b4c923a7a2a771daa87a9409bfe0dfc887ca09db37fa2928af3361f75ee85
+      harness/pgo_strawman.sh   sha256 770b2022ce22a8b98a699433b426d4b28c4d46f4af04c26cc45a349b0f9783c0
+
+  Both digests were computed at the source and recomputed after copying, and
+  match. pgo_compare.sh line 80 prints the "RECOVER size=... hits=... same=..."
+  format used below, and its four configurations are declared at lines 103-108
+  as none / strawman / onepass / sgza. The raw stdout is still reproduced below
+  verbatim: the script tells you how the run was built, and only the capture
+  tells you what it produced.
 
   tools/pgo_allocator_compare.sh in this repository is the THREE-CONFIGURATION
   form of the same method. Its rows are none / fnptr_no_ptr_barrier /
@@ -19,15 +24,18 @@ PROVENANCE
   produced the output below, and re-running it will not reproduce these rows
   line for line. Cite it as the method, not as the origin of this capture.
 
-  THE onepass -> zeroizing-alloc 0.1.1 MAPPING: reported, and not checkable
-  against anything held here. The source is a message in the orchestrating
-  session, relaying the msoffice-crypto session's report that the harness
-  script declared zeroizing-alloc = "0.1.1" as the 'onepass' dependency. That
-  is a session message rather than a captured artifact, and the script it
-  describes is in none of the trees named above, so the mapping cannot be
-  re-verified from any file. It is recorded here with its source attached
-  rather than asserted bare; read every 'onepass' row below as carrying that
-  qualification.
+  THE onepass -> zeroizing-alloc 0.1.1 MAPPING: now checkable against a held
+  file, where it was previously only reported. harness/pgo_compare.sh line 106
+  declares the onepass configuration's dependency as
+
+      measure onepass   "zeroizing-alloc = \"0.1.1\""
+
+  and the generated project is held alongside it as harness/onepass-Cargo.toml
+  (zeroizing-alloc = "0.1.1", lto = "fat", codegen-units = 1) and
+  harness/onepass-main.rs, which declares
+  #[global_allocator] static A: ZeroAlloc<std::alloc::System>. So the onepass
+  rows below are upstream zeroizing-alloc 0.1.1 from crates.io, and that no
+  longer rests on anyone's word.
 
   Two output blocks follow, and they are one result. The second is NOT
   optional: cite them together. The first block alone reads as a four-row
@@ -42,9 +50,18 @@ WHAT THE ROWS ARE
             second control: a wipe reached through a function pointer, with no
             volatile read of the pointer, which is the shape indirect-call
             promotion is expected to defeat.
-  onepass   zeroizing-alloc 0.1.1, per the reported mapping recorded under
-            PROVENANCE above, with the qualification stated there.
+  onepass   zeroizing-alloc 0.1.1 from crates.io. The mapping is checkable
+            against harness/pgo_compare.sh line 106 and the generated project
+            held at harness/onepass-Cargo.toml and harness/onepass-main.rs.
   sgza      secure-gate-zalloc.
+
+  ON THE STRAWMAN ROW'S LABEL. The captured output below, and the recovered
+  scripts, label that configuration "NO volatile read of ptr". Read "ptr" as
+  the BLOCK pointer. harness/pgo_strawman.sh line 25 does volatile-read the
+  WIPER *function* pointer -- so a reader comparing the label against the held
+  script will find an apparent conflict, and this note is here because that
+  comparison is now possible. The label is reproduced unaltered because the
+  capture and the scripts are evidence and are not edited to read better.
 
   The row mapping is recorded here rather than inferred from the row names.
 

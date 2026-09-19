@@ -26,9 +26,10 @@
 # ---------------------------------------------------------------------------------------
 # Provenance. These figures are NOT this script's output. They were captured in
 # msoffice-crypto (branch experiment/zeroizing-alloc, PR #19) on 2026-09-18, rustc 1.96.1,
-# WSL2 Ubuntu 24.04, glibc 2.39, x86-64, by a FOUR-configuration variant of this comparison
-# whose script is held in no tree available here. This script is the three-configuration
-# form of the same method, so running it will not reproduce these rows. The capture, and
+# WSL2 Ubuntu 24.04, glibc 2.39, x86-64, by a FOUR-configuration variant of this comparison.
+# That variant's script was recovered from the machine that ran it and is held alongside the
+# capture, at docs/design/receipts/harness/pgo_compare.sh and pgo_strawman.sh. This script is
+# the three-configuration form of the same method, so running it will not reproduce these rows. The capture, and
 # the provenance of each of its rows, is in
 # docs/design/receipts/2026-09-18-pgo-fat-lto-rustc-1.96.1.txt. Nothing here has been
 # reproduced on the 1.85 toolchain this repository pins; re-run and rewrite this block
