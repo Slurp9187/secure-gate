@@ -1,11 +1,11 @@
 ---
-name: publish-prep
+name: secure-gate-publish-prep
 description: Prepare a secure-gate release for crates.io on either line — verify, cut the changelog, tag, and dry-run — in an order that does not need redoing. Use when cutting or publishing 0.9.x from main or 0.8.x from release/0.8, when a tag needs moving, or when deciding whether unreleased work is worth a release at all. Covers the per-line toolchain split, the tag mechanics, and the Windows traps that cost time here.
 ---
 
 # Publish prep
 
-The mechanics of getting a release out. `changelog-protocol` governs what the
+The mechanics of getting a release out. `secure-gate-changelog-protocol` governs what the
 changelog may *claim*; this governs the order you do things in, which is where
 the time actually goes.
 

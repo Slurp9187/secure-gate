@@ -1,5 +1,5 @@
 ---
-name: changelog-protocol
+name: secure-gate-changelog-protocol
 description: Keep secure-gate's CHANGELOG honest across its two release lines by making every claim in it verifiable. Use when writing or reviewing changelog entries, bumping the version, cutting or tagging a release, publishing to crates.io, or when a section's version, date, or publication note looks out of step with the manifest, the tags, or the index. Also use before asserting in prose that a version is or is not published.
 ---
 
@@ -158,7 +158,7 @@ unversioned docs.rs URLs and has no badge to move.
    `### Changed` / `### Fixed` / `### Removed` / `### Security`. No dates unless
    the date is evidence.
 3. **Cut.** Replace `Unreleased` with the ISO date. Tag *after* the dry run,
-   not before — see `publish-prep`.
+   not before — see `secure-gate-publish-prep`.
 4. **Publish.** Then nothing: no publication note, no badge move. The date in the
    heading is the release marker, and the README versions already match the
    manifest. This step used to carry three edits and they were missed twice,
