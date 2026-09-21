@@ -1,5 +1,5 @@
 ---
-name: changelog-protocol
+name: secure-gate-changelog-protocol
 description: Keep secure-gate's CHANGELOG honest across its two release lines by making every claim in it verifiable. Use when writing or reviewing changelog entries, bumping the version, cutting or tagging a release, publishing to crates.io, or when a section's version, date, or publication note looks out of step with the manifest, the tags, or the index. Also use before asserting in prose that a version is or is not published.
 ---
 
