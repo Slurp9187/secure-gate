@@ -4,6 +4,8 @@ Status: deferred — not for 0.9.x stable; revisit as an additive, feature-gated
 Section it would serve: [`SECURITY.md`](../../SECURITY.md) §3, *Swap / core dumps / external
 memory exposure*, and the comparison table beside the `secrets` crate
 Reference implementation studied: `sequoia-openpgp` 2.4.1, `src/crypto/mem.rs`
+Tracking: #264. Prior discussion: #56 (closed *not planned*; this note revises two of its
+assumptions — a stored session key, and guard-returning `expose` access)
 
 `Fixed<T>` and `Dynamic<T>` hold a secret in plaintext for their whole lifetime and wipe it on
 drop. Sequoia goes one step further: a secret that is not being used right now is held
