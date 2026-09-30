@@ -27,6 +27,7 @@
 //! | Inner type | Realloc surface | Use case |
 //! |---|---|---|
 //! | `Dynamic<[u8; N]>` (boxed array) | **None** — fixed size | Long-lived known-size keys held on the heap |
+//! | `Dynamic<[u8]>` (boxed slice) | **None** once built — the length is set at construction and cannot change | Secrets whose length is known only at runtime but never changes afterwards |
 //! | `Dynamic<Vec<u8>>` pre-sized | None *if* you avoid capacity-growing mutations | Variable-length secrets with a known upper bound |
 //! | `Dynamic<Vec<u8>>` growable | **Yes** — each realloc leaves the old buffer unzeroed | Convenient, but see realloc-residue warning below |
 //! | `Dynamic<String>` | Same as `Dynamic<Vec<u8>>` | Passwords, API keys |
@@ -34,6 +35,29 @@
 //! For **long-lived, known-size key material**, prefer `Dynamic<[u8; N]>` —
 //! it combines `Dynamic`'s heap-only property with zero realloc surface.
 //! See `SECURITY.md` § "Inherent Rust Limitations" for the broader discussion.
+//!
+//! When the length is fixed but only known at runtime, `Dynamic<[u8]>` gives the same
+//! guarantee by construction: `with_secret_mut` hands the closure a `&mut [u8]`, which has
+//! no `push`, `extend` or `reserve`, so a reallocation is not expressible rather than merely
+//! discouraged. Two things to know before choosing it:
+//!
+//! - **Build the `Vec` at its exact final capacity.** `Dynamic::<[u8]>::new(vec)` converts
+//!   through `Box<[u8]>::from(Vec)`, which shrinks a `Vec` with excess capacity into a
+//!   newly allocated buffer and frees the old one unwiped. `vec![0u8; len]` is already
+//!   exact; a `Vec` that was grown or truncated is not.
+//! - **It is the narrowest `Dynamic` shape.** Scoped access, [`Debug`](core::fmt::Debug)
+//!   redaction, zeroize-on-drop and `ct_eq` (with `ct-eq`) work. `SecretLen::len`,
+//!   `new_with`, `from_random`, `into_inner`, the encoding traits, serde and `Clone` are
+//!   not implemented for it; read the length with `with_secret(|s| s.len())`.
+//!
+//! ```
+//! use secure_gate::{Dynamic, RevealSecret, RevealSecretMut};
+//!
+//! let len = 32; // known only at runtime
+//! let mut key: Dynamic<[u8]> = Dynamic::new(vec![0u8; len]); // exact capacity: no shrink
+//! key.with_secret_mut(|k: &mut [u8]| k.fill(0x42)); // `&mut [u8]` — cannot grow
+//! assert_eq!(key.with_secret(|k| k.len()), 32);
+//! ```
 //!
 //! # Construction
 //!

@@ -79,10 +79,38 @@ is a lesson for this crate.
   constant-time `secure_cmp`. Comparing ciphertexts could not work, since salts differ.
 - **`Hash` decrypts too.** `Encrypted::hash` feeds the plaintext into the caller's `Hasher`,
   whose state is never wiped. A small leak worth not copying.
-- **Construction wipes its source.** `Protected::from(Vec<u8>)` copies byte by byte
-  (`careful_memcpy`, because the source notes `copy_from_slice` "indeed leaks secrets") and
-  then zeroes the source `Vec`'s entire *capacity*, not just its length.
+- **Construction wipes its source.** `Protected::from(Vec<u8>)` copies into a fresh
+  exact-size box and then zeroes the source `Vec`'s entire *capacity*, not just its length.
+- **The "careful" copy is not careful once optimised.** The copy above goes through
+  `careful_memcpy`, an element-by-element `iter().zip().for_each` loop, because the source
+  notes that `copy_from_slice` "indeed leaks secrets" (presumably through SIMD registers or
+  stack scratch left behind by an optimised `memcpy`). Compiled standalone at `-O3` on x86_64
+  with rustc 1.94.1, **both** `careful_memcpy` and `copy_from_slice` reduce to a tail call
+  `jmp memcpy`: LLVM recognises the loop as a copy idiom. Inlined into sequoia's callers or on
+  other targets it may differ — not tested — but it cannot be relied on.
 - **Kill switch.** `DANGER_DISABLE_ENCRYPTED_MEMORY` is a `const false`; not a runtime option.
+
+### What carries over without sealing
+
+Three of sequoia's `Protected` techniques look worth adopting on their own. Checked against
+this crate, only one needed anything:
+
+| Sequoia technique | Status here |
+|---|---|
+| Exact-size `Box<[u8]>` that cannot grow, so it can never reallocate | **Already expressible**, now documented. `Dynamic<[u8; N]>` was already recommended for compile-time lengths; `Dynamic<[u8]>` is the runtime-length equivalent — `with_secret_mut` hands out `&mut [u8]`, so growth does not compile. The `Dynamic` module docs gained a table row, the one construction caveat (`Box<[u8]>::from(Vec)` shrinks a `Vec` with spare capacity into a new buffer and frees the old one unwiped, so build it at exact capacity), and a doctest. |
+| Zero the source `Vec`'s whole capacity after copying out of it | **Not needed.** Sequoia copies out of the caller's `Vec`, leaving a second plaintext copy to clean up. `Dynamic::new` *moves* the `Vec` in, so the caller's buffer is the one the wrapper holds, and drop already zeroizes its full capacity. Becomes relevant only if a constructor that copies out of an owned `Vec` is ever added. |
+| Byte-by-byte copy instead of `memcpy` | **Not adoptable.** Compiles back to `memcpy` (above). A copy that provably leaves nothing in registers or on the stack needs `asm!` or volatile writes, i.e. `unsafe`, which `#![forbid(unsafe_code)]` rules out. The crate's existing answer — avoid the copy: move-in construction, and `new_with` writing into the wrapper's own storage — is the stronger one. |
+
+`Dynamic<[u8]>` is the narrowest `Dynamic` shape. Verified against the crate: construction via
+`new` / `From<Box<[u8]>>`, `with_secret`, `with_secret_mut`, `Debug` redaction and `ct_eq`
+work; `SecretLen::len` (E0599), `new_with` (E0599) and `into_inner` (`[u8]: SentinelValue`
+unsatisfied, E0277) do not. Additive follow-ups if the shape proves popular, none needed for
+0.9 stable:
+
+- `impl<T: Zeroize> SecretLen for Dynamic<[T]>`, mirroring the `Dynamic<Vec<T>>` impl.
+- `Dynamic::<[u8]>::new_with(len, f)` / `try_new_with` / `from_random(len)`, which would make
+  exact capacity the only way to build one and remove the caveat above.
+- Encoding and serde impls, as for `Dynamic<Vec<u8>>`.
 
 ## Fitting it to `Fixed` and `Dynamic`
 

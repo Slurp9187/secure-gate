@@ -224,6 +224,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Both corrections were made on `release/0.8` while backporting rc.12 and are re-derived
   here. The staleness was inherited on both lines, not introduced by that backport.
 
+- The `Dynamic` module docs' inner-type table gains `Dynamic<[u8]>`, the boxed slice: the
+  shape for a secret whose length is known only at runtime but never changes. It already
+  worked; it was undocumented. `with_secret_mut` hands the closure a `&mut [u8]`, so a
+  reallocation does not compile rather than being advised against. The entry carries the one
+  construction trap — `Box<[u8]>::from(Vec)` shrinks a `Vec` with spare capacity into a new
+  buffer and frees the old one unwiped, so build it at exact capacity — and says plainly that
+  it is the narrowest `Dynamic` shape: no `SecretLen`, `new_with`, `into_inner`, encoders,
+  serde or `Clone`. A doctest pins the documented use.
+- `docs/design/sealed_memory.md` (new) records an analysis of `sequoia-openpgp`'s
+  encrypted-in-memory secrets and why a sealed variant of `Fixed`/`Dynamic` is deferred past
+  0.9 stable, including a compile-checked `E0034` hazard for glob importers that any later
+  scoped-access trait must avoid. It also checks three of sequoia's buffer techniques against
+  this crate: one was already expressible (above), one is unneeded because `Dynamic::new`
+  moves rather than copies, and one — a byte-by-byte copy in place of `memcpy` — compiles
+  back to `memcpy` at `-O3` and is not adopted.
+
 ### Removed
 
 - **BREAKING: `derive: [ConstantTimeEq]` is rejected on the shaped newtype arms.** It was
