@@ -239,6 +239,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this crate: one was already expressible (above), one is unneeded because `Dynamic::new`
   moves rather than copies, and one — a byte-by-byte copy in place of `memcpy` — compiles
   back to `memcpy` at `-O3` and is not adopted.
+- `SECURITY.md`'s **What secure-gate does NOT protect against** gains *lossy hardware readout
+  of RAM* (cold boot, Rowhammer-style bit recovery, Spectre-class leaks). It was an unstated
+  gap: the list covered a clean memory read and software side channels, but not a readout
+  that recovers most of a short key. The entry names the known mitigation — idle secrets
+  encrypted under a key recomputed from a large pre-key, as in `sequoia-openpgp` — says what
+  it does not cover, and points to #56, where an opt-in sealed type is tracked as deferred.
 
 ### Removed
 
