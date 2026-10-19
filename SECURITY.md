@@ -23,7 +23,7 @@ This document outlines the security model, design choices, strengths, limitation
 - **Anything past `into_inner()`** — extraction hands you the plain value and ends protection. It is not wiped for you, and its `Debug` is not redacted.
 - **Encoded/serialized output** — every encoder (`to_hex()`, `to_base32()`, `to_base64url()`, `try_to_bech32()`, `try_to_bech32m()`) returns `EncodedSecret`: `Zeroizing<String>` with a redacted `Debug` and no `Display`, so the encoded copy is wiped on drop. serde `Serialize`, by contrast, produces full secrets in ordinary non-zeroizing buffers that this crate cannot reach. `EncodedSecret::into_inner()` is the named call that hands you an unprotected `String`.
 - **All side channels beyond equality timing** — cache, power, EM, and branch-predictor attacks are out of scope.
-- **Lossy hardware readout of RAM** — cold boot, Rowhammer-style bit recovery, transient-execution (Spectre-class) leaks. Wrappers hold their secret in plaintext for their whole lifetime, and a readout with a few wrong bits is enough to recover a short key by search. The known mitigation is to keep idle secrets *encrypted* in memory under a key recomputed on each access from a large random pre-key, so that any single wrong bit makes the key useless: [`sequoia-openpgp`](https://crates.io/crates/sequoia-openpgp)'s `crypto::mem::Encrypted` does this, after OpenSSH. It narrows lossy readout only — against a clean read it is no help (first bullet). `secure-gate` does not provide it; an opt-in sealed type is tracked, deferred, in [#56](https://github.com/Slurp9187/secure-gate/issues/56), with the design in [`docs/design/sealed_memory.md`](https://github.com/Slurp9187/secure-gate/blob/main/docs/design/sealed_memory.md).
+- **Lossy hardware readout of RAM** — cold boot, Rowhammer-style bit recovery, transient-execution (Spectre-class) leaks. Wrappers hold their secret in plaintext for their whole lifetime, and a readout with a few wrong bits is enough to recover a short key by search. The known mitigation is to keep idle secrets *encrypted* in memory under a key recomputed on each access from a large random pre-key, so that any single wrong bit makes the key useless: [`sequoia-openpgp`](https://crates.io/crates/sequoia-openpgp)'s `crypto::mem::Encrypted` does this, after OpenSSH. It narrows lossy readout only — against a clean read it is no help (first bullet). The opt-in `sealed` feature provides it: `SealedFixed` / `SealedDynamic`, under a page-locked `Prekey` (see [3. Swap / core dumps / external memory exposure](#3-swap--core-dumps--external-memory-exposure) and [`docs/design/sealed_memory.md`](https://github.com/Slurp9187/secure-gate/blob/main/docs/design/sealed_memory.md)). `Fixed` and `Dynamic` remain plaintext.
 - **Allocation-based DoS from deserialization** — `MAX_DESERIALIZE_BYTES` is a post-materialization bound only; the upstream deserializer may allocate arbitrarily first.
 - **Stack/register residue** — temporaries, FFI boundaries, and compiler spills are outside wrapper control.
 
@@ -66,11 +66,18 @@ hibernation, which writes all of RAM to disk by design, nor a core dump when the
 crashes. Encrypted swap and disabled core dumps are deployment-level controls that cover
 what locking cannot.
 
-Nothing here is a `secure-gate` feature and nothing is planned. Every guarantee this crate
-makes is about preventing a *programmer* mistake, mostly at compile time; keeping the
-operating system from paging memory is a different layer with a different actor, and
-absorbing it would cost `no_std` support, the single-dependency property, and
-`#![forbid(unsafe_code)]` to ship a weaker version of the crates above.
+None of this is offered for `Fixed` or `Dynamic`. Every guarantee those make is about
+preventing a *programmer* mistake, mostly at compile time; keeping the operating system from
+paging memory is a different layer with a different actor, and absorbing it would cost
+`no_std` support, the single-dependency property, and `#![forbid(unsafe_code)]` to ship a
+weaker version of the crates above.
+
+The one allocation this crate does lock is the opt-in `sealed` feature's `Prekey`, and it
+follows the rule above: 16 KiB aligned to 16 KiB, so it owns whole pages on 4 KiB- and
+16 KiB-page systems and its unlock cannot reach a neighbour. It locks through `region`, so
+the `unsafe` stays in that dependency. It does not lock your secrets; it keeps a sealed
+secret that does reach swap from being opened there. See
+[3. Swap / core dumps / external memory exposure](#3-swap--core-dumps--external-memory-exposure).
 
 ## Inherent Rust Limitations
 
@@ -280,8 +287,39 @@ and outside any in-process library's reach.
 - Disable hibernation on machines that hold long-lived keys, or ensure hibernation storage is encrypted.
 
 `secure-gate` treats all three of these mitigations as deployment
-configuration. The crate does not call `mlock` or set process flags
-itself.
+configuration. `Fixed` and `Dynamic` never call `mlock` or set process
+flags.
+
+**Opt-in, beside these and not instead of them: the `sealed` feature.**
+`SealedFixed<N>` and `SealedDynamic` hold a secret as ChaCha20-Poly1305
+ciphertext and open it only for one `with_secret` / `with_secret_mut`
+call. The sealing key, `SHA-256(salt ‖ pre-key)`, is recomputed on every
+access and never stored. The pre-key is 16 KiB of random bytes in a
+`Prekey` that each sealed object holds an `Arc` to; it is not a `static`,
+and when the last reference drops it is wiped while still locked, then
+unlocked, then freed.
+
+| Threat | Sealed |
+|---|---|
+| Lossy readout (cold boot, Rowhammer, Spectre-class) | Narrowed: one wrong bit of the pre-key's 131,072 makes the key useless |
+| Sealed secret paged to **swap** | Covered when the pre-key is locked: the pre-key is not in swap, so the ciphertext there cannot be opened |
+| Pre-key lock refused (quota) | `Prekey::lock_status()` returns `Err`; nothing panics, but the pre-key can then be swapped like any memory |
+| **Hibernation** file | Not covered: it captures locked pages too |
+| **Crash or core dump** | Not covered: it captures pre-key, salt and ciphertext together |
+| Clean read of process memory (debugger, `/proc/<pid>/mem`, code in the process) | Not covered: same reason |
+| The plaintext temporary while the closure runs, and copies the closure makes | Not covered: on the stack (`SealedFixed`) or heap (`SealedDynamic`), unlocked, wiped when the call returns |
+
+On Windows every `VirtualLock` in a process draws on its working-set
+quota. With the default minimum, about eleven pre-keys lock before the
+next is refused (measured on Windows 11). An application holding more,
+or locking other memory too, raises the quota with
+`SetProcessWorkingSetSize` at startup. On Unix the limit is
+`RLIMIT_MEMLOCK`.
+
+Each access costs about 7–11 µs for a 32-byte key against well under a
+nanosecond for `Fixed` (see `docs/design/sealed_memory.md` for the
+numbers and the machine). The design, and what it deliberately does not
+offer (`expose_secret`, `Hash`), is in that note.
 
 ### 4. Copying the secret out of a reveal borrow
 

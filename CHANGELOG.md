@@ -141,6 +141,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   audits to record their coverage rather than their verdict.
 
 ### Added
+- **Sealed memory, behind the opt-in `sealed` feature (#56).** `SealedFixed<N>` and
+  `SealedDynamic<Vec<u8> | String>` hold a secret as ChaCha20-Poly1305 ciphertext and open it
+  only for one `with_secret` / `with_secret_mut` call. The sealing key is
+  `SHA-256(salt ‖ pre-key)`, recomputed on every access and never stored, so a lossy readout
+  of RAM (cold boot, Rowhammer, Spectre-class) that gets one bit of the 16 KiB pre-key wrong
+  yields a useless key. The design follows `sequoia-openpgp`'s `mem::Encrypted`; the
+  analysis and what departs from it are in `docs/design/sealed_memory.md`.
+
+  The pre-key is a `Prekey` that every sealed object holds an `Arc` to, **not a `static`**:
+  when the last reference drops it is wiped while still locked, then unlocked, then freed.
+  Its 16 KiB are aligned to 16 KiB and locked in RAM (`VirtualLock` / `mlock`, through
+  `region`, so this crate keeps `#![forbid(unsafe_code)]`); with the pre-key out of swap, a
+  sealed secret that is swapped cannot be opened from there. A refused lock is reported by
+  `Prekey::lock_status()` and never panics. On Windows the default working-set quota
+  allowed 11 pre-keys before refusing the 12th.
+
+  Not offered, on purpose: `expose_secret`, `RevealSecret`, `Hash`. `Debug` prints
+  `[REDACTED]`, with no salt or length. `SealedDynamic::with_secret_mut` hands out
+  `&mut [u8]` / `&mut str`, so the closure cannot grow the buffer and abandon a copy. Locking
+  does not cover hibernation, crash dumps or a clean read of process memory; `SECURITY.md` §3
+  says what is and is not covered.
+
+  Each access costs about 7–11 µs for a 32-byte key (`benches/sealed_vs_fixed.rs`). The
+  feature adds `chacha20poly1305` 0.11, `sha2` 0.11 and `region` 4.0.1, all
+  `rust-version = "1.85"`, and implies `std` and `rand`. It is not part of `full`. The
+  default dependency set is unchanged.
+- **`sealed_fixed_newtype!`** seals a `fixed_newtype!` role into its own type:
+  `sealed_fixed_newtype!(pub SealedAppKey, AppKey, "doc")` gives `SealedAppKey::seal(AppKey,
+  &prekey)` and `unseal() -> AppKey`, and accepts no other role (compile-fail doctests).
+  `fixed_newtype!`'s size-literal form gains a hidden conversion trait impl under `sealed` so
+  the bytes move across instead of being copied out by hand.
+- **`secure_gate::scoped::RevealScoped`**, closure-only read access implemented for every
+  `RevealSecret` type and for the sealed types, so generic code can take either. It is not
+  re-exported at the crate root: its method shares `with_secret`'s name, and a root
+  re-export would make `use secure_gate::*;` callers fail with E0034
+  (`tests/sealed_glob_import.rs`).
 - `tests/compile-fail/with_secret_no_move_out.rs` and `tests/reveal_copy_out.rs`, a pair
   pinning the two halves of that scoping from opposite sides: that moving a secret out of
   a reveal borrow does *not* compile for a non-`Copy` inner type, and that copying one out

@@ -1,18 +1,99 @@
 # Sealed memory: encrypting idle secrets in RAM
 
-Status: deferred — not for 0.9.x stable; revisit as an additive, feature-gated minor release
-Section it would serve: [`SECURITY.md`](../../SECURITY.md) §3, *Swap / core dumps / external
-memory exposure*, and the comparison table beside the `secrets` crate
+Status: built for 0.9.0-rc.13 behind the opt-in `sealed` feature (PR #265). The analysis
+below is the one it was built from; [As built](#as-built-090-rc13) records where the build
+departs from it, and why.
+Section it serves: [`SECURITY.md`](../../SECURITY.md) §3, *Swap / core dumps / external
+memory exposure*
 Reference implementation studied: `sequoia-openpgp` 2.4.1, `src/crypto/mem.rs`
-Tracking: #56 (reopened; this note revises two assumptions from its original proposal and
-brainstorm — a stored session key, and guard-returning `expose` access)
+Tracking: #56
 
 `Fixed<T>` and `Dynamic<T>` hold a secret in plaintext for their whole lifetime and wipe it on
 drop. Sequoia goes one step further: a secret that is not being used right now is held
 **encrypted**, and is decrypted only for the length of one closure call. This note records how
-that works, how it would map onto this crate, what it would cost, and why it is not in the
-first stable release. It exists so nobody has to repeat the analysis when the question comes
-back.
+that works, how it maps onto this crate, what it costs, and what was built.
+
+## As built (0.9.0-rc.13)
+
+The owner decided on 2026-10-18 to ship this in rc.13 rather than after 0.9 stable, and
+encrypted-file-vault (EFV) asked for three things sequoia does not do: lock the pre-key's
+pages, survive a refused lock, and avoid a never-wiped `static`. What shipped:
+
+| Point | As built | Differs from the analysis below? |
+|---|---|---|
+| Feature | `sealed = ["std", "rand", chacha20poly1305 0.11, sha2 0.11, region 4.0.1]`; not in `full` (which excludes `std`) | — |
+| Pre-key | `Prekey`, held as `Arc<Prekey>` by every sealed object; **not a static** | **Yes**: the analysis recommended a global `OnceLock` |
+| Pre-key memory | One 16 KiB block, `#[repr(align(16384))]`, locked with `region::lock` | **Yes**: sequoia uses four unaligned, unlocked `Vec`s |
+| Failed lock | `Prekey::new()` always returns; `lock_status() -> Result<(), LockError>` | New |
+| Pre-key end of life | Wiped while still locked, then unlocked, then freed, when the last `Arc` drops | **Yes**: sequoia never frees or wipes it |
+| Key derivation | `SHA-256(salt ‖ pre-key)` into a `Fixed<[u8; 32]>`, per access | No (kept SHA-256; see [Measured cost](#measured-cost)) |
+| AEAD | ChaCha20-Poly1305, detached tag, zero nonce, fresh salt per seal and re-seal | No |
+| `SealedFixed<N>` | Ciphertext, tag, salt inline; opens in place into a stack `Fixed` | No |
+| `SealedDynamic<T>` | `T` is `Vec<u8>` or `String`; ciphertext `Box<[u8]>`; `with_secret_mut` hands out `&mut [u8]` / `&mut str` | Resolves the open question: fixed length, no growth |
+| Scoped trait | `secure_gate::scoped::RevealScoped`, not at the root; read access only | No |
+| Roles | `sealed_fixed_newtype!(pub SealedAppKey, AppKey, "doc")` | New (EFV seals four `fixed_newtype!` roles) |
+| Not offered | `expose_secret`, `RevealSecret`, `Hash`; `Debug` is `[REDACTED]` | No |
+
+### Why the pre-key is an owner object, not a static
+
+A `static` is never dropped, so it is never wiped: sequoia's pre-key outlives every secret it
+protected, for the life of the process. EFV's rule is "no secrets in static", enforced by a CI
+gate. An `Arc<Prekey>` kept by every sealed object costs one reference count per object and
+nothing per access, and buys three things:
+
+- **The pre-key is wiped.** When the last sealed object (or other `Arc`) drops, the 16 KiB are
+  zeroed. An application that holds one `Prekey` per session and drops it, with everything
+  sealed under it, at lock or logout gets a lock that also destroys the sealing material.
+- **No allowlist entry** in a consumer's no-static-secrets gate.
+- **Re-keying is possible.** A forked child, or a new session, creates its own.
+
+The cost is an argument at seal time (`seal(secret, &prekey)`) and none at access time, since
+each object carries its own `Arc`. The analysis's objection to an explicit context, "costs an
+argument at every call", applied to passing it on every *access*; holding it in the object
+removes that.
+
+### Locking
+
+`region::lock` is a safe function, so the `unsafe` stays in that dependency and this crate keeps
+`#![forbid(unsafe_code)]`. The block is aligned to its own size, so it fills whole pages on
+4 KiB- and 16 KiB-page systems and owns them: its unlock cannot release a neighbour's lock, the
+hazard [`SECURITY.md`](../../SECURITY.md) describes for naive `mlock`. On a 64 KiB-page system
+it would share a page; not tested.
+
+`Drop` wipes, then drops the `LockGuard` (which unlocks), and only then lets the box free the
+pages: unlocking after the free could unlock whatever reuses them.
+
+A refused lock is reported, never fatal. On Windows every `VirtualLock` in the process shares
+the working-set quota: **with the default minimum, 11 pre-keys locked and the 12th was refused**
+(`ERROR_WORKING_SET_QUOTA`, 1453), measured on Windows 11 in a test process. EFV raises the
+quota to 4 MiB at startup. Two test findings worth keeping:
+
+- Parallel tests in one binary share the quota, so a test asserting a lock succeeds is flaky
+  beside other locking tests. `tests/sealed_lock.rs` holds a single test for that reason.
+- On Windows, freeing a 16 KiB heap block decommits its pages, which releases their lock
+  whether or not they were unlocked. A test that drops pre-keys and then checks the quota came
+  back passes even with the unlock deleted. `wipe_and_unlock_returns_the_quota` unlocks while
+  the blocks are still allocated, and fails with the unlock deleted (checked).
+
+### Measured cost
+
+AMD Ryzen 9 9950X3D (SHA-NI available), Windows 11, rustc 1.98.1, release profile;
+`cargo bench --features sealed --bench sealed_vs_fixed`, criterion medians. The machine was
+shared with other builds, so treat these as an order of magnitude:
+
+| Operation | Time |
+|---|---|
+| `Fixed<[u8; 32]>::with_secret` | ~0.36 ns |
+| `SealedFixed<32>::with_secret` | ~7–11 µs |
+| `SealedFixed<32>::with_secret_mut` (open, re-seal, fresh salt) | ~15 µs |
+| `SealedFixed<32>::seal` | ~7.5 µs |
+| `SealedDynamic<Vec<u8>>::with_secret`, 4 KiB | ~11.5 µs |
+| `Prekey::new` (allocate, RNG, lock, and wipe on drop) | ~8 µs |
+
+SHA-256 against BLAKE3 over the same 32 + 16,384 bytes, best of 12 rounds of 20,000 in a
+standalone release binary: **6.44 µs vs 6.29 µs**. With SHA-NI they are the same, so SHA-256
+stays: no extra dependency for no gain. A CPU without SHA extensions would favour BLAKE3;
+not measured.
 
 ## How sequoia does it
 
@@ -142,7 +223,7 @@ that already carry most of the inherent API:
 - `Dynamic<String>` → sealed as bytes; unsealing uses `String::from_utf8`, which cannot fail
   on authenticated plaintext and does not copy.
 
-### `SealedFixed<N>` — stays `no_std`, no heap
+### `SealedFixed<N>` — no heap per access
 
 ```rust
 pub struct SealedFixed<const N: usize> {
@@ -189,7 +270,9 @@ Sequoia's `OnceLock` + heap + OS RNG assumes `std`. Two options:
    caller puts it in a `static`; lets the caller decide when to regenerate (e.g. after
    `fork()`). Costs an argument at every call.
 
-Recommendation: ship (1); add (2) only if someone asks for sealing without `std`.
+Recommendation at the time: ship (1); add (2) only if someone asks for sealing without `std`.
+Superseded: what shipped is neither, but an owner object held by each sealed value; see
+[Why the pre-key is an owner object](#why-the-pre-key-is-an-owner-object-not-a-static).
 
 Unlike sequoia, the pre-key can at least live in a `Fixed<[u8; 16384]>` so it is wiped if ever
 dropped. Locking it or excluding it from core dumps (`mlock`, `MADV_DONTDUMP`) needs `unsafe`
@@ -263,35 +346,40 @@ binaries:
 | generic `fn f<S: RevealScoped>` called with `Fixed` and `SealedFixed` | compiles | compiles | compiles |
 
 Re-exporting the module-scoped trait as `pub use scoped::RevealScoped as _;` brought the E0034
-back. The model is not the real crate; re-run the same three cases against `src/` when this is
-implemented.
+back. The model is not the real crate; the same three cases now run against `src/` in
+`tests/sealed_glob_import.rs`. One more collision the model did not show: any scope that imports
+*both* traits by name gets E0034 on `fixed.with_secret(..)` too. The `scoped` module docs say so
+and give the qualified-path call.
 
 ## Costs
 
 - **Not zero-overhead.** Each access hashes 16 KiB and runs one AEAD pass; each mutation adds
-  an RNG call and a second AEAD pass. Expected to be tens of microseconds per access — **not
-  measured**. Benchmark before publishing any number.
+  an RNG call and a second AEAD pass. Measured at about 7–11 µs per
+  32-byte access; see [Measured cost](#measured-cost).
 - **New crypto surface.** Key derivation, AEAD and nonce discipline in a crate that currently
   performs no cryptography of its own. It needs its own review cycle.
 - **Narrow threat model.** Helps against lossy readout only. Must be documented as such, next
   to — not instead of — encrypted swap, disabled core dumps and `mlock`.
 
-## Why it is deferred
+## Why it was deferred, and why it ships now
 
 The 0.9 stable pitch is zero-overhead, no `unsafe`, `zeroize` as the only required dependency,
-and `no_std`. The sealed family breaks the first, the third and (for the global pre-key) the
-fourth. It reads better as an opt-in advanced feature on a crate that is already stable than
-as part of a first release that then has to explain the exceptions. And since the path above
-is additive — new feature, new optional dependencies, new types, a new trait that stays out of
-glob imports — nothing in 0.9 needs to change to keep the door open.
+and `no_std`. The sealed family breaks the first and third, and needs `std`. The original plan
+was to add it after 0.9 stable, as an opt-in advanced feature.
 
-## Open questions for when this is picked up
+It ships in rc.13 instead because a consumer (EFV) needs it now for its long-lived keys, and
+because every one of those costs is confined to the opt-in feature: the default dependency set
+is still `zeroize` alone, `Fixed` and `Dynamic` are unchanged, `no_std` builds do not see it,
+and the crate itself still forbids `unsafe`.
 
-- Benchmark `SealedFixed<32>` access against `Fixed<[u8; 32]>`; decide whether SHA-256 or
-  BLAKE3 for the key derivation based on the number.
-- Is `SealedDynamic` wanted at all, or does `SealedFixed` cover the real uses (keys, not
-  passphrases)?
-- `with_secret_mut` on `SealedDynamic`: `&mut Vec<u8>` with the growth caveat, or `&mut [u8]`?
-- Pre-key after `fork()`: document, or re-key the child (which means re-sealing everything)?
-- Pre-key locking / `MADV_DONTDUMP`: worth a dependency that uses `unsafe`?
-- Does anyone need the explicit-context (`no_std`) variant?
+## Open questions, resolved
+
+- **Benchmark; SHA-256 or BLAKE3?** Measured above; SHA-256.
+- **Is `SealedDynamic` wanted?** Yes: EFV keeps passwords and an SSH key as `Dynamic<String>`.
+- **`with_secret_mut` on `SealedDynamic`?** `&mut [u8]` / `&mut str`. To change the length,
+  unseal, edit and seal again.
+- **Pre-key after `fork()`?** Documented, not handled: the child shares the bytes but not the
+  page locks, and creates its own `Prekey` if it should not hold the parent's.
+- **Pre-key locking?** Built, through `region`.
+- **Explicit-context `no_std` variant?** Not built. The owner object covers re-keying, which
+  was the variant's other selling point; `no_std` sealing waits for someone to ask.
