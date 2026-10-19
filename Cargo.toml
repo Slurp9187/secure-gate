@@ -166,6 +166,11 @@ name = "dynamic_vs_raw"
 harness = false
 
 [[bench]]
+name = "sealed_vs_fixed"
+harness = false
+required-features = ["sealed"]
+
+[[bench]]
 name = "serde"
 harness = false
 
