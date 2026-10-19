@@ -198,7 +198,12 @@ impl Prekey {
     /// A fresh random salt, and so a fresh sealing key. Drawn before any plaintext is
     /// copied into a ciphertext buffer, so an RNG failure cannot leave plaintext behind.
     pub(crate) fn fresh_salt() -> [u8; SALT_LEN] {
-        Fixed::<[u8; SALT_LEN]>::from_random().into_inner()
+        let mut rng = SysRng;
+        let words: [u64; SALT_LEN / 8] = core::array::from_fn(|_| {
+            rng.try_next_u64()
+                .expect("SysRng failure is a program error")
+        });
+        core::array::from_fn(|i| words[i / 8].to_le_bytes()[i % 8])
     }
 
     /// Encrypts `buf` in place under the key for `salt`; returns the detached tag.
