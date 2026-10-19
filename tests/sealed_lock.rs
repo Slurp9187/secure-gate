@@ -9,6 +9,10 @@ use secure_gate::{Fixed, Prekey, SealedFixed};
 /// over; on Unix the limit may be higher than this, which the test allows.
 const MANY: usize = 1024;
 
+/// The pre-key's shape: 16 KiB at 16 KiB alignment.
+#[repr(C, align(16384))]
+struct Spacer([u8; 16384]);
+
 #[test]
 fn locks_succeed_fail_softly_and_are_released_on_drop() {
     // A first pre-key, alone in the process, locks.
@@ -41,14 +45,22 @@ fn locks_succeed_fail_softly_and_are_released_on_drop() {
         let s = SealedFixed::seal(Fixed::new([3u8; 32]), last);
         s.with_secret(|b| assert_eq!(b[0], 3));
 
-        // Dropping the pre-keys unlocks their pages, so the quota is free again.
+        // Dropping the pre-keys unlocks their pages, so the quota is free again. The freed
+        // slots are filled with same-shaped spacers first, so the new pre-keys land on
+        // other pages: re-locking a page that was never unlocked costs no quota, and would
+        // let a missing unlock pass.
+        let count = held.len();
         drop(s);
         held.clear();
-        let again = Prekey::new();
-        assert_eq!(
-            again.lock_status(),
-            Ok(()),
-            "dropped pre-keys gave their quota back"
-        );
+        let spacers: Vec<_> = (0..count).map(|_| Box::new(Spacer([1u8; 16384]))).collect();
+        let again: Vec<_> = (0..count - 1).map(|_| Prekey::new()).collect();
+        for k in &again {
+            assert_eq!(
+                k.lock_status(),
+                Ok(()),
+                "dropped pre-keys gave their quota back"
+            );
+        }
+        drop(spacers);
     }
 }
