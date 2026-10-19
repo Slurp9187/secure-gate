@@ -23,7 +23,7 @@ pages, survive a refused lock, and avoid a never-wiped `static`. What shipped:
 |---|---|---|
 | Feature | `sealed = ["std", "rand", chacha20poly1305 0.11, sha2 0.11, region 4.0.1]`; not in `full` (which excludes `std`) | — |
 | Pre-key | `Prekey`, held as `Arc<Prekey>` by every sealed object; **not a static** | **Yes**: the analysis recommended a global `OnceLock` |
-| Pre-key memory | One 16 KiB block, `#[repr(align(16384))]`, locked with `region::lock` | **Yes**: sequoia uses four unaligned, unlocked `Vec`s |
+| Pre-key memory | One 16 KiB pre-key in a block aligned per target (16 KiB on x86, x86_64, Apple aarch64; 64 KiB elsewhere, since rc.14), locked with `region::lock` | **Yes**: sequoia uses four unaligned, unlocked `Vec`s |
 | Failed lock | `Prekey::new()` always returns; `lock_status() -> Result<(), LockError>` | New |
 | Pre-key end of life | Wiped while still locked, then unlocked, then freed, when the last `Arc` drops | **Yes**: sequoia never frees or wipes it |
 | Key derivation | `SHA-256(salt ‖ pre-key)` into a `Fixed<[u8; 32]>`, per access | No (kept SHA-256; see [Measured cost](#measured-cost)) |
@@ -55,10 +55,19 @@ removes that.
 ### Locking
 
 `region::lock` is a safe function, so the `unsafe` stays in that dependency and this crate keeps
-`#![forbid(unsafe_code)]`. The block is aligned to its own size, so it fills whole pages on
-4 KiB- and 16 KiB-page systems and owns them: its unlock cannot release a neighbour's lock, the
-hazard [`SECURITY.md`](../../SECURITY.md) describes for naive `mlock`. On a 64 KiB-page system
-it would share a page; not tested.
+`#![forbid(unsafe_code)]`. The block is aligned to at least the target's page size, so it
+owns every page it touches: its unlock cannot release a neighbour's lock, the hazard
+[`SECURITY.md`](../../SECURITY.md) describes for naive `mlock`.
+
+In rc.13 the block was aligned to 16 KiB everywhere, and a larger page was refused. Since
+rc.14 the alignment comes from a per-target table, taken from the `secrets` crate (1.3.0,
+`src/secret.rs`, which added it after its own unlock-a-neighbour bug, #109), with the
+pre-key's 16 KiB as the floor: 16 KiB on x86, x86_64 and Apple aarch64, 64 KiB on every other
+aarch64 and every unlisted target. On those, a `Prekey` costs 64 KiB of locked memory, inside
+Linux's 8 MiB default `RLIMIT_MEMLOCK` since kernel 5.16. The page-size refusal stays as the
+fallback for a target the table gets wrong. Checked by cross-compiling six targets with each
+one's alignment asserted at compile time (an assertion flipped to the wrong value fails the
+build); no 64 KiB-page hardware was available, so not run there.
 
 `Drop` wipes, then drops the `LockGuard` (which unlocks), and only then lets the box free the
 pages: unlocking after the free could unlock whatever reuses them.
