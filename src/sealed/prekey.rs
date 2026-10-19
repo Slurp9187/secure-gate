@@ -290,6 +290,45 @@ mod tests {
         assert!(prekey.lock.is_none());
     }
 
+    /// Exhausts the lock quota with pre-keys whose blocks stay allocated, unlocks them,
+    /// and checks the quota came back. The blocks must stay allocated: on Windows freeing
+    /// one decommits its pages, which releases the lock with or without an unlock.
+    /// Other tests in this binary lock pages concurrently, so this asks only that most of
+    /// the freed quota be usable again; a missing unlock frees none of it.
+    #[test]
+    fn wipe_and_unlock_returns_the_quota() {
+        let mut held = Vec::new();
+        while held.len() < 1024 {
+            let block = random_block();
+            let lock = region::lock(block.0.as_ptr(), PREKEY_LEN);
+            let refused = lock.is_err();
+            held.push(Prekey::from_parts(block, lock));
+            if refused {
+                break;
+            }
+        }
+        let locked = held.iter().filter(|p| p.lock.is_some()).count();
+        if locked == held.len() {
+            return; // No refusal within the cap: this platform's quota is out of reach.
+        }
+        for p in &mut held {
+            p.wipe_and_unlock();
+        }
+        let relocked: Vec<_> = (0..locked)
+            .map(|_| {
+                let block = random_block();
+                let lock = region::lock(block.0.as_ptr(), PREKEY_LEN);
+                Prekey::from_parts(block, lock)
+            })
+            .collect();
+        let ok = relocked.iter().filter(|p| p.lock.is_some()).count();
+        assert!(
+            ok * 2 >= locked,
+            "only {ok} of {locked} relocked after unlocking"
+        );
+        drop(held);
+    }
+
     #[test]
     fn the_sealing_key_depends_on_every_prekey_bit() {
         let mut prekey = Arc::try_unwrap(Prekey::new()).unwrap();
