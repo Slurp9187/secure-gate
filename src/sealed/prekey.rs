@@ -19,11 +19,47 @@ pub(crate) const TAG_LEN: usize = 16;
 /// Size of the random salt drawn for every seal.
 pub(crate) const SALT_LEN: usize = 32;
 
-/// The pre-key's storage. Aligned to its own size, so it starts on a page boundary and
-/// fills whole pages on both 4 KiB- and 16 KiB-page systems: locking it locks nothing
-/// else, and unlocking it on drop cannot unlock a neighbor's pages.
-#[repr(C, align(16384))]
+/// The pre-key's storage, aligned to at least the target's page size so it owns every page
+/// it touches: locking it locks nothing else, and unlocking it on drop cannot unlock a
+/// neighbor's pages (`munlock` and `VirtualUnlock` work on whole pages and do not nest).
+///
+/// `repr(align)` takes a literal, so the alignment is chosen per target, after the `secrets`
+/// crate's table (1.3.0, `src/secret.rs`), with the pre-key's own 16 KiB as the floor:
+///
+/// | Target | Alignment | Why |
+/// |---|---|---|
+/// | x86, x86_64 | 16 KiB | 4 KiB pages; the floor |
+/// | aarch64 Apple | 16 KiB | 16 KiB pages |
+/// | aarch64 other | 64 KiB | Linux kernels built for 64 KiB pages exist |
+/// | anything else | 64 KiB | unknown; ppc64le's default page is 64 KiB |
+///
+/// On a 64 KiB-aligned target the block is 64 KiB, of which only the first 16 KiB are the
+/// pre-key; the rest is never written. [`lock_block`] still refuses a page larger than the
+/// alignment, for any target this table gets wrong.
+#[cfg_attr(
+    any(
+        target_arch = "x86",
+        target_arch = "x86_64",
+        all(target_arch = "aarch64", target_vendor = "apple"),
+    ),
+    repr(C, align(16384))
+)]
+#[cfg_attr(
+    not(any(
+        target_arch = "x86",
+        target_arch = "x86_64",
+        all(target_arch = "aarch64", target_vendor = "apple"),
+    )),
+    repr(C, align(65536))
+)]
 struct Block([u8; PREKEY_LEN]);
+
+/// The block's alignment, and the largest page it can own.
+const BLOCK_ALIGN: usize = core::mem::align_of::<Block>();
+
+// The block holds the whole pre-key, and fills whole aligned units.
+const _: () = assert!(BLOCK_ALIGN >= PREKEY_LEN);
+const _: () = assert!(core::mem::size_of::<Block>() % BLOCK_ALIGN == 0);
 
 /// Why the pre-key's pages are not locked in RAM. Returned by [`Prekey::lock_status`].
 ///
@@ -33,8 +69,9 @@ struct Block([u8; PREKEY_LEN]);
 /// is `RLIMIT_MEMLOCK`.
 ///
 /// It is also returned, without asking the operating system, when the page size is larger
-/// than the pre-key (64 KiB pages on some Linux builds): the pre-key would then share a page
-/// with other memory, and unlocking it on drop would unlock that memory too.
+/// than the pre-key's block is aligned for (16 KiB on x86, x86_64 and Apple aarch64; 64 KiB
+/// elsewhere): the pre-key would then share a page with other memory, and unlocking it on
+/// drop would unlock that memory too.
 ///
 /// Carries the operating system's error code or the page size, never an address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -225,16 +262,17 @@ impl Prekey {
     }
 }
 
-/// Locks `block`'s pages, unless a page is larger than the block: locking it would then
-/// lock, and later unlock, a neighbor's memory too.
+/// Locks `block`'s pages, unless a page is larger than the block's alignment: locking it
+/// would then lock, and later unlock, a neighbor's memory too.
 fn lock_block(block: &Block, page_size: usize) -> Result<region::LockGuard, LockError> {
-    if page_size > PREKEY_LEN {
+    if page_size > BLOCK_ALIGN {
         return Err(LockError {
             os_code: None,
             page_size: Some(page_size),
         });
     }
-    region::lock(block.0.as_ptr(), PREKEY_LEN).map_err(|err| LockError::from_region(&err))
+    region::lock(block.0.as_ptr(), core::mem::size_of::<Block>())
+        .map_err(|err| LockError::from_region(&err))
 }
 
 /// Size of the stack region [`scrub_stack`] overwrites.
@@ -319,11 +357,11 @@ pub(crate) mod tests {
     fn block_is_page_aligned_and_fills_whole_pages() {
         let block = random_block();
         let addr = block.0.as_ptr() as usize;
-        assert_eq!(addr % 16384, 0);
-        assert_eq!(core::mem::size_of::<Block>(), PREKEY_LEN);
+        assert_eq!(addr % BLOCK_ALIGN, 0);
         let page = region::page::size();
-        if page <= PREKEY_LEN {
-            assert_eq!(PREKEY_LEN % page, 0);
+        if page <= BLOCK_ALIGN {
+            assert_eq!(addr % page, 0);
+            assert_eq!(core::mem::size_of::<Block>() % page, 0);
         } else {
             let _q = quota();
             assert_eq!(
@@ -496,22 +534,26 @@ pub(crate) mod tests {
     #[test]
     fn a_page_larger_than_the_prekey_is_refused_without_locking() {
         let block = random_block();
-        // The real lock would succeed on this machine's pages; a 64 KiB page must not try.
-        let Err(refused) = lock_block(&block, 65536) else {
-            panic!("a page larger than the pre-key must be refused");
+        // The real lock would succeed on this machine's pages; a page larger than the
+        // block's alignment must not even try.
+        let too_large = BLOCK_ALIGN * 2;
+        let Err(refused) = lock_block(&block, too_large) else {
+            panic!("a page larger than the block's alignment must be refused");
         };
-        assert_eq!(refused.page_too_large(), Some(65536));
+        assert_eq!(refused.page_too_large(), Some(too_large));
         assert_eq!(refused.raw_os_error(), None);
         assert_eq!(
             refused.to_string(),
-            "the sealed-memory pre-key was not locked: the 65536-byte page would be shared \
-             with other memory"
+            format!(
+                "the sealed-memory pre-key was not locked: the {too_large}-byte page would \
+                 be shared with other memory"
+            )
         );
         let prekey = Prekey::from_parts(block, Err(refused));
         assert!(prekey.lock.is_none());
         assert_eq!(
             prekey.lock_status().unwrap_err().page_too_large(),
-            Some(65536)
+            Some(too_large)
         );
     }
 
@@ -519,7 +561,7 @@ pub(crate) mod tests {
     fn a_page_no_larger_than_the_prekey_is_locked() {
         let _q = quota();
         let block = random_block();
-        let page = region::page::size().min(PREKEY_LEN);
+        let page = region::page::size().min(BLOCK_ALIGN);
         assert!(lock_block(&block, page).is_ok());
     }
 

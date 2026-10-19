@@ -61,8 +61,9 @@
 //!   are the caller's to wipe.
 //! - Registers, and stack residue beyond the overwritten 32 KiB. The overwrite was measured
 //!   on one target; another target's cipher backend or frame layout may differ.
-//! - Pages larger than 16 KiB (64 KiB on some Linux builds): the pre-key would share its page,
-//!   so it is not locked at all, and [`Prekey::lock_status`] says so.
+//! - Pages larger than the pre-key block's alignment (16 KiB on x86, x86_64 and Apple
+//!   aarch64; 64 KiB elsewhere): the pre-key would share its page, so it is not locked at
+//!   all, and [`Prekey::lock_status`] says so. No known target's default page is larger.
 //! - What [`unseal`](SealedFixed::unseal) returns: an ordinary `Fixed`, whose by-value
 //!   return can leave a copy in the caller's frame (`SECURITY.md` §1). Read through
 //!   `with_secret` instead where you can.

@@ -446,7 +446,7 @@ requirement has to carry a pre-release tag.
 The requirement has to carry a pre-release tag. Both lines are pre-release only — the
 newest stable on crates.io is `0.6.1` — and a caret matches a pre-release only when the
 requirement itself carries one for the same `major.minor.patch`. So `"0.9"` means
-`>=0.9.0, <0.10.0`, `0.9.0-rc.13` sorts *below* `0.9.0`, and nothing satisfies it: `"0.9"`
+`>=0.9.0, <0.10.0`, `0.9.0-rc.14` sorts *below* `0.9.0`, and nothing satisfies it: `"0.9"`
 and `"0.8"` are not shorthands here, they are resolve failures.
 
 `"0.9.0-rc"` is the form that tracks a line rather than a version. `^0.9.0-rc` is
@@ -460,7 +460,7 @@ once `0.9.0` ships — nothing to update when the next candidate lands. It float
      snippets above are the tracking form and carry no version, so they are not part of
      this. References to a *past* release -- which tag last carried a deleted crate, when a
      behaviour changed -- are history and never move. -->
-and candidates on these lines have carried breaking changes: pin `"=0.9.0-rc.13"` when
+and candidates on these lines have carried breaking changes: pin `"=0.9.0-rc.14"` when
 `cargo update` must stay put. The pre-release tag is also matched against exactly one
 `major.minor.patch`, so `"0.9.0-rc"` will not pick up a later `0.9.1-rc.1`.
 

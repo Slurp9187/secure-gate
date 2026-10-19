@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0-rc.14] - Unreleased
+
+### Changed
+- **The sealed-memory pre-key now locks on 64 KiB-page systems instead of refusing.** Its
+  block is aligned per target, after the `secrets` crate's table (1.3.0): 16 KiB on x86,
+  x86_64 and Apple aarch64, 64 KiB on every other aarch64 and on any target not listed
+  (ppc64le's default page is 64 KiB). The block owns every page it touches, so locking it
+  locks nothing else and unlocking it on drop cannot release a neighbour's lock. On a
+  64 KiB-aligned target a `Prekey` takes 64 KiB, all locked, of which only the first 16 KiB
+  hold the pre-key. `Prekey::lock_status()` still refuses, and says why, for a page larger
+  than the block's alignment, for any target the table gets wrong. Checked by
+  cross-compiling for x86_64 Windows, Linux and macOS, aarch64 Linux and macOS, and ppc64le
+  Linux with each target's alignment asserted at compile time; not run on 64 KiB-page
+  hardware. Suggested by the review of the sealed-memory release.
+
 ## [0.9.0-rc.13] - 2026-10-19
 
 ### Security

@@ -73,8 +73,9 @@ paging memory is a different layer with a different actor, and absorbing it woul
 weaker version of the crates above.
 
 The one allocation this crate does lock is the opt-in `sealed` feature's `Prekey`, and it
-follows the rule above: 16 KiB aligned to 16 KiB, so it owns whole pages on 4 KiB- and
-16 KiB-page systems and its unlock cannot reach a neighbour. It locks through `region`, so
+follows the rule above: its block is aligned to at least the target's page size (16 KiB on
+x86, x86_64 and Apple aarch64, 64 KiB elsewhere), so it owns every page it touches and its
+unlock cannot reach a neighbour. It locks through `region`, so
 the `unsafe` stays in that dependency. It does not lock your secrets; it keeps a sealed
 secret that does reach swap from being opened there. See
 [3. Swap / core dumps / external memory exposure](#3-swap--core-dumps--external-memory-exposure).
@@ -325,7 +326,7 @@ unlocked, then freed.
 | The plaintext temporary while the closure runs, and copies the closure makes | Not covered: on the stack (`SealedFixed`) or heap (`SealedDynamic`), unlocked; wiped, and the stack below overwritten, when the call returns |
 | Registers, and stack residue beyond the 32 KiB overwritten after each access | Not covered; measured on one target only |
 | The `Fixed` that `SealedFixed::unseal` returns | An ordinary `Fixed` from there on: returning it by value can leave a copy in the caller's frame (one found in a release build), as in [1. Stack-move residue](#1-stack-move-residue-fixedt). Read through `with_secret` / `with_role` instead of unsealing |
-| Pages larger than 16 KiB | The pre-key is not locked (it would share a page); `lock_status()` says so |
+| Pages larger than the pre-key block's alignment (16 KiB on x86, x86_64, Apple aarch64; 64 KiB elsewhere) | The pre-key is not locked (it would share a page); `lock_status()` says so |
 
 On Windows every `VirtualLock` in a process draws on its working-set
 quota. With the default minimum, about eleven pre-keys lock before the
