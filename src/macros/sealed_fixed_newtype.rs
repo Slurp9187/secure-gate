@@ -7,21 +7,29 @@
 /// (`fixed_newtype!(pub AppKey, 32)`). The length is taken from it, so it is never
 /// restated. No derives.
 ///
-/// The generated type has `seal(Role, &Arc<Prekey>)`, `with_secret`, `with_secret_mut`,
-/// `unseal() -> Role`, `len`, `is_empty`, a redacted `Debug`, and `ConstantTimeEq` under
-/// `ct-eq`. Like `SealedFixed`, it has no `expose_secret` and no `Hash`.
+/// The generated type has `seal(Role, &Arc<Prekey>)`, `with_role` / `with_role_mut` (the
+/// closure gets `&Role` / `&mut Role`, for code that takes the role rather than bytes),
+/// `with_secret` / `with_secret_mut` (bytes), `unseal() -> Role`, `len`, `is_empty`, a
+/// redacted `Debug`, and `ConstantTimeEq` under `ct-eq`. Like `SealedFixed`, it has no
+/// `expose_secret` and no `Hash`. The role a closure gets lives only for the call, in the
+/// frame the stack scrub covers; moving it out of the closure takes it out of that cover.
 ///
 /// ```rust
-/// use secure_gate::{Prekey, RevealSecret, fixed_newtype, sealed_fixed_newtype};
+/// use secure_gate::{Prekey, RevealSecret, RevealSecretMut, fixed_newtype, sealed_fixed_newtype};
 ///
 /// fixed_newtype!(pub AppKey, 32, "The app key.");
 /// sealed_fixed_newtype!(pub SealedAppKey, AppKey, "The app key, sealed while idle.");
 ///
 /// let prekey = Prekey::new();
-/// let sealed = SealedAppKey::seal(AppKey::new([9u8; 32]), &prekey);
+/// let mut sealed = SealedAppKey::seal(AppKey::new([9u8; 32]), &prekey);
 /// sealed.with_secret(|k| assert_eq!(k[0], 9));
+///
+/// // Code that takes the role, not bytes:
+/// fn wrap_vault(key: &AppKey) -> u8 { key.with_secret(|k| k[0]) }
+/// assert_eq!(sealed.with_role(wrap_vault), 9);
+/// sealed.with_role_mut(|key: &mut AppKey| key.with_secret_mut(|k| k[0] = 10));
 /// let key: AppKey = sealed.unseal();
-/// key.with_secret(|k| assert_eq!(k[0], 9));
+/// key.with_secret(|k| assert_eq!(k[0], 10));
 /// ```
 ///
 /// Roles stay apart when sealed. A sealed role does not take another role's key:
@@ -35,6 +43,20 @@
 ///
 /// let prekey = Prekey::new();
 /// let _ = SealedAppKey::seal(DbKey::new([0u8; 32]), &prekey);
+/// ```
+///
+/// `with_role` hands only its own role:
+///
+/// ```compile_fail,E0631
+/// use secure_gate::{Prekey, fixed_newtype, sealed_fixed_newtype};
+///
+/// fixed_newtype!(pub AppKey, 32);
+/// fixed_newtype!(pub DbKey, 32);
+/// sealed_fixed_newtype!(pub SealedAppKey, AppKey);
+///
+/// fn open_db(_: &DbKey) {}
+/// let prekey = Prekey::new();
+/// SealedAppKey::seal(AppKey::new([0u8; 32]), &prekey).with_role(open_db);
 /// ```
 ///
 /// Nor does one sealed role stand in for another:
@@ -73,6 +95,31 @@ macro_rules! sealed_fixed_newtype {
                     <$role as $crate::__private::FixedRole>::into_fixed(secret),
                     prekey,
                 ))
+            }
+
+            /// Decrypts into a temporary of the role for the length of `f`, then wipes it and
+            /// the stack below the call.
+            #[inline]
+            pub fn with_role<F, R>(&self, f: F) -> R
+            where
+                F: ::core::ops::FnOnce(&$role) -> R,
+            {
+                self.0
+                    .__with_wrapped(<$role as $crate::__private::FixedRole>::from_fixed, f)
+            }
+
+            /// Decrypts into a temporary of the role, lets `f` change it, then re-seals under
+            /// a fresh salt and wipes the temporary and the stack below the call.
+            #[inline]
+            pub fn with_role_mut<F, R>(&mut self, f: F) -> R
+            where
+                F: ::core::ops::FnOnce(&mut $role) -> R,
+            {
+                self.0.__with_wrapped_mut(
+                    <$role as $crate::__private::FixedRole>::from_fixed,
+                    <$role as $crate::__private::FixedRole>::into_fixed,
+                    f,
+                )
             }
 
             /// Decrypts into a temporary for the length of `f`, then wipes it.

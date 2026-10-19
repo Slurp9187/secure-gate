@@ -198,11 +198,7 @@ impl Prekey {
     /// A fresh random salt, and so a fresh sealing key. Drawn before any plaintext is
     /// copied into a ciphertext buffer, so an RNG failure cannot leave plaintext behind.
     pub(crate) fn fresh_salt() -> [u8; SALT_LEN] {
-        let mut salt = [0u8; SALT_LEN];
-        SysRng
-            .try_fill_bytes(&mut salt)
-            .expect("SysRng failure is a program error");
-        salt
+        Fixed::<[u8; SALT_LEN]>::from_random().into_inner()
     }
 
     /// Encrypts `buf` in place under the key for `salt`; returns the detached tag.
@@ -398,7 +394,7 @@ mod tests {
     #[test]
     fn the_sealing_key_depends_on_every_prekey_bit() {
         let mut prekey = Arc::try_unwrap(Prekey::new()).unwrap();
-        let salt = [5u8; SALT_LEN];
+        let salt = Prekey::fresh_salt();
         let before = prekey.sealing_key(&salt);
         prekey.block.0[PREKEY_LEN - 1] ^= 1;
         let after = prekey.sealing_key(&salt);
@@ -408,7 +404,7 @@ mod tests {
     #[test]
     fn the_sealing_key_is_sha256_of_salt_then_prekey() {
         let prekey = Prekey::new();
-        let salt = [9u8; SALT_LEN];
+        let salt = Prekey::fresh_salt();
         let mut hasher = Sha256::new();
         hasher.update(salt);
         hasher.update(prekey.block.0);

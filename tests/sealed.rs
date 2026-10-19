@@ -199,6 +199,37 @@ fn sealed_roles_seal_and_unseal_their_own_role() {
 
 // Imported here, not at the top: a scope that has both `RevealScoped` and `RevealSecret`
 // sees two `with_secret` methods on `Fixed` (E0034). See the `scoped` module docs.
+#[test]
+fn with_role_hands_the_role_and_with_role_mut_reseals_it() {
+    fn key_byte(k: &AppKey) -> u8 {
+        k.with_secret(|b| b[0])
+    }
+    let prekey = Prekey::new();
+    let mut s = SealedAppKey::seal(AppKey::new([7u8; 32]), &prekey);
+    assert_eq!(s.with_role(key_byte), 7);
+    let r = s.with_role_mut(|k: &mut AppKey| {
+        secure_gate::RevealSecretMut::with_secret_mut(k, |b| b[0] = 8);
+        "done"
+    });
+    assert_eq!(r, "done");
+    assert_eq!(s.with_role(key_byte), 8);
+    s.unseal().with_secret(|b| assert_eq!(b[0], 8));
+}
+
+#[test]
+fn a_panic_inside_with_role_mut_leaves_the_sealed_role_unchanged() {
+    let prekey = Prekey::new();
+    let mut s = SealedDbKey::seal(DbKey::new([1u8; 32]), &prekey);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        s.with_role_mut(|k: &mut DbKey| {
+            secure_gate::RevealSecretMut::with_secret_mut(k, |b| b[0] = 2);
+            panic!("closure failed");
+        })
+    }));
+    assert!(result.is_err());
+    s.with_secret(|b| assert_eq!(b[0], 1));
+}
+
 fn first_byte<S: secure_gate::scoped::RevealScoped<Inner = [u8; 32]>>(s: &S) -> u8 {
     secure_gate::scoped::RevealScoped::with_secret(s, |b| b[0])
 }
