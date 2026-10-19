@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use super::prekey::{Prekey, SALT_LEN, TAG_LEN};
+use super::prekey::{Prekey, SALT_LEN, TAG_LEN, scrub_stack};
 use crate::{Fixed, RevealSecret, RevealSecretMut};
 
 /// A fixed-size byte secret held encrypted in RAM while idle, opened for one closure call
@@ -46,6 +46,7 @@ impl<const N: usize> SealedFixed<N> {
         let mut ct = [0u8; N];
         secret.with_secret(|plain| ct.copy_from_slice(plain));
         let tag = prekey.seal_in_place(&salt, &mut ct);
+        scrub_stack();
         Self {
             ct,
             tag,
@@ -69,8 +70,12 @@ impl<const N: usize> SealedFixed<N> {
     where
         F: FnOnce(&[u8; N]) -> R,
     {
-        let plain = Fixed::new_with(|buf| self.open_into(buf));
-        plain.with_secret(f)
+        let result = {
+            let plain = Fixed::new_with(|buf| self.open_into(buf));
+            plain.with_secret(f)
+        };
+        scrub_stack();
+        result
     }
 
     /// Decrypts into a temporary, lets `f` change it, then seals the result under a fresh
@@ -81,19 +86,25 @@ impl<const N: usize> SealedFixed<N> {
     where
         F: FnOnce(&mut [u8; N]) -> R,
     {
-        let mut plain = Fixed::new_with(|buf| self.open_into(buf));
-        let result = plain.with_secret_mut(f);
-        let salt = Prekey::fresh_salt();
-        plain.with_secret(|p| self.ct.copy_from_slice(p));
-        self.tag = self.prekey.seal_in_place(&salt, &mut self.ct);
-        self.salt = salt;
+        let result = {
+            let mut plain = Fixed::new_with(|buf| self.open_into(buf));
+            let result = plain.with_secret_mut(f);
+            let salt = Prekey::fresh_salt();
+            plain.with_secret(|p| self.ct.copy_from_slice(p));
+            self.tag = self.prekey.seal_in_place(&salt, &mut self.ct);
+            self.salt = salt;
+            result
+        };
+        scrub_stack();
         result
     }
 
     /// Opens the secret back into a plain [`Fixed`]. Protection from sealing ends here;
     /// the returned wrapper still wipes on drop.
     pub fn unseal(self) -> Fixed<[u8; N]> {
-        Fixed::new_with(|buf| self.open_into(buf))
+        let plain = Fixed::new_with(|buf| self.open_into(buf));
+        scrub_stack();
+        plain
     }
 
     /// The secret's length in bytes, `N`.

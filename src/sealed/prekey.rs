@@ -32,10 +32,15 @@ struct Block([u8; PREKEY_LEN]);
 /// process working-set quota, which every `VirtualLock` in the process shares; on Unix it
 /// is `RLIMIT_MEMLOCK`.
 ///
-/// Carries the operating system's error code, never an address.
+/// It is also returned, without asking the operating system, when the page size is larger
+/// than the pre-key (64 KiB pages on some Linux builds): the pre-key would then share a page
+/// with other memory, and unlocking it on drop would unlock that memory too.
+///
+/// Carries the operating system's error code or the page size, never an address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LockError {
     os_code: Option<i32>,
+    page_size: Option<usize>,
 }
 
 impl LockError {
@@ -44,7 +49,10 @@ impl LockError {
             region::Error::SystemCall(code) | region::Error::MachCall(code) => Some(*code),
             _ => None,
         };
-        Self { os_code }
+        Self {
+            os_code,
+            page_size: None,
+        }
     }
 
     /// The operating system's error code (`GetLastError` on Windows, `errno` on Unix), when
@@ -52,16 +60,27 @@ impl LockError {
     pub fn raw_os_error(&self) -> Option<i32> {
         self.os_code
     }
+
+    /// The page size, when locking was not attempted because a page is larger than the
+    /// pre-key.
+    pub fn page_too_large(&self) -> Option<usize> {
+        self.page_size
+    }
 }
 
 impl core::fmt::Display for LockError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self.os_code {
-            Some(code) => write!(
+        match (self.os_code, self.page_size) {
+            (_, Some(size)) => write!(
+                f,
+                "the sealed-memory pre-key was not locked: the {size}-byte page would be \
+                 shared with other memory"
+            ),
+            (Some(code), None) => write!(
                 f,
                 "the sealed-memory pre-key could not be locked in RAM (OS error {code})"
             ),
-            None => f.write_str("the sealed-memory pre-key could not be locked in RAM"),
+            (None, None) => f.write_str("the sealed-memory pre-key could not be locked in RAM"),
         }
     }
 }
@@ -119,17 +138,29 @@ impl Prekey {
         SysRng
             .try_fill_bytes(&mut block.0)
             .expect("SysRng failure is a program error");
-        let lock = region::lock(block.0.as_ptr(), PREKEY_LEN);
-        Arc::new(Self::from_parts(block, lock))
+        let page = region::page::size();
+        let prekey = if page > PREKEY_LEN {
+            // A page would hold more than the pre-key, so locking it would lock, and later
+            // unlock, a neighbor's memory too.
+            let refused = LockError {
+                os_code: None,
+                page_size: Some(page),
+            };
+            Self::from_parts(block, Err(refused))
+        } else {
+            let lock = region::lock(block.0.as_ptr(), PREKEY_LEN);
+            Self::from_parts(block, lock.map_err(|err| LockError::from_region(&err)))
+        };
+        Arc::new(prekey)
     }
 
     fn from_parts(
         block: alloc::boxed::Box<Block>,
-        lock: Result<region::LockGuard, region::Error>,
+        lock: Result<region::LockGuard, LockError>,
     ) -> Self {
         let (lock, lock_error) = match lock {
             Ok(guard) => (Some(guard), None),
-            Err(err) => (None, Some(LockError::from_region(&err))),
+            Err(err) => (None, Some(err)),
         };
         Self {
             block,
@@ -201,6 +232,26 @@ impl Prekey {
     }
 }
 
+/// Size of the stack region [`scrub_stack`] overwrites.
+const SCRUB_LEN: usize = 32 * 1024;
+
+/// Overwrites the stack region below its caller with zeros.
+///
+/// The ChaCha20 backend leaves its state block (constant, then the 32-byte sealing key) on
+/// the stack after a pass, and moves can leave a copy of a temporary plaintext. Neither is
+/// reachable for a wipe. Called at the end of every seal and open, from the frame that made
+/// the calls, this function's frame lies over the region those calls used and zeroes it.
+/// The technique is sequoia's `zero_stack`; `[u64]` keeps the volatile writes word-sized.
+///
+/// Best effort: it covers what the calls left in `SCRUB_LEN` bytes below the caller, not
+/// registers, and not copies a closure parks elsewhere.
+#[inline(never)]
+pub(crate) fn scrub_stack() {
+    let mut area = [0u64; SCRUB_LEN / 8];
+    area.zeroize();
+    core::hint::black_box(&area);
+}
+
 impl Prekey {
     /// Wipe while the pages are still locked, then unlock. `Drop` calls this before the box
     /// frees the pages: unlocking after the free could unlock whatever reuses them.
@@ -246,11 +297,15 @@ mod tests {
     fn a_failed_lock_is_reported_and_sealing_still_works() {
         let prekey = Arc::new(Prekey::from_parts(
             random_block(),
-            Err(region::Error::SystemCall(1453)),
+            Err(LockError::from_region(&region::Error::SystemCall(1453))),
         ));
         let err = prekey.lock_status().unwrap_err();
         assert_eq!(err.raw_os_error(), Some(1453));
-        assert_eq!(format!("{err:?}"), "LockError { os_code: Some(1453) }");
+        assert_eq!(err.page_too_large(), None);
+        assert_eq!(
+            format!("{err:?}"),
+            "LockError { os_code: Some(1453), page_size: None }"
+        );
         assert_eq!(
             err.to_string(),
             "the sealed-memory pre-key could not be locked in RAM (OS error 1453)"
@@ -266,11 +321,18 @@ mod tests {
 
     #[test]
     fn a_non_os_lock_failure_has_no_code() {
-        let prekey =
-            Prekey::from_parts(random_block(), Err(region::Error::InvalidParameter("size")));
+        let prekey = Prekey::from_parts(
+            random_block(),
+            Err(LockError::from_region(&region::Error::InvalidParameter(
+                "size",
+            ))),
+        );
         let err = prekey.lock_status().unwrap_err();
         assert_eq!(err.raw_os_error(), None);
-        assert_eq!(format!("{err:?}"), "LockError { os_code: None }");
+        assert_eq!(
+            format!("{err:?}"),
+            "LockError { os_code: None, page_size: None }"
+        );
     }
 
     #[test]
@@ -282,7 +344,7 @@ mod tests {
         // Other tests lock pages too and share the quota; a refused lock still exercises
         // the wipe, and `tests/sealed_lock.rs` covers the unlock in a process of its own.
         let locked = guard.is_ok();
-        let mut prekey = Prekey::from_parts(block, guard);
+        let mut prekey = Prekey::from_parts(block, guard.map_err(|e| LockError::from_region(&e)));
         assert!(prekey.block.0.iter().any(|&b| b != 0));
         assert_eq!(prekey.lock.is_some(), locked);
         prekey.wipe_and_unlock();
@@ -302,7 +364,10 @@ mod tests {
             let block = random_block();
             let lock = region::lock(block.0.as_ptr(), PREKEY_LEN);
             let refused = lock.is_err();
-            held.push(Prekey::from_parts(block, lock));
+            held.push(Prekey::from_parts(
+                block,
+                lock.map_err(|e| LockError::from_region(&e)),
+            ));
             if refused {
                 break;
             }
@@ -318,7 +383,7 @@ mod tests {
             .map(|_| {
                 let block = random_block();
                 let lock = region::lock(block.0.as_ptr(), PREKEY_LEN);
-                Prekey::from_parts(block, lock)
+                Prekey::from_parts(block, lock.map_err(|e| LockError::from_region(&e)))
             })
             .collect();
         let ok = relocked.iter().filter(|p| p.lock.is_some()).count();
@@ -378,6 +443,23 @@ mod tests {
         }));
         assert!(result.is_err());
         assert_eq!(buf, [0u8; 8]);
+    }
+
+    #[test]
+    fn a_page_larger_than_the_prekey_is_reported_and_not_locked() {
+        let refused = LockError {
+            os_code: None,
+            page_size: Some(65536),
+        };
+        let prekey = Prekey::from_parts(random_block(), Err(refused));
+        assert!(prekey.lock.is_none());
+        let err = prekey.lock_status().unwrap_err();
+        assert_eq!(err.page_too_large(), Some(65536));
+        assert_eq!(err.raw_os_error(), None);
+        assert_eq!(
+            err.to_string(),
+            "the sealed-memory pre-key was not locked: the 65536-byte page would be shared with other memory"
+        );
     }
 
     #[test]

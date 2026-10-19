@@ -3,7 +3,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use super::prekey::{Prekey, SALT_LEN, TAG_LEN};
+use super::prekey::{Prekey, SALT_LEN, TAG_LEN, scrub_stack};
 use crate::{Dynamic, RevealSecret};
 
 mod private {
@@ -100,8 +100,13 @@ impl<T: SealedPayload> SealedDynamic<T> {
     /// Seals `secret` under `prekey`. The plain wrapper is consumed and wiped on drop.
     pub fn seal(secret: Dynamic<T>, prekey: &Arc<Prekey>) -> Self {
         let salt = Prekey::fresh_salt();
-        let mut ct = secret.with_secret(|plain| Box::<[u8]>::from(plain.bytes()));
-        let tag = prekey.seal_in_place(&salt, &mut ct);
+        // Held in a wiping buffer until it is ciphertext: if the encrypt panics, the
+        // plaintext copy is wiped as it unwinds instead of going back to the allocator.
+        let mut buf =
+            zeroize::Zeroizing::new(secret.with_secret(|plain| Box::<[u8]>::from(plain.bytes())));
+        let tag = prekey.seal_in_place(&salt, &mut buf);
+        let ct = core::mem::take(&mut *buf);
+        scrub_stack();
         Self {
             ct,
             tag,
@@ -116,8 +121,12 @@ impl<T: SealedPayload> SealedDynamic<T> {
     where
         F: FnOnce(&T) -> R,
     {
-        let plain = T::from_plain(self.open());
-        plain.with_secret(f)
+        let result = {
+            let plain = T::from_plain(self.open());
+            plain.with_secret(f)
+        };
+        scrub_stack();
+        result
     }
 
     /// Decrypts into a temporary, lets `f` change it in place, then seals the result under
@@ -132,19 +141,26 @@ impl<T: SealedPayload> SealedDynamic<T> {
     where
         F: FnOnce(&mut T::Mut) -> R,
     {
-        let mut plain = self.open();
-        let result = crate::RevealSecretMut::with_secret_mut(&mut plain, |buf| f(T::view_mut(buf)));
-        let salt = Prekey::fresh_salt();
-        plain.with_secret(|p| self.ct.copy_from_slice(p));
-        self.tag = self.prekey.seal_in_place(&salt, &mut self.ct);
-        self.salt = salt;
+        let result = {
+            let mut plain = self.open();
+            let result =
+                crate::RevealSecretMut::with_secret_mut(&mut plain, |buf| f(T::view_mut(buf)));
+            let salt = Prekey::fresh_salt();
+            plain.with_secret(|p| self.ct.copy_from_slice(p));
+            self.tag = self.prekey.seal_in_place(&salt, &mut self.ct);
+            self.salt = salt;
+            result
+        };
+        scrub_stack();
         result
     }
 
     /// Opens the secret back into a plain [`Dynamic`]. Protection from sealing ends here;
     /// the returned wrapper still wipes on drop.
     pub fn unseal(self) -> Dynamic<T> {
-        T::from_plain(self.open())
+        let plain = T::from_plain(self.open());
+        scrub_stack();
+        plain
     }
 
     /// The secret's length in bytes. Length can itself be sensitive for passwords; it is
