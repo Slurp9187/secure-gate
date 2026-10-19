@@ -11,9 +11,16 @@ const MANY: usize = 1024;
 
 #[test]
 fn locks_succeed_fail_softly_and_are_released_on_drop() {
-    // A first pre-key, alone in the process, locks.
+    // A first pre-key, alone in the process, locks. Required on Windows, where the default
+    // quota allows it; elsewhere a zero RLIMIT_MEMLOCK (common in containers) or pages larger
+    // than the pre-key refuse it by design, and the rest of this test has nothing to measure.
     let first = Prekey::new();
-    assert_eq!(first.lock_status(), Ok(()), "a lone pre-key locks");
+    if cfg!(windows) {
+        assert_eq!(first.lock_status(), Ok(()), "a lone pre-key locks");
+    } else if let Err(why) = first.lock_status() {
+        eprintln!("skipping: this host refuses a lone pre-key lock ({why})");
+        return;
+    }
     drop(first);
 
     // Keep creating until the quota refuses one. A refusal is reported, never a panic, and

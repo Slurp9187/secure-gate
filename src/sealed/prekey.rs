@@ -136,23 +136,13 @@ impl Prekey {
     /// is not a panic; see [`lock_status`](Self::lock_status).
     pub fn new() -> Arc<Self> {
         let mut block = alloc::boxed::Box::new(Block([0u8; PREKEY_LEN]));
+        // Locked while it still holds zeros, then filled: the random bytes never sit in
+        // pages that could be swapped, unless the lock is refused.
+        let lock = lock_block(&block, region::page::size());
         SysRng
             .try_fill_bytes(&mut block.0)
             .expect("SysRng failure is a program error");
-        let page = region::page::size();
-        let prekey = if page > PREKEY_LEN {
-            // A page would hold more than the pre-key, so locking it would lock, and later
-            // unlock, a neighbor's memory too.
-            let refused = LockError {
-                os_code: None,
-                page_size: Some(page),
-            };
-            Self::from_parts(block, Err(refused))
-        } else {
-            let lock = region::lock(block.0.as_ptr(), PREKEY_LEN);
-            Self::from_parts(block, lock.map_err(|err| LockError::from_region(&err)))
-        };
-        Arc::new(prekey)
+        Arc::new(Self::from_parts(block, lock))
     }
 
     fn from_parts(
@@ -219,7 +209,8 @@ impl Prekey {
 
     /// Decrypts `buf` in place. On a tag mismatch `buf` is wiped and this panics: sealed
     /// memory that fails to authenticate was modified or corrupted, and nothing can be
-    /// recovered from it.
+    /// recovered from it. (The tag is checked before any keystream is applied, so `buf`
+    /// still holds ciphertext then; it is wiped regardless.)
     pub(crate) fn open_in_place(&self, salt: &[u8; SALT_LEN], tag: &[u8; TAG_LEN], buf: &mut [u8]) {
         let opened = self.cipher(salt).decrypt_inout_detached(
             &Nonce::default(),
@@ -232,6 +223,18 @@ impl Prekey {
             panic!("sealed memory was modified or corrupted");
         }
     }
+}
+
+/// Locks `block`'s pages, unless a page is larger than the block: locking it would then
+/// lock, and later unlock, a neighbor's memory too.
+fn lock_block(block: &Block, page_size: usize) -> Result<region::LockGuard, LockError> {
+    if page_size > PREKEY_LEN {
+        return Err(LockError {
+            os_code: None,
+            page_size: Some(page_size),
+        });
+    }
+    region::lock(block.0.as_ptr(), PREKEY_LEN).map_err(|err| LockError::from_region(&err))
 }
 
 /// Size of the stack region [`scrub_stack`] overwrites.
@@ -252,6 +255,22 @@ pub(crate) fn scrub_stack() {
     let mut area = [0u64; SCRUB_LEN / 8];
     area.zeroize();
     core::hint::black_box(&area);
+}
+
+/// Runs `f`, then [`scrub_stack`], on every exit: a panic from `f` (the caller's closure, or
+/// a tag mismatch) is caught, the stack scrubbed, and the panic resumed. Without this an
+/// unwind skips the scrub and leaves the cipher's copy of the sealing key behind. A `Drop`
+/// guard is not a substitute: on Windows, unwinding runs cleanup below the frames that
+/// threw, so the guard's scrub would not lie over them. Under `panic = "abort"` there is
+/// no unwind to survive.
+#[inline(always)]
+pub(crate) fn scrubbed<R>(f: impl FnOnce() -> R) -> R {
+    let result = std::panic::catch_unwind(core::panic::AssertUnwindSafe(f));
+    scrub_stack();
+    match result {
+        Ok(value) => value,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
 }
 
 impl Prekey {
@@ -277,8 +296,18 @@ impl core::fmt::Debug for Prekey {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
+    /// Every test in this crate's unit tests that creates a pre-key takes this first: they
+    /// share one per-process lock quota (about 11 pre-keys under Windows' default), and the
+    /// quota test below needs it to itself.
+    pub(crate) fn quota() -> std::sync::MutexGuard<'static, ()> {
+        static QUOTA: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        QUOTA
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
 
     fn random_block() -> alloc::boxed::Box<Block> {
         let mut block = alloc::boxed::Box::new(Block([0u8; PREKEY_LEN]));
@@ -292,11 +321,21 @@ mod tests {
         let addr = block.0.as_ptr() as usize;
         assert_eq!(addr % 16384, 0);
         assert_eq!(core::mem::size_of::<Block>(), PREKEY_LEN);
-        assert_eq!(PREKEY_LEN % region::page::size(), 0);
+        let page = region::page::size();
+        if page <= PREKEY_LEN {
+            assert_eq!(PREKEY_LEN % page, 0);
+        } else {
+            let _q = quota();
+            assert_eq!(
+                Prekey::new().lock_status().unwrap_err().page_too_large(),
+                Some(page)
+            );
+        }
     }
 
     #[test]
     fn a_failed_lock_is_reported_and_sealing_still_works() {
+        let _q = quota();
         let prekey = Arc::new(Prekey::from_parts(
             random_block(),
             Err(LockError::from_region(&region::Error::SystemCall(1453))),
@@ -339,6 +378,7 @@ mod tests {
 
     #[test]
     fn wipe_and_unlock_zeroes_the_prekey_and_releases_the_lock() {
+        let _q = quota();
         let lock = region::lock(core::ptr::null::<u8>(), 0).map_err(|_| ());
         assert!(lock.is_err(), "a zero-length lock is rejected");
         let block = random_block();
@@ -357,10 +397,12 @@ mod tests {
     /// Exhausts the lock quota with pre-keys whose blocks stay allocated, unlocks them,
     /// and checks the quota came back. The blocks must stay allocated: on Windows freeing
     /// one decommits its pages, which releases the lock with or without an unlock.
-    /// Other tests in this binary lock pages concurrently, so this asks only that most of
-    /// the freed quota be usable again; a missing unlock frees none of it.
+    /// Every other pre-key test in this binary takes the same `quota()` guard, so this one
+    /// has the quota to itself; it still asks only that most of the freed quota be usable
+    /// again, and a missing unlock frees none of it.
     #[test]
     fn wipe_and_unlock_returns_the_quota() {
+        let _q = quota();
         let mut held = Vec::new();
         while held.len() < 1024 {
             let block = random_block();
@@ -398,6 +440,7 @@ mod tests {
 
     #[test]
     fn the_sealing_key_depends_on_every_prekey_bit() {
+        let _q = quota();
         let mut prekey = Arc::try_unwrap(Prekey::new()).unwrap();
         let salt = Prekey::fresh_salt();
         let before = prekey.sealing_key(&salt);
@@ -408,6 +451,7 @@ mod tests {
 
     #[test]
     fn the_sealing_key_is_sha256_of_salt_then_prekey() {
+        let _q = quota();
         let prekey = Prekey::new();
         let salt = Prekey::fresh_salt();
         let mut hasher = Sha256::new();
@@ -425,6 +469,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "sealed memory was modified or corrupted")]
     fn a_wrong_tag_panics() {
+        let _q = quota();
         let prekey = Prekey::new();
         let salt = Prekey::fresh_salt();
         let mut buf = [1u8; 8];
@@ -435,6 +480,7 @@ mod tests {
 
     #[test]
     fn a_failed_open_wipes_the_buffer_before_panicking() {
+        let _q = quota();
         let prekey = Prekey::new();
         let salt = Prekey::fresh_salt();
         let mut buf = [1u8; 8];
@@ -448,24 +494,38 @@ mod tests {
     }
 
     #[test]
-    fn a_page_larger_than_the_prekey_is_reported_and_not_locked() {
-        let refused = LockError {
-            os_code: None,
-            page_size: Some(65536),
+    fn a_page_larger_than_the_prekey_is_refused_without_locking() {
+        let block = random_block();
+        // The real lock would succeed on this machine's pages; a 64 KiB page must not try.
+        let Err(refused) = lock_block(&block, 65536) else {
+            panic!("a page larger than the pre-key must be refused");
         };
-        let prekey = Prekey::from_parts(random_block(), Err(refused));
-        assert!(prekey.lock.is_none());
-        let err = prekey.lock_status().unwrap_err();
-        assert_eq!(err.page_too_large(), Some(65536));
-        assert_eq!(err.raw_os_error(), None);
+        assert_eq!(refused.page_too_large(), Some(65536));
+        assert_eq!(refused.raw_os_error(), None);
         assert_eq!(
-            err.to_string(),
-            "the sealed-memory pre-key was not locked: the 65536-byte page would be shared with other memory"
+            refused.to_string(),
+            "the sealed-memory pre-key was not locked: the 65536-byte page would be shared \
+             with other memory"
+        );
+        let prekey = Prekey::from_parts(block, Err(refused));
+        assert!(prekey.lock.is_none());
+        assert_eq!(
+            prekey.lock_status().unwrap_err().page_too_large(),
+            Some(65536)
         );
     }
 
     #[test]
+    fn a_page_no_larger_than_the_prekey_is_locked() {
+        let _q = quota();
+        let block = random_block();
+        let page = region::page::size().min(PREKEY_LEN);
+        assert!(lock_block(&block, page).is_ok());
+    }
+
+    #[test]
     fn debug_is_redacted() {
+        let _q = quota();
         assert_eq!(format!("{:?}", Prekey::new()), "[REDACTED]");
     }
 }

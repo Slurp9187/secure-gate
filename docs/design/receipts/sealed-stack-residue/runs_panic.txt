@@ -1,0 +1,55 @@
+Captured 2026-10-19T04:23Z, Windows 11 x86_64, rustc 1.98.1 (48a229cea 2026-09-01)
+before = 5805536 (scrub on normal return only; unseal built in its own frame); after = this branch (scrubbed() on every exit; unseal opens in the caller's frame)
+
+=== before, debug: cargo test  --features sealed --test probe_panic -- --nocapture --test-threads=1
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=0 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=1 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=1 plaintext hits=0
+[default hook] unseal, result dropped: key hits=0 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+[silent hook] with_secret, normal return: key hits=0 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=1 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=1 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=0 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+
+=== before, --release: cargo test --release --features sealed --test probe_panic -- --nocapture --test-threads=1
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=0 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=0 plaintext hits=1
+[default hook] with_secret, tag mismatch panics: key hits=0
+[silent hook] with_secret, normal return: key hits=0 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=0 plaintext hits=1
+[silent hook] with_secret, tag mismatch panics: key hits=0
+
+=== after, debug: cargo test  --features sealed --test probe_panic -- --nocapture --test-threads=1
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=0 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=0 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+[silent hook] with_secret, normal return: key hits=0 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=0 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+
+=== after, --release: cargo test --release --features sealed --test probe_panic -- --nocapture --test-threads=1
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=0 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=0 plaintext hits=1
+[default hook] with_secret, tag mismatch panics: key hits=0
+[silent hook] with_secret, normal return: key hits=0 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=0 plaintext hits=1
+[silent hook] with_secret, tag mismatch panics: key hits=0
+

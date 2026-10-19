@@ -3,7 +3,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use super::prekey::{Prekey, SALT_LEN, TAG_LEN, scrub_stack};
+use super::prekey::{Prekey, SALT_LEN, TAG_LEN, scrubbed};
 use crate::{Dynamic, RevealSecret};
 
 mod private {
@@ -55,9 +55,15 @@ impl SealedPayload for String {
 
     /// Reuses the `Vec`'s buffer; nothing is copied.
     fn from_plain(plain: Dynamic<Vec<u8>>) -> Dynamic<Self> {
-        let s = String::from_utf8(plain.into_inner())
-            .expect("authenticated plaintext of a sealed String is UTF-8");
-        Dynamic::new(s)
+        match String::from_utf8(plain.into_inner()) {
+            Ok(s) => Dynamic::new(s),
+            Err(not_utf8) => {
+                // Unreachable for plaintext that authenticated; wipe it before panicking anyway.
+                let mut bytes = not_utf8.into_bytes();
+                zeroize::Zeroize::zeroize(&mut bytes);
+                panic!("authenticated plaintext of a sealed String is UTF-8");
+            }
+        }
     }
 
     fn view_mut(buf: &mut [u8]) -> &mut str {
@@ -85,8 +91,8 @@ impl SealedPayload for String {
 ///
 /// # Panics
 ///
-/// Every access panics if the sealed bytes fail to authenticate. The partial plaintext is
-/// wiped first.
+/// Every access panics if the sealed bytes fail to authenticate. The temporary is wiped and
+/// the stack below the call scrubbed before the panic continues.
 #[must_use = "holds secret material; bind it or chain a method call"]
 pub struct SealedDynamic<T: SealedPayload> {
     ct: Box<[u8]>,
@@ -104,9 +110,8 @@ impl<T: SealedPayload> SealedDynamic<T> {
         // plaintext copy is wiped as it unwinds instead of going back to the allocator.
         let mut buf =
             zeroize::Zeroizing::new(secret.with_secret(|plain| Box::<[u8]>::from(plain.bytes())));
-        let tag = prekey.seal_in_place(&salt, &mut buf);
+        let tag = scrubbed(|| prekey.seal_in_place(&salt, &mut buf));
         let ct = core::mem::take(&mut *buf);
-        scrub_stack();
         Self {
             ct,
             tag,
@@ -121,12 +126,10 @@ impl<T: SealedPayload> SealedDynamic<T> {
     where
         F: FnOnce(&T) -> R,
     {
-        let result = {
+        scrubbed(|| {
             let plain = T::from_plain(self.open());
             plain.with_secret(f)
-        };
-        scrub_stack();
-        result
+        })
     }
 
     /// Decrypts into a temporary, lets `f` change it in place, then seals the result under
@@ -136,12 +139,13 @@ impl<T: SealedPayload> SealedDynamic<T> {
     /// fixed, so the buffer can never reallocate and abandon an unwiped copy of the
     /// plaintext. To change the length, [`unseal`](Self::unseal), edit, and seal again.
     ///
-    /// If `f` panics, the temporary is still wiped and the sealed value is left as it was.
+    /// If `f` panics, the temporary is still wiped, the stack scrubbed, and the sealed value
+    /// left as it was.
     pub fn with_secret_mut<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut T::Mut) -> R,
     {
-        let result = {
+        scrubbed(|| {
             let mut plain = self.open();
             let result =
                 crate::RevealSecretMut::with_secret_mut(&mut plain, |buf| f(T::view_mut(buf)));
@@ -150,17 +154,13 @@ impl<T: SealedPayload> SealedDynamic<T> {
             self.tag = self.prekey.seal_in_place(&salt, &mut self.ct);
             self.salt = salt;
             result
-        };
-        scrub_stack();
-        result
+        })
     }
 
     /// Opens the secret back into a plain [`Dynamic`]. Protection from sealing ends here;
     /// the returned wrapper still wipes on drop.
     pub fn unseal(self) -> Dynamic<T> {
-        let plain = T::from_plain(self.open());
-        scrub_stack();
-        plain
+        scrubbed(|| T::from_plain(self.open()))
     }
 
     /// The secret's length in bytes. Length can itself be sensitive for passwords; it is
@@ -212,21 +212,6 @@ impl<T: SealedPayload> crate::ConstantTimeEq for SealedDynamic<T> {
     }
 }
 
-/// Copies the sealed bytes and shares the pre-key. The copy opens to the same plaintext
-/// under the same key and nonce, so no nonce is reused for a second message.
-#[cfg(feature = "cloneable")]
-impl<T: SealedPayload> Clone for SealedDynamic<T> {
-    fn clone(&self) -> Self {
-        Self {
-            ct: self.ct.clone(),
-            tag: self.tag,
-            salt: self.salt,
-            prekey: Arc::clone(&self.prekey),
-            _payload: core::marker::PhantomData,
-        }
-    }
-}
-
 /// Always prints `[REDACTED]`: no salt, no tag, no length.
 impl<T: SealedPayload> core::fmt::Debug for SealedDynamic<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -237,9 +222,11 @@ impl<T: SealedPayload> core::fmt::Debug for SealedDynamic<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sealed::prekey::tests::quota;
 
     #[test]
     fn the_ciphertext_is_not_the_plaintext_and_differs_per_seal() {
+        let _q = quota();
         let prekey = Prekey::new();
         let a = SealedDynamic::seal(Dynamic::<Vec<u8>>::new(alloc::vec![7u8; 40]), &prekey);
         let b = SealedDynamic::seal(Dynamic::<Vec<u8>>::new(alloc::vec![7u8; 40]), &prekey);
@@ -250,6 +237,7 @@ mod tests {
 
     #[test]
     fn with_secret_mut_reseals_under_a_fresh_salt() {
+        let _q = quota();
         let prekey = Prekey::new();
         let mut s = SealedDynamic::seal(Dynamic::<String>::new(String::from("abc")), &prekey);
         let (salt, ct) = (s.salt, s.ct.clone());
@@ -262,6 +250,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "sealed memory was modified or corrupted")]
     fn a_flipped_tag_bit_panics() {
+        let _q = quota();
         let prekey = Prekey::new();
         let mut s = SealedDynamic::seal(Dynamic::<Vec<u8>>::new(alloc::vec![1u8; 5]), &prekey);
         s.tag[15] ^= 0x80;

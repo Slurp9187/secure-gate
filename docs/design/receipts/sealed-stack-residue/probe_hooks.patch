@@ -1,6 +1,6 @@
---- a/src/sealed/fixed.rs	2026-10-18 18:54:58.695655600 -0700
-+++ b/src/sealed/fixed.rs	2026-10-18 18:55:00.786301400 -0700
-@@ -139,6 +139,13 @@
+--- a/src/sealed/fixed.rs	2026-10-18 21:23:16.450829300 -0700
++++ b/src/sealed/fixed.rs	2026-10-18 21:23:53.644934400 -0700
+@@ -207,6 +207,15 @@
          N == 0
      }
  
@@ -10,13 +10,15 @@
 +    pub fn __probe_cipher_only(&self) { self.prekey.__probe_cipher_only(&self.salt) }
 +    #[doc(hidden)]
 +    pub fn __probe_key(&self) -> [u8; 32] { self.prekey.__probe_key(&self.salt) }
++    #[doc(hidden)]
++    pub fn __probe_flip(&mut self) { self.ct[0] ^= 1; }
 +
      #[inline(always)]
      fn open_into(&self, buf: &mut [u8; N]) {
          buf.copy_from_slice(&self.ct);
---- a/src/sealed/prekey.rs	2026-10-18 18:52:51.770575600 -0700
-+++ b/src/sealed/prekey.rs	2026-10-18 18:53:19.461444600 -0700
-@@ -188,6 +188,15 @@
+--- a/src/sealed/prekey.rs	2026-10-18 21:20:53.949136300 -0700
++++ b/src/sealed/prekey.rs	2026-10-18 21:23:53.503271300 -0700
+@@ -179,6 +179,15 @@
          })
      }
  

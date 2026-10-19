@@ -161,10 +161,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The ChaCha20 backend leaves a copy of the sealing key on the stack, and release builds
   left one of the plaintext; an independent audit found both. Every seal and open now ends
   by overwriting the 32 KiB of stack below the call (sequoia's `zero_stack` technique, in
-  safe Rust), and `SealedFixed` opens in place. A probe found the key 4 times and the
-  plaintext once before, and neither after, on x86_64 Windows; the probe and its output are
-  in `docs/design/receipts/sealed-stack-residue/`. Registers and other targets are not
-  covered by that measurement.
+  safe Rust), on a panic as well as a normal return, and `SealedFixed` opens in place. A
+  probe found the key 4 times (debug) and the plaintext once (release) before, and neither
+  after, on x86_64 Windows; the probes and their output are in
+  `docs/design/receipts/sealed-stack-residue/`. Registers and other targets are not covered
+  by that measurement, and the `Fixed` that `unseal` returns is an ordinary `Fixed` from
+  then on: its by-value return can leave a copy in the caller's frame, as `SECURITY.md` §1
+  describes for any moved `Fixed`.
+
+  The pre-key is locked while it still holds zeros and filled afterwards. Sealed types are
+  not `Clone`, with or without `cloneable`: like `Fixed<[u8; N]>`, a sealed byte secret is
+  not copied implicitly.
 
   Not offered, on purpose: `expose_secret`, `RevealSecret`, `Hash`. `Debug` prints
   `[REDACTED]`, with no salt or length. `SealedDynamic::with_secret_mut` hands out

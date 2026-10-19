@@ -140,8 +140,10 @@ macro_rules! sealed_fixed_newtype {
                 self.0.with_secret_mut(f)
             }
 
-            /// Opens the key back into its plain role.
-            #[inline]
+            /// Opens the key back into its plain role. From then on it is an ordinary role
+            /// value: returning it by value can leave a copy in the caller's frame
+            /// (`SECURITY.md` §1). To read the key, prefer `with_role`, which leaves nothing.
+            #[inline(always)]
             pub fn unseal(self) -> $role {
                 <$role as $crate::__private::FixedRole>::from_fixed(self.0.unseal())
             }

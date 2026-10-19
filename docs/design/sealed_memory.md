@@ -32,7 +32,7 @@ pages, survive a refused lock, and avoid a never-wiped `static`. What shipped:
 | `SealedDynamic<T>` | `T` is `Vec<u8>` or `String`; ciphertext `Box<[u8]>`; `with_secret_mut` hands out `&mut [u8]` / `&mut str` | Resolves the open question: fixed length, no growth |
 | Scoped trait | `secure_gate::scoped::RevealScoped`, not at the root; read access only | No |
 | Roles | `sealed_fixed_newtype!(pub SealedAppKey, AppKey, "doc")` | New (EFV seals four `fixed_newtype!` roles) |
-| Not offered | `expose_secret`, `RevealSecret`, `Hash`; `Debug` is `[REDACTED]` | No |
+| Not offered | `expose_secret`, `RevealSecret`, `Hash`, `Clone`; `Debug` is `[REDACTED]` | `Clone`: **yes**, the analysis below proposed it under `cloneable`; dropped after review, because `Fixed<[u8; N]>` itself is never `Clone` |
 
 ### Why the pre-key is an owner object, not a static
 
@@ -96,6 +96,27 @@ Two changes, both in safe Rust:
 
 After both, the same probe found neither, in debug and release (`receipts/sealed-stack-residue/`).
 Measured on x86_64 Windows with rustc 1.98.1 only; registers are not inspected.
+
+A second round of review found two gaps, both measured with a panic probe that is also in
+the receipts directory:
+
+- **Panics skipped the scrub.** A closure that panics, or a tag mismatch, unwinds out of the
+  access before `scrub_stack` runs, and the key copy stayed. How many copies depends on
+  frame layout: `runs_panic.txt` shows one per panicking access in debug; reviewers' runs of
+  `5805536` counted two (debug), one (release, tag mismatch), and four inside the closure.
+  Every access now runs through `scrubbed()`, which catches the unwind, scrubs, and resumes
+  it. A `Drop` guard would not do: on Windows the cleanup that runs during unwinding sits
+  below the frames that threw, so its scrub would not lie over them. After the change: 0.
+- **`unseal` returns by value.** It now opens in place in the caller's frame, but the
+  return itself can still copy the `Fixed` within that frame (release: one copy, before and
+  after). That copy is the caller's, made by the move; no scrub from inside `unseal` can
+  reach it. A reviewer counted more in other shapes (release): two through a holding
+  helper, two moved into a `Box`, three for a sealed role's `unseal`, which adds a wrap. It is documented as the `SECURITY.md` §1 hazard it is, and reads should go
+  through `with_secret` / `with_role`, which leave nothing.
+
+The same review made the pre-key lock before it is filled, made the 64 KiB-page refusal a
+function its test calls, and serialised the unit tests that lock pages (they share one
+quota with the quota test).
 
 ### Measured cost
 
@@ -321,7 +342,7 @@ is unsound, so that is a separate, deliberate decision.
 | `Debug` | Fully redacted — no salt, no length. Stricter than sequoia. |
 | `ConstantTimeEq` | Unseal both, compare with `subtle`. |
 | `Hash` | **Do not implement.** Sequoia's leaks plaintext into the hasher. |
-| `Clone` (`cloneable`) | Copy the sealed bytes. Same key, nonce and plaintext, so no nonce reuse. |
+| `Clone` (`cloneable`) | Proposed: copy the sealed bytes. **Not built**: see [As built](#as-built-090-rc13). |
 | Serde, `ToHex` & co. | Via `with_secret`; unchanged behaviour, one unseal per call. |
 
 ## Compatibility: this can be added later without a breaking change

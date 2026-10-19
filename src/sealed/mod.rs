@@ -28,10 +28,11 @@
 //!   operating system allows it. Each sealed object keeps an `Arc` to the one it was sealed
 //!   under.
 //! - Every seal draws a random 32-byte salt. The sealing key is `SHA-256(salt ‖ pre-key)`,
-//!   recomputed on every access and wiped at the end of it. It is never stored in the
-//!   object. The cipher leaves a copy of it on the stack, so every seal and open ends by
-//!   overwriting the 32 KiB of stack below the call (sequoia's `zero_stack` technique),
-//!   which also removes plaintext a move left there. Measured on x86_64 Windows:
+//!   recomputed on every access and wiped as soon as the cipher is keyed. It is never
+//!   stored in the object. The cipher leaves a copy of it on the stack, so every seal and
+//!   open ends by overwriting the 32 KiB of stack below the call (sequoia's `zero_stack`
+//!   technique), on a panic as well as a normal return, which also removes plaintext a move
+//!   left there. Measured on x86_64 Windows:
 //!   `docs/design/receipts/sealed-stack-residue/` in the repository.
 //! - Because every seal has its own key, the AEAD nonce is all-zero. Every re-seal after
 //!   [`with_secret_mut`](SealedFixed::with_secret_mut) draws a new salt, so no key ever
@@ -62,11 +63,17 @@
 //!   on one target; another target's cipher backend or frame layout may differ.
 //! - Pages larger than 16 KiB (64 KiB on some Linux builds): the pre-key would share its page,
 //!   so it is not locked at all, and [`Prekey::lock_status`] says so.
+//! - What [`unseal`](SealedFixed::unseal) returns: an ordinary `Fixed`, whose by-value
+//!   return can leave a copy in the caller's frame (`SECURITY.md` §1). Read through
+//!   `with_secret` instead where you can.
 //!
 //! It narrows one threat. It is not a substitute for encrypted swap, disabled core dumps,
 //! or anything else in `SECURITY.md`.
 //!
 //! # Cost
+//!
+//! Each access needs about 32 KiB of free stack for the scrub, on top of the cipher's own
+//! frames: mind small custom thread stacks.
 //!
 //! Not zero-overhead. Each access hashes 16 KiB and runs one AEAD pass; each mutation adds
 //! an RNG call and a second pass. The repository's `sealed_vs_fixed` benchmark measures it.
@@ -134,6 +141,15 @@ pub use prekey::{LockError, Prekey};
 /// use secure_gate::{Fixed, Prekey, SealedFixed};
 /// let s = SealedFixed::seal(Fixed::new([0u8; 32]), &Prekey::new());
 /// let leaked: &[u8; 32] = s.with_secret(|b| b);
+/// ```
+///
+/// Not `Clone`, even with the `cloneable` feature: like `Fixed<[u8; N]>`, a sealed byte
+/// secret is not copied implicitly.
+///
+/// ```compile_fail,E0277
+/// use secure_gate::{Fixed, Prekey, SealedFixed};
+/// fn needs<C: Clone>(_: &C) {}
+/// needs(&SealedFixed::seal(Fixed::new([0u8; 32]), &Prekey::new()));
 /// ```
 ///
 /// Only `Vec<u8>` and `String` can be sealed as variable-length secrets:

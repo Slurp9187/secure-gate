@@ -11,8 +11,10 @@ measured with the same probe. This directory holds that probe and its captured o
 | File | What it is |
 |---|---|
 | `probe_stack.rs` | The probe, an integration test. It reads the stack with `unsafe` volatile reads and needs hooks that expose the sealing key, so it is kept here rather than in `tests/`. |
-| `probe_hooks.patch` | The hooks: three `#[doc(hidden)]` methods that derive the key the way an access does. Applied to a scratch copy only; never part of the crate. |
-| `runs.txt` | Captured stdout, before and after the fix, debug and release. |
+| `probe_panic.rs` | The second-round probe: an access whose closure panics, a `with_secret_mut` whose closure panics, a tag mismatch (one ciphertext byte flipped), and `unseal` with its result dropped. Written by a reviewer of PR #265, with the `unseal` case added. |
+| `probe_hooks.patch` | The hooks: `#[doc(hidden)]` methods that derive the key the way an access does, and one that flips a ciphertext byte. Applied to a scratch copy only; never part of the crate. |
+| `runs.txt` | First round: captured stdout, before and after the scrub, debug and release. |
+| `runs_panic.txt` | Second round: the panic probe before (`5805536`) and after `scrubbed()` and in-place `unseal`. Every panic path reads 0 after; `unseal` still reads one plaintext copy in release, the by-value return described in `SECURITY.md` §1. |
 
 ## Method
 
@@ -37,11 +39,13 @@ From a checkout of the branch, in a scratch copy (`git archive HEAD | tar -x -C 
 
 ```text
 git apply docs/design/receipts/sealed-stack-residue/probe_hooks.patch
-cp docs/design/receipts/sealed-stack-residue/probe_stack.rs tests/
-cargo test --release --features sealed --test probe_stack -- --nocapture
+cp docs/design/receipts/sealed-stack-residue/probe_*.rs tests/
+cargo test --release --features sealed --test probe_stack --test probe_panic -- --nocapture --test-threads=1
 ```
 
-The "before" rows come from commit `de02d62`, the last commit without the fix.
+The "before" rows come from commit `de02d62` (`runs.txt`) and `5805536` (`runs_panic.txt`).
+Give each copy its own `CARGO_TARGET_DIR`: two copies sharing one can silently reuse the
+other's build of this crate, and the hooks then appear to be missing.
 
 ## What it does not cover
 

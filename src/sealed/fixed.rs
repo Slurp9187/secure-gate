@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use super::prekey::{Prekey, SALT_LEN, TAG_LEN, scrub_stack};
+use super::prekey::{Prekey, SALT_LEN, TAG_LEN, scrubbed};
 use crate::{Fixed, RevealSecret, RevealSecretMut};
 
 /// A fixed-size byte secret held encrypted in RAM while idle, opened for one closure call
@@ -30,7 +30,8 @@ use crate::{Fixed, RevealSecret, RevealSecretMut};
 /// # Panics
 ///
 /// Every access panics if the sealed bytes fail to authenticate: they were modified or
-/// corrupted in memory and cannot be recovered. The partial plaintext is wiped first.
+/// corrupted in memory and cannot be recovered. The temporary is wiped and the stack below
+/// the call scrubbed before the panic continues.
 #[must_use = "holds secret material; bind it or chain a method call"]
 pub struct SealedFixed<const N: usize> {
     ct: [u8; N],
@@ -45,8 +46,7 @@ impl<const N: usize> SealedFixed<N> {
         let salt = Prekey::fresh_salt();
         let mut ct = [0u8; N];
         secret.with_secret(|plain| ct.copy_from_slice(plain));
-        let tag = prekey.seal_in_place(&salt, &mut ct);
-        scrub_stack();
+        let tag = scrubbed(|| prekey.seal_in_place(&salt, &mut ct));
         Self {
             ct,
             tag,
@@ -70,9 +70,7 @@ impl<const N: usize> SealedFixed<N> {
     where
         F: FnOnce(&[u8; N]) -> R,
     {
-        let result = self.open_and_call(f);
-        scrub_stack();
-        result
+        scrubbed(|| self.open_and_call(f))
     }
 
     // The plaintext temporary lives in this frame, below the caller's, so the
@@ -92,14 +90,13 @@ impl<const N: usize> SealedFixed<N> {
     /// Decrypts into a temporary, lets `f` change it, then seals the result under a fresh
     /// salt and wipes the temporary.
     ///
-    /// If `f` panics, the temporary is still wiped and the sealed value is left as it was.
+    /// If `f` panics, the temporary is still wiped, the stack scrubbed, and the sealed value
+    /// left as it was.
     pub fn with_secret_mut<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut [u8; N]) -> R,
     {
-        let result = self.open_mutate_reseal(f);
-        scrub_stack();
-        result
+        scrubbed(|| self.open_mutate_reseal(f))
     }
 
     // As `open_and_call`: the temporary lives in this frame so the scrub reaches it.
@@ -128,9 +125,7 @@ impl<const N: usize> SealedFixed<N> {
         W: FnOnce(Fixed<[u8; N]>) -> T,
         F: FnOnce(&T) -> R,
     {
-        let result = self.open_wrap_call(wrap, f);
-        scrub_stack();
-        result
+        scrubbed(|| self.open_wrap_call(wrap, f))
     }
 
     // The move into `wrap` copies the plaintext within this frame, which the scrub covers.
@@ -156,9 +151,7 @@ impl<const N: usize> SealedFixed<N> {
         U: FnOnce(T) -> Fixed<[u8; N]>,
         F: FnOnce(&mut T) -> R,
     {
-        let result = self.open_wrap_mutate_reseal(wrap, unwrap, f);
-        scrub_stack();
-        result
+        scrubbed(|| self.open_wrap_mutate_reseal(wrap, unwrap, f))
     }
 
     #[inline(never)]
@@ -181,12 +174,24 @@ impl<const N: usize> SealedFixed<N> {
     }
 
     /// Opens the secret back into a plain [`Fixed`]. Protection from sealing ends here;
-    /// the returned wrapper still wipes on drop.
+    /// the returned wrapper still wipes on drop, and is an ordinary `Fixed` from then on,
+    /// moves included: returning it by value can leave a copy in the caller's frame that
+    /// nothing wipes (`SECURITY.md` §1; one was measured in a release build). To read the
+    /// secret, prefer [`with_secret`](Self::with_secret), which leaves nothing.
+    //
+    // Inlined, so `plain` is built in the caller's frame and opened in place through a
+    // reference: a `Fixed` built in a callee's frame and returned would leave a copy there
+    // that nothing wipes. The opening itself runs below, inside the scrubbed region.
+    #[inline(always)]
     pub fn unseal(self) -> Fixed<[u8; N]> {
         let mut plain = Fixed::new([0u8; N]);
-        plain.with_secret_mut(|buf| self.open_into(buf));
-        scrub_stack();
+        scrubbed(|| plain.with_secret_mut(|buf| self.open_into_out_of_line(buf)));
         plain
+    }
+
+    #[inline(never)]
+    fn open_into_out_of_line(&self, buf: &mut [u8; N]) {
+        self.open_into(buf);
     }
 
     /// The secret's length in bytes, `N`.
@@ -195,7 +200,8 @@ impl<const N: usize> SealedFixed<N> {
         N
     }
 
-    /// `true` only for `SealedFixed<0>`.
+    /// `N == 0`. A zero-length `Fixed` does not compile, so this is `false` for every
+    /// `SealedFixed` that can exist; it is here for symmetry with `len`.
     #[inline(always)]
     pub const fn is_empty(&self) -> bool {
         N == 0
@@ -229,20 +235,6 @@ impl<const N: usize> crate::ConstantTimeEq for SealedFixed<N> {
     }
 }
 
-/// Copies the sealed bytes and shares the pre-key. The copy opens to the same plaintext
-/// under the same key and nonce, so no nonce is reused for a second message.
-#[cfg(feature = "cloneable")]
-impl<const N: usize> Clone for SealedFixed<N> {
-    fn clone(&self) -> Self {
-        Self {
-            ct: self.ct,
-            tag: self.tag,
-            salt: self.salt,
-            prekey: Arc::clone(&self.prekey),
-        }
-    }
-}
-
 /// Always prints `[REDACTED]`: no salt, no tag, no length.
 impl<const N: usize> core::fmt::Debug for SealedFixed<N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -253,9 +245,11 @@ impl<const N: usize> core::fmt::Debug for SealedFixed<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sealed::prekey::tests::quota;
 
     #[test]
     fn the_ciphertext_is_not_the_plaintext_and_differs_per_seal() {
+        let _q = quota();
         let prekey = Prekey::new();
         let a = SealedFixed::seal(Fixed::new([0x42u8; 32]), &prekey);
         let b = SealedFixed::seal(Fixed::new([0x42u8; 32]), &prekey);
@@ -266,6 +260,7 @@ mod tests {
 
     #[test]
     fn with_secret_mut_reseals_under_a_fresh_salt() {
+        let _q = quota();
         let prekey = Prekey::new();
         let mut s = SealedFixed::seal(Fixed::new([1u8; 16]), &prekey);
         let (salt, ct) = (s.salt, s.ct);
@@ -278,6 +273,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "sealed memory was modified or corrupted")]
     fn a_flipped_ciphertext_bit_panics() {
+        let _q = quota();
         let prekey = Prekey::new();
         let mut s = SealedFixed::seal(Fixed::new([1u8; 32]), &prekey);
         s.ct[3] ^= 0x10;
@@ -287,6 +283,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "sealed memory was modified or corrupted")]
     fn a_flipped_salt_bit_panics() {
+        let _q = quota();
         let prekey = Prekey::new();
         let mut s = SealedFixed::seal(Fixed::new([1u8; 32]), &prekey);
         s.salt[31] ^= 1;

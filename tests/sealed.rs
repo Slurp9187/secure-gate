@@ -120,20 +120,6 @@ fn ct_eq_compares_plaintext_across_salts_and_prekeys() {
     assert!(!k1.ct_eq(&k3));
 }
 
-#[cfg(feature = "cloneable")]
-#[test]
-fn a_clone_opens_to_the_same_secret_and_is_independent() {
-    let prekey = Prekey::new();
-    let mut a = SealedFixed::seal(Fixed::new([8u8; 8]), &prekey);
-    let b = a.clone();
-    a.with_secret_mut(|x| x[0] = 0);
-    b.with_secret(|x| assert_eq!(x, &[8u8; 8]));
-    a.with_secret(|x| assert_eq!(x[0], 0));
-
-    let c = SealedDynamic::seal(Dynamic::<Vec<u8>>::new(vec![1, 2]), &prekey);
-    c.clone().with_secret(|v| assert_eq!(v, &vec![1, 2]));
-}
-
 #[test]
 fn debug_reveals_nothing() {
     let prekey = Prekey::new();
@@ -177,8 +163,8 @@ fn sealing_works_whatever_the_lock_outcome() {
     for k in &keys {
         if let Err(e) = k.lock_status() {
             assert!(
-                e.raw_os_error().is_some(),
-                "a lock refusal carries the OS code"
+                e.raw_os_error().is_some() || e.page_too_large().is_some(),
+                "a lock refusal says why: an OS code, or a page too large to own"
             );
         }
         let s = SealedFixed::seal(Fixed::new([7u8; 32]), k);
