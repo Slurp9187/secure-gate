@@ -177,10 +177,12 @@ impl<T: SealedPayload> SealedDynamic<T> {
     }
 
     fn open(&self) -> Dynamic<Vec<u8>> {
-        Dynamic::<Vec<u8>>::new_with(self.ct.len(), |buf| {
-            buf.copy_from_slice(&self.ct);
-            self.prekey.open_in_place(&self.salt, &self.tag, buf);
-        })
+        Dynamic::<Vec<u8>>::new_with(self.ct.len(), |buf| self.open_into(buf))
+    }
+
+    fn open_into(&self, buf: &mut [u8]) {
+        buf.copy_from_slice(&self.ct);
+        self.prekey.open_in_place(&self.salt, &self.tag, buf);
     }
 }
 
