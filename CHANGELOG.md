@@ -178,7 +178,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default dependency set is unchanged.
 - **`sealed_fixed_newtype!`** seals a `fixed_newtype!` role into its own type:
   `sealed_fixed_newtype!(pub SealedAppKey, AppKey, "doc")` gives `SealedAppKey::seal(AppKey,
-  &prekey)` and `unseal() -> AppKey`, and accepts no other role (compile-fail doctests).
+  &prekey)`, `with_role(|k: &AppKey| ..)` / `with_role_mut` for code that takes the role
+  rather than bytes, and `unseal() -> AppKey`; it accepts and hands out no other role
+  (compile-fail doctests).
   `fixed_newtype!`'s size-literal form gains a hidden conversion trait impl under `sealed` so
   the bytes move across instead of being copied out by hand.
 - **`secure_gate::scoped::RevealScoped`**, closure-only read access implemented for every
