@@ -44,3 +44,4 @@ AGENT.md
 !/.claude/
 /.claude/*
 !/.claude/skills/
+/.agent/*
