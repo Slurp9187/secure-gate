@@ -42,3 +42,11 @@ cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
 with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
 .
 
+=== falsification: the fixed tree with scrub_stack's body deleted
+debug:   with_secret: key hits=4 plaintext hits=0
+release: with_secret: key hits=0 plaintext hits=0
+
+The scrub is what removes the debug key copies. In release this probe sees no key copy
+with or without the scrub on this tree; the audit's own release run, on an earlier copy,
+found one directly after "expand 32-byte k". Release key residue depends on frame layout,
+and this probe does not always reach it.
