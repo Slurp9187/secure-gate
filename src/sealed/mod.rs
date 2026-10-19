@@ -1,0 +1,78 @@
+//! Secrets held **encrypted in RAM while idle**, opened for one closure call at a time.
+//! Requires the `sealed` feature.
+//!
+//! [`Fixed`](crate::Fixed) and [`Dynamic`](crate::Dynamic) hold their secret in plaintext
+//! for their whole lifetime and wipe it on drop. [`SealedFixed`] and [`SealedDynamic`] hold
+//! it as ChaCha20-Poly1305 ciphertext instead, and decrypt only into a temporary that
+//! exists for the length of a `with_secret` / `with_secret_mut` call. The design follows
+//! `sequoia-openpgp`'s `crypto::mem::Encrypted`, itself following OpenSSH.
+//!
+//! ```rust
+//! use secure_gate::{Fixed, Prekey, SealedFixed};
+//!
+//! // One per session; drop it, and everything sealed under it, at lock or logout.
+//! let prekey = Prekey::new();
+//! if let Err(why) = prekey.lock_status() {
+//!     eprintln!("note: {why}"); // not fatal
+//! }
+//!
+//! let mut key = SealedFixed::seal(Fixed::new([7u8; 32]), &prekey);
+//! key.with_secret(|k| assert_eq!(k[0], 7));
+//! key.with_secret_mut(|k| k[0] = 8); // re-sealed under a fresh salt
+//! let plain: Fixed<[u8; 32]> = key.unseal();
+//! ```
+//!
+//! # How it works
+//!
+//! - A [`Prekey`] is 16 KiB of random bytes, page-aligned and locked in RAM where the
+//!   operating system allows it. Each sealed object keeps an `Arc` to the one it was sealed
+//!   under.
+//! - Every seal draws a random 32-byte salt. The sealing key is `SHA-256(salt ‖ pre-key)`,
+//!   recomputed on every access and wiped at the end of it. It is never stored.
+//! - Because every seal has its own key, the AEAD nonce is all-zero. Every re-seal after
+//!   [`with_secret_mut`](SealedFixed::with_secret_mut) draws a new salt, so no key ever
+//!   encrypts twice.
+//!
+//! # What it protects against
+//!
+//! **Lossy readout** of process memory: Spectre-class side channels, Rowhammer, cold boot.
+//! These recover memory with bit errors. A 32-byte key read with a few flipped bits is
+//! still recoverable by search; a sealing key that depends on all 131,072 bits of the
+//! pre-key is not, because one wrong bit anywhere avalanches through SHA-256.
+//!
+//! With the pre-key locked, a sealed secret that reaches the **swap file** cannot be
+//! opened from it, because the pre-key never gets there.
+//!
+//! # What it does not protect against
+//!
+//! - A **clean** read of the address space: a debugger, `/proc/<pid>/mem`, an attacker who
+//!   can run code in the process. That read gets pre-key, salt and ciphertext together.
+//! - **Hibernation** files and **crash or core dumps**, which capture locked pages too.
+//! - A failed lock ([`Prekey::lock_status`] says so): the pre-key can then be swapped out
+//!   like any other memory.
+//! - The plaintext temporary while a closure runs. It lives on the stack
+//!   ([`SealedFixed`]) or the heap ([`SealedDynamic`]), is not locked, and is wiped when the
+//!   call returns. Copies the closure makes are the caller's to wipe.
+//!
+//! It narrows one threat. It is not a substitute for encrypted swap, disabled core dumps,
+//! or anything else in `SECURITY.md`.
+//!
+//! # Cost
+//!
+//! Not zero-overhead. Each access hashes 16 KiB and runs one AEAD pass; each mutation adds
+//! an RNG call and a second pass. The repository's `sealed_vs_fixed` benchmark measures it.
+//!
+//! # Not implemented, on purpose
+//!
+//! - `expose_secret` / [`RevealSecret`](crate::RevealSecret): plaintext must not outlive
+//!   the call. Use [`RevealScoped`](crate::scoped::RevealScoped) for generic scoped access.
+//! - `Hash`: it would feed the plaintext into a hasher whose state is never wiped.
+//! - `Debug` beyond `[REDACTED]`: no salt, no tag, no length.
+
+mod dynamic;
+mod fixed;
+mod prekey;
+
+pub use dynamic::{SealedDynamic, SealedPayload};
+pub use fixed::SealedFixed;
+pub use prekey::{LockError, Prekey};

@@ -23,6 +23,14 @@ include = [
 
 [dependencies]
 base16ct = { version = "1", optional = true, default-features = false }
+# The three `sealed` dependencies. ChaCha20-Poly1305 seals, SHA-256 derives each object's
+# sealing key from the pre-key, and `region` locks the pre-key's pages in RAM. `region::lock`
+# is a safe function, so the `unsafe` it needs stays in that crate and this one keeps
+# `#![forbid(unsafe_code)]`. `zeroize` on the first two wipes the cipher's copy of the key and
+# the hasher's state when they drop. All three declare `rust-version = "1.85"`.
+chacha20poly1305 = { version = "0.11", optional = true, default-features = false, features = ["zeroize"] }
+region = { version = "4.0.1", optional = true, default-features = false }
+sha2 = { version = "0.11", optional = true, default-features = false, features = ["zeroize"] }
 # `default-features = false` is a no-op for base32ct (it has none), but keeps the
 # three `*ct` lines uniform. The `0.3.1` floor is load-bearing rather than
 # cosmetic: `0.3.0` panics with an out-of-bounds index when an unpadded input's
@@ -119,6 +127,11 @@ encoding-base64 = ["dep:base64ct"]
 # Covers BIP-173 (bech32) and BIP-350 (bech32m) together: they are one dependency,
 # one error type, and one code-length knob, differing only in a checksum constant.
 encoding-bech32 = ["dep:bech32"]
+
+# Sealed: secrets held encrypted in RAM while idle (`SealedFixed`, `SealedDynamic`),
+# opened for one closure call at a time. Needs `std` for the lockable, wipeable pre-key and
+# `rand` for its bytes and every seal's salt. Not part of `full`, which excludes `std`.
+sealed = ["std", "rand", "dep:chacha20poly1305", "dep:sha2", "dep:region"]
 
 # Cloneable: opt-in cloning
 cloneable = []

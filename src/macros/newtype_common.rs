@@ -277,6 +277,17 @@ macro_rules! __sg_newtype_opt {
 
 #[doc(hidden)]
 #[macro_export]
+#[cfg(feature = "sealed")]
+macro_rules! __sg_if_sealed { ($($t:tt)*) => { $($t)* }; }
+#[doc(hidden)]
+#[macro_export]
+#[cfg(not(feature = "sealed"))]
+macro_rules! __sg_if_sealed {
+    ($($t:tt)*) => {};
+}
+
+#[doc(hidden)]
+#[macro_export]
 #[cfg(feature = "rand")]
 macro_rules! __sg_if_rand { ($($t:tt)*) => { $($t)* }; }
 #[doc(hidden)]

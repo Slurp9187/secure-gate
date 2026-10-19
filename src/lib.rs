@@ -191,6 +191,7 @@
 //! | | | **Cryptographic** |
 //! | `ct-eq` | no | [`ConstantTimeEq`] via `subtle` — timing-safe comparison |
 //! | `rand` | no | `from_random()` / `from_rng()` — `no_std` for [`Fixed`] |
+//! | `sealed` | no | [`SealedFixed`] / [`SealedDynamic`]: secrets encrypted in RAM while idle, under a locked [`Prekey`] (implies `std`, `rand`) |
 //! | | | **Serialization** |
 //! | `serde-serialize` | no | Serde `Serialize` (requires [`SerializableSecret`] marker) |
 //! | `serde-deserialize` | no | Serde `Deserialize` with 1 MiB default limit |
@@ -203,7 +204,7 @@
 //! | `encoding` | no | All encoding features |
 //! | | | **Meta** |
 //! | `cloneable` | no | [`CloneableSecret`] opt-in cloning |
-//! | `full` | no | Everything except `std` |
+//! | `full` | no | Everything except `std` and `sealed` |
 //!
 //! # What's available without `alloc`?
 //!
@@ -301,6 +302,12 @@ mod error;
 /// Core traits for wrapper polymorphism - always available.
 pub mod traits;
 
+#[cfg(feature = "sealed")]
+pub mod sealed;
+
+#[cfg(feature = "sealed")]
+pub mod scoped;
+
 /// Implementation detail of the `*_newtype!` macros — not a public API.
 ///
 /// Generated code needs to name `Zeroize`, `serde` traits, and `alloc` types
@@ -320,6 +327,37 @@ pub mod __private {
     #[cfg(feature = "serde-serialize")]
     pub use serde::{Serialize, Serializer};
     pub use zeroize::{Zeroize, ZeroizeOnDrop};
+
+    #[cfg(feature = "sealed")]
+    pub use alloc::sync::Arc;
+
+    /// A `fixed_newtype!` byte role, convertible to and from the `Fixed` it wraps without
+    /// copying the bytes out by hand. Lets `sealed_fixed_newtype!` seal a role directly.
+    #[cfg(feature = "sealed")]
+    pub trait FixedRole: Sized {
+        /// The wrapped `Fixed<[u8; N]>`.
+        type Fixed: SealableFixed;
+        /// Unwraps the role.
+        fn into_fixed(self) -> Self::Fixed;
+        /// Wraps a `Fixed` as the role.
+        fn from_fixed(fixed: Self::Fixed) -> Self;
+    }
+
+    /// Maps `Fixed<[u8; N]>` to `SealedFixed<N>` without naming `N`.
+    #[cfg(feature = "sealed")]
+    pub trait SealableFixed {
+        /// `SealedFixed<N>`.
+        type Sealed;
+    }
+
+    #[cfg(feature = "sealed")]
+    impl<const N: usize> SealableFixed for crate::Fixed<[u8; N]> {
+        type Sealed = crate::SealedFixed<N>;
+    }
+
+    /// The `SealedFixed<N>` a role seals into.
+    #[cfg(feature = "sealed")]
+    pub type SealedOf<R> = <<R as FixedRole>::Fixed as SealableFixed>::Sealed;
 }
 
 /// Heap-allocated secret wrapper with explicit access and automatic zeroization on drop.
@@ -341,6 +379,25 @@ pub mod __private {
 /// ```
 #[cfg(feature = "alloc")]
 pub use dynamic::Dynamic;
+
+/// A fixed-size byte secret held encrypted in RAM while idle — see the [`sealed`] module.
+/// Requires the `sealed` feature.
+#[cfg(feature = "sealed")]
+pub use sealed::SealedFixed;
+
+/// A `Vec<u8>` or `String` secret held encrypted in RAM while idle — see the [`sealed`]
+/// module. Requires the `sealed` feature.
+#[cfg(feature = "sealed")]
+pub use sealed::SealedDynamic;
+
+/// The locked, wipeable pre-key every sealing key is derived from — see the [`sealed`]
+/// module. Requires the `sealed` feature.
+#[cfg(feature = "sealed")]
+pub use sealed::Prekey;
+
+/// Why a [`Prekey`]'s pages are not locked in RAM. Requires the `sealed` feature.
+#[cfg(feature = "sealed")]
+pub use sealed::LockError;
 
 /// Cursor-like reader over [`Dynamic<Vec<u8>>`] — see [`Dynamic::as_reader`].
 #[cfg(feature = "std")]
