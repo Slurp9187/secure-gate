@@ -332,7 +332,8 @@ quota. With the default minimum, about eleven pre-keys lock before the
 next is refused (measured on Windows 11). An application holding more,
 or locking other memory too, raises the quota with
 `SetProcessWorkingSetSize` at startup. On Unix the limit is
-`RLIMIT_MEMLOCK`.
+`RLIMIT_MEMLOCK`; where it is 0 (common in containers) every lock is
+refused with `EPERM`, reported by `lock_status()`, and sealing still works.
 
 Each access costs about 7–11 µs for a 32-byte key against well under a
 nanosecond for `Fixed` (see `docs/design/sealed_memory.md` for the

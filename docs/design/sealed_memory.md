@@ -66,7 +66,15 @@ pages: unlocking after the free could unlock whatever reuses them.
 A refused lock is reported, never fatal. On Windows every `VirtualLock` in the process shares
 the working-set quota: **with the default minimum, 11 pre-keys locked and the 12th was refused**
 (`ERROR_WORKING_SET_QUOTA`, 1453), measured on Windows 11 in a test process. EFV raises the
-quota to 4 MiB at startup. Two test findings worth keeping:
+quota to 4 MiB at startup.
+
+On Linux (WSL2, rustc 1.85.1, 4 KiB pages, `RLIMIT_MEMLOCK` 65536 KiB; measured by the third
+review pass) `mlock` succeeds; under `ulimit -l 0` it is refused with `EPERM`, `lock_status()`
+reports it, and sealing still opens; and freeing a pre-key's block without `munlock` returns
+the charge, as freeing does on Windows. `wipe_and_unlock_returns_the_quota` passed under
+`ulimit -l 48`. macOS was not run.
+
+Two test findings worth keeping:
 
 - Parallel tests in one binary share the quota, so a test asserting a lock succeeds is flaky
   beside other locking tests. `tests/sealed_lock.rs` holds a single test for that reason.
