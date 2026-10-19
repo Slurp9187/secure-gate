@@ -485,6 +485,11 @@ it, it is recoverable from git history — `git checkout v0.9.0-rc.8 -- secure-g
 restores the last version, along with its migration guide. (`v0.9.0-rc.8` is the last tag
 that carries it; the crate was deleted before `rc.9`.)
 
+One difference to know when moving from `secrecy` 0.10: its only wrapper is the heap
+`SecretBox`, because a stack `Secret<T>` leaves copies behind when moved. Here `Fixed<T>` is
+that inline, stack-capable type, kept for `no_std` and speed; for a long-held secret prefer
+`Dynamic` or a sealed type. See `SECURITY.md` §3.
+
 ## Features
 
 Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = false` for heap-free `Fixed` only.

@@ -279,6 +279,16 @@ process is irrelevant — the bytes already left the process's address
 space. This applies identically to C, C++, Go, and Rust; it is OS-level
 and outside any in-process library's reach.
 
+The stack is part of what gets paged and dumped. `Fixed<T>` stores its
+bytes inline, so it can live on the stack, and moving it can leave earlier
+copies that its drop never wipes ([1. Stack-move residue](#1-stack-move-residue-fixedt)).
+For a secret held a long time, prefer `Dynamic` (one heap address) or a
+sealed type. `secrecy` 0.10 removed its stack `Secret<T>` for the same
+reason ("the secret lingers on the stack",
+[iqlusioninc/crates#1140](https://github.com/iqlusioninc/crates/pull/1140));
+this crate keeps the inline type for `no_std` and speed, and states the
+trade-off instead.
+
 **Recommended patterns (deployment-level):**
 
 - Use **encrypted swap** (default on most modern Linux distributions, FileVault on macOS, BitLocker on Windows).
