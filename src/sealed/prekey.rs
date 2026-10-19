@@ -92,10 +92,11 @@ impl std::error::Error for LockError {}
 ///
 /// Each [`SealedFixed`](crate::SealedFixed) and [`SealedDynamic`](crate::SealedDynamic)
 /// keeps an `Arc` to the `Prekey` it was sealed under and derives its key afresh on every
-/// access as `SHA-256(salt ‖ pre-key)`. The key itself is never stored. A lossy readout of
-/// memory (Spectre-class side channels, Rowhammer, cold boot) that gets any one of the
-/// pre-key's 131,072 bits wrong yields a useless key, with nothing to say which bit was
-/// wrong. See the [`sealed`](crate::sealed) module for the whole threat model.
+/// access as `SHA-256(salt ‖ pre-key)`. The key itself is never stored, and the stack the
+/// cipher used is overwritten after each access, since the cipher leaves a copy there. A
+/// lossy readout of memory (Spectre-class side channels, Rowhammer, cold boot) that gets any
+/// one of the pre-key's 131,072 bits wrong yields a useless key, with nothing to say which
+/// bit was wrong. See the [`sealed`](crate::sealed) module for the whole threat model.
 ///
 /// # Lifetime
 ///

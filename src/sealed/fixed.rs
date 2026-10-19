@@ -70,12 +70,23 @@ impl<const N: usize> SealedFixed<N> {
     where
         F: FnOnce(&[u8; N]) -> R,
     {
-        let result = {
-            let plain = Fixed::new_with(|buf| self.open_into(buf));
-            plain.with_secret(f)
-        };
+        let result = self.open_and_call(f);
         scrub_stack();
         result
+    }
+
+    // The plaintext temporary lives in this frame, below the caller's, so the
+    // `scrub_stack` that follows lies over it and over anything a move left there. It is
+    // built as zeros and decrypted in place: a `Fixed` returned by value would be moved,
+    // leaving an unwiped copy in the slot it left.
+    #[inline(never)]
+    fn open_and_call<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&[u8; N]) -> R,
+    {
+        let mut plain = Fixed::new([0u8; N]);
+        plain.with_secret_mut(|buf| self.open_into(buf));
+        plain.with_secret(f)
     }
 
     /// Decrypts into a temporary, lets `f` change it, then seals the result under a fresh
@@ -86,23 +97,32 @@ impl<const N: usize> SealedFixed<N> {
     where
         F: FnOnce(&mut [u8; N]) -> R,
     {
-        let result = {
-            let mut plain = Fixed::new_with(|buf| self.open_into(buf));
-            let result = plain.with_secret_mut(f);
-            let salt = Prekey::fresh_salt();
-            plain.with_secret(|p| self.ct.copy_from_slice(p));
-            self.tag = self.prekey.seal_in_place(&salt, &mut self.ct);
-            self.salt = salt;
-            result
-        };
+        let result = self.open_mutate_reseal(f);
         scrub_stack();
+        result
+    }
+
+    // As `open_and_call`: the temporary lives in this frame so the scrub reaches it.
+    #[inline(never)]
+    fn open_mutate_reseal<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut [u8; N]) -> R,
+    {
+        let mut plain = Fixed::new([0u8; N]);
+        plain.with_secret_mut(|buf| self.open_into(buf));
+        let result = plain.with_secret_mut(f);
+        let salt = Prekey::fresh_salt();
+        plain.with_secret(|p| self.ct.copy_from_slice(p));
+        self.tag = self.prekey.seal_in_place(&salt, &mut self.ct);
+        self.salt = salt;
         result
     }
 
     /// Opens the secret back into a plain [`Fixed`]. Protection from sealing ends here;
     /// the returned wrapper still wipes on drop.
     pub fn unseal(self) -> Fixed<[u8; N]> {
-        let plain = Fixed::new_with(|buf| self.open_into(buf));
+        let mut plain = Fixed::new([0u8; N]);
+        plain.with_secret_mut(|buf| self.open_into(buf));
         scrub_stack();
         plain
     }

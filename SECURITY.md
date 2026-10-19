@@ -294,7 +294,11 @@ flags.
 `SealedFixed<N>` and `SealedDynamic` hold a secret as ChaCha20-Poly1305
 ciphertext and open it only for one `with_secret` / `with_secret_mut`
 call. The sealing key, `SHA-256(salt ‖ pre-key)`, is recomputed on every
-access and never stored. The pre-key is 16 KiB of random bytes in a
+access and never stored in the object. The cipher leaves a copy of it on
+the stack, so every seal and open ends by overwriting the 32 KiB of stack
+below the call; a probe found the key 4 times there before that overwrite
+and 0 times after (x86_64 Windows only; the run is in
+`docs/design/receipts/sealed-stack-residue/`). The pre-key is 16 KiB of random bytes in a
 `Prekey` that each sealed object holds an `Arc` to; it is not a `static`,
 and when the last reference drops it is wiped while still locked, then
 unlocked, then freed.
@@ -307,7 +311,9 @@ unlocked, then freed.
 | **Hibernation** file | Not covered: it captures locked pages too |
 | **Crash or core dump** | Not covered: it captures pre-key, salt and ciphertext together |
 | Clean read of process memory (debugger, `/proc/<pid>/mem`, code in the process) | Not covered: same reason |
-| The plaintext temporary while the closure runs, and copies the closure makes | Not covered: on the stack (`SealedFixed`) or heap (`SealedDynamic`), unlocked, wiped when the call returns |
+| The plaintext temporary while the closure runs, and copies the closure makes | Not covered: on the stack (`SealedFixed`) or heap (`SealedDynamic`), unlocked; wiped, and the stack below overwritten, when the call returns |
+| Registers, and stack residue beyond the 32 KiB overwritten after each access | Not covered; measured on one target only |
+| Pages larger than 16 KiB | The pre-key is not locked (it would share a page); `lock_status()` says so |
 
 On Windows every `VirtualLock` in a process draws on its working-set
 quota. With the default minimum, about eleven pre-keys lock before the

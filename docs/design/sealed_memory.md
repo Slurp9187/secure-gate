@@ -75,6 +75,28 @@ quota to 4 MiB at startup. Two test findings worth keeping:
   back passes even with the unlock deleted. `wipe_and_unlock_returns_the_quota` unlocks while
   the blocks are still allocated, and fails with the unlock deleted (checked).
 
+### Stack residue, and the scrub
+
+The independent audit of PR #265 probed the stack after one `SealedFixed<32>::with_secret`.
+Before the fix it found the 32-byte sealing key four times (debug) and the plaintext once
+(release). The key comes from the ChaCha20 backend's state block, which it leaves on the
+stack: the constant `expand 32-byte k`, then the key. RustCrypto's `zeroize` feature wipes
+the cipher *struct*, not that block. The plaintext copy sat just below the caller's frame;
+the audit did not pin its source. The likely one is the by-value move of the `Fixed`
+temporary out of `Fixed::new_with`, and opening in place (below) is what removed it.
+
+Two changes, both in safe Rust:
+
+- Every seal and open ends with `scrub_stack()`: an `#[inline(never)]` function whose 32 KiB
+  frame lies over the region the cipher and hash just used, zeroized with `[u64]` volatile
+  writes. It is sequoia's `zero_stack`, without the `memsec` call.
+- `SealedFixed` opens into a zeroed `Fixed` built in place, inside an `#[inline(never)]`
+  frame below the scrub's caller, so nothing is moved and the frame is inside the scrubbed
+  region.
+
+After both, the same probe found neither, in debug and release (`receipts/sealed-stack-residue/`).
+Measured on x86_64 Windows with rustc 1.98.1 only; registers are not inspected.
+
 ### Measured cost
 
 AMD Ryzen 9 9950X3D (SHA-NI available), Windows 11, rustc 1.98.1, release profile;
@@ -89,6 +111,9 @@ shared with other builds, so treat these as an order of magnitude:
 | `SealedFixed<32>::seal` | ~7.5 µs |
 | `SealedDynamic<Vec<u8>>::with_secret`, 4 KiB | ~11.5 µs |
 | `Prekey::new` (allocate, RNG, lock, and wipe on drop) | ~8 µs |
+
+Re-measured after the stack scrub was added (see above): `with_secret` ~8.0 µs,
+`with_secret_mut` ~14.9 µs, `seal` ~7.9 µs. Within the noise of the figures above.
 
 SHA-256 against BLAKE3 over the same 32 + 16,384 bytes, best of 12 rounds of 20,000 in a
 standalone release binary: **6.44 µs vs 6.29 µs**. With SHA-NI they are the same, so SHA-256

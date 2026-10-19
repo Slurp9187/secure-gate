@@ -155,7 +155,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `region`, so this crate keeps `#![forbid(unsafe_code)]`); with the pre-key out of swap, a
   sealed secret that is swapped cannot be opened from there. A refused lock is reported by
   `Prekey::lock_status()` and never panics. On Windows the default working-set quota
-  allowed 11 pre-keys before refusing the 12th.
+  allowed 11 pre-keys before refusing the 12th. On pages larger than 16 KiB the pre-key
+  would share a page, so it is not locked and `lock_status()` says why.
+
+  The ChaCha20 backend leaves a copy of the sealing key on the stack, and release builds
+  left one of the plaintext; an independent audit found both. Every seal and open now ends
+  by overwriting the 32 KiB of stack below the call (sequoia's `zero_stack` technique, in
+  safe Rust), and `SealedFixed` opens in place. A probe found the key 4 times and the
+  plaintext once before, and neither after, on x86_64 Windows; the probe and its output are
+  in `docs/design/receipts/sealed-stack-residue/`. Registers and other targets are not
+  covered by that measurement.
 
   Not offered, on purpose: `expose_secret`, `RevealSecret`, `Hash`. `Debug` prints
   `[REDACTED]`, with no salt or length. `SealedDynamic::with_secret_mut` hands out

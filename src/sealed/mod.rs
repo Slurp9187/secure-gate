@@ -28,7 +28,11 @@
 //!   operating system allows it. Each sealed object keeps an `Arc` to the one it was sealed
 //!   under.
 //! - Every seal draws a random 32-byte salt. The sealing key is `SHA-256(salt ‖ pre-key)`,
-//!   recomputed on every access and wiped at the end of it. It is never stored.
+//!   recomputed on every access and wiped at the end of it. It is never stored in the
+//!   object. The cipher leaves a copy of it on the stack, so every seal and open ends by
+//!   overwriting the 32 KiB of stack below the call (sequoia's `zero_stack` technique),
+//!   which also removes plaintext a move left there. Measured on x86_64 Windows:
+//!   `docs/design/receipts/sealed-stack-residue/` in the repository.
 //! - Because every seal has its own key, the AEAD nonce is all-zero. Every re-seal after
 //!   [`with_secret_mut`](SealedFixed::with_secret_mut) draws a new salt, so no key ever
 //!   encrypts twice.
@@ -51,8 +55,13 @@
 //! - A failed lock ([`Prekey::lock_status`] says so): the pre-key can then be swapped out
 //!   like any other memory.
 //! - The plaintext temporary while a closure runs. It lives on the stack
-//!   ([`SealedFixed`]) or the heap ([`SealedDynamic`]), is not locked, and is wiped when the
-//!   call returns. Copies the closure makes are the caller's to wipe.
+//!   ([`SealedFixed`]) or the heap ([`SealedDynamic`]) and is not locked; it is wiped, and
+//!   the stack below the call overwritten, when the call returns. Copies the closure makes
+//!   are the caller's to wipe.
+//! - Registers, and stack residue beyond the overwritten 32 KiB. The overwrite was measured
+//!   on one target; another target's cipher backend or frame layout may differ.
+//! - Pages larger than 16 KiB (64 KiB on some Linux builds): the pre-key would share its page,
+//!   so it is not locked at all, and [`Prekey::lock_status`] says so.
 //!
 //! It narrows one threat. It is not a substitute for encrypted swap, disabled core dumps,
 //! or anything else in `SECURITY.md`.
