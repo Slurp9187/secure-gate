@@ -191,7 +191,7 @@
 //! | | | **Cryptographic** |
 //! | `ct-eq` | no | [`ConstantTimeEq`] via `subtle` — timing-safe comparison |
 //! | `rand` | no | `from_random()` / `from_rng()` — `no_std` for [`Fixed`] |
-//! | `sealed` | no | [`SealedFixed`] / [`SealedDynamic`]: secrets encrypted in RAM while idle, under a locked [`Prekey`] (implies `std`, `rand`) |
+//! | `sealed` | no | `SealedFixed` / `SealedDynamic`: secrets encrypted in RAM while idle, under a locked `Prekey` (implies `std`, `rand`) |
 //! | | | **Serialization** |
 //! | `serde-serialize` | no | Serde `Serialize` (requires [`SerializableSecret`] marker) |
 //! | `serde-deserialize` | no | Serde `Deserialize` with 1 MiB default limit |
