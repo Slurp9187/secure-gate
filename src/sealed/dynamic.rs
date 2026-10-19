@@ -215,3 +215,38 @@ impl<T: SealedPayload> core::fmt::Debug for SealedDynamic<T> {
         f.write_str("[REDACTED]")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_ciphertext_is_not_the_plaintext_and_differs_per_seal() {
+        let prekey = Prekey::new();
+        let a = SealedDynamic::seal(Dynamic::<Vec<u8>>::new(alloc::vec![7u8; 40]), &prekey);
+        let b = SealedDynamic::seal(Dynamic::<Vec<u8>>::new(alloc::vec![7u8; 40]), &prekey);
+        assert_ne!(&*a.ct, &[7u8; 40][..]);
+        assert_ne!(a.salt, b.salt);
+        assert_ne!(a.ct, b.ct);
+    }
+
+    #[test]
+    fn with_secret_mut_reseals_under_a_fresh_salt() {
+        let prekey = Prekey::new();
+        let mut s = SealedDynamic::seal(Dynamic::<String>::new(String::from("abc")), &prekey);
+        let (salt, ct) = (s.salt, s.ct.clone());
+        s.with_secret_mut(|p: &mut str| p.make_ascii_uppercase());
+        assert_ne!(s.salt, salt);
+        assert_ne!(s.ct, ct);
+        s.with_secret(|p| assert_eq!(p, "ABC"));
+    }
+
+    #[test]
+    #[should_panic(expected = "sealed memory was modified or corrupted")]
+    fn a_flipped_tag_bit_panics() {
+        let prekey = Prekey::new();
+        let mut s = SealedDynamic::seal(Dynamic::<Vec<u8>>::new(alloc::vec![1u8; 5]), &prekey);
+        s.tag[15] ^= 0x80;
+        s.with_secret(|_| ());
+    }
+}

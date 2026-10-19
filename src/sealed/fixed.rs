@@ -156,3 +156,47 @@ impl<const N: usize> core::fmt::Debug for SealedFixed<N> {
         f.write_str("[REDACTED]")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_ciphertext_is_not_the_plaintext_and_differs_per_seal() {
+        let prekey = Prekey::new();
+        let a = SealedFixed::seal(Fixed::new([0x42u8; 32]), &prekey);
+        let b = SealedFixed::seal(Fixed::new([0x42u8; 32]), &prekey);
+        assert_ne!(a.ct, [0x42u8; 32]);
+        assert_ne!(a.salt, b.salt);
+        assert_ne!(a.ct, b.ct);
+    }
+
+    #[test]
+    fn with_secret_mut_reseals_under_a_fresh_salt() {
+        let prekey = Prekey::new();
+        let mut s = SealedFixed::seal(Fixed::new([1u8; 16]), &prekey);
+        let (salt, ct) = (s.salt, s.ct);
+        s.with_secret_mut(|_| {});
+        assert_ne!(s.salt, salt);
+        assert_ne!(s.ct, ct);
+        s.with_secret(|p| assert_eq!(p, &[1u8; 16]));
+    }
+
+    #[test]
+    #[should_panic(expected = "sealed memory was modified or corrupted")]
+    fn a_flipped_ciphertext_bit_panics() {
+        let prekey = Prekey::new();
+        let mut s = SealedFixed::seal(Fixed::new([1u8; 32]), &prekey);
+        s.ct[3] ^= 0x10;
+        s.with_secret(|_| ());
+    }
+
+    #[test]
+    #[should_panic(expected = "sealed memory was modified or corrupted")]
+    fn a_flipped_salt_bit_panics() {
+        let prekey = Prekey::new();
+        let mut s = SealedFixed::seal(Fixed::new([1u8; 32]), &prekey);
+        s.salt[31] ^= 1;
+        let _ = s.unseal();
+    }
+}

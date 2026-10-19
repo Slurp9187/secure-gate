@@ -26,6 +26,9 @@
 //! `fixed.with_secret(..)` would fail with `E0034` (multiple applicable items). Import it
 //! by path, as above. Sealed types also have `with_secret` as an inherent method, so
 //! calling it on them needs no import at all.
+//!
+//! The same collision happens in any scope that imports both traits by name. There, call
+//! the one you mean with a qualified path: `RevealScoped::with_secret(&s, |b| ..)`.
 
 use crate::RevealSecret;
 

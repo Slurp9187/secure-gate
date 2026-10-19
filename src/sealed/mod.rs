@@ -76,3 +76,62 @@ mod prekey;
 pub use dynamic::{SealedDynamic, SealedPayload};
 pub use fixed::SealedFixed;
 pub use prekey::{LockError, Prekey};
+
+/// What the sealed types must not offer, checked by compiling each misuse.
+///
+/// No `expose_secret`, so no reference outlives the call:
+///
+/// ```compile_fail,E0599
+/// use secure_gate::{Fixed, Prekey, SealedFixed};
+/// let s = SealedFixed::seal(Fixed::new([0u8; 32]), &Prekey::new());
+/// let _ = s.expose_secret();
+/// ```
+///
+/// No `RevealSecret` impl to reach it through either:
+///
+/// ```compile_fail,E0277
+/// use secure_gate::{Fixed, Prekey, RevealSecret, SealedFixed};
+/// fn needs<S: RevealSecret>(_: &S) {}
+/// needs(&SealedFixed::seal(Fixed::new([0u8; 32]), &Prekey::new()));
+/// ```
+///
+/// No `Hash`, which would feed the plaintext to a hasher that is never wiped:
+///
+/// ```compile_fail,E0277
+/// use secure_gate::{Fixed, Prekey, SealedFixed};
+/// fn needs<H: core::hash::Hash>(_: &H) {}
+/// needs(&SealedFixed::seal(Fixed::new([0u8; 32]), &Prekey::new()));
+/// ```
+///
+/// `with_secret_mut` on a sealed `Vec` hands out a fixed-length slice, so it cannot grow:
+///
+/// ```compile_fail,E0599
+/// use secure_gate::{Dynamic, Prekey, SealedDynamic};
+/// let mut s = SealedDynamic::seal(Dynamic::<Vec<u8>>::new(vec![1]), &Prekey::new());
+/// s.with_secret_mut(|v| v.push(2));
+/// ```
+///
+/// Nor can a sealed `String`:
+///
+/// ```compile_fail,E0599
+/// use secure_gate::{Dynamic, Prekey, SealedDynamic};
+/// let mut s = SealedDynamic::seal(Dynamic::<String>::new(String::from("a")), &Prekey::new());
+/// s.with_secret_mut(|v| v.push_str("b"));
+/// ```
+///
+/// A borrow from `with_secret` cannot escape the closure:
+///
+/// ```compile_fail
+/// use secure_gate::{Fixed, Prekey, SealedFixed};
+/// let s = SealedFixed::seal(Fixed::new([0u8; 32]), &Prekey::new());
+/// let leaked: &[u8; 32] = s.with_secret(|b| b);
+/// ```
+///
+/// Only `Vec<u8>` and `String` can be sealed as variable-length secrets:
+///
+/// ```compile_fail,E0277
+/// use secure_gate::{Dynamic, Prekey, SealedDynamic};
+/// let _ = SealedDynamic::seal(Dynamic::<Vec<u16>>::new(vec![1]), &Prekey::new());
+/// ```
+#[cfg(doctest)]
+pub struct MisuseDoesNotCompile;

@@ -119,15 +119,23 @@ impl Prekey {
         SysRng
             .try_fill_bytes(&mut block.0)
             .expect("SysRng failure is a program error");
-        let (lock, lock_error) = match region::lock(block.0.as_ptr(), PREKEY_LEN) {
+        let lock = region::lock(block.0.as_ptr(), PREKEY_LEN);
+        Arc::new(Self::from_parts(block, lock))
+    }
+
+    fn from_parts(
+        block: alloc::boxed::Box<Block>,
+        lock: Result<region::LockGuard, region::Error>,
+    ) -> Self {
+        let (lock, lock_error) = match lock {
             Ok(guard) => (Some(guard), None),
             Err(err) => (None, Some(LockError::from_region(&err))),
         };
-        Arc::new(Self {
+        Self {
             block,
             lock,
             lock_error,
-        })
+        }
     }
 
     /// `Ok(())` if the pre-key's pages are locked in RAM; otherwise why they are not.
@@ -193,12 +201,18 @@ impl Prekey {
     }
 }
 
-impl Drop for Prekey {
-    fn drop(&mut self) {
-        // Wipe while the pages are still locked, then unlock, and only then let the box
-        // free them: unlocking after the free could unlock whatever reuses the pages.
+impl Prekey {
+    /// Wipe while the pages are still locked, then unlock. `Drop` calls this before the box
+    /// frees the pages: unlocking after the free could unlock whatever reuses them.
+    fn wipe_and_unlock(&mut self) {
         self.block.0.zeroize();
         drop(self.lock.take());
+    }
+}
+
+impl Drop for Prekey {
+    fn drop(&mut self) {
+        self.wipe_and_unlock();
     }
 }
 
@@ -206,5 +220,129 @@ impl Drop for Prekey {
 impl core::fmt::Debug for Prekey {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[REDACTED]")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn random_block() -> alloc::boxed::Box<Block> {
+        let mut block = alloc::boxed::Box::new(Block([0u8; PREKEY_LEN]));
+        SysRng.try_fill_bytes(&mut block.0).unwrap();
+        block
+    }
+
+    #[test]
+    fn block_is_page_aligned_and_fills_whole_pages() {
+        let block = random_block();
+        let addr = block.0.as_ptr() as usize;
+        assert_eq!(addr % 16384, 0);
+        assert_eq!(core::mem::size_of::<Block>(), PREKEY_LEN);
+        assert_eq!(PREKEY_LEN % region::page::size(), 0);
+    }
+
+    #[test]
+    fn a_failed_lock_is_reported_and_sealing_still_works() {
+        let prekey = Arc::new(Prekey::from_parts(
+            random_block(),
+            Err(region::Error::SystemCall(1453)),
+        ));
+        let err = prekey.lock_status().unwrap_err();
+        assert_eq!(err.raw_os_error(), Some(1453));
+        assert_eq!(format!("{err:?}"), "LockError { os_code: Some(1453) }");
+        assert_eq!(
+            err.to_string(),
+            "the sealed-memory pre-key could not be locked in RAM (OS error 1453)"
+        );
+
+        let salt = Prekey::fresh_salt();
+        let mut buf = *b"still sealed";
+        let tag = prekey.seal_in_place(&salt, &mut buf);
+        assert_ne!(&buf, b"still sealed");
+        prekey.open_in_place(&salt, &tag, &mut buf);
+        assert_eq!(&buf, b"still sealed");
+    }
+
+    #[test]
+    fn a_non_os_lock_failure_has_no_code() {
+        let prekey =
+            Prekey::from_parts(random_block(), Err(region::Error::InvalidParameter("size")));
+        let err = prekey.lock_status().unwrap_err();
+        assert_eq!(err.raw_os_error(), None);
+        assert_eq!(format!("{err:?}"), "LockError { os_code: None }");
+    }
+
+    #[test]
+    fn wipe_and_unlock_zeroes_the_prekey_and_releases_the_lock() {
+        let lock = region::lock(core::ptr::null::<u8>(), 0).map_err(|_| ());
+        assert!(lock.is_err(), "a zero-length lock is rejected");
+        let block = random_block();
+        let guard = region::lock(block.0.as_ptr(), PREKEY_LEN);
+        // Other tests lock pages too and share the quota; a refused lock still exercises
+        // the wipe, and `tests/sealed_lock.rs` covers the unlock in a process of its own.
+        let locked = guard.is_ok();
+        let mut prekey = Prekey::from_parts(block, guard);
+        assert!(prekey.block.0.iter().any(|&b| b != 0));
+        assert_eq!(prekey.lock.is_some(), locked);
+        prekey.wipe_and_unlock();
+        assert!(prekey.block.0.iter().all(|&b| b == 0));
+        assert!(prekey.lock.is_none());
+    }
+
+    #[test]
+    fn the_sealing_key_depends_on_every_prekey_bit() {
+        let mut prekey = Arc::try_unwrap(Prekey::new()).unwrap();
+        let salt = [5u8; SALT_LEN];
+        let before = prekey.sealing_key(&salt);
+        prekey.block.0[PREKEY_LEN - 1] ^= 1;
+        let after = prekey.sealing_key(&salt);
+        assert_ne!(before.with_secret(|k| *k), after.with_secret(|k| *k));
+    }
+
+    #[test]
+    fn the_sealing_key_is_sha256_of_salt_then_prekey() {
+        let prekey = Prekey::new();
+        let salt = [9u8; SALT_LEN];
+        let mut hasher = Sha256::new();
+        hasher.update(salt);
+        hasher.update(prekey.block.0);
+        let expected: [u8; 32] = hasher.finalize().into();
+        assert_eq!(prekey.sealing_key(&salt).with_secret(|k| *k), expected);
+    }
+
+    #[test]
+    fn every_salt_is_fresh() {
+        assert_ne!(Prekey::fresh_salt(), Prekey::fresh_salt());
+    }
+
+    #[test]
+    #[should_panic(expected = "sealed memory was modified or corrupted")]
+    fn a_wrong_tag_panics() {
+        let prekey = Prekey::new();
+        let salt = Prekey::fresh_salt();
+        let mut buf = [1u8; 8];
+        let mut tag = prekey.seal_in_place(&salt, &mut buf);
+        tag[0] ^= 1;
+        prekey.open_in_place(&salt, &tag, &mut buf);
+    }
+
+    #[test]
+    fn a_failed_open_wipes_the_buffer_before_panicking() {
+        let prekey = Prekey::new();
+        let salt = Prekey::fresh_salt();
+        let mut buf = [1u8; 8];
+        let tag = prekey.seal_in_place(&salt, &mut buf);
+        buf[0] ^= 1;
+        let result = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
+            prekey.open_in_place(&salt, &tag, &mut buf);
+        }));
+        assert!(result.is_err());
+        assert_eq!(buf, [0u8; 8]);
+    }
+
+    #[test]
+    fn debug_is_redacted() {
+        assert_eq!(format!("{:?}", Prekey::new()), "[REDACTED]");
     }
 }
