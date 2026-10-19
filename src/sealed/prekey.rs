@@ -57,9 +57,9 @@ struct Block([u8; PREKEY_LEN]);
 /// The block's alignment, and the largest page it can own.
 const BLOCK_ALIGN: usize = core::mem::align_of::<Block>();
 
-// The block holds the whole pre-key, and fills whole aligned units.
+// The block holds the whole pre-key. (That it fills whole aligned units needs no check:
+// a type's size is always a multiple of its alignment.)
 const _: () = assert!(BLOCK_ALIGN >= PREKEY_LEN);
-const _: () = assert!(core::mem::size_of::<Block>() % BLOCK_ALIGN == 0);
 
 /// Why the pre-key's pages are not locked in RAM. Returned by [`Prekey::lock_status`].
 ///
@@ -99,7 +99,9 @@ impl LockError {
     }
 
     /// The page size, when locking was not attempted because a page is larger than the
-    /// pre-key.
+    /// pre-key's block is aligned for (16 KiB on x86, x86_64 and Apple aarch64; 64 KiB
+    /// elsewhere). A page larger than the 16 KiB pre-key but within that alignment is locked,
+    /// not reported.
     pub fn page_too_large(&self) -> Option<usize> {
         self.page_size
     }
@@ -171,6 +173,14 @@ impl Prekey {
     ///
     /// Panics if the system RNG fails, as [`Fixed::from_random`] does. A failure to lock
     /// is not a panic; see [`lock_status`](Self::lock_status).
+    ///
+    /// # Stack use
+    ///
+    /// An unoptimized build constructs the block on the stack before boxing it, so this
+    /// call needs a few times the block's size in free stack: about 192 KiB where the block
+    /// is 64 KiB (aarch64 other than Apple, and unlisted targets), less on x86. An optimized
+    /// build writes it to the heap directly. Avoiding the stack copy in every profile would
+    /// take `unsafe` (`Box::new_zeroed`), which this crate forbids.
     pub fn new() -> Arc<Self> {
         let mut block = alloc::boxed::Box::new(Block([0u8; PREKEY_LEN]));
         // Locked while it still holds zeros, then filled: the random bytes never sit in
@@ -558,10 +568,15 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_page_no_larger_than_the_prekey_is_locked() {
+    fn a_page_no_larger_than_the_block_alignment_is_locked() {
+        let page = region::page::size();
+        if page > BLOCK_ALIGN {
+            // Locking here would take a page the block shares with other memory; the
+            // refusal test above covers this host.
+            return;
+        }
         let _q = quota();
         let block = random_block();
-        let page = region::page::size().min(BLOCK_ALIGN);
         assert!(lock_block(&block, page).is_ok());
     }
 

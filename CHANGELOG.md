@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Linux with each target's alignment asserted at compile time; not run on 64 KiB-page
   hardware. Suggested by the review of the sealed-memory release.
 
+  From the review of that change: `LockError::page_too_large` now says the bound is the
+  block's alignment, not the pre-key's size; `Prekey::new` documents that an unoptimized
+  build stages the block on the stack (about 192 KiB of stack where the block is 64 KiB);
+  and the lock-success unit test skips a host whose pages exceed the block's alignment
+  instead of locking a shared page.
+
 ## [0.9.0-rc.13] - 2026-10-19
 
 ### Security

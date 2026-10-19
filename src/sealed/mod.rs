@@ -76,7 +76,8 @@
 //! Each access needs about 32 KiB of free stack for the scrub, on top of the cipher's own
 //! frames: mind small custom thread stacks. Measured on x86_64 Windows: an access on a
 //! 64 KiB thread stack completes in a release build and overflows in a debug build; 96 KiB
-//! completes in both.
+//! completes in both. [`Prekey::new`] in an unoptimized build needs more: a few times the
+//! pre-key block's size (about 192 KiB where the block is 64 KiB).
 //!
 //! Not zero-overhead. Each access hashes 16 KiB and runs one AEAD pass; each mutation adds
 //! an RNG call and a second pass. The repository's `sealed_vs_fixed` benchmark measures it.
