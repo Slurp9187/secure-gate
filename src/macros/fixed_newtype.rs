@@ -476,6 +476,18 @@ macro_rules! fixed_newtype {
             }
         }
 
+        // Lets `sealed_fixed_newtype!` seal this role, and unseal back to it, by moving the
+        // `Fixed` across instead of copying the bytes out by hand.
+        $crate::__sg_if_sealed! {
+            impl $crate::__private::FixedRole for $name {
+                type Fixed = $crate::Fixed<[u8; $size]>;
+                #[inline(always)]
+                fn into_fixed(self) -> Self::Fixed { self.0 }
+                #[inline(always)]
+                fn from_fixed(fixed: Self::Fixed) -> Self { Self(fixed) }
+            }
+        }
+
         $crate::__sg_if_rand! {
             impl $name {
                 /// Generates the secret from the system RNG.

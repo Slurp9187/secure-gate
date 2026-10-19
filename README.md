@@ -417,7 +417,8 @@ Across the release candidates: `SecretLen` split out of `RevealSecret` (which no
 every inner type); Base32 (RFC 4648 §6) added behind `encoding-base32`; wrapper encoders
 are `ToHex` / `ToBase32` / `ToBase64Url` / `ToBech32` / `ToBech32m` trait impls; `fixed_newtype!` / `dynamic_newtype!` for nominal secret roles, which now get `ConstantTimeEq`
 without asking for it; `try_new_with` on both wrappers, for a fill that can fail; `SlotWriter`; no `Display`
-on `EncodedSecret`.
+on `EncodedSecret`; and, behind the opt-in `sealed` feature, `SealedFixed` /
+`SealedDynamic`, which keep idle secrets encrypted in RAM under a page-locked `Prekey`.
 
 Three breaking changes are worth reading before you upgrade. Every encoder now returns
 `EncodedSecret` and the `*_zeroizing` twins are gone, so the short name is the safe one.
@@ -484,6 +485,11 @@ it, it is recoverable from git history — `git checkout v0.9.0-rc.8 -- secure-g
 restores the last version, along with its migration guide. (`v0.9.0-rc.8` is the last tag
 that carries it; the crate was deleted before `rc.9`.)
 
+One difference to know when moving from `secrecy` 0.10: its only wrapper is the heap
+`SecretBox`, because a stack `Secret<T>` leaves copies behind when moved. Here `Fixed<T>` is
+that inline, stack-capable type, kept for `no_std` and speed; for a long-held secret prefer
+`Dynamic` or a sealed type. See `SECURITY.md` §3.
+
 ## Features
 
 Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = false` for heap-free `Fixed` only.
@@ -503,7 +509,8 @@ Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = 
 | `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                                                                                                      |
 | `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                                                                                                    |
 | `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                                                                                                          |
-| `full`              | All features except `std`                                                                                                                                                                                                                                   |
+| `sealed`            | `SealedFixed` / `SealedDynamic`: secrets held encrypted in RAM while idle, opened per closure call, under a page-locked, wipeable `Prekey`. Implies `std` + `rand`; adds `chacha20poly1305`, `sha2`, `region`. See `SECURITY.md` §3. |
+| `full`              | All features except `std` and `sealed`                                                                                                                                                                                                                                 |
 
 `no_std` compatible — the crate is `#![no_std]` unless the `std` feature is enabled, verified in CI by cross-building for `thumbv7em-none-eabihf`. `Fixed<T>` with `rand` works heap-free (on bare-metal targets, `getrandom` additionally requires a user-configured platform backend for `from_random`; `from_rng` with a caller-supplied RNG has no such requirement). `Dynamic<T>`, encoding traits, and serde require `alloc`. `Fixed::try_from_*` decoding works without `alloc` using constant-time stack-based decoders. Disabled features have zero overhead.
 

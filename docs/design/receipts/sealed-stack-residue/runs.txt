@@ -1,0 +1,52 @@
+Captured 2026-10-19T01:55Z on AMD Ryzen 9 9950X3D 16-Core Processor          , Windows 11 x86_64, rustc 1.98.1 (48a229cea 2026-09-01)
+before = commit de02d62 (no scrub); after = this branch's open-in-place + scrub_stack fix
+
+=== before, debug: cargo +stable test  --features sealed --test probe_stack -- --nocapture
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=4 plaintext hits=0
+  key at 40377, 16 bytes before = "����\t`�n���H����"
+  key at 42041, 16 bytes before = "����\t`�n���H����"
+  key at 42393, 16 bytes before = "����\t`�n���H����"
+  key at 42665, 16 bytes before = "����\t`�n���H����"
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=1
+.
+
+=== before, --release: cargo +stable test --release --features sealed --test probe_stack -- --nocapture
+control hits=1
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=0 plaintext hits=1
+  plaintext at 48793
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+.
+
+=== after, debug: cargo +stable test  --features sealed --test probe_stack -- --nocapture
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=0 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+.
+
+=== after, --release: cargo +stable test --release --features sealed --test probe_stack -- --nocapture
+control hits=1
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=0 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+.
+
+=== falsification: the fixed tree with scrub_stack's body deleted
+debug:   with_secret: key hits=4 plaintext hits=0
+release: with_secret: key hits=0 plaintext hits=0
+
+The scrub is what removes the debug key copies. In release this probe sees no key copy
+with or without the scrub on this tree; the audit's own release run, on an earlier copy,
+found one directly after "expand 32-byte k". Release key residue depends on frame layout,
+and this probe does not always reach it.

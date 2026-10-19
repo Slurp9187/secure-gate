@@ -142,6 +142,13 @@ fn drain_bech32_payload<const N: usize>(
 /// on drop. There is no `Deref`, `AsRef`, or `Copy` — every access is explicit
 /// through [`RevealSecret`] or [`RevealSecretMut`].
 ///
+/// **Choose `Fixed` for short-lived secrets passed by reference.** Inline storage means a
+/// `Fixed` can live on the stack, and moving one by value copies its bytes and leaves the
+/// old slot unwiped: drop zeroizes only where the value ends up. Build it in place with
+/// [`new_with`](Self::new_with), pass `&Fixed` rather than `Fixed`, and for a secret held a
+/// long time prefer [`Dynamic`](crate::Dynamic) (one heap address) or, with the `sealed`
+/// feature, `SealedFixed`. `SECURITY.md` §1 has the details.
+///
 /// # Examples
 ///
 /// ```rust

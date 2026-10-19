@@ -101,3 +101,4 @@
 mod dynamic_newtype;
 mod fixed_newtype;
 mod newtype_common;
+mod sealed_fixed_newtype;
