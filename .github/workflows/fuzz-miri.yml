@@ -45,6 +45,13 @@ jobs:
       - name: Setup Miri
         run: cargo miri setup
 
+      # `full,std`, not `--all-features`: `sealed` is the one feature left out. Its pre-key
+      # lives in a mapping that `guarded-block` locks and protects with real system calls
+      # (`mlock`, `mprotect`, `VirtualLock`), which Miri cannot emulate, and `region` forms
+      # pointers from integers, which `-Zmiri-strict-provenance` rejects. Every push to
+      # `main` failed here from the sealed merge (rc.13) until this line. Without `sealed`,
+      # `full,std` is exactly what `--all-features` was; the sealed and guarded-block tests
+      # run natively on Ubuntu, Windows and macOS in ci.yml's `guarded-block` job instead.
       - name: Run Miri on all other tests (strict)
         env:
           MIRIFLAGS: >-
@@ -52,7 +59,7 @@ jobs:
             -Zmiri-disable-isolation
             -Zmiri-strict-provenance
         run: |
-          cargo miri test --workspace --all-features -- --skip serializable_secret_misuse
+          cargo miri test --workspace --features full,std -- --skip serializable_secret_misuse
 
       - name: Light corpus scan with Miri (weekly or manual)
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -118,6 +125,8 @@ jobs:
       # `--workspace` is retained rather than `-p secure-gate`: both branches are
       # single-crate now, so it resolves to the same thing, and it keeps working if
       # a second member ever returns.
+      # `full,std` rather than `--all-features`, for the reason given on the push job's step
+      # above. On `release/0.8`, which has no `sealed`, the two are the same set.
       - name: Run Miri (${{ matrix.ref }}, strict)
         env:
           MIRIFLAGS: >-
@@ -125,7 +134,7 @@ jobs:
             -Zmiri-disable-isolation
             -Zmiri-strict-provenance
         run: |
-          cargo miri test --workspace --all-features -- --skip serializable_secret_misuse
+          cargo miri test --workspace --features full,std -- --skip serializable_secret_misuse
 
   # Regression canary for the `if:`-gated split above. Every trigger this
   # workflow declares currently maps to one of the two jobs, so at least one
