@@ -232,7 +232,7 @@ changes, so pin `"=0.9.0-rc.15"` when `cargo update` must stay put.
 | Branch | Version | Edition | MSRV | Status |
 |---|---|---|---|---|
 | `main` | 0.9.x | 2024 | 1.85 | Active development |
-| `release/0.8` | 0.8.x | 2021 | 1.70 | Same API, kept in lockstep, without dependency or toolchain bumps |
+| `release/0.8` | 0.8.x | 2021 | 1.70 | Same API as of 0.8.0-rc.14; a final backport follows 0.9.0 stable |
 
 On Rust older than 1.85, use `secure-gate = "0.8.0-rc"`. Changes per release, including the
 breaking ones, are in [CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/main/CHANGELOG.md).

@@ -4,7 +4,7 @@ All notable changes to this crate are documented in this file. The format follow
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-10-20
 
 ### Added
 - `GuardedBlock<N>`: `N` bytes in a mapping of their own between two no-access guard pages,
