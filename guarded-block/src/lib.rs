@@ -20,7 +20,8 @@
 //!   swap. A refused lock is reported by [`GuardedBlock::lock_status`], never fatal.
 //! - **Not in core dumps (Linux).** `madvise(MADV_DONTDUMP)` on the block, best effort.
 //! - **Optionally, no access while idle.** With [`GuardedBlock::new_with_idle_noaccess`] the
-//!   block is readable only while a [`GuardedBlock::with`] call is running. On Windows that
+//!   block is readable only while a [`GuardedBlock::with`] call is running (unless the
+//!   system refuses to make it no-access again; see [`GuardedBlock::with`]). On Windows that
 //!   keeps it out of other processes' `ReadProcessMemory` and out of full-memory crash
 //!   dumps taken while it is idle; everywhere, an in-process read of its address faults
 //!   while it is idle. Its price on Windows is the lock: a no-access page leaves the
@@ -75,7 +76,8 @@ pub struct MapError {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum MapStep {
-    /// Reserving and committing the mapping.
+    /// Reserving and committing the mapping, or sizing it (`N` rounded up to whole pages,
+    /// plus two guard pages, must fit in `isize::MAX`).
     Map,
     /// Making a guard page no-access.
     Guard,
@@ -272,8 +274,20 @@ impl<const N: usize> GuardedBlock<N> {
     fn create(fill: impl FnOnce(&mut [u8; N]), idle: bool) -> Result<Self, MapError> {
         const { assert!(N > 0, "a guarded block holds at least one byte") };
         let page = region::page::size();
-        let block_len = N.div_ceil(page) * page;
-        let total = block_len + 2 * page;
+        // Checked, not wrapping: a wrapped `total` would map less than the `[u8; N]` formed
+        // below. (rustc already rejects `[u8; N]` above `isize::MAX`, and no `N` up to that
+        // can overflow here, but the soundness of `fill` should not rest on that.)
+        let sizes = N
+            .div_ceil(page)
+            .checked_mul(page)
+            .and_then(|block_len| Some((block_len, block_len.checked_add(2 * page)?)))
+            .filter(|&(_, total)| total <= isize::MAX as usize);
+        let Some((block_len, total)) = sizes else {
+            return Err(MapError {
+                step: MapStep::Map,
+                os_code: None,
+            });
+        };
         let map = region::alloc(total, Protection::READ_WRITE)
             .map_err(|e| MapError::new(MapStep::Map, &e))?;
         let mut this = Self {
@@ -329,7 +343,10 @@ impl<const N: usize> GuardedBlock<N> {
     /// Calls `f` with the block's bytes.
     ///
     /// In idle no-access mode the block is made readable for the call and no-access again
-    /// after it, even if `f` panics. Concurrent calls share one readable window.
+    /// after it, even if `f` panics. Concurrent calls share one readable window. If the
+    /// system refuses to make it no-access again, which it does only in exhaustion cases
+    /// (out of memory mappings), the block stays readable until a later call closes it;
+    /// nothing reports this, and [`lock_status`](Self::lock_status) is about the lock only.
     ///
     /// # Panics
     ///
@@ -409,8 +426,9 @@ impl<const N: usize> Drop for Window<'_, N> {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         *count -= 1;
         if *count == 0 {
-            // SAFETY: as in `open_window`. A failure leaves the block readable, which loses
-            // the idle protection but not the data; there is no one to report it to here.
+            // SAFETY: as in `open_window`. A failure leaves the block readable until a later
+            // window closes it, which loses the idle protection but not the data; `with`'s
+            // docs say so, since there is no one to report it to here.
             let _ = unsafe {
                 region::protect(
                     self.block.block_ptr(),

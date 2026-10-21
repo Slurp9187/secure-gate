@@ -58,7 +58,8 @@ why the crates that do are built around their own allocator:
 | Crate | What it buys |
 |---|---|
 | [`secrets`](https://crates.io/crates/secrets) | Guarded pages via libsodium: `mlock`, guard pages, and `mprotect` set to no-access except during a scoped borrow — a hardware-enforced version of what `with_secret` does by convention. Needs libsodium and `std`. |
-| [`memsec`](https://crates.io/crates/memsec) | The same primitives without the libsodium dependency. |
+| [`memsec`](https://crates.io/crates/memsec) | The same primitives without the libsodium dependency, as `unsafe fn`s you call yourself. |
+| [`guarded-block`](https://crates.io/crates/guarded-block) | From this repository; what the `sealed` pre-key uses. A fixed-size block in a mapping of its own between no-access guard pages, read-only once filled, locked, `MADV_DONTDUMP` on Linux, optionally no-access between scoped reads. A safe API; refused locks, a no-access lock lost on Windows, and a `fork()` child are reported. Write-once: for a key, not a secret you edit. |
 | [`region`](https://crates.io/crates/region) | Thin safe wrappers over lock/protect for ranges you already own — the page caveats above are yours to handle. |
 
 **And locking is not the whole answer even when done right.** It does not cover
@@ -322,8 +323,8 @@ two no-access guard pages, and is read-only from the moment it is filled
 | Sealed secret paged to **swap** | Covered when the pre-key is locked: the pre-key is not in swap, so the ciphertext there cannot be opened |
 | Pre-key lock refused (quota) | `Prekey::lock_status()` returns `Err`; nothing panics, but the pre-key can then be swapped like any memory |
 | **Hibernation** file | Not covered: it captures locked pages too |
-| Linear **over-read** from another buffer in the process (C code, Heartbleed-style) | Covered for the pre-key: it is off the heap, and a read reaching it from below faults on its guard page. Measured: 64 KiB reads from C buffers got the whole heap-held pre-key (rc.14) in every run, the guarded one in none |
-| **Core dump** (Linux) | Covered for the pre-key: `MADV_DONTDUMP` keeps it out, so the dumped ciphertext cannot be opened |
+| Linear **over-read** from another buffer in the process (C code, Heartbleed-style) | Covered for the pre-key: it is off the heap, where 64 KiB reads from C buffers got the whole heap-held pre-key (rc.14) in every run and the mapped one in none; and a read running into it faults on its guard page, measured with readable memory placed directly against it (an unguarded mapping there gives up all 16 KiB) |
+| **Core dump** (Linux) | The pre-key is marked `MADV_DONTDUMP`, which the kernel documents as leaving it out of core dumps, so a dumped ciphertext could not be opened. The flag was checked on the mapping; no core dump was taken |
 | **Crash dump** (Windows, macOS) | Not covered with `Prekey::new()`: a full-memory dump captures pre-key, salt and ciphertext together. On Windows, `Prekey::new_idle_noaccess()` keeps the pre-key out of a dump taken while it is idle (measured), but cannot also keep it locked, so it may then reach the pagefile |
 | Clean read of process memory (debugger, `/proc/<pid>/mem`, code in the process) | Not covered: same reason |
 | The plaintext temporary while the closure runs, and copies the closure makes | Not covered: on the stack (`SealedFixed`) or heap (`SealedDynamic`), unlocked; wiped, and the stack below overwritten, when the call returns |

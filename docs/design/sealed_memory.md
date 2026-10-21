@@ -76,7 +76,7 @@ A probe measured that, and three alternatives, before anything was built. It per
 | Layout | One 64 KiB read from a C buffer captured the whole pre-key |
 |---|---|
 | Heap block (rc.13–rc.14) | [M] 60/60 runs on each platform |
-| Four heap pages (asked for) | [M] 27/60 on each platform, and part of it (median 8–12 KiB) in every run: the pages come from the heap the C code uses and land beside its buffers |
+| Four heap pages (asked for) | [M] 26/60 on Windows and 27/60 on Linux, and part of it in every run (best read at least 4 KiB on Windows, 8 KiB on Linux; median 12 KiB on a warm heap, 8 KiB interleaved): the pages come from the heap the C code uses and land beside its buffers |
 | A mapping of its own, no guards | [M] 0/60, but with readable memory placed directly below and above it, 16384/16384 bytes (3/3 per platform): only placement protected it |
 | A mapping between guard pages (built) | [M] 0/60, and with readable memory directly below and above it, an access violation or `SIGSEGV` before any byte (3/3 per platform) |
 
@@ -85,7 +85,8 @@ layout, since guard pages are not locked. [I] The split would have locked four t
 16 KiB- and 64 KiB-page targets, where each piece must own a page. The derivation is
 unchanged: [M] hashing the salt and then the pages in order equals hashing the salt and the
 joined bytes, and a unit test pins the derivation to a vector computed in Python. Per access,
-[M] the guarded pre-key costs the same 5.95 µs SHA-256 pass as before.
+[M] the derivation is one SHA-256 pass over the same 16 KiB, 5.95 µs here; [I] the layout
+does not change that work, though no before/after against rc.14 was run.
 
 Sequoia (2.4.2, `openpgp/src/crypto/mem.rs`) allocates its pre-key as four pages, but states
 its threat as imperfect readout (Spectre, Rowhammer, cold boot) and never over-reads, and its
@@ -112,7 +113,10 @@ process, while a full-memory dump needs someone on the live machine running as t
 could also change the protection back or inject code; Windows' default crash report is a
 minidump without the heap. Its cost per access, [M] on top of the 5.95 µs hash: +3.7 µs in a
 quiet process, +5.4 µs with 4 busy threads, +8.5 µs with 16 on Windows; +4.7 to +9.5 µs on
-WSL2, a VM. The cost grows with threads because each protection change interrupts every CPU
+WSL2, a VM. Where that goes differs by platform. On Windows the two protection changes alone
+cost [M] 0.65–0.97 µs; the rest is [I] faulting the 16 KiB back into the working set, which
+a no-access page leaves ([M] `win_wsex.txt`). On WSL2 the protection changes alone account
+for it ([M] 4.6–9.2 µs), and grow with threads, [I] since each change interrupts every CPU
 running one of the process's threads.
 
 `Drop` makes the pre-key writable, wipes it, drops the lock guard (which unlocks), and only

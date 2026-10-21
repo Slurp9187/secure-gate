@@ -46,8 +46,12 @@
 //! |------|-----------|----------|---------|
 //! | [`Fixed<T>`] | Stack | Keys, nonces, tokens — compile-time-known size | Always available |
 //! | [`Dynamic<T>`] | Heap | Passwords, API keys, ciphertexts — variable length | `alloc` (default) |
+//! | [`SealedFixed<N>` / `SealedDynamic<T>`](https://docs.rs/secure-gate/latest/secure_gate/sealed/index.html) | Encrypted in RAM while idle, under a guarded, locked pre-key | Long-held keys in a process whose memory may be read while they idle | `sealed` |
 //!
-//! Both types share the same [`RevealSecret`] / [`RevealSecretMut`] access API.
+//! `Fixed` and `Dynamic` share the same [`RevealSecret`] / [`RevealSecretMut`] access API.
+//! The sealed types are opened only through scoped `with_secret` calls (no `expose_secret`),
+//! cost about 8 µs per access, and are for keys held across a session, not hot loops; their
+//! module, `secure_gate::sealed`, has the threat model and the measurements.
 //!
 //! # Quick start
 //!

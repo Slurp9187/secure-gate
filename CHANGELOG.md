@@ -13,13 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SQLCipher and OpenSSL) reached it before: measured, a 64 KiB read from a live C `malloc`
   buffer captured the whole heap-held pre-key in 60 of 60 runs on Windows and on Linux. The
   pre-key is now in a mapping of its own, laid out as a no-access guard page, its pages, and a
-  no-access guard page; it is read-only once filled, still locked, and on Linux excluded from
-  core dumps (`MADV_DONTDUMP`). Measured: no run captured any of it, and with readable memory
-  placed directly below and above it a 64 KiB read faults before reading a byte. The
+  no-access guard page; it is read-only once filled, still locked, and on Linux marked
+  `MADV_DONTDUMP` so the kernel leaves it out of core dumps (the flag was checked; no core
+  dump was taken). Measured: off the heap, no run captured any of it (a mapping without guard
+  pages did not either: no C buffer sat against it); and with readable memory placed directly
+  below and above it, a 64 KiB read faults on the guard page, where the same read of an
+  unguarded mapping takes all 16 KiB. The
   derivation (`SHA-256(salt ‖ pre-key)`) is unchanged, pinned by a vector computed outside
   Rust; the locked quota is unchanged (11 pre-keys under Windows' default); so is the cost per
   access. The requested alternative, splitting the pre-key into four heap pages, was measured
-  first and still fully captured in 27 of 60 runs per platform, partly in every run. The
+  first and still fully captured in 26 of 60 runs on Windows and 27 of 60 on Linux, partly in
+  every run. The
   `unsafe` this needs is in a new crate in this repository, `guarded-block`, published
   separately, so this crate keeps `#![forbid(unsafe_code)]`; `sealed` depends on it in place of
   `region`. Probe and raw output: `docs/design/receipts/guarded-prekey/`.
@@ -31,7 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   idle (measured). It cannot also be locked there: a no-access page leaves the working set and
   its lock is dropped (measured), so on Windows this pre-key may reach the pagefile, and
   `lock_status()` returns a `LockError` whose new `idle_noaccess()` is `true`. On Linux the
-  lock is kept. About 4–9 µs more per access. `Prekey::new()` stays the default: a pre-key in
+  lock is kept. About 4–9 µs more per access; on Windows most of that is faulting the
+  pre-key's pages back into the working set, not the protection changes themselves. `Prekey::new()` stays the default: a pre-key in
   the pagefile is readable offline and outlives the process.
 
 ### Changed

@@ -13,7 +13,8 @@ All notable changes to this crate are documented in this file. The format follow
   fills it through a closure; `with` reads it; `lock_status` reports a refused lock
   (`LockError`, with the OS error code and never an address), and in a `fork()` child reports
   the lock as not inherited (`LockError::forked`); `MapError` reports a failed mapping or
-  protection change.
+  protection change, or a size that does not fit (checked arithmetic, never a wrapped
+  mapping smaller than the block).
 - `GuardedBlock::new_with_idle_noaccess`: also no-access except during `with` calls, which
   share one readable window under a mutex and close it again on a panic. On Windows a
   no-access page cannot stay locked (measured: the lock is dropped and the page leaves the

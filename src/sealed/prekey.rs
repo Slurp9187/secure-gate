@@ -32,6 +32,24 @@ pub(crate) const SALT_LEN: usize = 32;
 /// in a `fork()` child of the process that made the pre-key, which does not inherit its lock.
 ///
 /// Carries the operating system's error code, never an address.
+///
+/// # Example
+///
+/// Report the reason, and raise the quota where it is the cause:
+///
+/// ```
+/// use secure_gate::Prekey;
+///
+/// let prekey = Prekey::new();
+/// match prekey.lock_status() {
+///     Ok(()) => {}
+///     // ERROR_WORKING_SET_QUOTA: every `VirtualLock` in a Windows process shares the
+///     // working-set quota (about eleven pre-keys under the default). Raise it at startup
+///     // with `SetProcessWorkingSetSize` if the application holds more.
+///     Err(why) if why.raw_os_error() == Some(1453) => eprintln!("raise the quota: {why}"),
+///     Err(why) => eprintln!("sealed secrets work, but may reach swap: {why}"),
+/// }
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LockError {
     os_code: Option<i32>,
@@ -135,6 +153,42 @@ impl std::error::Error for LockError {}
 /// process's memory (a debugger, `/proc/<pid>/mem`) still see the pre-key, and so does a
 /// crash dump on Windows (unless the pre-key is idle no-access) and on macOS.
 ///
+/// # Example
+///
+/// One pre-key per session, created at login and dropped at logout with everything sealed
+/// under it:
+///
+/// ```
+/// use std::sync::Arc;
+/// use secure_gate::{Dynamic, Fixed, Prekey, RevealSecret, SealedDynamic, SealedFixed};
+///
+/// struct Session {
+///     prekey: Arc<Prekey>,
+///     db_key: SealedFixed<32>,
+///     password: SealedDynamic<String>,
+/// }
+///
+/// fn login(db_key: Fixed<[u8; 32]>, password: Dynamic<String>) -> Session {
+///     let prekey = Prekey::new();
+///     if let Err(why) = prekey.lock_status() {
+///         eprintln!("{why}"); // not fatal; see `LockError`
+///     }
+///     Session {
+///         db_key: SealedFixed::seal(db_key, &prekey),
+///         password: SealedDynamic::seal(password, &prekey),
+///         prekey,
+///     }
+/// }
+///
+/// let session = login(Fixed::new([7u8; 32]), Dynamic::new(String::from("hunter2")));
+/// session.db_key.with_secret(|k| assert_eq!(k[0], 7));
+/// session.password.with_secret(|p| assert_eq!(p, "hunter2"));
+/// drop(session); // logout: the sealed values, then the pre-key, are wiped
+/// ```
+///
+/// [`new_idle_noaccess`](Self::new_idle_noaccess) is the alternative where crash dumps or
+/// same-user memory reads matter more than the pagefile; its docs compare the two.
+///
 /// # Fork
 ///
 /// A child created by `fork()` shares the parent's pre-key bytes (copy-on-write) but not
@@ -181,9 +235,10 @@ impl Prekey {
     ///   pagefile while idle. This mode therefore does not lock on Windows, and
     ///   [`lock_status`](Self::lock_status) returns an error whose
     ///   [`idle_noaccess`](LockError::idle_noaccess) is `true`. On Linux the lock is kept.
-    /// - **Time.** Two protection changes per access: measured at about 4 µs on top of an
-    ///   access's 6 µs hash in a quiet process, 9 µs with 16 busy threads, since each change
-    ///   interrupts every CPU running one of the process's threads.
+    /// - **Time.** Measured at about 4 µs on top of an access's 6 µs hash in a quiet
+    ///   process, 9 µs with 16 busy threads. On Windows most of it is faulting the pre-key's
+    ///   pages back into the working set, which a no-access page leaves; on Linux it is the two
+    ///   protection changes, which interrupt every CPU running one of the process's threads.
     /// - **A rare panic.** Making the pre-key readable for an access can fail where mapping
     ///   it would have (the process is out of memory mappings); the access then panics.
     ///

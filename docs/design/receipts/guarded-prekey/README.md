@@ -63,8 +63,9 @@ Full capture by one 64 KiB read, runs out of 20:
 | bare | 0 / 0 / 0 | 0 / 0 / 0 |
 | guarded | 0 / 0 / 0 | 0 / 0 / 0 |
 
-Real over-reads matched in every case run: block 10/10 full per platform; split 7/10 full and
-3/10 partial (8–12 KiB) per platform.
+Real over-reads matched in every case run: block 10/10 full per platform; split 7/10 full on
+each platform, and 3/10 partial: 8–12 KiB on Windows (12288, 8192, 12288), 12 KiB each on
+Linux.
 
 Neighbor test (3 runs each, per platform): bare gives up 16384/16384 bytes; guarded faults
 before reading any.
@@ -98,4 +99,5 @@ with X = `NONE`, the quota frees (an extra lock succeeds) and 11/11 unlocks fail
 158, "the segment is already unlocked" (2 runs each). Linux with X = `READ` or `NONE` (64 blocks;
 the quota was not reached): smaps keeps `lo` throughout and 64/64 unlocks succeed. `win_wsex.txt`:
 after `NONE` all four pages leave the working set, and the first one read back in is not
-locked.
+locked. (Its `locked=1` on pages with `valid=0` is not a lock: for an invalid page the
+structure's bits have another layout, and the probe reads bit 22 regardless.)
