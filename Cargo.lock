@@ -448,6 +448,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
 
 [[package]]
+name = "guarded-block"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "region",
+ "zeroize",
+]
+
+[[package]]
 name = "half"
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -838,7 +847,7 @@ dependencies = [
 
 [[package]]
 name = "secure-gate"
-version = "0.9.0-rc.14"
+version = "0.9.0-rc.15"
 dependencies = [
  "aes",
  "base16ct",
@@ -847,6 +856,7 @@ dependencies = [
  "bech32",
  "chacha20poly1305",
  "criterion",
+ "guarded-block",
  "proptest",
  "rand 0.10.2",
  "region",

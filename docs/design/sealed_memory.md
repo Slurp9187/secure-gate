@@ -13,7 +13,7 @@ drop. Sequoia goes one step further: a secret that is not being used right now i
 **encrypted**, and is decrypted only for the length of one closure call. This note records how
 that works, how it maps onto this crate, what it costs, and what was built.
 
-## As built (0.9.0-rc.13)
+## As built (0.9.0-rc.13, pre-key memory revised in rc.15)
 
 The owner decided on 2026-10-18 to ship this in rc.13 rather than after 0.9 stable, and
 encrypted-file-vault (EFV) asked for three things sequoia does not do: lock the pre-key's
@@ -23,9 +23,9 @@ pages, survive a refused lock, and avoid a never-wiped `static`. What shipped:
 |---|---|---|
 | Feature | `sealed = ["std", "rand", chacha20poly1305 0.11, sha2 0.11, region 4.0.1]`; not in `full` (which excludes `std`) | — |
 | Pre-key | `Prekey`, held as `Arc<Prekey>` by every sealed object; **not a static** | **Yes**: the analysis recommended a global `OnceLock` |
-| Pre-key memory | One 16 KiB pre-key in a block aligned per target (16 KiB on x86, x86_64, Apple aarch64; 64 KiB elsewhere, since rc.14), locked with `region::lock` | **Yes**: sequoia uses four unaligned, unlocked `Vec`s |
+| Pre-key memory | Since rc.15: a mapping of its own from `guarded-block` (no-access guard page, 16 KiB read-only and locked, no-access guard page). rc.13–rc.14: a heap block aligned per target, locked with `region::lock` | **Yes**: sequoia uses four unaligned, unlocked `Vec`s |
 | Failed lock | `Prekey::new()` always returns; `lock_status() -> Result<(), LockError>` | New |
-| Pre-key end of life | Wiped while still locked, then unlocked, then freed, when the last `Arc` drops | **Yes**: sequoia never frees or wipes it |
+| Pre-key end of life | Wiped (while still locked, if the lock was granted), then unlocked, then unmapped, when the last `Arc` drops | **Yes**: sequoia never frees or wipes it |
 | Key derivation | `SHA-256(salt ‖ pre-key)` into a `Fixed<[u8; 32]>`, per access | No (kept SHA-256; see [Measured cost](#measured-cost)) |
 | AEAD | ChaCha20-Poly1305, detached tag, zero nonce, fresh salt per seal and re-seal | No |
 | `SealedFixed<N>` | Ciphertext, tag, salt inline; opens in place into a stack `Fixed` | No |
@@ -52,25 +52,71 @@ each object carries its own `Arc`. The analysis's objection to an explicit conte
 argument at every call", applied to passing it on every *access*; holding it in the object
 removes that.
 
-### Locking
+### Locking, and the guarded mapping (rc.15)
 
-`region::lock` is a safe function, so the `unsafe` stays in that dependency and this crate keeps
-`#![forbid(unsafe_code)]`. The block is aligned to at least the target's page size, so it
-owns every page it touches: its unlock cannot release a neighbour's lock, the hazard
+Since rc.15 the pre-key is not on the heap. `guarded-block`, a crate in this repository
+(`guarded-block/`, published on its own), maps it as a no-access guard page, the pre-key's
+pages (read-only once filled, locked), and a no-access guard page, and on Linux marks them
+`MADV_DONTDUMP`. The `unsafe` that page protection needs (`region::protect` is an
+`unsafe fn`, and `region::alloc` hands out raw pointers) lives in that crate, so this one keeps
+`#![forbid(unsafe_code)]`. A mapping owns whole pages by construction, so the per-target
+alignment table rc.14 added, its page-size refusal (`LockError::page_too_large`) and the
+debug-build stack copy in `Prekey::new` are gone: the pre-key is written straight into the
+mapping. Its unlock still cannot reach a neighbour's lock, the hazard
 [`SECURITY.md`](../../SECURITY.md) describes for naive `mlock`.
 
-In rc.13 the block was aligned to 16 KiB everywhere, and a larger page was refused. Since
-rc.14 the alignment comes from a per-target table, taken from the `secrets` crate (1.3.0,
-`src/secret.rs`, which added it after its own unlock-a-neighbour bug, #109), with the
-pre-key's 16 KiB as the floor: 16 KiB on x86, x86_64 and Apple aarch64, 64 KiB on every other
-aarch64 and every unlisted target. On those, a `Prekey` costs 64 KiB of locked memory, inside
-Linux's 8 MiB default `RLIMIT_MEMLOCK` since kernel 5.16. The page-size refusal stays as the
-fallback for a target the table gets wrong. Checked by cross-compiling six targets with each
-one's alignment asserted at compile time (an assertion flipped to the wrong value fails the
-build); no 64 KiB-page hardware was available, so not run there.
+**Why.** EFV asked for the pre-key to be split into four separately allocated, aligned and
+locked 4 KiB pages, against a Heartbleed-style over-read: C code in the same process (EFV
+links SQLCipher and vendored OpenSSL) reading up to 64 KiB past one of its own heap buffers.
+A probe measured that, and three alternatives, before anything was built. It performed real
+64 KiB `memcpy` over-reads from live C `malloc` buffers (16 B–16 KiB, cold and warm heaps,
+20 fresh processes per case) on Windows 11 and on Linux (WSL2, glibc 2.43). [M] is measured,
+[I] inferred:
 
-`Drop` wipes, then drops the `LockGuard` (which unlocks), and only then lets the box free the
-pages: unlocking after the free could unlock whatever reuses them.
+| Layout | One 64 KiB read from a C buffer captured the whole pre-key |
+|---|---|
+| Heap block (rc.13–rc.14) | [M] 60/60 runs on each platform |
+| Four heap pages (asked for) | [M] 27/60 on each platform, and part of it (median 8–12 KiB) in every run: the pages come from the heap the C code uses and land beside its buffers |
+| A mapping of its own, no guards | [M] 0/60, but with readable memory placed directly below and above it, 16384/16384 bytes (3/3 per platform): only placement protected it |
+| A mapping between guard pages (built) | [M] 0/60, and with readable memory directly below and above it, an access violation or `SIGSEGV` before any byte (3/3 per platform) |
+
+Locked quota is unchanged: [M] 11 pre-keys lock under Windows' default working set in every
+layout, since guard pages are not locked. [I] The split would have locked four times as much on
+16 KiB- and 64 KiB-page targets, where each piece must own a page. The derivation is
+unchanged: [M] hashing the salt and then the pages in order equals hashing the salt and the
+joined bytes, and a unit test pins the derivation to a vector computed in Python. Per access,
+[M] the guarded pre-key costs the same 5.95 µs SHA-256 pass as before.
+
+Sequoia (2.4.2, `openpgp/src/crypto/mem.rs`) allocates its pre-key as four pages, but states
+its threat as imperfect readout (Spectre, Rowhammer, cold boot) and never over-reads, and its
+pages are unaligned heap `Vec`s. Three crates that offer guarded memory were read before
+writing one: `memmap2` 0.9.11 maps memory safely but cannot make a page no-access; `seckey`
+0.12.1 (on `memsec` 0.6.3) has guard pages, but takes its pages from the global allocator,
+ignores `mprotect` and `mlock` failures, is not `Sync`, prints the address in `Debug`, and has
+been unchanged since 2023; `secrets` 1.3.0 is guarded through libsodium, a C library. The
+probe and its raw output are in [`receipts/guarded-prekey/`](receipts/guarded-prekey/).
+
+**Idle no-access, and why it is not the default.** `Prekey::new_idle_noaccess()` also makes
+the pre-key no-access except while a sealing key is derived from it (about 6 µs per access).
+On Windows that keeps it out of other processes' `ReadProcessMemory` and out of a full-memory
+crash dump taken while it is idle: [M] a `MiniDumpWithFullMemory` dump held a marker from the
+pre-key with the heap block and with a readable guarded block, and did not with an idle
+no-access one (2/2 each). But [M] on Windows a no-access page cannot stay locked: with 11
+blocks filling the quota, switching them to no-access freed the quota and every later unlock
+failed with error 158 ("segment is already unlocked"), while read-only kept every lock (2/2
+runs each); `QueryWorkingSetEx` shows no-access pages leave the working set at once and come
+back unlocked. So on Windows the choice is the pagefile or the dump, not both. On Linux [M] the
+lock survives (smaps keeps `lo`; 64/64 unlocks succeed). The default stays locked because a
+pre-key in the pagefile is readable offline by anyone who later gets the disk, and outlives the
+process, while a full-memory dump needs someone on the live machine running as the user, who
+could also change the protection back or inject code; Windows' default crash report is a
+minidump without the heap. Its cost per access, [M] on top of the 5.95 µs hash: +3.7 µs in a
+quiet process, +5.4 µs with 4 busy threads, +8.5 µs with 16 on Windows; +4.7 to +9.5 µs on
+WSL2, a VM. The cost grows with threads because each protection change interrupts every CPU
+running one of the process's threads.
+
+`Drop` makes the pre-key writable, wipes it, drops the lock guard (which unlocks), and only
+then unmaps: unlocking after the unmap would act on whatever is mapped there next.
 
 A refused lock is reported, never fatal. On Windows every `VirtualLock` in the process shares
 the working-set quota: **with the default minimum, 11 pre-keys locked and the 12th was refused**
@@ -81,7 +127,8 @@ On Linux (WSL2, rustc 1.85.1, 4 KiB pages, `RLIMIT_MEMLOCK` 65536 KiB; measured 
 review pass) `mlock` succeeds; under `ulimit -l 0` it is refused with `EPERM`, `lock_status()`
 reports it, and sealing still opens; and freeing a pre-key's block without `munlock` returns
 the charge, as freeing does on Windows. `wipe_and_unlock_returns_the_quota` passed under
-`ulimit -l 48`. macOS was not run.
+`ulimit -l 48` (rc.13–rc.14; since rc.15 `guarded-block`'s `release_wipes_then_unlocks`
+checks the unlock instead). macOS was not run.
 
 Two test findings worth keeping:
 
@@ -89,8 +136,12 @@ Two test findings worth keeping:
   beside other locking tests. `tests/sealed_lock.rs` holds a single test for that reason.
 - On Windows, freeing a 16 KiB heap block decommits its pages, which releases their lock
   whether or not they were unlocked. A test that drops pre-keys and then checks the quota came
-  back passes even with the unlock deleted. `wipe_and_unlock_returns_the_quota` unlocks while
-  the blocks are still allocated, and fails with the unlock deleted (checked).
+  back passes even with the unlock deleted. `wipe_and_unlock_returns_the_quota` unlocked while
+  the blocks were still allocated, and failed with the unlock deleted (checked). Unmapping
+  the rc.15 mapping releases the lock the same way, so `guarded-block`'s
+  `release_wipes_then_unlocks` asks the operating system whether the pages are still locked
+  (`VirtualUnlock`'s error 158 on Windows, the smaps `lo` flag on Linux) before the unmap; it
+  fails with either the wipe or the unlock deleted (checked).
 
 ### Stack residue, and the scrub
 
@@ -443,6 +494,6 @@ and the crate itself still forbids `unsafe`.
   unseal, edit and seal again.
 - **Pre-key after `fork()`?** Documented, not handled: the child shares the bytes but not the
   page locks, and creates its own `Prekey` if it should not hold the parent's.
-- **Pre-key locking?** Built, through `region`.
+- **Pre-key locking?** Built, through `region` (rc.13), through `guarded-block` since rc.15.
 - **Explicit-context `no_std` variant?** Not built. The owner object covers re-keying, which
   was the variant's other selling point; `no_std` sealing waits for someone to ask.

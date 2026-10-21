@@ -163,8 +163,8 @@ fn sealing_works_whatever_the_lock_outcome() {
     for k in &keys {
         if let Err(e) = k.lock_status() {
             assert!(
-                e.raw_os_error().is_some() || e.page_too_large().is_some(),
-                "a lock refusal says why: an OS code, or a page too large to own"
+                e.raw_os_error().is_some() || e.idle_noaccess(),
+                "a lock refusal says why: an OS code, or idle no-access on Windows"
             );
         }
         let s = SealedFixed::seal(Fixed::new([7u8; 32]), k);
@@ -256,5 +256,43 @@ fn sealed_values_open_from_other_threads() {
         .collect();
     for h in handles {
         assert_eq!(h.join().unwrap(), 6);
+    }
+}
+
+#[test]
+fn an_idle_noaccess_prekey_seals_and_opens_every_sealed_type() {
+    let prekey = Prekey::new_idle_noaccess();
+    assert!(prekey.is_idle_noaccess());
+    assert!(!Prekey::new().is_idle_noaccess());
+
+    let mut f = SealedFixed::seal(Fixed::new([0x11u8; 32]), &prekey);
+    f.with_secret_mut(|b| b[0] = 0x22);
+    f.with_secret(|b| assert_eq!(b[..2], [0x22, 0x11]));
+
+    let mut d = SealedDynamic::seal(Dynamic::<String>::new(String::from("idle")), &prekey);
+    d.with_secret_mut(|s| s.make_ascii_uppercase());
+    d.with_secret(|s| assert_eq!(s, "IDLE"));
+
+    let role = SealedAppKey::seal(AppKey::new([0x33u8; 32]), &prekey);
+    role.with_secret(|b| assert_eq!(b[31], 0x33));
+
+    // Sealed objects reach the pre-key from several threads at once; each access opens and
+    // closes a shared readable window.
+    std::thread::scope(|s| {
+        for _ in 0..4 {
+            s.spawn(|| {
+                for _ in 0..50 {
+                    f.with_secret(|b| assert_eq!(b[0], 0x22));
+                }
+            });
+        }
+    });
+
+    if cfg!(windows) {
+        let why = prekey.lock_status().unwrap_err();
+        assert!(
+            why.idle_noaccess(),
+            "on Windows idle no-access gives up the lock"
+        );
     }
 }

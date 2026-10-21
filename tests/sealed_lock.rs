@@ -12,8 +12,8 @@ const MANY: usize = 1024;
 #[test]
 fn locks_succeed_fail_softly_and_are_released_on_drop() {
     // A first pre-key, alone in the process, locks. Required on Windows, where the default
-    // quota allows it; elsewhere a zero RLIMIT_MEMLOCK (common in containers) or pages larger
-    // than the pre-key refuse it by design, and the rest of this test has nothing to measure.
+    // quota allows it; elsewhere a zero RLIMIT_MEMLOCK (common in containers) refuses it,
+    // and the rest of this test has nothing to measure.
     let first = Prekey::new();
     if cfg!(windows) {
         assert_eq!(first.lock_status(), Ok(()), "a lone pre-key locks");
@@ -48,10 +48,10 @@ fn locks_succeed_fail_softly_and_are_released_on_drop() {
         let s = SealedFixed::seal(Fixed::new([3u8; 32]), last);
         s.with_secret(|b| assert_eq!(b[0], 3));
 
-        // After the drops a new pre-key locks again. This does not prove the unlock: on
-        // Windows, freeing the block decommits its pages, which releases their lock anyway.
-        // `wipe_and_unlock_returns_the_quota` in `src/sealed/prekey.rs` unlocks while the
-        // blocks are still allocated, which is what tells a missing unlock apart.
+        // After the drops a new pre-key locks again. This does not prove the unlock:
+        // unmapping the pre-key's pages releases their lock anyway. `release_wipes_then_unlocks`
+        // in `guarded-block/src/lib.rs` checks the unlock while the mapping still exists,
+        // which is what tells a missing unlock apart.
         drop(s);
         held.clear();
         assert_eq!(Prekey::new().lock_status(), Ok(()));

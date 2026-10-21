@@ -1,0 +1,27 @@
+# Its own `[workspace]` table, like `residue-probe`: secure-gate depends on this crate by path
+# and version, and excludes it from its own workspace so this crate's `unsafe` is built,
+# linted and reviewed on its own terms.
+[workspace]
+
+[package]
+name = "guarded-block"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Slurp9187/secure-gate"
+description = "A fixed-size secret block in its own memory mapping, between no-access guard pages, read-only and locked in RAM while live, optionally no-access while idle. A safe API over region's page protection."
+keywords = ["memory", "guard-page", "mlock", "mprotect", "security"]
+categories = ["memory-management", "cryptography"]
+readme = "README.md"
+include = ["/src/**/*.rs", "/CHANGELOG.md", "/README.md", "/LICENSE*"]
+
+# `region` does the system calls (it is already in secure-gate's `sealed` graph), `zeroize`
+# does the wipe, `libc` only `madvise(MADV_DONTDUMP)` on Linux. All three declare
+# `rust-version` at or below 1.85.
+[dependencies]
+region = { version = "4.0.1", default-features = false }
+zeroize = { version = "1.8", default-features = false }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = { version = "0.2.172", default-features = false }

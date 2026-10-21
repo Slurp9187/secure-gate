@@ -45,8 +45,7 @@ impl<const N: usize> SealedFixed<N> {
     pub fn seal(secret: Fixed<[u8; N]>, prekey: &Arc<Prekey>) -> Self {
         let salt = Prekey::fresh_salt();
         let mut ct = [0u8; N];
-        secret.with_secret(|plain| ct.copy_from_slice(plain));
-        let tag = scrubbed(|| prekey.seal_in_place(&salt, &mut ct));
+        let tag = scrubbed(|| secret.with_secret(|plain| prekey.seal_into(&salt, plain, &mut ct)));
         Self {
             ct,
             tag,
@@ -109,8 +108,7 @@ impl<const N: usize> SealedFixed<N> {
         plain.with_secret_mut(|buf| self.open_into(buf));
         let result = plain.with_secret_mut(f);
         let salt = Prekey::fresh_salt();
-        plain.with_secret(|p| self.ct.copy_from_slice(p));
-        self.tag = self.prekey.seal_in_place(&salt, &mut self.ct);
+        self.tag = plain.with_secret(|p| self.prekey.seal_into(&salt, p, &mut self.ct));
         self.salt = salt;
         result
     }
@@ -167,8 +165,7 @@ impl<const N: usize> SealedFixed<N> {
         let result = f(&mut wrapped);
         let plain = unwrap(wrapped);
         let salt = Prekey::fresh_salt();
-        plain.with_secret(|p| self.ct.copy_from_slice(p));
-        self.tag = self.prekey.seal_in_place(&salt, &mut self.ct);
+        self.tag = plain.with_secret(|p| self.prekey.seal_into(&salt, p, &mut self.ct));
         self.salt = salt;
         result
     }
@@ -246,6 +243,29 @@ impl<const N: usize> core::fmt::Debug for SealedFixed<N> {
 mod tests {
     use super::*;
     use crate::sealed::prekey::tests::quota;
+
+    /// A re-seal whose key derivation fails (an idle no-access pre-key that cannot be made
+    /// readable) must leave the old ciphertext in place, never the new plaintext.
+    #[test]
+    fn a_failed_reseal_leaves_ciphertext_not_plaintext() {
+        let _q = quota();
+        let prekey = Prekey::new();
+        let mut s = SealedFixed::seal(Fixed::new([0x42u8; 32]), &prekey);
+        let before = s.ct;
+        let r = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
+            s.with_secret_mut(|b| {
+                *b = [0x99u8; 32];
+                crate::sealed::prekey::tests::fail_next_derivation();
+            });
+        }));
+        assert!(r.is_err());
+        assert_ne!(
+            s.ct, [0x99u8; 32],
+            "the new plaintext was left in the ciphertext"
+        );
+        assert_eq!(s.ct, before);
+        s.with_secret(|b| assert_eq!(b, &[0x42u8; 32]));
+    }
 
     #[test]
     fn the_ciphertext_is_not_the_plaintext_and_differs_per_seal() {

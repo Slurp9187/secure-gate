@@ -24,9 +24,9 @@
 //!
 //! # How it works
 //!
-//! - A [`Prekey`] is 16 KiB of random bytes, page-aligned and locked in RAM where the
-//!   operating system allows it. Each sealed object keeps an `Arc` to the one it was sealed
-//!   under.
+//! - A [`Prekey`] is 16 KiB of random bytes in a memory mapping of its own, between
+//!   no-access guard pages, read-only, and locked in RAM where the operating system allows
+//!   it. Each sealed object keeps an `Arc` to the one it was sealed under.
 //! - Every seal draws a random 32-byte salt. The sealing key is `SHA-256(salt ‖ pre-key)`,
 //!   recomputed on every access and wiped as soon as the cipher is keyed. It is never
 //!   stored in the object. The cipher leaves a copy of it on the stack, so every seal and
@@ -48,11 +48,22 @@
 //! With the pre-key locked, a sealed secret that reaches the **swap file** cannot be
 //! opened from it, because the pre-key never gets there.
 //!
+//! A **linear over-read** from a buffer elsewhere in the process (a C library's,
+//! Heartbleed-style) does not reach the pre-key: it is not on the heap, and a read running
+//! into it from below faults on its guard page first. Measured: a 64 KiB read from a C
+//! buffer captured the whole pre-key in every run while it lived on the heap (rc.14), and
+//! none of it once guarded.
+//!
 //! # What it does not protect against
 //!
 //! - A **clean** read of the address space: a debugger, `/proc/<pid>/mem`, an attacker who
 //!   can run code in the process. That read gets pre-key, salt and ciphertext together.
-//! - **Hibernation** files and **crash or core dumps**, which capture locked pages too.
+//! - **Hibernation** files, which capture locked pages too, and **crash dumps** on Windows
+//!   and macOS. On Linux the pre-key is excluded from core dumps (`MADV_DONTDUMP`). On
+//!   Windows a [`Prekey::new_idle_noaccess`] pre-key is absent from a full-memory dump taken
+//!   while it is idle, at the price of its lock.
+//! - Over-reads of the sealed objects themselves: their ciphertext and salt are ordinary
+//!   memory, but useless without the pre-key.
 //! - A failed lock ([`Prekey::lock_status`] says so): the pre-key can then be swapped out
 //!   like any other memory.
 //! - The plaintext temporary while a closure runs. It lives on the stack
@@ -61,9 +72,6 @@
 //!   are the caller's to wipe.
 //! - Registers, and stack residue beyond the overwritten 32 KiB. The overwrite was measured
 //!   on one target; another target's cipher backend or frame layout may differ.
-//! - Pages larger than the pre-key block's alignment (16 KiB on x86, x86_64 and Apple
-//!   aarch64; 64 KiB elsewhere): the pre-key would share its page, so it is not locked at
-//!   all, and [`Prekey::lock_status`] says so. No known target's default page is larger.
 //! - What [`unseal`](SealedFixed::unseal) returns: an ordinary `Fixed`, whose by-value
 //!   return can leave a copy in the caller's frame (`SECURITY.md` §1). Read through
 //!   `with_secret` instead where you can.
@@ -76,8 +84,7 @@
 //! Each access needs about 32 KiB of free stack for the scrub, on top of the cipher's own
 //! frames: mind small custom thread stacks. Measured on x86_64 Windows: an access on a
 //! 64 KiB thread stack completes in a release build and overflows in a debug build; 96 KiB
-//! completes in both. [`Prekey::new`] in an unoptimized build needs more: a few times the
-//! pre-key block's size (about 192 KiB where the block is 64 KiB).
+//! completes in both.
 //!
 //! Not zero-overhead. Each access hashes 16 KiB and runs one AEAD pass; each mutation adds
 //! an RNG call and a second pass. The repository's `sealed_vs_fixed` benchmark measures it.

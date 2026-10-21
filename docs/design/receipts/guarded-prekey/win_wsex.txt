@@ -1,0 +1,5 @@
+locked READ_WRITE: query_ok=true pages=[valid=1 locked=1; valid=1 locked=1; valid=1 locked=1; valid=1 locked=1]
+after READ: query_ok=true pages=[valid=1 locked=1; valid=1 locked=1; valid=1 locked=1; valid=1 locked=1]
+after NONE: query_ok=true pages=[valid=0 locked=1; valid=0 locked=1; valid=0 locked=1; valid=0 locked=1]
+after READ again (not touched): query_ok=true pages=[valid=0 locked=1; valid=0 locked=1; valid=0 locked=1; valid=0 locked=1]
+after READ again and a read: query_ok=true pages=[valid=1 locked=0; valid=0 locked=1; valid=0 locked=1; valid=0 locked=1]

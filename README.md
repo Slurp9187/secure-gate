@@ -446,7 +446,7 @@ requirement has to carry a pre-release tag.
 The requirement has to carry a pre-release tag. Both lines are pre-release only — the
 newest stable on crates.io is `0.6.1` — and a caret matches a pre-release only when the
 requirement itself carries one for the same `major.minor.patch`. So `"0.9"` means
-`>=0.9.0, <0.10.0`, `0.9.0-rc.14` sorts *below* `0.9.0`, and nothing satisfies it: `"0.9"`
+`>=0.9.0, <0.10.0`, `0.9.0-rc.15` sorts *below* `0.9.0`, and nothing satisfies it: `"0.9"`
 and `"0.8"` are not shorthands here, they are resolve failures.
 
 `"0.9.0-rc"` is the form that tracks a line rather than a version. `^0.9.0-rc` is
@@ -460,7 +460,7 @@ once `0.9.0` ships — nothing to update when the next candidate lands. It float
      snippets above are the tracking form and carry no version, so they are not part of
      this. References to a *past* release -- which tag last carried a deleted crate, when a
      behaviour changed -- are history and never move. -->
-and candidates on these lines have carried breaking changes: pin `"=0.9.0-rc.14"` when
+and candidates on these lines have carried breaking changes: pin `"=0.9.0-rc.15"` when
 `cargo update` must stay put. The pre-release tag is also matched against exactly one
 `major.minor.patch`, so `"0.9.0-rc"` will not pick up a later `0.9.1-rc.1`.
 
@@ -509,7 +509,7 @@ Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = 
 | `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                                                                                                      |
 | `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                                                                                                    |
 | `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                                                                                                          |
-| `sealed`            | `SealedFixed` / `SealedDynamic`: secrets held encrypted in RAM while idle, opened per closure call, under a page-locked, wipeable `Prekey`. Implies `std` + `rand`; adds `chacha20poly1305`, `sha2`, `region`. See `SECURITY.md` §3. |
+| `sealed`            | `SealedFixed` / `SealedDynamic`: secrets held encrypted in RAM while idle, opened per closure call, under a guarded, page-locked, wipeable `Prekey`. Implies `std` + `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`. See `SECURITY.md` §3. |
 | `full`              | All features except `std` and `sealed`                                                                                                                                                                                                                                 |
 
 `no_std` compatible — the crate is `#![no_std]` unless the `std` feature is enabled, verified in CI by cross-building for `thumbv7em-none-eabihf`. `Fixed<T>` with `rand` works heap-free (on bare-metal targets, `getrandom` additionally requires a user-configured platform backend for `from_random`; `from_rng` with a caller-supplied RNG has no such requirement). `Dynamic<T>`, encoding traits, and serde require `alloc`. `Fixed::try_from_*` decoding works without `alloc` using constant-time stack-based decoders. Disabled features have zero overhead.
