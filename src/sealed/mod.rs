@@ -60,7 +60,7 @@
 //! - A **clean** read of the address space: a debugger, `/proc/<pid>/mem`, an attacker who
 //!   can run code in the process. That read gets pre-key, salt and ciphertext together.
 //! - **Hibernation** files, which capture locked pages too, and **crash dumps** on Windows
-//!   and macOS. On Linux the pre-key is excluded from core dumps (`MADV_DONTDUMP`). On
+//!   and macOS. On Linux the pre-key is marked `MADV_DONTDUMP`, which the kernel documents as leaving it out of core dumps. On
 //!   Windows a [`Prekey::new_idle_noaccess`] pre-key is absent from a full-memory dump taken
 //!   while it is idle, at the price of its lock.
 //! - Over-reads of the sealed objects themselves: their ciphertext and salt are ordinary

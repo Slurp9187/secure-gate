@@ -18,7 +18,8 @@
 //!   faults.
 //! - **Locked.** `VirtualLock` on Windows, `mlock` on Unix, so the block is not written to
 //!   swap. A refused lock is reported by [`GuardedBlock::lock_status`], never fatal.
-//! - **Not in core dumps (Linux).** `madvise(MADV_DONTDUMP)` on the block, best effort.
+//! - **Not in core dumps (Linux).** `madvise(MADV_DONTDUMP)` on the block, best effort;
+//!   the kernel documents such pages as left out of core dumps.
 //! - **Optionally, no access while idle.** With [`GuardedBlock::new_with_idle_noaccess`] the
 //!   block is readable only while a [`GuardedBlock::with`] call is running (unless the
 //!   system refuses to make it no-access again; see [`GuardedBlock::with`]). On Windows that
@@ -260,9 +261,10 @@ impl<const N: usize> GuardedBlock<N> {
     /// and its lock is dropped, so the block may be written to the pagefile while idle.
     /// [`lock_status`](Self::lock_status) then returns an error whose
     /// [`idle_noaccess`](LockError::idle_noaccess) is `true`. On Linux the lock survives the
-    /// protection change and is kept. Each access costs two extra protection changes, a few
-    /// microseconds, more with many busy threads, since each change interrupts every CPU
-    /// running one of the process's threads.
+    /// protection change and is kept. Each access costs a few microseconds more, more with
+    /// many busy threads. On Linux that is the two protection changes, each of which
+    /// interrupts every CPU running one of the process's threads; on Windows most of it is
+    /// faulting the block's pages back into the working set, which a no-access page leaves.
     ///
     /// # Errors
     ///

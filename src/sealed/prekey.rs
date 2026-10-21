@@ -132,10 +132,11 @@ impl std::error::Error for LockError {}
 /// - A linear over-read from a buffer below it, such as a C library's in the same process
 ///   (Heartbleed-style), faults on the guard page instead of reading the pre-key.
 /// - It is read-only from the moment it is filled until it drops.
-/// - Its pages are locked (`VirtualLock` on Windows, `mlock` on Unix), and on Linux excluded
-///   from core dumps (`MADV_DONTDUMP`).
+/// - Its pages are locked (`VirtualLock` on Windows, `mlock` on Unix), and on Linux
+///   marked `MADV_DONTDUMP`, which the kernel documents as leaving it out of core dumps.
 /// - With [`new_idle_noaccess`](Self::new_idle_noaccess) it is also no-access except while a
-///   sealing key is being derived from it, which on Windows costs the lock.
+///   sealing key is being derived from it (unless the system refuses to make it no-access
+///   again), which on Windows costs the lock.
 ///
 /// # Lifetime
 ///
@@ -221,7 +222,10 @@ impl Prekey {
     }
 
     /// As [`new`](Self::new), and the pre-key is also no-access except while a sealing key
-    /// is being derived from it (about 6 µs per access).
+    /// is being derived from it (about 6 µs per access). If the system refuses to make it
+    /// no-access again after an access, which happens only in exhaustion cases (out of
+    /// memory mappings), it stays readable until a later access closes it; nothing reports
+    /// that, and [`lock_status`](Self::lock_status) is about the lock only.
     ///
     /// What that adds: while idle, the pre-key cannot be read at its address at all. On
     /// Windows that keeps it out of other processes' `ReadProcessMemory` and out of a

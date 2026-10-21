@@ -36,7 +36,8 @@ What each part is for:
   reported by `lock_status()`, never fatal.
 - **Not in core dumps** on Linux (`MADV_DONTDUMP`, best effort).
 - **Optionally no-access while idle** (`new_with_idle_noaccess`): readable only during a
-  `with` call. On Windows that keeps it out of `ReadProcessMemory` and full-memory crash
+  `with` call (unless the system refuses the change back to no-access, in which case a later
+  call closes it). On Windows that keeps it out of `ReadProcessMemory` and full-memory crash
   dumps taken while idle, but a no-access page cannot stay locked there, so this mode does
   not lock on Windows and `lock_status()` says so. On Linux the lock is kept.
 - **Wiped on drop** (while still locked, if the lock was granted), then unlocked and
