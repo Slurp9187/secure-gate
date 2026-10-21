@@ -162,7 +162,8 @@ reading it.
 
 Each access costs about 8 µs (it hashes the pre-key) and 32 KiB of stack, so sealing is for
 long-held keys, not hot loops. `Prekey::new_idle_noaccess()` also makes the pre-key
-unreadable between accesses, which on Windows keeps it out of crash dumps but costs its lock.
+unreadable between accesses (unless the system refuses that change, in exhaustion cases),
+which on Windows keeps it out of crash dumps but costs its lock.
 What it covers and what it does not:
 [`sealed`](https://docs.rs/secure-gate/latest/secure_gate/sealed/index.html) and
 [SECURITY.md §3](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md#3-swap--core-dumps--external-memory-exposure).
