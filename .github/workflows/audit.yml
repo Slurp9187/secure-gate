@@ -21,6 +21,13 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same pull request cancels the run it supersedes. Every other run
+# (pushes to `main`, the schedule, manual dispatch) gets a group of its own and is never
+# cancelled, so each `main` commit keeps a complete result to check a release tag against.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Audits the ref that triggered the event (dependency changes on push / PR).
   audit:
