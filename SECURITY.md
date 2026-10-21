@@ -58,7 +58,8 @@ why the crates that do are built around their own allocator:
 | Crate | What it buys |
 |---|---|
 | [`secrets`](https://crates.io/crates/secrets) | Guarded pages via libsodium: `mlock`, guard pages, and `mprotect` set to no-access except during a scoped borrow — a hardware-enforced version of what `with_secret` does by convention. Needs libsodium and `std`. |
-| [`memsec`](https://crates.io/crates/memsec) | The same primitives without the libsodium dependency. |
+| [`memsec`](https://crates.io/crates/memsec) | The same primitives without the libsodium dependency, as `unsafe fn`s you call yourself. |
+| [`guarded-block`](https://crates.io/crates/guarded-block) | From this repository; what the `sealed` pre-key uses. A fixed-size block in a mapping of its own between no-access guard pages, read-only once filled, locked, `MADV_DONTDUMP` on Linux, optionally no-access between scoped reads. A safe API; refused locks, a no-access lock lost on Windows, and a `fork()` child are reported. Write-once: for a key, not a secret you edit. |
 | [`region`](https://crates.io/crates/region) | Thin safe wrappers over lock/protect for ranges you already own — the page caveats above are yours to handle. |
 
 **And locking is not the whole answer even when done right.** It does not cover
@@ -73,10 +74,9 @@ paging memory is a different layer with a different actor, and absorbing it woul
 weaker version of the crates above.
 
 The one allocation this crate does lock is the opt-in `sealed` feature's `Prekey`, and it
-follows the rule above: its block is aligned to at least the target's page size (16 KiB on
-x86, x86_64 and Apple aarch64, 64 KiB elsewhere), so it owns every page it touches and its
-unlock cannot reach a neighbour. It locks through `region`, so
-the `unsafe` stays in that dependency. It does not lock your secrets; it keeps a sealed
+follows the rule above: it is not on the heap but in a memory mapping of its own, so it owns
+every page it touches and its unlock cannot reach a neighbour. The mapping comes from this
+repository's `guarded-block` crate, so the `unsafe` stays in that dependency. It does not lock your secrets; it keeps a sealed
 secret that does reach swap from being opened there. See
 [3. Swap / core dumps / external memory exposure](#3-swap--core-dumps--external-memory-exposure).
 
@@ -312,8 +312,10 @@ key 4 times there before that overwrite in a debug build, and a plaintext
 copy once in a release build; after it, neither (x86_64 Windows only; the
 runs are in `docs/design/receipts/sealed-stack-residue/`). The pre-key is 16 KiB of random bytes in a
 `Prekey` that each sealed object holds an `Arc` to; it is not a `static`,
-and when the last reference drops it is wiped while still locked, then
-unlocked, then freed.
+and when the last reference drops it is wiped (while still locked, if the
+lock was granted), then unlocked, then unmapped. Since rc.15 it lives in a mapping of its own between
+two no-access guard pages, and is read-only from the moment it is filled
+(`guarded-block`).
 
 | Threat | Sealed |
 |---|---|
@@ -321,12 +323,13 @@ unlocked, then freed.
 | Sealed secret paged to **swap** | Covered when the pre-key is locked: the pre-key is not in swap, so the ciphertext there cannot be opened |
 | Pre-key lock refused (quota) | `Prekey::lock_status()` returns `Err`; nothing panics, but the pre-key can then be swapped like any memory |
 | **Hibernation** file | Not covered: it captures locked pages too |
-| **Crash or core dump** | Not covered: it captures pre-key, salt and ciphertext together |
+| Linear **over-read** from another buffer in the process (C code, Heartbleed-style) | Covered for the pre-key: it is off the heap, where 64 KiB reads from C buffers got the whole heap-held pre-key (rc.14) in every run and the mapped one in none; and a read running into it faults on its guard page, measured with readable memory placed directly against it (an unguarded mapping there gives up all 16 KiB) |
+| **Core dump** (Linux) | The pre-key is marked `MADV_DONTDUMP`, which the kernel documents as leaving it out of core dumps, so a dumped ciphertext could not be opened. The flag was checked on the mapping; no core dump was taken |
+| **Crash dump** (Windows, macOS) | Not covered with `Prekey::new()`: a full-memory dump captures pre-key, salt and ciphertext together. On Windows, `Prekey::new_idle_noaccess()` keeps the pre-key out of a dump taken while it is idle (measured), but cannot also keep it locked, so it may then reach the pagefile |
 | Clean read of process memory (debugger, `/proc/<pid>/mem`, code in the process) | Not covered: same reason |
 | The plaintext temporary while the closure runs, and copies the closure makes | Not covered: on the stack (`SealedFixed`) or heap (`SealedDynamic`), unlocked; wiped, and the stack below overwritten, when the call returns |
 | Registers, and stack residue beyond the 32 KiB overwritten after each access | Not covered; measured on one target only |
 | The `Fixed` that `SealedFixed::unseal` returns | An ordinary `Fixed` from there on: returning it by value can leave a copy in the caller's frame (one found in a release build), as in [1. Stack-move residue](#1-stack-move-residue-fixedt). Read through `with_secret` / `with_role` instead of unsealing |
-| Pages larger than the pre-key block's alignment (16 KiB on x86, x86_64, Apple aarch64; 64 KiB elsewhere) | The pre-key is not locked (it would share a page); `lock_status()` says so |
 
 On Windows every `VirtualLock` in a process draws on its working-set
 quota. With the default minimum, about eleven pre-keys lock before the

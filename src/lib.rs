@@ -46,8 +46,22 @@
 //! |------|-----------|----------|---------|
 //! | [`Fixed<T>`] | Stack | Keys, nonces, tokens — compile-time-known size | Always available |
 //! | [`Dynamic<T>`] | Heap | Passwords, API keys, ciphertexts — variable length | `alloc` (default) |
+#![cfg_attr(
+    feature = "sealed",
+    doc = "| [`SealedFixed<N>`](SealedFixed) / [`SealedDynamic<T>`](SealedDynamic) | Encrypted in RAM while idle, under a guarded, locked [`Prekey`] | Long-held keys in a process whose memory may be read while they idle | `sealed` |"
+)]
+#![cfg_attr(
+    not(feature = "sealed"),
+    doc = "| `SealedFixed<N>` / `SealedDynamic<T>` | Encrypted in RAM while idle, under a guarded, locked `Prekey` | Long-held keys in a process whose memory may be read while they idle | `sealed` |"
+)]
 //!
-//! Both types share the same [`RevealSecret`] / [`RevealSecretMut`] access API.
+//! `Fixed` and `Dynamic` share the same [`RevealSecret`] / [`RevealSecretMut`] access API.
+//! The sealed types are opened only through scoped `with_secret` calls (no `expose_secret`),
+//! cost about 8 µs per access, and are for keys held across a session, not hot loops; their
+//! module has the threat model and the measurements.
+//!
+//! (The row above is a real intra-doc link where `sealed` is enabled, as on docs.rs, and
+//! plain text where it is not, so builds without the feature have no broken link.)
 //!
 //! # Quick start
 //!

@@ -1,0 +1,12 @@
+layout=bare readable_neighbor_directly_below=true read_from=layout-1024 len=65536 survived=true prekey_bytes_matching=16384/16384
+ exit=0
+layout=bare readable_neighbor_directly_below=true read_from=layout-1024 len=65536 survived=true prekey_bytes_matching=16384/16384
+ exit=0
+layout=bare readable_neighbor_directly_below=true read_from=layout-1024 len=65536 survived=true prekey_bytes_matching=16384/16384
+ exit=0
+layout=guarded readable_neighbor_directly_below=true read_from=layout-1024 len=65536 /usr/bin/bash: line 9:   158 Segmentation fault         $B neighbor $l 2>&1
+ exit=139
+layout=guarded readable_neighbor_directly_below=true read_from=layout-1024 len=65536 /usr/bin/bash: line 9:   159 Segmentation fault         $B neighbor $l 2>&1
+ exit=139
+layout=guarded readable_neighbor_directly_below=true read_from=layout-1024 len=65536 /usr/bin/bash: line 9:   160 Segmentation fault         $B neighbor $l 2>&1
+ exit=139

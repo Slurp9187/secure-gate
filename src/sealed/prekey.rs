@@ -4,6 +4,7 @@ use alloc::sync::Arc;
 
 use chacha20poly1305::aead::AeadInOut;
 use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce};
+use guarded_block::GuardedBlock;
 use rand::{TryRng, rngs::SysRng};
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
@@ -19,48 +20,6 @@ pub(crate) const TAG_LEN: usize = 16;
 /// Size of the random salt drawn for every seal.
 pub(crate) const SALT_LEN: usize = 32;
 
-/// The pre-key's storage, aligned to at least the target's page size so it owns every page
-/// it touches: locking it locks nothing else, and unlocking it on drop cannot unlock a
-/// neighbor's pages (`munlock` and `VirtualUnlock` work on whole pages and do not nest).
-///
-/// `repr(align)` takes a literal, so the alignment is chosen per target, after the `secrets`
-/// crate's table (1.3.0, `src/secret.rs`), with the pre-key's own 16 KiB as the floor:
-///
-/// | Target | Alignment | Why |
-/// |---|---|---|
-/// | x86, x86_64 | 16 KiB | 4 KiB pages; the floor |
-/// | aarch64 Apple | 16 KiB | 16 KiB pages |
-/// | aarch64 other | 64 KiB | Linux kernels built for 64 KiB pages exist |
-/// | anything else | 64 KiB | unknown; ppc64le's default page is 64 KiB |
-///
-/// On a 64 KiB-aligned target the block is 64 KiB, of which only the first 16 KiB are the
-/// pre-key; the rest is never written. [`lock_block`] still refuses a page larger than the
-/// alignment, for any target this table gets wrong.
-#[cfg_attr(
-    any(
-        target_arch = "x86",
-        target_arch = "x86_64",
-        all(target_arch = "aarch64", target_vendor = "apple"),
-    ),
-    repr(C, align(16384))
-)]
-#[cfg_attr(
-    not(any(
-        target_arch = "x86",
-        target_arch = "x86_64",
-        all(target_arch = "aarch64", target_vendor = "apple"),
-    )),
-    repr(C, align(65536))
-)]
-struct Block([u8; PREKEY_LEN]);
-
-/// The block's alignment, and the largest page it can own.
-const BLOCK_ALIGN: usize = core::mem::align_of::<Block>();
-
-// The block holds the whole pre-key. (That it fills whole aligned units needs no check:
-// a type's size is always a multiple of its alignment.)
-const _: () = assert!(BLOCK_ALIGN >= PREKEY_LEN);
-
 /// Why the pre-key's pages are not locked in RAM. Returned by [`Prekey::lock_status`].
 ///
 /// Not fatal: the sealed types work the same either way. What is lost is the guarantee
@@ -68,66 +27,92 @@ const _: () = assert!(BLOCK_ALIGN >= PREKEY_LEN);
 /// process working-set quota, which every `VirtualLock` in the process shares; on Unix it
 /// is `RLIMIT_MEMLOCK`.
 ///
-/// It is also returned, without asking the operating system, when the page size is larger
-/// than the pre-key's block is aligned for (16 KiB on x86, x86_64 and Apple aarch64; 64 KiB
-/// elsewhere): the pre-key would then share a page with other memory, and unlocking it on
-/// drop would unlock that memory too.
+/// It is also returned, without asking the operating system, for a pre-key made with
+/// [`Prekey::new_idle_noaccess`] on Windows, where a no-access page cannot stay locked, and
+/// in a `fork()` child of the process that made the pre-key, which does not inherit its lock.
 ///
-/// Carries the operating system's error code or the page size, never an address.
+/// Carries the operating system's error code, never an address.
+///
+/// # Example
+///
+/// Report the reason, and raise the quota where it is the cause:
+///
+/// ```
+/// use secure_gate::Prekey;
+///
+/// let prekey = Prekey::new();
+/// match prekey.lock_status() {
+///     Ok(()) => {}
+///     // ERROR_WORKING_SET_QUOTA: every `VirtualLock` in a Windows process shares the
+///     // working-set quota (about eleven pre-keys under the default). Raise it at startup
+///     // with `SetProcessWorkingSetSize` if the application holds more.
+///     Err(why) if why.raw_os_error() == Some(1453) => eprintln!("raise the quota: {why}"),
+///     Err(why) => eprintln!("sealed secrets work, but may reach swap: {why}"),
+/// }
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LockError {
     os_code: Option<i32>,
-    page_size: Option<usize>,
+    idle_noaccess: bool,
+    forked: bool,
 }
 
 impl LockError {
-    fn from_region(err: &region::Error) -> Self {
-        let os_code = match err {
-            region::Error::SystemCall(code) | region::Error::MachCall(code) => Some(*code),
-            _ => None,
-        };
+    fn from_guarded(err: guarded_block::LockError) -> Self {
         Self {
-            os_code,
-            page_size: None,
+            os_code: err.raw_os_error(),
+            idle_noaccess: err.idle_noaccess(),
+            forked: err.forked(),
         }
     }
 
     /// The operating system's error code (`GetLastError` on Windows, `errno` on Unix), when
-    /// the failure came from a system call.
+    /// the lock was attempted and refused.
     pub fn raw_os_error(&self) -> Option<i32> {
         self.os_code
     }
 
-    /// The page size, when locking was not attempted because a page is larger than the
-    /// pre-key's block is aligned for (16 KiB on x86, x86_64 and Apple aarch64; 64 KiB
-    /// elsewhere). A page larger than the 16 KiB pre-key but within that alignment is locked,
-    /// not reported.
-    pub fn page_too_large(&self) -> Option<usize> {
-        self.page_size
+    /// `true` when locking was not attempted because the pre-key was made with
+    /// [`Prekey::new_idle_noaccess`] on Windows: a no-access page leaves the process's
+    /// working set, and its lock with it.
+    pub fn idle_noaccess(&self) -> bool {
+        self.idle_noaccess
+    }
+
+    /// `true` in a `fork()` child of the process that made the pre-key: page locks are not
+    /// inherited, so the child holds the pre-key unlocked whatever the parent was granted.
+    pub fn forked(&self) -> bool {
+        self.forked
     }
 }
 
 impl core::fmt::Display for LockError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match (self.os_code, self.page_size) {
-            (_, Some(size)) => write!(
-                f,
-                "the sealed-memory pre-key was not locked: the {size}-byte page would be \
-                 shared with other memory"
+        if self.forked {
+            return f.write_str(
+                "the sealed-memory pre-key is not locked in RAM in this process: it was made \
+                 before a fork, and page locks are not inherited",
+            );
+        }
+        match (self.idle_noaccess, self.os_code) {
+            (true, _) => f.write_str(
+                "the sealed-memory pre-key is not locked in RAM: it is no-access while idle \
+                 (Prekey::new_idle_noaccess), and on Windows a no-access page cannot stay locked",
             ),
-            (Some(code), None) => write!(
+            (false, Some(code)) => write!(
                 f,
                 "the sealed-memory pre-key could not be locked in RAM (OS error {code})"
             ),
-            (None, None) => f.write_str("the sealed-memory pre-key could not be locked in RAM"),
+            (false, None) => f.write_str("the sealed-memory pre-key could not be locked in RAM"),
         }
     }
 }
 
 impl std::error::Error for LockError {}
 
-/// The 16 KiB of random bytes that every sealing key is derived from, locked in RAM where
-/// the operating system allows it.
+/// The 16 KiB of random bytes that every sealing key is derived from, in memory of its own
+/// between no-access guard pages, read-only, and locked in RAM where the operating system
+/// allows it.
 ///
 /// Each [`SealedFixed`](crate::SealedFixed) and [`SealedDynamic`](crate::SealedDynamic)
 /// keeps an `Arc` to the `Prekey` it was sealed under and derives its key afresh on every
@@ -137,92 +122,184 @@ impl std::error::Error for LockError {}
 /// one of the pre-key's 131,072 bits wrong yields a useless key, with nothing to say which
 /// bit was wrong. See the [`sealed`](crate::sealed) module for the whole threat model.
 ///
+/// # Memory
+///
+/// The pre-key is not on the heap. It has a mapping of its own (from the
+/// [`guarded-block`](https://crates.io/crates/guarded-block) crate, which holds the `unsafe`
+/// this crate forbids), laid out as a no-access guard page, the pre-key's pages, and a
+/// no-access guard page:
+///
+/// - A linear over-read from a buffer below it, such as a C library's in the same process
+///   (Heartbleed-style), faults on the guard page instead of reading the pre-key.
+/// - It is read-only from the moment it is filled until it drops.
+/// - Its pages are locked (`VirtualLock` on Windows, `mlock` on Unix), and on Linux
+///   marked `MADV_DONTDUMP`, which the kernel documents as leaving it out of core dumps.
+/// - With [`new_idle_noaccess`](Self::new_idle_noaccess) it is also no-access except while a
+///   sealing key is being derived from it (unless the system refuses to make it no-access
+///   again), which on Windows costs the lock.
+///
 /// # Lifetime
 ///
 /// The pre-key is not a `static`. It lives as long as the last sealed object, or the last
-/// other `Arc`, that refers to it. When that one drops, the pre-key is wiped while its pages
-/// are still locked, then unlocked, then freed. An application typically holds one `Prekey`
-/// for a session and drops it, along with everything sealed under it, at lock or logout.
+/// other `Arc`, that refers to it. When that one drops, the pre-key is wiped (while its
+/// pages are still locked, if the lock was granted), then unlocked, then unmapped. An application typically holds one
+/// `Prekey` for a session and drops it, along with everything sealed under it, at lock or
+/// logout.
 ///
 /// # Locking
 ///
-/// [`new`](Self::new) asks the operating system to keep the pre-key's pages out of swap
-/// (`VirtualLock` on Windows, `mlock` on Unix) and never fails because it could not:
-/// [`lock_status`](Self::lock_status) reports the outcome so the caller can decide. Locking
-/// covers swap only. Hibernation, crash and core dumps, and a clean read of the process's
-/// memory (a debugger, `/proc/<pid>/mem`) all still see the pre-key.
+/// [`new`](Self::new) asks the operating system to keep the pre-key's pages out of swap and
+/// never fails because it could not: [`lock_status`](Self::lock_status) reports the outcome
+/// so the caller can decide. Locking covers swap only. Hibernation and a clean read of the
+/// process's memory (a debugger, `/proc/<pid>/mem`) still see the pre-key, and so does a
+/// crash dump on Windows (unless the pre-key is idle no-access) and on macOS.
+///
+/// # Example
+///
+/// One pre-key per session, created at login and dropped at logout with everything sealed
+/// under it:
+///
+/// ```
+/// use std::sync::Arc;
+/// use secure_gate::{Dynamic, Fixed, Prekey, RevealSecret, SealedDynamic, SealedFixed};
+///
+/// struct Session {
+///     prekey: Arc<Prekey>,
+///     db_key: SealedFixed<32>,
+///     password: SealedDynamic<String>,
+/// }
+///
+/// fn login(db_key: Fixed<[u8; 32]>, password: Dynamic<String>) -> Session {
+///     let prekey = Prekey::new();
+///     if let Err(why) = prekey.lock_status() {
+///         eprintln!("{why}"); // not fatal; see `LockError`
+///     }
+///     Session {
+///         db_key: SealedFixed::seal(db_key, &prekey),
+///         password: SealedDynamic::seal(password, &prekey),
+///         prekey,
+///     }
+/// }
+///
+/// let session = login(Fixed::new([7u8; 32]), Dynamic::new(String::from("hunter2")));
+/// session.db_key.with_secret(|k| assert_eq!(k[0], 7));
+/// session.password.with_secret(|p| assert_eq!(p, "hunter2"));
+/// drop(session); // logout: the sealed values, then the pre-key, are wiped
+/// ```
+///
+/// [`new_idle_noaccess`](Self::new_idle_noaccess) is the alternative where crash dumps or
+/// same-user memory reads matter more than the pagefile; its docs compare the two.
 ///
 /// # Fork
 ///
 /// A child created by `fork()` shares the parent's pre-key bytes (copy-on-write) but not
-/// its page locks. A child that should not hold the parent's sealing material creates its
-/// own `Prekey` and re-seals what it keeps.
+/// its page locks, and [`lock_status`](Self::lock_status) says so in the child. A child that
+/// should not hold the parent's sealing material creates its own `Prekey` and re-seals what
+/// it keeps.
+///
+/// A child of a *multithreaded* parent must not use an inherited
+/// [idle no-access](Self::new_idle_noaccess) pre-key at all: a thread that was mid-access at
+/// the fork leaves the child its open window (the pre-key stays readable) or its held mutex
+/// (the child's first access deadlocks). POSIX allows such a child only async-signal-safe
+/// calls until it execs in any case.
 pub struct Prekey {
-    // Field order matters only for the default drop; `Drop` below sequences it explicitly.
-    block: alloc::boxed::Box<Block>,
-    lock: Option<region::LockGuard>,
-    lock_error: Option<LockError>,
+    block: GuardedBlock<PREKEY_LEN>,
 }
 
 impl Prekey {
-    /// Generates a pre-key from the system RNG and tries to lock its pages in RAM.
+    /// Generates a pre-key from the system RNG into guarded, read-only memory, and tries
+    /// to lock its pages in RAM.
     ///
     /// Returns an `Arc`, because every sealed object keeps one.
     ///
     /// # Panics
     ///
-    /// Panics if the system RNG fails, as [`Fixed::from_random`] does. A failure to lock
-    /// is not a panic; see [`lock_status`](Self::lock_status).
-    ///
-    /// # Stack use
-    ///
-    /// An unoptimized build constructs the block on the stack before boxing it, so this
-    /// call needs a few times the block's size in free stack: about 192 KiB where the block
-    /// is 64 KiB (aarch64 other than Apple, and unlisted targets), less on x86. An optimized
-    /// build writes it to the heap directly. Avoiding the stack copy in every profile would
-    /// take `unsafe` (`Box::new_zeroed`), which this crate forbids.
+    /// Panics if the system RNG fails, as [`Fixed::from_random`] does, or if the operating
+    /// system refuses to map the pre-key or protect its pages (memory or address-space
+    /// exhaustion). A failure to lock is not a panic; see [`lock_status`](Self::lock_status).
     pub fn new() -> Arc<Self> {
-        let mut block = alloc::boxed::Box::new(Block([0u8; PREKEY_LEN]));
-        // Locked while it still holds zeros, then filled: the random bytes never sit in
-        // pages that could be swapped, unless the lock is refused.
-        let lock = lock_block(&block, region::page::size());
-        SysRng
-            .try_fill_bytes(&mut block.0)
-            .expect("SysRng failure is a program error");
-        Arc::new(Self::from_parts(block, lock))
+        Arc::new(Self::create(false))
     }
 
-    fn from_parts(
-        block: alloc::boxed::Box<Block>,
-        lock: Result<region::LockGuard, LockError>,
-    ) -> Self {
-        let (lock, lock_error) = match lock {
-            Ok(guard) => (Some(guard), None),
-            Err(err) => (None, Some(err)),
+    /// As [`new`](Self::new), and the pre-key is also no-access except while a sealing key
+    /// is being derived from it (about 6 µs per access). If the system refuses to make it
+    /// no-access again after an access, which happens only in exhaustion cases (out of
+    /// memory mappings), it stays readable until a later access closes it; nothing reports
+    /// that, and [`lock_status`](Self::lock_status) is about the lock only.
+    ///
+    /// What that adds: while idle, the pre-key cannot be read at its address at all. On
+    /// Windows that keeps it out of other processes' `ReadProcessMemory` and out of a
+    /// full-memory crash dump taken while it is idle, which a locked pre-key does not
+    /// (measured; the repository's `docs/design/sealed_memory.md` has the numbers).
+    ///
+    /// What it costs:
+    ///
+    /// - **On Windows, the lock.** A no-access page leaves the process's working set, and
+    ///   its `VirtualLock` is dropped (measured), so the pre-key may be written to the
+    ///   pagefile while idle. This mode therefore does not lock on Windows, and
+    ///   [`lock_status`](Self::lock_status) returns an error whose
+    ///   [`idle_noaccess`](LockError::idle_noaccess) is `true`. On Linux the lock is kept.
+    /// - **Time.** Measured at about 4 µs on top of an access's 6 µs hash in a quiet
+    ///   process, 9 µs with 16 busy threads. On Windows most of it is faulting the pre-key's
+    ///   pages back into the working set, which a no-access page leaves; on Linux it is the two
+    ///   protection changes, which interrupt every CPU running one of the process's threads.
+    /// - **A rare panic.** Making the pre-key readable for an access can fail where mapping
+    ///   it would have (the process is out of memory mappings); the access then panics.
+    ///
+    /// Choose it where crash dumps or same-user memory reads are a larger risk than the
+    /// pagefile, for example a Windows machine with an encrypted system drive that collects
+    /// full crash dumps. [`new`](Self::new) is the default because, without an encrypted
+    /// drive, a pre-key in the pagefile outlives the process.
+    ///
+    /// # Panics
+    ///
+    /// As [`new`](Self::new).
+    pub fn new_idle_noaccess() -> Arc<Self> {
+        Arc::new(Self::create(true))
+    }
+
+    fn create(idle: bool) -> Self {
+        let fill = |block: &mut [u8; PREKEY_LEN]| {
+            SysRng
+                .try_fill_bytes(block)
+                .expect("SysRng failure is a program error");
+        };
+        let block = if idle {
+            GuardedBlock::new_with_idle_noaccess(fill)
+        } else {
+            GuardedBlock::new_with(fill)
         };
         Self {
-            block,
-            lock,
-            lock_error,
+            block: block.unwrap_or_else(|err| {
+                panic!("the sealed-memory pre-key could not be set up: {err}")
+            }),
         }
     }
 
     /// `Ok(())` if the pre-key's pages are locked in RAM; otherwise why they are not.
     pub fn lock_status(&self) -> Result<(), LockError> {
-        match self.lock_error {
-            None => Ok(()),
-            Some(err) => Err(err),
-        }
+        self.block.lock_status().map_err(LockError::from_guarded)
+    }
+
+    /// `true` if this pre-key was made with [`new_idle_noaccess`](Self::new_idle_noaccess).
+    pub fn is_idle_noaccess(&self) -> bool {
+        self.block.is_idle_noaccess()
     }
 
     /// `SHA-256(salt ‖ pre-key)`, written straight into a wrapper that wipes it on drop.
+    /// The pre-key is read only inside this call, which in idle no-access mode is its whole
+    /// readable window.
     #[inline]
     fn sealing_key(&self, salt: &[u8; SALT_LEN]) -> Fixed<[u8; 32]> {
+        #[cfg(test)]
+        tests::maybe_fail_derivation();
         Fixed::new_with(|key: &mut [u8; 32]| {
-            let mut hasher = Sha256::new();
-            hasher.update(salt);
-            hasher.update(&self.block.0);
-            hasher.finalize_into(key.into());
+            self.block.with(|prekey| {
+                let mut hasher = Sha256::new();
+                hasher.update(salt);
+                hasher.update(prekey);
+                hasher.finalize_into(key.into());
+            });
         })
     }
 
@@ -243,7 +320,30 @@ impl Prekey {
         core::array::from_fn(|i| words[i / 8].to_le_bytes()[i % 8])
     }
 
-    /// Encrypts `buf` in place under the key for `salt`; returns the detached tag.
+    /// Copies `plain` into `out` and encrypts it there under the key for `salt`; returns
+    /// the detached tag.
+    ///
+    /// The key is derived before `out` is written. Deriving it is the one step that can
+    /// fail (for an idle no-access pre-key, when it cannot be made readable), and a failure
+    /// after the copy would leave plaintext in `out`, a ciphertext buffer nothing wipes.
+    /// Use this, not a copy followed by [`seal_in_place`](Self::seal_in_place), wherever
+    /// `out` is not itself a wiping buffer.
+    pub(crate) fn seal_into(
+        &self,
+        salt: &[u8; SALT_LEN],
+        plain: &[u8],
+        out: &mut [u8],
+    ) -> [u8; TAG_LEN] {
+        let cipher = self.cipher(salt);
+        out.copy_from_slice(plain);
+        cipher
+            .encrypt_inout_detached(&Nonce::default(), &[], out.into())
+            .expect("ChaCha20-Poly1305 rejects only inputs over 256 GiB")
+            .into()
+    }
+
+    /// Encrypts `buf` in place under the key for `salt`; returns the detached tag. Only for
+    /// a `buf` that wipes itself if this panics; see [`seal_into`](Self::seal_into).
     ///
     /// The nonce is all-zero. That is sound only because every seal draws a new salt with
     /// [`fresh_salt`](Self::fresh_salt) and so a new key: no key ever encrypts twice.
@@ -270,19 +370,6 @@ impl Prekey {
             panic!("sealed memory was modified or corrupted");
         }
     }
-}
-
-/// Locks `block`'s pages, unless a page is larger than the block's alignment: locking it
-/// would then lock, and later unlock, a neighbor's memory too.
-fn lock_block(block: &Block, page_size: usize) -> Result<region::LockGuard, LockError> {
-    if page_size > BLOCK_ALIGN {
-        return Err(LockError {
-            os_code: None,
-            page_size: Some(page_size),
-        });
-    }
-    region::lock(block.0.as_ptr(), core::mem::size_of::<Block>())
-        .map_err(|err| LockError::from_region(&err))
 }
 
 /// Size of the stack region [`scrub_stack`] overwrites.
@@ -321,21 +408,6 @@ pub(crate) fn scrubbed<R>(f: impl FnOnce() -> R) -> R {
     }
 }
 
-impl Prekey {
-    /// Wipe while the pages are still locked, then unlock. `Drop` calls this before the box
-    /// frees the pages: unlocking after the free could unlock whatever reuses them.
-    fn wipe_and_unlock(&mut self) {
-        self.block.0.zeroize();
-        drop(self.lock.take());
-    }
-}
-
-impl Drop for Prekey {
-    fn drop(&mut self) {
-        self.wipe_and_unlock();
-    }
-}
-
 /// Always prints `[REDACTED]`.
 impl core::fmt::Debug for Prekey {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -348,8 +420,7 @@ pub(crate) mod tests {
     use super::*;
 
     /// Every test in this crate's unit tests that creates a pre-key takes this first: they
-    /// share one per-process lock quota (about 11 pre-keys under Windows' default), and the
-    /// quota test below needs it to itself.
+    /// share one per-process lock quota (about 11 pre-keys under Windows' default).
     pub(crate) fn quota() -> std::sync::MutexGuard<'static, ()> {
         static QUOTA: std::sync::Mutex<()> = std::sync::Mutex::new(());
         QUOTA
@@ -357,144 +428,139 @@ pub(crate) mod tests {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    fn random_block() -> alloc::boxed::Box<Block> {
-        let mut block = alloc::boxed::Box::new(Block([0u8; PREKEY_LEN]));
-        SysRng.try_fill_bytes(&mut block.0).unwrap();
-        block
+    std::thread_local! {
+        static FAIL_NEXT_DERIVATION: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
+    }
+
+    /// Makes this thread's next sealing-key derivation panic, as it does in idle no-access
+    /// mode when the pre-key cannot be made readable.
+    pub(crate) fn fail_next_derivation() {
+        FAIL_NEXT_DERIVATION.with(|f| f.set(true));
+    }
+
+    pub(super) fn maybe_fail_derivation() {
+        if FAIL_NEXT_DERIVATION.with(|f| f.replace(false)) {
+            panic!("injected: could not make the guarded block readable");
+        }
+    }
+
+    /// A pre-key holding `bytes`, in the same guarded memory as a real one.
+    fn with_bytes(bytes: &[u8; PREKEY_LEN]) -> Prekey {
+        Prekey {
+            block: GuardedBlock::new_with(|b| b.copy_from_slice(bytes)).unwrap(),
+        }
+    }
+
+    fn protection_at(addr: usize) -> region::Protection {
+        region::query(addr as *const u8).unwrap().protection()
     }
 
     #[test]
-    fn block_is_page_aligned_and_fills_whole_pages() {
-        let block = random_block();
-        let addr = block.0.as_ptr() as usize;
-        assert_eq!(addr % BLOCK_ALIGN, 0);
-        let page = region::page::size();
-        if page <= BLOCK_ALIGN {
-            assert_eq!(addr % page, 0);
-            assert_eq!(core::mem::size_of::<Block>() % page, 0);
-        } else {
-            let _q = quota();
-            assert_eq!(
-                Prekey::new().lock_status().unwrap_err().page_too_large(),
-                Some(page)
-            );
+    fn the_prekey_lies_between_noaccess_guard_pages_and_is_read_only() {
+        let _q = quota();
+        let prekey = Prekey::new();
+        let [below, block, above] = prekey.block.layout();
+        assert!(block.len() >= PREKEY_LEN);
+        assert_eq!(protection_at(below.start), region::Protection::NONE);
+        assert_eq!(protection_at(block.start), region::Protection::READ);
+        assert_eq!(protection_at(block.end - 1), region::Protection::READ);
+        assert_eq!(protection_at(above.start), region::Protection::NONE);
+        assert!(!prekey.is_idle_noaccess());
+    }
+
+    #[test]
+    fn an_idle_noaccess_prekey_is_noaccess_between_accesses() {
+        let _q = quota();
+        let prekey = Prekey::new_idle_noaccess();
+        assert!(prekey.is_idle_noaccess());
+        let block = prekey.block.layout()[1].clone();
+        assert_eq!(protection_at(block.start), region::Protection::NONE);
+        let salt = Prekey::fresh_salt();
+        let mut buf = *b"idle";
+        let tag = prekey.seal_in_place(&salt, &mut buf);
+        prekey.open_in_place(&salt, &tag, &mut buf);
+        assert_eq!(&buf, b"idle");
+        assert_eq!(protection_at(block.start), region::Protection::NONE);
+        if cfg!(windows) {
+            let err = prekey.lock_status().unwrap_err();
+            assert!(err.idle_noaccess());
+            assert_eq!(err.raw_os_error(), None);
         }
     }
 
     #[test]
-    fn a_failed_lock_is_reported_and_sealing_still_works() {
-        let _q = quota();
-        let prekey = Arc::new(Prekey::from_parts(
-            random_block(),
-            Err(LockError::from_region(&region::Error::SystemCall(1453))),
-        ));
-        let err = prekey.lock_status().unwrap_err();
-        assert_eq!(err.raw_os_error(), Some(1453));
-        assert_eq!(err.page_too_large(), None);
+    fn lock_errors_say_why_and_carry_no_address() {
+        let quota = LockError {
+            os_code: Some(1453),
+            idle_noaccess: false,
+            forked: false,
+        };
+        assert_eq!(quota.raw_os_error(), Some(1453));
+        assert!(!quota.idle_noaccess());
         assert_eq!(
-            format!("{err:?}"),
-            "LockError { os_code: Some(1453), page_size: None }"
+            format!("{quota:?}"),
+            "LockError { os_code: Some(1453), idle_noaccess: false, forked: false }"
         );
         assert_eq!(
-            err.to_string(),
+            quota.to_string(),
             "the sealed-memory pre-key could not be locked in RAM (OS error 1453)"
         );
-
-        let salt = Prekey::fresh_salt();
-        let mut buf = *b"still sealed";
-        let tag = prekey.seal_in_place(&salt, &mut buf);
-        assert_ne!(&buf, b"still sealed");
-        prekey.open_in_place(&salt, &tag, &mut buf);
-        assert_eq!(&buf, b"still sealed");
-    }
-
-    #[test]
-    fn a_non_os_lock_failure_has_no_code() {
-        let prekey = Prekey::from_parts(
-            random_block(),
-            Err(LockError::from_region(&region::Error::InvalidParameter(
-                "size",
-            ))),
-        );
-        let err = prekey.lock_status().unwrap_err();
-        assert_eq!(err.raw_os_error(), None);
+        let bare = LockError {
+            os_code: None,
+            idle_noaccess: false,
+            forked: false,
+        };
         assert_eq!(
-            format!("{err:?}"),
-            "LockError { os_code: None, page_size: None }"
+            bare.to_string(),
+            "the sealed-memory pre-key could not be locked in RAM"
+        );
+        let idle = LockError {
+            os_code: None,
+            idle_noaccess: true,
+            forked: false,
+        };
+        assert_eq!(
+            idle.to_string(),
+            "the sealed-memory pre-key is not locked in RAM: it is no-access while idle \
+             (Prekey::new_idle_noaccess), and on Windows a no-access page cannot stay locked"
+        );
+        let forked = LockError {
+            os_code: None,
+            idle_noaccess: false,
+            forked: true,
+        };
+        assert_eq!(
+            forked.to_string(),
+            "the sealed-memory pre-key is not locked in RAM in this process: it was made \
+             before a fork, and page locks are not inherited"
         );
     }
 
+    /// The derivation is the one rc.13 shipped, checked against a vector computed outside
+    /// Rust: Python's `hashlib.sha256(bytes([7]) * 32 + bytes(i % 251 for i in range(16384)))`.
     #[test]
-    fn wipe_and_unlock_zeroes_the_prekey_and_releases_the_lock() {
+    fn the_sealing_key_matches_an_independent_sha256_vector() {
         let _q = quota();
-        let lock = region::lock(core::ptr::null::<u8>(), 0).map_err(|_| ());
-        assert!(lock.is_err(), "a zero-length lock is rejected");
-        let block = random_block();
-        let guard = region::lock(block.0.as_ptr(), PREKEY_LEN);
-        // Other tests lock pages too and share the quota; a refused lock still exercises
-        // the wipe, and `tests/sealed_lock.rs` covers the unlock in a process of its own.
-        let locked = guard.is_ok();
-        let mut prekey = Prekey::from_parts(block, guard.map_err(|e| LockError::from_region(&e)));
-        assert!(prekey.block.0.iter().any(|&b| b != 0));
-        assert_eq!(prekey.lock.is_some(), locked);
-        prekey.wipe_and_unlock();
-        assert!(prekey.block.0.iter().all(|&b| b == 0));
-        assert!(prekey.lock.is_none());
-    }
-
-    /// Exhausts the lock quota with pre-keys whose blocks stay allocated, unlocks them,
-    /// and checks the quota came back. The blocks must stay allocated: on Windows freeing
-    /// one decommits its pages, which releases the lock with or without an unlock.
-    /// Every other pre-key test in this binary takes the same `quota()` guard, so this one
-    /// has the quota to itself; it still asks only that most of the freed quota be usable
-    /// again, and a missing unlock frees none of it.
-    #[test]
-    fn wipe_and_unlock_returns_the_quota() {
-        let _q = quota();
-        let mut held = Vec::new();
-        while held.len() < 1024 {
-            let block = random_block();
-            let lock = region::lock(block.0.as_ptr(), PREKEY_LEN);
-            let refused = lock.is_err();
-            held.push(Prekey::from_parts(
-                block,
-                lock.map_err(|e| LockError::from_region(&e)),
-            ));
-            if refused {
-                break;
-            }
-        }
-        let locked = held.iter().filter(|p| p.lock.is_some()).count();
-        if locked == held.len() {
-            return; // No refusal within the cap: this platform's quota is out of reach.
-        }
-        for p in &mut held {
-            p.wipe_and_unlock();
-        }
-        let relocked: Vec<_> = (0..locked)
-            .map(|_| {
-                let block = random_block();
-                let lock = region::lock(block.0.as_ptr(), PREKEY_LEN);
-                Prekey::from_parts(block, lock.map_err(|e| LockError::from_region(&e)))
-            })
-            .collect();
-        let ok = relocked.iter().filter(|p| p.lock.is_some()).count();
-        assert!(
-            ok * 2 >= locked,
-            "only {ok} of {locked} relocked after unlocking"
+        let bytes: [u8; PREKEY_LEN] = core::array::from_fn(|i| (i % 251) as u8);
+        let prekey = with_bytes(&bytes);
+        let key = prekey.sealing_key(&[7u8; SALT_LEN]).with_secret(|k| *k);
+        let hex: alloc::string::String = key.iter().map(|b| alloc::format!("{b:02x}")).collect();
+        assert_eq!(
+            hex,
+            "5fdf15d9989af9c0c55f07f7ba974f74ac47ada2c2b21a6e0539eaebd833cd62"
         );
-        drop(held);
     }
 
     #[test]
     fn the_sealing_key_depends_on_every_prekey_bit() {
         let _q = quota();
-        let mut prekey = Arc::try_unwrap(Prekey::new()).unwrap();
+        let bytes: [u8; PREKEY_LEN] = core::array::from_fn(|i| (i % 251) as u8);
+        let mut flipped = bytes;
+        flipped[PREKEY_LEN - 1] ^= 1;
         let salt = Prekey::fresh_salt();
-        let before = prekey.sealing_key(&salt);
-        prekey.block.0[PREKEY_LEN - 1] ^= 1;
-        let after = prekey.sealing_key(&salt);
-        assert_ne!(before.with_secret(|k| *k), after.with_secret(|k| *k));
+        let a = with_bytes(&bytes).sealing_key(&salt).with_secret(|k| *k);
+        let b = with_bytes(&flipped).sealing_key(&salt).with_secret(|k| *k);
+        assert_ne!(a, b);
     }
 
     #[test]
@@ -502,10 +568,12 @@ pub(crate) mod tests {
         let _q = quota();
         let prekey = Prekey::new();
         let salt = Prekey::fresh_salt();
-        let mut hasher = Sha256::new();
-        hasher.update(salt);
-        hasher.update(prekey.block.0);
-        let expected: [u8; 32] = hasher.finalize().into();
+        let expected: [u8; 32] = prekey.block.with(|pk| {
+            let mut hasher = Sha256::new();
+            hasher.update(salt);
+            hasher.update(pk);
+            hasher.finalize().into()
+        });
         assert_eq!(prekey.sealing_key(&salt).with_secret(|k| *k), expected);
     }
 
@@ -542,47 +610,9 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_page_larger_than_the_prekey_is_refused_without_locking() {
-        let block = random_block();
-        // The real lock would succeed on this machine's pages; a page larger than the
-        // block's alignment must not even try.
-        let too_large = BLOCK_ALIGN * 2;
-        let Err(refused) = lock_block(&block, too_large) else {
-            panic!("a page larger than the block's alignment must be refused");
-        };
-        assert_eq!(refused.page_too_large(), Some(too_large));
-        assert_eq!(refused.raw_os_error(), None);
-        assert_eq!(
-            refused.to_string(),
-            format!(
-                "the sealed-memory pre-key was not locked: the {too_large}-byte page would \
-                 be shared with other memory"
-            )
-        );
-        let prekey = Prekey::from_parts(block, Err(refused));
-        assert!(prekey.lock.is_none());
-        assert_eq!(
-            prekey.lock_status().unwrap_err().page_too_large(),
-            Some(too_large)
-        );
-    }
-
-    #[test]
-    fn a_page_no_larger_than_the_block_alignment_is_locked() {
-        let page = region::page::size();
-        if page > BLOCK_ALIGN {
-            // Locking here would take a page the block shares with other memory; the
-            // refusal test above covers this host.
-            return;
-        }
-        let _q = quota();
-        let block = random_block();
-        assert!(lock_block(&block, page).is_ok());
-    }
-
-    #[test]
     fn debug_is_redacted() {
         let _q = quota();
         assert_eq!(format!("{:?}", Prekey::new()), "[REDACTED]");
+        assert_eq!(format!("{:?}", Prekey::new_idle_noaccess()), "[REDACTED]");
     }
 }

@@ -1,0 +1,240 @@
+layout=block variant=cold seed=1 span=16384 gaps=[] cbufs_within_64k_below=9 capture_any=9 capture_full=9 max_captured=16384 nearest_cbuf_gap=11
+layout=block variant=cold seed=2 span=16384 gaps=[] cbufs_within_64k_below=22 capture_any=22 capture_full=22 max_captured=16384 nearest_cbuf_gap=38
+layout=block variant=cold seed=3 span=16384 gaps=[] cbufs_within_64k_below=20 capture_any=20 capture_full=20 max_captured=16384 nearest_cbuf_gap=15
+layout=block variant=cold seed=4 span=16384 gaps=[] cbufs_within_64k_below=9 capture_any=9 capture_full=9 max_captured=16384 nearest_cbuf_gap=23
+layout=block variant=cold seed=5 span=16384 gaps=[] cbufs_within_64k_below=8 capture_any=8 capture_full=8 max_captured=16384 nearest_cbuf_gap=17
+layout=block variant=cold seed=6 span=16384 gaps=[] cbufs_within_64k_below=28 capture_any=28 capture_full=28 max_captured=16384 nearest_cbuf_gap=19
+layout=block variant=cold seed=7 span=16384 gaps=[] cbufs_within_64k_below=22 capture_any=22 capture_full=22 max_captured=16384 nearest_cbuf_gap=20
+layout=block variant=cold seed=8 span=16384 gaps=[] cbufs_within_64k_below=11 capture_any=11 capture_full=11 max_captured=16384 nearest_cbuf_gap=14
+layout=block variant=cold seed=9 span=16384 gaps=[] cbufs_within_64k_below=40 capture_any=40 capture_full=40 max_captured=16384 nearest_cbuf_gap=19
+layout=block variant=cold seed=10 span=16384 gaps=[] cbufs_within_64k_below=22 capture_any=22 capture_full=22 max_captured=16384 nearest_cbuf_gap=28
+layout=block variant=cold seed=11 span=16384 gaps=[] cbufs_within_64k_below=9 capture_any=9 capture_full=9 max_captured=16384 nearest_cbuf_gap=9
+layout=block variant=cold seed=12 span=16384 gaps=[] cbufs_within_64k_below=9 capture_any=9 capture_full=9 max_captured=16384 nearest_cbuf_gap=17
+layout=block variant=cold seed=13 span=16384 gaps=[] cbufs_within_64k_below=10 capture_any=10 capture_full=10 max_captured=16384 nearest_cbuf_gap=33
+layout=block variant=cold seed=14 span=16384 gaps=[] cbufs_within_64k_below=32 capture_any=32 capture_full=32 max_captured=16384 nearest_cbuf_gap=29
+layout=block variant=cold seed=15 span=16384 gaps=[] cbufs_within_64k_below=27 capture_any=27 capture_full=27 max_captured=16384 nearest_cbuf_gap=26
+layout=block variant=cold seed=16 span=16384 gaps=[] cbufs_within_64k_below=27 capture_any=27 capture_full=27 max_captured=16384 nearest_cbuf_gap=39
+layout=block variant=cold seed=17 span=16384 gaps=[] cbufs_within_64k_below=10 capture_any=10 capture_full=10 max_captured=16384 nearest_cbuf_gap=17
+layout=block variant=cold seed=18 span=16384 gaps=[] cbufs_within_64k_below=11 capture_any=11 capture_full=11 max_captured=16384 nearest_cbuf_gap=37
+layout=block variant=cold seed=19 span=16384 gaps=[] cbufs_within_64k_below=36 capture_any=36 capture_full=36 max_captured=16384 nearest_cbuf_gap=31
+layout=block variant=cold seed=20 span=16384 gaps=[] cbufs_within_64k_below=24 capture_any=24 capture_full=24 max_captured=16384 nearest_cbuf_gap=16
+layout=block variant=warm seed=1 span=16384 gaps=[] cbufs_within_64k_below=16 capture_any=16 capture_full=14 max_captured=16384 nearest_cbuf_gap=32
+layout=block variant=warm seed=2 span=16384 gaps=[] cbufs_within_64k_below=15 capture_any=15 capture_full=13 max_captured=16384 nearest_cbuf_gap=8
+layout=block variant=warm seed=3 span=16384 gaps=[] cbufs_within_64k_below=12 capture_any=12 capture_full=8 max_captured=16384 nearest_cbuf_gap=11
+layout=block variant=warm seed=4 span=16384 gaps=[] cbufs_within_64k_below=26 capture_any=26 capture_full=24 max_captured=16384 nearest_cbuf_gap=12
+layout=block variant=warm seed=5 span=16384 gaps=[] cbufs_within_64k_below=9 capture_any=9 capture_full=8 max_captured=16384 nearest_cbuf_gap=15
+layout=block variant=warm seed=6 span=16384 gaps=[] cbufs_within_64k_below=6 capture_any=6 capture_full=5 max_captured=16384 nearest_cbuf_gap=11
+layout=block variant=warm seed=7 span=16384 gaps=[] cbufs_within_64k_below=16 capture_any=16 capture_full=14 max_captured=16384 nearest_cbuf_gap=14
+layout=block variant=warm seed=8 span=16384 gaps=[] cbufs_within_64k_below=21 capture_any=21 capture_full=6 max_captured=16384 nearest_cbuf_gap=32
+layout=block variant=warm seed=9 span=16384 gaps=[] cbufs_within_64k_below=20 capture_any=20 capture_full=19 max_captured=16384 nearest_cbuf_gap=21
+layout=block variant=warm seed=10 span=16384 gaps=[] cbufs_within_64k_below=17 capture_any=17 capture_full=17 max_captured=16384 nearest_cbuf_gap=30
+layout=block variant=warm seed=11 span=16384 gaps=[] cbufs_within_64k_below=13 capture_any=13 capture_full=7 max_captured=16384 nearest_cbuf_gap=14
+layout=block variant=warm seed=12 span=16384 gaps=[] cbufs_within_64k_below=17 capture_any=17 capture_full=17 max_captured=16384 nearest_cbuf_gap=88
+layout=block variant=warm seed=13 span=16384 gaps=[] cbufs_within_64k_below=5 capture_any=5 capture_full=4 max_captured=16384 nearest_cbuf_gap=35
+layout=block variant=warm seed=14 span=16384 gaps=[] cbufs_within_64k_below=16 capture_any=16 capture_full=16 max_captured=16384 nearest_cbuf_gap=10
+layout=block variant=warm seed=15 span=16384 gaps=[] cbufs_within_64k_below=5 capture_any=5 capture_full=4 max_captured=16384 nearest_cbuf_gap=36
+layout=block variant=warm seed=16 span=16384 gaps=[] cbufs_within_64k_below=7 capture_any=7 capture_full=5 max_captured=16384 nearest_cbuf_gap=22
+layout=block variant=warm seed=17 span=16384 gaps=[] cbufs_within_64k_below=11 capture_any=11 capture_full=10 max_captured=16384 nearest_cbuf_gap=38
+layout=block variant=warm seed=18 span=16384 gaps=[] cbufs_within_64k_below=16 capture_any=16 capture_full=15 max_captured=16384 nearest_cbuf_gap=14
+layout=block variant=warm seed=19 span=16384 gaps=[] cbufs_within_64k_below=18 capture_any=18 capture_full=15 max_captured=16384 nearest_cbuf_gap=23
+layout=block variant=warm seed=20 span=16384 gaps=[] cbufs_within_64k_below=20 capture_any=20 capture_full=14 max_captured=16384 nearest_cbuf_gap=23
+layout=block variant=interleaved seed=1 span=16384 gaps=[] cbufs_within_64k_below=16 capture_any=16 capture_full=14 max_captured=16384 nearest_cbuf_gap=32
+layout=block variant=interleaved seed=2 span=16384 gaps=[] cbufs_within_64k_below=11 capture_any=11 capture_full=9 max_captured=16384 nearest_cbuf_gap=21
+layout=block variant=interleaved seed=3 span=16384 gaps=[] cbufs_within_64k_below=16 capture_any=16 capture_full=9 max_captured=16384 nearest_cbuf_gap=38
+layout=block variant=interleaved seed=4 span=16384 gaps=[] cbufs_within_64k_below=26 capture_any=26 capture_full=24 max_captured=16384 nearest_cbuf_gap=12
+layout=block variant=interleaved seed=5 span=16384 gaps=[] cbufs_within_64k_below=9 capture_any=9 capture_full=8 max_captured=16384 nearest_cbuf_gap=15
+layout=block variant=interleaved seed=6 span=16384 gaps=[] cbufs_within_64k_below=6 capture_any=6 capture_full=6 max_captured=16384 nearest_cbuf_gap=39
+layout=block variant=interleaved seed=7 span=16384 gaps=[] cbufs_within_64k_below=21 capture_any=21 capture_full=18 max_captured=16384 nearest_cbuf_gap=14
+layout=block variant=interleaved seed=8 span=16384 gaps=[] cbufs_within_64k_below=12 capture_any=12 capture_full=5 max_captured=16384 nearest_cbuf_gap=20
+layout=block variant=interleaved seed=9 span=16384 gaps=[] cbufs_within_64k_below=19 capture_any=19 capture_full=19 max_captured=16384 nearest_cbuf_gap=13
+layout=block variant=interleaved seed=10 span=16384 gaps=[] cbufs_within_64k_below=14 capture_any=14 capture_full=13 max_captured=16384 nearest_cbuf_gap=33
+layout=block variant=interleaved seed=11 span=16384 gaps=[] cbufs_within_64k_below=13 capture_any=13 capture_full=10 max_captured=16384 nearest_cbuf_gap=14
+layout=block variant=interleaved seed=12 span=16384 gaps=[] cbufs_within_64k_below=8 capture_any=8 capture_full=7 max_captured=16384 nearest_cbuf_gap=21
+layout=block variant=interleaved seed=13 span=16384 gaps=[] cbufs_within_64k_below=7 capture_any=7 capture_full=6 max_captured=16384 nearest_cbuf_gap=23
+layout=block variant=interleaved seed=14 span=16384 gaps=[] cbufs_within_64k_below=20 capture_any=20 capture_full=16 max_captured=16384 nearest_cbuf_gap=16
+layout=block variant=interleaved seed=15 span=16384 gaps=[] cbufs_within_64k_below=7 capture_any=7 capture_full=6 max_captured=16384 nearest_cbuf_gap=26
+layout=block variant=interleaved seed=16 span=16384 gaps=[] cbufs_within_64k_below=8 capture_any=8 capture_full=5 max_captured=16384 nearest_cbuf_gap=19
+layout=block variant=interleaved seed=17 span=16384 gaps=[] cbufs_within_64k_below=9 capture_any=9 capture_full=8 max_captured=16384 nearest_cbuf_gap=15
+layout=block variant=interleaved seed=18 span=16384 gaps=[] cbufs_within_64k_below=16 capture_any=16 capture_full=15 max_captured=16384 nearest_cbuf_gap=14
+layout=block variant=interleaved seed=19 span=16384 gaps=[] cbufs_within_64k_below=18 capture_any=18 capture_full=15 max_captured=16384 nearest_cbuf_gap=23
+layout=block variant=interleaved seed=20 span=16384 gaps=[] cbufs_within_64k_below=24 capture_any=24 capture_full=15 max_captured=16384 nearest_cbuf_gap=17
+layout=split variant=cold seed=1 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=29 capture_any=29 capture_full=6 max_captured=16384 nearest_cbuf_gap=27
+layout=split variant=cold seed=2 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=36 capture_any=36 capture_full=8 max_captured=16384 nearest_cbuf_gap=19
+layout=split variant=cold seed=3 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=38 capture_any=38 capture_full=7 max_captured=16384 nearest_cbuf_gap=20
+layout=split variant=cold seed=4 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=38 capture_any=38 capture_full=7 max_captured=16384 nearest_cbuf_gap=26
+layout=split variant=cold seed=5 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=33 capture_any=33 capture_full=8 max_captured=16384 nearest_cbuf_gap=26
+layout=split variant=cold seed=6 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=35 capture_any=35 capture_full=8 max_captured=16384 nearest_cbuf_gap=21
+layout=split variant=cold seed=7 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=26 capture_any=26 capture_full=6 max_captured=16384 nearest_cbuf_gap=36
+layout=split variant=cold seed=8 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=41 capture_any=41 capture_full=8 max_captured=16384 nearest_cbuf_gap=29
+layout=split variant=cold seed=9 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=43 capture_any=43 capture_full=8 max_captured=16384 nearest_cbuf_gap=19
+layout=split variant=cold seed=10 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=31 capture_any=31 capture_full=6 max_captured=16384 nearest_cbuf_gap=35
+layout=split variant=cold seed=11 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=34 capture_any=34 capture_full=7 max_captured=16384 nearest_cbuf_gap=25
+layout=split variant=cold seed=12 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=45 capture_any=45 capture_full=6 max_captured=16384 nearest_cbuf_gap=34
+layout=split variant=cold seed=13 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=25 capture_any=25 capture_full=8 max_captured=16384 nearest_cbuf_gap=33
+layout=split variant=cold seed=14 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=35 capture_any=35 capture_full=8 max_captured=16384 nearest_cbuf_gap=20
+layout=split variant=cold seed=15 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=46 capture_any=46 capture_full=8 max_captured=16384 nearest_cbuf_gap=12
+layout=split variant=cold seed=16 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=34 capture_any=34 capture_full=7 max_captured=16384 nearest_cbuf_gap=25
+layout=split variant=cold seed=17 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=37 capture_any=37 capture_full=9 max_captured=16384 nearest_cbuf_gap=11
+layout=split variant=cold seed=18 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=36 capture_any=36 capture_full=9 max_captured=16384 nearest_cbuf_gap=30
+layout=split variant=cold seed=19 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=40 capture_any=40 capture_full=9 max_captured=16384 nearest_cbuf_gap=37
+layout=split variant=cold seed=20 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=30 capture_any=30 capture_full=6 max_captured=16384 nearest_cbuf_gap=9
+layout=split variant=warm seed=1 span=905216 gaps=[880640, 4096, 4096] cbufs_within_64k_below=295 capture_any=86 capture_full=0 max_captured=12288 nearest_cbuf_gap=38
+layout=split variant=warm seed=2 span=1056768 gaps=[1032192, 4096, 4096] cbufs_within_64k_below=288 capture_any=50 capture_full=0 max_captured=12288 nearest_cbuf_gap=22
+layout=split variant=warm seed=3 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=25 capture_any=25 capture_full=6 max_captured=16384 nearest_cbuf_gap=14
+layout=split variant=warm seed=4 span=983040 gaps=[958464, 4096, 4096] cbufs_within_64k_below=250 capture_any=39 capture_full=0 max_captured=12288 nearest_cbuf_gap=10
+layout=split variant=warm seed=5 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=18 capture_any=18 capture_full=10 max_captured=16384 nearest_cbuf_gap=21
+layout=split variant=warm seed=6 span=262144 gaps=[106496, 135168, 4096] cbufs_within_64k_below=81 capture_any=44 capture_full=0 max_captured=8192 nearest_cbuf_gap=15
+layout=split variant=warm seed=7 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=32 capture_any=32 capture_full=20 max_captured=16384 nearest_cbuf_gap=12
+layout=split variant=warm seed=8 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=34 capture_any=34 capture_full=4 max_captured=16384 nearest_cbuf_gap=35
+layout=split variant=warm seed=9 span=266240 gaps=[4096, 241664, 4096] cbufs_within_64k_below=75 capture_any=55 capture_full=0 max_captured=8192 nearest_cbuf_gap=21
+layout=split variant=warm seed=10 span=651264 gaps=[4096, 626688, 4096] cbufs_within_64k_below=166 capture_any=44 capture_full=0 max_captured=8192 nearest_cbuf_gap=28
+layout=split variant=warm seed=11 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=37 capture_any=37 capture_full=22 max_captured=16384 nearest_cbuf_gap=11
+layout=split variant=warm seed=12 span=176128 gaps=[4096, 151552, 4096] cbufs_within_64k_below=72 capture_any=48 capture_full=0 max_captured=8192 nearest_cbuf_gap=19
+layout=split variant=warm seed=13 span=237568 gaps=[4096, 4096, 212992] cbufs_within_64k_below=79 capture_any=39 capture_full=0 max_captured=12288 nearest_cbuf_gap=23
+layout=split variant=warm seed=14 span=585728 gaps=[561152, 4096, 4096] cbufs_within_64k_below=177 capture_any=58 capture_full=0 max_captured=12288 nearest_cbuf_gap=38
+layout=split variant=warm seed=15 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=20 capture_any=20 capture_full=5 max_captured=16384 nearest_cbuf_gap=14
+layout=split variant=warm seed=16 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=18 capture_any=18 capture_full=1 max_captured=16384 nearest_cbuf_gap=474
+layout=split variant=warm seed=17 span=397312 gaps=[372736, 4096, 4096] cbufs_within_64k_below=62 capture_any=20 capture_full=0 max_captured=12288 nearest_cbuf_gap=18
+layout=split variant=warm seed=18 span=126976 gaps=[102400, 4096, 4096] cbufs_within_64k_below=51 capture_any=42 capture_full=0 max_captured=12288 nearest_cbuf_gap=15
+layout=split variant=warm seed=19 span=671744 gaps=[4096, 643072, 8192] cbufs_within_64k_below=159 capture_any=40 capture_full=0 max_captured=8192 nearest_cbuf_gap=21
+layout=split variant=warm seed=20 span=1044480 gaps=[266240, 757760, 4096] cbufs_within_64k_below=416 capture_any=49 capture_full=0 max_captured=8192 nearest_cbuf_gap=10
+layout=split variant=interleaved seed=1 span=1007616 gaps=[897024, 28672, 65536] cbufs_within_64k_below=328 capture_any=107 capture_full=0 max_captured=8192 nearest_cbuf_gap=17
+layout=split variant=interleaved seed=2 span=1212416 gaps=[1085440, 73728, 36864] cbufs_within_64k_below=309 capture_any=55 capture_full=0 max_captured=8192 nearest_cbuf_gap=19
+layout=split variant=interleaved seed=3 span=143360 gaps=[86016, 20480, 20480] cbufs_within_64k_below=38 capture_any=36 capture_full=0 max_captured=12288 nearest_cbuf_gap=9
+layout=split variant=interleaved seed=4 span=1073152 gaps=[966656, 81920, 8192] cbufs_within_64k_below=259 capture_any=57 capture_full=0 max_captured=8192 nearest_cbuf_gap=20
+layout=split variant=interleaved seed=5 span=143360 gaps=[36864, 45056, 45056] cbufs_within_64k_below=44 capture_any=44 capture_full=0 max_captured=8192 nearest_cbuf_gap=11
+layout=split variant=interleaved seed=6 span=675840 gaps=[634880, 12288, 12288] cbufs_within_64k_below=168 capture_any=45 capture_full=0 max_captured=12288 nearest_cbuf_gap=8
+layout=split variant=interleaved seed=7 span=180224 gaps=[36864, 28672, 98304] cbufs_within_64k_below=41 capture_any=39 capture_full=0 max_captured=8192 nearest_cbuf_gap=17
+layout=split variant=interleaved seed=8 span=159744 gaps=[36864, 65536, 40960] cbufs_within_64k_below=83 capture_any=83 capture_full=0 max_captured=8192 nearest_cbuf_gap=178
+layout=split variant=interleaved seed=9 span=327680 gaps=[4096, 290816, 16384] cbufs_within_64k_below=95 capture_any=47 capture_full=0 max_captured=8192 nearest_cbuf_gap=34
+layout=split variant=interleaved seed=10 span=974848 gaps=[684032, 262144, 12288] cbufs_within_64k_below=230 capture_any=55 capture_full=0 max_captured=8192 nearest_cbuf_gap=19
+layout=split variant=interleaved seed=11 span=380928 gaps=[4096, 319488, 40960] cbufs_within_64k_below=83 capture_any=40 capture_full=0 max_captured=8192 nearest_cbuf_gap=21
+layout=split variant=interleaved seed=12 span=245760 gaps=[159744, 32768, 36864] cbufs_within_64k_below=77 capture_any=55 capture_full=0 max_captured=8192 nearest_cbuf_gap=10
+layout=split variant=interleaved seed=13 span=729088 gaps=[217088, 462848, 32768] cbufs_within_64k_below=220 capture_any=50 capture_full=0 max_captured=8192 nearest_cbuf_gap=20
+layout=split variant=interleaved seed=14 span=753664 gaps=[630784, 32768, 73728] cbufs_within_64k_below=206 capture_any=80 capture_full=0 max_captured=8192 nearest_cbuf_gap=35
+layout=split variant=interleaved seed=15 span=151552 gaps=[81920, 28672, 24576] cbufs_within_64k_below=60 capture_any=53 capture_full=0 max_captured=12192 nearest_cbuf_gap=29
+layout=split variant=interleaved seed=16 span=139264 gaps=[45056, 53248, 24576] cbufs_within_64k_below=39 capture_any=39 capture_full=0 max_captured=8192 nearest_cbuf_gap=8
+layout=split variant=interleaved seed=17 span=466944 gaps=[421888, 24576, 4096] cbufs_within_64k_below=110 capture_any=49 capture_full=0 max_captured=12288 nearest_cbuf_gap=8
+layout=split variant=interleaved seed=18 span=270336 gaps=[159744, 45056, 49152] cbufs_within_64k_below=71 capture_any=57 capture_full=0 max_captured=8192 nearest_cbuf_gap=14
+layout=split variant=interleaved seed=19 span=106496 gaps=[28672, 20480, 40960] cbufs_within_64k_below=72 capture_any=72 capture_full=0 max_captured=12288 nearest_cbuf_gap=37
+layout=split variant=interleaved seed=20 span=1077248 gaps=[266240, 786432, 8192] cbufs_within_64k_below=431 capture_any=47 capture_full=0 max_captured=8192 nearest_cbuf_gap=23
+layout=bare variant=cold seed=1 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=29623661298233
+layout=bare variant=cold seed=2 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=25006530926882
+layout=bare variant=cold seed=3 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=44940738480309
+layout=bare variant=cold seed=4 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=19173887700761
+layout=bare variant=cold seed=5 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=17838152459963
+layout=bare variant=cold seed=6 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=31749102248059
+layout=bare variant=cold seed=7 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=30175480930763
+layout=bare variant=cold seed=8 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=30479847880194
+layout=bare variant=cold seed=9 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=35112793714352
+layout=bare variant=cold seed=10 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=27076698446788
+layout=bare variant=cold seed=11 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=34512693940510
+layout=bare variant=cold seed=12 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=18664209240567
+layout=bare variant=cold seed=13 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=27491660810270
+layout=bare variant=cold seed=14 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=34149746409602
+layout=bare variant=cold seed=15 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=14142197518606
+layout=bare variant=cold seed=16 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=29965828513164
+layout=bare variant=cold seed=17 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=30332352892944
+layout=bare variant=cold seed=18 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=34968903235818
+layout=bare variant=cold seed=19 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=40821850080485
+layout=bare variant=cold seed=20 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=24849931655040
+layout=bare variant=warm seed=1 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=28626639057802
+layout=bare variant=warm seed=2 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=21347388738035
+layout=bare variant=warm seed=3 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=28416617901904
+layout=bare variant=warm seed=4 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=41988484410449
+layout=bare variant=warm seed=5 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=34308266040160
+layout=bare variant=warm seed=6 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=35284488330177
+layout=bare variant=warm seed=7 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=25862035018089
+layout=bare variant=warm seed=8 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=31042860748938
+layout=bare variant=warm seed=9 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=40595123861760
+layout=bare variant=warm seed=10 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=27742582421749
+layout=bare variant=warm seed=11 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=39061539211286
+layout=bare variant=warm seed=12 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=31331818866763
+layout=bare variant=warm seed=13 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=30476861528243
+layout=bare variant=warm seed=14 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=41850067149761
+layout=bare variant=warm seed=15 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=31418964066947
+layout=bare variant=warm seed=16 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=41351704278443
+layout=bare variant=warm seed=17 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=19018313169805
+layout=bare variant=warm seed=18 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=35965206173366
+layout=bare variant=warm seed=19 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=37755181833010
+layout=bare variant=warm seed=20 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=20031760164109
+layout=bare variant=interleaved seed=1 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=31249465295754
+layout=bare variant=interleaved seed=2 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=31237820221939
+layout=bare variant=interleaved seed=3 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=31944737185616
+layout=bare variant=interleaved seed=4 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=32724761951313
+layout=bare variant=interleaved seed=5 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=14962282650464
+layout=bare variant=interleaved seed=6 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=25288127167425
+layout=bare variant=interleaved seed=7 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=25994682020201
+layout=bare variant=interleaved seed=8 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=36446209884298
+layout=bare variant=interleaved seed=9 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=25819355371776
+layout=bare variant=interleaved seed=10 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=33166263793909
+layout=bare variant=interleaved seed=11 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=28561823578134
+layout=bare variant=interleaved seed=12 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=31113655654475
+layout=bare variant=interleaved seed=13 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=31897775458483
+layout=bare variant=interleaved seed=14 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=20441915306945
+layout=bare variant=interleaved seed=15 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=26039704261251
+layout=bare variant=interleaved seed=16 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=42957504972203
+layout=bare variant=interleaved seed=17 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=40484996643725
+layout=bare variant=interleaved seed=18 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=17031370094262
+layout=bare variant=interleaved seed=19 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=28388876806962
+layout=bare variant=interleaved seed=20 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=30281723184397
+layout=guarded variant=cold seed=1 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=14086310249017
+layout=guarded variant=cold seed=2 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=19369224042786
+layout=guarded variant=cold seed=3 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=35408247908533
+layout=guarded variant=cold seed=4 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=43350191238937
+layout=guarded variant=cold seed=5 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=42920357734075
+layout=guarded variant=cold seed=6 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=25413532307579
+layout=guarded variant=cold seed=7 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=36944549585355
+layout=guarded variant=cold seed=8 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=26167877023234
+layout=guarded variant=cold seed=9 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=17511650467504
+layout=guarded variant=cold seed=10 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=18194185702340
+layout=guarded variant=cold seed=11 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=24115957711134
+layout=guarded variant=cold seed=12 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=33869910917623
+layout=guarded variant=cold seed=13 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=19651551156254
+layout=guarded variant=cold seed=14 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=37892310368386
+layout=guarded variant=cold seed=15 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=22392505155854
+layout=guarded variant=cold seed=16 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=21842645777804
+layout=guarded variant=cold seed=17 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=27831371239440
+layout=guarded variant=cold seed=18 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=33443125061866
+layout=guarded variant=cold seed=19 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=14947891979493
+layout=guarded variant=cold seed=20 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=36019494078336
+layout=guarded variant=warm seed=1 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=16509900456842
+layout=guarded variant=warm seed=2 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=37402628671987
+layout=guarded variant=warm seed=3 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=27710066794320
+layout=guarded variant=warm seed=4 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=29514097781841
+layout=guarded variant=warm seed=5 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=28632627743584
+layout=guarded variant=warm seed=6 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=32698844838849
+layout=guarded variant=warm seed=7 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=28943727354217
+layout=guarded variant=warm seed=8 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=32401292075146
+layout=guarded variant=warm seed=9 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=22816121841920
+layout=guarded variant=warm seed=10 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=19631197993205
+layout=guarded variant=warm seed=11 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=31835741501462
+layout=guarded variant=warm seed=12 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=23694062979147
+layout=guarded variant=warm seed=13 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=35663955962035
+layout=guarded variant=warm seed=14 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=27920403588033
+layout=guarded variant=warm seed=15 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=39235565728387
+layout=guarded variant=warm seed=16 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=26087195723179
+layout=guarded variant=warm seed=17 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=27223559162765
+layout=guarded variant=warm seed=18 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=25003523249846
+layout=guarded variant=warm seed=19 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=17406467627826
+layout=guarded variant=warm seed=20 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=22381833188621
+layout=guarded variant=interleaved seed=1 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=22121109394314
+layout=guarded variant=interleaved seed=2 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=36213033146867
+layout=guarded variant=interleaved seed=3 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=33047042600784
+layout=guarded variant=interleaved seed=4 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=26080966077521
+layout=guarded variant=interleaved seed=5 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=43590672042848
+layout=guarded variant=interleaved seed=6 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=44502083165121
+layout=guarded variant=interleaved seed=7 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=42869932630377
+layout=guarded variant=interleaved seed=8 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=21437239128202
+layout=guarded variant=interleaved seed=9 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=26248364251392
+layout=guarded variant=interleaved seed=10 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=27908787362037
+layout=guarded variant=interleaved seed=11 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=34577034278934
+layout=guarded variant=interleaved seed=12 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=36305347246155
+layout=guarded variant=interleaved seed=13 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=32829083625651
+layout=guarded variant=interleaved seed=14 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=36287108944833
+layout=guarded variant=interleaved seed=15 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=28497081201283
+layout=guarded variant=interleaved seed=16 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=23726895596971
+layout=guarded variant=interleaved seed=17 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=44119217478541
+layout=guarded variant=interleaved seed=18 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=31136767231670
+layout=guarded variant=interleaved seed=19 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=37048019372850
+layout=guarded variant=interleaved seed=20 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=31725198701837

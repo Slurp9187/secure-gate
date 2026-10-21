@@ -1,0 +1,18 @@
+quota not reached at 64 blocks (Linux limit high); continuing
+cycle: READ_WRITE -> Protection(READ) -> READ
+linux lo flag before NONE: true
+linux lo flag while NONE: true
+extra lock while all NONE: SUCCEEDED (quota freed => locks dropped?)
+linux lo flag after READ again: true
+extra lock after READ again: SUCCEEDED
+after NONE/READ cycle: unlock ok=64 not-locked=0
+
+quota not reached at 64 blocks (Linux limit high); continuing
+cycle: READ_WRITE -> Protection(0x0) -> READ
+linux lo flag before NONE: true
+linux lo flag while NONE: true
+extra lock while all NONE: SUCCEEDED (quota freed => locks dropped?)
+linux lo flag after READ again: true
+extra lock after READ again: SUCCEEDED
+after NONE/READ cycle: unlock ok=64 not-locked=0
+

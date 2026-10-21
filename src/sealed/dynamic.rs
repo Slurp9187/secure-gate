@@ -150,8 +150,7 @@ impl<T: SealedPayload> SealedDynamic<T> {
             let result =
                 crate::RevealSecretMut::with_secret_mut(&mut plain, |buf| f(T::view_mut(buf)));
             let salt = Prekey::fresh_salt();
-            plain.with_secret(|p| self.ct.copy_from_slice(p));
-            self.tag = self.prekey.seal_in_place(&salt, &mut self.ct);
+            self.tag = plain.with_secret(|p| self.prekey.seal_into(&salt, p, &mut self.ct));
             self.salt = salt;
             result
         })
@@ -233,6 +232,29 @@ mod tests {
         assert_ne!(&*a.ct, &[7u8; 40][..]);
         assert_ne!(a.salt, b.salt);
         assert_ne!(a.ct, b.ct);
+    }
+
+    /// As for `SealedFixed`: a re-seal whose key derivation fails leaves the old
+    /// ciphertext, never the new plaintext.
+    #[test]
+    fn a_failed_reseal_leaves_ciphertext_not_plaintext() {
+        let _q = quota();
+        let prekey = Prekey::new();
+        let mut s = SealedDynamic::seal(Dynamic::<Vec<u8>>::new(vec![0x42u8; 40]), &prekey);
+        let before = s.ct.clone();
+        let r = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
+            s.with_secret_mut(|b| {
+                b.fill(0x99);
+                crate::sealed::prekey::tests::fail_next_derivation();
+            });
+        }));
+        assert!(r.is_err());
+        assert!(
+            s.ct.iter().any(|&x| x != 0x99),
+            "the new plaintext was left in the ciphertext"
+        );
+        assert_eq!(s.ct, before);
+        s.with_secret(|b| assert_eq!(b.as_slice(), &[0x42u8; 40]));
     }
 
     #[test]

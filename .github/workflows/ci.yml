@@ -453,3 +453,58 @@ jobs:
 
       - name: cargo fmt --check
         run: cargo fmt --manifest-path residue-probe/Cargo.toml --check
+
+  # ---------------------------------------------------------------------------
+  # guarded-block job — the crate that holds the sealed pre-key's `unsafe`
+  #
+  # Excluded from the root workspace like residue-probe, so no other job builds it on its
+  # own terms. Its behavior is per operating system (guard pages, locks that survive or not
+  # across a protection change, MADV_DONTDUMP on Linux), so it runs on all three, at the MSRV
+  # and on stable. The sealed tests of this crate, which sit on top of it, run beside it:
+  # every other job is Ubuntu-only.
+  # ---------------------------------------------------------------------------
+  guarded-block:
+    name: guarded-block – ${{ matrix.os }}, ${{ matrix.toolchain }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        toolchain: [stable, "1.85"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust ${{ matrix.toolchain }}
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          components: clippy, rustfmt
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            guarded-block
+            .
+
+      - name: cargo test (guarded-block)
+        run: cargo test --manifest-path guarded-block/Cargo.toml
+
+      - name: cargo clippy (guarded-block)
+        if: matrix.toolchain == 'stable'
+        run: cargo clippy --manifest-path guarded-block/Cargo.toml --all-targets -- -D warnings
+
+      - name: cargo fmt --check (guarded-block)
+        if: matrix.toolchain == 'stable'
+        run: cargo fmt --manifest-path guarded-block/Cargo.toml --check
+
+      - name: cargo doc (guarded-block)
+        if: matrix.toolchain == 'stable'
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --manifest-path guarded-block/Cargo.toml --no-deps
+
+      - name: secure-gate sealed tests on this OS
+        run: cargo test --features sealed --lib --test sealed --test sealed_lock --test sealed_glob_import

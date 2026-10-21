@@ -1,0 +1,26 @@
+filled quota with 11 locked blocks (System call failed: Insufficient quota to complete the requested service. (os error 1453))
+cycle: READ_WRITE -> Protection(READ) -> READ
+extra lock while all NONE: refused (quota still held)
+extra lock after READ again: refused
+after NONE/READ cycle: unlock ok=11 not-locked=0
+
+filled quota with 11 locked blocks (System call failed: Insufficient quota to complete the requested service. (os error 1453))
+cycle: READ_WRITE -> Protection(0x0) -> READ
+extra lock while all NONE: SUCCEEDED (quota freed => locks dropped?)
+extra lock after READ again: SUCCEEDED
+first unlock error: System call failed: The segment is already unlocked. (os error 158)
+after NONE/READ cycle: unlock ok=0 not-locked=11
+
+filled quota with 11 locked blocks (System call failed: Insufficient quota to complete the requested service. (os error 1453))
+cycle: READ_WRITE -> Protection(READ) -> READ
+extra lock while all NONE: refused (quota still held)
+extra lock after READ again: refused
+after NONE/READ cycle: unlock ok=11 not-locked=0
+
+filled quota with 11 locked blocks (System call failed: Insufficient quota to complete the requested service. (os error 1453))
+cycle: READ_WRITE -> Protection(0x0) -> READ
+extra lock while all NONE: SUCCEEDED (quota freed => locks dropped?)
+extra lock after READ again: SUCCEEDED
+first unlock error: System call failed: The segment is already unlocked. (os error 158)
+after NONE/READ cycle: unlock ok=0 not-locked=11
+

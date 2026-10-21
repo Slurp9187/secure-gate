@@ -1,6 +1,6 @@
 [package]
 name = "secure-gate"
-version = "0.9.0-rc.14"
+version = "0.9.0-rc.15"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -24,12 +24,15 @@ include = [
 [dependencies]
 base16ct = { version = "1", optional = true, default-features = false }
 # The three `sealed` dependencies. ChaCha20-Poly1305 seals, SHA-256 derives each object's
-# sealing key from the pre-key, and `region` locks the pre-key's pages in RAM. `region::lock`
-# is a safe function, so the `unsafe` it needs stays in that crate and this one keeps
-# `#![forbid(unsafe_code)]`. `zeroize` on the first two wipes the cipher's copy of the key and
-# the hasher's state when they drop. All three declare `rust-version = "1.85"`.
+# sealing key from the pre-key, and `guarded-block` holds the pre-key: its own mapping between
+# no-access guard pages, read-only and locked in RAM. `guarded-block` is this repository's
+# own crate (`guarded-block/`), published separately so the `unsafe` page protection needs
+# lives there and this crate keeps `#![forbid(unsafe_code)]`; the path is for local builds
+# and CI, the version is what the published manifest keeps. `zeroize` on the first two wipes
+# the cipher's copy of the key and the hasher's state when they drop. All three declare
+# `rust-version = "1.85"`.
 chacha20poly1305 = { version = "0.11", optional = true, default-features = false, features = ["zeroize"] }
-region = { version = "4.0.1", optional = true, default-features = false }
+guarded-block = { version = "0.1.0", path = "guarded-block", optional = true }
 sha2 = { version = "0.11", optional = true, default-features = false, features = ["zeroize"] }
 # `default-features = false` is a no-op for base32ct (it has none), but keeps the
 # three `*ct` lines uniform. The `0.3.1` floor is load-bearing rather than
@@ -85,6 +88,10 @@ zeroizing-alloc = "0.1.1"
 # the mechanism instead of two that can drift. A path-only dev-dependency: it is dropped from
 # the published manifest, and `tests/` does not ship, so it cannot reach a consumer's build.
 secure-gate-residue-probe = { path = "residue-probe" }
+# Reads page protections back in the `sealed` unit tests (`region::query`), to check the
+# pre-key's guard pages and read-only block. Tests only; the library reaches `region` through
+# `guarded-block`.
+region = { version = "4.0.1", default-features = false }
 
 [package.metadata.docs.rs]
 all-features = true
@@ -131,7 +138,7 @@ encoding-bech32 = ["dep:bech32"]
 # Sealed: secrets held encrypted in RAM while idle (`SealedFixed`, `SealedDynamic`),
 # opened for one closure call at a time. Needs `std` for the lockable, wipeable pre-key and
 # `rand` for its bytes and every seal's salt. Not part of `full`, which excludes `std`.
-sealed = ["std", "rand", "dep:chacha20poly1305", "dep:sha2", "dep:region"]
+sealed = ["std", "rand", "dep:chacha20poly1305", "dep:sha2", "dep:guarded-block"]
 
 # Cloneable: opt-in cloning
 cloneable = []
@@ -174,8 +181,9 @@ required-features = ["sealed"]
 name = "serde"
 harness = false
 
-# The nested `fuzz` and `residue-probe` crates each declare their own `[workspace]`;
-# excluding them here keeps `cargo` from trying to pull libfuzzer -- or a crate whose whole
-# job is to install a `#[global_allocator]` -- into this package's graph.
+# The nested `fuzz`, `residue-probe` and `guarded-block` crates each declare their own
+# `[workspace]`; excluding them here keeps `cargo` from trying to pull libfuzzer -- or a crate
+# whose whole job is to install a `#[global_allocator]` -- into this package's graph, and keeps
+# `guarded-block`'s `unsafe` built and linted on its own terms.
 [workspace]
-exclude = ["fuzz", "residue-probe"]
+exclude = ["fuzz", "residue-probe", "guarded-block"]

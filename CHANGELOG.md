@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0-rc.15] - Unreleased
+
+### Security
+- **The sealed-memory pre-key now lives off the heap, between no-access guard pages.** A
+  linear over-read by C code in the same process (Heartbleed-style; a consumer links
+  SQLCipher and OpenSSL) reached it before: measured, a 64 KiB read from a live C `malloc`
+  buffer captured the whole heap-held pre-key in 60 of 60 runs on Windows and on Linux. The
+  pre-key is now in a mapping of its own, laid out as a no-access guard page, its pages, and a
+  no-access guard page; it is read-only once filled, still locked, and on Linux marked
+  `MADV_DONTDUMP` so the kernel leaves it out of core dumps (the flag was checked; no core
+  dump was taken). Measured: off the heap, no run captured any of it (a mapping without guard
+  pages did not either: no C buffer sat against it); and with readable memory placed directly
+  below and above it, a 64 KiB read faults on the guard page, where the same read of an
+  unguarded mapping takes all 16 KiB. The
+  derivation (`SHA-256(salt ‖ pre-key)`) is unchanged, pinned by a vector computed outside
+  Rust; the locked quota is unchanged (11 pre-keys under Windows' default); so is the cost per
+  access. The requested alternative, splitting the pre-key into four heap pages, was measured
+  first and still fully captured in 26 of 60 runs on Windows and 27 of 60 on Linux, partly in
+  every run. The
+  `unsafe` this needs is in a new crate in this repository, `guarded-block`, published
+  separately, so this crate keeps `#![forbid(unsafe_code)]`; `sealed` depends on it in place of
+  `region`. Probe and raw output: `docs/design/receipts/guarded-prekey/`.
+
+### Added
+- **`Prekey::new_idle_noaccess()`**, and `Prekey::is_idle_noaccess()`: the pre-key is also
+  no-access except while a sealing key is derived from it. On Windows that keeps it out of
+  other processes' `ReadProcessMemory` and out of a full-memory crash dump taken while it is
+  idle (measured). It cannot also be locked there: a no-access page leaves the working set and
+  its lock is dropped (measured), so on Windows this pre-key may reach the pagefile, and
+  `lock_status()` returns a `LockError` whose new `idle_noaccess()` is `true`. On Linux the
+  lock is kept. About 4–9 µs more per access; on Windows most of that is faulting the
+  pre-key's pages back into the working set, not the protection changes themselves. `Prekey::new()` stays the default: a pre-key in
+  the pagefile is readable offline and outlives the process.
+
+### Changed
+- **`LockError::page_too_large` is removed** (pre-stable API change). A mapping owns whole
+  pages on every page size, so the page-size refusal and the per-target alignment table it
+  guarded (both from rc.14) are gone. `LockError` gains `idle_noaccess()` and `forked()`:
+  in a `fork()` child, `Prekey::lock_status()` now reports that page locks were not
+  inherited, where before it repeated the parent's result.
+- `Prekey::new` no longer stages the pre-key on the stack in an unoptimized build; it is
+  written straight into its mapping. It now panics if the operating system refuses to map or
+  protect the pre-key (memory or address-space exhaustion), as it already did for an RNG
+  failure.
+
 ## [0.9.0-rc.14] - 2026-10-19
 
 ### Changed

@@ -1,0 +1,49 @@
+layout=block variant=cold seed=1 span=16384 gaps=[] cbufs_within_64k_below=15 capture_any=15 capture_full=15 max_captured=16384 nearest_cbuf_gap=8 real_from=-4368 real_captured=16384
+ exit=0
+layout=block variant=cold seed=2 span=16384 gaps=[] cbufs_within_64k_below=22 capture_any=22 capture_full=22 max_captured=16384 nearest_cbuf_gap=14 real_from=-8464 real_captured=16384
+ exit=0
+layout=block variant=cold seed=3 span=16384 gaps=[] cbufs_within_64k_below=20 capture_any=20 capture_full=20 max_captured=16384 nearest_cbuf_gap=20 real_from=-12560 real_captured=16384
+ exit=0
+layout=block variant=cold seed=4 span=16384 gaps=[] cbufs_within_64k_below=24 capture_any=24 capture_full=24 max_captured=16384 nearest_cbuf_gap=10 real_from=-4368 real_captured=16384
+ exit=0
+layout=block variant=cold seed=5 span=16384 gaps=[] cbufs_within_64k_below=17 capture_any=17 capture_full=17 max_captured=16384 nearest_cbuf_gap=12 real_from=-12480 real_captured=16384
+ exit=0
+layout=block variant=warm seed=1 span=16384 gaps=[] cbufs_within_64k_below=15 capture_any=15 capture_full=13 max_captured=16384 nearest_cbuf_gap=16 real_from=-12320 real_captured=16384
+ exit=0
+layout=block variant=warm seed=2 span=16384 gaps=[] cbufs_within_64k_below=9 capture_any=9 capture_full=6 max_captured=16384 nearest_cbuf_gap=13 real_from=-14832 real_captured=16384
+ exit=0
+layout=block variant=warm seed=3 span=16384 gaps=[] cbufs_within_64k_below=13 capture_any=13 capture_full=7 max_captured=16384 nearest_cbuf_gap=13 real_from=-39552 real_captured=16384
+ exit=0
+layout=block variant=warm seed=4 span=16384 gaps=[] cbufs_within_64k_below=27 capture_any=27 capture_full=25 max_captured=16384 nearest_cbuf_gap=26 real_from=-18576 real_captured=16384
+ exit=0
+layout=block variant=warm seed=5 span=16384 gaps=[] cbufs_within_64k_below=6 capture_any=6 capture_full=5 max_captured=16384 nearest_cbuf_gap=26 real_from=-37600 real_captured=16384
+ exit=0
+layout=split variant=cold seed=1 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=28 capture_any=28 capture_full=8 max_captured=16384 nearest_cbuf_gap=9 real_from=-224 real_captured=16384
+ exit=0
+layout=split variant=cold seed=2 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=38 capture_any=38 capture_full=7 max_captured=16384 nearest_cbuf_gap=17 real_from=-224 real_captured=16384
+ exit=0
+layout=split variant=cold seed=3 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=43 capture_any=43 capture_full=6 max_captured=16384 nearest_cbuf_gap=25 real_from=-224 real_captured=16384
+ exit=0
+layout=split variant=cold seed=4 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=37 capture_any=37 capture_full=7 max_captured=16384 nearest_cbuf_gap=25 real_from=-224 real_captured=16384
+ exit=0
+layout=split variant=cold seed=5 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=30 capture_any=30 capture_full=5 max_captured=16384 nearest_cbuf_gap=35 real_from=-3600 real_captured=16384
+ exit=0
+layout=split variant=warm seed=1 span=913408 gaps=[888832, 4096, 4096] cbufs_within_64k_below=301 capture_any=86 capture_full=0 max_captured=12288 nearest_cbuf_gap=9 real_from=-18446744073708660016 real_captured=12288
+ exit=0
+layout=split variant=warm seed=2 span=1052672 gaps=[1028096, 4096, 4096] cbufs_within_64k_below=296 capture_any=50 capture_full=0 max_captured=12288 nearest_cbuf_gap=16 real_from=-18446744073708554896 real_captured=12288
+ exit=0
+layout=split variant=warm seed=3 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=30 capture_any=30 capture_full=5 max_captured=16384 nearest_cbuf_gap=38 real_from=-23488 real_captured=16384
+ exit=0
+layout=split variant=warm seed=4 span=983040 gaps=[958464, 4096, 4096] cbufs_within_64k_below=260 capture_any=49 capture_full=0 max_captured=12288 nearest_cbuf_gap=11 real_from=-18446744073708591088 real_captured=12288
+ exit=0
+layout=split variant=warm seed=5 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=13 capture_any=13 capture_full=5 max_captured=16384 nearest_cbuf_gap=27 real_from=-29408 real_captured=16384
+ exit=0
+layout=bare readable_neighbor_directly_below=true read_from=layout-1024 len=65536 survived=true prekey_bytes_matching=16384/16384
+ exit=0
+layout=bare readable_neighbor_directly_below=true read_from=layout-1024 len=65536 survived=true prekey_bytes_matching=16384/16384
+ exit=0
+layout=bare readable_neighbor_directly_below=true read_from=layout-1024 len=65536 survived=true prekey_bytes_matching=16384/16384
+ exit=0
+layout=guarded readable_neighbor_directly_below=true read_from=layout-1024 len=65536  exit=139
+layout=guarded readable_neighbor_directly_below=true read_from=layout-1024 len=65536  exit=139
+layout=guarded readable_neighbor_directly_below=true read_from=layout-1024 len=65536  exit=139

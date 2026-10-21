@@ -1,0 +1,90 @@
+layout=block variant=cold seed=1 span=16384 gaps=[] cbufs_within_64k_below=73 capture_any=73 capture_full=70 max_captured=16384 nearest_cbuf_gap=16129 real_from=-48336 real_captured=16384
+ exit=0
+layout=block variant=cold seed=2 span=16384 gaps=[] cbufs_within_64k_below=80 capture_any=80 capture_full=71 max_captured=16384 nearest_cbuf_gap=6490 real_from=-37408 real_captured=16384
+ exit=0
+layout=block variant=cold seed=3 span=16384 gaps=[] cbufs_within_64k_below=84 capture_any=84 capture_full=52 max_captured=16384 nearest_cbuf_gap=13661 real_from=-13792 real_captured=16384
+ exit=0
+layout=block variant=cold seed=4 span=16384 gaps=[] cbufs_within_64k_below=87 capture_any=87 capture_full=61 max_captured=16384 nearest_cbuf_gap=3298 real_from=-31376 real_captured=16384
+ exit=0
+layout=block variant=cold seed=5 span=16384 gaps=[] cbufs_within_64k_below=65 capture_any=65 capture_full=36 max_captured=16384 nearest_cbuf_gap=14458 real_from=-32368 real_captured=16384
+ exit=0
+layout=block variant=warm seed=1 span=16384 gaps=[] cbufs_within_64k_below=9 capture_any=9 capture_full=7 max_captured=16384 nearest_cbuf_gap=1164 real_from=-20064 real_captured=16384
+ exit=0
+layout=block variant=warm seed=2 span=16384 gaps=[] cbufs_within_64k_below=6 capture_any=6 capture_full=5 max_captured=16384 nearest_cbuf_gap=789 real_from=-33136 real_captured=16384
+ exit=0
+layout=block variant=warm seed=3 span=16384 gaps=[] cbufs_within_64k_below=10 capture_any=10 capture_full=8 max_captured=16384 nearest_cbuf_gap=5848 real_from=-48432 real_captured=16384
+ exit=0
+layout=block variant=warm seed=4 span=16384 gaps=[] cbufs_within_64k_below=18 capture_any=18 capture_full=15 max_captured=16384 nearest_cbuf_gap=595 real_from=-35200 real_captured=16384
+ exit=0
+layout=block variant=warm seed=5 span=16384 gaps=[] cbufs_within_64k_below=3 capture_any=3 capture_full=3 max_captured=16384 nearest_cbuf_gap=5163 real_from=-22720 real_captured=16384
+ exit=0
+layout=split variant=cold seed=1 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=101 capture_any=101 capture_full=50 max_captured=16384 nearest_cbuf_gap=1760 real_from=-27152 real_captured=16384
+ exit=0
+layout=split variant=cold seed=2 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=100 capture_any=100 capture_full=41 max_captured=16384 nearest_cbuf_gap=2272 real_from=-23248 real_captured=16384
+ exit=0
+layout=split variant=cold seed=3 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=89 capture_any=89 capture_full=65 max_captured=16384 nearest_cbuf_gap=4256 real_from=-5824 real_captured=16384
+ exit=0
+layout=split variant=cold seed=4 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=84 capture_any=84 capture_full=43 max_captured=16384 nearest_cbuf_gap=1910 real_from=-35888 real_captured=16384
+ exit=0
+layout=split variant=cold seed=5 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=73 capture_any=73 capture_full=36 max_captured=16384 nearest_cbuf_gap=5317 real_from=-35648 real_captured=16384
+ exit=0
+layout=split variant=warm seed=1 span=2793472 gaps=[2768896, 4096, 4096] cbufs_within_64k_below=199 capture_any=37 capture_full=0 max_captured=12288 nearest_cbuf_gap=1477 real_from=-18446744073706798160 real_captured=12288
+ exit=0
+layout=split variant=warm seed=2 span=3362816 gaps=[503808, 2838528, 4096] cbufs_within_64k_below=217 capture_any=25 capture_full=0 max_captured=8192 nearest_cbuf_gap=1499 real_from=-18446744073706235008 real_captured=8192
+ exit=0
+layout=split variant=warm seed=3 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=7 capture_any=7 capture_full=3 max_captured=16384 nearest_cbuf_gap=3096 real_from=-36784 real_captured=16384
+ exit=0
+layout=split variant=warm seed=4 span=1699840 gaps=[1675264, 4096, 4096] cbufs_within_64k_below=124 capture_any=33 capture_full=0 max_captured=12288 nearest_cbuf_gap=2618 real_from=-18446744073707904480 real_captured=12288
+ exit=0
+layout=split variant=warm seed=5 span=28672 gaps=[4096, 4096, 4096] cbufs_within_64k_below=5 capture_any=5 capture_full=4 max_captured=16384 nearest_cbuf_gap=4283 real_from=-28864 real_captured=16384
+ exit=0
+layout=bare variant=cold seed=1 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=bare variant=cold seed=2 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=2101389 real_from=-2101504 exit=139
+layout=bare variant=cold seed=3 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=bare variant=cold seed=4 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=bare variant=cold seed=5 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=2297941 real_from=-2298080 exit=139
+layout=bare variant=warm seed=1 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=bare variant=warm seed=2 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=bare variant=warm seed=3 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=bare variant=warm seed=4 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=bare variant=warm seed=5 span=16384 gaps=[] cbufs_within_64k_below=8 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=4164 real_from=-4352 exit=139
+layout=guarded variant=cold seed=1 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=guarded variant=cold seed=2 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=guarded variant=cold seed=3 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=guarded variant=cold seed=4 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=1908832 real_from=-1909008 exit=139
+layout=guarded variant=cold seed=5 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=guarded variant=warm seed=1 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=guarded variant=warm seed=2 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=guarded variant=warm seed=3 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=guarded variant=warm seed=4 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+layout=guarded variant=warm seed=5 span=16384 gaps=[] cbufs_within_64k_below=0 capture_any=0 capture_full=0 max_captured=0 nearest_cbuf_gap=-1 real_from=-64 exit=139
+
+thread 'main' (50172) panicked at src\main.rs:489:5:
+space below is not free
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ exit=101
+
+thread 'main' (67268) panicked at src\main.rs:489:5:
+space below is not free
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ exit=101
+
+thread 'main' (42128) panicked at src\main.rs:489:5:
+space below is not free
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ exit=101
+
+thread 'main' (67596) panicked at src\main.rs:489:5:
+space below is not free
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ exit=101
+
+thread 'main' (26124) panicked at src\main.rs:489:5:
+space below is not free
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ exit=101
+
+thread 'main' (48576) panicked at src\main.rs:489:5:
+space below is not free
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ exit=101
