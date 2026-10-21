@@ -50,6 +50,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   protect the pre-key (memory or address-space exhaustion), as it already did for an RNG
   failure.
 
+### Documentation
+- **The README is a front page again** (539 lines to 271). It keeps the quick start, a
+  "which type?" table, access, naming, encoding, installation and features, and gains a
+  **Sealed memory** section with a worked example, which it had lacked since rc.13. The
+  reference material it carried is already in the rustdoc, `SECURITY.md` and this file, and
+  the README now links to it there: the zero-size and codegen-root caveats (`Fixed`), the
+  `generic` macro arms (`fixed_newtype!`), the threat model and audit surfaces, and per-release
+  changes. Every remaining example still runs as a doctest.
+
 ## [0.9.0-rc.14] - 2026-10-19
 
 ### Changed
