@@ -3,15 +3,15 @@
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 use secure_gate::Dynamic;
 #[cfg(feature = "encoding-base64")]
-use secure_gate::{Fixed, FromBase64UrlStr, RevealSecret, ToBase64Url};
+use secure_gate::{Fixed, RevealSecret, ToBase64Url};
 
 #[cfg(feature = "encoding-base64")]
 #[test]
 fn test_slice_to_base64url() {
     let input = b"hello";
     let encoded = input.to_base64url().into_inner();
-    let decoded = encoded.try_from_base64url().expect("valid base64url");
-    assert_eq!(decoded, b"hello");
+    let decoded = Dynamic::<Vec<u8>>::try_from_base64url(&encoded).expect("valid base64url");
+    assert_eq!(decoded.expose_secret(), b"hello");
 }
 
 #[cfg(feature = "encoding-base64")]

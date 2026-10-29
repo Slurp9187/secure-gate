@@ -2,7 +2,7 @@ error[E0599]: the method `to_hex` exists for reference `&str`, but its trait bou
   --> tests/compile-fail/str_not_encodable.rs:12:20
    |
 12 |     let _ = "text".to_hex();
-   |                    ^^^^^^
+   |                    ^^^^^^ method cannot be called on `&str` due to unsatisfied trait bounds
    |
    = note: the following trait bounds were not satisfied:
            `str: EncodableBytes`

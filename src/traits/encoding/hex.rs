@@ -22,7 +22,7 @@
 //!   multi-step operations, prefer `with_secret(|b| b.to_hex())` — the borrow checker
 //!   enforces the reference cannot escape the closure.
 //! - **Decoding lives elsewhere**: this module encodes. For the reverse direction and
-//!   its untrusted-input rules see `FromHexStr`; validate hex
+//!   its untrusted-input rules see `Fixed::try_from_hex` / `Dynamic::try_from_hex`; validate hex
 //!   strings upstream before wrapping
 //!   in secrets.
 //!

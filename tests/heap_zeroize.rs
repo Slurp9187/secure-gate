@@ -288,9 +288,7 @@ fn count_allocs<F: FnOnce()>(f: F) -> usize {
 
 #[cfg(feature = "encoding-bech32")]
 fn check_bech32_hrp_mismatch_materializes_nothing() {
-    use secure_gate::{
-        Bech32Error, Fixed, FromBech32Str, FromBech32mStr, ToBech32, ToBech32m, bech32_code_length,
-    };
+    use secure_gate::{Bech32Error, Fixed, ToBech32, ToBech32m, bech32_code_length};
 
     const N: usize = bech32_code_length(3, 900);
     let secret = vec![0x5Au8; 900];
@@ -303,16 +301,8 @@ fn check_bech32_hrp_mismatch_materializes_nothing() {
         .expect("encode")
         .into_inner();
 
-    // Every HRP-checked decode path, sized, on both checksums and all three surfaces.
+    // Every HRP-checked decode path, sized, on both checksums and both surfaces.
     let wrong = count_allocs(|| {
-        assert!(matches!(
-            b32.try_from_bech32_sized::<N>("kem"),
-            Err(Bech32Error::UnexpectedHrp)
-        ));
-        assert!(matches!(
-            b32m.try_from_bech32m_sized::<N>("kem"),
-            Err(Bech32Error::UnexpectedHrp)
-        ));
         assert!(matches!(
             Dynamic::<Vec<u8>>::try_from_bech32_sized::<N>(&b32, "kem"),
             Err(Bech32Error::UnexpectedHrp)
@@ -336,15 +326,15 @@ fn check_bech32_hrp_mismatch_materializes_nothing() {
          the payload was materialized before the HRP was compared"
     );
 
-    // Positive control: a correct decode into a Vec must allocate, or the counter
+    // Positive control: a correct decode into a Dynamic must allocate, or the counter
     // above proved nothing.
     let right = count_allocs(|| {
-        let v = b32.try_from_bech32_sized::<N>("age").expect("decode");
-        core::hint::black_box(&v);
+        let d = Dynamic::<Vec<u8>>::try_from_bech32_sized::<N>(&b32, "age").expect("decode");
+        core::hint::black_box(&d);
     });
     assert!(
         right >= 1,
-        "positive control: a successful Vec decode must allocate"
+        "positive control: a successful Dynamic decode must allocate"
     );
 
     // And Fixed decodes onto the stack: zero allocations even on success (the

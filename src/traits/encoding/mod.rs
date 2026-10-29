@@ -5,7 +5,8 @@
 //! All encoding traits require `alloc`. Every encoder returns
 //! [`EncodedSecret`](crate::EncodedSecret): the encoded form is a second full copy of
 //! the secret, and it stays wiped until it drops.
-//! See the [`decoding`](super::decoding) module for the reverse direction.
+//! For the reverse direction, decode with the `try_from_*` constructors on
+//! [`Fixed`](crate::Fixed) and [`Dynamic`](crate::Dynamic).
 //!
 //! Each encoding trait has its own feature gate:
 //!

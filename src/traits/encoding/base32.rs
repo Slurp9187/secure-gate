@@ -26,7 +26,7 @@
 //!   or multi-step operations, prefer `with_secret(|b| b.to_base32())` — the borrow
 //!   checker enforces the reference cannot escape the closure.
 //! - **Canonical form only**: uppercase, unpadded. See
-//!   [`FromBase32Str`](crate::FromBase32Str) for what the decoder accepts.
+//!   [`Fixed::try_from_base32`](crate::Fixed::try_from_base32) for what the decoder accepts.
 //!
 //! # Example
 //!

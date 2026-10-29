@@ -41,9 +41,10 @@
 //! - `ct-eq`          → [`ConstantTimeEq`]
 //! - `cloneable`      → [`CloneableSecret`]
 //! - `serde-serialize`→ [`SerializableSecret`]
-//! - `encoding-*`     → per-format encoding / decoding traits (`ToHex`, `FromHexStr`, …)
+//! - `encoding-*`     → per-format encoding traits (`ToHex`, `ToBase32`, …); decoding is the
+//!   `try_from_*` constructors on `Fixed` / `Dynamic`
 //!
-//! The encoding traits (`ToHex`, `FromHexStr`, etc.) are re-exported from submodules for convenience.
+//! The encoding traits (`ToHex`, etc.) are re-exported from submodules for convenience.
 //!
 //! See individual trait docs for detailed usage and examples.
 
@@ -69,24 +70,7 @@ pub mod constant_time_eq;
 #[cfg(feature = "ct-eq")]
 pub use constant_time_eq::ConstantTimeEq;
 
-pub mod decoding;
 pub mod encoding;
-
-// Re-export per-format decoding traits (feature-gated; blanket impls return Vec<u8> — alloc required)
-#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
-pub use decoding::FromBase32Str;
-
-#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
-pub use decoding::FromBase64UrlStr;
-
-#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-pub use decoding::FromBech32Str;
-
-#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-pub use decoding::FromBech32mStr;
-
-#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
-pub use decoding::FromHexStr;
 
 // Re-export per-format encoding traits (feature-gated)
 // Note: blanket impls of ToBase32, ToBase64Url, ToBech32, ToBech32m require alloc (String output).

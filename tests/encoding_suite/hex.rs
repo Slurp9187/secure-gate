@@ -3,7 +3,7 @@
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 use secure_gate::Dynamic;
 #[cfg(feature = "encoding-hex")]
-use secure_gate::{Fixed, FromHexStr, RevealSecret, ToHex};
+use secure_gate::{Fixed, RevealSecret, ToHex};
 
 #[cfg(feature = "encoding-hex")]
 #[test]
@@ -37,12 +37,11 @@ fn dynamic_try_from_hex_invalid_input_returns_err() {
     assert!(Dynamic::<Vec<u8>>::try_from_hex("xyz").is_err());
 }
 
-#[cfg(feature = "encoding-hex")]
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 #[test]
-fn str_receiver_try_from_hex_decodes_via_blanket_impl() {
-    let input = "00ff";
-    let bytes = input.try_from_hex().expect("hex");
-    assert_eq!(bytes, vec![0x00, 0xFF]);
+fn dynamic_try_from_hex_decodes_short_input() {
+    let bytes = Dynamic::<Vec<u8>>::try_from_hex("00ff").expect("hex");
+    assert_eq!(bytes.expose_secret(), &[0x00, 0xFF]);
 }
 
 // No-alloc decode path tests: Fixed::try_from_hex works with only encoding-hex (no alloc feature)

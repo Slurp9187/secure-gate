@@ -38,10 +38,10 @@ pw.expose_secret_mut().clear();
 
 #[cfg(feature = "encoding-hex")]
 {
-    use secure_gate::{FromHexStr, ToHex};
+    use secure_gate::ToHex;
     let hex = key.with_secret(|bytes| bytes.to_hex()); // `EncodedSecret`: wiped on drop
-    let decoded: Vec<u8> = hex.try_from_hex().expect("valid hex");
-    key.with_secret(|original| assert_eq!(decoded, original));
+    let decoded = Aes256Key::try_from_hex(&hex).expect("valid hex"); // straight into the wrapper
+    decoded.with_secret(|d| key.with_secret(|original| assert_eq!(d, original)));
 }
 ```
 

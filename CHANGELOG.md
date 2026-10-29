@@ -29,6 +29,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   private dependency (the system RNG behind `from_random` and `sealed`), so a future `rand`
   bump is not an API change. The `try_new_with` docs on `Fixed` and `Dynamic` gain a
   seeded-RNG example.
+- **The `From*Str` decoder traits are removed** (pre-stable API change): `FromHexStr`,
+  `FromBase32Str`, `FromBase64UrlStr`, `FromBech32Str` and `FromBech32mStr`, which were
+  implemented on every string. They duplicated the `try_from_*` constructors on `Fixed` and
+  `Dynamic`, and they were the one decode path that handed secret bytes out unwrapped: a
+  dropped `Vec<u8>` left the decoded secret in freed heap memory, and the README's quick start
+  decoded through exactly that path. Returning `zeroize::Zeroizing<Vec<u8>>` instead was
+  tried and rejected: it put a foreign type, with a `Debug` that prints the bytes, at this
+  crate's boundary, and it made callers who name the type add `zeroize` themselves. Decoding
+  now always lands in a wrapper this crate owns. Migrate with:
+
+  ```rust
+  // before                                 // after
+  let b = s.try_from_hex()?;                let b = Dynamic::<Vec<u8>>::try_from_hex(&s)?;
+                                            // or Fixed::<[u8; 32]>::try_from_hex(&s)? for a known size
+  let (hrp, b) = s.try_from_bech32_unchecked()?;
+  // the payload: Dynamic::<Vec<u8>>::try_from_bech32_unchecked(&s)?
+  // the HRP is public text in front of the `1` separator: the `bech32` crate reads it
+  ```
+
+  The decoders now live inside `Dynamic::try_from_*`, where the decoded buffer is wrapped in
+  `Zeroizing` as soon as it exists; nothing changes for `Fixed`/`Dynamic` callers.
 
 ## [0.9.0-rc.15] - 2026-10-20
 
