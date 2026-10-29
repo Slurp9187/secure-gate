@@ -11,9 +11,9 @@
 //   cargo +1.87 test -p secure-gate --features=full --test compile_fail_tests
 // On 1.87, fixed_zero_size.stderr no longer records a src/fixed.rs line number (rustc
 // reports "evaluation panicked: <message>" instead), so edits above `NON_ZERO_SIZED` no
-// longer shift it. Under `--all-features`, `sealed` adds a second E0509 to
-// newtype_manual_drop (from `FixedRole::into_fixed`, the same trap reported twice); that
-// mismatch is expected, not a regression.
+// longer shift it. Every snapshot here matches under both `--features=full` and
+// `--all-features`; a case whose diagnostic depends on a feature `full` leaves out (such
+// as `sealed`) must pick an input that does not, as newtype_manual_drop does.
 
 // Compile-fail test: a zero-sized secret cannot be constructed. The guard is a `const`
 // assertion in `Fixed::new`, `Fixed::new_with` and `Fixed::try_new_with` — the three
