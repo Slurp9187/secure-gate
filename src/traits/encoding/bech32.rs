@@ -268,9 +268,15 @@ impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBech32 for T {
         // checksum midstate -- a unit test pins its size -- and each char goes into
         // `out` as it is produced. One allocation, no intermediate copy anywhere.
         //
+        // `out` is inside `Zeroizing` from the first line, not wrapped on the last one,
+        // so the partly or fully encoded secret is wiped if anything unwinds before the
+        // `EncodedSecret` exists. Nothing in the loop is expected to: `push` within the
+        // reserved capacity cannot reallocate. The wrap costs nothing and removes the
+        // question.
+        //
         // The CODE_LENGTH gate that `encode_lower_to_fmt` applied via `encoded_length`
         // is replicated exactly: refuse when the whole string would exceed N.
-        let mut out = alloc::string::String::with_capacity(len);
+        let mut out = zeroize::Zeroizing::new(alloc::string::String::with_capacity(len));
         let chain = data
             .iter()
             .copied()
@@ -293,7 +299,7 @@ impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBech32 for T {
         if matches!(case, Case::Upper) {
             out.make_ascii_uppercase();
         }
-        Ok(crate::EncodedSecret::new(out))
+        Ok(crate::EncodedSecret::from_zeroizing(out))
     }
 }
 

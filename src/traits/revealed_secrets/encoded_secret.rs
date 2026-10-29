@@ -145,15 +145,28 @@ pub struct EncodedSecret(zeroize::Zeroizing<alloc::string::String>);
 
 #[cfg(feature = "alloc")]
 impl EncodedSecret {
+    // Gated by its callers, not by "any encoder": with only `encoding-bech32` on, the
+    // bech32 encoders use `from_zeroizing` below and this would be dead code, which
+    // `-D warnings` makes a build error.
     #[cfg(any(
         feature = "encoding-hex",
         feature = "encoding-base32",
         feature = "encoding-base64",
-        feature = "encoding-bech32",
     ))]
     #[inline(always)]
     pub(crate) fn new(s: alloc::string::String) -> Self {
         Self(zeroize::Zeroizing::new(s))
+    }
+
+    /// Takes over a buffer that was wrapped before it was filled, so an encoder can hold
+    /// the output inside `Zeroizing` for its whole life instead of wrapping it on the
+    /// last line. The bech32 encoders fill their buffer character by character and use
+    /// this; the hex, base32 and base64 backends return a finished `String` and use
+    /// [`new`](Self::new).
+    #[cfg(feature = "encoding-bech32")]
+    #[inline(always)]
+    pub(crate) fn from_zeroizing(s: zeroize::Zeroizing<alloc::string::String>) -> Self {
+        Self(s)
     }
 
     /// Consumes self and returns the inner `String`.
