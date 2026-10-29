@@ -45,7 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                                             // or Fixed::<[u8; 32]>::try_from_hex(&s)? for a known size
   let (hrp, b) = s.try_from_bech32_unchecked()?;
   // the payload: Dynamic::<Vec<u8>>::try_from_bech32_unchecked(&s)?
-  // the HRP is public text in front of the `1` separator: the `bech32` crate reads it
+  // the HRP: the text before the last `1` (`s.rsplit_once('1')`), in its original case;
+  // trust it only after `Dynamic::try_from_bech32(&s, hrp)` succeeds
   ```
 
   The decoders now live inside `Dynamic::try_from_*`, where the decoded buffer is wrapped in
