@@ -650,7 +650,10 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// # Errors
     ///
-    /// - [`HexError::InvalidHex`](crate::HexError::InvalidHex) — non-hex characters or odd-length input.
+    /// - [`HexError::InvalidHex`](crate::HexError::InvalidHex) — non-hex characters or odd-length
+    ///   input. Without `alloc` an input that decodes to *more* than `N` bytes also lands here
+    ///   rather than in `InvalidLength`, because the fixed stack buffer cannot hold the overflow
+    ///   to measure it.
     /// - [`HexError::InvalidLength`](crate::HexError::InvalidLength) — decoded byte count does not equal `N`.
     ///
     /// # Examples
@@ -809,7 +812,10 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// # Errors
     ///
-    /// - [`Base64Error::InvalidBase64`](crate::Base64Error::InvalidBase64) — non-base64 characters or invalid padding.
+    /// - [`Base64Error::InvalidBase64`](crate::Base64Error::InvalidBase64) — non-base64 characters
+    ///   or invalid padding. Without `alloc` an input that decodes to *more* than `N` bytes also
+    ///   lands here rather than in `InvalidLength`, because the fixed stack buffer cannot hold the
+    ///   overflow to measure it.
     /// - [`Base64Error::InvalidLength`](crate::Base64Error::InvalidLength) — decoded byte count does not equal `N`.
     ///
     /// # Examples

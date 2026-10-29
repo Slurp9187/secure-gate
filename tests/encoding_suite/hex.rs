@@ -1,18 +1,21 @@
 //! encoding_suite/hex.rs — hex encoding/decoding tests
 
+// `ToHex` and `Dynamic` need `alloc`; `Fixed::try_from_hex` does not. Every test that
+// encodes, or decodes into `Dynamic`, is gated on `all(encoding-hex, alloc)` so the suite
+// compiles without `alloc` and the literal-string `Fixed` tests run there.
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
-use secure_gate::Dynamic;
+use secure_gate::{Dynamic, ToHex};
 #[cfg(feature = "encoding-hex")]
-use secure_gate::{Fixed, RevealSecret, ToHex};
+use secure_gate::{Fixed, RevealSecret};
 
-#[cfg(feature = "encoding-hex")]
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 #[test]
 fn test_slice_to_hex() {
     let input = [0xDEu8, 0xAD, 0xBE, 0xEF];
     assert_eq!(input.to_hex().into_inner(), "deadbeef");
 }
 
-#[cfg(feature = "encoding-hex")]
+#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 #[test]
 fn fixed_try_from_hex_roundtrip() {
     let fixed = Fixed::new([1u8; 32]);

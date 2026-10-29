@@ -79,13 +79,32 @@ fn bech32_error_display() {
     );
 }
 
-/// HexError::InvalidLength carries expected/got in every build profile.
+/// HexError::InvalidLength carries expected/got in every build profile. An input that
+/// decodes to *fewer* bytes than `N` reaches it on both paths; one that decodes to *more*
+/// reaches it only with `alloc`, because the no-alloc path decodes into a stack buffer of
+/// exactly `N` bytes and the backend rejects the overflow before a length can be measured.
 #[cfg(feature = "encoding-hex")]
 #[test]
 fn hex_error_invalid_length() {
+    // 2 decoded bytes into a 4-byte target: InvalidLength on both paths.
+    let err =
+        secure_gate::Fixed::<[u8; 4]>::try_from_hex("dead").expect_err("length mismatch must fail");
+    match err {
+        secure_gate::HexError::InvalidLength { expected, got, .. } => {
+            assert_eq!(expected, 4);
+            assert_eq!(got, 2);
+        }
+        _ => panic!("expected InvalidLength"),
+    }
+    assert_eq!(
+        format!("{}", err),
+        "decoded length mismatch: expected 4, got 2"
+    );
+
     // 4 decoded bytes into a 2-byte target.
     let err = secure_gate::Fixed::<[u8; 2]>::try_from_hex("deadbeef")
         .expect_err("length mismatch must fail");
+    #[cfg(feature = "alloc")]
     match err {
         secure_gate::HexError::InvalidLength { expected, got, .. } => {
             assert_eq!(expected, 2);
@@ -93,29 +112,30 @@ fn hex_error_invalid_length() {
         }
         _ => panic!("expected InvalidLength"),
     }
-    assert_eq!(
-        format!("{}", err),
-        "decoded length mismatch: expected 2, got 4"
-    );
+    #[cfg(not(feature = "alloc"))]
+    assert_eq!(err, secure_gate::HexError::InvalidHex);
 }
 
-/// Base32Error::InvalidLength carries expected/got in every build profile.
+/// Base32Error::InvalidLength carries expected/got in every build profile. Too few
+/// decoded bytes reach it on both paths; too many reach it only with `alloc` (the
+/// no-alloc path's stack buffer is exactly `N` bytes, so the backend rejects the
+/// overflow first), as the constructor's docs say.
 #[cfg(feature = "encoding-base32")]
 #[test]
 fn base32_error_invalid_length() {
-    // "32W353Y" decodes to 4 bytes; target is 2.
-    let err = secure_gate::Fixed::<[u8; 2]>::try_from_base32("32W353Y")
+    // "MZXQ" decodes to 2 bytes; target is 4: InvalidLength on both paths.
+    let err = secure_gate::Fixed::<[u8; 4]>::try_from_base32("MZXQ")
         .expect_err("length mismatch must fail");
     match err {
         secure_gate::Base32Error::InvalidLength { expected, got, .. } => {
-            assert_eq!(expected, 2);
-            assert_eq!(got, 4);
+            assert_eq!(expected, 4);
+            assert_eq!(got, 2);
         }
         _ => panic!("expected InvalidLength"),
     }
     assert_eq!(
         format!("{}", err),
-        "decoded length mismatch: expected 2, got 4"
+        "decoded length mismatch: expected 4, got 2"
     );
 
     // Copy like its siblings — usable after being passed by value. `Copy` also
@@ -123,15 +143,48 @@ fn base32_error_invalid_length() {
     // can never own an allocation derived from the rejected input.
     let copied = err;
     assert_eq!(copied, err);
+
+    // "32W353Y" decodes to 4 bytes; target is 2.
+    let err = secure_gate::Fixed::<[u8; 2]>::try_from_base32("32W353Y")
+        .expect_err("length mismatch must fail");
+    #[cfg(feature = "alloc")]
+    match err {
+        secure_gate::Base32Error::InvalidLength { expected, got, .. } => {
+            assert_eq!(expected, 2);
+            assert_eq!(got, 4);
+        }
+        _ => panic!("expected InvalidLength"),
+    }
+    #[cfg(not(feature = "alloc"))]
+    assert_eq!(err, secure_gate::Base32Error::InvalidBase32);
 }
 
-/// Base64Error::InvalidLength carries expected/got in every build profile.
+/// Base64Error::InvalidLength carries expected/got in every build profile. Too few
+/// decoded bytes reach it on both paths; too many reach it only with `alloc` (the
+/// no-alloc path's stack buffer is exactly `N` bytes, so the backend rejects the
+/// overflow first).
 #[cfg(feature = "encoding-base64")]
 #[test]
 fn base64_error_invalid_length() {
+    // "Zm8" decodes to 2 bytes; target is 4: InvalidLength on both paths.
+    let err = secure_gate::Fixed::<[u8; 4]>::try_from_base64url("Zm8")
+        .expect_err("length mismatch must fail");
+    match err {
+        secure_gate::Base64Error::InvalidLength { expected, got, .. } => {
+            assert_eq!(expected, 4);
+            assert_eq!(got, 2);
+        }
+        _ => panic!("expected InvalidLength"),
+    }
+    assert_eq!(
+        format!("{}", err),
+        "decoded length mismatch: expected 4, got 2"
+    );
+
     // "3q2-7w" decodes to 4 bytes; target is 2.
     let err = secure_gate::Fixed::<[u8; 2]>::try_from_base64url("3q2-7w")
         .expect_err("length mismatch must fail");
+    #[cfg(feature = "alloc")]
     match err {
         secure_gate::Base64Error::InvalidLength { expected, got, .. } => {
             assert_eq!(expected, 2);
@@ -139,10 +192,8 @@ fn base64_error_invalid_length() {
         }
         _ => panic!("expected InvalidLength"),
     }
-    assert_eq!(
-        format!("{}", err),
-        "decoded length mismatch: expected 2, got 4"
-    );
+    #[cfg(not(feature = "alloc"))]
+    assert_eq!(err, secure_gate::Base64Error::InvalidBase64);
 }
 
 /// Bech32Error::InvalidLength carries expected/got in every build profile.

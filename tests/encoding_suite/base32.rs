@@ -1,11 +1,14 @@
 //! encoding_suite/base32.rs — base32 encoding/decoding tests
 
+// `ToBase32` and `Dynamic` need `alloc`; `Fixed::try_from_base32` does not. Every test
+// that encodes, or decodes into `Dynamic`, is gated on `all(encoding-base32, alloc)` so
+// the suite compiles without `alloc` and the literal-string `Fixed` tests run there.
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
-use secure_gate::{Dynamic, SecretLen, fixed_newtype};
+use secure_gate::{Dynamic, SecretLen, ToBase32, fixed_newtype};
 #[cfg(feature = "encoding-base32")]
-use secure_gate::{Fixed, RevealSecret, ToBase32};
+use secure_gate::{Fixed, RevealSecret};
 
-#[cfg(feature = "encoding-base32")]
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 #[test]
 fn test_slice_to_base32() {
     let input = b"hello";
@@ -14,7 +17,7 @@ fn test_slice_to_base32() {
     assert_eq!(decoded.expose_secret(), b"hello");
 }
 
-#[cfg(feature = "encoding-base32")]
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_base32_roundtrip() {
     let fixed = Fixed::new([7u8; 32]);
@@ -238,7 +241,7 @@ fn base32_accepts_non_canonical_trailing_bits() {
     assert_eq!(lenient.to_base32().into_inner(), "MY");
 }
 
-#[cfg(feature = "encoding-base32")]
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_base32_totp_seed_size() {
     // A 20-byte TOTP/HOTP shared secret is 32 base32 characters — the `otpauth://` form,
@@ -257,7 +260,7 @@ fn fixed_try_from_base32_totp_seed_size() {
     decoded.with_secret(|d| assert_eq!(d, &[0xAAu8; 20]));
 }
 
-#[cfg(feature = "encoding-base32")]
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_base32_large_n() {
     let data = [0x42u8; 128];

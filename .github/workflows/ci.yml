@@ -108,17 +108,13 @@ jobs:
           # No `alloc`, so the doctests compile against the no-alloc API. `full` implies
           # `alloc`, and the `test` job runs `--tests`, which skips doctests, so without
           # these two rows an example that uses an alloc-only encoder under an
-          # `encoding-*`-only gate fails nowhere in CI; twelve of them did. Doctests only:
-          # the hex, base32 and base64 integration suites import the alloc-only encoders
-          # under the same `encoding-*`-only gates, so `--tests` does not build here.
-          - name: encoding, no alloc (doctests)
+          # `encoding-*`-only gate fails nowhere in CI; twelve of them did.
+          - name: encoding, no alloc
             package: secure-gate
             features: "--no-default-features --features=encoding"
-            doctests_only: true
-          - name: encoding-bech32, no alloc (doctests)
+          - name: encoding-bech32, no alloc
             package: secure-gate
             features: "--no-default-features --features=encoding-bech32"
-            doctests_only: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -132,7 +128,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Clippy (${{ matrix.name }})
-        if: ${{ !matrix.doctests_only }}
         run: cargo clippy -p ${{ matrix.package }} --tests --benches ${{ matrix.features }}
 
       - name: Doctests (${{ matrix.name }})
@@ -174,12 +169,11 @@ jobs:
             features: "--no-default-features --features=ct-eq,alloc"
 
           # ── Encoding ──────────────────────────────────────────────────────────
-          # Encoding traits return String and require alloc; integration tests
-          # import the traits, so alloc is needed to compile the test binaries.
-          # True of every row here except the last. The bech32 no-alloc row builds
-          # because every item in encoding_suite/bech32*.rs is gated on
-          # all(encoding-bech32, alloc): the suite compiles out, and what that row
-          # actually exercises is tests/newtype_nostd.rs.
+          # Encoding traits return String and require alloc, so every test that
+          # encodes, or decodes into `Dynamic`, is gated on all(encoding-*, alloc)
+          # in encoding_suite/. The two no-alloc rows at the end of this group build
+          # the rest: the literal-string `Fixed::try_from_*` tests, which are the
+          # no-alloc decode coverage, and tests/newtype_nostd.rs.
           - name: encoding (all formats)
             features: "--no-default-features --features=alloc,encoding"
 
@@ -200,6 +194,12 @@ jobs:
           # inside `__sg_if_alloc!` undetected.
           - name: encoding-bech32, no alloc
             features: "--no-default-features --features=encoding-bech32"
+
+          # All four formats without `alloc`: the hex, base32 and base64 suites could
+          # not build here until their encoding tests were alloc-gated like bech32's,
+          # so no job ran their no-alloc `Fixed::try_from_*` tests. This one does.
+          - name: encoding (all formats), no alloc
+            features: "--no-default-features --features=encoding"
 
           # ── Serde ─────────────────────────────────────────────────────────────
           - name: serde (serialize + deserialize)
