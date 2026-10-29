@@ -105,6 +105,16 @@ jobs:
           - name: all features
             package: secure-gate
             features: "--all-features"
+          # No `alloc`, so the doctests compile against the no-alloc API. `full` implies
+          # `alloc`, and the `test` job runs `--tests`, which skips doctests, so without
+          # these two rows an example that uses an alloc-only encoder under an
+          # `encoding-*`-only gate fails nowhere in CI; twelve of them did.
+          - name: encoding, no alloc
+            package: secure-gate
+            features: "--no-default-features --features=encoding"
+          - name: encoding-bech32, no alloc
+            package: secure-gate
+            features: "--no-default-features --features=encoding-bech32"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -159,12 +169,11 @@ jobs:
             features: "--no-default-features --features=ct-eq,alloc"
 
           # ── Encoding ──────────────────────────────────────────────────────────
-          # Encoding traits return String and require alloc; integration tests
-          # import the traits, so alloc is needed to compile the test binaries.
-          # True of every row here except the last. The bech32 no-alloc row builds
-          # because every item in encoding_suite/bech32*.rs is gated on
-          # all(encoding-bech32, alloc): the suite compiles out, and what that row
-          # actually exercises is tests/newtype_nostd.rs.
+          # Encoding traits return String and require alloc, so every test that
+          # encodes, or decodes into `Dynamic`, is gated on all(encoding-*, alloc)
+          # in encoding_suite/. The two no-alloc rows at the end of this group build
+          # the rest: the literal-string `Fixed::try_from_*` tests, which are the
+          # no-alloc decode coverage, and tests/newtype_nostd.rs.
           - name: encoding (all formats)
             features: "--no-default-features --features=alloc,encoding"
 
@@ -185,6 +194,12 @@ jobs:
           # inside `__sg_if_alloc!` undetected.
           - name: encoding-bech32, no alloc
             features: "--no-default-features --features=encoding-bech32"
+
+          # All four formats without `alloc`: the hex, base32 and base64 suites could
+          # not build here until their encoding tests were alloc-gated like bech32's,
+          # so no job ran their no-alloc `Fixed::try_from_*` tests. This one does.
+          - name: encoding (all formats), no alloc
+            features: "--no-default-features --features=encoding"
 
           # ── Serde ─────────────────────────────────────────────────────────────
           - name: serde (serialize + deserialize)
@@ -224,10 +239,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run tests (${{ matrix.name }})
-        # The trybuild snapshots are intentionally blessed on Rust 1.85.
+        # The trybuild snapshots are intentionally blessed on Rust 1.87.
         # Stable rustc diagnostics drift over time (dynamic_string_no_hex broke
         # when stable switched E0599's candidate note to a single-line form), so
-        # skip those cases here; the `compile-fail` job below runs them on 1.85.
+        # skip those cases here; the `compile-fail` job below runs them on 1.87.
         # `--skip` matches substrings, and every compile-fail test is named
         # `*_compile_fail`, so new cases are excluded automatically. The one
         # legacy name without the suffix is listed explicitly.
@@ -315,42 +330,42 @@ jobs:
   # MSRV job — verify declared rust-version is actually buildable
   #
   # Runs `cargo check` (not full tests) on the MSRV toolchain to catch any
-  # accidental use of post-1.85 APIs before they reach a release. This crate
-  # uses Rust edition 2024, which requires rustc ≥ 1.85.0. Clippy's
+  # accidental use of post-1.87 APIs before they reach a release. Edition 2024
+  # needs rustc ≥ 1.85.0; the patched `ctutils` (RUSTSEC-2026-0385) needs 1.87. Clippy's
   # --version-lint flag catches MSRV violations in the main `test` job, but
   # a real toolchain check is the authoritative guard.
   # ---------------------------------------------------------------------------
   msrv:
-    name: MSRV – cargo check (1.85)
+    name: MSRV – cargo check (1.87)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust 1.85
+      - name: Install Rust 1.87
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: "1.85"
+          toolchain: "1.87"
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
       - name: Update Cargo.lock with MSRV toolchain
-        run: cargo +1.85 update
+        run: cargo +1.87 update
 
       - name: cargo check – default features
-        run: cargo +1.85 check
+        run: cargo +1.87 check
 
       - name: cargo check – full features
-        run: cargo +1.85 check --features=full
+        run: cargo +1.87 check --features=full
 
       # `check` with `default`/`full` compiles the library only: neither implies
       # `std`, and neither builds test targets. That let a test file stop compiling
       # on the declared MSRV while every job stayed green — `--all-features
       # --all-targets` is the configuration that catches it.
       - name: cargo check – all features, all targets
-        run: cargo +1.85 check --workspace --all-features --all-targets
+        run: cargo +1.87 check --workspace --all-features --all-targets
 
   # ---------------------------------------------------------------------------
   # Compile-fail job — API-surface enforcement on the blessing toolchain
@@ -361,28 +376,28 @@ jobs:
   # `Serialize` without `SerializableSecret`, no zero-size aliases, no encoding
   # methods on `Dynamic<String>`) were asserted in prose and enforced nowhere.
   #
-  # This job runs exactly those tests, pinned to 1.85 — the toolchain the .stderr
+  # This job runs exactly those tests, pinned to 1.87 — the toolchain the .stderr
   # files are blessed against — so the diagnostics are stable by construction.
-  # Regenerate snapshots with: TRYBUILD=overwrite cargo +1.85 test compile_fail
+  # Regenerate snapshots with: TRYBUILD=overwrite cargo +1.87 test compile_fail
   # ---------------------------------------------------------------------------
   compile-fail:
-    name: Compile-fail – trybuild (1.85)
+    name: Compile-fail – trybuild (1.87)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust 1.85
+      - name: Install Rust 1.87
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: "1.85"
+          toolchain: "1.87"
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
       - name: Run core compile-fail tests
-        run: cargo +1.85 test -p secure-gate --features=full --test compile_fail_tests
+        run: cargo +1.87 test -p secure-gate --features=full --test compile_fail_tests
 
   # ---------------------------------------------------------------------------
   # AddressSanitizer job — heap zeroization oracle
@@ -478,6 +493,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         toolchain: [stable, "1.85"]
+        # guarded-block's MSRV is 1.85; secure-gate's is 1.87 (patched `ctutils`), so the
+        # sealed-tests step below runs on 1.87 where guarded-block runs on 1.85.
+        include:
+          - toolchain: stable
+            sealed_toolchain: stable
+          - toolchain: "1.85"
+            sealed_toolchain: "1.87"
 
     steps:
       - name: Checkout repository
@@ -488,6 +510,10 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain }}
           components: clippy, rustfmt
+
+      - name: Install Rust ${{ matrix.sealed_toolchain }} for secure-gate's sealed tests
+        if: matrix.sealed_toolchain != matrix.toolchain
+        run: rustup toolchain install ${{ matrix.sealed_toolchain }} --profile minimal
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
@@ -514,4 +540,4 @@ jobs:
         run: cargo doc --manifest-path guarded-block/Cargo.toml --no-deps
 
       - name: secure-gate sealed tests on this OS
-        run: cargo test --features sealed --lib --test sealed --test sealed_lock --test sealed_glob_import
+        run: cargo +${{ matrix.sealed_toolchain }} test --features sealed --lib --test sealed --test sealed_lock --test sealed_glob_import

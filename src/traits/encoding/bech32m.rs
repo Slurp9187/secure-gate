@@ -37,14 +37,17 @@
 //! # Example
 //!
 //! ```rust
+//! # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 //! use secure_gate::{Case, Fixed, ToBech32m, RevealSecret};
-//!
+//! # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+//! {
 //! let secret = Fixed::new([0x00u8, 0x01]);
 //!
 //! // Use try_to_bech32m — the sole encoding API:
 //! let encoded = secret.with_secret(|s| s.try_to_bech32m("key", Case::Lower)).unwrap();
 //! assert!(encoded.starts_with("key1"));
 //! // `encoded` is an `EncodedSecret`: wiped on drop, `Debug` redacted.
+//! }
 //! ```
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use super::Case;
@@ -78,12 +81,16 @@ pub use super::bech32::{BECH32_CODE_LENGTH, bech32_code_length};
 /// 90-character cap. Exceeding it produces valid bech32m that wallets will reject.
 ///
 /// ```rust
+/// # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 /// use secure_gate::{Case, ToBech32m};
+/// # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+/// {
 ///
 /// let blob = [0x5Au8; 900];
 /// assert!(blob.try_to_bech32m("kem", Case::Lower).is_err()); // past the 1023 default
 /// let encoded = blob.try_to_bech32m_sized::<2048>("kem", Case::Lower)?;
 /// assert!(encoded.starts_with("kem1"));
+/// # }
 /// # Ok::<(), secure_gate::Bech32Error>(())
 /// ```
 #[cfg(feature = "encoding-bech32")]
@@ -207,9 +214,15 @@ impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBech32m for T {
         // checksum midstate -- a unit test pins its size -- and each char goes into
         // `out` as it is produced. One allocation, no intermediate copy anywhere.
         //
+        // `out` is inside `Zeroizing` from the first line, not wrapped on the last one,
+        // so the partly or fully encoded secret is wiped if anything unwinds before the
+        // `EncodedSecret` exists. Nothing in the loop is expected to: `push` within the
+        // reserved capacity cannot reallocate. The wrap costs nothing and removes the
+        // question.
+        //
         // The CODE_LENGTH gate that `encode_lower_to_fmt` applied via `encoded_length`
         // is replicated exactly: refuse when the whole string would exceed N.
-        let mut out = alloc::string::String::with_capacity(len);
+        let mut out = zeroize::Zeroizing::new(alloc::string::String::with_capacity(len));
         let chain = data
             .iter()
             .copied()
@@ -232,7 +245,7 @@ impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBech32m for T {
         if matches!(case, Case::Upper) {
             out.make_ascii_uppercase();
         }
-        Ok(crate::EncodedSecret::new(out))
+        Ok(crate::EncodedSecret::from_zeroizing(out))
     }
 }
 

@@ -22,16 +22,16 @@
 //!   multi-step operations, prefer `with_secret(|b| b.to_hex())` — the borrow checker
 //!   enforces the reference cannot escape the closure.
 //! - **Decoding lives elsewhere**: this module encodes. For the reverse direction and
-//!   its untrusted-input rules see `FromHexStr`; validate hex
+//!   its untrusted-input rules see `Fixed::try_from_hex` / `Dynamic::try_from_hex`; validate hex
 //!   strings upstream before wrapping
 //!   in secrets.
 //!
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "encoding-hex")]
+//! # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 //! use secure_gate::{Fixed, ToHex, RevealSecret};
-//! # #[cfg(feature = "encoding-hex")]
+//! # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 //! {
 //! let secret = Fixed::new([0x0au8, 0x0bu8, 0x0cu8, 0x0du8]);
 //!

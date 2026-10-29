@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/secure-gate.svg)](https://crates.io/crates/secure-gate)
 [![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate)
 [![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
-[![MSRV: 1.85](https://img.shields.io/badge/msrv-1.85-blue)](https://github.com/Slurp9187/secure-gate/blob/main/Cargo.toml)
+[![MSRV: 1.87](https://img.shields.io/badge/msrv-1.87-blue)](https://github.com/Slurp9187/secure-gate/blob/main/Cargo.toml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
 Secure wrappers for secrets with **explicit access** and **mandatory zeroization** — a `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
@@ -38,10 +38,10 @@ pw.expose_secret_mut().clear();
 
 #[cfg(feature = "encoding-hex")]
 {
-    use secure_gate::{FromHexStr, ToHex};
+    use secure_gate::ToHex;
     let hex = key.with_secret(|bytes| bytes.to_hex()); // `EncodedSecret`: wiped on drop
-    let decoded: Vec<u8> = hex.try_from_hex().expect("valid hex");
-    key.with_secret(|original| assert_eq!(decoded, original));
+    let decoded = Aes256Key::try_from_hex(&hex).expect("valid hex"); // straight into the wrapper
+    decoded.with_secret(|d| key.with_secret(|original| assert_eq!(d, original)));
 }
 ```
 
@@ -225,16 +225,16 @@ secure-gate = "0.9.0-rc"                                                        
 Both release lines are pre-release only, and a caret requirement matches a pre-release only
 when it names one: `"0.9"` resolves to nothing, while `"0.9.0-rc"` tracks the newest
 `0.9.0-rc.N` and keeps resolving once `0.9.0` ships. Release candidates have carried breaking
-changes, so pin `"=0.9.0-rc.15"` when `cargo update` must stay put.
+changes, so pin `"=0.9.0-rc.16"` when `cargo update` must stay put.
 <!-- Every concrete version in this file equals the version in Cargo.toml; bump them in the
      same commit. The install lines use the tracking form and carry no version. -->
 
 | Branch | Version | Edition | MSRV | Status |
 |---|---|---|---|---|
-| `main` | 0.9.x | 2024 | 1.85 | Active development |
+| `main` | 0.9.x | 2024 | 1.87 | Active development |
 | `release/0.8` | 0.8.x | 2021 | 1.70 | Same API as of 0.8.0-rc.14; a final backport follows 0.9.0 stable |
 
-On Rust older than 1.85, use `secure-gate = "0.8.0-rc"`. Changes per release, including the
+On Rust older than 1.87, use `secure-gate = "0.8.0-rc"`. Changes per release, including the
 breaking ones, are in [CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/main/CHANGELOG.md).
 
 ## Features
@@ -243,7 +243,7 @@ breaking ones, are in [CHANGELOG.md](https://github.com/Slurp9187/secure-gate/bl
 |---|---|
 | `alloc` _(default)_ | `Dynamic<T>`, including wiping `Vec` / `String` spare capacity |
 | `std` | `std::io::Read` / `Write` for `Dynamic<Vec<u8>>` (implies `alloc`) |
-| `rand` | `from_random()` (system RNG) and `from_rng()`; heap-free for `Fixed` |
+| `rand` | `from_random()` (system RNG); heap-free for `Fixed`. For an RNG you supply, use `try_new_with(\|b\| rng.try_fill_bytes(b))`, which needs no feature |
 | `ct-eq` | `ConstantTimeEq` via `subtle` |
 | `encoding` | All of `encoding-hex`, `-base32`, `-base64`, `-bech32` |
 | `serde` | `serde-deserialize` (1 MiB default limit) and `serde-serialize` (opt-in per type via `SerializableSecret`) |
@@ -263,7 +263,7 @@ stack-capable counterpart, kept for `no_std` and speed; for a long-held secret p
 
 ## Contributing
 
-MSRV is 1.85; regenerate `Cargo.lock` with `cargo +1.85 update`. CI runs lint, tests across
+MSRV is 1.87; regenerate `Cargo.lock` with `cargo +1.87 update`. CI runs lint, tests across
 feature combinations, rustdoc with `--all-features` (the docs.rs set, and the documentation
 contract), the MSRV, AddressSanitizer, and fuzz targets; see
 [`.github/workflows/`](.github/workflows/).

@@ -5,10 +5,10 @@
 //! | Type | Produced by | Feature |
 //! |------|------------|---------|
 //! | [`FromSliceError`] | [`Fixed::try_from(&[u8])`](crate::Fixed) | Always |
-//! | [`HexError`] | [`Fixed::try_from_hex`](crate::Fixed::try_from_hex), [`FromHexStr`](crate::FromHexStr) | `encoding-hex` |
-//! | [`Base32Error`] | [`Fixed::try_from_base32`](crate::Fixed::try_from_base32), [`FromBase32Str`](crate::FromBase32Str) | `encoding-base32` |
-//! | [`Base64Error`] | [`Fixed::try_from_base64url`](crate::Fixed::try_from_base64url), [`FromBase64UrlStr`](crate::FromBase64UrlStr) | `encoding-base64` |
-//! | [`Bech32Error`] | `try_from_bech32*`, [`FromBech32Str`](crate::FromBech32Str), [`FromBech32mStr`](crate::FromBech32mStr) | `encoding-bech32` |
+//! | [`HexError`] | [`Fixed::try_from_hex`](crate::Fixed::try_from_hex), [`Dynamic::try_from_hex`](crate::Dynamic::try_from_hex) | `encoding-hex` |
+//! | [`Base32Error`] | [`Fixed::try_from_base32`](crate::Fixed::try_from_base32), [`Dynamic::try_from_base32`](crate::Dynamic::try_from_base32) | `encoding-base32` |
+//! | [`Base64Error`] | [`Fixed::try_from_base64url`](crate::Fixed::try_from_base64url), [`Dynamic::try_from_base64url`](crate::Dynamic::try_from_base64url) | `encoding-base64` |
+//! | [`Bech32Error`] | `try_from_bech32*` / `try_from_bech32m*` on `Fixed` and `Dynamic` | `encoding-bech32` |
 //!
 //! Every type in this module is produced by a function in this crate. There is no
 //! unified wrapper enum: a caller decoding several formats owns the union it needs,

@@ -60,7 +60,7 @@ curl -s https://index.crates.io/se/cu/secure-gate | jq -r 'select(.yanked==false
 
 ## Two lines, two changelogs, one crate
 
-`main` (0.9.x, edition 2024, MSRV 1.85) and `release/0.8` (0.8.x, edition 2021, MSRV 1.70) are
+`main` (0.9.x, edition 2024, MSRV 1.87) and `release/0.8` (0.8.x, edition 2021, MSRV 1.70) are
 independently versioned and tagged, and **each branch's `CHANGELOG.md` describes only its own
 line.** One changelog per branch, at the root.
 

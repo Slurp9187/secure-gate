@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0-rc.16] - Unreleased
+
+### Security
+- **MSRV is now 1.87** (was 1.85), to take the fix for RUSTSEC-2026-0385. `ctutils`, which
+  reaches `sealed` through `chacha20poly1305 -> poly1305 -> universal-hash` (the Poly1305 tag
+  comparison), could compile its `Choice` mask generation to a branch on a secret before
+  0.4.4, and its `u128` comparisons branched on 32-bit targets. Every patched release
+  declares `rust-version = "1.87"`. `Cargo.lock` moves to 0.4.7, and `Cargo.toml` adds a
+  `ctutils >= 0.4.4` floor under the `sealed` feature, because a lockfile does not reach
+  dependents. `cargo audit` had been red on `main` since the advisory was published.
+  `guarded-block` keeps its own MSRV of 1.85; it does not use `ctutils`. A dependent that
+  declares an MSRV below 1.87 has to raise it to take this release (a tree holding
+  `criterion` 0.7, whose `clap` 4.6 declares exactly 1.85, is the known case); that cost
+  was chosen over an audit ignore because the branch sits in the tag comparison every
+  `sealed` user runs. On Rust 1.85 or 1.86, use the 0.8 line (`secure-gate = "0.8.0-rc"`,
+  MSRV 1.70). The compile-fail snapshots are re-recorded on 1.87; only rustc's wording
+  changed.
+
+### Changed
+- **`from_rng` is removed** (pre-stable API change) from `Fixed`, `Dynamic<Vec<u8>>` and the
+  types `fixed_newtype!` / `dynamic_newtype!` generate. It took `R: TryRng + TryCryptoRng`,
+  which put `rand` 0.10, a pre-1.0 crate, into this crate's public API: the next `rand`
+  release would have forced a breaking release here. It also accepted only that one `rand`
+  version's RNGs. Its body was already one call to `try_new_with`, which takes any fallible
+  fill and wipes the buffer on `Err`, so nothing is lost. Migrate with:
+
+  ```rust
+  // before
+  let key = Fixed::<[u8; 32]>::from_rng(&mut rng)?;
+  let tok = Dynamic::<Vec<u8>>::from_rng(24, &mut rng)?;
+  // after (`use rand::TryRng;` for `try_fill_bytes`)
+  let key = Fixed::<[u8; 32]>::try_new_with(|b| rng.try_fill_bytes(b))?;
+  let tok = Dynamic::<Vec<u8>>::try_new_with(24, |b| rng.try_fill_bytes(b))?;
+  ```
+
+  The same closure takes an RNG from any `rand` version, `getrandom`, a crypto provider or
+  a hardware source, and needs no feature. `from_random()` is unchanged. `rand` is now a
+  private dependency (the system RNG behind `from_random` and `sealed`), so a future `rand`
+  bump is not an API change. The `try_new_with` docs on `Fixed` and `Dynamic` gain a
+  seeded-RNG example.
+- **The `From*Str` decoder traits are removed** (pre-stable API change): `FromHexStr`,
+  `FromBase32Str`, `FromBase64UrlStr`, `FromBech32Str` and `FromBech32mStr`, which were
+  implemented on every string. They duplicated the `try_from_*` constructors on `Fixed` and
+  `Dynamic`, and they were the one decode path that handed secret bytes out unwrapped: a
+  dropped `Vec<u8>` left the decoded secret in freed heap memory, and the README's quick start
+  decoded through exactly that path. Returning `zeroize::Zeroizing<Vec<u8>>` instead was
+  tried and rejected: it put a foreign type, with a `Debug` that prints the bytes, at this
+  crate's boundary, and it made callers who name the type add `zeroize` themselves. Decoding
+  now always lands in a wrapper this crate owns. Migrate with:
+
+  ```rust
+  // before                                 // after
+  let b = s.try_from_hex()?;                let b = Dynamic::<Vec<u8>>::try_from_hex(&s)?;
+                                            // or Fixed::<[u8; 32]>::try_from_hex(&s)? for a known size
+  let (hrp, b) = s.try_from_bech32_unchecked()?;
+  // the payload: Dynamic::<Vec<u8>>::try_from_bech32_unchecked(&s)?
+  // the HRP: the text before the last `1` (`s.rsplit_once('1')`), in its original case;
+  // trust it only after `Dynamic::try_from_bech32(&s, hrp)` succeeds
+  ```
+
+  The decoders now live inside `Dynamic::try_from_*`, where the decoded buffer is wrapped in
+  `Zeroizing` as soon as it exists; nothing changes for `Fixed`/`Dynamic` callers.
+
 ## [0.9.0-rc.15] - 2026-10-20
 
 ### Security

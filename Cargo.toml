@@ -1,8 +1,8 @@
 [package]
 name = "secure-gate"
-version = "0.9.0-rc.15"
+version = "0.9.0-rc.16"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Slurp9187/secure-gate"
 
@@ -30,10 +30,18 @@ base16ct = { version = "1", optional = true, default-features = false }
 # lives there and this crate keeps `#![forbid(unsafe_code)]`; the path is for local builds
 # and CI, the version is what the published manifest keeps. `zeroize` on the first two wipes
 # the cipher's copy of the key and the hasher's state when they drop. All three declare
-# `rust-version = "1.85"`.
+# `rust-version = "1.85"`; this crate's own 1.87 comes from `ctutils`, below.
 chacha20poly1305 = { version = "0.11", optional = true, default-features = false, features = ["zeroize"] }
 guarded-block = { version = "0.1.0", path = "guarded-block", optional = true }
 sha2 = { version = "0.11", optional = true, default-features = false, features = ["zeroize"] }
+# Not used directly: a version floor on a transitive dependency, for the same reason as
+# `base32ct` below. `ctutils` reaches the cipher through `chacha20poly1305 -> poly1305 ->
+# universal-hash` (the tag comparison), and below 0.4.4 its `Choice` mask generation could
+# compile to a branch on a secret, and its `u128` comparisons branched on 32-bit targets
+# (RUSTSEC-2026-0385). Our lockfile does not travel downstream, so without this line a
+# dependent's own lockfile could keep 0.4.2. Every patched release declares
+# `rust-version = "1.87"`, which is why this crate's MSRV is 1.87.
+ctutils = { version = "0.4.4", optional = true, default-features = false }
 # `default-features = false` is a no-op for base32ct (it has none), but keeps the
 # three `*ct` lines uniform. The `0.3.1` floor is load-bearing rather than
 # cosmetic: `0.3.0` panics with an out-of-bounds index when an unpadded input's
@@ -45,8 +53,9 @@ sha2 = { version = "0.11", optional = true, default-features = false, features =
 base32ct = { version = "0.3.1", optional = true, default-features = false }
 base64ct = { version = "1", optional = true, default-features = false }
 bech32 = { version = "0.11", default-features = false, optional = true }
-# `sys_rng` provides `rngs::SysRng` without pulling `std`; the `TryRng` /
-# `TryCryptoRng` traits come from `rand_core` and are always available.
+# `sys_rng` provides `rngs::SysRng` without pulling `std`. A private dependency: no `rand`
+# type appears in this crate's API (a caller-supplied RNG fills through `try_new_with`), so a
+# `rand` bump here is never a breaking change for dependents.
 # On bare-metal targets `getrandom` additionally requires a user-configured
 # backend (see the `rand` feature docs in lib.rs).
 rand = { version = "0.10", optional = true, default-features = false, features = ["sys_rng"] }
@@ -138,7 +147,7 @@ encoding-bech32 = ["dep:bech32"]
 # Sealed: secrets held encrypted in RAM while idle (`SealedFixed`, `SealedDynamic`),
 # opened for one closure call at a time. Needs `std` for the lockable, wipeable pre-key and
 # `rand` for its bytes and every seal's salt. Not part of `full`, which excludes `std`.
-sealed = ["std", "rand", "dep:chacha20poly1305", "dep:sha2", "dep:guarded-block"]
+sealed = ["std", "rand", "dep:chacha20poly1305", "dep:sha2", "dep:guarded-block", "dep:ctutils"]
 
 # Cloneable: opt-in cloning
 cloneable = []

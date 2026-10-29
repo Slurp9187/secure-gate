@@ -26,14 +26,14 @@
 //!   or multi-step operations, prefer `with_secret(|b| b.to_base32())` — the borrow
 //!   checker enforces the reference cannot escape the closure.
 //! - **Canonical form only**: uppercase, unpadded. See
-//!   [`FromBase32Str`](crate::FromBase32Str) for what the decoder accepts.
+//!   [`Fixed::try_from_base32`](crate::Fixed::try_from_base32) for what the decoder accepts.
 //!
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "encoding-base32")]
+//! # #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 //! use secure_gate::{Fixed, ToBase32, RevealSecret};
-//! # #[cfg(feature = "encoding-base32")]
+//! # #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 //! {
 //! let secret = Fixed::new([0x42u8; 4]);
 //!

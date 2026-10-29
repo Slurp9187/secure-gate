@@ -493,15 +493,6 @@ macro_rules! fixed_newtype {
                 /// Generates the secret from the system RNG.
                 #[inline]
                 pub fn from_random() -> Self { Self($crate::Fixed::from_random()) }
-
-                /// Generates the secret from a caller-supplied CSPRNG.
-                #[inline]
-                pub fn from_rng<R>(rng: &mut R) -> ::core::result::Result<Self, R::Error>
-                where
-                    R: $crate::__private::TryRng + $crate::__private::TryCryptoRng,
-                {
-                    ::core::result::Result::Ok(Self($crate::Fixed::from_rng(rng)?))
-                }
             }
         }
 

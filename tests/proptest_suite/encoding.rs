@@ -120,7 +120,7 @@ mod bech32m_roundtrip {
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 mod bech32_sized_roundtrip {
     use proptest::prelude::*;
-    use secure_gate::{BECH32_CODE_LENGTH, Bech32Error, FromBech32Str, ToBech32};
+    use secure_gate::{BECH32_CODE_LENGTH, Bech32Error, Dynamic, RevealSecret, ToBech32};
 
     const BIG: usize = 4096;
 
@@ -138,8 +138,8 @@ mod bech32_sized_roundtrip {
             prop::collection::vec(any::<u8>(), 1500usize..1600), // KEM-sized
         ]) {
             let encoded = data.try_to_bech32_sized::<BIG>("age", secure_gate::Case::Lower).expect("encodes").into_inner();
-            let decoded = encoded.try_from_bech32_sized::<BIG>("age").expect("decodes");
-            prop_assert_eq!(decoded, data);
+            let decoded = Dynamic::<Vec<u8>>::try_from_bech32_sized::<BIG>(&encoded, "age").expect("decodes");
+            prop_assert_eq!(decoded.expose_secret(), &data);
         }
 
         /// The code length is a gate, never an input to the checksum: encoding the same
@@ -165,8 +165,8 @@ mod bech32_sized_roundtrip {
             let encoded = data.try_to_bech32_sized::<BIG>("age", secure_gate::Case::Lower).expect("encodes").into_inner();
             prop_assume!(encoded.len() > BECH32_CODE_LENGTH);
             prop_assert_eq!(
-                encoded.try_from_bech32("age"),
-                Err(Bech32Error::OperationFailed)
+                Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "age").unwrap_err(),
+                Bech32Error::OperationFailed
             );
         }
 
@@ -177,8 +177,8 @@ mod bech32_sized_roundtrip {
         ) {
             let encoded = data.try_to_bech32_sized::<BIG>("age", secure_gate::Case::Lower).expect("encodes").into_inner();
             prop_assert_eq!(
-                encoded.try_from_bech32_sized::<BIG>("kem"),
-                Err(Bech32Error::UnexpectedHrp)
+                Dynamic::<Vec<u8>>::try_from_bech32_sized::<BIG>(&encoded, "kem").unwrap_err(),
+                Bech32Error::UnexpectedHrp
             );
         }
     }
@@ -187,7 +187,7 @@ mod bech32_sized_roundtrip {
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 mod bech32m_sized_roundtrip {
     use proptest::prelude::*;
-    use secure_gate::{FromBech32mStr, ToBech32m};
+    use secure_gate::{Dynamic, RevealSecret, ToBech32m};
 
     const BIG: usize = 4096;
 
@@ -201,8 +201,8 @@ mod bech32m_sized_roundtrip {
             prop::collection::vec(any::<u8>(), 1500usize..1600),
         ]) {
             let encoded = data.try_to_bech32m_sized::<BIG>("age", secure_gate::Case::Lower).expect("encodes").into_inner();
-            let decoded = encoded.try_from_bech32m_sized::<BIG>("age").expect("decodes");
-            prop_assert_eq!(decoded, data);
+            let decoded = Dynamic::<Vec<u8>>::try_from_bech32m_sized::<BIG>(&encoded, "age").expect("decodes");
+            prop_assert_eq!(decoded.expose_secret(), &data);
         }
     }
 }
@@ -210,7 +210,7 @@ mod bech32m_sized_roundtrip {
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 mod bech32_variants_never_cross {
     use proptest::prelude::*;
-    use secure_gate::{FromBech32Str, FromBech32mStr, ToBech32, ToBech32m};
+    use secure_gate::{Dynamic, ToBech32, ToBech32m};
 
     const BIG: usize = 4096;
 
@@ -230,8 +230,8 @@ mod bech32_variants_never_cross {
             // Identical payloads, different checksums: the strings differ, and
             // neither decodes under the other's algorithm.
             prop_assert_ne!(&b32, &b32m);
-            prop_assert!(b32.try_from_bech32m_sized::<BIG>("x").is_err());
-            prop_assert!(b32m.try_from_bech32_sized::<BIG>("x").is_err());
+            prop_assert!(Dynamic::<Vec<u8>>::try_from_bech32m_sized::<BIG>(&b32, "x").is_err());
+            prop_assert!(Dynamic::<Vec<u8>>::try_from_bech32_sized::<BIG>(&b32m, "x").is_err());
         }
     }
 }

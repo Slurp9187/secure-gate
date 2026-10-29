@@ -117,8 +117,8 @@
 //! │   ├── ConstantTimeEq    ← ct-eq feature
 //! │   ├── CloneableSecret   ← cloneable feature
 //! │   ├── SerializableSecret← serde-serialize feature
-//! │   ├── encoding/         ← ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m
-//! │   └── decoding/         ← FromHexStr, FromBase32Str, FromBase64UrlStr, FromBech32Str, FromBech32mStr
+//! │   └── encoding/         ← ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m
+//! │                           (decoding: the `try_from_*` constructors on Fixed / Dynamic)
 //! ├── macros/               ← fixed_newtype!, dynamic_newtype!
 //! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error
 //! ```
@@ -204,17 +204,17 @@
 //! | `std` | no | Full `std` support (implies `alloc`) |
 //! | | | **Cryptographic** |
 //! | `ct-eq` | no | [`ConstantTimeEq`] via `subtle` — timing-safe comparison |
-//! | `rand` | no | `from_random()` / `from_rng()` — `no_std` for [`Fixed`] |
+//! | `rand` | no | `from_random()` (system RNG) — `no_std` for [`Fixed`] |
 //! | `sealed` | no | `SealedFixed` / `SealedDynamic`: secrets encrypted in RAM while idle, under a locked `Prekey` (implies `std`, `rand`) |
 //! | | | **Serialization** |
 //! | `serde-serialize` | no | Serde `Serialize` (requires [`SerializableSecret`] marker) |
 //! | `serde-deserialize` | no | Serde `Deserialize` with 1 MiB default limit |
 //! | `serde` | no | Both directions |
 //! | | | **Encoding** |
-//! | `encoding-hex` | no | [`ToHex`] / [`FromHexStr`] via `base16ct` (constant-time) |
-//! | `encoding-base32` | no | [`ToBase32`] / [`FromBase32Str`] via `base32ct` (constant-time) |
-//! | `encoding-base64` | no | [`ToBase64Url`] / [`FromBase64UrlStr`] via `base64ct` (constant-time) |
-//! | `encoding-bech32` | no | [`ToBech32`] / [`FromBech32Str`] (BIP-173) **and** [`ToBech32m`] / [`FromBech32mStr`] (BIP-350); `_sized::<N>` for a caller-chosen code length |
+//! | `encoding-hex` | no | [`ToHex`] / `try_from_hex` via `base16ct` (constant-time) |
+//! | `encoding-base32` | no | [`ToBase32`] / `try_from_base32` via `base32ct` (constant-time) |
+//! | `encoding-base64` | no | [`ToBase64Url`] / `try_from_base64url` via `base64ct` (constant-time) |
+//! | `encoding-bech32` | no | [`ToBech32`] / `try_from_bech32` (BIP-173) **and** [`ToBech32m`] / `try_from_bech32m` (BIP-350); `_sized::<N>` for a caller-chosen code length |
 //! | `encoding` | no | All encoding features |
 //! | | | **Meta** |
 //! | `cloneable` | no | [`CloneableSecret`] opt-in cloning |
@@ -234,7 +234,7 @@
 //! - [`FromSliceError`]
 //!
 //! **Not** available without `alloc`: [`Dynamic<T>`], [`EncodedSecret`],
-//! encoding traits ([`ToHex`], etc.), decoding traits ([`FromHexStr`], etc.),
+//! encoding traits ([`ToHex`], etc.), the `Dynamic::try_from_*` decoders,
 //! [`dynamic_newtype!`], serde support.
 //!
 //! # `no_std`
@@ -242,14 +242,14 @@
 //! `no_std` compatible (`#![no_std]` unless the `std` feature is enabled — verified in CI
 //! by cross-building for `thumbv7em-none-eabihf`). [`Fixed<T>`] works without `alloc`.
 //! Enable `alloc` (default) for [`Dynamic<T>`]. For pure stack / embedded builds, use
-//! `default-features = false`. MSRV: **1.85** (Rust edition 2024).
+//! `default-features = false`. MSRV: **1.87** (Rust edition 2024).
 //!
 //! One caveat: the `rand` feature compiles without `std` or `alloc`, but
 //! [`Fixed::from_random`] relies on `getrandom`, which needs a platform entropy backend.
 //! On bare-metal targets you must configure one (see the `getrandom` crate's
 //! "custom backend" documentation); without it, builds enabling `rand` fail at link
-//! time on such targets. [`Fixed::from_rng`] with a caller-supplied RNG has no such
-//! requirement.
+//! time on such targets. Filling from a caller-supplied RNG through
+//! [`Fixed::try_new_with`] has no such requirement, and needs no feature at all.
 //!
 //! # Security
 //!
@@ -334,8 +334,6 @@ pub mod scoped;
 pub mod __private {
     #[cfg(feature = "alloc")]
     pub use alloc::{boxed::Box, string::String, vec::Vec};
-    #[cfg(feature = "rand")]
-    pub use rand::{TryCryptoRng, TryRng};
     #[cfg(feature = "serde-deserialize")]
     pub use serde::{Deserialize, Deserializer};
     #[cfg(feature = "serde-serialize")]
@@ -620,42 +618,17 @@ pub use traits::SerializableSecret;
 // Newtype macros (`dynamic_newtype!` needs `alloc`)
 mod macros;
 
-/// Decodes Base32 strings (`&str`) to `Vec<u8>`. Blanket impl for `AsRef<str>`.
-/// Requires `encoding-base32` + `alloc`. See [`ToBase32`] for the encoding counterpart.
-#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
-pub use traits::FromBase32Str;
-
-/// Decodes Base64url strings (`&str`) to `Vec<u8>`. Blanket impl for `AsRef<str>`.
-/// Requires `encoding-base64` + `alloc`. See [`ToBase64Url`] for the encoding counterpart.
-#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
-pub use traits::FromBase64UrlStr;
-
-/// Decodes Bech32 (BIP-173) strings to `Vec<u8>` with HRP validation.
-/// Requires `encoding-bech32` + `alloc`. See [`ToBech32`] for the encoding counterpart.
-#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-pub use traits::FromBech32Str;
-
-/// Decodes Bech32m (BIP-350) strings to `Vec<u8>` with HRP validation.
-/// Requires `encoding-bech32` + `alloc`. See [`ToBech32m`] for the encoding counterpart.
-#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-pub use traits::FromBech32mStr;
-
-/// Decodes hex strings (`&str`) to `Vec<u8>`. Blanket impl for `AsRef<str>`.
-/// Requires `encoding-hex` + `alloc`. See [`ToHex`] for the encoding counterpart.
-#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
-pub use traits::FromHexStr;
-
 /// Encodes byte data as Base32 strings (RFC 4648 §6, uppercase, no padding).
 /// Blanket impl for `AsRef<[u8]> + `[`EncodableBytes`]. Returns [`EncodedSecret`].
 /// Requires `encoding-base32` + `alloc`.
-/// See [`FromBase32Str`] for the decoding counterpart.
+/// Decode with [`Fixed::try_from_base32`] or [`Dynamic::try_from_base32`].
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 pub use traits::ToBase32;
 
 /// Encodes byte data as Base64url strings (RFC 4648, URL-safe, no padding).
 /// Blanket impl for `AsRef<[u8]> + `[`EncodableBytes`]. Returns [`EncodedSecret`].
 /// Requires `encoding-base64` + `alloc`.
-/// See [`FromBase64UrlStr`] for the decoding counterpart.
+/// Decode with [`Fixed::try_from_base64url`] or [`Dynamic::try_from_base64url`].
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use traits::ToBase64Url;
 
@@ -663,7 +636,7 @@ pub use traits::ToBase64Url;
 /// `AsRef<[u8]> + `[`EncodableBytes`]; returns `Result<`[`EncodedSecret`]`, _>`.
 /// The plain methods use [`BECH32_CODE_LENGTH`]; `try_to_bech32_sized::<N>` takes the
 /// code length as a parameter. Requires `encoding-bech32` + `alloc`.
-/// See [`FromBech32Str`] for the decoding counterpart.
+/// Decode with [`Fixed::try_from_bech32`] or [`Dynamic::try_from_bech32`].
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use traits::ToBech32;
 
@@ -671,7 +644,7 @@ pub use traits::ToBech32;
 /// `AsRef<[u8]> + `[`EncodableBytes`]; returns `Result<`[`EncodedSecret`]`, _>`.
 /// The plain methods use [`BECH32_CODE_LENGTH`]; `try_to_bech32m_sized::<N>` takes the
 /// code length as a parameter. Requires `encoding-bech32` + `alloc`.
-/// See [`FromBech32mStr`] for the decoding counterpart.
+/// Decode with [`Fixed::try_from_bech32m`] or [`Dynamic::try_from_bech32m`].
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use traits::ToBech32m;
 
@@ -710,7 +683,7 @@ pub use traits::{BECH32_CODE_LENGTH, bech32_code_length};
 /// Blanket impl for `AsRef<[u8]> + `[`EncodableBytes`]. Provides `to_hex()` and
 /// `to_hex_upper()`, both returning [`EncodedSecret`].
 /// Requires `encoding-hex` + `alloc`.
-/// See [`FromHexStr`] for the decoding counterpart.
+/// Decode with [`Fixed::try_from_hex`] or [`Dynamic::try_from_hex`].
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub use traits::ToHex;
 

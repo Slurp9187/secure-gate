@@ -677,7 +677,7 @@ fn check_new_with_keeps_the_closures_buffer(size: usize) {
     assert_eq!(w.nonzero, 0, "{} bytes survived the drop", w.nonzero);
 }
 
-/// Pins that `from_random` and `from_rng` generate straight into the buffer that will be protected:
+/// Pins that `from_random`, and `try_new_with` filled from a caller-supplied RNG, generate straight into the buffer that will be protected:
 /// two allocations, no third buffer, exact capacity, and a wipe at drop.
 ///
 /// A generator that filled a scratch buffer and then copied it would leave the scratch copy
@@ -721,15 +721,21 @@ fn check_random_constructors_fill_the_protected_buffer(len: usize) {
 
     let mut rng = <rand::rngs::StdRng as rand::SeedableRng>::from_seed([7u8; 32]);
     let mut tok = None;
-    let allocs = count_allocs(|| tok = Some(Tok::from_rng(len, &mut rng).expect("rng fill")));
-    let tok = tok.expect("from_rng returned");
+    let allocs = count_allocs(|| {
+        tok = Some(
+            Tok::try_new_with(len, |s| rand::TryRng::try_fill_bytes(&mut rng, s))
+                .expect("rng fill"),
+        )
+    });
+    let tok = tok.expect("try_new_with returned");
     assert_eq!(
         allocs, 2,
-        "Tok::from_rng performed {allocs} allocations; expected the same two as from_random"
+        "Tok::try_new_with from a seeded RNG performed {allocs} allocations; expected the same \
+         two as from_random"
     );
     let buffer = tok.expose_secret().as_ptr();
     let w = watch_block(buffer, move || drop(tok));
-    assert!(w.freed, "the from_rng buffer was never released");
+    assert!(w.freed, "the seeded-RNG buffer was never released");
     assert_eq!(w.nonzero, 0, "{} bytes survived the drop", w.nonzero);
 }
 

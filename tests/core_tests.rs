@@ -322,14 +322,14 @@ fn fixed_from_random() {
 
 #[cfg(feature = "rand")]
 #[test]
-fn fixed_from_rng_seeded_deterministic() {
-    use rand::SeedableRng;
+fn fixed_try_new_with_seeded_rng_deterministic() {
     use rand::rngs::StdRng;
+    use rand::{SeedableRng, TryRng};
 
     let mut rng_a = StdRng::from_seed([1u8; 32]);
     let mut rng_b = StdRng::from_seed([1u8; 32]);
-    let key_a: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_a).expect("rng fill");
-    let key_b: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_b).expect("rng fill");
+    let key_a = Fixed::<[u8; 16]>::try_new_with(|b| rng_a.try_fill_bytes(b)).expect("rng fill");
+    let key_b = Fixed::<[u8; 16]>::try_new_with(|b| rng_b.try_fill_bytes(b)).expect("rng fill");
     key_a.with_secret(|a| {
         key_b.with_secret(|b| assert_eq!(a, b, "same seed must yield same bytes"))
     });
@@ -338,14 +338,16 @@ fn fixed_from_rng_seeded_deterministic() {
 #[cfg(feature = "rand")]
 #[cfg(feature = "alloc")]
 #[test]
-fn dynamic_from_rng_seeded() {
-    use rand::SeedableRng;
+fn dynamic_try_new_with_seeded_rng() {
     use rand::rngs::StdRng;
+    use rand::{SeedableRng, TryRng};
     use secure_gate::Dynamic;
 
     let mut rng = StdRng::from_seed([9u8; 32]);
-    let a: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).expect("rng fill");
-    let b: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).expect("rng fill");
+    let a: Dynamic<Vec<u8>> =
+        Dynamic::try_new_with(32, |s| rng.try_fill_bytes(s)).expect("rng fill");
+    let b: Dynamic<Vec<u8>> =
+        Dynamic::try_new_with(32, |s| rng.try_fill_bytes(s)).expect("rng fill");
     a.with_secret(|sa| {
         b.with_secret(|sb| assert_ne!(sa, sb, "sequential draws from same RNG should differ"));
     });
@@ -473,12 +475,10 @@ impl rand::TryRng for FailingRng {
 }
 
 #[cfg(feature = "rand")]
-impl rand::TryCryptoRng for FailingRng {}
-
-#[cfg(feature = "rand")]
 #[test]
-fn fixed_from_rng_error_returns_err() {
-    let result = Fixed::<[u8; 4]>::from_rng(&mut FailingRng);
+fn fixed_try_new_with_failing_rng_returns_err() {
+    use rand::TryRng;
+    let result = Fixed::<[u8; 4]>::try_new_with(|b| FailingRng.try_fill_bytes(b));
     assert!(result.is_err());
 }
 
@@ -589,9 +589,10 @@ fn dynamic_vec_try_new_with_err_propagates() {
 #[cfg(feature = "rand")]
 #[cfg(feature = "alloc")]
 #[test]
-fn dynamic_from_rng_error_returns_err() {
+fn dynamic_try_new_with_failing_rng_returns_err() {
+    use rand::TryRng;
     use secure_gate::Dynamic;
-    let result = Dynamic::<Vec<u8>>::from_rng(32, &mut FailingRng);
+    let result = Dynamic::<Vec<u8>>::try_new_with(32, |s| FailingRng.try_fill_bytes(s));
     assert!(result.is_err());
 }
 

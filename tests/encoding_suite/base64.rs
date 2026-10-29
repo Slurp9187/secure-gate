@@ -1,20 +1,23 @@
 //! encoding_suite/base64.rs — base64url encoding/decoding tests
 
+// `ToBase64Url` and `Dynamic` need `alloc`; `Fixed::try_from_base64url` does not. Every
+// test that encodes, or decodes into `Dynamic`, is gated on `all(encoding-base64, alloc)`
+// so the suite compiles without `alloc` and the literal-string `Fixed` tests run there.
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
-use secure_gate::Dynamic;
+use secure_gate::{Dynamic, ToBase64Url};
 #[cfg(feature = "encoding-base64")]
-use secure_gate::{Fixed, FromBase64UrlStr, RevealSecret, ToBase64Url};
+use secure_gate::{Fixed, RevealSecret};
 
-#[cfg(feature = "encoding-base64")]
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 #[test]
 fn test_slice_to_base64url() {
     let input = b"hello";
     let encoded = input.to_base64url().into_inner();
-    let decoded = encoded.try_from_base64url().expect("valid base64url");
-    assert_eq!(decoded, b"hello");
+    let decoded = Dynamic::<Vec<u8>>::try_from_base64url(&encoded).expect("valid base64url");
+    assert_eq!(decoded.expose_secret(), b"hello");
 }
 
-#[cfg(feature = "encoding-base64")]
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 #[test]
 fn fixed_try_from_base64url_roundtrip() {
     let fixed = Fixed::new([7u8; 32]);
@@ -99,7 +102,7 @@ fn fixed_try_from_base64url_rejects_padding() {
     assert!(Fixed::<[u8; 3]>::try_from_base64url("AAAA=").is_err());
 }
 
-#[cfg(feature = "encoding-base64")]
+#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 #[test]
 fn fixed_try_from_base64url_large_n() {
     let data = [0x42u8; 128];

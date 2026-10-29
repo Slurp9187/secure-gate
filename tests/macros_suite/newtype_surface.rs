@@ -61,7 +61,7 @@ fixed_newtype!(
 fn fixed_full_surface() {
     let k = EncKey::from_random();
     let mut rng = rand::rngs::StdRng::from_seed([3u8; 32]);
-    let r = EncKey::from_rng(&mut rng).unwrap();
+    let r = EncKey::try_new_with(|b| rand::TryRng::try_fill_bytes(&mut rng, b)).unwrap();
     assert_eq!((k.len(), r.len()), (32, 32));
 
     let h = EncKey::try_from_hex(&"ab".repeat(32)).unwrap();
@@ -117,7 +117,7 @@ fn fixed_full_surface() {
 fn dynamic_vec_full_surface() {
     let t = Token::from_random(8);
     let mut rng = rand::rngs::StdRng::from_seed([4u8; 32]);
-    let r = Token::from_rng(8, &mut rng).unwrap();
+    let r = Token::try_new_with(8, |b| rand::TryRng::try_fill_bytes(&mut rng, b)).unwrap();
     assert_eq!((t.len(), r.len()), (8, 8));
 
     let h = Token::try_from_hex("deadbeef").unwrap();
