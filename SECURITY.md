@@ -581,11 +581,14 @@ Two specific consequences:
   redaction is a property of the wrapper, not of `T`. One level down it is the same
   story — `format!("{:?}", enc)` prints `[REDACTED]`, `format!("{:?}", &*enc)` prints
   the encoded secret.
-- **`EncodedSecret::into_zeroizing()` is a downgrade.** It returns `zeroize::Zeroizing<String>`, whose `Debug`
-  is not redacted (`zeroize` 1.8/1.9 derive it; a future release may change the
-  rendering). Zeroize-on-drop is preserved, redaction is not. It exists for APIs that
-  demand a `Zeroizing<T>` by name. Note that this crate does not re-export `zeroize`, so
-  naming that return type means taking a compatible `zeroize` dependency yourself.
+- **`EncodedSecret::into_zeroizing()` hands off to a foreign type.** It returns
+  `zeroize::Zeroizing<String>`. Zeroize-on-drop is preserved, and its `Debug` prints
+  `Zeroizing { .. }`: this crate requires `zeroize` 1.9.1, the release that made it opaque
+  (1.9.0 and earlier printed the value). What is lost is the rest of `EncodedSecret`:
+  `Zeroizing<String>` derefs to `String`, so `{:?}` on `&*value` and every `String`
+  method reach the bytes. It exists for APIs that demand a `Zeroizing<T>` by name. This
+  crate does not re-export `zeroize`, so naming that return type means taking a `zeroize`
+  dependency yourself.
 
 An encoded secret is still the whole secret in a different alphabet. `EncodedSecret` is a
 zeroizing `String` buffer with redacted `Debug` — not a redaction of the value.
@@ -1060,7 +1063,7 @@ byte-shaped newtype can implement it.
 
 - `EncodedSecret::into_inner()` → returns a plain `String`, ends zeroization protection. Use only when an API requires ownership of `String`.
 
-- `EncodedSecret::into_zeroizing()` → returns `Zeroizing<String>`. Zeroize-on-drop is preserved; the redacted `Debug` is **not**, because `zeroize::Zeroizing` derives its own. Prefer this when a downstream API accepts `Zeroizing<String>` by name.
+- `EncodedSecret::into_zeroizing()` → returns `Zeroizing<String>`. Zeroize-on-drop is preserved and its `Debug` is opaque (`zeroize` ≥ 1.9.1, required by this crate), but it derefs to `String`, so the bytes are one `&*` away. Prefer this when a downstream API accepts `Zeroizing<String>` by name.
 
 **Bech32 code length.** The plain `try_to_bech32` / `try_from_bech32` methods use
 `BECH32_CODE_LENGTH` (1023) — the length of the bech32 BCH code, within which the

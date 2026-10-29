@@ -13,8 +13,8 @@
 //!   `_sized::<N>` forms of the last two. Only bech32 and bech32m take a code length.
 //!
 //! It wraps [`zeroize::Zeroizing`] internally, provides redacted `Debug` (`[REDACTED]`),
-//! and offers an `into_zeroizing()` escape hatch that keeps the wiping but not the
-//! redaction. It is the idiomatic way to hand off
+//! and offers an `into_zeroizing()` escape hatch that keeps the wiping and an opaque
+//! `Debug` but hands over a type that derefs to `String`. It is the idiomatic way to hand off
 //! encoded output while preserving the crate’s “secrets are radioactive”
 //! guarantees.
 //!

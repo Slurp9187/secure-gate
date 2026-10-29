@@ -23,6 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   MSRV 1.70). The compile-fail snapshots are re-recorded on 1.87; only rustc's wording
   changed.
 
+- **`zeroize` requirement raised to `1.9.1`** (was `1.8`), so `EncodedSecret::into_zeroizing`
+  no longer prints the secret through `Debug`. `zeroize` 1.9.1 replaced `Zeroizing`'s
+  derived `Debug` with an opaque `Zeroizing { .. }` (RustCrypto/utils#1497); 1.9.0 and
+  earlier printed the wrapped value, and this crate's docs had said `into_zeroizing`
+  drops redaction. With the floor at 1.9.1 a dependent cannot resolve a printing version,
+  and the docs now state the opaque form. What `into_zeroizing` still gives up is the
+  rest of `EncodedSecret`: `Zeroizing<String>` derefs to `String`. The test that pinned
+  the old printing behavior caught the change and now pins the opaque one. 1.9.1 declares
+  `rust-version = "1.85"`, inside this release's 1.87 floor.
+
 ### Changed
 - **`from_rng` is removed** (pre-stable API change) from `Fixed`, `Dynamic<Vec<u8>>` and the
   types `fixed_newtype!` / `dynamic_newtype!` generate. It took `R: TryRng + TryCryptoRng`,

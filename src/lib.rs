@@ -165,9 +165,10 @@
 //!
 //! - `format!("{:?}", &*encoded)` prints the encoded secret. Redaction lives on the
 //!   wrapper, not on `str`; dereferencing first opts out of it.
-//! - [`EncodedSecret::into_zeroizing`] returns a `Zeroizing<String>`, whose `Debug` is
-//!   **not** redacted. It is a deliberate hand-off to a foreign type, not an equivalent
-//!   wrapper.
+//! - [`EncodedSecret::into_zeroizing`] returns a `Zeroizing<String>`. It keeps the wipe,
+//!   and its `Debug` is opaque (`zeroize` ≥ 1.9.1, which this crate requires), but it
+//!   derefs to `String`. It is a deliberate hand-off to a foreign type, not an
+//!   equivalent wrapper.
 //!
 //! # Import paths
 //!
@@ -582,8 +583,8 @@ pub use traits::FixedStorage;
 ///
 /// Use [`into_inner()`](EncodedSecret::into_inner) to extract a plain `String`
 /// (ends zeroization) or [`into_zeroizing()`](EncodedSecret::into_zeroizing) to keep
-/// the wiping. `into_zeroizing` is a partial downgrade: zeroize-on-drop survives, the
-/// redacted `Debug` does not, because `zeroize::Zeroizing` derives its own.
+/// the wiping. `into_zeroizing` is a hand-off to a foreign type: zeroize-on-drop
+/// survives and its `Debug` is opaque, but it derefs to `String`.
 ///
 /// Requires `alloc` feature.
 #[cfg(feature = "alloc")]

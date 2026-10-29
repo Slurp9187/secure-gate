@@ -131,12 +131,11 @@ fn encoded_secret_into_zeroizing_carries_the_content() {
         "into_zeroizing copied the buffer instead of moving it"
     );
 
-    // `into_zeroizing` is a *partial* downgrade, and this is the half that is lost:
-    // `Zeroizing<String>` derives `Debug`, so the encoded secret prints in the clear --
-    // emphatically not `[REDACTED]`. The type's own docs promise exactly that. If a
-    // future `zeroize` starts redacting, this assert fails and the claim in
-    // `EncodedSecret::into_zeroizing` needs rewriting; that is the point of pinning it,
-    // not an accident of the dependency version.
+    // `Zeroizing<String>`'s `Debug` is opaque from `zeroize` 1.9.1, which this crate's
+    // manifest requires; 1.9.0 and earlier printed the value. `into_zeroizing`'s docs
+    // promise the opaque form, so this pins it. If it fails, either the `zeroize` floor
+    // in Cargo.toml was lowered below 1.9.1 or `zeroize` changed `Debug` again, and the
+    // claim in `EncodedSecret::into_zeroizing` (and SECURITY.md) needs rewriting.
     //
     // The rendering is deliberately reduced to a bool before the assert, and never
     // interpolated into the failure message. It is a plaintext copy derived from the
@@ -145,7 +144,14 @@ fn encoded_secret_into_zeroizing_carries_the_content() {
     // though the fixture here is the literal `0xDEADBEEF`. Keep it out of the message.
     let prints_in_clear = format!("{protected:?}").contains(expected);
     assert!(
-        prints_in_clear,
-        "zeroize's Debug no longer prints the value in the clear; fix into_zeroizing's docs"
+        !prints_in_clear,
+        "Zeroizing's Debug printed the value; check the zeroize floor (>= 1.9.1) and fix \
+         into_zeroizing's docs"
+    );
+    // Positive control: what the opaque guard hides is still one deref away. That is the
+    // part of `EncodedSecret` the hand-off does lose, and the docs say so.
+    assert!(
+        format!("{:?}", &**protected).contains(expected),
+        "deref of Zeroizing<String> no longer reaches the String"
     );
 }

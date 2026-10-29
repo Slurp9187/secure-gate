@@ -68,11 +68,15 @@ subtle = { version = "2.6", optional = true, default-features = false }
 # enabling it here would force `syn` + `quote` + `proc-macro2` into every downstream
 # build. It lives in `[dev-dependencies]` below instead. `Display` / `Error` for the
 # types in `src/error.rs` are hand-written for the same reason — see that module.
-zeroize = { version = "1.8", default-features = false }
+#
+# The `1.9.1` floor is load-bearing: that release made `Zeroizing`'s `Debug` opaque
+# (`Zeroizing { .. }`) where 1.9.0 and earlier printed the wrapped value. Below it,
+# `EncodedSecret::into_zeroizing` would hand back a type whose `{:?}` prints the secret.
+zeroize = { version = "1.9.1", default-features = false }
 
 [dev-dependencies]
 # Derive macro for benches/tests/fuzz only; see the `zeroize` note above.
-zeroize = { version = "1.8", default-features = false, features = ["zeroize_derive"] }
+zeroize = { version = "1.9.1", default-features = false, features = ["zeroize_derive"] }
 # `aes` backs the RustCrypto in-place cipher doctest in `src/fixed.rs` (#144).
 # Pinned to the 0.8 line because that is the `cipher` 0.4 / `GenericArray` API the
 # example demonstrates; `aes` 0.9 moves to `hybrid-array` and a different shape.

@@ -210,13 +210,15 @@ impl EncodedSecret {
     ///
     /// This is an explicit escape hatch for APIs that name `Zeroizing<String>`.
     ///
-    /// # This downgrades `Debug`
+    /// # What carries over, and what does not
     ///
-    /// Zeroize-on-drop is preserved, but redaction is not: `Zeroizing<String>` derives
-    /// `Debug` (`zeroize` 1.8/1.9; a future release may change the rendering), so `{:?}`
-    /// on the returned value can print the encoded secret. This crate does not
-    /// re-export `zeroize`, so naming the return type means depending on a compatible
-    /// `zeroize` version directly.
+    /// Zeroize-on-drop is preserved. `{:?}` on the returned value prints
+    /// `Zeroizing { .. }`, not the secret: this crate requires `zeroize` 1.9.1, the release
+    /// that made `Zeroizing`'s `Debug` opaque. What it does not keep is everything else
+    /// `EncodedSecret` does: `Zeroizing<String>` derefs to `String`, so `{:?}` on
+    /// `&*value`, `.clone()`, `.to_string()` and every `String` method reach the bytes,
+    /// and it carries no `#[must_use]`. This crate does not re-export `zeroize`, so naming
+    /// the return type means depending on `zeroize` directly.
     #[inline(always)]
     pub fn into_zeroizing(self) -> zeroize::Zeroizing<alloc::string::String> {
         self.0
