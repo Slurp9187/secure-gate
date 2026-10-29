@@ -15,9 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declares `rust-version = "1.87"`. `Cargo.lock` moves to 0.4.7, and `Cargo.toml` adds a
   `ctutils >= 0.4.4` floor under the `sealed` feature, because a lockfile does not reach
   dependents. `cargo audit` had been red on `main` since the advisory was published.
-  `guarded-block` keeps its own MSRV of 1.85; it does not use `ctutils`. On Rust 1.85 or
-  1.86, use the 0.8 line (`secure-gate = "0.8.0-rc"`, MSRV 1.70). The compile-fail
-  snapshots are re-recorded on 1.87; only rustc's wording changed.
+  `guarded-block` keeps its own MSRV of 1.85; it does not use `ctutils`. A dependent that
+  declares an MSRV below 1.87 has to raise it to take this release (a tree holding
+  `criterion` 0.7, whose `clap` 4.6 declares exactly 1.85, is the known case); that cost
+  was chosen over an audit ignore because the branch sits in the tag comparison every
+  `sealed` user runs. On Rust 1.85 or 1.86, use the 0.8 line (`secure-gate = "0.8.0-rc"`,
+  MSRV 1.70). The compile-fail snapshots are re-recorded on 1.87; only rustc's wording
+  changed.
 
 ### Changed
 - **`from_rng` is removed** (pre-stable API change) from `Fixed`, `Dynamic<Vec<u8>>` and the
