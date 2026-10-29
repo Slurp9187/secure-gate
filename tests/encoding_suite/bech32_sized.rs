@@ -20,6 +20,67 @@ use secure_gate::{Dynamic, Fixed, RevealSecret, SecretLen};
 #[cfg(feature = "encoding-bech32")]
 use secure_gate::{ToBech32, ToBech32m};
 
+// ─────────────────────────── the Checksum impls ───────────────────────────
+
+/// `bech32` asks every `Checksum` implementor to run its `sanity_check` from a unit test:
+/// it verifies the shifted generator table and that the midstate holds the checksum. `N`
+/// never enters either, so the default and a large code length are both checked.
+#[test]
+fn checksum_impls_pass_bech32s_own_sanity_check() {
+    use bech32::primitives::checksum::Checksum;
+    secure_gate::Bech32Standard::sanity_check();
+    secure_gate::Bech32mStandard::sanity_check();
+    secure_gate::Bech32Sized::<65535>::sanity_check();
+    secure_gate::Bech32mSized::<65535>::sanity_check();
+}
+
+/// The impls copy their constants from `bech32`'s own `Bech32` / `Bech32m`, including the
+/// error-correction items `bech32` 0.12 added. Pinned so a drift on either side is a test
+/// failure rather than a silently different code.
+#[test]
+fn checksum_constants_match_bech32s_own_impls() {
+    use bech32::primitives::checksum::Checksum;
+    use secure_gate::{Bech32Standard, Bech32mStandard};
+
+    assert_eq!(Bech32Standard::GENERATOR_SH, bech32::Bech32::GENERATOR_SH);
+    assert_eq!(
+        Bech32Standard::TARGET_RESIDUE,
+        bech32::Bech32::TARGET_RESIDUE
+    );
+    assert_eq!(
+        Bech32Standard::CHECKSUM_LENGTH,
+        bech32::Bech32::CHECKSUM_LENGTH
+    );
+    assert_eq!(Bech32Standard::CODE_LENGTH, bech32::Bech32::CODE_LENGTH);
+    assert_eq!(
+        Bech32Standard::ROOT_GENERATOR,
+        bech32::Bech32::ROOT_GENERATOR
+    );
+    assert_eq!(
+        Bech32Standard::ROOT_EXPONENTS,
+        bech32::Bech32::ROOT_EXPONENTS
+    );
+
+    assert_eq!(Bech32mStandard::GENERATOR_SH, bech32::Bech32m::GENERATOR_SH);
+    assert_eq!(
+        Bech32mStandard::TARGET_RESIDUE,
+        bech32::Bech32m::TARGET_RESIDUE
+    );
+    assert_eq!(
+        Bech32mStandard::CHECKSUM_LENGTH,
+        bech32::Bech32m::CHECKSUM_LENGTH
+    );
+    assert_eq!(Bech32mStandard::CODE_LENGTH, bech32::Bech32m::CODE_LENGTH);
+    assert_eq!(
+        Bech32mStandard::ROOT_GENERATOR,
+        bech32::Bech32m::ROOT_GENERATOR
+    );
+    assert_eq!(
+        Bech32mStandard::ROOT_EXPONENTS,
+        bech32::Bech32m::ROOT_EXPONENTS
+    );
+}
+
 // ─────────────────────────── the helper ───────────────────────────
 
 #[test]

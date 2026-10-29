@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0-rc.17] - Unreleased
+
+### Security
+- **`sealed` now wipes the Poly1305 state on drop.** `poly1305` wipes its whole struct (the
+  one-time MAC key `r`/`s` it loads for each seal, and the accumulator) only under its own
+  `zeroize` feature, and `chacha20poly1305`'s `zeroize` feature does not turn that on, so the
+  `Poly1305` instance behind every seal's tag was dropped unwiped. chacha20poly1305 always
+  wiped its own copy of the MAC key; this covers the second copy. `Cargo.toml` adds
+  `poly1305` as a direct optional dependency under `sealed` with `features = ["zeroize"]`,
+  which turns the feature on through Cargo's feature unification, the same mechanism as the
+  `ctutils` floor. Found by this release's zeroize audit. No API or output change.
+
+### Changed
+- **`bech32` 0.11 → 0.12** (pre-stable API change for one narrow case). `Bech32Sized<N>` and
+  `Bech32mSized<N>` implement `bech32::primitives::checksum::Checksum`, so this crate's
+  `bech32` version is part of its public API. 0.12 added error-correction items to that
+  trait (`CorrectionField`, `ROOT_GENERATOR`, `ROOT_EXPONENTS`); both impls now carry them,
+  copied from `bech32`'s own `Bech32` / `Bech32m` and pinned by a test that compares them,
+  and pass `bech32`'s `Checksum::sanity_check`. This crate never calls correction.
+  - **Unaffected:** every `to_bech32*` / `try_from_bech32*` caller, encoded output (byte-identical),
+    and decoding.
+  - **Affected:** code that passes `Bech32Sized` / `Bech32mSized` to `bech32`'s own API must
+    use `bech32` 0.12.
+- **Dependency refresh.** `Cargo.lock` takes the current Rust-1.87-compatible patch release
+  of every dependency (rand 0.10.3, serde_json 1.0.154, and transitive patches). Releases that
+  need 1.88 are skipped by the MSRV-aware resolver and not required: sha2 0.11.1, proptest
+  1.12, trybuild 1.0.122. Dev-only: criterion 0.7 → 0.8 (MSRV 1.86). `aes` stays on 0.8 in
+  dev-dependencies on purpose (its doctest demonstrates the `cipher` 0.4 API).
+- **Zeroize audit.** Every crate in the `sealed` graph that holds key, keystream, MAC or hash
+  state now has its `zeroize` feature on: chacha20poly1305, chacha20, sha2, digest and
+  block-buffer already did; poly1305 is the fix under Security above. `cipher`,
+  `crypto-common` and `hybrid-array` have the flag but turning it on would wipe nothing more;
+  the reasoning is recorded in `Cargo.toml`. No other dependency has a `zeroize` feature.
+
 ## [0.9.0-rc.16] - 2026-10-29
 
 ### Security

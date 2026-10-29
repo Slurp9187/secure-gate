@@ -160,6 +160,15 @@ pub enum Bech32Sized<const CODE_LENGTH: usize> {}
 impl<const N: usize> Checksum for Bech32Sized<N> {
     type MidstateRepr = u32;
 
+    // Error-correction data, required by `bech32` 0.12: the extension field and root of the
+    // length-1023 BCH code, copied from `bech32`'s own `Bech32` impl. This crate never calls
+    // correction, so these only satisfy the trait; above `N = 1023` they describe a code the
+    // string no longer is, the same caveat as the detection guarantee documented above.
+    type CorrectionField = bech32::Fe1024;
+    const ROOT_GENERATOR: Self::CorrectionField =
+        bech32::Fe1024::new([bech32::Fe32::P, bech32::Fe32::X]);
+    const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 24..=26;
+
     const CODE_LENGTH: usize = N;
     const CHECKSUM_LENGTH: usize = 6;
 
