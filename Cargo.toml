@@ -1,6 +1,6 @@
 [package]
 name = "secure-gate"
-version = "0.9.0-rc.16"
+version = "0.9.0-rc.17"
 edition = "2024"
 rust-version = "1.87"
 license = "MIT OR Apache-2.0"
@@ -29,11 +29,28 @@ base16ct = { version = "1", optional = true, default-features = false }
 # own crate (`guarded-block/`), published separately so the `unsafe` page protection needs
 # lives there and this crate keeps `#![forbid(unsafe_code)]`; the path is for local builds
 # and CI, the version is what the published manifest keeps. `zeroize` on the first two wipes
-# the cipher's copy of the key and the hasher's state when they drop. All three declare
-# `rust-version = "1.85"`; this crate's own 1.87 comes from `ctutils`, below.
+# the cipher's copy of the key and the hasher's state when they drop. chacha20poly1305,
+# guarded-block and sha2 0.11.0 declare `rust-version = "1.85"`; this crate's own 1.87 comes
+# from `ctutils`, below. sha2 0.11.1 declares 1.88: the `"0.11"` requirement admits it and the
+# MSRV-aware resolver skips it on a 1.87 toolchain, so the floor here stays at 0.11.
+#
+# Zeroize audit (rc.17): `zeroize` is on for chacha20poly1305, chacha20, sha2, digest and
+# block-buffer through these two features, and for poly1305 through the line below; that is
+# every crate here that holds key, keystream, MAC or hash state. `cipher`, `crypto-common` and
+# `hybrid-array` also have the flag and leave it off on purpose: `cipher`'s only adds a
+# `ZeroizeOnDrop` marker to a wrapper whose buffer block-buffer already wipes, and the other two
+# only add `Zeroize` impls for arrays this graph never holds key material in (chacha20poly1305
+# wipes its key itself). No other dependency has a `zeroize` feature.
 chacha20poly1305 = { version = "0.11", optional = true, default-features = false, features = ["zeroize"] }
 guarded-block = { version = "0.1.0", path = "guarded-block", optional = true }
 sha2 = { version = "0.11", optional = true, default-features = false, features = ["zeroize"] }
+# Not used directly: turns on poly1305's own `zeroize` feature, which chacha20poly1305's does
+# not. Without it the `Poly1305` instance that computes each seal's tag (holding the one-time
+# MAC key `r`/`s` and the accumulator) is dropped unwiped; with it, its `Drop` wipes the whole
+# struct. chacha20poly1305 wipes its own copy of the MAC key either way. Same mechanism as the
+# `ctutils` floor below: a direct optional dependency that only adds a feature. `rust-version`
+# 1.85.
+poly1305 = { version = "0.9.1", optional = true, default-features = false, features = ["zeroize"] }
 # Not used directly: a version floor on a transitive dependency, for the same reason as
 # `base32ct` below. `ctutils` reaches the cipher through `chacha20poly1305 -> poly1305 ->
 # universal-hash` (the tag comparison), and below 0.4.4 its `Choice` mask generation could
@@ -52,7 +69,10 @@ ctutils = { version = "0.4.4", optional = true, default-features = false }
 # declares the same `rust-version` as `0.3.0`, so the floor costs no MSRV.
 base32ct = { version = "0.3.1", optional = true, default-features = false }
 base64ct = { version = "1", optional = true, default-features = false }
-bech32 = { version = "0.11", default-features = false, optional = true }
+# Public: `Bech32Sized<N>` / `Bech32mSized<N>` implement `bech32`'s `Checksum` trait, so a
+# minor bump here (0.11 -> 0.12 added required `Checksum` items) is a breaking change for
+# anyone who uses those types with `bech32` directly.
+bech32 = { version = "0.12", default-features = false, optional = true }
 # `sys_rng` provides `rngs::SysRng` without pulling `std`. A private dependency: no `rand`
 # type appears in this crate's API (a caller-supplied RNG fills through `try_new_with`), so a
 # `rand` bump here is never a breaking change for dependents.
@@ -81,7 +101,7 @@ zeroize = { version = "1.9.1", default-features = false, features = ["zeroize_de
 # Pinned to the 0.8 line because that is the `cipher` 0.4 / `GenericArray` API the
 # example demonstrates; `aes` 0.9 moves to `hybrid-array` and a different shape.
 aes = "0.8"
-criterion = { version = "0.7", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 proptest = "1.10"
 # `std_rng` adds `rngs::StdRng` for deterministic tests and doctests without
 # forcing it (or `std`) on downstream users of the library's `rand` feature.
@@ -151,7 +171,7 @@ encoding-bech32 = ["dep:bech32"]
 # Sealed: secrets held encrypted in RAM while idle (`SealedFixed`, `SealedDynamic`),
 # opened for one closure call at a time. Needs `std` for the lockable, wipeable pre-key and
 # `rand` for its bytes and every seal's salt. Not part of `full`, which excludes `std`.
-sealed = ["std", "rand", "dep:chacha20poly1305", "dep:sha2", "dep:guarded-block", "dep:ctutils"]
+sealed = ["std", "rand", "dep:chacha20poly1305", "dep:sha2", "dep:guarded-block", "dep:ctutils", "dep:poly1305"]
 
 # Cloneable: opt-in cloning
 cloneable = []
