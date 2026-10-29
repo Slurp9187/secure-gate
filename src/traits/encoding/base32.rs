@@ -31,9 +31,9 @@
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "encoding-base32")]
+//! # #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 //! use secure_gate::{Fixed, ToBase32, RevealSecret};
-//! # #[cfg(feature = "encoding-base32")]
+//! # #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 //! {
 //! let secret = Fixed::new([0x42u8; 4]);
 //!

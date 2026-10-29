@@ -29,9 +29,9 @@
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "encoding-hex")]
+//! # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 //! use secure_gate::{Fixed, ToHex, RevealSecret};
-//! # #[cfg(feature = "encoding-hex")]
+//! # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 //! {
 //! let secret = Fixed::new([0x0au8, 0x0bu8, 0x0cu8, 0x0du8]);
 //!

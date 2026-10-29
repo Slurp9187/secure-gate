@@ -37,14 +37,17 @@
 //! # Example
 //!
 //! ```rust
+//! # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 //! use secure_gate::{Case, Fixed, ToBech32m, RevealSecret};
-//!
+//! # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+//! {
 //! let secret = Fixed::new([0x00u8, 0x01]);
 //!
 //! // Use try_to_bech32m — the sole encoding API:
 //! let encoded = secret.with_secret(|s| s.try_to_bech32m("key", Case::Lower)).unwrap();
 //! assert!(encoded.starts_with("key1"));
 //! // `encoded` is an `EncodedSecret`: wiped on drop, `Debug` redacted.
+//! }
 //! ```
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use super::Case;
@@ -78,12 +81,16 @@ pub use super::bech32::{BECH32_CODE_LENGTH, bech32_code_length};
 /// 90-character cap. Exceeding it produces valid bech32m that wallets will reject.
 ///
 /// ```rust
+/// # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 /// use secure_gate::{Case, ToBech32m};
+/// # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+/// {
 ///
 /// let blob = [0x5Au8; 900];
 /// assert!(blob.try_to_bech32m("kem", Case::Lower).is_err()); // past the 1023 default
 /// let encoded = blob.try_to_bech32m_sized::<2048>("kem", Case::Lower)?;
 /// assert!(encoded.starts_with("kem1"));
+/// # }
 /// # Ok::<(), secure_gate::Bech32Error>(())
 /// ```
 #[cfg(feature = "encoding-bech32")]

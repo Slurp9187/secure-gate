@@ -27,9 +27,9 @@
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "encoding-base64")]
+//! # #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 //! use secure_gate::{Fixed, ToBase64Url, RevealSecret};
-//! # #[cfg(feature = "encoding-base64")]
+//! # #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 //! {
 //! let secret = Fixed::new([0x42u8; 4]);
 //!

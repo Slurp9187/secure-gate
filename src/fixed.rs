@@ -658,12 +658,13 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// ```rust
     /// # #[cfg(feature = "encoding-hex")]
     /// # {
-    /// use secure_gate::{Fixed, RevealSecret, ToHex};
+    /// use secure_gate::{Fixed, RevealSecret};
     ///
     /// // Round-trip: encode then decode.
     /// let original = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
     /// # #[cfg(feature = "alloc")]
     /// # {
+    /// use secure_gate::ToHex;
     /// let hex_str = original.to_hex();
     /// let decoded = Fixed::<[u8; 4]>::try_from_hex(&hex_str).unwrap();
     /// assert_eq!(decoded.expose_secret(), &[0xDE, 0xAD, 0xBE, 0xEF]);
@@ -743,19 +744,16 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(feature = "encoding-base32")]
+    /// # #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
     /// # {
     /// use secure_gate::{Fixed, RevealSecret, ToBase32};
     ///
-    /// # #[cfg(feature = "alloc")]
-    /// # {
     /// // Round-trip.
     /// let original = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
     /// let encoded = original.to_base32();
     /// assert_eq!(&*encoded, "32W353Y");
     /// let decoded = Fixed::<[u8; 4]>::try_from_base32(&encoded).unwrap();
     /// assert_eq!(decoded.expose_secret(), &[0xDE, 0xAD, 0xBE, 0xEF]);
-    /// # }
     /// # }
     /// ```
     pub fn try_from_base32(s: &str) -> Result<Self, crate::error::Base32Error> {
@@ -817,18 +815,15 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(feature = "encoding-base64")]
+    /// # #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
     /// # {
     /// use secure_gate::{Fixed, RevealSecret, ToBase64Url};
     ///
-    /// # #[cfg(feature = "alloc")]
-    /// # {
     /// // Round-trip.
     /// let original = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
     /// let encoded = original.to_base64url();
     /// let decoded = Fixed::<[u8; 4]>::try_from_base64url(&encoded).unwrap();
     /// assert_eq!(decoded.expose_secret(), &[0xDE, 0xAD, 0xBE, 0xEF]);
-    /// # }
     /// # }
     /// ```
     pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {

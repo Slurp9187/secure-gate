@@ -34,9 +34,9 @@
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "encoding-bech32")]
+//! # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 //! use secure_gate::{Case, Fixed, ToBech32, RevealSecret};
-//! # #[cfg(feature = "encoding-bech32")]
+//! # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 //! {
 //! let secret = Fixed::new([0x42u8; 4]);
 //!
@@ -85,12 +85,16 @@ pub const BECH32_CODE_LENGTH: usize = 1023;
 /// the 6-character checksum. Use it to pick an `N` for the `_sized` methods:
 ///
 /// ```rust
+/// # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 /// use secure_gate::{Case, ToBech32, bech32_code_length};
+/// # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+/// {
 ///
 /// const N: usize = bech32_code_length(3, 4096); // hrp "age", 4 KiB payload
 /// let blob = [0xA5u8; 4096];
 /// let encoded = blob.try_to_bech32_sized::<N>("age", Case::Lower)?;
 /// assert!(encoded.starts_with("age1"));
+/// # }
 /// # Ok::<(), secure_gate::Bech32Error>(())
 /// ```
 ///
@@ -136,12 +140,16 @@ pub const fn bech32_code_length(hrp_len: usize, payload_bytes: usize) -> usize {
 /// [`Bech32Standard`].
 ///
 /// ```rust
+/// # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 /// use secure_gate::{Case, ToBech32};
+/// # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+/// {
 ///
 /// // A 2 KiB KEM ciphertext needs a code length well past the BCH bound.
 /// let ct = [0x5Au8; 2048];
 /// let encoded = ct.try_to_bech32_sized::<4096>("kyber", Case::Lower)?;
 /// assert!(encoded.starts_with("kyber1"));
+/// # }
 /// # Ok::<(), secure_gate::Bech32Error>(())
 /// ```
 #[cfg(feature = "encoding-bech32")]
