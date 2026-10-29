@@ -4,6 +4,12 @@ All notable changes to this crate are documented in this file. The format follow
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- `zeroize` requirement raised from 1.8 to 1.9, in step with secure-gate. zeroize 1.9.x
+  declares `rust-version` 1.85, so the MSRV is unchanged.
+
 ## [0.1.0] - 2026-10-20
 
 ### Added

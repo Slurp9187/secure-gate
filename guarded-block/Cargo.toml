@@ -21,7 +21,7 @@ include = ["/src/**/*.rs", "/CHANGELOG.md", "/README.md", "/LICENSE*"]
 # `rust-version` at or below 1.85.
 [dependencies]
 region = { version = "4.0.1", default-features = false }
-zeroize = { version = "1.8", default-features = false }
+zeroize = { version = "1.9", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = { version = "0.2.172", default-features = false }
