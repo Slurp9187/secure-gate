@@ -30,5 +30,6 @@ error[E0599]: no method named `into_wrapper` found for struct `FileId` in the cu
    |
 help: there is a method `into_inner` with a similar name
    |
-14 |     let _b: Dynamic<String> = f.into_inner(); // not opted in
-   |                                 ~~~~~~~~~~
+14 -     let _b: Dynamic<String> = f.into_wrapper(); // not opted in
+14 +     let _b: Dynamic<String> = f.into_inner(); // not opted in
+   |

@@ -10,4 +10,3 @@ error[E0277]: `[u8; 32]` has not opted in to cloning, so a secret wrapping it ca
    = note: For a type you do not own, the orphan rule forbids that impl and rejects it with E0117 — wrap it in a newtype of your own and implement the marker for that.
    = note: If you arrived here from `#[derive(Clone)]` on a generated newtype, the derive forwards to the wrapper's `Clone`, which is what requires this marker. The `derive: [Clone]` argument is refused outright with a fuller explanation; writing `impl Clone` by hand keeps the decision visible in your own code.
    = note: required for `Fixed<[u8; 32]>` to implement `Clone`
-   = note: this error originates in the derive macro `Clone` (in Nightly builds, run with -Z macro-backtrace for more info)

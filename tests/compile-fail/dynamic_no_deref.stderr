@@ -2,7 +2,7 @@ error[E0614]: type `Dynamic<Vec<u8>>` cannot be dereferenced
   --> tests/compile-fail/dynamic_no_deref.rs:14:33
    |
 14 |     let _via_deref: &Vec<u8> = &*secret;
-   |                                 ^^^^^^^
+   |                                 ^^^^^^^ can't be dereferenced
 
 error[E0277]: the trait bound `Dynamic<Vec<u8>>: AsRef<Vec<u8>>` is not satisfied
   --> tests/compile-fail/dynamic_no_deref.rs:20:58

@@ -7,10 +7,11 @@
 // To regenerate .stderr files after a toolchain upgrade:
 //   TRYBUILD=overwrite cargo test compile_fail
 //
-// The snapshots are pinned to CI's configuration, rustc 1.85 with `--features=full`:
-//   cargo +1.85 test -p secure-gate --features=full --test compile_fail_tests
-// Any edit above `NON_ZERO_SIZED` in src/fixed.rs, docs included, shifts the line number
-// fixed_zero_size.stderr records. Under `--all-features`, `sealed` adds a second E0509 to
+// The snapshots are pinned to CI's configuration, rustc 1.87 with `--features=full`:
+//   cargo +1.87 test -p secure-gate --features=full --test compile_fail_tests
+// On 1.87, fixed_zero_size.stderr no longer records a src/fixed.rs line number (rustc
+// reports "evaluation panicked: <message>" instead), so edits above `NON_ZERO_SIZED` no
+// longer shift it. Under `--all-features`, `sealed` adds a second E0509 to
 // newtype_manual_drop (from `FixedRole::into_fixed`, the same trap reported twice); that
 // mismatch is expected, not a regression.
 

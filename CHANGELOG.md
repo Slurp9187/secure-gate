@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0-rc.16] - Unreleased
 
+### Security
+- **MSRV is now 1.87** (was 1.85), to take the fix for RUSTSEC-2026-0385. `ctutils`, which
+  reaches `sealed` through `chacha20poly1305 -> poly1305 -> universal-hash` (the Poly1305 tag
+  comparison), could compile its `Choice` mask generation to a branch on a secret before
+  0.4.4, and its `u128` comparisons branched on 32-bit targets. Every patched release
+  declares `rust-version = "1.87"`. `Cargo.lock` moves to 0.4.7, and `Cargo.toml` adds a
+  `ctutils >= 0.4.4` floor under the `sealed` feature, because a lockfile does not reach
+  dependents. `cargo audit` had been red on `main` since the advisory was published.
+  `guarded-block` keeps its own MSRV of 1.85; it does not use `ctutils`. On Rust 1.85 or
+  1.86, use the 0.8 line (`secure-gate = "0.8.0-rc"`, MSRV 1.70). The compile-fail
+  snapshots are re-recorded on 1.87; only rustc's wording changed.
+
 ### Changed
 - **`from_rng` is removed** (pre-stable API change) from `Fixed`, `Dynamic<Vec<u8>>` and the
   types `fixed_newtype!` / `dynamic_newtype!` generate. It took `R: TryRng + TryCryptoRng`,

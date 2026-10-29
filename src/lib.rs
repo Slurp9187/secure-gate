@@ -242,7 +242,7 @@
 //! `no_std` compatible (`#![no_std]` unless the `std` feature is enabled — verified in CI
 //! by cross-building for `thumbv7em-none-eabihf`). [`Fixed<T>`] works without `alloc`.
 //! Enable `alloc` (default) for [`Dynamic<T>`]. For pure stack / embedded builds, use
-//! `default-features = false`. MSRV: **1.85** (Rust edition 2024).
+//! `default-features = false`. MSRV: **1.87** (Rust edition 2024).
 //!
 //! One caveat: the `rand` feature compiles without `std` or `alloc`, but
 //! [`Fixed::from_random`] relies on `getrandom`, which needs a platform entropy backend.

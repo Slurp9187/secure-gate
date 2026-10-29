@@ -2,7 +2,7 @@ error[E0614]: type `Fixed<[u8; 4]>` cannot be dereferenced
   --> tests/compile-fail/fixed_no_deref.rs:18:31
    |
 18 |     let _via_deref: [u8; 4] = *secret;
-   |                               ^^^^^^^
+   |                               ^^^^^^^ can't be dereferenced
 
 error[E0599]: no method named `as_ref` found for struct `Fixed` in the current scope
   --> tests/compile-fail/fixed_no_deref.rs:21:40

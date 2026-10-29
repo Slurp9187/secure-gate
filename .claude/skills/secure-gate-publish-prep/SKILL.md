@@ -23,7 +23,7 @@ This is the largest local fact. `RUSTFLAGS="-D warnings"` on everything.
 | `test --features full` and `--all-features` | stable | **`+1.70`** |
 | `clippy --all-features --all-targets` | stable | **stable** — 1.70 has no `unexpected_cfgs` and passes *falsely* |
 | `doc --no-deps` | `--all-features` | **`--features=full`** |
-| compile-fail snapshots | 1.85 | **`+1.70`**, trybuild `=1.0.81` |
+| compile-fail snapshots | 1.87 | **`+1.70`**, trybuild `=1.0.81` |
 
 Two rows are counterintuitive and both are deliberate. **Clippy runs on stable even for 0.8**,
 because an older compiler does not know a lint exists and therefore passes for the wrong
