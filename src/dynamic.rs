@@ -168,7 +168,7 @@ use crate::traits::encoding::bech32m::ToBech32m;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{TryCryptoRng, TryRng, rngs::SysRng};
+use rand::{TryRng, rngs::SysRng};
 
 // Dynamic<Vec<u8>> is always alloc-dependent, so the alloc-gated blanket traits
 // are always available when encoding features are enabled for this type.
@@ -221,7 +221,6 @@ use crate::traits::decoding::hex::FromHexStr;
 /// | [`try_from_bech32m(s, hrp)`](Self::try_from_bech32m) | `encoding-bech32` | HRP-validated Bech32m |
 /// | [`try_from_bech32m_unchecked(s)`](Self::try_from_bech32m_unchecked) | `encoding-bech32` | Bech32m without HRP check |
 /// | [`from_random(len)`](Self::from_random) | `rand` | System RNG |
-/// | [`from_rng(len, rng)`](Self::from_rng) | `rand` | Custom RNG |
 ///
 /// # See also
 ///
@@ -685,6 +684,21 @@ impl Dynamic<Vec<u8>> {
     /// assert!(read_exact_secret(&mut [7u8; 8].as_slice(), 32).is_err());
     /// # }
     /// ```
+    ///
+    /// This is also how to generate from an RNG you supply. Anything that fills a byte slice
+    /// works, whatever crate or `rand` version it comes from;
+    /// [`from_random`](Self::from_random) covers the system RNG.
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "alloc", feature = "rand"))] {
+    /// use rand::rngs::StdRng;
+    /// use rand::{SeedableRng, TryRng};
+    /// use secure_gate::Dynamic;
+    ///
+    /// let mut rng = StdRng::from_seed([9u8; 32]);
+    /// let nonce = Dynamic::<Vec<u8>>::try_new_with(24, |b| rng.try_fill_bytes(b)).expect("rng fill");
+    /// # }
+    /// ```
     #[inline(always)]
     pub fn try_new_with<F, E>(len: usize, f: F) -> Result<Self, E>
     where
@@ -946,54 +960,6 @@ impl Dynamic<alloc::vec::Vec<u8>> {
                 .try_fill_bytes(slot)
                 .expect("SysRng failure is a program error");
         })
-    }
-
-    /// Allocates a `Vec<u8>` of length `len`, fills it from `rng`, and wraps it.
-    ///
-    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRng`](rand::TryRng) — for example,
-    /// a seeded `StdRng` for deterministic tests. Requires the `rand`
-    /// feature and `alloc` (implicit — [`Dynamic<T>`](crate::Dynamic) itself requires it).
-    ///
-    /// # Errors
-    ///
-    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRng::try_fill_bytes) fails.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # #[cfg(all(feature = "alloc", feature = "rand"))]
-    /// # {
-    /// use rand::rngs::StdRng;
-    /// use rand::SeedableRng;
-    /// use secure_gate::Dynamic;
-    ///
-    /// let mut rng = StdRng::from_seed([9u8; 32]);
-    /// let nonce: Dynamic<Vec<u8>> = Dynamic::from_rng(24, &mut rng).expect("rng fill");
-    /// # }
-    /// ```
-    #[inline]
-    pub fn from_rng<R: TryRng + TryCryptoRng>(len: usize, rng: &mut R) -> Result<Self, R::Error> {
-        // This body was the captured-local workaround `try_new_with` exists to retire:
-        // `new_with` could not report failure, so the error was written to a local and
-        // checked afterwards. One expression now — and one observable behaviour change,
-        // not none.
-        //
-        // The old body was `Vec::new()` followed by `v.resize(len, 0u8)`, and `resize`
-        // grows through `RawVec::grow_amortized`, which floors capacity at
-        // `MIN_NON_ZERO_CAP` — 8 for one-byte elements. So `from_rng(4, ..)` used to return
-        // a buffer of length 4 with capacity 8, while `alloc::vec![0u8; len]` allocates the
-        // exact size and returns capacity 4. That is visible through
-        // `with_secret(Vec::capacity)`, which this crate's tests read directly, and it
-        // tightens the `io::Write` impl's spare-room branch
-        // (`buf.len() > v.capacity() - v.len()`): a short random secret no longer carries
-        // up to four free bytes that could absorb a small write without growing. Holding no
-        // slack is the whole point of the new constructor, so the change stays — it is just
-        // not behaviour-neutral, and a 0.8 backport that assumes it is will be wrong about
-        // any capacity assertion below 8.
-        //
-        // Everything else is unchanged: same `R::Error`, same wipe-on-`Err` (the
-        // `Zeroizing` drops on the way out), same allocation count.
-        Self::try_new_with(len, |slot| rng.try_fill_bytes(slot))
     }
 }
 

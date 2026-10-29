@@ -225,7 +225,7 @@ secure-gate = "0.9.0-rc"                                                        
 Both release lines are pre-release only, and a caret requirement matches a pre-release only
 when it names one: `"0.9"` resolves to nothing, while `"0.9.0-rc"` tracks the newest
 `0.9.0-rc.N` and keeps resolving once `0.9.0` ships. Release candidates have carried breaking
-changes, so pin `"=0.9.0-rc.15"` when `cargo update` must stay put.
+changes, so pin `"=0.9.0-rc.16"` when `cargo update` must stay put.
 <!-- Every concrete version in this file equals the version in Cargo.toml; bump them in the
      same commit. The install lines use the tracking form and carry no version. -->
 
@@ -243,7 +243,7 @@ breaking ones, are in [CHANGELOG.md](https://github.com/Slurp9187/secure-gate/bl
 |---|---|
 | `alloc` _(default)_ | `Dynamic<T>`, including wiping `Vec` / `String` spare capacity |
 | `std` | `std::io::Read` / `Write` for `Dynamic<Vec<u8>>` (implies `alloc`) |
-| `rand` | `from_random()` (system RNG) and `from_rng()`; heap-free for `Fixed` |
+| `rand` | `from_random()` (system RNG); heap-free for `Fixed`. For an RNG you supply, use `try_new_with(\|b\| rng.try_fill_bytes(b))`, which needs no feature |
 | `ct-eq` | `ConstantTimeEq` via `subtle` |
 | `encoding` | All of `encoding-hex`, `-base32`, `-base64`, `-bech32` |
 | `serde` | `serde-deserialize` (1 MiB default limit) and `serde-serialize` (opt-in per type via `SerializableSecret`) |

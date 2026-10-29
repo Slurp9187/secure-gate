@@ -104,7 +104,7 @@ use crate::traits::encoding::bech32m::ToBech32m;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{TryCryptoRng, TryRng, rngs::SysRng};
+use rand::{TryRng, rngs::SysRng};
 use zeroize::Zeroize;
 
 /// Drains a validated Bech32/Bech32m payload into a stack buffer.
@@ -182,7 +182,6 @@ fn drain_bech32_payload<const N: usize>(
 /// | [`try_from_bech32m`](Self::try_from_bech32m) | `encoding-bech32` | HRP-validated Bech32m decoding |
 /// | [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked) | `encoding-bech32` | Bech32m without HRP check |
 /// | [`from_random()`](Self::from_random) | `rand` | System RNG |
-/// | [`from_rng(rng)`](Self::from_rng) | `rand` | Custom RNG |
 ///
 /// # What `T` may be
 ///
@@ -485,8 +484,7 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     ///
     /// Elsewhere here `try_` marks a constructor that *parses* untrusted input —
     /// [`try_from_hex`](Self::try_from_hex), [`try_from_base32`](Self::try_from_base32),
-    /// `TryFrom<&[u8]>` — while [`from_rng`](Self::from_rng) is fallible and keeps
-    /// `from_`. This method widens the prefix to its ordinary Rust meaning, the one
+    /// `TryFrom<&[u8]>`. This method widens the prefix to its ordinary Rust meaning, the one
     /// `try_reserve` and `try_lock` carry: **`try_` marks a constructor that can fail**,
     /// whether because it validates input or because the caller's fill can.
     ///
@@ -533,6 +531,23 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     ///
     /// // A short read fails, and yields no secret at all.
     /// assert!(read_key(&mut [7u8; 8].as_slice()).is_err());
+    /// # }
+    /// ```
+    ///
+    /// This is also how to generate from an RNG you supply: a seeded one for reproducible
+    /// tests, a specific provider, a hardware source. Anything that fills a byte slice works,
+    /// whatever crate or `rand` version it comes from, which is why this crate has no
+    /// `from_rng` and names no RNG trait in its API. [`from_random`](Self::from_random)
+    /// covers the system RNG.
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "rand")] {
+    /// use rand::rngs::StdRng;
+    /// use rand::{SeedableRng, TryRng};
+    /// use secure_gate::Fixed;
+    ///
+    /// let mut rng = StdRng::from_seed([1u8; 32]);
+    /// let key = Fixed::<[u8; 16]>::try_new_with(|b| rng.try_fill_bytes(b)).expect("rng fill");
     /// # }
     /// ```
     ///
@@ -1216,37 +1231,6 @@ impl<const N: usize> Fixed<[u8; N]> {
                 .try_fill_bytes(arr)
                 .expect("SysRng failure is a program error");
         })
-    }
-
-    /// Fills a new `[u8; N]` from `rng` and wraps it.
-    ///
-    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRng`](rand::TryRng) — for example,
-    /// a seeded `StdRng` for deterministic tests. Requires the `rand`
-    /// feature. Heap-free.
-    ///
-    /// # Errors
-    ///
-    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRng::try_fill_bytes) fails.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # #[cfg(feature = "rand")]
-    /// # {
-    /// use rand::rngs::StdRng;
-    /// use rand::SeedableRng;
-    /// use secure_gate::Fixed;
-    ///
-    /// let mut rng = StdRng::from_seed([1u8; 32]);
-    /// let key: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng).expect("rng fill");
-    /// # }
-    /// ```
-    #[inline]
-    pub fn from_rng<R: TryRng + TryCryptoRng>(rng: &mut R) -> Result<Self, R::Error> {
-        // This body was the captured-local workaround `try_new_with` exists to retire:
-        // `new_with` could not report failure, so the error was written to a local and
-        // checked afterwards. Same behaviour, one expression.
-        Self::try_new_with(|arr| rng.try_fill_bytes(arr))
     }
 }
 

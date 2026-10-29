@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0-rc.16] - Unreleased
+
+### Changed
+- **`from_rng` is removed** (pre-stable API change) from `Fixed`, `Dynamic<Vec<u8>>` and the
+  types `fixed_newtype!` / `dynamic_newtype!` generate. It took `R: TryRng + TryCryptoRng`,
+  which put `rand` 0.10, a pre-1.0 crate, into this crate's public API: the next `rand`
+  release would have forced a breaking release here. It also accepted only that one `rand`
+  version's RNGs. Its body was already one call to `try_new_with`, which takes any fallible
+  fill and wipes the buffer on `Err`, so nothing is lost. Migrate with:
+
+  ```rust
+  // before
+  let key = Fixed::<[u8; 32]>::from_rng(&mut rng)?;
+  let tok = Dynamic::<Vec<u8>>::from_rng(24, &mut rng)?;
+  // after (`use rand::TryRng;` for `try_fill_bytes`)
+  let key = Fixed::<[u8; 32]>::try_new_with(|b| rng.try_fill_bytes(b))?;
+  let tok = Dynamic::<Vec<u8>>::try_new_with(24, |b| rng.try_fill_bytes(b))?;
+  ```
+
+  The same closure takes an RNG from any `rand` version, `getrandom`, a crypto provider or
+  a hardware source, and needs no feature. `from_random()` is unchanged. `rand` is now a
+  private dependency (the system RNG behind `from_random` and `sealed`), so a future `rand`
+  bump is not an API change. The `try_new_with` docs on `Fixed` and `Dynamic` gain a
+  seeded-RNG example.
+
 ## [0.9.0-rc.15] - 2026-10-20
 
 ### Security

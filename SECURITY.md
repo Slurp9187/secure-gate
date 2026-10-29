@@ -622,7 +622,7 @@ limitation 4 above, and it is the reason that row reads "must not" rather than "
 | `alloc` *(default)* | Enables `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity. Use `default-features = false` for no-heap builds — the crate is `#![no_std]` without the `std` feature, verified in CI by cross-building for `thumbv7em-none-eabihf`. | Enable unless on embedded/pure-stack target                                                                                      |
 | `std`               | Full `std` support (implies `alloc`). Adds two surfaces: `as_reader()` copies secret bytes into caller-owned buffers that this crate cannot wipe, and the `Write` impl on `Dynamic<Vec<u8>>` grows by hand so it can zeroize the outgoing buffer. Audit `as_reader` call sites like Tier 2 access. | Optional; `alloc` is sufficient for most targets                                                                                 |
 | `ct-eq`             | Timing-safe direct byte comparison (`.ct_eq()`)                                                                                                                           | Strongly recommended; avoid `==`                                                                                                 |
-| `rand`              | `from_random()` uses system `SysRng` (`rand` 0.10) and panics on failure; `from_rng()` accepts caller-supplied `TryRng + TryCryptoRng` and returns `Result`            | Use trusted entropy sources; prefer `from_rng()` where RNG failure should be handled explicitly                                 |
+| `rand`              | `from_random()` uses system `SysRng` (`rand` 0.10, a private dependency) and panics on failure. A caller-supplied RNG fills through `try_new_with(\|b\| rng.try_fill_bytes(b))`, which returns `Result` and wipes on `Err`; it needs no feature and works with any RNG crate or version | Use trusted entropy sources; prefer `try_new_with` with your RNG where RNG failure should be handled explicitly |
 | `serde-deserialize` | Decodes to inner type; temporary buffers use `zeroize::Zeroizing` (zeroized on rejection too). `Fixed<[u8; N]>` rejects over-length sequences before its buffer can grow, so no unzeroized realloc residue is left behind. 1 MiB default limit (`MAX_DESERIALIZE_BYTES`). See allocation notes below. | Enable for trusted deserialization sources; set a tight limit for untrusted input and enforce transport-level size caps upstream |
 | `serde-serialize`   | Opt-in export via marker trait; audit all implementations                                                                                                                 | Enable sparingly; monitor exfiltration risk                                                                                      |
 | `encoding`          | Meta: enables all encoding sub-features (hex, base32, base64url, bech32, bech32m). Encoding traits require `alloc` (they return `EncodedSecret`, which owns a `String`); `Fixed::try_from_*` decoding works without `alloc`. | Enable per-format instead for minimal surface                                                                                    |
@@ -683,9 +683,9 @@ limitation 4 above, and it is the reason that row reads "must not" rather than "
 - `Fixed<T>` decode constructors previously used `copy_from_slice` into a separate
   stack-allocated `[0u8; N]` before wrapping. **This has been mitigated**: all
   library-internal decode paths (`try_from_hex`, `try_from_base32`,
-  `try_from_base64url`, `try_from_bech32*`, `TryFrom<&[u8]>`) and the RNG constructors
-  (`from_random`, `from_rng`) now use `Fixed::new_with`, which writes directly into the
-  wrapper's storage and avoids the intermediate slot. The `new(value)` constructor still
+  `try_from_base64url`, `try_from_bech32*`, `TryFrom<&[u8]>`) and `from_random` now use
+  `Fixed::new_with`, and a caller-supplied RNG fills through `Fixed::try_new_with`; both
+  write directly into the wrapper's storage and avoid the intermediate slot. The `new(value)` constructor still
   accepts a pre-constructed array and may produce a brief stack temporary (compiler often
   eliminates it at opt-level ≥ 1 with `#[inline(always)]`). `Dynamic<T>` avoids all stack
   involvement via `from_protected_bytes` + `mem::swap` (heap-only path).

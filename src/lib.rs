@@ -204,7 +204,7 @@
 //! | `std` | no | Full `std` support (implies `alloc`) |
 //! | | | **Cryptographic** |
 //! | `ct-eq` | no | [`ConstantTimeEq`] via `subtle` — timing-safe comparison |
-//! | `rand` | no | `from_random()` / `from_rng()` — `no_std` for [`Fixed`] |
+//! | `rand` | no | `from_random()` (system RNG) — `no_std` for [`Fixed`] |
 //! | `sealed` | no | `SealedFixed` / `SealedDynamic`: secrets encrypted in RAM while idle, under a locked `Prekey` (implies `std`, `rand`) |
 //! | | | **Serialization** |
 //! | `serde-serialize` | no | Serde `Serialize` (requires [`SerializableSecret`] marker) |
@@ -248,8 +248,8 @@
 //! [`Fixed::from_random`] relies on `getrandom`, which needs a platform entropy backend.
 //! On bare-metal targets you must configure one (see the `getrandom` crate's
 //! "custom backend" documentation); without it, builds enabling `rand` fail at link
-//! time on such targets. [`Fixed::from_rng`] with a caller-supplied RNG has no such
-//! requirement.
+//! time on such targets. Filling from a caller-supplied RNG through
+//! [`Fixed::try_new_with`] has no such requirement, and needs no feature at all.
 //!
 //! # Security
 //!
@@ -334,8 +334,6 @@ pub mod scoped;
 pub mod __private {
     #[cfg(feature = "alloc")]
     pub use alloc::{boxed::Box, string::String, vec::Vec};
-    #[cfg(feature = "rand")]
-    pub use rand::{TryCryptoRng, TryRng};
     #[cfg(feature = "serde-deserialize")]
     pub use serde::{Deserialize, Deserializer};
     #[cfg(feature = "serde-serialize")]

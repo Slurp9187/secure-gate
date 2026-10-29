@@ -1,6 +1,6 @@
 [package]
 name = "secure-gate"
-version = "0.9.0-rc.15"
+version = "0.9.0-rc.16"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -45,8 +45,9 @@ sha2 = { version = "0.11", optional = true, default-features = false, features =
 base32ct = { version = "0.3.1", optional = true, default-features = false }
 base64ct = { version = "1", optional = true, default-features = false }
 bech32 = { version = "0.11", default-features = false, optional = true }
-# `sys_rng` provides `rngs::SysRng` without pulling `std`; the `TryRng` /
-# `TryCryptoRng` traits come from `rand_core` and are always available.
+# `sys_rng` provides `rngs::SysRng` without pulling `std`. A private dependency: no `rand`
+# type appears in this crate's API (a caller-supplied RNG fills through `try_new_with`), so a
+# `rand` bump here is never a breaking change for dependents.
 # On bare-metal targets `getrandom` additionally requires a user-configured
 # backend (see the `rand` feature docs in lib.rs).
 rand = { version = "0.10", optional = true, default-features = false, features = ["sys_rng"] }

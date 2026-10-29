@@ -390,17 +390,6 @@ macro_rules! dynamic_newtype {
                 /// Generates `len` random bytes from the system RNG.
                 #[inline]
                 pub fn from_random(len: usize) -> Self { Self(<$crate::Dynamic<$crate::__private::Vec<u8>>>::from_random(len)) }
-
-                /// Generates `len` bytes from a caller-supplied CSPRNG.
-                #[inline]
-                pub fn from_rng<R>(len: usize, rng: &mut R) -> ::core::result::Result<Self, R::Error>
-                where
-                    R: $crate::__private::TryRng + $crate::__private::TryCryptoRng,
-                {
-                    ::core::result::Result::Ok(Self(
-                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::from_rng(len, rng)?,
-                    ))
-                }
             }
         }
 
