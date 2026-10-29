@@ -78,6 +78,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The decoders now live inside `Dynamic::try_from_*`, where the decoded buffer is wrapped in
   `Zeroizing` as soon as it exists; nothing changes for `Fixed`/`Dynamic` callers.
 
+### Documentation
+- **"A guardrail, not a vault"** opens `README.md` and `SECURITY.md`: the crate stops the
+  ordinary mistakes, cannot stop a deliberate copy, and holds two rules: the easy path is
+  safe, and every way out is a named call. `SECURITY.md` adds that this is the test for
+  proposed changes: a finding is a defect when the easy path leaks or an exit has no name.
+
 ## [0.9.0-rc.15] - 2026-10-20
 
 ### Security

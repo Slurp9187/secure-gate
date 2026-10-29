@@ -1,5 +1,24 @@
 # Security Considerations for secure-gate
 
+## A guardrail, not a vault
+
+secure-gate stops the ordinary mistakes: a secret printed by `{:?}`, compared with `==`,
+left in freed memory, or handed out as a plain `Vec`. It cannot stop someone who decides
+to copy a secret out; a secret nobody can read is useless. So the rule is:
+
+- **The easy path is safe.** The obvious way to hold, decode, encode or compare a secret
+  keeps it wrapped, wiped and redacted.
+- **Leaving it is named.** Every way out (`expose_secret`, `into_inner`, `into_zeroizing`,
+  `as_reader`) is a call you can grep for and a reviewer can see.
+
+If the friction feels like it is in your way, that is the library working. Don't route
+around it with `.to_vec()`, `*bytes` or `.to_string()`; name the exit instead, or keep the
+secret wrapped.
+
+This is also the test for any proposed change. A finding is a defect when the easy path
+leaks or an exit has no name. A way out that is already named, or a copy made inside a
+`with_secret` closure, is the design working; the sections below document each one.
+
 ## TL;DR
 
 - **No independent audit** — review the source code yourself before production use.

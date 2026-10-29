@@ -12,6 +12,21 @@ Secure wrappers for secrets with **explicit access** and **mandatory zeroization
 > **Security Notice**: This crate has **not undergone independent audit**.
 > Review the code and [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) before production use.
 
+## A guardrail, not a vault
+
+secure-gate stops the ordinary mistakes: a secret printed by `{:?}`, compared with `==`,
+left in freed memory, or handed out as a plain `Vec`. It cannot stop someone who decides
+to copy a secret out; a secret nobody can read is useless. So the rule is:
+
+- **The easy path is safe.** The obvious way to hold, decode, encode or compare a secret
+  keeps it wrapped, wiped and redacted.
+- **Leaving it is named.** Every way out (`expose_secret`, `into_inner`, `into_zeroizing`,
+  `as_reader`) is a call you can grep for and a reviewer can see.
+
+If the friction feels like it is in your way, that is the library working. Don't route
+around it with `.to_vec()`, `*bytes` or `.to_string()`; name the exit instead, or keep the
+secret wrapped.
+
 ## Quick start
 
 ```rust
