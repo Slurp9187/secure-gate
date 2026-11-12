@@ -11,6 +11,12 @@ figure is a claim that was true when it was typed, and a reader cannot tell it a
 typed wrong. This directory holds the raw stdout instead, so the figures in §2 can be checked
 against the runs they came from rather than taken on trust.
 
+**"The experimental allocator"** below is an unpublished zero-on-free allocator written while
+this work was being done. It was never released, its repository has been deleted, and nothing
+in this crate or its dependents uses it. The raw captures still carry its working name and its
+`sgza` row label, because they are kept byte-identical (see *Checksums*); that name refers to
+nothing that can be fetched today.
+
 ## The rule this directory is curated by
 
 **Measurements travel; verdicts do not.**
@@ -80,7 +86,7 @@ Three reading notes that apply throughout:
   back and counting how many of 16 pattern bytes survived. Rows: `none` (no allocator),
   `strawman` (a **synthetic** fn-pointer control construct built by the harness — not a
   released crate; see the scoping bullet below), `onepass` (`zeroizing-alloc` 0.1.1 — see the
-  mapping bullet below), `sgza` (`secure-gate-zalloc`). The row mapping is stated in the file's header
+  mapping bullet below), `sgza` (the experimental allocator). The row mapping is stated in the file's header
   rather than inferred from the row names.
 - **Date:** 2026-09-18. Produced by a **four-configuration variant** of the msoffice-crypto
   comparison harness, on branch `experiment/zeroizing-alloc` (PR #19, closed unmerged the
@@ -132,7 +138,7 @@ Three reading notes that apply throughout:
   should be.
 - **What the `strawman` construct is, precisely.** Per the harness author, and as
   `harness/pgo_strawman.sh` records in the comment above the library it writes, it is a **copy
-  of `secure-gate-zalloc`'s `CONTROL_LIB`** — not any released crate, and **not** any released
+  of the experimental allocator's `CONTROL_LIB`** — not any released crate, and **not** any released
   crate with a line removed. It is close to `zeroizing-alloc` in shape (same `clear_bytes`, same
   `#[used] static WIPER`, same volatile load, the same three `GlobalAlloc` methods), but *close*
   is not *differs by exactly one edit*, and nothing here should be read as claiming a one-line
@@ -146,7 +152,7 @@ Three reading notes that apply throughout:
   the callee resolvable at promotion time, and what the instrumented build must match. Four
   rows: a control and the subject, each with and without PGO, at 4096 bytes (64-byte figures in
   parentheses). The subject row is labeled `this crate`: the crate the test lives in,
-  `secure-gate-zalloc`, at commit `13fe5e2`.
+  the experimental allocator, at commit `13fe5e2`.
 - **Date:** 2026-09-17 18:13:26 UTC.
 - **Toolchain:** not restated in the capture. `00-env-linux.txt` records rustc 1.85.1 /
   LLVM 19.1.7 on the same host earlier the same day.
@@ -167,7 +173,7 @@ Three reading notes that apply throughout:
 ### `45-hazard-final.txt` + `46-hazard-ours.txt` — cite as a pair
 
 These two are one item. `45` demonstrates the hazard; `46` is the same driver, same toolchain,
-against `secure-gate-zalloc`'s design. Neither file measures any released third-party crate.
+against the experimental allocator's design. Neither file measures any released third-party crate.
 
 **`45-hazard-final.txt` — the hazard, with its controls**
 
@@ -197,9 +203,9 @@ against `secure-gate-zalloc`'s design. Neither file measures any released third-
   this repo's own terms, with controls in the same output. That is a property of the synthetic
   construct this driver builds and of nothing else.
 
-**`46-hazard-ours.txt` — the same driver against `secure-gate-zalloc`**
+**`46-hazard-ours.txt` — the same driver against the experimental allocator**
 
-- **What it measured:** the same three LTO modes against `secure-gate-zalloc` at `main b186c53`,
+- **What it measured:** the same three LTO modes against the experimental allocator at `main b186c53`,
   with the no-PGO control, the promotion remarks, the PGO result, and the IR at the
   deallocation site.
 - **Date:** not stamped in the capture; produced 2026-09-17, ~17:02 UTC, by `_hazard_ours.sh`,
@@ -222,7 +228,7 @@ against `secure-gate-zalloc`'s design. Neither file measures any released third-
 - **What it measured:** **`secure-gate`'s own §2 shape**, not a synthetic one — a 4 KiB secret
   grown one byte past its capacity through `with_secret_mut`, with a neighbor behind it so the
   reallocation has to move (`moved: true`), and the abandoned block requested back and read.
-  Run at `secure-gate-zalloc` commit `2434dfa`, whose subject records the fix that made the
+  Run at the experimental allocator's commit `2434dfa`, whose subject records the fix that made the
   readout sample payload rather than the allocator's own bookkeeping.
 - **Date:** 2026-09-17 19:26:44 UTC.
 - **Toolchain:** not restated in the capture; see `00-env-linux.txt` (rustc 1.85.1, glibc 2.39,
@@ -266,11 +272,11 @@ What these receipts support, stated at the width the measurements actually cover
   it (`45`, and the `strawman` and `none` controls in the 1.96.1 run).
 - In the PGO + fat LTO + `cgu=1` configuration where those controls fired, neither the
   `onepass` row (`zeroizing-alloc` 0.1.1, the mapping now checkable in `harness/`) nor the
-  `sgza` row (`secure-gate-zalloc`) left the pattern behind: **0/16**, `same=true`, at both block sizes
+  `sgza` row (the experimental allocator) left the pattern behind: **0/16**, `same=true`, at both block sizes
   (`2026-09-18-pgo-fat-lto-rustc-1.96.1.txt`) — **one run, one configuration**, for the
   upstream 0.1.1 that `harness/` pins. `48` reproduces that independently through
-  the cargo fat-LTO flow **for `secure-gate-zalloc` only** — its subject row is labeled
-  `this crate`, which is `secure-gate-zalloc` at `13fe5e2`, not `zeroizing-alloc`. No run
+  the cargo fat-LTO flow **for the experimental allocator only** — its subject row is labeled
+  `this crate`, which is the experimental allocator at `13fe5e2`, not `zeroizing-alloc`. No run
   held in this directory measures `zeroizing-alloc` a second time.
 
 What they do not support, and must not be stretched to:
@@ -280,7 +286,7 @@ What they do not support, and must not be stretched to:
   able to defeat, to prove it can detect residue at all. Their results are a property of those
   constructs. They **do not compose with any other row** into a claim about a crate — neither
   about how a crate behaved nor about why it behaved that way. `strawman` in particular is a
-  copy of `secure-gate-zalloc`'s `CONTROL_LIB`, not a released crate edited down, so no
+  copy of the experimental allocator's `CONTROL_LIB`, not a released crate edited down, so no
   difference between it and any crate is established here at all.
 - **Fat LTO through cargo is not every LTO mode through cargo** (`48`).
 - **A run where promotion did not fire is inconclusive** — five of `45`'s nine configurations,
@@ -322,8 +328,9 @@ fix.
 ## Provenance of the copies
 
 Every `.txt` other than `2026-09-18-pgo-fat-lto-rustc-1.96.1.txt` was copied byte-for-byte,
-unedited, from `C:\Users\chadm\Projects\secure-gate-zalloc\docs\reviews\receipts-2\`, where the
-`_*.sh` drivers that produced them also live. Filenames are unchanged so a citation resolves in
+unedited, from the experimental allocator's `docs/reviews/receipts-2/`, where the `_*.sh`
+drivers that produced them also lived. That repository has since been deleted, so the drivers
+are not available; the captures here are the record. Filenames are unchanged so a citation resolves in
 either tree.
 
 | File in this directory | Bytes | SHA-256 |
