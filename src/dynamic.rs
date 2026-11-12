@@ -292,9 +292,8 @@ impl From<&[u8]> for Dynamic<Vec<u8>> {
 /// move) and a caller-side buffer whose bytes are provably unchanged once the wrapper is
 /// built and dropped.
 ///
-/// This is the impl a caller now reaches for after `Dynamic::<String>::new_with` was removed
-/// outright in 0.9.0-rc.12 — an `&str` is what's already on hand, so `From<&str>` reads as
-/// the drop-in replacement. It is the **worse** one: whatever plaintext the `&str` borrows
+/// `Dynamic<String>` has no closure constructor, and an `&str` is usually what is on hand,
+/// so this impl reads as the obvious way in. It is the **worse** one: whatever plaintext the `&str` borrows
 /// from — a literal, an owned `String`, a line read off stdin — is untouched by this call and
 /// stays live and unprotected for as long as its own scope does. If you own the `String`,
 /// size it once — `String::with_capacity` at the exact final length — and move it in with
@@ -556,14 +555,12 @@ impl Dynamic<Vec<u8>> {
     /// the slot: capacity equals length, so the wrapper never holds slack, and the slot is
     /// a slice, so **growth is not expressible** and the reallocation hazard cannot arise.
     ///
-    /// # Changed in 0.9.0-rc.12 — this took no `len` before
+    /// # Why it takes a length
     ///
-    /// If you are here from `E0061: this function takes 2 arguments but 1 was supplied`,
-    /// this is why. The previous signature handed the closure a **zero-capacity
-    /// `Vec<u8>`**, so filling it reallocated — and a `Vec` reallocation frees the old
-    /// block **without zeroizing it**, abandoning a copy of the secret on the heap that
-    /// nothing would ever wipe. A constructor whose entire purpose was to avoid an
-    /// unprotected copy created one, silently, in the common case of two pushes.
+    /// A closure handed an empty `Vec<u8>` to fill would reallocate as it grew, and a
+    /// `Vec` reallocation frees the old block **without zeroizing it**, abandoning a copy
+    /// of the secret on the heap that nothing would ever wipe. So the closure gets a
+    /// slice of the final size instead.
     ///
     /// Pass the final length and fill the slot:
     ///
@@ -571,7 +568,6 @@ impl Dynamic<Vec<u8>> {
     /// # #[cfg(feature = "alloc")] {
     /// use secure_gate::{Dynamic, RevealSecret};
     ///
-    /// // was: new_with(|v| { v.extend_from_slice(&material); v.resize(16, 0); })
     /// let key = Dynamic::<Vec<u8>>::new_with(16, |slot| {
     ///     slot[..4].copy_from_slice(&[1, 2, 3, 4]);
     /// });

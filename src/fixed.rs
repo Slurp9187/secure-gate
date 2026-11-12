@@ -188,9 +188,9 @@ fn drain_bech32_payload<const N: usize>(
 ///
 /// [`Fixed::new`] requires [`FixedStorage`](crate::FixedStorage) on the inner type: a
 /// type that owns no heap allocation. This is what makes the documented
-/// claim that `Fixed` has no reallocation surface true rather than aspirational. It used
-/// to be bounded only by `Zeroize`, so `Fixed<Vec<u8>>`, `Fixed<String>` and even
-/// `Fixed<[Vec<u8>; 2]>` compiled and abandoned an unwiped buffer holding the whole
+/// claim that `Fixed` has no reallocation surface true rather than aspirational. With
+/// only a `Zeroize` bound, `Fixed<Vec<u8>>`, `Fixed<String>` and even
+/// `Fixed<[Vec<u8>; 2]>` would compile and abandon an unwiped buffer holding the whole
 /// secret on any capacity change. Arrays, the primitives, tuples and `Option` satisfy
 /// the marker already, and nothing heap-owning does (`Box<[T]>` included); a custom inner
 /// type writes one line. For a
@@ -393,10 +393,8 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     /// # let _ = (a, b);
     /// ```
     ///
-    /// Before 0.9.0-rc.10 this method was inherent to `Fixed<[u8; N]>`, where the
-    /// parameter was always a byte array and inference had nothing to resolve. A
-    /// newtype built by [`fixed_newtype!`](crate::fixed_newtype) is unaffected in
-    /// both arms: its generated `new_with` has a concrete parameter type.
+    /// A newtype built by [`fixed_newtype!`](crate::fixed_newtype) needs no annotation
+    /// in either arm: its generated `new_with` has a concrete parameter type.
     ///
     /// # Security rationale
     ///

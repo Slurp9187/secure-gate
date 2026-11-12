@@ -65,6 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     was described as decode-only though the encoders return it; the crate-level module tree
     omitted `sealed`, `scoped`, `SlotWriter` and four traits, and said every public item is at
     the crate root when `scoped::RevealScoped` and `sealed::SealedPayload` are not.
+  - API docs no longer narrate release-candidate history ("Before 0.9.0-rc.10…", "Changed in
+    0.9.0-rc.12"). They describe current behaviour and its reason; the history is here.
   - `README.md`'s Stability section now says the deeper module paths under `traits` are not
     covered by the promise, matching the crate docs.
 

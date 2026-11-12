@@ -73,8 +73,7 @@
 //! impl SerializableSecret for BackupKey {}
 //!
 //! // `Dynamic`, not `Fixed`: the payload is a `Vec`, so its capacity can change, and
-//! // `Fixed::new` now refuses it. This example used to use `Fixed` and was itself an
-//! // instance of the weakness `SECURITY.md` documents.
+//! // `Fixed::new` refuses it.
 //! let key = Dynamic::new(BackupKey(vec![0u8; 32]));
 //! // Serialization exposes the secret — encrypt/authenticate output before storage.
 //! // let bytes = serde_json::to_vec(&key).unwrap();

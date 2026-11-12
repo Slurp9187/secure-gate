@@ -35,10 +35,10 @@
 /// **`ConstantTimeEq` is not an option on the size-literal arm, and naming it is an
 /// error.** A `[u8; N]` payload gets [`ct_eq`](crate::ConstantTimeEq::ct_eq)
 /// automatically whenever the `ct-eq` feature is on, because the wrapper it forwards
-/// to always has it and a plain `type Name = Fixed<[u8; N]>;` therefore always did.
-/// Requiring the token here put the extra word on the spelling this crate recommends
-/// as the safer of the two, for the one comparison whose alternative is a timing
-/// leak. Since the arm now emits the impl itself, a second one from the `derive:`
+/// to always has it, as a plain `type Name = Fixed<[u8; N]>;` does. Requiring the
+/// token here would put the extra word on the spelling this crate recommends as the
+/// safer of the two, for the one comparison whose alternative is a timing leak.
+/// Since the arm emits the impl itself, a second one from the `derive:`
 /// list is `E0119: conflicting implementations` — delete the token. It remains a
 /// real opt-in on the `generic` arms, where the inner type may or may not implement
 /// the trait.
@@ -153,12 +153,11 @@
 /// [`dynamic_newtype!`](crate::dynamic_newtype) already refuses the analogous
 /// spellings (`generic Vec<u8>`, `generic String`). Write the size literal.
 ///
-/// **The inner type must not be able to reallocate.** This arm used to accept
-/// `generic Vec<u8>` and `generic String`, which put a growable buffer inside the
-/// wrapper the documentation calls free of any realloc surface; measured, each
-/// abandoned an unwiped buffer holding the whole secret on any capacity change, and
-/// with no `io::Write` escape of the sort [`Dynamic<Vec<u8>>`](crate::Dynamic) has.
-/// [`Fixed::new`](crate::Fixed::new) now requires
+/// **The inner type must not be able to reallocate.** `generic Vec<u8>` and
+/// `generic String` would put a growable buffer inside the wrapper the documentation
+/// calls free of any realloc surface; measured, each abandons an unwiped buffer holding
+/// the whole secret on any capacity change, and with no `io::Write` escape of the sort
+/// [`Dynamic<Vec<u8>>`](crate::Dynamic) has. [`Fixed::new`](crate::Fixed::new) requires
 /// [`FixedStorage`](crate::FixedStorage), so those forms are a compile error reported
 /// at this declaration. Arrays, the primitives, tuples and `Option` are covered for you,
 /// which is every shape this arm exists for; a custom inner type adds
@@ -289,10 +288,9 @@
 /// reopens whatever the base wrapper implements for that inner type, which on a
 /// `generic` newtype includes the surface the arm withheld: `as_wrapper().len()`
 /// and `.byte_len()` answer for any `Fixed<[T; N]>`. The reduced surface is a
-/// property of the label, not a barrier. This is now worth granting less often than
-/// it was — a literal array gets its own `len()` from the array arm, so reaching for
-/// the outbound token merely to measure a secret is no longer the trade it used to
-/// be. Where it is still the only route is the opaque arm. The exposure is
+/// property of the label, not a barrier. It is rarely worth granting just to measure a
+/// secret: a literal array gets its own `len()` from the array arm. Where it is the
+/// only route is the opaque arm. The exposure is
 /// largest during a partial migration — the regime real consumers live in —
 /// because while most aliases stay plain the base type is a universal donor.
 /// Audit these methods the way you audit `expose_secret()`.

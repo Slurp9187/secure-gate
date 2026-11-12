@@ -11,22 +11,21 @@
 //! nothing.
 //!
 //! [`FixedStorage`] is what makes the exemption true. [`Fixed::new`](crate::Fixed::new)
-//! requires it, so the compiler now rejects an inner type that owns a heap allocation.
+//! requires it, so the compiler rejects an inner type that owns a heap allocation.
 //!
 //! # The contract
 //!
 //! Implementing `FixedStorage` for a type asserts that **the type owns no heap
 //! allocation**. Nothing else, and note that this is stricter than "cannot be resized".
 //!
-//! The first version of this trait asked only for a fixed capacity, and blessed `Box<[T]>`
-//! on the reasoning that a boxed slice has its length fixed at construction. That was
-//! wrong, and measurably so: the residue never needed a capacity change. Whole-value
+//! `Box<[T]>` shows why. A boxed slice has its length fixed at construction, so it looks
+//! safe, and it is not: the residue does not need a capacity change. Whole-value
 //! replacement abandons the allocation just as well, and the wrapper wipes whatever it
-//! holds at drop, not what it used to hold. On a `Fixed<Box<[u8]>>` carrying a 1024-byte
-//! secret, `with_secret_mut(|slot| *slot = other_boxed_slice)` released the original block
-//! with **1024 of 1024** bytes intact, and so did the same assignment through
-//! `expose_secret_mut`. The inline contrast, `Fixed<[u8; 1024]>` assigned the same way,
-//! freed nothing at all — there is no allocation to abandon. So `Box<[T]>` is no longer
+//! holds at drop, not what it held before. Measured on a `Fixed<Box<[u8]>>` carrying a
+//! 1024-byte secret, `with_secret_mut(|slot| *slot = other_boxed_slice)` releases the
+//! original block with **1024 of 1024** bytes intact, and so does the same assignment
+//! through `expose_secret_mut`. The inline contrast, `Fixed<[u8; 1024]>` assigned the same
+//! way, frees nothing at all — there is no allocation to abandon. So `Box<[T]>` is not
 //! implemented, and the predicate is heap ownership rather than resizability.
 //!
 //! The test to apply to your own type: *does `Self` own a heap allocation?* If yes, do not
@@ -41,7 +40,7 @@
 //! the `generic` arm of [`fixed_newtype!`](crate::fixed_newtype) exists for — holding a
 //! custom secret on a target with no allocator.
 //!
-//! What the marker buys is that the claim is now *written down at a greppable line* in
+//! What the marker buys is that the claim is *written down at a greppable line* in
 //! the crate making it, rather than being an unstated assumption. That is the same trade
 //! the other opt-in markers in this crate make.
 //!
