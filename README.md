@@ -297,10 +297,11 @@ stack-capable counterpart, kept for `no_std` and speed; for a long-held secret p
 
 ## Contributing
 
-MSRV is 1.87; regenerate `Cargo.lock` with `cargo +1.87 update`. CI runs lint, tests across
-feature combinations, rustdoc with `--all-features` (the docs.rs set, and the documentation
-contract), the MSRV, AddressSanitizer, and fuzz targets; see
-[`.github/workflows/`](.github/workflows/).
+MSRV is 1.87; regenerate `Cargo.lock` with `cargo +1.87 update`. CI runs clippy and tests
+across feature combinations, rustdoc with `--all-features` (the docs.rs set, and the
+documentation contract), the MSRV, AddressSanitizer, an assembly check that the zeroing
+stores survive optimization, a check that the `sealed` dependencies keep their `zeroize`
+features, Miri, and fuzz targets; see [`.github/workflows/`](.github/workflows/).
 
 ## License
 

@@ -1,0 +1,148 @@
+name: Fuzz (nightly)
+
+# Nightly fuzzing of both release lines. Scheduled events fire only from the default
+# branch, so `release/0.8` is reached from here by checking it out.
+#
+# Every leg runs under AddressSanitizer, which is cargo-fuzz's default. There used to be a
+# second "asan" leg per target, but it differed only by LeakSanitizer, which
+# `-detect_leaks=0` switched off again, so it repeated the first leg.
+#
+# Each night continues from the previous night's corpus. The corpus is passed along as an
+# artifact of this workflow (data only, never the Actions cache), downloaded from the most
+# recent completed run. Coverage stops growing within minutes for most targets, so a
+# 15-minute budget per target loses little against the 58 minutes used before.
+
+on:
+  schedule:
+    - cron: "0 10 * * *" # 10:00 UTC every day
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # To find the previous run and download its corpus artifacts.
+  actions: read
+
+jobs:
+  fuzz:
+    name: ${{ matrix.ref }} – ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        ref: [main, "release/0.8"]
+        target: [expose, mut, parsing, encoding, serde, ct_eq]
+        include:
+          # Artifact names cannot contain a slash.
+          - ref: main
+            label: main
+          - ref: "release/0.8"
+            label: release-0.8
+
+    env:
+      # Do not add `-runs=0`: in fork mode the parent's run budget is checked against zero
+      # immediately, and the whole session exits in about two seconds.
+      FUZZER_ARGS: >-
+        -fork=1
+        -timeout=60
+        -rss_limit_mb=8192
+        -max_total_time=900
+        -max_len=0
+        -only_ascii=0
+        -use_value_profile=1
+        -detect_leaks=0
+
+    steps:
+      - name: Checkout ${{ matrix.ref }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.ref }}
+
+      - name: Install Rust nightly + rust-src
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rust-src
+          # No dependency cache: this job runs another branch's code in the default
+          # branch's context (see docs/design/ci_cross_branch_coverage.md). The fuzz
+          # build takes under a minute.
+          cache: false
+
+      - name: Install cargo-fuzz
+        # Not `--locked`: cargo-fuzz 0.13.1's bundled lockfile pinned a rustix that no
+        # longer builds on nightly.
+        run: cargo install cargo-fuzz
+
+      - name: Find the previous run
+        id: prev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow fuzz-nightly.yml \
+            --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          echo "Previous run: ${run_id:-none}"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download the previous corpus
+        if: steps.prev.outputs.run_id != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: fuzz-corpus-${{ matrix.label }}-${{ matrix.target }}
+          path: fuzz/corpus/${{ matrix.target }}
+          run-id: ${{ steps.prev.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Seed an empty corpus
+        run: |
+          dir="fuzz/corpus/${{ matrix.target }}"
+          mkdir -p "$dir"
+          echo "Corpus files before fuzzing: $(find "$dir" -type f | wc -l)"
+          if [ -n "$(ls -A "$dir")" ]; then exit 0; fi
+          printf 'fuzzme' > "$dir/seed_basic"
+          printf '\x00\x00\x00\x00' > "$dir/seed_zero"
+          printf '\xff\xff\xff\xff' > "$dir/seed_ff"
+          head -c 1024 /dev/urandom > "$dir/seed_random"
+          case "${{ matrix.target }}" in
+            serde)
+              printf '[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]' > "$dir/seed_fixed32"
+              printf '"hello world"' > "$dir/seed_string"
+              printf '[72,101,108,108,111]' > "$dir/seed_vec"
+              printf '{}' > "$dir/seed_empty_object"
+              ;;
+            encoding)
+              printf 'deadbeef' > "$dir/seed_hex"
+              printf 'DEADBEEF' > "$dir/seed_hex_upper"
+              printf 'QkJCQg' > "$dir/seed_base64"
+              printf 'NBSWY3DP' > "$dir/seed_base32"
+              printf 'test1abcdef' > "$dir/seed_bech32"
+              printf 'fuzz1vehk7cnpwgry9h76' > "$dir/seed_bech32_payload"
+              printf '{}' > "$dir/seed_empty_object"
+              printf '[]' > "$dir/seed_empty_array"
+              printf 'null' > "$dir/seed_null"
+              printf 'invalid json' > "$dir/seed_invalid"
+              ;;
+          esac
+
+      - name: Fuzz ${{ matrix.target }} for 15 minutes
+        run: |
+          cargo +nightly fuzz run ${{ matrix.target }} fuzz/corpus/${{ matrix.target }} -- $FUZZER_ARGS
+          echo "Corpus files after fuzzing: $(find fuzz/corpus/${{ matrix.target }} -type f | wc -l)"
+
+      - name: Upload corpus for the next run
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-corpus-${{ matrix.label }}-${{ matrix.target }}
+          path: fuzz/corpus/${{ matrix.target }}/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload crashes
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-crash-${{ matrix.label }}-${{ matrix.target }}-${{ github.run_id }}
+          path: fuzz/artifacts/${{ matrix.target }}/**
+          retention-days: 30
+          if-no-files-found: warn
