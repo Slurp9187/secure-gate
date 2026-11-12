@@ -97,12 +97,6 @@ pub use encoding::ToBech32;
 pub use encoding::EncodableBytes;
 
 #[cfg(feature = "encoding-bech32")]
-pub use encoding::{Bech32Sized, Bech32Standard};
-
-#[cfg(feature = "encoding-bech32")]
-pub use encoding::{Bech32mSized, Bech32mStandard};
-
-#[cfg(feature = "encoding-bech32")]
 pub use encoding::{BECH32_CODE_LENGTH, bech32_code_length};
 
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]

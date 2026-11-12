@@ -673,17 +673,6 @@ pub use traits::Case;
 ))]
 pub use traits::EncodableBytes;
 
-/// Bech32 (BIP-173) checksum with a caller-chosen code length. `N` caps the length of
-/// the whole encoded string and never enters the checksum. Above [`BECH32_CODE_LENGTH`]
-/// the BCH error-detection guarantee no longer holds - see the type docs.
-#[cfg(feature = "encoding-bech32")]
-pub use traits::{Bech32Sized, Bech32Standard};
-
-/// Bech32m (BIP-350) checksum with a caller-chosen code length - the bech32m twin of
-/// [`Bech32Sized`], with the same rules and the same guarantee boundary.
-#[cfg(feature = "encoding-bech32")]
-pub use traits::{Bech32mSized, Bech32mStandard};
-
 /// The bech32 BCH code length (1023) used by every non-`_sized` method, and the helper
 /// that sizes an `N` from an HRP length and a payload byte count.
 #[cfg(feature = "encoding-bech32")]
