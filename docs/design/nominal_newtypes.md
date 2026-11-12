@@ -19,7 +19,7 @@
 > which previously had no access impl at all). The spike macros in
 > `src/macros/` have been updated to match.
 >
-> **§5.1 was decided in favour of option (c)** and is implemented. Note that
+> **§5.1 was decided in favor of option (c)** and is implemented. Note that
 > the restructure did **not** resolve it on its own — an interim revision of
 > this note claimed so and was retracted. A generated newtype being local
 > means a user *can* hand-write `impl Clone for EncKey` (verified), but that
@@ -312,7 +312,7 @@ Each was hit during development; the fix (where applicable) is in the code.
 
    The fix is to remove the silent path, not to see through the alias: the
    generic arm now requires an explicit `generic` marker
-   (`dynamic_newtype!(pub P, generic MyStr)`), and anything unrecognised hits a
+   (`dynamic_newtype!(pub P, generic MyStr)`), and anything unrecognized hits a
    catch-all that names both options. Pinned by
    `tests/compile-fail/dynamic_newtype_alias_rejected.rs`.
 
@@ -337,7 +337,7 @@ Each was hit during development; the fix (where applicable) is in the code.
    become a newtype through a one-line `.into()`. Both are gone (§8, R2): no
    `From<Wrapper>` is generated, and the named base-access methods exist only
    with `derive: [FromWrapper]` / `[IntoWrapper]` (`WrapperAccess` = both), so
-   relabelling needs `FromWrapper` on the *receiving* type. By default the only path between roles is a
+   relabeling needs `FromWrapper` on the *receiving* type. By default the only path between roles is a
    `with_secret` round trip — explicit, and visible in the audit sweep. Pinned
    by `tests/compile-fail/newtype_no_from_wrapper.rs`.
 
@@ -423,9 +423,9 @@ type alias at that stage. Both macro kinds are equally blind here. Trap 6 is
 not a `macro_rules!` limitation — it is a property of macros.
 
 **What actually fixes trap 6** (implemented): make the fallback explicit. The
-generic arm now requires a `generic` marker, so an unrecognised bare type no
+generic arm now requires a `generic` marker, so an unrecognized bare type no
 longer falls through and silently loses the shaped API — it is a compile error
-that names the fix. See trap 6 for the current behaviour.
+that names the fix. See trap 6 for the current behavior.
 
 **What a proc macro would still buy, honestly:** better diagnostics (precise
 spans and wording), and easier maintenance if the generation logic grows past
@@ -450,7 +450,7 @@ The objection survives only for `--no-default-features` builds, which are
 exactly the `no_std` ones the argument was written to protect — so the decision
 stands, but on narrower ground than "adding `syn`". The real reasons to stay put
 are now: the macros work and are covered by `tests/macros_suite/`, rewriting
-tested generation before 1.0 is churn against a real risk of behaviour drift,
+tested generation before 1.0 is churn against a real risk of behavior drift,
 and the maintenance cost is bounded and rare (an encoder signature change
 touches the forwarding sites once — the `Case` parameter in rc.9 hit sixteen
 across `fixed.rs`, `dynamic.rs` and both newtype macros). If that number grows,
@@ -467,7 +467,7 @@ Decide before writing the remaining ~25 forwarders by hand.
 
 The worry was that the arm hands back a type "that silently lacks most of the
 API". The `generic` marker that fixed trap 6 removed the silent part, which was
-the whole of the objection: an unrecognised inner type is now a `compile_error!`
+the whole of the objection: an unrecognized inner type is now a `compile_error!`
 naming both options, so nothing degrades quietly, and writing the word `generic`
 is how a caller states that the reduced surface is what they meant.
 

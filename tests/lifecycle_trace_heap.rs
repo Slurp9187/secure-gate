@@ -1309,7 +1309,7 @@ fn check_write_growth_wipes_the_orphan(initial: usize, extra: usize) {
 /// pointer matching the pre-call address plus a single allocation (the documented sentinel `Box`).
 /// "The wrapper wipes a sentinel, not the secret" is the payload buffer *not* being released while
 /// the wrapper drops. "Protection ends here" is the last measurement: the returned `Vec` has no
-/// zeroize-on-drop, so its buffer is freed with every byte intact. That is documented behaviour,
+/// zeroize-on-drop, so its buffer is freed with every byte intact. That is documented behavior,
 /// not a leak — tier 3 of the access model hands ownership over — and the positive control at the
 /// end shows protection can be resumed explicitly with `zeroize::Zeroizing`.
 fn check_into_inner_moves_the_buffer_and_ends_protection(size: usize) {
@@ -1412,7 +1412,7 @@ fn check_into_wrapper_drops_the_label_not_the_protection(size: usize) {
 
     let cap = base.with_secret(Vec::capacity);
     let w = watch_block(buffer, move || drop(base));
-    assert!(w.freed, "the unlabelled buffer was never released");
+    assert!(w.freed, "the unlabeled buffer was never released");
     assert_eq!(
         w.size, cap,
         "the watched block's size is not the buffer's capacity, so this check covered only part \
@@ -1428,9 +1428,9 @@ fn check_into_wrapper_drops_the_label_not_the_protection(size: usize) {
 /// Pins the inbound half of the same wall: `from_wrapper` relabels in place, and the borrowing
 /// accessors reach the same buffer without moving or copying it.
 ///
-/// `from_wrapper` is the direction the macro's documentation calls the relabelling path and warns
+/// `from_wrapper` is the direction the macro's documentation calls the relabeling path and warns
 /// against on boundary-guarding types. Whatever the policy, the mechanics must be free and
-/// lossless: a relabelling that reallocated would leave the pre-label buffer unwiped.
+/// lossless: a relabeling that reallocated would leave the pre-label buffer unwiped.
 fn check_from_wrapper_relabels_in_place(size: usize) {
     let base: Dynamic<Vec<u8>> = Dynamic::new(vec![PAYLOAD; size]);
     let buffer = base.expose_secret().as_ptr();
@@ -1470,7 +1470,7 @@ fn check_from_wrapper_relabels_in_place(size: usize) {
 
     let cap = shared.with_secret(Vec::capacity);
     let w = watch_block(buffer, move || drop(shared));
-    assert!(w.freed, "the relabelled buffer was never released");
+    assert!(w.freed, "the relabeled buffer was never released");
     assert_eq!(
         w.size, cap,
         "the watched block's size is not the buffer's capacity, so this check covered only part \

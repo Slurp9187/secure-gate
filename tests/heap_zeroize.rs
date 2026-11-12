@@ -18,7 +18,7 @@
 //!
 //! The *counting* mode is the exception: its counter is thread-local, so allocations made by the
 //! libtest harness thread or any other thread are not attributed to the closure under test. That
-//! removes a source of false failures; it is not a licence to parallelize -- an over-count made
+//! removes a source of false failures; it is not a license to parallelize -- an over-count made
 //! `check_bech32_hrp_mismatch_materializes_nothing` fail once in CI against code that was
 //! byte-identical to the passing runs.
 //!
@@ -1375,7 +1375,7 @@ fn all_heap_zeroed() {
     // it is the only place the guarantee can be tested at all: from outside, a
     // constructor that wiped and one that abandoned a half-written secret both just
     // return Err. Guards against "wrap only on success", which would leak partial
-    // plaintext on every malformed input — the routine behaviour of decoders that write
+    // plaintext on every malformed input — the routine behavior of decoders that write
     // into a caller-supplied buffer.
     //
     // 8192 again, though nothing unwinds on this path: the pin is by pointer, so the

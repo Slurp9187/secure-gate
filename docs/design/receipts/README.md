@@ -16,7 +16,7 @@ against the runs they came from rather than taken on trust.
 **Measurements travel; verdicts do not.**
 
 What is here is captured output: a command line, a toolchain, and what the program did.
-Review rounds, their conclusions and their characterisations of any third-party crate are
+Review rounds, their conclusions and their characterizations of any third-party crate are
 **not** re-homed here in any form. A review's verdict about someone else's crate is not
 evidence, and carrying one into this repo would put it under this repo's name where it would
 outlive anyone able to correct it.
@@ -34,7 +34,7 @@ at all.
 Each entry below therefore states **whether the attack engaged**, evidenced within the same
 output either by a `pgo-icall-prom (success)` remark or by a control actually recovering the
 planted pattern. **An attempt where promotion never fired is INCONCLUSIVE, not a pass, and is
-labelled that way.** A clean subject counts only when the same run has shown the attack works.
+labeled that way.** A clean subject counts only when the same run has shown the attack works.
 
 Three reading notes that apply throughout:
 
@@ -145,7 +145,7 @@ Three reading notes that apply throughout:
   `[profile.release] lto = "fat"` rather than a hand-rolled `rustc` recipe — which is what makes
   the callee resolvable at promotion time, and what the instrumented build must match. Four
   rows: a control and the subject, each with and without PGO, at 4096 bytes (64-byte figures in
-  parentheses). The subject row is labelled `this crate`: the crate the test lives in,
+  parentheses). The subject row is labeled `this crate`: the crate the test lives in,
   `secure-gate-zalloc`, at commit `13fe5e2`.
 - **Date:** 2026-09-17 18:13:26 UTC.
 - **Toolchain:** not restated in the capture. `00-env-linux.txt` records rustc 1.85.1 /
@@ -220,7 +220,7 @@ against `secure-gate-zalloc`'s design. Neither file measures any released third-
 ### `49-secure-gate-shape-linux.txt`
 
 - **What it measured:** **`secure-gate`'s own §2 shape**, not a synthetic one — a 4 KiB secret
-  grown one byte past its capacity through `with_secret_mut`, with a neighbour behind it so the
+  grown one byte past its capacity through `with_secret_mut`, with a neighbor behind it so the
   reallocation has to move (`moved: true`), and the abandoned block requested back and read.
   Run at `secure-gate-zalloc` commit `2434dfa`, whose subject records the fix that made the
   readout sample payload rather than the allocator's own bookkeeping.
@@ -269,7 +269,7 @@ What these receipts support, stated at the width the measurements actually cover
   `sgza` row (`secure-gate-zalloc`) left the pattern behind: **0/16**, `same=true`, at both block sizes
   (`2026-09-18-pgo-fat-lto-rustc-1.96.1.txt`) — **one run, one configuration**, for the
   upstream 0.1.1 that `harness/` pins. `48` reproduces that independently through
-  the cargo fat-LTO flow **for `secure-gate-zalloc` only** — its subject row is labelled
+  the cargo fat-LTO flow **for `secure-gate-zalloc` only** — its subject row is labeled
   `this crate`, which is `secure-gate-zalloc` at `13fe5e2`, not `zeroizing-alloc`. No run
   held in this directory measures `zeroizing-alloc` a second time.
 

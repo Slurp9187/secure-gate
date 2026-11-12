@@ -98,7 +98,7 @@ branch without default-branch access, this decision must be revisited.
 
 ## CodeQL on `release/0.8`
 
-Default setup analyses only the default branch and pull requests into it, so `release/0.8`
+Default setup analyzes only the default branch and pull requests into it, so `release/0.8`
 had no CodeQL analyses at all. `.github/workflows/codeql.yml` is the advanced setup that
 replaces it: `push` and `pull_request` on both `main` and `release/0.8`, plus a weekly cron
 (which, like every cron, fires only on `main`). It must exist on both branches.
@@ -107,7 +107,7 @@ It is active: default setup is off and the repository variable `CODEQL_ADVANCED`
 The job keeps the `vars.CODEQL_ADVANCED == 'true'` gate so that the file is inert wherever
 default setup is still on, since GitHub rejects SARIF from an advanced configuration then.
 
-To check that `release/0.8` is being analysed:
+To check that `release/0.8` is being analyzed:
 
 ```bash
 gh api --paginate 'repos/Slurp9187/secure-gate/code-scanning/analyses?per_page=100' \

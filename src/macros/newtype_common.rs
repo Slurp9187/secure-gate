@@ -217,7 +217,7 @@ macro_rules! __sg_newtype_opt {
     //
     //   FromWrapper — INBOUND: `from_wrapper(base) -> Self`. A base-typed value
     //                 becomes this role. Every plain alias of the same base is
-    //                 already that base type, so this is the relabelling path;
+    //                 already that base type, so this is the relabeling path;
     //                 a type that guards a boundary should never take it.
     //   IntoWrapper — OUTBOUND: `as_wrapper`, `as_wrapper_mut`, `into_wrapper`.
     //                 Material leaves this role toward the base type. Needed to

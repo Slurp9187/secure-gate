@@ -203,7 +203,7 @@ impl<T: FixedStorage, const N: usize> FixedStorage for [T; N] {}
 /// `Wrapping` is a transparent arithmetic wrapper: same storage as its payload.
 impl<T: FixedStorage> FixedStorage for core::num::Wrapping<T> {}
 
-/// `MaybeUninit<T>` is `T`'s storage, initialised or not. No allocation either way.
+/// `MaybeUninit<T>` is `T`'s storage, initialized or not. No allocation either way.
 impl<T: FixedStorage> FixedStorage for core::mem::MaybeUninit<T> {}
 
 /// `zeroize::Zeroizing<T>` holds `T` inline and wipes it on drop, so it qualifies exactly

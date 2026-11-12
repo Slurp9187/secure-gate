@@ -11,7 +11,7 @@
 # Linux only, and glibc specifically: the readout depends on the allocator handing the
 # just-freed block straight back, which glibc does and the Windows heap does not. On Windows
 # the question is unanswerable for a different reason -- `HeapFree` is not a deallocation
-# function LLVM recognises, so a fill before it is never proven dead and never eliminated,
+# function LLVM recognizes, so a fill before it is never proven dead and never eliminated,
 # whether or not the wipe mechanism is sound.
 #
 #   bash tools/pgo_allocator_compare.sh

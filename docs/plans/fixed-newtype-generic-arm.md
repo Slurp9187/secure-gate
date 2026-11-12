@@ -52,7 +52,7 @@ Change it to `generic [i16; 0]` (or another non-`u8` ZST array). Regenerate `tes
 
 ### A3. Tests
 
-New compile-fail, modelled on `dynamic_newtype_generic_shaped_rejected.rs`: all four tails, plus a positive control that `generic [i16; 256]` and `generic [u8; 32]`-by-size-literal still compile. Wire it in `tests/compile_fail_tests.rs`.
+New compile-fail, modeled on `dynamic_newtype_generic_shaped_rejected.rs`: all four tails, plus a positive control that `generic [i16; 256]` and `generic [u8; 32]`-by-size-literal still compile. Wire it in `tests/compile_fail_tests.rs`.
 
 ### A4. Docs
 
