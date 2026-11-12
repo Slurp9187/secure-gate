@@ -21,6 +21,9 @@
 /// — it is a zeroizing `String` wrapper for encoded output. Its only accessor is
 /// `Deref<Target = str>`, plus the two named consumers [`into_inner`](EncodedSecret::into_inner)
 /// and [`into_zeroizing`](EncodedSecret::into_zeroizing).
+/// There are deliberately no `AsRef` impls, because `Deref` already opens that door, and
+/// the [`CloneableSecret`](crate::CloneableSecret) and
+/// [`SerializableSecret`](crate::SerializableSecret) markers do not apply to it.
 ///
 /// `Deref` here is a deliberate exception to the crate's no-`Deref` rule, and the
 /// alternative (drop it, add `as_str()`, and close `.to_string()`) was considered and

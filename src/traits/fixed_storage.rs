@@ -117,12 +117,25 @@
 
 /// Marker trait asserting that a type owns no heap allocation.
 ///
-/// Required by [`Fixed::new`](crate::Fixed::new). See the
-/// [module documentation](self) for the contract, for what is already implemented,
-/// and for why this is an assertion rather than an enforcement.
-///
 /// No methods — its only purpose is to gate construction of a
-/// [`Fixed<T>`](crate::Fixed).
+/// [`Fixed<T>`](crate::Fixed). [`Fixed::new`](crate::Fixed::new) requires it, which is
+/// what makes the claim that `Fixed<T>` has no reallocation surface true: `Fixed<Vec<u8>>`
+/// and `Fixed<String>` cannot be built, where they would otherwise abandon an unwiped
+/// buffer holding the whole secret on any capacity change.
+///
+/// Implemented for the primitives and the `NonZero` integers, `[T; N]` for any `N`, tuples
+/// up to ten elements, `Option<T>`, `Wrapping<T>`, `MaybeUninit<T>`, `Zeroizing<T>` and
+/// `Fixed<T>` itself. Nothing heap-owning is implemented: `Vec<T>`, `String` and `Box<[T]>`
+/// are all absent, because the residue does not need a capacity change — replacing the
+/// whole value abandons the allocation too, measured at 1024 of 1024 bytes through a
+/// `Fixed<Box<[u8]>>`. For a heap-backed secret use [`Dynamic`](crate::Dynamic), which
+/// documents the residue and offers the one safe growth path.
+///
+/// A custom inner type writes `impl FixedStorage for MyKey {}`. The compiler checks that
+/// you made the claim, not that it is true. The test to apply: *does the type own a heap
+/// allocation?* If it does, do not implement this. The
+/// [module documentation](crate::traits::fixed_storage) has the full contract and why
+/// this is an assertion rather than an enforcement.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not known to be free of heap allocations, so it cannot be the inner type of a `Fixed`",
     label = "`Fixed` holds its secret inline; `{Self}` does not implement `FixedStorage`",

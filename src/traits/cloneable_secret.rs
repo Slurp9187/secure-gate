@@ -102,8 +102,23 @@
 /// Marker trait that opts a secret type into cloning.
 ///
 /// No methods — its only purpose is to gate the `Clone` impl on
-/// [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic).
+/// [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic). Each clone is
+/// zeroized on drop independently, and each one is another copy of the secret in memory.
 /// Requires the `cloneable` feature.
+///
+/// Implement this on your inner type `T`; `Fixed<T>` and `Dynamic<T>` then gain the
+/// gated `Clone` impl. It is deliberately not implemented for anything by default:
+/// cloning is a risk a crate opts into, one type at a time.
+///
+/// **Coherence note:** Rust's orphan rule prevents downstream crates from implementing
+/// this marker for foreign types such as `String`, `Vec<u8>`, or `[u8; N]` — so
+/// `Dynamic<String>` and `Fixed<[u8; N]>` themselves can never become `Clone`. To opt
+/// a secret into cloning, define a newtype inner type in your crate (deriving
+/// `Zeroize` and `Clone`) and implement the marker on it. This is intentional: it keeps
+/// every cloneable secret type visible in *your* code. The
+/// [module documentation](crate::traits::cloneable_secret) has a worked example.
+///
+/// See also [`SerializableSecret`](crate::SerializableSecret), the other opt-in marker.
 #[cfg(feature = "cloneable")]
 #[diagnostic::on_unimplemented(
     message = "`{Self}` has not opted in to cloning, so a secret wrapping it cannot be cloned",

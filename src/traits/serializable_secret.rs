@@ -99,7 +99,26 @@
 /// Marker trait that opts a secret type into serialization.
 ///
 /// No methods — its only purpose is to gate the `Serialize` impl on
-/// [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic).
-/// Requires the `serde-serialize` feature.
+/// [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic). Serialization
+/// writes out the full secret, so audit every impl. Requires the `serde-serialize`
+/// feature.
+///
+/// **`Deserialize` does not require this marker.** It is gated separately by the
+/// `serde-deserialize` feature, with its own impls on the wrapper types. This marker
+/// controls `Serialize` only.
+///
+/// Implement this on your inner type `T`; `Fixed<T>` and `Dynamic<T>` then gain the
+/// gated `Serialize` impl. It is deliberately not implemented for anything by default:
+/// serialization is a risk a crate opts into, one type at a time.
+///
+/// **Coherence note:** Rust's orphan rule prevents downstream crates from implementing
+/// this marker for foreign types such as `String`, `Vec<u8>`, or `[u8; N]` — so
+/// `Fixed<[u8; N]>` and `Dynamic<String>` themselves can never become `Serialize`. To
+/// opt a secret into serialization, define a newtype inner type in your crate (deriving
+/// `Zeroize` and `Serialize`) and implement the marker on it. This is intentional: it
+/// keeps every serializable secret type visible in *your* code. The
+/// [module documentation](crate::traits::serializable_secret) has a worked example.
+///
+/// See also [`CloneableSecret`](crate::CloneableSecret), the other opt-in marker.
 #[cfg(feature = "serde-serialize")]
 pub trait SerializableSecret: serde::Serialize {}

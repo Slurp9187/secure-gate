@@ -67,6 +67,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     the crate root when `scoped::RevealScoped` and `sealed::SealedPayload` are not.
   - API docs no longer narrate release-candidate history ("Before 0.9.0-rc.10…", "Changed in
     0.9.0-rc.12"). They describe current behaviour and its reason; the history is here.
+  - The traits, `EncodedSecret`, `Case`, the bech32 length items and the sealed types now
+    have pages at the crate root (`#[doc(inline)]` on the root re-exports). docs.rs showed
+    them as a bare re-export list, with their pages only under the deeper module paths. The
+    comments that sat on those re-exports, which rustdoc did not render, are folded into
+    each item's own docs.
   - `README.md`'s Stability section now says the deeper module paths under `traits` are not
     covered by the promise, matching the crate docs.
 

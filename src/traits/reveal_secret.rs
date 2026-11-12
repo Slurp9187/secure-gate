@@ -138,10 +138,16 @@
 ///
 /// Implemented for **all** [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic),
 /// whatever the inner type — length metadata lives in the narrower [`SecretLen`].
-/// Prefer the scoped [`with_secret`](Self::with_secret) method; use
-/// [`expose_secret`](Self::expose_secret) only when a long-lived reference is
-/// unavoidable. See [`RevealSecretMut`](crate::RevealSecretMut) for the mutable
-/// counterpart.
+/// See [`RevealSecretMut`](crate::RevealSecretMut) for the mutable counterpart.
+///
+/// Access comes in three tiers. Prefer the earliest that does the job:
+///
+/// - **Tier 1** (preferred): [`with_secret`](Self::with_secret) — scoped closure; the
+///   borrow cannot escape.
+/// - **Tier 2** (escape hatch): [`expose_secret`](Self::expose_secret) — a direct
+///   reference, for FFI and third-party APIs that need one.
+/// - **Tier 3** (consumption): [`into_inner`](Self::into_inner) — transfers ownership
+///   of the plain value; protection ends with the call.
 pub trait RevealSecret {
     /// The inner secret type being revealed.
     ///

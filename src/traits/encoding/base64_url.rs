@@ -47,7 +47,10 @@ use base64ct::{Base64UrlUnpadded, Encoding};
 
 /// Extension trait for encoding byte data as URL-safe base64 strings (no padding).
 ///
-/// *Requires feature `encoding-base64`.*
+/// *Requires features `encoding-base64` and `alloc`.* Every method returns an
+/// [`EncodedSecret`](crate::EncodedSecret). Decode with
+/// [`Fixed::try_from_base64url`](crate::Fixed::try_from_base64url) or
+/// [`Dynamic::try_from_base64url`](crate::Dynamic::try_from_base64url).
 ///
 /// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes), and implemented directly on the
 /// byte-shaped wrappers (`Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`). Uses the RFC 4648

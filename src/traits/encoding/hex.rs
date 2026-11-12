@@ -51,7 +51,10 @@ use base16ct;
 
 /// Extension trait for encoding byte data as hexadecimal strings.
 ///
-/// *Requires feature `encoding-hex`.*
+/// *Requires features `encoding-hex` and `alloc`.* Every method returns an
+/// [`EncodedSecret`](crate::EncodedSecret). Decode with
+/// [`Fixed::try_from_hex`](crate::Fixed::try_from_hex) or
+/// [`Dynamic::try_from_hex`](crate::Dynamic::try_from_hex).
 ///
 /// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes) (byte slices, arrays, `Vec<u8>`),
 /// and implemented directly on the byte-shaped wrappers (`Fixed<[u8; N]>`,
