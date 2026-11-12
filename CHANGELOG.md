@@ -36,6 +36,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   abandons none. Both places now say so and point at `new_with`. The code is unchanged; an
   in-place path is #249.
 
+- **`SECURITY.md` rewritten: 1107 lines to about 510, organized around where protection
+  stops.** "Where accident-prevention ends" now leads the document and states the rule: a
+  buffer this crate allocates and the caller never holds is wiped on every path; a buffer
+  the caller or another library holds is documented and left alone. A two-column table
+  lists what falls on each side. The heap-reallocation material, which appeared three
+  times, is one section with a measurements table and a construction-path table. Removed:
+  "Best Practices", "Core Security Model" and "Module-by-Module Security Notes" (each
+  restated other sections), and the passages describing what the document used to say.
+  No claim was added beyond the rule itself, and every measurement is kept. Headings that
+  other files link to keep their names: the four numbered limitations, "3-Tier Access
+  Model", "What secure-gate does NOT protect against", "Inherent Rust Limitations".
+- **Five rustdoc links to `SECURITY.md` pointed at `secure-gate-core/SECURITY.md`**, a path
+  that has not existed since the repository was flattened. They now resolve.
+
 ### Tests
 - **Allocator-level checks for three wipes that had none.** `tests/heap_zeroize.rs` now
   watches `Dynamic<[u8]>` on drop; an `EncodedSecret` dropped directly, once per encoder

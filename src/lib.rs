@@ -258,7 +258,7 @@
 //! enforced with `#![forbid(unsafe_code)]`. Prefer scoped access ([`RevealSecret::with_secret`])
 //! over direct references. Encoders return [`EncodedSecret`], which stays wiped until it
 //! drops; `EncodedSecret::into_inner` is the named call that ends that. See
-//! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md)
+//! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md)
 //! for the full threat model.
 //!
 //! # Inherent Rust Limitations
@@ -280,10 +280,10 @@
 //!   encrypted swap, disabled core dumps).
 //!
 //! Full discussion in
-//! [SECURITY.md § Inherent Rust Limitations](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md#inherent-rust-limitations).
+//! [SECURITY.md § Inherent Rust Limitations](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md#inherent-rust-limitations).
 //!
 //! See the [README](https://github.com/Slurp9187/secure-gate/blob/main/README.md) and
-//! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for full details.
+//! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for full details.
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

@@ -19,8 +19,8 @@
 //! | [`SentinelValue`]      | Inert placeholder left by `into_inner`       | Always available         | Implemented for `[T; N]` (any `N`), `String`, `Vec<T>`                |
 //! | [`FixedStorage`]       | Asserts the inner type cannot reallocate     | Always available         | Required by `Fixed::new`. Implemented for primitives, `[T; N]`, small tuples and `Box<T>`; a custom inner type writes one line. `Vec`/`String` deliberately excluded |
 //! | [`ConstantTimeEq`]     | Deterministic constant-time equality         | `ct-eq`                  | Timing-attack resistant byte comparison                               |
-//! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for opt-in risk details. |
-//! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/secure-gate-core/SECURITY.md) for opt-in risk details. |
+//! | [`CloneableSecret`]    | Opt-in marker for safe cloning               | `cloneable`              | Requires explicit impl on inner type; zeroize preserved. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for opt-in risk details. |
+//! | [`SerializableSecret`] | Opt-in marker for Serde serialization        | `serde-serialize`        | Serialization exposes secret — use with extreme caution. See [`SECURITY.md`](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for opt-in risk details. |
 //!
 //! # Security Guarantees
 //!
