@@ -10,9 +10,9 @@
 #![allow(clippy::redundant_clone)]
 
 mod common;
+mod encoded_secret_suite;
 mod encoding_suite;
 mod macros_suite;
-mod revealed_secrets_suite;
 mod serde_suite;
 // Proptest is valuable on native runs, but prohibitively slow under Miri's
 // interpreter; deterministic suites and the dedicated fuzz/Miri workflow still

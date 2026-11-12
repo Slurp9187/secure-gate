@@ -48,10 +48,10 @@
 //!
 //! See individual trait docs for detailed usage and examples.
 
-pub mod revealed_secrets;
+pub mod encoded_secret;
 
 #[cfg(feature = "alloc")]
-pub use revealed_secrets::EncodedSecret;
+pub use encoded_secret::EncodedSecret;
 
 pub mod reveal_secret;
 pub use reveal_secret::{RevealSecret, SecretLen};

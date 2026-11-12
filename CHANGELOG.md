@@ -25,6 +25,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     has a proven error-detection bound) is now on `BECH32_CODE_LENGTH`. The `sanity_check`
     and constant-pinning tests moved from `tests/encoding_suite/bech32_sized.rs` into the
     modules.
+- **BREAKING: `secure_gate::traits::revealed_secrets` is renamed to
+  `secure_gate::traits::encoded_secret`.** The module held one type, and its name was left
+  over from when it also held `InnerSecret`. It is now a single file,
+  `src/traits/encoded_secret.rs`, in the same layout as its sibling trait modules.
+  - **Unaffected:** `secure_gate::EncodedSecret` and `secure_gate::traits::EncodedSecret`, the
+    paths the docs tell callers to use. The type, its methods and its rendered docs are
+    unchanged.
+  - **Affected:** code that imports through the deep path. Change
+    `traits::revealed_secrets::EncodedSecret` to `secure_gate::EncodedSecret`.
+  - The integration suite moved from `tests/revealed_secrets_suite/` to
+    `tests/encoded_secret_suite/`, and the trybuild snapshots name the new source path.
+
+- **The `serde`, `serde-serialize` and `serde-deserialize` features no longer turn on serde's
+  `derive` feature.** Nothing in this crate derives `Serialize` or `Deserialize`, so the
+  feature only added `serde_derive`, `syn`, `quote` and `proc-macro2` to every build that
+  enabled serde support. `derive` is now a dev-dependency feature, used by the tests, benches
+  and doc examples.
+  - **Affected:** a crate that writes `#[derive(Serialize)]` or `#[derive(Deserialize)]` and
+    relied on this crate to switch `derive` on. Add `features = ["derive"]` to its own `serde`
+    dependency.
+- **The `serde` dependency floor is now `1.0.95`** (was `1.0`). Earlier versions do not compile
+  with the `alloc`-without-`std` configuration this crate asks for, so a dependent whose
+  lockfile held one could not build. Found by resolving every direct dependency to its lowest
+  allowed version; all other floors build.
 
 ### Security
 - **A rejected hex, Base32 or Base64url input no longer leaves the decoded bytes in freed
