@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0-rc.18] - Unreleased
+
+### Security
+- **A rejected hex, Base32 or Base64url input no longer leaves the decoded bytes in freed
+  memory.** `Dynamic::try_from_hex` / `try_from_base32` / `try_from_base64url`, and the same
+  three on `Fixed` when `alloc` is on (the default), decoded through the backend's
+  `decode_vec`, which allocates a plain `Vec`, and wrapped the result in `Zeroizing`. That
+  covered success only. `base16ct`, `base32ct` and `base64ct` decode in constant time: they
+  write every output byte and report a bad character at the end, so an input that is a valid
+  encoding followed by junk was rejected with the whole secret already decoded, and the
+  backend dropped that buffer unwiped. Measured: a 1008-byte secret as hex followed by
+  `\r\n` came back from the allocator with 1007 of its bytes in the freed block, for `Dynamic`
+  and (64 bytes) for `Fixed`; likewise Base64url followed by `=` padding, and Base32 followed
+  by eight invalid characters. The decode buffer is now allocated by this crate inside
+  `Zeroizing` before the backend writes to it, through the backends' slice API
+  (`src/decode_staging.rs`), so every exit wipes it. Accepted inputs, errors and output are
+  unchanged. The `Fixed` decoders without `alloc`, and all bech32 decoders, were not affected.
+  `tests/heap_zeroize.rs` checks the rejected path at the allocator for all six constructors;
+  it fails on rc.17. Found by the pre-stable audit of every wipe claim in `README.md` and
+  `SECURITY.md`.
+
+### Documentation
+- **`SECURITY.md` states what serde deserialization leaves behind on success.** The
+  `serde-deserialize` row and the encoding notes said temporary buffers are zeroized. That is
+  true of the buffer the deserializer returns, and not of the ones it grew through to build
+  it, which belong to the deserializer. Measured with `serde_json`: a 1008-byte
+  `Dynamic<Vec<u8>>` from a JSON array abandons 5 unwiped blocks (992 bytes of the secret); a
+  `Dynamic<String>` from `from_str` abandons none, and from `from_reader` 6. `Fixed<[u8; N]>`
+  abandons none. Both places now say so and point at `new_with`. The code is unchanged; an
+  in-place path is #249.
+
+- **`SECURITY.md` rewritten: 1107 lines to about 510, organized around where protection
+  stops.** "Where accident-prevention ends" now leads the document and states the rule: a
+  buffer this crate allocates and the caller never holds is wiped on every path; a buffer
+  the caller or another library holds is documented and left alone. A two-column table
+  lists what falls on each side. The heap-reallocation material, which appeared three
+  times, is one section with a measurements table and a construction-path table. Removed:
+  "Best Practices", "Core Security Model" and "Module-by-Module Security Notes" (each
+  restated other sections), and the passages describing what the document used to say.
+  No claim was added beyond the rule itself, and every measurement is kept. Headings that
+  other files link to keep their names: the four numbered limitations, "3-Tier Access
+  Model", "What secure-gate does NOT protect against", "Inherent Rust Limitations".
+- **Five rustdoc links to `SECURITY.md` pointed at `secure-gate-core/SECURITY.md`**, a path
+  that has not existed since the repository was flattened. They now resolve.
+
+### Tests
+- **Allocator-level checks for three wipes that had none.** `tests/heap_zeroize.rs` now
+  watches `Dynamic<[u8]>` on drop; an `EncodedSecret` dropped directly, once per encoder
+  (hex, upper hex, Base32, Base64url, bech32, bech32m; only hex after `into_zeroizing` was
+  covered); and `SealedDynamic`'s plaintext copies on seal, `with_secret`,
+  `with_secret_mut`, a panicking closure and unseal. Each asserts the gate inspected exactly
+  one buffer, so a check cannot pass by observing nothing. All held on rc.17; no code change.
+
 ## [0.9.0-rc.17] - 2026-10-29
 
 ### Security

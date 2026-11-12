@@ -680,11 +680,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     pub fn try_from_hex(hex: &str) -> Result<Self, crate::error::HexError> {
         #[cfg(feature = "alloc")]
         {
-            use zeroize::Zeroizing;
-            let bytes = Zeroizing::new(
-                base16ct::mixed::decode_vec(hex.as_bytes())
-                    .map_err(|_| crate::error::HexError::InvalidHex)?,
-            );
+            let bytes =
+                crate::decode_staging::hex(hex).map_err(|_| crate::error::HexError::InvalidHex)?;
             if bytes.len() != N {
                 return Err(crate::error::HexError::InvalidLength {
                     expected: N,
@@ -762,12 +759,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     pub fn try_from_base32(s: &str) -> Result<Self, crate::error::Base32Error> {
         #[cfg(feature = "alloc")]
         {
-            use base32ct::{Base32UpperUnpadded, Encoding};
-            use zeroize::Zeroizing;
-            let bytes = Zeroizing::new(
-                Base32UpperUnpadded::decode_vec(s)
-                    .map_err(|_| crate::error::Base32Error::InvalidBase32)?,
-            );
+            let bytes = crate::decode_staging::base32(s)
+                .map_err(|_| crate::error::Base32Error::InvalidBase32)?;
             if bytes.len() != N {
                 return Err(crate::error::Base32Error::InvalidLength {
                     expected: N,
@@ -835,12 +828,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
         #[cfg(feature = "alloc")]
         {
-            use base64ct::{Base64UrlUnpadded, Encoding};
-            use zeroize::Zeroizing;
-            let bytes = Zeroizing::new(
-                Base64UrlUnpadded::decode_vec(s)
-                    .map_err(|_| crate::error::Base64Error::InvalidBase64)?,
-            );
+            let bytes = crate::decode_staging::base64url(s)
+                .map_err(|_| crate::error::Base64Error::InvalidBase64)?;
             if bytes.len() != N {
                 return Err(crate::error::Base64Error::InvalidLength {
                     expected: N,

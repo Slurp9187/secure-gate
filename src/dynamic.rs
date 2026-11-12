@@ -333,12 +333,12 @@ impl<T: 'static + zeroize::Zeroize> From<T> for Dynamic<T> {
 impl Dynamic<Vec<u8>> {
     /// Decodes a hex string (lowercase, uppercase, or mixed) into `Dynamic<Vec<u8>>`.
     ///
-    /// The decoded buffer is wrapped in `Zeroizing` as soon as it exists, and stays in it
-    /// until after the `Box` allocation completes, guaranteeing zeroization even on OOM panic.
+    /// The decode buffer is allocated inside `Zeroizing` before a byte is written to it, so
+    /// it is wiped when the input is rejected as well as on success, and it stays in
+    /// `Zeroizing` until after the `Box` allocation completes (an OOM panic wipes it too).
     pub fn try_from_hex(s: &str) -> Result<Self, crate::error::HexError> {
-        let bytes = base16ct::mixed::decode_vec(s.as_bytes())
-            .map(zeroize::Zeroizing::new)
-            .map_err(|_| crate::error::HexError::InvalidHex)?;
+        let bytes =
+            crate::decode_staging::hex(s).map_err(|_| crate::error::HexError::InvalidHex)?;
         Ok(Self::from_protected_bytes(bytes))
     }
 }
@@ -348,8 +348,9 @@ impl Dynamic<Vec<u8>> {
 impl Dynamic<Vec<u8>> {
     /// Decodes an uppercase, unpadded Base32 (RFC 4648 §6) string into `Dynamic<Vec<u8>>`.
     ///
-    /// The decoded buffer is wrapped in `Zeroizing` as soon as it exists, and stays in it
-    /// until after the `Box` allocation completes, guaranteeing zeroization even on OOM panic.
+    /// The decode buffer is allocated inside `Zeroizing` before a byte is written to it, so
+    /// it is wiped when the input is rejected as well as on success, and it stays in
+    /// `Zeroizing` until after the `Box` allocation completes (an OOM panic wipes it too).
     ///
     /// Decoding is strict about the alphabet, case, padding and length, but lenient
     /// about non-canonical trailing bits: unused bits in the final group are ignored
@@ -358,9 +359,7 @@ impl Dynamic<Vec<u8>> {
     /// only encoder-produced strings are canonical. Do not use the decoded value to
     /// decide that two encoded strings were equal.
     pub fn try_from_base32(s: &str) -> Result<Self, crate::error::Base32Error> {
-        use base32ct::{Base32UpperUnpadded, Encoding};
-        let bytes = Base32UpperUnpadded::decode_vec(s)
-            .map(zeroize::Zeroizing::new)
+        let bytes = crate::decode_staging::base32(s)
             .map_err(|_| crate::error::Base32Error::InvalidBase32)?;
         Ok(Self::from_protected_bytes(bytes))
     }
@@ -371,12 +370,11 @@ impl Dynamic<Vec<u8>> {
 impl Dynamic<Vec<u8>> {
     /// Decodes a Base64url (unpadded) string into `Dynamic<Vec<u8>>`.
     ///
-    /// The decoded buffer is wrapped in `Zeroizing` as soon as it exists, and stays in it
-    /// until after the `Box` allocation completes, guaranteeing zeroization even on OOM panic.
+    /// The decode buffer is allocated inside `Zeroizing` before a byte is written to it, so
+    /// it is wiped when the input is rejected as well as on success, and it stays in
+    /// `Zeroizing` until after the `Box` allocation completes (an OOM panic wipes it too).
     pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
-        use base64ct::{Base64UrlUnpadded, Encoding};
-        let bytes = Base64UrlUnpadded::decode_vec(s)
-            .map(zeroize::Zeroizing::new)
+        let bytes = crate::decode_staging::base64url(s)
             .map_err(|_| crate::error::Base64Error::InvalidBase64)?;
         Ok(Self::from_protected_bytes(bytes))
     }
