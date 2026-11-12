@@ -12,7 +12,7 @@ permissions:
 
 # A newer push to the same pull request cancels the run it supersedes. Every other run
 # (pushes to `main`, the schedule, manual dispatch) gets a group of its own and is never
-# cancelled, so each `main` commit keeps a complete result to check a release tag against.
+# canceled, so each `main` commit keeps a complete result to check a release tag against.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -452,6 +452,35 @@ jobs:
         run: cargo +${{ matrix.sealed_toolchain }} test --features sealed --lib --test sealed --test sealed_lock --test sealed_glob_import
 
   # ---------------------------------------------------------------------------
+  # Feature combinations — every set of up to three features compiles
+  #
+  # The test matrix above lists hand-picked feature sets. cargo-hack reads the features
+  # from Cargo.toml, so a new feature is covered without a new matrix row. `--lib` only:
+  # the test files assume some feature pairings (for example `cloneable` with `alloc`).
+  # ---------------------------------------------------------------------------
+  features:
+    name: Feature combinations (cargo-hack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
+
+      - name: Check every combination of up to three features
+        run: cargo hack check -p secure-gate --lib --feature-powerset --depth 3 --no-dev-deps
+
+  # ---------------------------------------------------------------------------
   # Package job — the crate as published builds on its own
   #
   # `cargo package` assembles the .crate exactly as `cargo publish` would and builds it
@@ -583,6 +612,7 @@ jobs:
       - residue-probe
       - guarded-block
       - package
+      - features
       - sealed-zeroize
       - dse
       - fuzz-smoke

@@ -25,7 +25,7 @@ on:
     - cron: "0 7 * * 1"
   # Needed to scan a branch on demand -- without it the Actions UI shows no "Run
   # workflow" button and `gh workflow run codeql.yml` fails. That matters most
-  # right after activation, when `release/0.8` has never been analysed and the
+  # right after activation, when `release/0.8` has never been analyzed and the
   # alternative is pushing a commit or waiting until Monday.
   workflow_dispatch:
 
@@ -34,7 +34,7 @@ permissions:
 
 # A newer push to the same pull request cancels the run it supersedes. Every other run
 # (pushes to `main`, the schedule, manual dispatch) gets a group of its own and is never
-# cancelled, so each `main` commit keeps a complete result to check a release tag against.
+# canceled, so each `main` commit keeps a complete result to check a release tag against.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

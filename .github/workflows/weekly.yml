@@ -69,3 +69,28 @@ jobs:
       ref: ${{ matrix.ref }}
       label: ${{ matrix.label }}
       cache: false
+
+  # The sealed-zeroize check in ci.yml reads the committed Cargo.lock, which users of the
+  # crate never get. This run resolves the newest compatible dependencies first, so an
+  # upstream release that drops a `zeroize` feature is caught within a week. `main` only:
+  # `release/0.8` has no `sealed` feature.
+  sealed-zeroize-latest:
+    name: Sealed – zeroize features on (latest dependencies)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # No `ref`: scheduled runs already check out `main`.
+      - name: Checkout main
+        uses: actions/checkout@v7
+
+      - name: Install Rust stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          cache: false
+
+      - name: Resolve the newest compatible dependencies
+        run: cargo update
+
+      - name: Check the sealed dependency graph
+        run: tools/check_sealed_zeroize.sh

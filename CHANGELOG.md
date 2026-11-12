@@ -119,7 +119,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   poly1305 is built without `zeroize`, or if any other crate in that graph offers the feature
   and leaves it off without being listed as a deliberate exception (cipher, crypto-common,
   hybrid-array, per the audit in `Cargo.toml`). A dependency update could previously turn one
-  off through feature unification with no test noticing.
+  off through feature unification with no test noticing. A weekly run repeats the check
+  after `cargo update`, because users never get the committed lockfile, so an upstream
+  release that drops the feature is caught within a week.
+- **New check: every combination of up to three features compiles.** cargo-hack reads the
+  features from `Cargo.toml` (`--feature-powerset --depth 3`, library only, about 400
+  combinations), so a new feature is covered without adding a row to the hand-written test
+  matrix.
 - **The nightly fuzz runs now build on each other.** The corpus download looked only in the
   current run, so every night restarted from the hand-written seeds, and the coverage report
   it fed was empty every night. Each night now downloads the previous run's corpus. The
