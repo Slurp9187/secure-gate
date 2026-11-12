@@ -269,6 +269,24 @@ breaking ones, are in [CHANGELOG.md](https://github.com/Slurp9187/secure-gate/bl
 `no_std` unless `std` is enabled, checked in CI by building for `thumbv7em-none-eabihf`.
 `Fixed` and its decoders work without an allocator.
 
+## Stability
+
+From 0.9.0, the public API follows semantic versioning within the 0.9 line: a 0.9.x release
+adds, and does not remove or change. The promise covers the items exported from the crate
+root and from `traits`, `sealed` and `scoped`, the input grammar of the macros, and each
+feature's name and what it enables.
+
+- **Features.** `full` stays as listed above. It will not grow to include `std` or `sealed`,
+  so it remains usable on `no_std` targets.
+- **MSRV.** The minimum supported Rust version rises only in a minor release (0.9 to 0.10),
+  never in a patch release.
+- **Traits.** The public traits can be implemented outside this crate, and the newtype macros
+  do so. A method added to one in a 0.9.x release always comes with a default body, so
+  existing implementations keep compiling.
+- **Dependencies in the API.** Only `zeroize` and `serde`, both 1.x, appear in public
+  signatures. `bech32`, `rand`, `subtle` and the other dependencies are private and can be
+  upgraded without a breaking release.
+
 ## Moving from `secrecy`
 
 `secrecy` 0.10's only wrapper is the heap `SecretBox`. `Fixed<T>` is the inline,

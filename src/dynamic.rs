@@ -400,14 +400,16 @@ impl Dynamic<Vec<u8>> {
     ///
     /// `C` is the bech32 code length: the cap on the whole encoded string. Pass the `C`
     /// the string was encoded with, or any larger value. See
-    /// [`Bech32Sized`](crate::Bech32Sized) for what `C` above
+    /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) for what `C` above
     /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
     pub fn try_from_bech32_sized<const C: usize>(
         s: &str,
         expected_hrp: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
-        let checked = bech32::primitives::decode::CheckedHrpstring::new::<crate::Bech32Sized<C>>(s)
-            .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
+        let checked = bech32::primitives::decode::CheckedHrpstring::new::<
+            crate::traits::encoding::bech32::Bech32Sized<C>,
+        >(s)
+        .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         // Compare the HRP (public metadata, so not constant-time) *before* materializing any
         // payload byte, so a mismatch never leaves decoded secret material on the heap.
         if !checked.hrp().as_str().eq_ignore_ascii_case(expected_hrp) {
@@ -433,8 +435,10 @@ impl Dynamic<Vec<u8>> {
     pub fn try_from_bech32_unchecked_sized<const C: usize>(
         s: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
-        let checked = bech32::primitives::decode::CheckedHrpstring::new::<crate::Bech32Sized<C>>(s)
-            .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
+        let checked = bech32::primitives::decode::CheckedHrpstring::new::<
+            crate::traits::encoding::bech32::Bech32Sized<C>,
+        >(s)
+        .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
             checked.byte_iter().collect(),
         )))
@@ -457,15 +461,16 @@ impl Dynamic<Vec<u8>> {
     }
 
     /// Like [`try_from_bech32m`](Self::try_from_bech32m), accepting strings up to `C`
-    /// characters. See [`Bech32mSized`](crate::Bech32mSized) for what `C` above
+    /// characters. See [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) for what `C` above
     /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
     pub fn try_from_bech32m_sized<const C: usize>(
         s: &str,
         expected_hrp: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
-        let checked =
-            bech32::primitives::decode::CheckedHrpstring::new::<crate::Bech32mSized<C>>(s)
-                .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
+        let checked = bech32::primitives::decode::CheckedHrpstring::new::<
+            crate::traits::encoding::bech32m::Bech32mSized<C>,
+        >(s)
+        .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         // Compare the HRP (public metadata, so not constant-time) *before* materializing any
         // payload byte, so a mismatch never leaves decoded secret material on the heap.
         if !checked.hrp().as_str().eq_ignore_ascii_case(expected_hrp) {
@@ -490,9 +495,10 @@ impl Dynamic<Vec<u8>> {
     pub fn try_from_bech32m_unchecked_sized<const C: usize>(
         s: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
-        let checked =
-            bech32::primitives::decode::CheckedHrpstring::new::<crate::Bech32mSized<C>>(s)
-                .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
+        let checked = bech32::primitives::decode::CheckedHrpstring::new::<
+            crate::traits::encoding::bech32m::Bech32mSized<C>,
+        >(s)
+        .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
         Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
             checked.byte_iter().collect(),
         )))

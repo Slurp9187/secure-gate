@@ -69,9 +69,9 @@ ctutils = { version = "0.4.4", optional = true, default-features = false }
 # declares the same `rust-version` as `0.3.0`, so the floor costs no MSRV.
 base32ct = { version = "0.3.1", optional = true, default-features = false }
 base64ct = { version = "1", optional = true, default-features = false }
-# Public: `Bech32Sized<N>` / `Bech32mSized<N>` implement `bech32`'s `Checksum` trait, so a
-# minor bump here (0.11 -> 0.12 added required `Checksum` items) is a breaking change for
-# anyone who uses those types with `bech32` directly.
+# Private: the `Checksum` impls (`Bech32Sized<N>` / `Bech32mSized<N>`) are `pub(crate)` and
+# no `bech32` type appears in a public signature, so a `bech32` minor bump is not a
+# breaking change for this crate's users. Keep it that way.
 bech32 = { version = "0.12", default-features = false, optional = true }
 # `sys_rng` provides `rngs::SysRng` without pulling `std`. A private dependency: no `rand`
 # type appears in this crate's API (a caller-supplied RNG fills through `try_new_with`), so a

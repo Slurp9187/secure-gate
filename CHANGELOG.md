@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0-rc.18] - Unreleased
 
+### Changed
+- **`Bech32Sized<N>`, `Bech32mSized<N>`, `Bech32Standard` and `Bech32mStandard` are no longer
+  public** (pre-stable API change for one narrow case). The two types implement
+  `bech32::primitives::checksum::Checksum`, which made this crate's `bech32` version part of
+  its public API: the 0.11 → 0.12 bump in rc.17 was a breaking change for that reason, and
+  the next one would have forced a breaking release after 0.9.0. The types are now
+  `pub(crate)` and the two aliases, which nothing else used, are removed. No `bech32` type
+  appears in a public signature any more, so `bech32` can be upgraded in a 0.9.x release.
+  - **Unaffected:** every `try_to_bech32*` / `try_from_bech32*` caller, including the
+    `_sized::<N>` forms, which take the code length as a number. Encoded output and decoding
+    are unchanged. `BECH32_CODE_LENGTH` and `bech32_code_length` stay public.
+  - **Affected:** code that names one of the four types, for example to pass it to `bech32`'s
+    own API. Implement `Checksum` on a local type instead; the constants are those of
+    `bech32::Bech32` / `bech32::Bech32m` with a different `CODE_LENGTH`.
+  - The guarantee note that lived on the types (above 1023 characters the checksum no longer
+    has a proven error-detection bound) is now on `BECH32_CODE_LENGTH`. The `sanity_check`
+    and constant-pinning tests moved from `tests/encoding_suite/bech32_sized.rs` into the
+    modules.
+
 ### Security
 - **A rejected hex, Base32 or Base64url input no longer leaves the decoded bytes in freed
   memory.** `Dynamic::try_from_hex` / `try_from_base32` / `try_from_base64url`, and the same
@@ -27,6 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SECURITY.md`.
 
 ### Documentation
+- **`README.md` gains a Stability section** stating what the 0.9 line promises: the public
+  items, the macro grammar and the feature set are additive-only within 0.9.x; `full` will
+  not grow to include `std` or `sealed`; the MSRV rises only in a minor release; a method
+  added to a public trait always has a default body; only `zeroize` and `serde` appear in
+  public signatures.
+
 - **`SECURITY.md` states what serde deserialization leaves behind on success.** The
   `serde-deserialize` row and the encoding notes said temporary buffers are zeroized. That is
   true of the buffer the deserializer returns, and not of the ones it grew through to build

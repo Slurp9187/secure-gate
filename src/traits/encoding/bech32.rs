@@ -27,7 +27,7 @@
 //!   (1023), the length at which the BCH checksum retains its error-detection
 //!   guarantee. For larger payloads — age-style recipients, KEM ciphertexts,
 //!   arbitrary binary blobs — use the `_sized::<N>` methods with an explicit `N`
-//!   and read the guarantee note on [`Bech32Sized`] first.
+//!   and read the guarantee note on [`BECH32_CODE_LENGTH`] first.
 //!   For Bitcoin address formats, use [`ToBech32m`](crate::ToBech32m) (BIP-350).
 //! - **Treat all input as untrusted**: validate data upstream before wrapping.
 //!
@@ -75,6 +75,43 @@ pub(crate) const GENERATOR_SH: [u32; 5] = [
 /// It is *not* BIP-173's 90-character limit: that is a convention for Bitcoin addresses
 /// which the `bech32` crate deliberately does not enforce. 1023 characters is roughly
 /// 630 payload bytes, depending on HRP length — see [`bech32_code_length`].
+///
+/// # Caller-chosen code lengths
+///
+/// The `_sized::<N>` methods take the code length as a const argument. `N` is the maximum
+/// length of the whole encoded string — HRP, separator, payload and checksum together.
+/// It is a **length gate only**: `N` never enters the checksum computation, so the same
+/// bytes and HRP produce byte-identical output at every `N`, and a string is decodable
+/// by any `N` at least as large as the string.
+///
+/// # The guarantee, and where it ends
+///
+/// The bech32 checksum is a BCH code of length 1023. Within that length it is guaranteed
+/// to detect up to 4 character errors. **Above it, that guarantee does not hold** — the
+/// same 30-bit checksum is stretched over a longer message, and it degrades to an
+/// integrity check with no proven detection bound. It is still computed and verified; it
+/// simply stops promising what BIP-173 proves. The same holds for bech32m (BIP-350).
+///
+/// Choosing `N > 1023` is therefore a deliberate trade, which is why it is spelled at
+/// the call site rather than baked into a default. For payloads that fit, prefer the
+/// plain methods.
+///
+/// Separately, and more restrictively: Bitcoin address tooling expects BIP-173's
+/// 90-character cap. Exceeding it produces valid bech32m that wallets will reject.
+///
+/// ```rust
+/// # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+/// use secure_gate::{Case, ToBech32};
+/// # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+/// {
+///
+/// // A 2 KiB KEM ciphertext needs a code length well past the BCH bound.
+/// let ct = [0x5Au8; 2048];
+/// let encoded = ct.try_to_bech32_sized::<4096>("kyber", Case::Lower)?;
+/// assert!(encoded.starts_with("kyber1"));
+/// # }
+/// # Ok::<(), secure_gate::Bech32Error>(())
+/// ```
 #[cfg(feature = "encoding-bech32")]
 pub const BECH32_CODE_LENGTH: usize = 1023;
 
@@ -99,7 +136,7 @@ pub const BECH32_CODE_LENGTH: usize = 1023;
 /// ```
 ///
 /// Values above [`BECH32_CODE_LENGTH`] forfeit the checksum's error-detection guarantee
-/// — see [`Bech32Sized`].
+/// — see [`BECH32_CODE_LENGTH`].
 #[cfg(feature = "encoding-bech32")]
 #[must_use]
 pub const fn bech32_code_length(hrp_len: usize, payload_bytes: usize) -> usize {
@@ -122,39 +159,13 @@ pub const fn bech32_code_length(hrp_len: usize, payload_bytes: usize) -> usize {
 
 /// Bech32 (BIP-173) checksum with a caller-chosen code length.
 ///
-/// `N` is the maximum length of the whole encoded string — HRP, separator, payload and
-/// checksum together. It is a **length gate only**: `N` never enters the checksum
-/// computation, so the same bytes and HRP produce byte-identical output at every `N`,
-/// and a string is decodable by any `N` at least as large as the string.
-///
-/// # The guarantee, and where it ends
-///
-/// The bech32 checksum is a BCH code of length [`BECH32_CODE_LENGTH`] (1023). Within
-/// that length it is guaranteed to detect up to 4 character errors. **Above it, that
-/// guarantee does not hold** — the same 30-bit checksum is stretched over a longer
-/// message, and it degrades to an integrity check with no proven detection bound. It is
-/// still computed and verified; it simply stops promising what BIP-173 proves.
-///
-/// Choosing `N > 1023` is therefore a deliberate trade, which is why it is spelled at
-/// the call site rather than baked into a default. For payloads that fit, prefer
-/// [`Bech32Standard`].
-///
-/// ```rust
-/// # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-/// use secure_gate::{Case, ToBech32};
-/// # #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-/// {
-///
-/// // A 2 KiB KEM ciphertext needs a code length well past the BCH bound.
-/// let ct = [0x5Au8; 2048];
-/// let encoded = ct.try_to_bech32_sized::<4096>("kyber", Case::Lower)?;
-/// assert!(encoded.starts_with("kyber1"));
-/// # }
-/// # Ok::<(), secure_gate::Bech32Error>(())
-/// ```
+/// Crate-private on purpose: it implements `bech32`'s `Checksum` trait, and exporting it
+/// would make the pre-1.0 `bech32` crate part of this crate's public API. Callers choose
+/// the length through the `_sized::<N>` methods; the rules and the guarantee boundary
+/// are documented on [`BECH32_CODE_LENGTH`].
 #[cfg(feature = "encoding-bech32")]
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Bech32Sized<const CODE_LENGTH: usize> {}
+pub(crate) enum Bech32Sized<const CODE_LENGTH: usize> {}
 
 #[cfg(feature = "encoding-bech32")]
 impl<const N: usize> Checksum for Bech32Sized<N> {
@@ -175,13 +186,6 @@ impl<const N: usize> Checksum for Bech32Sized<N> {
     const GENERATOR_SH: [u32; 5] = GENERATOR_SH;
     const TARGET_RESIDUE: u32 = 1;
 }
-
-/// Bech32 (BIP-173) at the BCH code length, [`BECH32_CODE_LENGTH`].
-///
-/// The checksum's error-detection guarantee holds throughout. This is what every
-/// non-`_sized` bech32 method uses.
-#[cfg(feature = "encoding-bech32")]
-pub type Bech32Standard = Bech32Sized<BECH32_CODE_LENGTH>;
 
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use crate::error::Bech32Error;
@@ -219,7 +223,7 @@ pub trait ToBech32 {
     /// that fits both, because `N` is a length gate and never enters the checksum.
     ///
     /// Passing `N` greater than [`BECH32_CODE_LENGTH`] forfeits the checksum's
-    /// error-detection guarantee — see [`Bech32Sized`].
+    /// error-detection guarantee — see [`BECH32_CODE_LENGTH`].
     ///
     /// # Errors
     ///
@@ -320,6 +324,31 @@ mod tests {
     use alloc::vec::Vec;
     use bech32::primitives::iter::ByteIterExt;
     use bech32::{Bech32, Fe32, Fe32IterExt, NoChecksum, decode, encode_lower};
+
+    /// `bech32` asks every `Checksum` implementor to run its `sanity_check` from a unit
+    /// test: it verifies the shifted generator table and that the midstate holds the
+    /// checksum. `N` never enters either, so the default and a large code length are both
+    /// checked.
+    #[test]
+    fn checksum_impl_passes_bech32s_own_sanity_check() {
+        Bech32Sized::<BECH32_CODE_LENGTH>::sanity_check();
+        Bech32Sized::<65535>::sanity_check();
+    }
+
+    /// The impl copies its constants from `bech32`'s own `Bech32`, including the
+    /// error-correction items `bech32` 0.12 added. Pinned so a drift on either side is a
+    /// test failure rather than a silently different code.
+    #[test]
+    fn checksum_constants_match_bech32s_own_impl() {
+        type Ours = Bech32Sized<BECH32_CODE_LENGTH>;
+        type Theirs = bech32::Bech32;
+        assert_eq!(Ours::GENERATOR_SH, Theirs::GENERATOR_SH);
+        assert_eq!(Ours::TARGET_RESIDUE, Theirs::TARGET_RESIDUE);
+        assert_eq!(Ours::CHECKSUM_LENGTH, Theirs::CHECKSUM_LENGTH);
+        assert_eq!(Ours::CODE_LENGTH, Theirs::CODE_LENGTH);
+        assert_eq!(Ours::ROOT_GENERATOR, Theirs::ROOT_GENERATOR);
+        assert_eq!(Ours::ROOT_EXPONENTS, Theirs::ROOT_EXPONENTS);
+    }
 
     /// The encoder chain holds no payload-sized state. `encode_lower_to_fmt` staged
     /// output through a 1 KiB stack array; this crate now drives the chain directly,

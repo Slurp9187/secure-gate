@@ -885,7 +885,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// `C` is the bech32 *code length* -- the cap on the whole encoded string -- and is
     /// independent of `N`, the decoded byte count this wrapper holds. Pass the `C` the
     /// string was encoded with, or any larger value. See
-    /// [`Bech32Sized`](crate::Bech32Sized) for what `C` above
+    /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) for what `C` above
     /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
     ///
     /// Works without `alloc` -- decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
@@ -962,7 +962,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// characters.
     ///
     /// `C` is the bech32m *code length*, independent of `N`, the decoded byte count.
-    /// See [`Bech32mSized`](crate::Bech32mSized) for what `C` above
+    /// See [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) for what `C` above
     /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
     ///
     /// Works without `alloc` -- decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
