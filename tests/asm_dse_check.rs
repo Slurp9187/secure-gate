@@ -159,7 +159,7 @@ fn fixed_drop_emits_volatile_zero_stores() {
     assert!(
         asm_path.is_file(),
         "cargo reported success but no assembly was emitted at {}\n\
-         The `--emit=asm=<path>` form may no longer be honoured by rustc.",
+         The `--emit=asm=<path>` form may no longer be honored by rustc.",
         asm_path.display()
     );
 

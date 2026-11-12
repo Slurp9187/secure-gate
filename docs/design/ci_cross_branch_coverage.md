@@ -85,7 +85,7 @@ branch without default-branch access, this decision must be revisited.
 
 ## Known gap: CodeQL does not scan `release/0.8`
 
-Code scanning is on **default setup**, which analyses the default branch and
+Code scanning is on **default setup**, which analyzes the default branch and
 pull requests targeting it. It has no multi-branch option. As a result:
 
 - `release/0.8` has **zero** CodeQL analyses, against 751 on `main`.

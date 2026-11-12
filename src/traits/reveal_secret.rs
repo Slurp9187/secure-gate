@@ -229,7 +229,7 @@ pub trait RevealSecret {
     ///
     /// # Coming from `secrecy`
     ///
-    /// This is the closest analogue to `secrecy`'s `ExposeSecret::expose_secret`, and the
+    /// This is the closest analog to `secrecy`'s `ExposeSecret::expose_secret`, and the
     /// spelling is the same on purpose — this crate kept that vocabulary when it went its
     /// own way. What differs is that it is not the only door. As of `secrecy` 0.10.3,
     /// `fn expose_secret(&self) -> &S` is documented there as *"the only method providing

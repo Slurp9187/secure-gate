@@ -286,7 +286,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   block is aligned per target, after the `secrets` crate's table (1.3.0): 16 KiB on x86,
   x86_64 and Apple aarch64, 64 KiB on every other aarch64 and on any target not listed
   (ppc64le's default page is 64 KiB). The block owns every page it touches, so locking it
-  locks nothing else and unlocking it on drop cannot release a neighbor's lock. On a
+  locks nothing else and unlocking it on drop cannot release a neighbour's lock. On a
   64 KiB-aligned target a `Prekey` takes 64 KiB, all locked, of which only the first 16 KiB
   hold the pre-key. `Prekey::lock_status()` still refuses, and says why, for a page larger
   than the block's alignment, for any target the table gets wrong. Checked by
@@ -312,7 +312,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The measurement behind that recommendation now lives in this repository, with its controls.**
   Three test binaries differing from one another only in the `#[global_allocator]` they
   install run §2's own shapes: a 4 KiB secret grown one byte past its capacity
-  through `with_secret_mut` with a neighbor behind it, and a pre-sized 4096-byte buffer
+  through `with_secret_mut` with a neighbour behind it, and a pre-sized 4096-byte buffer
   truncated to 2048 and then shrunk. Each counts occurrences of a pattern planted in the secret
   among the bytes of every block released while the workload runs. `tests/heap_residue.rs`
   (bare spy) establishes the pattern is released at all; `tests/heap_residue_nowipe.rs` (the same
@@ -380,10 +380,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line pins MSRV 1.70.
 
 - **The hazard is now a number rather than a claim.** A 4 KiB secret grown one byte past its
-  capacity through `with_secret_mut`, with an allocated neighbor behind it so the reallocation
+  capacity through `with_secret_mut`, with an allocated neighbour behind it so the reallocation
   has to move, leaves **4032 of 4032 payload bytes** readable in the abandoned block — x86-64
   Linux/glibc and Windows alike. Taken with no allocator installed, so it measures this crate's
-  hazard and not any allocator's behavior, and it reproduces in about fifteen lines.
+  hazard and not any allocator's behaviour, and it reproduces in about fifteen lines.
 
   The readout window starts at byte 64 deliberately, and the section says so: a freed glibc
   chunk carries the allocator's free-list links in its first bytes — two words in a small bin,
@@ -620,7 +620,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   break only surfaces when someone enables the feature.
 
   The machinery removed is `__sg_newtype_base_ct_eq!` — four arms of recursive token
-  munching, replaced by `__sg_newtype_ct_eq!($name)`, a flat emitter modeled on the
+  munching, replaced by `__sg_newtype_ct_eq!($name)`, a flat emitter modelled on the
   `__sg_newtype_len!` that already sat beside it at all three call sites. Net −62/+46 lines
   across the macro layer, and one less recursive expansion for anyone reading `cargo expand`
   output.
@@ -761,7 +761,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this)` — that rc.11 retired from `Fixed::from_rng`, because `new_with` could not report
   failure. It is now `Self::try_new_with(len, |slot| rng.try_fill_bytes(slot))`. Both
   constructors also lose a `v.resize(len, 0)` that only ever existed to size a buffer that
-  now arrives sized. Same observable behavior, and the strongest evidence available that
+  now arrives sized. Same observable behaviour, and the strongest evidence available that
   the signature is the right one.
 
   **`dynamic_newtype!`'s `Vec<u8>` arm forwards both.** `new_with(len, f)` and
@@ -806,7 +806,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offset arithmetic: `slot[..7].copy_from_slice(LABEL); slot[7..7 + id.len()]
   .copy_from_slice(suite_id);` and so on, by hand. That trades a reallocation hazard for an
   **offset hazard**, and in byte-exact wire-format code the second is the worse of the two.
-  A wrong bound in an HPKE-style labeled concatenation derives the wrong key and then
+  A wrong bound in an HPKE-style labelled concatenation derives the wrong key and then
   runs, and nothing downstream is in a position to say so; a realloc at least leaves the
   right bytes in the right place.
 
@@ -890,7 +890,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   That is not a hypothetical. It was `Fixed::from_rng`'s own body, written that way because
   there was no alternative, and it is correct only for as long as nobody deletes the last
   line — do that and a failed fill yields a half-written secret that looks fine. `from_rng`
-  is now `Self::try_new_with(|arr| rng.try_fill_bytes(arr))`, which is the same behavior and
+  is now `Self::try_new_with(|arr| rng.try_fill_bytes(arr))`, which is the same behaviour and
   the strongest evidence available that the signature is the right one: the first thing the
   new API did was delete the workaround it was designed to retire.
 
@@ -946,7 +946,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **No migration.** `derive: [ConstantTimeEq]` on a size-literal newtype still compiles and
   still means what it says: the token is redundant there now, not removed. Emitting the
   impl twice would be `E0119`, so the derive list is scanned and that one token dropped
-  before the rest reach the base expansion — neighboring options are unaffected, in either
+  before the rest reach the base expansion — neighbouring options are unaffected, in either
   order. Deleting it from existing declarations is optional tidying.
 
   It remains a genuine opt-in everywhere else. On the `generic` arms the inner type may or
@@ -1096,7 +1096,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `FixedStorage + SentinelValue`, so a non-byte array (`[i16; 256]`, `[u32; 60]`)
   gets the same in-place constructor the byte arm already had: the slot starts as
   `T::sentinel_value()` and the closure writes into the wrapper's own storage.
-  `fixed_newtype!`'s `generic` arm forwards it. The specialized `NON_ZERO_LEN`
+  `fixed_newtype!`'s `generic` arm forwards it. The specialised `NON_ZERO_LEN`
   assertion on `Fixed<[u8; N]>` is gone; both `new` and `new_with` now read
   `NON_ZERO_SIZED`. Tracking: #215.
 
@@ -1441,7 +1441,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the chunk in place does so, copying and abandoning nothing. Measured with the default system
   allocator and no instrumentation: a full 1008-byte buffer grown by 96 — the exact pair
   `check_growth_orphan_retains_secret_vec` uses — extends in place, as do a 1040-byte `String`
-  grown by 16, a 4096-byte buffer grown by 65536, and a growth with one allocated neighbor
+  grown by 16, a 4096-byte buffer grown by 65536, and a growth with one allocated neighbour
   immediately behind. On a fragmented heap the same growth moves and the abandoned chunk holds
   the secret. So the exposure is real with a probabilistic trigger. The documentation now says
   so, and says that the byte counts come from an instrument that does not override `realloc`
@@ -1862,7 +1862,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `check`, `test` and `doc` work bare.
 
 - **BREAKING: `InnerSecret<T>`.** The wrapper `into_inner` used to return. It was a
-  newtype over `Zeroizing<T>` whose only distinct behavior was escaping this crate's own
+  newtype over `Zeroizing<T>` whose only distinct behaviour was escaping this crate's own
   no-`Deref` rule, and it made the owned hand-off read as
   `secret.into_inner().into_zeroizing()` — two calls, and a clone for anything you
   actually wanted to own. Its redacted `Debug` was the argument for keeping it, but a
@@ -1912,7 +1912,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Migration:** delete them from any `use` list; delete any `T: SecureEncoding` /
   `T: SecureDecoding` bound and rely on the per-format trait itself, or on
   `AsRef<[u8]> + EncodableBytes` for encoding and `AsRef<str>` for decoding. No encoding
-  or decoding behavior changes from this removal.
+  or decoding behaviour changes from this removal.
 
 - **BREAKING: `DecodingError`.** A public enum that no function in the crate ever
   produced. There was no `From<HexError>`, no constructor, and no signature returning
@@ -2341,7 +2341,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hits under `full` and 0 under `--no-default-features`. The decision stands, but on the
   narrower `no_std` ground it was written to protect, and the amendment restates the
   reasons that actually carry it now: the macros work, are covered by tests, and
-  rewriting tested generation before 1.0 is churn against real behavior-drift risk.
+  rewriting tested generation before 1.0 is churn against real behaviour-drift risk.
 
   §5.3 recorded "there is no coherence obstacle", which is true for *concrete* impls and
   too broad as stated. A second *blanket* impl keyed on the wrapper trait — the shape
@@ -2483,7 +2483,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Returning the `String` from your own public function hands callers a value with
   no zeroize-on-drop and no redacted `Debug`; every later copy — a `format!`, a log
   line, a `Clone`, a `serde` round-trip — is an ordinary heap allocation this crate
-  can no longer clear. Returning `EncodedSecret` keeps the protection traveling
+  can no longer clear. Returning `EncodedSecret` keeps the protection travelling
   with the value, and it derefs to `str`, so read-only callers need no change.
 
 - **`dynamic_newtype!`'s doc slot takes exactly one string literal.** It is matched
@@ -2534,7 +2534,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Inner types are matched as literal tokens.** `dynamic_newtype!(pub P, String)` and
   `(pub P, Vec<u8>)` get the full API for their shape; anything else requires an
   explicit `generic` marker (`dynamic_newtype!(pub P, generic MyStr)`) and gets the
-  reduced surface — no `SecretLen`, no encoders. A bare unrecognized type is a compile
+  reduced surface — no `SecretLen`, no encoders. A bare unrecognised type is a compile
   error naming both options, rather than silently degrading. Macros match tokens, not
   resolved types, and this is true of procedural macros too (they run before type
   resolution), so the fix is to remove the silent path rather than to see through the
@@ -2761,7 +2761,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   emits when it folds the newtype into the plain wrapper, but only knew the
   `.set a, b` form. rustc 1.98 (LLVM 22) writes `a = b` instead, so on that toolchain
   the fold looked like a missing symbol and all four DSE jobs failed with "could not
-  find 'make_and_drop_newtype' label". Both forms are recognized now; verified on 1.85
+  find 'make_and_drop_newtype' label". Both forms are recognised now; verified on 1.85
   (`.set`) and 1.98 (`=`), ELF and COFF.
 
 ### Dependencies
