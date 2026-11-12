@@ -1,34 +1,11 @@
 name: CodeQL
 
-# Advanced setup, replacing the repository's CodeQL *default* setup.
-#
-# Default setup analyses the default branch and pull requests targeting it, and
-# offers no way to add a second branch. That left `release/0.8` — a maintained
-# LTS line carrying security-sensitive code — with zero analyses, and gave pull
-# requests into it no code-scanning checks at all. See
-# docs/design/ci_cross_branch_coverage.md.
-#
-# ACTIVATION IS A TWO-STEP SETTINGS CHANGE, not a merge:
-#
-#   1. Settings -> Code security -> Code scanning -> CodeQL analysis ->
-#      switch "Default setup" off.
-#   2. Settings -> Secrets and variables -> Actions -> Variables ->
-#      set repository variable  CODEQL_ADVANCED = true
-#
-# Until step 2, the job below skips. That is deliberate: GitHub rejects SARIF
-# from an advanced configuration while default setup is still enabled, so a
-# workflow that ran unconditionally would fail every push and pull request
-# between merging this file and flipping the setting.
-#
-# DO THE STEPS IN ORDER. Step 2 before step 1 lets this job run while default
-# setup is still on, and its SARIF upload is rejected -- the exact red state
-# the gate exists to prevent. Step 1 first is safe: this job keeps skipping
-# until the variable is set, so the only cost is a short unscanned window.
-#
-# This is the one workflow in the repo allowed to skip every job (contrast the
-# `guard` jobs in audit.yml, dse-check.yml and fuzz-miri.yml): here an all-skip
-# state is the intended pre-activation state, not a coverage hole, and while it
-# holds, default setup is still doing the scanning.
+# Advanced setup, replacing the repository's CodeQL default setup, which can only scan the
+# default branch. This file scans pushes and pull requests on both `main` and `release/0.8`,
+# and must exist on both branches for that. Activated by the repository variable
+# CODEQL_ADVANCED = true (already set); the gate stays so the file can be copied to a
+# branch or fork where default setup is still on, whose SARIF upload would be rejected.
+# Background: docs/design/ci_cross_branch_coverage.md.
 
 on:
   push:
@@ -36,8 +13,8 @@ on:
   pull_request:
     branches: [main, "release/0.8"]
   schedule:
-    # Weekly, matching the cadence default setup used. Monday 07:00 UTC, offset
-    # from the audit (05:00) and DSE (03:00) crons so the three do not contend.
+    # Weekly, matching the cadence default setup used. Monday 07:00 UTC, two hours
+    # after the weekly sweep (05:00) so the two do not contend.
     #
     # This fires only from the default branch -- GitHub raises scheduled events
     # nowhere else -- so the copy of this file on `release/0.8` never runs on the
@@ -65,7 +42,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    # See the activation note at the top of this file.
+    # See the note at the top of this file.
     if: vars.CODEQL_ADVANCED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -82,10 +59,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           # The query suite is left at the action's default, which matches the
@@ -94,9 +71,9 @@ jobs:
           # decision -- it should not ride along with this migration.
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"

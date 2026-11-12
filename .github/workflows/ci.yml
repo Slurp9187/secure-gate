@@ -4,18 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - "**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/workflows/ci.yml"
   pull_request:
     branches: [main]
-    paths:
-      - "**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/workflows/ci.yml"
 
 permissions:
   contents: read
@@ -27,13 +17,17 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Every setup-rust-toolchain step below also restores and saves the dependency cache (the
+# action runs Swatinem/rust-cache itself unless `cache: false`), and exports
+# RUSTFLAGS=-D warnings unless a step overrides RUSTFLAGS.
 jobs:
   fmt:
     name: rustfmt – check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust stable + rustfmt
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -47,9 +41,10 @@ jobs:
   docs:
     name: rustdoc – docs.rs feature set
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust stable
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -86,55 +81,15 @@ jobs:
           RUSTDOCFLAGS: --cfg docsrs
         run: cargo +nightly doc --no-deps --all-features --package secure-gate
 
-  lint:
-    name: Lint (${{ matrix.package }}/${{ matrix.name }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: no features
-            package: secure-gate
-            features: "--no-default-features"
-          - name: rand (no_std)
-            package: secure-gate
-            features: "--no-default-features --features=rand"
-          - name: full
-            package: secure-gate
-            features: "--features=full"
-          - name: all features
-            package: secure-gate
-            features: "--all-features"
-          # No `alloc`, so the doctests compile against the no-alloc API. `full` implies
-          # `alloc`, and the `test` job runs `--tests`, which skips doctests, so without
-          # these two rows an example that uses an alloc-only encoder under an
-          # `encoding-*`-only gate fails nowhere in CI; twelve of them did.
-          - name: encoding, no alloc
-            package: secure-gate
-            features: "--no-default-features --features=encoding"
-          - name: encoding-bech32, no alloc
-            package: secure-gate
-            features: "--no-default-features --features=encoding-bech32"
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust stable
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Clippy (${{ matrix.name }})
-        run: cargo clippy -p ${{ matrix.package }} --tests --benches ${{ matrix.features }}
-
-      - name: Doctests (${{ matrix.name }})
-        run: cargo test -p ${{ matrix.package }} --doc ${{ matrix.features }}
-
+  # One job per feature set. Six rows also run clippy and the doctests (`lint: true`): those
+  # used to be a separate six-job `lint` matrix over exactly these feature sets, which built
+  # every one of them twice. The doctest rows matter because this job's `--tests` skips
+  # doctests: without the two no-alloc rows, an example that uses an alloc-only encoder under
+  # an `encoding-*`-only gate fails nowhere in CI (twelve of them once did).
   test:
+    name: Test (${{ matrix.name }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -145,6 +100,7 @@ jobs:
 
           - name: No features
             features: "--no-default-features"
+            lint: true
 
           # ── Alloc / std ──────────────────────────────────────────────────
           - name: alloc explicit
@@ -158,6 +114,7 @@ jobs:
           # Dynamic::from_random() is covered by the alloc + rand entry below.
           - name: rand (no_std, Fixed only)
             features: "--no-default-features --features=rand"
+            lint: true
 
           - name: alloc + rand
             features: "--no-default-features --features=alloc,rand"
@@ -194,12 +151,14 @@ jobs:
           # inside `__sg_if_alloc!` undetected.
           - name: encoding-bech32, no alloc
             features: "--no-default-features --features=encoding-bech32"
+            lint: true
 
           # All four formats without `alloc`: the hex, base32 and base64 suites could
           # not build here until their encoding tests were alloc-gated like bech32's,
           # so no job ran their no-alloc `Fixed::try_from_*` tests. This one does.
           - name: encoding (all formats), no alloc
             features: "--no-default-features --features=encoding"
+            lint: true
 
           # ── Serde ─────────────────────────────────────────────────────────────
           - name: serde (serialize + deserialize)
@@ -218,6 +177,13 @@ jobs:
           # ── Full ──────────────────────────────────────────────────────────────
           - name: full
             features: "--features=full"
+            lint: true
+
+          # Build-invariance oracle. The error API promises identical shapes and messages in
+          # debug and release builds, and several tests assert exact Display output, so the
+          # runtime suites run once under `--release` as well.
+          - name: full, release profile
+            features: "--features=full --release"
 
           # `full` deliberately excludes `std`, so tests gated on `std` together
           # with another feature (e.g. the reader/writer forwarding on a
@@ -225,61 +191,37 @@ jobs:
           # compile in no other matrix entry. This one compiles all of them.
           - name: all features (full + std)
             features: "--all-features"
+            lint: true
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust stable
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
 
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
+      # `-D warnings` is spelled out rather than left to the RUSTFLAGS default that
+      # setup-rust-toolchain happens to set, so lint strictness does not hinge on an action
+      # default.
+      - name: Clippy (${{ matrix.name }})
+        if: matrix.lint
+        run: cargo clippy -p secure-gate --tests --benches ${{ matrix.features }} -- -D warnings
+
+      - name: Doctests (${{ matrix.name }})
+        if: matrix.lint
+        run: cargo test -p secure-gate --doc ${{ matrix.features }}
 
       - name: Run tests (${{ matrix.name }})
         # The trybuild snapshots are intentionally blessed on Rust 1.87.
         # Stable rustc diagnostics drift over time (dynamic_string_no_hex broke
         # when stable switched E0599's candidate note to a single-line form), so
-        # skip those cases here; the `compile-fail` job below runs them on 1.87.
+        # skip those cases here; the `msrv` job below runs them on 1.87.
         # `--skip` matches substrings, and every compile-fail test is named
         # `*_compile_fail`, so new cases are excluded automatically. The one
         # legacy name without the suffix is listed explicitly.
         run: cargo test -p secure-gate --tests ${{ matrix.features }} -- --skip compile_fail --skip serializable_secret_misuse
-
-  # ---------------------------------------------------------------------------
-  # Release-profile test job — build-invariance oracle
-  #
-  # The error API guarantees identical shapes and messages in debug and release
-  # builds, and several tests assert exact Display output. The matrix above runs
-  # the debug profile only, so run the runtime suites once under --release to
-  # keep the build-invariance property continuously verified.
-  #
-  # trybuild compile-fail tests are skipped in both crates: they assert compiler
-  # diagnostics (blessed against the pinned toolchain) which drift on stable and
-  # are independent of the build profile — the property this job guards is
-  # runtime behavior. Core cases are skipped by the `compile_fail` name suffix
-  # (plus the one legacy name).
-  # ---------------------------------------------------------------------------
-  test-release:
-    name: Test – release profile
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust stable
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Run core tests (release, full features)
-        run: cargo test -p secure-gate --tests --release --features=full -- --skip compile_fail --skip serializable_secret_misuse
 
   # ---------------------------------------------------------------------------
   # no_std job — cross-build for a bare-metal target
@@ -293,19 +235,17 @@ jobs:
   no-std:
     name: no_std – cross-build (thumbv7em-none-eabihf)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust stable + thumbv7em target
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
           target: thumbv7em-none-eabihf
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
 
       - name: Cross-build library for bare metal (feature matrix)
         run: |
@@ -327,29 +267,38 @@ jobs:
           done
 
   # ---------------------------------------------------------------------------
-  # MSRV job — verify declared rust-version is actually buildable
+  # MSRV job — the declared rust-version builds, and the trybuild snapshots hold
   #
-  # Runs `cargo check` (not full tests) on the MSRV toolchain to catch any
-  # accidental use of post-1.87 APIs before they reach a release. Edition 2024
-  # needs rustc ≥ 1.85.0; the patched `ctutils` (RUSTSEC-2026-0385) needs 1.87. Clippy's
-  # --version-lint flag catches MSRV violations in the main `test` job, but
-  # a real toolchain check is the authoritative guard.
+  # Two checks that need the same pinned 1.87 toolchain, in one job.
+  #
+  # Compile-fail: the trybuild snapshots assert compiler diagnostics, which drift on
+  # stable, so every other test job skips them. This step runs exactly those tests on
+  # 1.87, the toolchain the .stderr files are blessed against, so the negative API
+  # guarantees (no `Deref`/`AsRef` on the secret wrappers, no `Serialize` without
+  # `SerializableSecret`, no zero-size aliases, no encoding methods on
+  # `Dynamic<String>`) are enforced, not only stated. It runs first, against the
+  # committed Cargo.lock, before the MSRV steps re-resolve it.
+  # Regenerate snapshots with: TRYBUILD=overwrite cargo +1.87 test compile_fail
+  #
+  # MSRV: `cargo check` on 1.87 catches accidental use of newer APIs. Edition 2024
+  # needs rustc ≥ 1.85.0; the patched `ctutils` (RUSTSEC-2026-0385) needs 1.87.
   # ---------------------------------------------------------------------------
   msrv:
-    name: MSRV – cargo check (1.87)
+    name: MSRV 1.87 – check and trybuild
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust 1.87
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: "1.87"
 
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
+      - name: Compile-fail tests (trybuild, committed lockfile)
+        run: cargo +1.87 test -p secure-gate --features=full --test compile_fail_tests
 
       - name: Update Cargo.lock with MSRV toolchain
         run: cargo +1.87 update
@@ -368,38 +317,6 @@ jobs:
         run: cargo +1.87 check --workspace --all-features --all-targets
 
   # ---------------------------------------------------------------------------
-  # Compile-fail job — API-surface enforcement on the blessing toolchain
-  #
-  # The trybuild snapshots assert compiler diagnostics, which drift on stable, so
-  # every other test job skips them. That left them running in no CI job at all:
-  # the negative API guarantees (no `Deref`/`AsRef` on the secret wrappers, no
-  # `Serialize` without `SerializableSecret`, no zero-size aliases, no encoding
-  # methods on `Dynamic<String>`) were asserted in prose and enforced nowhere.
-  #
-  # This job runs exactly those tests, pinned to 1.87 — the toolchain the .stderr
-  # files are blessed against — so the diagnostics are stable by construction.
-  # Regenerate snapshots with: TRYBUILD=overwrite cargo +1.87 test compile_fail
-  # ---------------------------------------------------------------------------
-  compile-fail:
-    name: Compile-fail – trybuild (1.87)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust 1.87
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: "1.87"
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Run core compile-fail tests
-        run: cargo +1.87 test -p secure-gate --features=full --test compile_fail_tests
-
-  # ---------------------------------------------------------------------------
   # AddressSanitizer job — heap zeroization oracle
   #
   # Runs the `heap_zeroize`, `heap_residue`, `heap_residue_nowipe` and `heap_residue_wiped`
@@ -411,19 +328,17 @@ jobs:
   asan-heap:
     name: ASan – heap zeroization
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust nightly + rust-src
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly
           components: rust-src
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
 
       - name: Run heap_zeroize and heap_residue tests with AddressSanitizer
         env:
@@ -449,20 +364,17 @@ jobs:
   residue-probe:
     name: Residue-probe – build, test, lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust stable
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: residue-probe
+          cache-workspaces: residue-probe
 
       - name: cargo build
         run: cargo build --manifest-path residue-probe/Cargo.toml
@@ -488,6 +400,7 @@ jobs:
   guarded-block:
     name: guarded-block – ${{ matrix.os }}, ${{ matrix.toolchain }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -503,24 +416,20 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust ${{ matrix.toolchain }}
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.toolchain }}
           components: clippy, rustfmt
+          cache-workspaces: |
+            guarded-block
+            .
 
       - name: Install Rust ${{ matrix.sealed_toolchain }} for secure-gate's sealed tests
         if: matrix.sealed_toolchain != matrix.toolchain
         run: rustup toolchain install ${{ matrix.sealed_toolchain }} --profile minimal
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            guarded-block
-            .
 
       - name: cargo test (guarded-block)
         run: cargo test --manifest-path guarded-block/Cargo.toml
@@ -541,3 +450,151 @@ jobs:
 
       - name: secure-gate sealed tests on this OS
         run: cargo +${{ matrix.sealed_toolchain }} test --features sealed --lib --test sealed --test sealed_lock --test sealed_glob_import
+
+  # ---------------------------------------------------------------------------
+  # Package job — the crate as published builds on its own
+  #
+  # `cargo package` assembles the .crate exactly as `cargo publish` would and builds it
+  # from the unpacked archive, so a file missing from the package, or a dependency that
+  # only resolves through a path inside this repository, fails here rather than on
+  # release day.
+  # ---------------------------------------------------------------------------
+  package:
+    name: cargo package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: cargo package
+        run: cargo package -p secure-gate --locked
+
+  # ---------------------------------------------------------------------------
+  # Sealed zeroize features — every sealed dependency that holds key material wipes it
+  #
+  # The `sealed` stack relies on its dependencies' own `zeroize` features to wipe the
+  # cipher key, keystream, MAC state and hash state. A dependency update can turn one off
+  # through feature unification without any line in this repository changing, and no test
+  # would notice. The script checks the resolved graph against the audit recorded in
+  # Cargo.toml; see tools/check_sealed_zeroize.sh.
+  # ---------------------------------------------------------------------------
+  sealed-zeroize:
+    name: Sealed – zeroize features on
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          cache: false
+
+      - name: Check the sealed dependency graph
+        run: tools/check_sealed_zeroize.sh
+
+  # ---------------------------------------------------------------------------
+  # DSE check — volatile zero stores survive release optimization
+  #
+  # Defined once in dse.yml; the weekly cross-branch sweep in weekly.yml calls the same
+  # workflow for `main` and `release/0.8`. Here it checks this commit, with the
+  # dependency cache on.
+  # ---------------------------------------------------------------------------
+  dse:
+    name: DSE
+    uses: ./.github/workflows/dse.yml
+    with:
+      cache: true
+
+  # ---------------------------------------------------------------------------
+  # Fuzz smoke — 90 seconds per target
+  #
+  # Catches a fuzz target that no longer builds, and shallow crashes, before merge.
+  # Deep fuzzing is the nightly job in fuzz-nightly.yml.
+  # ---------------------------------------------------------------------------
+  fuzz-smoke:
+    name: Fuzz smoke (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [expose, mut, parsing, encoding, serde, ct_eq]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # The fuzz crate is its own workspace, so the built-in cache is pointed at it; the
+      # default (`.`) would cache the root target directory, which the fuzz build never uses.
+      - name: Install Rust nightly
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          cache-workspaces: fuzz
+
+      - name: Install cargo-fuzz
+        # Not `--locked`: cargo-fuzz 0.13.1's bundled lockfile pinned a rustix that no
+        # longer builds on nightly. The binary is kept by the cache with ~/.cargo/bin.
+        run: cargo install cargo-fuzz
+
+      - name: Fuzz ${{ matrix.target }} for 90 s
+        run: |
+          cargo +nightly fuzz run ${{ matrix.target }} -- \
+            -fork=1 \
+            -max_total_time=90 \
+            -timeout=30
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-crash-${{ matrix.target }}-${{ github.run_id }}
+          path: fuzz/artifacts/${{ matrix.target }}/**
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # The one check for branch protection to require
+  #
+  # Passes only if every job above succeeded. Requiring this single name, rather than
+  # each matrix leg, means renaming or adding a row never leaves a required check that
+  # no longer exists (pending forever) or a new one that nothing requires.
+  # ---------------------------------------------------------------------------
+  ci-passed:
+    name: CI passed
+    if: always()
+    needs:
+      - fmt
+      - docs
+      - test
+      - no-std
+      - msrv
+      - asan-heap
+      - residue-probe
+      - guarded-block
+      - package
+      - sealed-zeroize
+      - dse
+      - fuzz-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail unless every job succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          if ! printf '%s' "$NEEDS" | jq -e 'all(.[].result; . == "success")' > /dev/null; then
+            echo "::error::At least one CI job did not succeed."
+            exit 1
+          fi
