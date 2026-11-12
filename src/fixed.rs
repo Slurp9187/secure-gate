@@ -181,6 +181,7 @@ fn drain_bech32_payload<const N: usize>(
 /// | [`try_from_bech32_unchecked`](Self::try_from_bech32_unchecked) | `encoding-bech32` | Bech32 without HRP check |
 /// | [`try_from_bech32m`](Self::try_from_bech32m) | `encoding-bech32` | HRP-validated Bech32m decoding |
 /// | [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked) | `encoding-bech32` | Bech32m without HRP check |
+/// | The four `_sized::<C>` forms, such as [`try_from_bech32_sized`](Self::try_from_bech32_sized) | `encoding-bech32` | As above, for strings longer than [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) |
 /// | [`from_random()`](Self::from_random) | `rand` | System RNG |
 ///
 /// # What `T` may be
@@ -190,8 +191,9 @@ fn drain_bech32_payload<const N: usize>(
 /// claim that `Fixed` has no reallocation surface true rather than aspirational. It used
 /// to be bounded only by `Zeroize`, so `Fixed<Vec<u8>>`, `Fixed<String>` and even
 /// `Fixed<[Vec<u8>; 2]>` compiled and abandoned an unwiped buffer holding the whole
-/// secret on any capacity change. Arrays, the primitives, tuples, `Option` and boxed
-/// slices satisfy the marker already; a custom inner type writes one line. For a
+/// secret on any capacity change. Arrays, the primitives, tuples and `Option` satisfy
+/// the marker already, and nothing heap-owning does (`Box<[T]>` included); a custom inner
+/// type writes one line. For a
 /// growable payload use [`Dynamic`](crate::Dynamic), which documents the residue and
 /// offers one safe growth path.
 ///
@@ -1120,7 +1122,7 @@ impl<const N: usize> ToBech32m for Fixed<[u8; N]> {
     }
 }
 
-/// Explicit access to immutable [`Fixed<[T; N]>`] contents.
+/// Explicit access to the contents of a [`Fixed<T>`], read-only.
 impl<T: zeroize::Zeroize> RevealSecret for Fixed<T> {
     type Inner = T;
 
@@ -1137,7 +1139,7 @@ impl<T: zeroize::Zeroize> RevealSecret for Fixed<T> {
         &self.inner
     }
 
-    /// Consumes `self` and transfers ownership of the plain `[T; N]`.
+    /// Consumes `self` and transfers ownership of the plain inner value.
     ///
     /// Zero cost — no allocation. The sentinel placed in `self.inner` is
     /// `[T::default(); N]` via [`crate::SentinelValue`] (already zeroed for `u8`),
@@ -1174,7 +1176,7 @@ impl<const N: usize, T: zeroize::Zeroize> crate::SecretLen for Fixed<[T; N]> {
     }
 }
 
-/// Explicit access to mutable [`Fixed<[T; N]>`] contents.
+/// Explicit access to the contents of a [`Fixed<T>`], mutable.
 impl<T: zeroize::Zeroize> RevealSecretMut for Fixed<T> {
     #[inline(always)]
     fn with_secret_mut<F, R>(&mut self, f: F) -> R

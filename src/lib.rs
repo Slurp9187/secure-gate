@@ -109,22 +109,32 @@
 //! secure_gate (lib.rs)
 //! ├── Fixed<T>              ← always available, stack-allocated
 //! ├── Dynamic<T>            ← requires `alloc`, heap-allocated
+//! ├── SlotWriter            ← cursor a sized `new_with` hands out (alloc)
 //! ├── traits/
 //! │   ├── RevealSecret      ← immutable access (always available)
 //! │   ├── RevealSecretMut   ← mutable access (always available)
+//! │   ├── SecretLen         ← length metadata (always available)
+//! │   ├── SentinelValue     ← placeholder `into_inner` leaves behind (always available)
+//! │   ├── FixedStorage      ← marker `Fixed::new` requires (always available)
 //! │   ├── revealed_secrets/
 //! │   │   └── EncodedSecret     ← zeroizing encoded string wrapper (alloc)
 //! │   ├── ConstantTimeEq    ← ct-eq feature
 //! │   ├── CloneableSecret   ← cloneable feature
 //! │   ├── SerializableSecret← serde-serialize feature
-//! │   └── encoding/         ← ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m
+//! │   └── encoding/         ← ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m,
+//! │                           EncodableBytes
 //! │                           (decoding: the `try_from_*` constructors on Fixed / Dynamic)
-//! ├── macros/               ← fixed_newtype!, dynamic_newtype!
+//! ├── sealed/               ← SealedFixed, SealedDynamic, Prekey, LockError (sealed feature)
+//! ├── scoped                ← RevealScoped (always available; not at the root, see below)
+//! ├── macros/               ← fixed_newtype!, dynamic_newtype!, sealed_fixed_newtype!
 //! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error
 //! ```
 //!
-//! All public items are re-exported at the crate root. Use `secure_gate::Fixed`,
-//! not `secure_gate::fixed::Fixed`.
+//! Every public item is re-exported at the crate root, with two exceptions that are
+//! imported from their modules: [`scoped::RevealScoped`], whose `with_secret` would
+//! collide with [`RevealSecret::with_secret`] if both were in scope, and
+//! `sealed::SealedPayload`, the trait that bounds what `SealedDynamic` can hold. Use
+//! `secure_gate::Fixed`, not `secure_gate::fixed::Fixed`.
 //!
 //! # Type taxonomy
 //!
@@ -176,7 +186,7 @@
 //! // ✅ Correct — always import from the crate root
 //! use secure_gate::{Fixed, RevealSecret};
 //!
-//! // ❌ Wrong — these internal paths compile but are not the public API
+//! // ❌ Wrong — these deeper paths compile, but the stability promise does not cover them
 //! // use secure_gate::traits::reveal_secret::RevealSecret;
 //! // use secure_gate::traits::encoding::hex::ToHex;
 //! ```
@@ -472,7 +482,7 @@ pub use fixed::Fixed;
 /// Implement this on your inner type `T`; `Fixed<T>` and `Dynamic<T>` then gain the
 /// gated `Clone` impl automatically. **This marker is deliberately not implemented by
 /// default** on `Fixed<T>` or `Dynamic<T>` — cloning is an opt-in risk that must be
-/// explicitly enabled. Without the `cloneable` feature this type does not exist at all.
+/// explicitly enabled. Without the `cloneable` feature this trait does not exist at all.
 ///
 /// **Coherence note:** Rust's orphan rule prevents downstream crates from implementing
 /// this marker for foreign types such as `String`, `Vec<u8>`, or `[u8; N]` — so
@@ -563,8 +573,9 @@ pub use traits::SentinelValue;
 /// any capacity change — the same weakness `Dynamic` documents, minus `Dynamic`'s
 /// safe-growth `std::io::Write` path.
 ///
-/// Implemented for the primitives, `[T; N]` for any `N`, tuples up to four elements, and
-/// `Option<T>`. Nothing heap-owning is implemented: `Vec<T>`, `String` and `Box<[T]>` are
+/// Implemented for the primitives and the `NonZero` integers, `[T; N]` for any `N`, tuples
+/// up to ten elements, `Option<T>`, `Wrapping<T>`, `MaybeUninit<T>`, `Zeroizing<T>` and
+/// `Fixed<T>` itself. Nothing heap-owning is implemented: `Vec<T>`, `String` and `Box<[T]>` are
 /// all absent, because the residue does not need a capacity change — replacing the whole
 /// value abandons the allocation too, measured at 1024 of 1024 bytes through a
 /// `Fixed<Box<[u8]>>`. For a heap-backed secret use [`Dynamic`], which documents the
@@ -610,7 +621,7 @@ pub use traits::EncodedSecret;
 /// Implement this on your inner type `T`; `Fixed<T>` and `Dynamic<T>` then gain the
 /// gated `Serialize` impl automatically. **This marker is deliberately not implemented
 /// by default** on `Fixed<T>` or `Dynamic<T>` — serialization is an opt-in risk that
-/// must be explicitly enabled. Without the `serde-serialize` feature this type does not
+/// must be explicitly enabled. Without the `serde-serialize` feature this trait does not
 /// exist at all.
 ///
 /// **Coherence note:** Rust's orphan rule prevents downstream crates from implementing
@@ -658,13 +669,16 @@ pub use traits::ToBech32;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use traits::ToBech32m;
 
+/// The letter case an encoder writes, chosen by the caller of `try_to_bech32` and
+/// `try_to_bech32m` (and their `_sized` forms), the only encodings where both cases are
+/// valid. Requires `encoding-bech32`.
+#[cfg(feature = "encoding-bech32")]
+pub use traits::Case;
+
 /// Opt-in marker for byte-shaped encoding inputs. Every `To*` trait is blanket
 /// implemented for `AsRef<[u8]> + EncodableBytes`; the second bound keeps string-shaped
 /// types out, so an already-encoded value cannot be silently encoded again. Implement it
 /// for your own byte newtype to make it encodable.
-#[cfg(feature = "encoding-bech32")]
-pub use traits::Case;
-
 #[cfg(any(
     feature = "encoding-hex",
     feature = "encoding-base32",
@@ -686,7 +700,7 @@ pub use traits::{BECH32_CODE_LENGTH, bech32_code_length};
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub use traits::ToHex;
 
-/// Errors from Bech32 (BIP-173) and Bech32m (BIP-350) decoding.
+/// Errors from Bech32 (BIP-173) and Bech32m (BIP-350) encoding and decoding.
 /// Variant shapes are identical in debug and release builds; no secret material
 /// (payload bytes, HRP strings) is ever carried in an error.
 #[cfg(feature = "encoding-bech32")]

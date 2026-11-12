@@ -57,7 +57,7 @@
 //!
 //! // Every impl is a deliberate security decision — audit all usages.
 //! impl CloneableSecret for SessionKey {}
-//! // Required by `Fixed::new`: asserts this type owns no buffer that can be reallocated.
+//! // Required by `Fixed::new`: asserts this type owns no heap allocation.
 //! impl FixedStorage for SessionKey {}
 //!
 //! let original = Fixed::new(SessionKey([0u8; 32]));

@@ -87,11 +87,12 @@
 /// secret takes. [`Fixed<T>`](crate::Fixed) holds more than that, and the
 /// `generic` marker opts a newtype into it. The requirement is
 /// `Zeroize + `[`SentinelValue`](crate::SentinelValue)` + `[`FixedStorage`](crate::FixedStorage), checked at the
-/// declaration — slightly narrower than `Fixed<T>` itself, which needs only
-/// `Zeroize`, because the generated [`into_inner`](crate::RevealSecret::into_inner)
-/// has to leave an inert value behind. Arrays of a `Default` element, `String`
-/// and `Vec<T>` already satisfy both; a custom inner type needs its own
-/// `impl SentinelValue`, which is why that trait is public:
+/// declaration. That is one bound more than [`Fixed::new`](crate::Fixed::new) asks for
+/// (`Zeroize + FixedStorage`): `SentinelValue` is there because the generated
+/// [`into_inner`](crate::RevealSecret::into_inner) has to leave an inert value behind.
+/// Arrays of a `Default`, `FixedStorage` element already satisfy all three; a custom
+/// inner type writes its own `impl SentinelValue` and `impl FixedStorage`, which is why
+/// those traits are public:
 ///
 /// ```rust
 /// use secure_gate::{fixed_newtype, RevealSecret};
@@ -106,9 +107,10 @@
 /// [`Dynamic`](crate::Dynamic), so `Fixed` is the only wrapper, and a secret on
 /// such a target is frequently not bytes: an ML-KEM secret polynomial
 /// `[i16; 256]`, Ed25519 scalar limbs `[u64; 4]`, AES-256 expanded round keys
-/// `[u32; 60]`. An inner type missing either bound is a compile error reported
-/// from the expansion: `Zeroize` fails against `Fixed<T>`'s own bound, and
-/// `SentinelValue` against the one the generated `RevealSecret` restates.
+/// `[u32; 60]`. An inner type missing any of the three bounds is a compile error
+/// reported from the expansion: `Zeroize` fails against `Fixed<T>`'s own bound,
+/// `FixedStorage` against the constructors', and `SentinelValue` against the one the
+/// generated `RevealSecret` restates.
 /// [`dynamic_newtype!`](crate::dynamic_newtype)'s `generic` arm carries the
 /// same pair, for the same reason.
 ///
@@ -142,7 +144,9 @@
 /// would round-trip inside this crate and disagree with every implementation outside
 /// it. RNG is a separate question with a separate answer: the byte-level fill is well
 /// defined, but uniform bits are not a valid ML-KEM coefficient, a reduced scalar, or a
-/// derived round key. It is tracked in #219 rather than settled here.
+/// derived round key. So no `from_random` is generated for this arm; where uniform bits
+/// are a valid value for your type, write the constructor on the newtype yourself with the
+/// generated `new_with`.
 ///
 /// **`generic [u8; N]` is a compile error**, not a reduced byte array. It is the
 /// same payload as `fixed_newtype!(pub K, N)` with strictly less API, and

@@ -46,6 +46,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SECURITY.md`.
 
 ### Documentation
+- **Rustdoc reviewed against the code before the freeze.** No code changes. What was wrong:
+  - `Dynamic::new` was documented as accepting `&str` and `&[u8]`. It takes an owned value
+    or a `Box` and moves it; borrowed input goes through `Dynamic::from`, which copies.
+  - The guidance on choosing `Dynamic`'s inner type and constructor, the reallocation and
+    `panic = "abort"` warnings, and `EncodedSecret`'s "No `Display`" and "every `str` method
+    exits protection" sections were written as module docs on private modules, which rustdoc
+    never renders. They are now on `Dynamic` and `EncodedSecret` themselves.
+  - The list of types implementing `FixedStorage` was stale in three places (one named
+    `Box<T>`, another boxed slices, which are deliberately excluded).
+  - `Dynamic::deserialize_with_limit` said only that a failed deserialization can leave
+    unwiped buffers; a successful one can too, and the docs now say so.
+  - The implementor note on `RevealSecret` advised `unimplemented!()` for `into_inner`; the
+    method's `SentinelValue` bound is the guard and no panic is needed.
+  - `fixed_newtype!`'s `generic` arm listed two required bounds where there are three, and
+    pointed at a closed issue for RNG constructors.
+  - The doc comment for `EncodableBytes` was attached to the `Case` re-export; `Bech32Error`
+    was described as decode-only though the encoders return it; the crate-level module tree
+    omitted `sealed`, `scoped`, `SlotWriter` and four traits, and said every public item is at
+    the crate root when `scoped::RevealScoped` and `sealed::SealedPayload` are not.
+  - `README.md`'s Stability section now says the deeper module paths under `traits` are not
+    covered by the promise, matching the crate docs.
+
 - **`README.md` gains a Stability section** stating what the 0.9 line promises: the public
   items, the macro grammar and the feature set are additive-only within 0.9.x; `full` will
   not grow to include `std` or `sealed`; the MSRV rises only in a minor release; a method

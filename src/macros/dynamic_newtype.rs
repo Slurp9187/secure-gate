@@ -145,7 +145,7 @@
 /// It also has no `new_with`, which the `Vec<u8>` arm does get, and the reason is
 /// sharper than it used to be. [`fixed_newtype!`](crate::fixed_newtype)'s generic arm
 /// *does* forward [`Fixed::new_with`](crate::Fixed::new_with), because that constructor
-/// is generic over any `T: SentinelValue` — it hands the closure the inner value itself.
+/// is generic over any `T: FixedStorage + SentinelValue` — it hands the closure the inner value itself.
 /// `Dynamic::new_with` hands a sized **byte slot**, `FnOnce(&mut [u8])`, which is what
 /// makes growth inexpressible and the reallocation hazard impossible. A byte slot is
 /// meaningless for an arbitrary inner type, so there is nothing here to forward. `new`
