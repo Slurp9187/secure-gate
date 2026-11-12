@@ -1,0 +1,68 @@
+name: DSE zeroization check
+
+# Checks that LLVM dead-store elimination keeps the volatile zero stores emitted by
+# `Fixed<T>`'s drop glue (tests/asm_dse_check.rs). This is the only check in CI of that
+# claim.
+#
+# Reusable: ci.yml calls it for the commit under test, and weekly.yml calls it for `main`
+# and `release/0.8`. It is defined once so the two cannot drift.
+#
+# The test is gated to x86_64 and checks both AT&T (ubuntu-latest) and Intel
+# (windows-latest, MSVC) syntax. ARM64 macOS runners would skip it silently, so macOS is
+# not in the matrix.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Ref to check out; empty means the commit that triggered the caller.
+        type: string
+        default: ""
+      cache:
+        description: Use the dependency cache. Must stay false when `ref` names another branch.
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Ref to check out; empty means the branch selected above.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  dse-check:
+    name: ${{ inputs.ref || 'this commit' }} (${{ matrix.os }}, ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
+    # A release build of `asm_check` plus its deps in an isolated target dir; the slowest
+    # leg (windows-latest) runs well inside this.
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        toolchain: [stable, nightly]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      # The action's built-in dependency cache is used only for the commit under test. A
+      # run that checks out another branch from the default branch's context must not write
+      # the shared cache (see docs/design/ci_cross_branch_coverage.md).
+      - name: Install Rust ${{ matrix.toolchain }}
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          cache: ${{ inputs.cache }}
+
+      - name: Run DSE check (${{ matrix.toolchain }})
+        run: >
+          cargo +${{ matrix.toolchain }} test
+          -p secure-gate
+          --release
+          --test asm_dse_check
+          -- --ignored --nocapture

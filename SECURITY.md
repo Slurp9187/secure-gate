@@ -497,6 +497,8 @@ Before production use, review the source, the dependency versions, and these tes
 - `tests/heap_residue*.rs`: the §2 hazard measured, with and without a wiping allocator.
 - `tests/ct_eq_tests.rs`, `tests/proptest_suite/`: constant-time equality.
 - `tests/compile-fail/`: the accidents that must not compile.
+- `tools/check_sealed_zeroize.sh` (run on every pull request): fails if a `sealed` dependency that
+  holds key, keystream, MAC or hash state is built without its own `zeroize` feature.
 
 ## Vulnerability Reporting
 
