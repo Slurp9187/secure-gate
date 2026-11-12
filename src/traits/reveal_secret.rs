@@ -3,7 +3,7 @@
 //! > **Import path:** `use secure_gate::RevealSecret;`
 //!
 //! This module defines the core `RevealSecret` trait. See
-//! [`revealed_secrets`](crate::traits::revealed_secrets) for
+//! [`encoded_secret`](crate::traits::encoded_secret) for
 //! [`EncodedSecret`](crate::EncodedSecret), the wrapper for encoded output.
 //!
 //! The design ensures:

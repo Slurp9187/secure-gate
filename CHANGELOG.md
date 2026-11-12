@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     has a proven error-detection bound) is now on `BECH32_CODE_LENGTH`. The `sanity_check`
     and constant-pinning tests moved from `tests/encoding_suite/bech32_sized.rs` into the
     modules.
+- **BREAKING: `secure_gate::traits::revealed_secrets` is renamed to
+  `secure_gate::traits::encoded_secret`.** The module held one type, and its name was left
+  over from when it also held `InnerSecret`. It is now a single file,
+  `src/traits/encoded_secret.rs`, in the same layout as its sibling trait modules.
+  - **Unaffected:** `secure_gate::EncodedSecret` and `secure_gate::traits::EncodedSecret`, the
+    paths the docs tell callers to use. The type, its methods and its rendered docs are
+    unchanged.
+  - **Affected:** code that imports through the deep path. Change
+    `traits::revealed_secrets::EncodedSecret` to `secure_gate::EncodedSecret`.
+  - The integration suite moved from `tests/revealed_secrets_suite/` to
+    `tests/encoded_secret_suite/`, and the trybuild snapshots name the new source path.
 
 - **The `serde`, `serde-serialize` and `serde-deserialize` features no longer turn on serde's
   `derive` feature.** Nothing in this crate derives `Serialize` or `Deserialize`, so the

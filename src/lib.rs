@@ -116,8 +116,7 @@
 //! │   ├── SecretLen         ← length metadata (always available)
 //! │   ├── SentinelValue     ← placeholder `into_inner` leaves behind (always available)
 //! │   ├── FixedStorage      ← marker `Fixed::new` requires (always available)
-//! │   ├── revealed_secrets/
-//! │   │   └── EncodedSecret     ← zeroizing encoded string wrapper (alloc)
+//! │   ├── EncodedSecret     ← zeroizing encoded string wrapper (alloc)
 //! │   ├── ConstantTimeEq    ← ct-eq feature
 //! │   ├── CloneableSecret   ← cloneable feature
 //! │   ├── SerializableSecret← serde-serialize feature
