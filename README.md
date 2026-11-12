@@ -66,7 +66,7 @@ pw.expose_secret_mut().clear();
 |---|---|---|
 | A key or other fixed-size secret | `fixed_newtype!(pub Name, 32, "…")` | Stack-allocated, `no_std`, and a distinct type per role, so an encryption key cannot be passed where a MAC key belongs |
 | A password, token or other variable-length secret | `dynamic_newtype!(pub Name, String, "…")` | Heap-allocated (`alloc`); spare capacity is wiped too |
-| A secret with no role to confuse it with | `pub type Name = Fixed<[u8; 32]>;` | A plain alias: same protection, interchangeable with its base type |
+| A secret with no role to confuse it with | `pub type Name = Fixed<[u8; 32]>;` or `pub type Name = Dynamic<String>;` | A plain alias: same protection, interchangeable with its base type |
 | A long-lived key in a process that may be read while it idles | `SealedFixed` / `sealed_fixed_newtype!` (`sealed`) | Held encrypted in RAM, opened for one closure call at a time; see [Sealed memory](#sealed-memory) |
 
 Every wrapper redacts `Debug` (`[REDACTED]`), zeroizes on drop, has no `Deref`, and is read
@@ -287,13 +287,6 @@ under `traits` (such as `traits::reveal_secret::RevealSecret`) compile, and are 
 - **Dependencies in the API.** Only `zeroize` and `serde`, both 1.x, appear in public
   signatures. `bech32`, `rand`, `subtle` and the other dependencies are private and can be
   upgraded without a breaking release.
-
-## Moving from `secrecy`
-
-`secrecy` 0.10's only wrapper is the heap `SecretBox`. `Fixed<T>` is the inline,
-stack-capable counterpart, kept for `no_std` and speed; for a long-held secret prefer
-`Dynamic` or a sealed type. (The experimental `secure-gate-compat` shim was never published;
-`git checkout v0.9.0-rc.8 -- secure-gate-compat` restores it.)
 
 ## Contributing
 
