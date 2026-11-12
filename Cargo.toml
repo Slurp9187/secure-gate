@@ -15,6 +15,10 @@ categories = ["cryptography", "no-std", "data-structures"]
 # whose files are not in the tarball -- an index a consumer cannot verify is worse than none.
 include = [
     "/src/**/*.rs",
+    # `src/bin/asm_check.rs` exists only for `tests/asm_dse_check.rs`, and `tests/` does not
+    # ship. Left in, `cargo install secure-gate` would install a binary that does nothing.
+    # Cargo drops the `[[bin]]` target below from the published manifest with the file.
+    "!/src/bin/**",
     "/CHANGELOG.md",
     "/LICENSE*",
     "/README.md",
@@ -196,7 +200,8 @@ full = ["alloc", "rand", "encoding", "ct-eq", "cloneable", "serde"]
 
 [[bin]]
 name = "asm_check"
-# Not a user-facing tool. Exists solely for the asm_dse_check integration test.
+# Not a user-facing tool. Exists solely for the asm_dse_check integration test, and is
+# excluded from the published package (see `include` above).
 # `required-features` keeps this std-using binary out of no_std target builds
 # (e.g. `cargo build --target thumbv7em-none-eabihf --no-default-features`).
 required-features = ["std"]

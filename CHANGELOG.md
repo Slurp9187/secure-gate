@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.0-rc.18] - Unreleased
+## [0.9.0-rc.18] - 2026-11-12
 
 ### Changed
 - **`Bech32Sized<N>`, `Bech32mSized<N>`, `Bech32Standard` and `Bech32mStandard` are no longer
@@ -45,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Affected:** a crate that writes `#[derive(Serialize)]` or `#[derive(Deserialize)]` and
     relied on this crate to switch `derive` on. Add `features = ["derive"]` to its own `serde`
     dependency.
+- **The published package no longer contains `src/bin/asm_check.rs`.** It is the program
+  `tests/asm_dse_check.rs` compiles to read the release assembly, and `tests/` does not ship,
+  so in the package it was only a binary target that `cargo install secure-gate` would
+  install and that does nothing. It stays in the repository and the test is unchanged. The
+  library is not affected.
 - **The `serde` dependency floor is now `1.0.95`** (was `1.0`). Earlier versions do not compile
   with the `alloc`-without-`std` configuration this crate asks for, so a dependent whose
   lockfile held one could not build. Found by resolving every direct dependency to its lowest
