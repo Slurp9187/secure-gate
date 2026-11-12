@@ -1122,7 +1122,12 @@ fn check_boxed_slice_zeroed() {
 // more than the text needs would otherwise pass by observing nothing.
 // ---------------------------------------------------------------------------
 
-#[cfg(feature = "encoding")]
+#[cfg(all(
+    feature = "encoding-hex",
+    feature = "encoding-base32",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
 fn check_encoded_secret_drop_zeroed() {
     use secure_gate::{Case, EncodedSecret, ToBase32, ToBase64Url, ToBech32, ToBech32m, ToHex};
 
@@ -1275,7 +1280,12 @@ fn all_heap_zeroed() {
     check_boxed_slice_zeroed();
 
     // EncodedSecret dropped directly, one check per encoder
-    #[cfg(feature = "encoding")]
+    #[cfg(all(
+        feature = "encoding-hex",
+        feature = "encoding-base32",
+        feature = "encoding-base64",
+        feature = "encoding-bech32"
+    ))]
     check_encoded_secret_drop_zeroed();
 
     // SealedDynamic's plaintext copies: seal, read, mutate, panic, unseal
