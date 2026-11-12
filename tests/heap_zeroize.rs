@@ -502,13 +502,8 @@ fn check_string_zeroed(size: usize) {
 // that all seven constructors using `from_protected_bytes` produce a correctly
 // zeroized result on the happy path.
 //
-// Note: on the error path (invalid input) no `Vec` reaches our code — the `?`
-// propagates before we ever hold bytes, so there is no buffer of ours to zeroize.
-// The decoders' own scratch buffers are a separate matter and outside this crate's
-// control: base16ct/base32ct/base64ct decode into a plain `Vec` and only check the
-// accumulated error flag at the end, so a near-miss input leaves decoded plaintext
-// in a buffer they drop un-zeroized. That is an upstream property, identical across
-// all three formats, and these checks deliberately cover only our own buffers.
+// The error path (invalid input) is covered separately, by `check_decode_rejected_zeroed`
+// below.
 //
 // The decode is performed OUTSIDE the proxy window to avoid false positives
 // from decoder-internal allocations of the same size. Only the final drop of
@@ -977,6 +972,57 @@ fn check_newtype_try_new_with_err_zeroed(size: usize) {
 }
 
 // ---------------------------------------------------------------------------
+// Decode error path — a rejected input leaves no decoded bytes behind
+//
+// base16ct, base32ct and base64ct decode in constant time: they write every output byte
+// and report a bad character only at the end. So an input that is a valid encoding
+// followed by junk (a hex key with a CRLF line ending, Base64url with `=` padding) is
+// rejected with the whole decoded secret already written. Through 0.9.0-rc.17 that buffer
+// was the backend's own plain `Vec` (`decode_vec`), dropped unwiped; a 40-byte key was
+// measured coming back from the allocator intact. The crate now allocates the buffer
+// itself, inside `Zeroizing`, and decodes through the slice API (src/decode_staging.rs).
+//
+// The secret is 40 bytes of 0xC4 and the junk tails are sized so each staging buffer has
+// a length of its own (41, 45, 43), clear of the 16/32/64/128 classes used above and of
+// each other. Nothing else in the gate allocates: the errors are heap-free. Both the
+// `Dynamic` and the `Fixed` (alloc) constructors go through the same staging, and both
+// are exercised because they are separate call sites.
+// ---------------------------------------------------------------------------
+
+#[cfg(all(
+    feature = "encoding-hex",
+    feature = "encoding-base32",
+    feature = "encoding-base64"
+))]
+fn check_decode_rejected_zeroed() {
+    use secure_gate::{Fixed, ToBase32, ToBase64Url, ToHex};
+
+    const SECRET: [u8; 40] = [0xC4; 40];
+
+    // Built outside the gate. `into_inner` is deliberate: these are test inputs.
+    let hex = format!("{}\r\n", SECRET.to_hex().into_inner());
+    let base32 = format!("{}!!!!!!!!", SECRET.to_base32().into_inner());
+    let base64 = format!("{}====", SECRET.to_base64url().into_inner());
+    assert_eq!(
+        (hex.len() / 2, base32.len() * 5 / 8, base64.len() * 3 / 4),
+        (41, 45, 43)
+    );
+
+    with_proxy_check(41, || {
+        assert!(Dynamic::<Vec<u8>>::try_from_hex(&hex).is_err());
+        assert!(Fixed::<[u8; 40]>::try_from_hex(&hex).is_err());
+    });
+    with_proxy_check(45, || {
+        assert!(Dynamic::<Vec<u8>>::try_from_base32(&base32).is_err());
+        assert!(Fixed::<[u8; 40]>::try_from_base32(&base32).is_err());
+    });
+    with_proxy_check(43, || {
+        assert!(Dynamic::<Vec<u8>>::try_from_base64url(&base64).is_err());
+        assert!(Fixed::<[u8; 40]>::try_from_base64url(&base64).is_err());
+    });
+}
+
+// ---------------------------------------------------------------------------
 // EncodedSecret::into_zeroizing — the buffer keeps wiping after the hand-off
 //
 // `into_zeroizing` moves the inner `Zeroizing<String>` out of the wrapper. The
@@ -1095,6 +1141,14 @@ fn all_heap_zeroed() {
         check_decode_bech32m_zeroed(&[0xAAu8; 16]);
         check_decode_bech32m_zeroed(&[0xBBu8; 32]);
     }
+
+    // Decode error path: a rejected input must not leave the decoded bytes in a freed block.
+    #[cfg(all(
+        feature = "encoding-hex",
+        feature = "encoding-base32",
+        feature = "encoding-base64"
+    ))]
+    check_decode_rejected_zeroed();
 
     // Deserialize-path backing-buffer zeroization (deserialize_with_limit fix)
     #[cfg(feature = "serde-deserialize")]

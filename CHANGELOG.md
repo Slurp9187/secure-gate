@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0-rc.18] - Unreleased
+
+### Security
+- **A rejected hex, Base32 or Base64url input no longer leaves the decoded bytes in freed
+  memory.** `Dynamic::try_from_hex` / `try_from_base32` / `try_from_base64url`, and the same
+  three on `Fixed` when `alloc` is on (the default), decoded through the backend's
+  `decode_vec`, which allocates a plain `Vec`, and wrapped the result in `Zeroizing`. That
+  covered success only. `base16ct`, `base32ct` and `base64ct` decode in constant time: they
+  write every output byte and report a bad character at the end, so an input that is a valid
+  encoding followed by junk was rejected with the whole secret already decoded, and the
+  backend dropped that buffer unwiped. Measured: a 1008-byte secret as hex followed by
+  `\r\n` came back from the allocator with 1007 of its bytes in the freed block, for `Dynamic`
+  and (64 bytes) for `Fixed`; likewise Base64url followed by `=` padding, and Base32 followed
+  by eight invalid characters. The decode buffer is now allocated by this crate inside
+  `Zeroizing` before the backend writes to it, through the backends' slice API
+  (`src/decode_staging.rs`), so every exit wipes it. Accepted inputs, errors and output are
+  unchanged. The `Fixed` decoders without `alloc`, and all bech32 decoders, were not affected.
+  `tests/heap_zeroize.rs` checks the rejected path at the allocator for all six constructors;
+  it fails on rc.17. Found by the pre-stable audit of every wipe claim in `README.md` and
+  `SECURITY.md`.
+
+### Documentation
+- **`SECURITY.md` states what serde deserialization leaves behind on success.** The
+  `serde-deserialize` row and the encoding notes said temporary buffers are zeroized. That is
+  true of the buffer the deserializer returns, and not of the ones it grew through to build
+  it, which belong to the deserializer. Measured with `serde_json`: a 1008-byte
+  `Dynamic<Vec<u8>>` from a JSON array abandons 5 unwiped blocks (992 bytes of the secret); a
+  `Dynamic<String>` from `from_str` abandons none, and from `from_reader` 6. `Fixed<[u8; N]>`
+  abandons none. Both places now say so and point at `new_with`. The code is unchanged; an
+  in-place path is #249.
+
 ## [0.9.0-rc.17] - 2026-10-29
 
 ### Security

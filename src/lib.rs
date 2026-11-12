@@ -302,6 +302,15 @@ extern crate alloc;
 #[cfg(doc)]
 extern crate std;
 
+#[cfg(all(
+    feature = "alloc",
+    any(
+        feature = "encoding-hex",
+        feature = "encoding-base32",
+        feature = "encoding-base64"
+    )
+))]
+mod decode_staging;
 #[cfg(feature = "alloc")]
 mod dynamic;
 
