@@ -79,7 +79,15 @@ bech32 = { version = "0.12", default-features = false, optional = true }
 # On bare-metal targets `getrandom` additionally requires a user-configured
 # backend (see the `rand` feature docs in lib.rs).
 rand = { version = "0.10", optional = true, default-features = false, features = ["sys_rng"] }
-serde = { version = "1.0", optional = true, default-features = false, features = ["derive"] }
+# `derive` is deliberately NOT enabled, for the same reason as `zeroize_derive` below: nothing
+# in `src/` derives `Serialize` or `Deserialize` (the impls are hand-written), so enabling it
+# here would force `serde_derive` + `syn` + `quote` + `proc-macro2` into every downstream build
+# that turns a serde feature on. It lives in `[dev-dependencies]` instead.
+#
+# The `1.0.95` floor is load-bearing: `serde?/alloc` without `std` needs it. Through 1.0.94
+# serde's `alloc` feature switches on `#![feature(alloc)]`, which does not compile on a stable
+# toolchain, so a bare "1.0" admits versions this crate cannot build against.
+serde = { version = "1.0.95", optional = true, default-features = false }
 # default-features = false: subtle's default `std` feature would silently break
 # no_std builds; nothing in this crate needs it.
 subtle = { version = "2.6", optional = true, default-features = false }
@@ -97,6 +105,8 @@ zeroize = { version = "1.9.1", default-features = false }
 [dev-dependencies]
 # Derive macro for benches/tests/fuzz only; see the `zeroize` note above.
 zeroize = { version = "1.9.1", default-features = false, features = ["zeroize_derive"] }
+# Derive macros for tests, benches and doctests only; see the `serde` note above.
+serde = { version = "1.0.95", default-features = false, features = ["derive"] }
 # `aes` backs the RustCrypto in-place cipher doctest in `src/fixed.rs` (#144).
 # Pinned to the 0.8 line because that is the `cipher` 0.4 / `GenericArray` API the
 # example demonstrates; `aes` 0.9 moves to `hybrid-array` and a different shape.

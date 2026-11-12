@@ -26,6 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     and constant-pinning tests moved from `tests/encoding_suite/bech32_sized.rs` into the
     modules.
 
+- **The `serde`, `serde-serialize` and `serde-deserialize` features no longer turn on serde's
+  `derive` feature.** Nothing in this crate derives `Serialize` or `Deserialize`, so the
+  feature only added `serde_derive`, `syn`, `quote` and `proc-macro2` to every build that
+  enabled serde support. `derive` is now a dev-dependency feature, used by the tests, benches
+  and doc examples.
+  - **Affected:** a crate that writes `#[derive(Serialize)]` or `#[derive(Deserialize)]` and
+    relied on this crate to switch `derive` on. Add `features = ["derive"]` to its own `serde`
+    dependency.
+- **The `serde` dependency floor is now `1.0.95`** (was `1.0`). Earlier versions do not compile
+  with the `alloc`-without-`std` configuration this crate asks for, so a dependent whose
+  lockfile held one could not build. Found by resolving every direct dependency to its lowest
+  allowed version; all other floors build.
+
 ### Security
 - **A rejected hex, Base32 or Base64url input no longer leaves the decoded bytes in freed
   memory.** `Dynamic::try_from_hex` / `try_from_base32` / `try_from_base64url`, and the same

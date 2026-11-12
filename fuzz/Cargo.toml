@@ -21,7 +21,8 @@ secure-gate = { path = "..", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.9.1", default-features = false, features = ["alloc", "zeroize_derive"] }
 
 serde_json = "1.0"
-serde = "1.0"
+# `derive` is named here: the parent crate does not turn it on, and `serde.rs` derives both traits.
+serde = { version = "1.0", features = ["derive"] }
 
 # Direct deps for encoding round-trip verification.
 # `base32` is a deliberately *different* implementation from the `base32ct`
