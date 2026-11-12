@@ -36,7 +36,7 @@
 //! file's prose all refer to them, and a rename buys nothing that this paragraph does not.
 
 // NOTE ON MIRI: the `not(miri)` gate below compiles this entire file away under `cargo miri
-// test`, which `.github/workflows/fuzz-miri.yml` is the only job to run. The gate is necessary --
+// test`, which `.github/workflows/miri.yml` is the only job to run. The gate is necessary --
 // a `#[global_allocator]` that inspects freed memory is not something Miri can execute -- but it
 // means the thread-local reasoning below is checked by review and by the suite passing on a real
 // allocator, never by Miri. Weigh that when editing the TLS path.

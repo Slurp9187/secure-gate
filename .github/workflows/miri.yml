@@ -1,0 +1,86 @@
+name: Miri UB checks
+
+# Runs the test suite under Miri with strict provenance. It runs after every push to
+# `main` that touches code (about 30 minutes, too slow for every pull request), and
+# weekly.yml calls it for `main` and `release/0.8`.
+#
+# `full,std`, not `--all-features`: `sealed` is the one feature left out. Its pre-key
+# lives in a mapping that `guarded-block` locks and protects with real system calls
+# (`mlock`, `mprotect`, `VirtualLock`), which Miri cannot emulate, and `region` forms
+# pointers from integers, which `-Zmiri-strict-provenance` rejects. Without `sealed`,
+# `full,std` is exactly what `--all-features` was; the sealed and guarded-block tests run
+# natively on Ubuntu, Windows and macOS in ci.yml's `guarded-block` job instead. On
+# `release/0.8`, which has no `sealed`, the two sets are the same.
+#
+# Test binaries that install an inspecting `#[global_allocator]` (heap_zeroize and the
+# heap_residue family) are compiled out under Miri with `not(miri)`; they run natively in
+# ci.yml, including under ASan.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/miri.yml"
+  workflow_call:
+    inputs:
+      ref:
+        description: Ref to check out; empty means the commit that triggered the caller.
+        type: string
+        default: ""
+      cache:
+        description: Use the dependency cache. Must stay false when `ref` names another branch.
+        type: boolean
+        default: false
+      label:
+        description: Artifact-safe name for `ref` (no slashes), used in the failure-log artifact name.
+        type: string
+        default: ""
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  miri:
+    name: Miri (${{ inputs.ref || github.ref_name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Install Rust nightly with Miri
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: miri, rust-src
+          # The built-in dependency cache is used only on a push to `main`, where the run
+          # tests its own commit. Called from weekly.yml for another branch, it must not
+          # write the shared cache (see docs/design/ci_cross_branch_coverage.md).
+          cache: ${{ github.event_name == 'push' || inputs.cache }}
+
+      - name: Setup Miri
+        run: cargo miri setup
+
+      - name: Run Miri (strict)
+        env:
+          MIRIFLAGS: >-
+            -Zmiri-ignore-leaks
+            -Zmiri-disable-isolation
+            -Zmiri-strict-provenance
+        run: cargo miri test --workspace --features full,std -- --skip serializable_secret_misuse
+
+      - name: Upload Miri logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: miri-failure-logs-${{ inputs.label || 'this-commit' }}-${{ github.run_id }}
+          path: target/miri/**
+          retention-days: 14

@@ -1,0 +1,96 @@
+name: Weekly sweep (main and release/0.8)
+
+# Scheduled checks of both release lines. GitHub raises scheduled events only from the
+# default branch, so a `schedule:` on `release/0.8` would never fire; this workflow checks
+# that branch out instead (#169, docs/design/ci_cross_branch_coverage.md).
+#
+# None of these jobs use the dependency cache: they run another branch's code in the
+# default branch's context, and must not write the shared cache.
+#
+# This workflow has only scheduled and manual triggers, so no job here is split by `if:`
+# and none can be skipped by accident. The pull-request checks live in ci.yml.
+
+on:
+  schedule:
+    - cron: "0 5 * * 1" # Mondays 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Advisories are time-sensitive, and the older pinned lockfile on `release/0.8` is the
+  # more likely place for them to accumulate.
+  audit:
+    name: cargo audit (${{ matrix.ref }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        ref: [main, "release/0.8"]
+    steps:
+      - name: Checkout ${{ matrix.ref }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.ref }}
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - name: cargo audit
+        run: cargo audit
+
+  dse:
+    name: DSE (${{ matrix.ref }})
+    strategy:
+      fail-fast: false
+      matrix:
+        ref: [main, "release/0.8"]
+    uses: ./.github/workflows/dse.yml
+    with:
+      ref: ${{ matrix.ref }}
+      cache: false
+
+  miri:
+    name: Miri (${{ matrix.ref }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ref: main
+            label: main
+          - ref: "release/0.8"
+            label: release-0.8
+    uses: ./.github/workflows/miri.yml
+    with:
+      ref: ${{ matrix.ref }}
+      label: ${{ matrix.label }}
+      cache: false
+
+  # The sealed-zeroize check in ci.yml reads the committed Cargo.lock, which users of the
+  # crate never get. This run resolves the newest compatible dependencies first, so an
+  # upstream release that drops a `zeroize` feature is caught within a week. `main` only:
+  # `release/0.8` has no `sealed` feature.
+  sealed-zeroize-latest:
+    name: Sealed – zeroize features on (latest dependencies)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # No `ref`: scheduled runs already check out `main`.
+      - name: Checkout main
+        uses: actions/checkout@v7
+
+      - name: Install Rust stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          cache: false
+
+      - name: Resolve the newest compatible dependencies
+        run: cargo update
+
+      - name: Check the sealed dependency graph
+        run: tools/check_sealed_zeroize.sh

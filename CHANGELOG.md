@@ -112,6 +112,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `with_secret_mut`, a panicking closure and unseal. Each asserts the gate inspected exactly
   one buffer, so a check cannot pass by observing nothing. All held on rc.17; no code change.
 
+### CI
+- **New check: every `sealed` dependency that holds key material keeps its `zeroize` feature.**
+  `tools/check_sealed_zeroize.sh`, run on every pull request, reads the resolved dependency
+  graph of `sealed` and fails if chacha20poly1305, chacha20, sha2, digest, block-buffer or
+  poly1305 is built without `zeroize`, or if any other crate in that graph offers the feature
+  and leaves it off without being listed as a deliberate exception (cipher, crypto-common,
+  hybrid-array, per the audit in `Cargo.toml`). A dependency update could previously turn one
+  off through feature unification with no test noticing. A weekly run repeats the check
+  after `cargo update`, because users never get the committed lockfile, so an upstream
+  release that drops the feature is caught within a week.
+- **New check: every combination of up to three features compiles.** cargo-hack reads the
+  features from `Cargo.toml` (`--feature-powerset --depth 3`, library only, about 400
+  combinations), so a new feature is covered without adding a row to the hand-written test
+  matrix.
+- **The nightly fuzz runs now build on each other.** The corpus download looked only in the
+  current run, so every night restarted from the hand-written seeds, and the coverage report
+  it fed was empty every night. Each night now downloads the previous run's corpus. The
+  separate "asan" leg is gone: cargo-fuzz already builds with AddressSanitizer, and the leg
+  only added LeakSanitizer, which `-detect_leaks=0` turned off again. Budgets are 15 minutes
+  per target instead of 58 (the ct_eq target reached its final coverage within 9 seconds).
+  The two copies for `main` and `release/0.8` are one file, `fuzz-nightly.yml`.
+- **Scheduled cross-branch checks moved to `weekly.yml`.** The weekly `cargo audit`, DSE
+  check and Miri run for `main` and `release/0.8` were second jobs inside `audit.yml`,
+  `dse-check.yml` and `fuzz-miri.yml`, split from the per-commit jobs by `if:`, each with a
+  guard job. That put an always-skipped placeholder check on every pull request. The DSE
+  check and Miri are now reusable workflows (`dse.yml`, `miri.yml`) that `ci.yml`,
+  `weekly.yml` and pushes to `main` all call, so the scheduled and per-commit runs cannot
+  drift. The cross-branch runs now really skip the dependency cache: `setup-rust-toolchain`
+  ran `rust-cache` itself, so the earlier "no cache" steps did not prevent it.
+- **Fewer, merged pull-request jobs; nothing that backs a wipe claim was removed.** Clippy and
+  doctests run inside the six test rows with the same feature sets instead of a separate
+  six-job matrix; the release-profile run is a test row; the MSRV check and the trybuild
+  tests share one 1.87 job. Clippy now passes `-D warnings` itself instead of relying on the
+  action's RUSTFLAGS default. New `cargo package` job, and a single **CI passed** job that
+  depends on every other `ci.yml` job, for branch protection to require. The DSE check and the
+  90-second fuzz smoke test now run inside `ci.yml` on every pull request.
+- Actions moved to current major versions (Node 24), every job has a timeout, and dead steps
+  were removed (a Miri corpus scan that could never run, a path filter that matched
+  everything, a completed CodeQL activation guide).
+
 ## [0.9.0-rc.17] - 2026-10-29
 
 ### Security

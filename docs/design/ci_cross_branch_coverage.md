@@ -17,22 +17,30 @@ dependency tree, and the zeroization and UB guards never ran against its code.
 
 ## The shape that fixes it
 
-Each of `audit.yml`, `dse-check.yml` and `fuzz-miri.yml` carries a second job,
-gated to `schedule` / `workflow_dispatch`, with
+`.github/workflows/weekly.yml` runs on the cron and on manual dispatch only, and checks out
+each branch in turn:
 
 ```yaml
 strategy:
   matrix:
     ref: [main, "release/0.8"]
 steps:
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@v7
     with:
       ref: ${{ matrix.ref }}
 ```
 
-The workflow runs in the default branch's context (that is where the event was
-raised) and checks out the other ref to test it. There is no other way to reach
-`release/0.8` on a timer.
+It runs `cargo audit` directly, and calls the reusable `dse.yml` and `miri.yml` with that
+`ref`, so the weekly runs execute the same steps as the per-commit runs in `ci.yml` and
+`miri.yml`. `fuzz-nightly.yml` uses the same matrix for nightly fuzzing.
+
+The workflow runs in the default branch's context (that is where the event was raised) and
+checks out the other ref to test it. There is no other way to reach `release/0.8` on a timer.
+
+Before rc.18 each of `audit.yml`, `dse-check.yml` and `fuzz-miri.yml` carried this as a
+second job beside its push/PR job, split by `if:` on the event, with a `guard` job to fail
+the run if a new trigger left both skipped. Moving the scheduled half into its own workflow
+removed the splits, the guards, and the skipped placeholder checks they put on every PR.
 
 ## Why CodeQL flags it
 
@@ -41,7 +49,10 @@ raised) and checks out the other ref to test it. There is no other way to reach
 > Potential cache poisoning in the context of the default branch due to
 > privilege checkout of untrusted code from `matrix.ref`.
 
-The flagged locations are the **execution** steps, not cache steps:
+The flagged locations are the **execution** steps, not cache steps. The table gives the
+locations as first reported, in the pre-rc.18 files; the same steps now live in
+`weekly.yml`, `dse.yml` and `miri.yml`, so the alerts reappear at those locations and need
+the same dismissal:
 
 | Alert | Location | Flagged step |
 |-------|----------|--------------|
@@ -50,9 +61,11 @@ The flagged locations are the **execution** steps, not cache steps:
 | #12 | `dse-check.yml:110` | `run: cargo ... test --test asm_dse_check` |
 | #13 | `fuzz-miri.yml:122` | `run: cargo miri test ...` |
 
-This matters, and was initially got wrong: the cross-ref jobs already carry **no
-dependency cache**, deliberately, and removing those cache steps did **not**
-clear the alerts. The rule keys on running another ref's code under
+This matters, and was initially got wrong: the cross-ref jobs were meant to carry **no
+dependency cache**, and removing their cache steps did **not** clear the alerts. (They also
+did not remove the cache: `actions-rust-lang/setup-rust-toolchain` runs `Swatinem/rust-cache`
+itself unless given `cache: false`, so until rc.18 those jobs restored and saved the cache
+anyway. The cross-ref calls now pass `cache: false` to the action.) The rule keys on running another ref's code under
 default-branch scope at all, because that code could reach the Actions cache
 through any tooling it invokes. There is no cache action left to delete.
 
@@ -83,56 +96,22 @@ correctly identified, and the risk is accepted on the threat model above, not
 disputed. If the repository ever gains contributors who can write to the 0.8
 branch without default-branch access, this decision must be revisited.
 
-## Known gap: CodeQL does not scan `release/0.8`
+## CodeQL on `release/0.8`
 
-Code scanning is on **default setup**, which analyzes the default branch and
-pull requests targeting it. It has no multi-branch option. As a result:
+Default setup analyzes only the default branch and pull requests into it, so `release/0.8`
+had no CodeQL analyses at all. `.github/workflows/codeql.yml` is the advanced setup that
+replaces it: `push` and `pull_request` on both `main` and `release/0.8`, plus a weekly cron
+(which, like every cron, fires only on `main`). It must exist on both branches.
 
-- `release/0.8` has **zero** CodeQL analyses, against 751 on `main`.
-- Pull requests into `release/0.8` receive no CodeQL checks at all. PR #190 —
-  changed 191 files across a full repository flatten — was merged without any.
+It is active: default setup is off and the repository variable `CODEQL_ADVANCED` is `true`.
+The job keeps the `vars.CODEQL_ADVANCED == 'true'` gate so that the file is inert wherever
+default setup is still on, since GitHub rejects SARIF from an advanced configuration then.
 
-Closing this requires migrating to advanced setup: committing a `codeql.yml`
-workflow to both branches and disabling default setup in repository settings.
-That is a settings change, not something a pull request can carry.
-
-### Migration, prepared
-
-`.github/workflows/codeql.yml` carries the advanced setup that closes the gap:
-`push` and `pull_request` on both `main` and `release/0.8`, plus the same weekly
-cron, for both configured languages (`actions`, `rust`).
-
-It ships **inert**. The analyze job is gated on `vars.CODEQL_ADVANCED == 'true'`
-because GitHub rejects SARIF from an advanced configuration while default setup
-is still enabled — an ungated workflow would fail every push and PR in the
-window between merging the file and changing the setting. Activation is:
-
-1. Settings → Code security → Code scanning → CodeQL analysis → turn
-   **Default setup** off.
-2. Settings → Secrets and variables → Actions → Variables → set
-   `CODEQL_ADVANCED` = `true`.
-
-**Do these in order.** Step 2 before step 1 lets the analyze job run while
-default setup is still enabled, and GitHub rejects its SARIF upload -- the exact
-red state the gate exists to prevent. Step 1 first is safe: the workflow keeps
-skipping until the variable is set, so the only cost is a short window with no
-scanning.
-
-Both steps are repository-settings changes and cannot be performed by a pull
-request.
-
-After activating, `release/0.8` still has no analyses until the workflow actually
-runs there. Trigger it from the Actions tab (**Run workflow** -> branch
-`release/0.8`) or with `gh workflow run codeql.yml --ref release/0.8`; both need
-the `workflow_dispatch:` trigger, which this workflow carries for exactly that
-reason. The weekly cron does **not** cover that branch -- scheduled events fire
-only from the default branch, so `release/0.8` is reached by push and
-pull_request alone.
-
-Success is a nonzero `refs/heads/release/0.8` row in:
+To check that `release/0.8` is being analyzed:
 
 ```bash
-gh api --paginate 'repos/Slurp9187/secure-gate/code-scanning/analyses?per_page=100'   --jq '.[].ref' | sort | uniq -c | sort -rn
+gh api --paginate 'repos/Slurp9187/secure-gate/code-scanning/analyses?per_page=100' \
+  --jq '.[].ref' | sort | uniq -c | sort -rn
 ```
 
-A 200 from the settings API is not success. Until they are made, `release/0.8` remains unscanned.
+A nonzero `refs/heads/release/0.8` row is success.

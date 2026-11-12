@@ -205,12 +205,12 @@ Two reading rules the receipts README states, which anyone citing from here inhe
 
 ## Running it
 
-The three binaries are auto-discovered by Cargo; `test`, `test-release` and the `msrv`
-`--all-targets` check pick them up with no workflow edit. They are gated
+The three binaries are auto-discovered by Cargo; the `test` matrix (including its release-profile
+row) and the `msrv` `--all-targets` check pick them up with no workflow edit. They are gated
 `#![cfg(all(feature = "alloc", not(miri)))]` — `alloc`, not `std`, because a test binary links
 `std` regardless of the library's features and gating on `std` would cut them out of almost
-every matrix row; `not(miri)` because `fuzz-miri.yml` runs
-`cargo miri test --workspace --all-features`, and an intercepted global allocator is not
+every matrix row; `not(miri)` because `miri.yml` runs
+`cargo miri test --workspace --features full,std`, and an intercepted global allocator is not
 something to run under Miri.
 
 ```sh
