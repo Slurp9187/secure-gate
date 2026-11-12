@@ -19,11 +19,11 @@ REQUIRED=(chacha20poly1305 chacha20 sha2 digest block-buffer poly1305)
 ALLOWED_OFF=(cipher crypto-common hybrid-array)
 
 # Normal (non-dev) dependency graph of `sealed` alone, for every target, as "name version|features".
-graph=$(cargo tree -p secure-gate -e normal --no-default-features --features sealed \
+graph=$(cargo tree --color never -p secure-gate -e normal --no-default-features --features sealed \
   --target all --prefix none --format '{p}|{f}' | sed 's/ (\*)$//; s/ ([^)]*)|/|/' | sort -u)
 
 # "name version" of every package that declares a `zeroize` feature.
-offers=$(cargo metadata --format-version 1 --no-default-features --features sealed |
+offers=$(cargo metadata --color never --format-version 1 --no-default-features --features sealed |
   jq -r '.packages[] | select(.features | has("zeroize")) | "\(.name) v\(.version)"' | sort -u)
 
 has_zeroize() { # $1 = "name version"
