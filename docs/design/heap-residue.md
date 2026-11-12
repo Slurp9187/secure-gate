@@ -104,7 +104,7 @@ So that the numbers in the documentation and the numbers in the tests are the sa
 both workloads are shapes `SECURITY.md` §2 already describes:
 
 - **Growth-move** — a 4 KiB secret grown one byte past its capacity through `with_secret_mut`,
-  with an allocated neighbour behind it so the reallocation has to move rather than extend in
+  with an allocated neighbor behind it so the reallocation has to move rather than extend in
   place.
 - **Truncate-then-shrink** — a pre-sized 4096-byte buffer truncated to 2048 and then shrunk,
   abandoning a block that holds the live prefix *and* the discarded tail. §2's own point is
@@ -158,7 +158,7 @@ planted-pattern count and `> 0` on the block count, never equality against a rem
 and a block count that differs between two runs is not by itself evidence that anything
 changed.
 
-**No third-party crate is characterised here beyond what these artifacts measure.** What this
+**No third-party crate is characterized here beyond what these artifacts measure.** What this
 repository says about `zeroizing-alloc` is bounded by them: the wipe covers the blocks §2's
 hazard abandons, including the reallocation-abandoned ones, and it survived the PGO + fat LTO
 configuration the receipt records. Nothing beyond that, in either direction.
@@ -183,7 +183,7 @@ The survival question is answered separately, by different artifacts:
   hand-run, wired into no CI job, and refuses to run outside Linux/glibc — deliberately. The
   readout depends on the allocator handing the just-freed block straight back, which glibc does
   and the Windows heap does not; and on Windows `HeapFree` is not a deallocation function LLVM
-  recognises, so a fill before it is never proven dead. A green Windows number would be
+  recognizes, so a fill before it is never proven dead. A green Windows number would be
   consistent with the mechanism working *and* with it not, which is why the script prints a
   refusal instead of a figure.
 - `docs/design/receipts/` holds the captured stdout — raw output rather than transcribed

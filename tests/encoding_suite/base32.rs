@@ -145,7 +145,7 @@ fn fixed_try_from_base32_rejects_impossible_lengths() {
     assert!(Dynamic::<Vec<u8>>::try_from_base32("M").is_err());
     assert!(Fixed::<[u8; 1]>::try_from_base32("MZX").is_err());
     assert!(Fixed::<[u8; 3]>::try_from_base32("MZXW6Y").is_err());
-    // The neighbouring legal lengths (2, 4, 5, 7, 8 mod 8) are accepted.
+    // The neighboring legal lengths (2, 4, 5, 7, 8 mod 8) are accepted.
     assert!(Fixed::<[u8; 1]>::try_from_base32("MY").is_ok());
     assert!(Fixed::<[u8; 3]>::try_from_base32("MZXW6").is_ok());
 }
@@ -237,7 +237,7 @@ fn base32_accepts_non_canonical_trailing_bits() {
     let lenient = Dynamic::<Vec<u8>>::try_from_base32("MZ").expect("non-canonical");
     assert_eq!(canonical.expose_secret(), &[0x66]);
     assert_eq!(lenient.expose_secret(), &[0x66]);
-    // Re-encoding normalises back to the canonical spelling.
+    // Re-encoding normalizes back to the canonical spelling.
     assert_eq!(lenient.to_base32().into_inner(), "MY");
 }
 

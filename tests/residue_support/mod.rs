@@ -42,7 +42,7 @@ fn buffer_addr(secret: &mut Dynamic<Vec<u8>>) -> usize {
 }
 
 /// **Growth-move** — `SECURITY.md` §2: a 4 KiB secret grown one byte past its capacity
-/// through `with_secret_mut`, with an allocated neighbour behind it so the reallocation has
+/// through `with_secret_mut`, with an allocated neighbor behind it so the reallocation has
 /// to move rather than extend in place. The abandoned block is the hazard: the crate
 /// zeroizes the buffer it *holds*, and the one it no longer holds is released outside the
 /// crate entirely.
@@ -51,12 +51,12 @@ pub fn workload_growth_move() {
 
     // Allocated immediately after the payload buffer, so it sits behind it on a fresh heap.
     // `Dynamic::new` then *moves* that buffer in rather than copying it, so the buffer the
-    // wrapper holds is the one the neighbour is behind. The probe's spy forces the copying
-    // path anyway (see `secure_gate_residue_probe::Spy::realloc`), so this neighbour does
+    // wrapper holds is the one the neighbor is behind. The probe's spy forces the copying
+    // path anyway (see `secure_gate_residue_probe::Spy::realloc`), so this neighbor does
     // not decide the outcome — it keeps the workload the same shape as the one
     // SECURITY.md measures, and the assertion below is what actually establishes that a
     // block was abandoned.
-    let neighbour = vec![0u8; SECRET_LEN];
+    let neighbor = vec![0u8; SECRET_LEN];
 
     let mut secret: Dynamic<Vec<u8>> = Dynamic::new(payload);
     secret.with_secret_mut(|v| plant(v));
@@ -76,7 +76,7 @@ pub fn workload_growth_move() {
          nothing"
     );
 
-    std::hint::black_box((&secret, &neighbour));
+    std::hint::black_box((&secret, &neighbor));
 }
 
 /// **Truncate-then-shrink** — `SECURITY.md` §2: a pre-sized 4096-byte buffer truncated to

@@ -1,6 +1,6 @@
 //! `generic [u8; N]` is strictly dominated by the size-literal arm.
 //!
-//! It takes a payload this crate already specialises (`Fixed<[u8; N]>`) and then
+//! It takes a payload this crate already specializes (`Fixed<[u8; N]>`) and then
 //! withholds `SecretLen`, `From`, `TryFrom`, the encoders and `from_random`. Same
 //! bytes, strictly less API. `dynamic_newtype!` already refuses the analogous
 //! spellings; this is the matching pin.

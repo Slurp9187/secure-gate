@@ -134,7 +134,7 @@ Encoded lengths for comparison: 16 bytes → 26 chars; 20 bytes → 32 chars (he
 base64url 27); 32 bytes → 52 chars (hex 64, base64url 43).
 `encoded_len::<Base32UpperUnpadded>(n)` is a `const fn` if a stack buffer size is ever needed.
 
-### 3.4 Decode behaviour (`Base32UpperUnpadded::decode_vec`)
+### 3.4 Decode behavior (`Base32UpperUnpadded::decode_vec`)
 
 | Input | Result | Note |
 |---|---|---|
@@ -239,14 +239,14 @@ diverge from the base64 shape in this change.
 
 ### D5 — Non-canonical trailing bits are accepted (documented, not fixed)
 
-`"MZ"` decodes to the same byte as `"MY"`. This is `base32ct` behaviour (and the RFC permits
+`"MZ"` decodes to the same byte as `"MY"`. This is `base32ct` behavior (and the RFC permits
 lenient decoders). Consequences:
 
 - `decode(encode(x)) == x` always holds (the encoder is canonical).
 - `encode(decode(s)) == s` holds only for canonical `s`. The fuzz target's "stable re-encoding"
   check must feed *encoder-generated* strings, which is what the existing hex/base64 sections
   already do via `FuzzHexString` / `FuzzBase64String`. Keep that pattern.
-- Add one test that pins the behaviour so a future `base32ct` change is noticed.
+- Add one test that pins the behavior so a future `base32ct` change is noticed.
 
 ### D6 — Zeroization discipline is the base64 discipline
 
@@ -431,7 +431,7 @@ argument, unchanged).
 //! - **Treat all input as untrusted** / **Heap allocation**: as `base64_url.rs`.
 //! - **Strict validation**: uppercase RFC 4648 §6 alphabet only, no `=` padding, no
 //!   whitespace, length must be ≡ 0, 2, 4, 5 or 7 (mod 8). Lowercase input is rejected;
-//!   normalise upstream (`to_ascii_uppercase()`, ideally inside `zeroize::Zeroizing`).
+//!   normalize upstream (`to_ascii_uppercase()`, ideally inside `zeroize::Zeroizing`).
 //! - **Lenient trailing bits**: non-zero bits in the final partial group are ignored rather
 //!   than rejected (`"MZ"` decodes like `"MY"`). Only encoder-produced strings are canonical.
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
@@ -807,7 +807,7 @@ None are planned here, but any that is added must follow that suffix.
 - **`secure-gate-core/SECURITY.md`** (unchanged by rc.8): line 23 (zeroizing variants list),
   line 116 (dependency list: `base32ct` — constant-time Base32 encoding/decoding (RustCrypto)),
   feature table rows 208–210, method lists at 231, 249, 379, the grep list at 391–392
-  (`to_base32`, `to_base32_zeroizing`), and the two-flavour table at 418–423.
+  (`to_base32`, `to_base32_zeroizing`), and the two-flavor table at 418–423.
 - **`secure-gate-core/CHANGELOG.md`** — `[Unreleased]` is empty above `[0.9.0-rc.8]`; add
   `### Added`:
 
@@ -912,7 +912,7 @@ invocation, and `--no-default-features --features=std`).
   irrelevant to secrecy but matters if anyone ever uses the *encoded* string as an identity key;
   documented on the decoding trait and pinned by a test.
 - **Case strictness surprises users** who paste lowercase from a third-party UI. The error is
-  immediate and the docs say how to normalise; if it becomes a recurring complaint, the
+  immediate and the docs say how to normalize; if it becomes a recurring complaint, the
   explicit `_lower` methods in §8 are the answer, not silent tolerance.
 - **Macro drift.** The newtype macros duplicate the per-format wiring by hand (`__sg_if_*`
   helper plus a block in each front end). Forgetting one front end compiles fine and silently

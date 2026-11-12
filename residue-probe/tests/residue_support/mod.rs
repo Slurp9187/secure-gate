@@ -66,7 +66,7 @@ pub const WORKLOADS: [(&str, fn()); 2] = [
 /// The smallest possible subject: zero every byte of a block, then forward.
 ///
 /// Exists so this crate's own subject leg has a subject. It is not a recommendation of
-/// anything and characterises nothing but itself. `realloc` is left to the `GlobalAlloc`
+/// anything and characterizes nothing but itself. `realloc` is left to the `GlobalAlloc`
 /// default for the reason `NoWipe` gives: a subject and its controls must release memory by
 /// the same route.
 pub struct WipeOnFree<A: GlobalAlloc>(pub A);

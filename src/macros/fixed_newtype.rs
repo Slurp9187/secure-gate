@@ -140,7 +140,7 @@
 /// **`From`, `TryFrom`, the encoders and the RNG constructors are absent from both.**
 /// The encoders have no defined byte order over `[i16]`, and byte order is not the
 /// whole of it: the canonical encoding of these secrets is domain-specific — ML-KEM
-/// serialises as bit-packed 12-bit coefficients, not a 16-bit dump — so an encoder here
+/// serializes as bit-packed 12-bit coefficients, not a 16-bit dump — so an encoder here
 /// would round-trip inside this crate and disagree with every implementation outside
 /// it. RNG is a separate question with a separate answer: the byte-level fill is well
 /// defined, but uniform bits are not a valid ML-KEM coefficient, a reduced scalar, or a
@@ -308,7 +308,7 @@ macro_rules! fixed_newtype {
     // ---- `generic` applied to a byte array: rejected ----
     //
     // `generic [u8; N]` is strictly dominated by the size-literal arm. It takes
-    // the payload this crate already specialises and then withholds `SecretLen`,
+    // the payload this crate already specializes and then withholds `SecretLen`,
     // `From`, `TryFrom`, the encoders and `from_random`. Same bytes, strictly
     // less API, and no reason to write it. These must precede every
     // `generic $inner:ty` arm: once a `:ty` fragment is parsed there is no

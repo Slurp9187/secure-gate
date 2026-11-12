@@ -128,7 +128,7 @@ newtypes**. So:
   unchanged. What changes is ownership: a hand-written impl is the user's
   visible, greppable decision, whereas a `derive: [Clone]` token spells the
   same bypass in one word inside a macro expansion. **§5.1 was subsequently
-  decided in favour of option (c)** — `Clone`/`Serialize` dropped from
+  decided in favor of option (c)** — `Clone`/`Serialize` dropped from
   `derive:`, callers write them by hand — precisely because ownership, not
   mechanism, was the part that could be improved.
 

@@ -150,7 +150,7 @@ separate sentences.
 
 - `Spy<A: GlobalAlloc>` — the probe. Generic, so `Spy(System)`, `Spy(Jemalloc)` and
   `Spy(MyArena)` all work. Install it **beneath** the allocator under test.
-- `NoWipe<A: GlobalAlloc>` — the second control's composition, with no behaviour of its own.
+- `NoWipe<A: GlobalAlloc>` — the second control's composition, with no behavior of its own.
 - `residue_binary!` — one invocation per test file: `control`, `nowipe`, or
   `subject: Type = initializer`, plus `workloads:` and, for the controls, `planted_len:`.
   Generates that role's `#[global_allocator]` and its one `#[test]`.

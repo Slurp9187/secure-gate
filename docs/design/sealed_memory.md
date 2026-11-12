@@ -62,7 +62,7 @@ pages (read-only once filled, locked), and a no-access guard page, and on Linux 
 `#![forbid(unsafe_code)]`. A mapping owns whole pages by construction, so the per-target
 alignment table rc.14 added, its page-size refusal (`LockError::page_too_large`) and the
 debug-build stack copy in `Prekey::new` are gone: the pre-key is written straight into the
-mapping. Its unlock still cannot reach a neighbour's lock, the hazard
+mapping. Its unlock still cannot reach a neighbor's lock, the hazard
 [`SECURITY.md`](../../SECURITY.md) describes for naive `mlock`.
 
 **Why.** EFV asked for the pre-key to be split into four separately allocated, aligned and
@@ -187,7 +187,7 @@ the receipts directory:
   through `with_secret` / `with_role`, which leave nothing.
 
 The same review made the pre-key lock before it is filled, made the 64 KiB-page refusal a
-function its test calls, and serialised the unit tests that lock pages (they share one
+function its test calls, and serialized the unit tests that lock pages (they share one
 quota with the quota test).
 
 ### Measured cost
@@ -210,7 +210,7 @@ Re-measured after the stack scrub was added (see above): `with_secret` ~8.0 µs,
 
 SHA-256 against BLAKE3 over the same 32 + 16,384 bytes, best of 12 rounds of 20,000 in a
 standalone release binary: **6.44 µs vs 6.29 µs**. With SHA-NI they are the same, so SHA-256
-stays: no extra dependency for no gain. A CPU without SHA extensions would favour BLAKE3;
+stays: no extra dependency for no gain. A CPU without SHA extensions would favor BLAKE3;
 not measured.
 
 ## How sequoia does it
@@ -233,7 +233,7 @@ places:
    (`has_access_to_prekey`), filled lazily on first use with four separate 4096-byte heap
    buffers of random bytes (16 KiB total). It is never freed or wiped. It is ordinary heap
    memory: not a `Protected`, not `mlock`ed, no guard pages. The "pages" are plain `Vec`s with
-   no page alignment. Module privacy is the only barrier, and that is a code-organisation
+   no page alignment. Module privacy is the only barrier, and that is a code-organization
    boundary, not a runtime one.
 2. **The salt — one per sealed object.** 32 random bytes generated in `Encrypted::new`, stored
    in the struct next to the ciphertext. Not secret.
@@ -282,12 +282,12 @@ is a lesson for this crate.
   whose state is never wiped. A small leak worth not copying.
 - **Construction wipes its source.** `Protected::from(Vec<u8>)` copies into a fresh
   exact-size box and then zeroes the source `Vec`'s entire *capacity*, not just its length.
-- **The "careful" copy is not careful once optimised.** The copy above goes through
+- **The "careful" copy is not careful once optimized.** The copy above goes through
   `careful_memcpy`, an element-by-element `iter().zip().for_each` loop, because the source
   notes that `copy_from_slice` "indeed leaks secrets" (presumably through SIMD registers or
-  stack scratch left behind by an optimised `memcpy`). Compiled standalone at `-O3` on x86_64
+  stack scratch left behind by an optimized `memcpy`). Compiled standalone at `-O3` on x86_64
   with rustc 1.94.1, **both** `careful_memcpy` and `copy_from_slice` reduce to a tail call
-  `jmp memcpy`: LLVM recognises the loop as a copy idiom. Inlined into sequoia's callers or on
+  `jmp memcpy`: LLVM recognizes the loop as a copy idiom. Inlined into sequoia's callers or on
   other targets it may differ — not tested — but it cannot be relied on.
 - **Kill switch.** `DANGER_DISABLE_ENCRYPTED_MEMORY` is a `const false`; not a runtime option.
 
@@ -409,13 +409,13 @@ is unsound, so that is a separate, deliberate decision.
 
 ### Other traits
 
-| Trait | Sealed behaviour |
+| Trait | Sealed behavior |
 |---|---|
 | `Debug` | Fully redacted — no salt, no length. Stricter than sequoia. |
 | `ConstantTimeEq` | Unseal both, compare with `subtle`. |
 | `Hash` | **Do not implement.** Sequoia's leaks plaintext into the hasher. |
 | `Clone` (`cloneable`) | Proposed: copy the sealed bytes. **Not built**: see [As built](#as-built-090-rc13). |
-| Serde, `ToHex` & co. | Via `with_secret`; unchanged behaviour, one unseal per call. |
+| Serde, `ToHex` & co. | Via `with_secret`; unchanged behavior, one unseal per call. |
 
 ## Compatibility: this can be added later without a breaking change
 

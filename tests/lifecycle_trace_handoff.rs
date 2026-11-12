@@ -29,7 +29,7 @@
 //!
 //! The shapes below cover every `fixed_newtype!` front end plus a plain `type` alias,
 //! because the alias-versus-newtype contrast is the whole point of the nominal types
-//! and belongs next to the behaviour it is contrasted with.
+//! and belongs next to the behavior it is contrasted with.
 
 use core::cell::RefCell;
 use secure_gate::{
@@ -213,7 +213,7 @@ fn the_generic_arm_carries_the_access_model_for_a_non_byte_inner_type() {
 /// The point is not that five constructors work. It is that the nominal separation is
 /// the *only* difference between them: each one is built from one `SECRET` constant and
 /// each one reads back byte-identically, so anything that later diverges between them
-/// is a real behavioural difference and not an artifact of how they were built.
+/// is a real behavioral difference and not an artifact of how they were built.
 #[test]
 fn nominal_separation_changes_the_type_and_nothing_about_the_contents() {
     let opened = Opened::new(SECRET);
@@ -313,12 +313,12 @@ fn the_readme_rotation_pattern_overwrites_the_old_key_where_it_sits() {
 }
 
 /// Coefficients mutate through the generic arm's slice, in place, without disturbing
-/// their neighbours.
+/// their neighbors.
 ///
 /// The generic arm forwards `RevealSecretMut` the same way the byte arms do, but its
 /// inner type is multi-byte, so an indexing or element-size mistake in the forwarding
 /// would corrupt adjacent coefficients rather than producing an obvious failure. The
-/// untouched-neighbour assertions are what catch that.
+/// untouched-neighbor assertions are what catch that.
 #[test]
 fn generic_arm_coefficients_mutate_in_place_through_the_slice() {
     let mut poly = Poly::new([0i16; 256]);
@@ -690,9 +690,9 @@ fn debug_stays_redacted_at_every_stage_for_every_shape() {
     );
     let base = opened.into_wrapper();
     assert_eq!(format!("{base:?}"), "[REDACTED]", "after outbound crossing");
-    let relabelled = Opened::from_wrapper(base);
+    let relabeled = Opened::from_wrapper(base);
     assert_eq!(
-        format!("{relabelled:?}"),
+        format!("{relabeled:?}"),
         "[REDACTED]",
         "after a full circuit"
     );
@@ -703,7 +703,7 @@ fn debug_stays_redacted_at_every_stage_for_every_shape() {
     assert_eq!(format!("{:?}", Handoff::new(Traced(1))), "[REDACTED]");
 }
 
-/// The forwarded `Zeroize` reaches the secret through every layer of labelling.
+/// The forwarded `Zeroize` reaches the secret through every layer of labeling.
 ///
 /// `zeroize()` is the one end-of-life step a test can observe directly on a
 /// stack-backed secret, and the macros forward it per newtype, so a missing forward

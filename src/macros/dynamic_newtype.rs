@@ -594,7 +594,7 @@ macro_rules! dynamic_newtype {
         $crate::__sg_dynamic_ctor!($name, $inner);
     };
 
-    // ---- catch-all: unrecognised inner type ----
+    // ---- catch-all: unrecognized inner type ----
     //
     // Uses `$($rest:tt)+` rather than `$inner:ty` so it can never itself
     // hard-error on a malformed tail; the message names what was written.

@@ -55,7 +55,7 @@
 //!     std::hint::black_box(&buf);
 //! }
 //!
-//! /// Every workload, labelled, so the three binaries run the same list.
+//! /// Every workload, labeled, so the three binaries run the same list.
 //! pub const WORKLOADS: [(&str, fn()); 1] = [("push", workload as fn())];
 //! ```
 //!
@@ -442,7 +442,7 @@ unsafe impl<A: GlobalAlloc> GlobalAlloc for Spy<A> {
 // NoWipe — the control that makes a zero a measurement
 // ---------------------------------------------------------------------------
 
-/// A wrapper with a releasing allocator's *composition* and no behaviour of its own.
+/// A wrapper with a releasing allocator's *composition* and no behavior of its own.
 ///
 /// This is a synthetic construct that exists only to be the second control. It is not a model
 /// of, or a stand-in for, any real allocator: it forwards everything and does nothing, and

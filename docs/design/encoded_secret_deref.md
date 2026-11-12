@@ -6,7 +6,7 @@
 >
 > This is a rejected-alternatives record. It exists because `EncodedSecret` is the
 > one type in this crate that deliberately breaks the crate's own no-`Deref` rule,
-> and a reader who has internalised that rule is owed the reason. Nothing here is a
+> and a reader who has internalized that rule is owed the reason. Nothing here is a
 > threat-model claim — `SECURITY.md` stays the threat model and the audit surface
 > list, and does not repeat this argument.
 
@@ -123,7 +123,7 @@ anything.
 - Do not drop `Deref` on `EncodedSecret` to silence `to_string`. `as_str()` would
   work, and would make the type clumsy for its actual job.
 - Do not add `Deref` or `AsRef` to `Fixed`/`Dynamic`. The exception is for output,
-  and does not generalise.
+  and does not generalize.
 - Do not drop `EncodedSecret::into_inner` because `to_string` exists. One moves,
   the other copies.
 - Do not reintroduce `InnerSecret<T>`. It applied this same deref-with-wiping
