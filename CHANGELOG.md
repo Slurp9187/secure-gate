@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   abandons none. Both places now say so and point at `new_with`. The code is unchanged; an
   in-place path is #249.
 
+### Tests
+- **Allocator-level checks for three wipes that had none.** `tests/heap_zeroize.rs` now
+  watches `Dynamic<[u8]>` on drop; an `EncodedSecret` dropped directly, once per encoder
+  (hex, upper hex, Base32, Base64url, bech32, bech32m; only hex after `into_zeroizing` was
+  covered); and `SealedDynamic`'s plaintext copies on seal, `with_secret`,
+  `with_secret_mut`, a panicking closure and unseal. Each asserts the gate inspected exactly
+  one buffer, so a check cannot pass by observing nothing. All held on rc.17; no code change.
+
 ## [0.9.0-rc.17] - 2026-10-29
 
 ### Security

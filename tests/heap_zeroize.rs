@@ -59,6 +59,11 @@ static CHECKING: AtomicBool = AtomicBool::new(false);
 /// Written before `CHECKING` is enabled.
 static TARGET_SIZE: AtomicUsize = AtomicUsize::new(0);
 
+/// How many deallocations the asserting gate has inspected (and found zeroed) since
+/// [`with_proxy_check_counted`] last reset it. Lets a check prove it was not vacuous where
+/// the buffer under test has no `capacity()` to assert on from outside.
+static CHECK_HITS: AtomicUsize = AtomicUsize::new(0);
+
 // ---------------------------------------------------------------------------
 // Recording-mode gate — used by the checks that follow one specific buffer to its grave
 //
@@ -175,6 +180,7 @@ unsafe impl GlobalAlloc for ProxyAllocator {
                 let b = unsafe { core::ptr::read(ptr.add(i)) };
                 assert_eq!(b, 0, "byte at offset {i} was not zeroed before dealloc");
             }
+            CHECK_HITS.fetch_add(1, Ordering::SeqCst);
         }
 
         // Recording mode: match by exact pointer, not size, to avoid false results
@@ -230,6 +236,20 @@ fn with_proxy_check<F: FnOnce()>(size: usize, f: F) {
     CHECKING.store(true, Ordering::SeqCst);
     let _guard = CheckGuard; // cleared on return OR on unwind
     f();
+}
+
+/// [`with_proxy_check`], and returns how many deallocations of exactly `size` bytes the
+/// gate inspected. Every one of them was all-zero, or the allocator would have panicked.
+///
+/// For buffers whose size cannot be asserted from outside (an `EncodedSecret` exposes no
+/// capacity; a sealed type's plaintext temporary is never visible at all). The existing
+/// checks guard against a vacuous pass with `assert_eq!(capacity, size)`; these assert on
+/// the returned count instead: zero means nothing of that size was freed and the check
+/// observed nothing.
+fn with_proxy_check_counted<F: FnOnce()>(size: usize, f: F) -> usize {
+    CHECK_HITS.store(0, Ordering::SeqCst);
+    with_proxy_check(size, f);
+    CHECK_HITS.load(Ordering::SeqCst)
 }
 
 /// RAII guard that clears the counting gate on drop (normal return or unwind).
@@ -1068,6 +1088,166 @@ fn check_into_zeroizing_string_zeroed<const N: usize>() {
 }
 
 // ---------------------------------------------------------------------------
+// Dynamic<[u8]> — the exact-capacity boxed slice
+//
+// The runtime-length shape whose buffer can never grow. Its drop had no allocator-level
+// check: the array, `Vec` and `String` shapes above each have one, and this is a separate
+// `Zeroize` path (`Box<[u8]>`). 72 bytes, clear of every size used above.
+// ---------------------------------------------------------------------------
+
+fn check_boxed_slice_zeroed() {
+    const LEN: usize = 72;
+    let hits = with_proxy_check_counted(LEN, || {
+        let secret: Dynamic<[u8]> = Dynamic::from(vec![0xAAu8; LEN].into_boxed_slice());
+        core::hint::black_box(&secret);
+        drop(secret);
+    });
+    assert_eq!(
+        hits, 1,
+        "expected exactly the one {LEN}-byte slice to be freed"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// EncodedSecret — dropped directly, for every encoder
+//
+// `check_into_zeroizing_string_zeroed` above follows the buffer through `into_zeroizing`,
+// for hex only. This is the ordinary case: an `EncodedSecret` that is simply dropped, from
+// each encoder, since each builds its `String` separately. An encoded secret is a second
+// full copy of the secret, so a buffer freed unwiped here is the secret freed unwiped.
+//
+// The subject is a bare 28-byte array, so the encoded `String` is the only allocation in
+// the gate. The gate matches on allocation size and `EncodedSecret` exposes no capacity,
+// so each check asserts the gate inspected exactly one block: an encoder that allocated
+// more than the text needs would otherwise pass by observing nothing.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "encoding")]
+fn check_encoded_secret_drop_zeroed() {
+    use secure_gate::{Case, EncodedSecret, ToBase32, ToBase64Url, ToBech32, ToBech32m, ToHex};
+
+    const SECRET: [u8; 28] = [0xC4; 28];
+
+    fn encode(name: &str) -> EncodedSecret {
+        match name {
+            "hex" => SECRET.to_hex(),
+            "hex upper" => SECRET.to_hex_upper(),
+            "base32" => SECRET.to_base32(),
+            "base64url" => SECRET.to_base64url(),
+            "bech32" => SECRET.try_to_bech32("key", Case::Lower).expect("fits"),
+            "bech32m" => SECRET.try_to_bech32m("key", Case::Lower).expect("fits"),
+            other => unreachable!("{other}"),
+        }
+    }
+
+    for name in [
+        "hex",
+        "hex upper",
+        "base32",
+        "base64url",
+        "bech32",
+        "bech32m",
+    ] {
+        // Encoded once outside the gate, only to learn the length the gate should match.
+        let len = encode(name).len();
+        let hits = with_proxy_check_counted(len, || {
+            let encoded = encode(name);
+            // Positive control: every alphabet here is ASCII, never NUL.
+            assert!(encoded.bytes().all(|b| b != 0), "{name}: nothing to wipe");
+            drop(encoded);
+        });
+        assert_eq!(
+            hits, 1,
+            "{name}: expected exactly one {len}-byte buffer freed (and zeroed)"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SealedDynamic — the plaintext copies made by seal, read, mutate and unseal
+//
+// Every sealed access decrypts into a heap temporary and promises to wipe it when the call
+// returns (`SECURITY.md` §3, `src/sealed/dynamic.rs`). Nothing watched that at the
+// allocator. Each step below runs in its own gate and frees exactly one 200-byte plaintext
+// buffer, which must be zero:
+//
+//   seal             the plain `Dynamic` that was consumed
+//   with_secret      the decrypted temporary
+//   with_secret_mut  the decrypted temporary (the ciphertext is rewritten in place)
+//   unseal           the returned `Dynamic`, dropped in a gate of its own: `unseal` also
+//                    frees the consumed ciphertext buffer, which is the same size
+//   (panic)          the temporary, when the `with_secret` closure unwinds
+//
+// The sealed value itself is dropped outside every gate: its buffer is ciphertext, the
+// same size as the plaintext, and correctly not zero.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "sealed")]
+fn check_sealed_dynamic_plaintext_zeroed() {
+    use secure_gate::{Prekey, SealedDynamic};
+
+    const LEN: usize = 200;
+    let prekey = Prekey::new();
+
+    let plain = Dynamic::<Vec<u8>>::new_with(LEN, |slot| slot.fill(0xC4));
+    let mut sealed = None;
+    let hits = with_proxy_check_counted(LEN, || {
+        sealed = Some(SealedDynamic::seal(plain, &prekey));
+    });
+    assert_eq!(hits, 1, "seal: the consumed plain buffer was not observed");
+    let mut sealed = sealed.expect("sealed above");
+
+    let hits = with_proxy_check_counted(LEN, || {
+        sealed.with_secret(|v| assert!(v.iter().all(|&b| b == 0xC4)));
+    });
+    assert_eq!(
+        hits, 1,
+        "with_secret: the plaintext temporary was not observed"
+    );
+
+    let hits = with_proxy_check_counted(LEN, || {
+        sealed.with_secret_mut(|v| v.fill(0xC5));
+    });
+    assert_eq!(
+        hits, 1,
+        "with_secret_mut: the plaintext temporary was not observed"
+    );
+
+    // A panic inside the closure must wipe the temporary too.
+    let hits = with_proxy_check_counted(LEN, || {
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            sealed.with_secret(|_| std::panic::resume_unwind(Box::new(())));
+        }));
+        assert!(caught.is_err());
+    });
+    assert_eq!(
+        hits, 1,
+        "with_secret panic: the plaintext temporary was not observed"
+    );
+
+    // unseal: the plaintext comes back as an ordinary `Dynamic`. `unseal` itself runs outside
+    // the gate because it frees the ciphertext buffer, which is the same size and not zero.
+    let unsealed = sealed.unseal();
+    let hits = with_proxy_check_counted(LEN, || drop(unsealed));
+    assert_eq!(
+        hits, 1,
+        "unseal: the returned buffer was not observed on drop"
+    );
+
+    // The `String` payload reuses the decrypted buffer (`String::from_utf8`), a separate
+    // code path from `Vec<u8>`.
+    const TEXT_LEN: usize = 216;
+    let sealed = SealedDynamic::seal(Dynamic::<String>::new("p".repeat(TEXT_LEN)), &prekey);
+    let hits = with_proxy_check_counted(TEXT_LEN, || {
+        sealed.with_secret(|s| assert!(s.bytes().all(|b| b == b'p')));
+    });
+    assert_eq!(
+        hits, 1,
+        "String with_secret: the plaintext temporary was not observed"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Aggregate test
 // ---------------------------------------------------------------------------
 
@@ -1090,6 +1270,17 @@ fn all_heap_zeroed() {
         check_into_zeroizing_string_zeroed::<24>();
         check_into_zeroizing_string_zeroed::<40>();
     }
+
+    // Dynamic<[u8]> — the exact-capacity boxed slice
+    check_boxed_slice_zeroed();
+
+    // EncodedSecret dropped directly, one check per encoder
+    #[cfg(feature = "encoding")]
+    check_encoded_secret_drop_zeroed();
+
+    // SealedDynamic's plaintext copies: seal, read, mutate, panic, unseal
+    #[cfg(feature = "sealed")]
+    check_sealed_dynamic_plaintext_zeroed();
 
     // Dynamic<[u8; N]> — boxed arrays
     check_array_zeroed::<16>();
