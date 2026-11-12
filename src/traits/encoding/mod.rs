@@ -64,17 +64,17 @@ pub enum Case {
 ///
 /// # Why the extra bound exists
 ///
-/// `str` and `String` implement `AsRef<[u8]>`, so an `AsRef<[u8]>`-only blanket made
-/// every string an encoding *input* — even though strings are this crate's decoding
-/// input. Two silent wrong answers followed from that:
+/// `str` and `String` implement `AsRef<[u8]>`, so an `AsRef<[u8]>`-only blanket would
+/// make every string an encoding *input* — even though strings are this crate's decoding
+/// input. Two silent wrong answers follow from that:
 ///
-/// - `encoded.to_hex()` compiled for an [`EncodedSecret`](crate::EncodedSecret), which
-///   derefs to `str`. It hex-encoded the *encoded text*: a 32-byte key came back as 124
-///   hex characters, with no signature or name to suggest anything was wrong.
-/// - `"text".to_hex()` encoded a string's UTF-8 bytes, which is occasionally what
+/// - `encoded.to_hex()` would compile for an [`EncodedSecret`](crate::EncodedSecret),
+///   which derefs to `str`. It hex-encodes the *encoded text*: a 32-byte key comes back
+///   as 124 hex characters, with no signature or name to suggest anything is wrong.
+/// - `"text".to_hex()` would encode a string's UTF-8 bytes, which is occasionally what
 ///   someone means and usually not.
 ///
-/// Both are now compile errors. Write `.as_bytes()` when you did mean the UTF-8.
+/// With the bound, both are compile errors. Write `.as_bytes()` when you did mean the UTF-8.
 ///
 /// # Implementing it
 ///

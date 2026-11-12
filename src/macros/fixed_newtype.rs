@@ -35,10 +35,10 @@
 /// **`ConstantTimeEq` is not an option on the size-literal arm, and naming it is an
 /// error.** A `[u8; N]` payload gets [`ct_eq`](crate::ConstantTimeEq::ct_eq)
 /// automatically whenever the `ct-eq` feature is on, because the wrapper it forwards
-/// to always has it and a plain `type Name = Fixed<[u8; N]>;` therefore always did.
-/// Requiring the token here put the extra word on the spelling this crate recommends
-/// as the safer of the two, for the one comparison whose alternative is a timing
-/// leak. Since the arm now emits the impl itself, a second one from the `derive:`
+/// to always has it, as a plain `type Name = Fixed<[u8; N]>;` does. Requiring the
+/// token here would put the extra word on the spelling this crate recommends as the
+/// safer of the two, for the one comparison whose alternative is a timing leak.
+/// Since the arm emits the impl itself, a second one from the `derive:`
 /// list is `E0119: conflicting implementations` — delete the token. It remains a
 /// real opt-in on the `generic` arms, where the inner type may or may not implement
 /// the trait.
@@ -87,11 +87,12 @@
 /// secret takes. [`Fixed<T>`](crate::Fixed) holds more than that, and the
 /// `generic` marker opts a newtype into it. The requirement is
 /// `Zeroize + `[`SentinelValue`](crate::SentinelValue)` + `[`FixedStorage`](crate::FixedStorage), checked at the
-/// declaration — slightly narrower than `Fixed<T>` itself, which needs only
-/// `Zeroize`, because the generated [`into_inner`](crate::RevealSecret::into_inner)
-/// has to leave an inert value behind. Arrays of a `Default` element, `String`
-/// and `Vec<T>` already satisfy both; a custom inner type needs its own
-/// `impl SentinelValue`, which is why that trait is public:
+/// declaration. That is one bound more than [`Fixed::new`](crate::Fixed::new) asks for
+/// (`Zeroize + FixedStorage`): `SentinelValue` is there because the generated
+/// [`into_inner`](crate::RevealSecret::into_inner) has to leave an inert value behind.
+/// Arrays of a `Default`, `FixedStorage` element already satisfy all three; a custom
+/// inner type writes its own `impl SentinelValue` and `impl FixedStorage`, which is why
+/// those traits are public:
 ///
 /// ```rust
 /// use secure_gate::{fixed_newtype, RevealSecret};
@@ -106,9 +107,10 @@
 /// [`Dynamic`](crate::Dynamic), so `Fixed` is the only wrapper, and a secret on
 /// such a target is frequently not bytes: an ML-KEM secret polynomial
 /// `[i16; 256]`, Ed25519 scalar limbs `[u64; 4]`, AES-256 expanded round keys
-/// `[u32; 60]`. An inner type missing either bound is a compile error reported
-/// from the expansion: `Zeroize` fails against `Fixed<T>`'s own bound, and
-/// `SentinelValue` against the one the generated `RevealSecret` restates.
+/// `[u32; 60]`. An inner type missing any of the three bounds is a compile error
+/// reported from the expansion: `Zeroize` fails against `Fixed<T>`'s own bound,
+/// `FixedStorage` against the constructors', and `SentinelValue` against the one the
+/// generated `RevealSecret` restates.
 /// [`dynamic_newtype!`](crate::dynamic_newtype)'s `generic` arm carries the
 /// same pair, for the same reason.
 ///
@@ -142,19 +144,20 @@
 /// would round-trip inside this crate and disagree with every implementation outside
 /// it. RNG is a separate question with a separate answer: the byte-level fill is well
 /// defined, but uniform bits are not a valid ML-KEM coefficient, a reduced scalar, or a
-/// derived round key. It is tracked in #219 rather than settled here.
+/// derived round key. So no `from_random` is generated for this arm; where uniform bits
+/// are a valid value for your type, write the constructor on the newtype yourself with the
+/// generated `new_with`.
 ///
 /// **`generic [u8; N]` is a compile error**, not a reduced byte array. It is the
 /// same payload as `fixed_newtype!(pub K, N)` with strictly less API, and
 /// [`dynamic_newtype!`](crate::dynamic_newtype) already refuses the analogous
 /// spellings (`generic Vec<u8>`, `generic String`). Write the size literal.
 ///
-/// **The inner type must not be able to reallocate.** This arm used to accept
-/// `generic Vec<u8>` and `generic String`, which put a growable buffer inside the
-/// wrapper the documentation calls free of any realloc surface; measured, each
-/// abandoned an unwiped buffer holding the whole secret on any capacity change, and
-/// with no `io::Write` escape of the sort [`Dynamic<Vec<u8>>`](crate::Dynamic) has.
-/// [`Fixed::new`](crate::Fixed::new) now requires
+/// **The inner type must not be able to reallocate.** `generic Vec<u8>` and
+/// `generic String` would put a growable buffer inside the wrapper the documentation
+/// calls free of any realloc surface; measured, each abandons an unwiped buffer holding
+/// the whole secret on any capacity change, and with no `io::Write` escape of the sort
+/// [`Dynamic<Vec<u8>>`](crate::Dynamic) has. [`Fixed::new`](crate::Fixed::new) requires
 /// [`FixedStorage`](crate::FixedStorage), so those forms are a compile error reported
 /// at this declaration. Arrays, the primitives, tuples and `Option` are covered for you,
 /// which is every shape this arm exists for; a custom inner type adds
@@ -285,10 +288,9 @@
 /// reopens whatever the base wrapper implements for that inner type, which on a
 /// `generic` newtype includes the surface the arm withheld: `as_wrapper().len()`
 /// and `.byte_len()` answer for any `Fixed<[T; N]>`. The reduced surface is a
-/// property of the label, not a barrier. This is now worth granting less often than
-/// it was — a literal array gets its own `len()` from the array arm, so reaching for
-/// the outbound token merely to measure a secret is no longer the trade it used to
-/// be. Where it is still the only route is the opaque arm. The exposure is
+/// property of the label, not a barrier. It is rarely worth granting just to measure a
+/// secret: a literal array gets its own `len()` from the array arm. Where it is the
+/// only route is the opaque arm. The exposure is
 /// largest during a partial migration — the regime real consumers live in —
 /// because while most aliases stay plain the base type is a universal donor.
 /// Audit these methods the way you audit `expose_secret()`.

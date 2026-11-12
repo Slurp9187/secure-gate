@@ -68,6 +68,18 @@
 /// Constant-time equality comparison, preventing timing side-channel attacks.
 ///
 /// Requires the `ct-eq` feature. Backed by the [`subtle`] crate internally.
+///
+/// `==` is **deliberately not implemented** on [`Fixed`](crate::Fixed) and
+/// [`Dynamic`](crate::Dynamic): always compare secrets with
+/// [`ct_eq`](ConstantTimeEq::ct_eq).
+///
+/// ```rust
+/// use secure_gate::{ConstantTimeEq, Fixed};
+///
+/// let a = Fixed::new([1u8; 32]);
+/// let b = Fixed::new([1u8; 32]);
+/// assert!(a.ct_eq(&b));
+/// ```
 #[cfg(feature = "ct-eq")]
 pub trait ConstantTimeEq {
     /// Performs equality comparison in constant time.

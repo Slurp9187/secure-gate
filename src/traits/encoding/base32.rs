@@ -51,7 +51,10 @@ use base32ct::{Base32UpperUnpadded, Encoding};
 
 /// Extension trait for encoding byte data as Base32 strings (RFC 4648 §6, uppercase, unpadded).
 ///
-/// *Requires feature `encoding-base32`.*
+/// *Requires features `encoding-base32` and `alloc`.* Every method returns an
+/// [`EncodedSecret`](crate::EncodedSecret). Decode with
+/// [`Fixed::try_from_base32`](crate::Fixed::try_from_base32) or
+/// [`Dynamic::try_from_base32`](crate::Dynamic::try_from_base32).
 ///
 /// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes), and implemented directly on the
 /// byte-shaped wrappers (`Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`). Uses the RFC 4648 §6

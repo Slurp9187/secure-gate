@@ -79,7 +79,9 @@ impl fmt::Display for FromSliceError {
 
 impl core::error::Error for FromSliceError {}
 
-/// Errors produced when decoding Bech32 (BIP-173) or Bech32m (BIP-350) strings.
+/// Errors produced when encoding to, or decoding from, Bech32 (BIP-173) or Bech32m
+/// (BIP-350) strings. The encoders return `InvalidHrp` and `OperationFailed`; the length
+/// and HRP mismatch variants come from decoding only.
 ///
 /// *Requires feature `encoding-bech32`.*
 ///

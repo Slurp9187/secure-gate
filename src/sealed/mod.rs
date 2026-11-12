@@ -50,8 +50,8 @@
 //!
 //! A **linear over-read** from a buffer elsewhere in the process (a C library's,
 //! Heartbleed-style) does not reach the pre-key. It is not on the heap: measured, a 64 KiB
-//! read from a C buffer captured the whole pre-key in every run while it lived there
-//! (rc.14), and none of it in its own mapping. And a read that runs into it faults on its
+//! read from a C buffer captured the whole pre-key in every run when it was kept on the
+//! heap, and none of it in its own mapping. And a read that runs into it faults on its
 //! guard page: measured with readable memory placed directly against the mapping, where the
 //! same read of an unguarded mapping takes all 16 KiB.
 //!

@@ -95,7 +95,10 @@ use crate::error::Bech32Error;
 
 /// Extension trait for encoding byte data as Bech32m (BIP-350) strings.
 ///
-/// *Requires feature `encoding-bech32`.*
+/// *Requires features `encoding-bech32` and `alloc`.* Every method returns an
+/// [`EncodedSecret`](crate::EncodedSecret). Decode with
+/// [`Fixed::try_from_bech32m`](crate::Fixed::try_from_bech32m) or
+/// [`Dynamic::try_from_bech32m`](crate::Dynamic::try_from_bech32m).
 ///
 /// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes). Use [`try_to_bech32m`](Self::try_to_bech32m)
 /// with the protocol's HRP. Test empty and invalid HRP inputs in security-critical code.

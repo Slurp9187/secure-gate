@@ -49,10 +49,11 @@
 //!
 //! # Note for `RevealSecret` Implementors
 //!
-//! Adding `into_inner` to this trait means every `RevealSecret` implementor must provide
-//! an owned-extraction implementation. For wrappers intentionally limited to borrowing
-//! semantics, implement `into_inner` with `unimplemented!()` or a compile-time guard, and
-//! document the design rationale clearly.
+//! `into_inner` is a required method, so every implementor writes one. Its `where` clause
+//! (`Self::Inner: Sized + SentinelValue + Zeroize`) is the compile-time guard: for an
+//! inner type that does not implement [`SentinelValue`](crate::SentinelValue) the method
+//! cannot be called, and no runtime check or panic is needed. A wrapper meant only for
+//! borrowing keeps `SentinelValue` off its inner type.
 //!
 //! # Usage Guidelines
 //!
@@ -137,10 +138,16 @@
 ///
 /// Implemented for **all** [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic),
 /// whatever the inner type — length metadata lives in the narrower [`SecretLen`].
-/// Prefer the scoped [`with_secret`](Self::with_secret) method; use
-/// [`expose_secret`](Self::expose_secret) only when a long-lived reference is
-/// unavoidable. See [`RevealSecretMut`](crate::RevealSecretMut) for the mutable
-/// counterpart.
+/// See [`RevealSecretMut`](crate::RevealSecretMut) for the mutable counterpart.
+///
+/// Access comes in three tiers. Prefer the earliest that does the job:
+///
+/// - **Tier 1** (preferred): [`with_secret`](Self::with_secret) — scoped closure; the
+///   borrow cannot escape.
+/// - **Tier 2** (escape hatch): [`expose_secret`](Self::expose_secret) — a direct
+///   reference, for FFI and third-party APIs that need one.
+/// - **Tier 3** (consumption): [`into_inner`](Self::into_inner) — transfers ownership
+///   of the plain value; protection ends with the call.
 pub trait RevealSecret {
     /// The inner secret type being revealed.
     ///
@@ -280,10 +287,11 @@ pub trait RevealSecret {
     /// where no safe placeholder value exists), `into_inner` is not callable — use
     /// `with_secret` or `expose_secret` instead.
     ///
-    /// The three concrete implementations in this crate all satisfy the bounds:
-    /// - `Fixed<[u8; N]>` — `[u8; N]: SentinelValue + Zeroize` for **any** `N` ✓
+    /// The common shapes in this crate all satisfy the bounds:
+    /// - `Fixed<[u8; N]>` and `Dynamic<[u8; N]>` — `[u8; N]: SentinelValue + Zeroize` for
+    ///   **any** `N` ✓
     /// - `Dynamic<String>` — `String: SentinelValue + Zeroize` ✓
-    /// - `Dynamic<Vec<T>>` — `Vec<T>: SentinelValue + Zeroize` ✓
+    /// - `Dynamic<Vec<T>>` — `Vec<T>: SentinelValue + Zeroize` (for `T: Zeroize`) ✓
     ///
     /// # Allocation Behavior
     ///

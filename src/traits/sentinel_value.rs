@@ -73,7 +73,8 @@
 /// wrappers around them. For inner types where every representable value is
 /// meaningful secret material (i.e. no safe placeholder exists), do not
 /// implement this trait — `into_inner` then stays uncallable for them, which
-/// is the safe default.
+/// is the safe default rather than a missing feature. `with_secret` and
+/// `expose_secret` still work.
 pub trait SentinelValue: Sized {
     /// Returns the inert placeholder value. Must not contain secret material.
     fn sentinel_value() -> Self;

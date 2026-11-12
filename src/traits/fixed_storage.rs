@@ -11,22 +11,21 @@
 //! nothing.
 //!
 //! [`FixedStorage`] is what makes the exemption true. [`Fixed::new`](crate::Fixed::new)
-//! requires it, so the compiler now rejects an inner type that owns a heap allocation.
+//! requires it, so the compiler rejects an inner type that owns a heap allocation.
 //!
 //! # The contract
 //!
 //! Implementing `FixedStorage` for a type asserts that **the type owns no heap
 //! allocation**. Nothing else, and note that this is stricter than "cannot be resized".
 //!
-//! The first version of this trait asked only for a fixed capacity, and blessed `Box<[T]>`
-//! on the reasoning that a boxed slice has its length fixed at construction. That was
-//! wrong, and measurably so: the residue never needed a capacity change. Whole-value
+//! `Box<[T]>` shows why. A boxed slice has its length fixed at construction, so it looks
+//! safe, and it is not: the residue does not need a capacity change. Whole-value
 //! replacement abandons the allocation just as well, and the wrapper wipes whatever it
-//! holds at drop, not what it used to hold. On a `Fixed<Box<[u8]>>` carrying a 1024-byte
-//! secret, `with_secret_mut(|slot| *slot = other_boxed_slice)` released the original block
-//! with **1024 of 1024** bytes intact, and so did the same assignment through
-//! `expose_secret_mut`. The inline contrast, `Fixed<[u8; 1024]>` assigned the same way,
-//! freed nothing at all — there is no allocation to abandon. So `Box<[T]>` is no longer
+//! holds at drop, not what it held before. Measured on a `Fixed<Box<[u8]>>` carrying a
+//! 1024-byte secret, `with_secret_mut(|slot| *slot = other_boxed_slice)` releases the
+//! original block with **1024 of 1024** bytes intact, and so does the same assignment
+//! through `expose_secret_mut`. The inline contrast, `Fixed<[u8; 1024]>` assigned the same
+//! way, frees nothing at all — there is no allocation to abandon. So `Box<[T]>` is not
 //! implemented, and the predicate is heap ownership rather than resizability.
 //!
 //! The test to apply to your own type: *does `Self` own a heap allocation?* If yes, do not
@@ -41,7 +40,7 @@
 //! the `generic` arm of [`fixed_newtype!`](crate::fixed_newtype) exists for — holding a
 //! custom secret on a target with no allocator.
 //!
-//! What the marker buys is that the claim is now *written down at a greppable line* in
+//! What the marker buys is that the claim is *written down at a greppable line* in
 //! the crate making it, rather than being an unstated assumption. That is the same trade
 //! the other opt-in markers in this crate make.
 //!
@@ -118,12 +117,25 @@
 
 /// Marker trait asserting that a type owns no heap allocation.
 ///
-/// Required by [`Fixed::new`](crate::Fixed::new). See the
-/// [module documentation](self) for the contract, for what is already implemented,
-/// and for why this is an assertion rather than an enforcement.
-///
 /// No methods — its only purpose is to gate construction of a
-/// [`Fixed<T>`](crate::Fixed).
+/// [`Fixed<T>`](crate::Fixed). [`Fixed::new`](crate::Fixed::new) requires it, which is
+/// what makes the claim that `Fixed<T>` has no reallocation surface true: `Fixed<Vec<u8>>`
+/// and `Fixed<String>` cannot be built, where they would otherwise abandon an unwiped
+/// buffer holding the whole secret on any capacity change.
+///
+/// Implemented for the primitives and the `NonZero` integers, `[T; N]` for any `N`, tuples
+/// up to ten elements, `Option<T>`, `Wrapping<T>`, `MaybeUninit<T>`, `Zeroizing<T>` and
+/// `Fixed<T>` itself. Nothing heap-owning is implemented: `Vec<T>`, `String` and `Box<[T]>`
+/// are all absent, because the residue does not need a capacity change — replacing the
+/// whole value abandons the allocation too, measured at 1024 of 1024 bytes through a
+/// `Fixed<Box<[u8]>>`. For a heap-backed secret use [`Dynamic`](crate::Dynamic), which
+/// documents the residue and offers the one safe growth path.
+///
+/// A custom inner type writes `impl FixedStorage for MyKey {}`. The compiler checks that
+/// you made the claim, not that it is true. The test to apply: *does the type own a heap
+/// allocation?* If it does, do not implement this. The
+/// [module documentation](crate::traits::fixed_storage) has the full contract and why
+/// this is an assertion rather than an enforcement.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not known to be free of heap allocations, so it cannot be the inner type of a `Fixed`",
     label = "`Fixed` holds its secret inline; `{Self}` does not implement `FixedStorage`",

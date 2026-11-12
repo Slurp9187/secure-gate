@@ -274,7 +274,8 @@ breaking ones, are in [CHANGELOG.md](https://github.com/Slurp9187/secure-gate/bl
 From 0.9.0, the public API follows semantic versioning within the 0.9 line: a 0.9.x release
 adds, and does not remove or change. The promise covers the items exported from the crate
 root and from `traits`, `sealed` and `scoped`, the input grammar of the macros, and each
-feature's name and what it enables.
+feature's name and what it enables. Import from the crate root: the deeper module paths
+under `traits` (such as `traits::reveal_secret::RevealSecret`) compile, and are not covered.
 
 - **Features.** `full` stays as listed above. It will not grow to include `std` or `sealed`,
   so it remains usable on `no_std` targets.

@@ -30,10 +30,10 @@
 ///
 /// **`ConstantTimeEq` is not an option on the `String` and `Vec<u8>` arms, and
 /// naming it is an error.** Both wrappers implement it whenever the `ct-eq` feature
-/// is on, so a plain `type Name = Dynamic<String>;` always had
-/// [`ct_eq`](crate::ConstantTimeEq::ct_eq) and the newtype — the spelling this crate
-/// recommends as the safer of the two — did not. Since these arms now emit the impl
-/// themselves, a second one from the `derive:` list is `E0119: conflicting
+/// is on, so a plain `type Name = Dynamic<String>;` has
+/// [`ct_eq`](crate::ConstantTimeEq::ct_eq), and the newtype — the spelling this crate
+/// recommends as the safer of the two — should not cost a token more. Since these arms
+/// emit the impl themselves, a second one from the `derive:` list is `E0119: conflicting
 /// implementations` — delete the token. It stays a real opt-in on the `generic` arm,
 /// where the inner type may or may not implement the trait.
 ///
@@ -142,17 +142,17 @@
 /// own `len()`, not the answer. Writing the marker is how you say you know
 /// that.
 ///
-/// It also has no `new_with`, which the `Vec<u8>` arm does get, and the reason is
-/// sharper than it used to be. [`fixed_newtype!`](crate::fixed_newtype)'s generic arm
+/// It also has no `new_with`, which the `Vec<u8>` arm does get.
+/// [`fixed_newtype!`](crate::fixed_newtype)'s generic arm
 /// *does* forward [`Fixed::new_with`](crate::Fixed::new_with), because that constructor
-/// is generic over any `T: SentinelValue` — it hands the closure the inner value itself.
+/// is generic over any `T: FixedStorage + SentinelValue` — it hands the closure the inner value itself.
 /// `Dynamic::new_with` hands a sized **byte slot**, `FnOnce(&mut [u8])`, which is what
 /// makes growth inexpressible and the reallocation hazard impossible. A byte slot is
 /// meaningless for an arbitrary inner type, so there is nothing here to forward. `new`
 /// takes its value by value — and *moves* the allocation rather than copying it, so
 /// build it pre-sized and as close to the call as you can.
 ///
-/// The `String` arm has no `new_with` either, as of 0.9.0-rc.12, and cannot: a `String`
+/// The `String` arm has no `new_with` either, and cannot: a `String`
 /// must hold valid UTF-8 and characters have variable byte widths, so a fixed byte
 /// window is not somewhere arbitrary text can be written.
 ///
@@ -175,7 +175,7 @@
 /// legitimate value to hold before validation — so there is nothing for a
 /// compile-time check to decide. That leaves one real gap: a statically
 /// zero-sized inner type. `Dynamic<Zst>` for a zero-sized `Zst` constructs
-/// happily, where `Fixed<Zst>` is now rejected. Validate expected lengths in
+/// happily, where `Fixed<Zst>` is rejected. Validate expected lengths in
 /// your own tests, and do not reach for a zero-sized inner type expecting to be
 /// stopped.
 ///
