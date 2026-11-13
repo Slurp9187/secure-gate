@@ -885,7 +885,7 @@ dependencies = [
 
 [[package]]
 name = "secure-gate"
-version = "0.9.0-rc.18"
+version = "0.9.0-rc.19"
 dependencies = [
  "aes",
  "base16ct",

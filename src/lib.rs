@@ -125,7 +125,8 @@
 //! │                           (decoding: the `try_from_*` constructors on Fixed / Dynamic)
 //! ├── sealed/               ← SealedFixed, SealedDynamic, Prekey, LockError (sealed feature)
 //! ├── scoped                ← RevealScoped (sealed feature; not at the root, see below)
-//! ├── macros/               ← fixed_newtype!, dynamic_newtype!, sealed_fixed_newtype!
+//! ├── macros/               ← fixed_newtype!, dynamic_newtype!, sealed_fixed_newtype!,
+//! │                           sealed_dynamic_newtype!
 //! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error
 //! ```
 //!
@@ -389,6 +390,19 @@ pub mod __private {
     /// The `SealedFixed<N>` a role seals into.
     #[cfg(feature = "sealed")]
     pub type SealedOf<R> = <<R as FixedRole>::Fixed as SealableFixed>::Sealed;
+
+    /// A `dynamic_newtype!` `String` or `Vec<u8>` role, convertible to and from the
+    /// `Dynamic` it wraps by moving the box, never the bytes. Lets `sealed_dynamic_newtype!`
+    /// seal a role directly.
+    #[cfg(feature = "sealed")]
+    pub trait DynamicRole: Sized {
+        /// `String` or `Vec<u8>`.
+        type Payload: crate::sealed::SealedPayload;
+        /// Unwraps the role.
+        fn into_dynamic(self) -> crate::Dynamic<Self::Payload>;
+        /// Wraps a `Dynamic` as the role.
+        fn from_dynamic(dynamic: crate::Dynamic<Self::Payload>) -> Self;
+    }
 }
 
 /// Heap-allocated secret wrapper with explicit access and automatic zeroization on drop.

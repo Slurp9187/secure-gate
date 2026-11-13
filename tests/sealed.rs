@@ -5,9 +5,14 @@
 use std::sync::Arc;
 
 use secure_gate::{
-    Dynamic, Fixed, Prekey, RevealSecret, SealedDynamic, SealedFixed, fixed_newtype,
-    sealed_fixed_newtype,
+    Dynamic, Fixed, Prekey, RevealSecret, SealedDynamic, SealedFixed, dynamic_newtype,
+    fixed_newtype, sealed_dynamic_newtype, sealed_fixed_newtype,
 };
+
+dynamic_newtype!(pub Password, String, "A login password.");
+dynamic_newtype!(pub Blob, Vec<u8>, "A variable-length key blob.");
+sealed_dynamic_newtype!(pub SealedPassword, Password, "A login password, sealed.");
+sealed_dynamic_newtype!(pub SealedBlob, Blob);
 
 fixed_newtype!(pub AppKey, 32, "The app key.");
 fixed_newtype!(pub DbKey, 32, "A database key.");
@@ -214,6 +219,101 @@ fn a_panic_inside_with_role_mut_leaves_the_sealed_role_unchanged() {
     }));
     assert!(result.is_err());
     s.with_secret(|b| assert_eq!(b[0], 1));
+}
+
+#[test]
+fn sealed_dynamic_roles_seal_and_unseal_their_own_role() {
+    let prekey = Prekey::new();
+    let mut s = SealedPassword::seal(Password::from("hunter2"), &prekey);
+    assert_eq!(s.len(), 7);
+    assert!(!s.is_empty());
+    s.with_secret(|p: &String| assert_eq!(p, "hunter2"));
+    s.with_secret_mut(|p: &mut str| p.make_ascii_uppercase());
+    let back: Password = s.unseal();
+    back.with_secret(|p| assert_eq!(p, "HUNTER2"));
+
+    let mut b = SealedBlob::seal(Blob::from(&[1u8, 2, 3][..]), &prekey);
+    b.with_secret_mut(|v: &mut [u8]| v[0] = 9);
+    let back: Blob = b.unseal();
+    back.with_secret(|v| assert_eq!(v.as_slice(), &[9, 2, 3]));
+
+    let empty = SealedBlob::seal(Blob::from(&[][..]), &prekey);
+    assert!(empty.is_empty());
+    empty.with_role(|r: &Blob| r.with_secret(|v| assert!(v.is_empty())));
+}
+
+#[test]
+fn with_role_hands_the_dynamic_role() {
+    fn long_enough(p: &Password) -> bool {
+        p.with_secret(|s| s.len() >= 7)
+    }
+    let prekey = Prekey::new();
+    let s = SealedPassword::seal(Password::from("hunter2"), &prekey);
+    assert!(s.with_role(long_enough));
+    // Opening does not consume or change the sealed value.
+    assert!(s.with_role(long_enough));
+    s.with_secret(|p| assert_eq!(p, "hunter2"));
+}
+
+#[test]
+fn a_panic_inside_a_dynamic_role_closure_leaves_the_sealed_role_unchanged() {
+    let prekey = Prekey::new();
+    let mut s = SealedPassword::seal(Password::from("abc"), &prekey);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        s.with_secret_mut(|p: &mut str| {
+            p.make_ascii_uppercase();
+            panic!("closure failed");
+        })
+    }));
+    assert!(result.is_err());
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        s.with_role(|_: &Password| panic!("closure failed"))
+    }));
+    assert!(result.is_err());
+    s.with_secret(|p| assert_eq!(p, "abc"));
+}
+
+#[cfg(feature = "ct-eq")]
+#[test]
+fn sealed_dynamic_roles_compare_plaintext() {
+    use secure_gate::ConstantTimeEq;
+    let (p1, p2) = (Prekey::new(), Prekey::new());
+    let a = SealedPassword::seal(Password::from("same"), &p1);
+    let b = SealedPassword::seal(Password::from("same"), &p2);
+    let c = SealedPassword::seal(Password::from("diff"), &p2);
+    assert!(a.ct_eq(&b));
+    assert!(!a.ct_eq(&c));
+}
+
+#[test]
+fn sealed_dynamic_roles_redact_debug_and_are_send_sync() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<SealedPassword>();
+    assert_send_sync::<SealedBlob>();
+    let prekey = Prekey::new();
+    let s = SealedPassword::seal(Password::from("hunter2"), &prekey);
+    assert_eq!(format!("{s:?}"), "[REDACTED]");
+}
+
+fn text_len<S: secure_gate::scoped::RevealScoped<Inner = String>>(s: &S) -> usize {
+    secure_gate::scoped::RevealScoped::with_secret(s, |p| p.len())
+}
+
+#[test]
+fn reveal_scoped_takes_plain_sealed_and_dynamic_role_types_alike() {
+    let prekey = Prekey::new();
+    assert_eq!(text_len(&Dynamic::<String>::new(String::from("ab"))), 2);
+    assert_eq!(
+        text_len(&SealedDynamic::seal(
+            Dynamic::<String>::new(String::from("abc")),
+            &prekey
+        )),
+        3
+    );
+    assert_eq!(
+        text_len(&SealedPassword::seal(Password::from("abcd"), &prekey)),
+        4
+    );
 }
 
 fn first_byte<S: secure_gate::scoped::RevealScoped<Inner = [u8; 32]>>(s: &S) -> u8 {

@@ -36,7 +36,7 @@ secure-gate = "0.9.0-rc"                                                        
 
 A caret requirement matches a pre-release only when it names one: `"0.9"` resolves to
 nothing until 0.9.0 ships, while `"0.9.0-rc"` tracks the newest candidate. Pin
-`"=0.9.0-rc.18"` when `cargo update` must stay put. On Rust older than 1.87, use
+`"=0.9.0-rc.19"` when `cargo update` must stay put. On Rust older than 1.87, use
 `secure-gate = "0.8.0-rc"` (the `release/0.8` line, MSRV 1.70).
 <!-- Every concrete version in this file equals the version in Cargo.toml; bump them in the
      same commit. The install lines use the tracking form and carry no version. -->
@@ -106,6 +106,7 @@ your own `rand = "0.10"` dependency; any RNG that can fill a byte slice works.
 | A password, token or other variable-length secret | `dynamic_newtype!(pub Name, String, "…")` | On the heap (`alloc`); spare capacity is wiped too |
 | A secret with no role to confuse it with | `pub type Name = Fixed<[u8; 32]>;` or `pub type Name = Dynamic<String>;` | Same protection; an alias is interchangeable with its base type |
 | A long-lived key in a process that may be read while it idles | `SealedFixed` / `sealed_fixed_newtype!` (`sealed`) | Held encrypted in RAM, opened for one closure call at a time |
+| A long-lived password or other variable-length secret, likewise | `SealedDynamic` / `sealed_dynamic_newtype!` (`sealed`) | The same, on the heap |
 
 ## Features
 
@@ -118,7 +119,7 @@ your own `rand = "0.10"` dependency; any RNG that can fill a byte slice works.
 | `encoding` | All of `encoding-hex`, `-base32`, `-base64`, `-bech32`; see [Encoding](#encoding) |
 | `serde` | `serde-deserialize` (1 MiB default limit) and `serde-serialize` (opt-in per type via `SerializableSecret`) |
 | `cloneable` | Opt-in cloning via `CloneableSecret` |
-| `sealed` | `SealedFixed`, `SealedDynamic`, `sealed_fixed_newtype!` and `Prekey` (implies `std`, `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`) |
+| `sealed` | `SealedFixed`, `SealedDynamic`, `sealed_fixed_newtype!`, `sealed_dynamic_newtype!` and `Prekey` (implies `std`, `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`) |
 | `full` | Everything except `std` and `sealed` |
 
 `no_std` unless `std` is enabled. `Fixed` and its decoders work without an allocator.

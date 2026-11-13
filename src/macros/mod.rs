@@ -37,6 +37,8 @@
 //! |--------------------------------|-------------------------------|----------|---------|
 //! | [`fixed_newtype!`]             | `struct` over `Fixed<[u8; N]>`, or over `Fixed<T>` with `generic T` | **Yes** | Always |
 //! | [`dynamic_newtype!`]           | `struct` over `Dynamic<T>`, or the same with `generic T` | **Yes** | `alloc` |
+//! | [`sealed_fixed_newtype!`](crate::sealed_fixed_newtype) | `struct` over `SealedFixed<N>`, for a `fixed_newtype!` byte role | **Yes** | `sealed` |
+//! | [`sealed_dynamic_newtype!`](crate::sealed_dynamic_newtype) | `struct` over `SealedDynamic<T>`, for a `dynamic_newtype!` `String` or `Vec<u8>` role | **Yes** | `sealed` |
 //! | `type Name = Fixed<[u8; N]>;`  | a second name for the wrapper | No       | Always  |
 //! | `type Name = Dynamic<T>;`      | a second name for the wrapper | No       | `alloc` |
 //!
@@ -101,4 +103,5 @@
 mod dynamic_newtype;
 mod fixed_newtype;
 mod newtype_common;
+mod sealed_dynamic_newtype;
 mod sealed_fixed_newtype;

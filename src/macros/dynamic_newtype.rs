@@ -347,6 +347,18 @@ macro_rules! dynamic_newtype {
             #[inline]
             fn from(s: &str) -> Self { Self(<$crate::Dynamic<$crate::__private::String>>::from(s)) }
         }
+
+        // Lets `sealed_dynamic_newtype!` seal this role, and unseal back to it, by moving
+        // the `Dynamic` (one pointer) across instead of copying the bytes out by hand.
+        $crate::__sg_if_sealed! {
+            impl $crate::__private::DynamicRole for $name {
+                type Payload = $crate::__private::String;
+                #[inline(always)]
+                fn into_dynamic(self) -> $crate::Dynamic<Self::Payload> { self.0 }
+                #[inline(always)]
+                fn from_dynamic(dynamic: $crate::Dynamic<Self::Payload>) -> Self { Self(dynamic) }
+            }
+        }
     };
 
     // ---- Vec<u8> arm ----
@@ -364,6 +376,18 @@ macro_rules! dynamic_newtype {
         impl ::core::convert::From<&[u8]> for $name {
             #[inline]
             fn from(s: &[u8]) -> Self { Self(<$crate::Dynamic<$crate::__private::Vec<u8>>>::from(s)) }
+        }
+
+        // Lets `sealed_dynamic_newtype!` seal this role, and unseal back to it, by moving
+        // the `Dynamic` (one pointer) across instead of copying the bytes out by hand.
+        $crate::__sg_if_sealed! {
+            impl $crate::__private::DynamicRole for $name {
+                type Payload = $crate::__private::Vec<u8>;
+                #[inline(always)]
+                fn into_dynamic(self) -> $crate::Dynamic<Self::Payload> { self.0 }
+                #[inline(always)]
+                fn from_dynamic(dynamic: $crate::Dynamic<Self::Payload>) -> Self { Self(dynamic) }
+            }
         }
         impl $name {
             /// Writes into a sized, pre-zeroed slot inside the wrapper's own storage.
