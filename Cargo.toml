@@ -145,7 +145,10 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-# Default: give users the most useful experience out of the box
+# There is no `no_std` feature: the crate is `no_std` whenever `std` is off. Three tiers:
+#   default-features = false   core only          Fixed
+#   default (alloc)            core + alloc       + Dynamic, string encoders, serde
+#   std                        all of std         + the std::io impls
 default = ["alloc"]
 
 # Enables heap allocation (Dynamic<T>, Box, Vec, String) + full zeroization of spare capacity.
@@ -159,7 +162,9 @@ alloc = [
     "bech32?/alloc",
 ]
 
-# Full std support (implies alloc). Enables std::io::Read/Write for Dynamic<Vec<u8>>.
+# Implies alloc. Adds only std::io impls: Write for Dynamic<Vec<u8>> and SlotWriter, and
+# Dynamic::as_reader() (Read). Changes no wipe that exists without it; that Write impl wipes
+# each buffer it outgrows.
 std = ["alloc"]
 
 # Rand: secure random generation

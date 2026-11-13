@@ -29,8 +29,8 @@ Don't route around it with `.to_vec()`, `*bytes` or `.to_string()`; name the exi
 
 ```toml
 [dependencies]
-secure-gate = "0.9.0-rc"                                                        # default: alloc
-# secure-gate = { version = "0.9.0-rc", default-features = false }             # no heap, no_std
+secure-gate = "0.9.0-rc"                                                        # default: heap on (`alloc`)
+# secure-gate = { version = "0.9.0-rc", default-features = false }             # heap off: `Fixed` only
 # secure-gate = { version = "0.9.0-rc", features = ["full"] }                  # batteries included
 ```
 
@@ -112,7 +112,7 @@ your own `rand = "0.10"` dependency; any RNG that can fill a byte slice works.
 | Feature | Adds |
 |---|---|
 | `alloc` _(default)_ | `Dynamic<T>`, including wiping `Vec` / `String` spare capacity |
-| `std` | `std::io::Read` / `Write` for `Dynamic<Vec<u8>>` (implies `alloc`) |
+| `std` | `std::io::Write` for `Dynamic<Vec<u8>>` and `SlotWriter`, and `Dynamic::as_reader()` (`std::io::Read`). Implies `alloc` |
 | `rand` | `from_random()` (system RNG); heap-free for `Fixed`. For an RNG you supply, use `try_new_with(\|b\| rng.try_fill_bytes(b))`, which needs no feature |
 | `ct-eq` | `ConstantTimeEq` via `subtle` |
 | `encoding` | All of `encoding-hex`, `-base32`, `-base64`, `-bech32`; see [Encoding](#encoding) |
@@ -121,7 +121,35 @@ your own `rand = "0.10"` dependency; any RNG that can fill a byte slice works.
 | `sealed` | `SealedFixed`, `SealedDynamic`, `sealed_fixed_newtype!` and `Prekey` (implies `std`, `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`) |
 | `full` | Everything except `std` and `sealed` |
 
-`no_std` unless `std` is enabled. `Fixed` and its decoders work without an allocator.
+### `std`, `alloc` and `no_std`
+
+There is no `no_std` feature. The crate is `no_std` whenever `std` is off, which it is by
+default, and two features decide how much of the standard library it uses:
+
+| In `Cargo.toml` | Uses | You get |
+|---|---|---|
+| `default-features = false` | `core` only: no heap, no OS | `Fixed` and its decoders |
+| nothing (the default, `alloc`) | `core` + `alloc`: a heap, still no OS | adds `Dynamic`, the string encoders and `serde` |
+| `features = ["std"]` | all of `std` | adds `std::io::Write` on `Dynamic<Vec<u8>>` and `SlotWriter`, and `Dynamic::as_reader()` |
+
+`alloc` is the only default feature, so turning the defaults off is how you turn the heap off.
+List what you still want after it:
+
+```toml
+secure-gate = { version = "0.9.0-rc", default-features = false, features = ["ct-eq", "encoding-hex"] }
+```
+
+- `rand`, `ct-eq`, `cloneable` and the `encoding-*` features work without `alloc`. The
+  encodings then decode into a `Fixed`; producing an encoded string needs `alloc`.
+- `serde`, `serde-serialize`, `serde-deserialize` and `full` turn `alloc` on. `sealed` turns
+  `std` on, and `std` turns `alloc` on.
+- Cargo features only add. If any crate in your build enables `alloc` or `std` on
+  `secure-gate`, it is on for the whole build.
+- No wipe gets weaker or stronger with the tier. `alloc` brings `Vec` and `String` into the
+  crate together with the wiping of their spare capacity. `std` changes nothing that exists
+  without it; its `io::Write` on `Dynamic<Vec<u8>>` wipes each buffer it outgrows, which
+  makes it the way to build a secret whose length is not known up front (see
+  [SECURITY.md](SECURITY.md)).
 
 ## Encoding
 
