@@ -455,7 +455,7 @@ deployment, redact at the logging boundary.
 | `serde-serialize` | Writes the full secret into buffers this crate cannot reach. Opt-in per type via `SerializableSecret`. | Enable sparingly; audit every impl |
 | `encoding`, `encoding-*` | Constant-time hex, Base32 and Base64url via RustCrypto backends; bech32 via `bech32`. Encoders need `alloc`; `Fixed::try_from_*` does not. | Enable per format |
 | `cloneable` | Opt-in cloning via `CloneableSecret`. Each clone is a wrapper and wipes itself. | Use minimally |
-| `sealed` | See §3. Implies `std` and `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`. Every dependency holding key, keystream, MAC or hash state has its `zeroize` feature on. | For long-held keys |
+| `sealed` | See §3. `SealedFixed`, `SealedDynamic`, `sealed_fixed_newtype!`, `sealed_dynamic_newtype!`. Implies `std` and `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`. Every dependency holding key, keystream, MAC or hash state has its `zeroize` feature on. | For long-held keys |
 | `full` | Everything except `std` and `sealed` | Convenient; audit what you use |
 
 ## Other notes

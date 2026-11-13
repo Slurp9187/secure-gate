@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0-rc.19] - Unreleased
+
+### Added
+- **`sealed_dynamic_newtype!`**, the sealed counterpart of a `dynamic_newtype!` role, beside
+  `sealed_fixed_newtype!` (`sealed` feature).
+  `sealed_dynamic_newtype!(pub SealedPassword, Password, "doc")` gives
+  `SealedPassword::seal(Password, &prekey)`, `with_role(|p: &Password| ..)` for code that
+  takes the role rather than a `String` or bytes, `with_secret`, `with_secret_mut`, and
+  `unseal() -> Password`; it accepts and hands out no other role (compile-fail doctests).
+  `Role` is a `String` or `Vec<u8>` role; a `generic` role cannot be sealed.
+  - There is deliberately no `with_role_mut`. A `&mut Role` reaches `&mut String` /
+    `&mut Vec<u8>`, which can grow, and growth frees the old plaintext buffer unwiped.
+    `with_secret_mut` hands out `&mut str` / `&mut [u8]`, as on `SealedDynamic`. To change
+    the length, `unseal`, edit and seal again.
+  - `with_role` moves the decrypted `Dynamic` into the role (one pointer, no byte copy) and
+    the role's `Drop` wipes the buffer, on unwind too. `tests/heap_zeroize.rs` checks that at
+    the allocator for `seal`, `with_role` and `unseal`, for both payloads.
+  - `dynamic_newtype!`'s `String` and `Vec<u8>` forms gain a hidden conversion trait impl
+    under `sealed`, as `fixed_newtype!` has, so the `Dynamic` moves across.
+
+### Documentation
+- README and the crate docs explain the `std` / `alloc` / `no_std` tiers in one table: there
+  is no `no_std` feature, `default-features = false` turns the heap off, which features turn
+  `alloc` back on, and no wipe gets weaker with the tier. The `std` row names what it adds
+  (`io::Write` on `Dynamic<Vec<u8>>` and `SlotWriter`, `Dynamic::as_reader()`).
+- README "Which type?" and "Sealed memory" list every sealed type, with a doctest that seals
+  with each.
+- README and SECURITY.md: "Leaving it is named" is now "Reaching it is named" and lists
+  `with_secret` beside the exits.
+
 ## [0.9.0-rc.18] - 2026-11-12
 
 ### Changed
