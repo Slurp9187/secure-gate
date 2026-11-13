@@ -212,7 +212,7 @@
 //! | Feature | Default | Description |
 //! |---------|---------|-------------|
 //! | `alloc` | **yes** | Heap types ([`Dynamic<T>`]), `Vec`/`String` zeroization |
-//! | `std` | no | Full `std` support (implies `alloc`) |
+//! | `std` | no | `std::io::Write` on `Dynamic<Vec<u8>>` and [`SlotWriter`], and `Dynamic::as_reader()` (implies `alloc`) |
 //! | | | **Cryptographic** |
 //! | `ct-eq` | no | [`ConstantTimeEq`] via `subtle` — timing-safe comparison |
 //! | `rand` | no | `from_random()` (system RNG) — `no_std` for [`Fixed`] |
@@ -248,12 +248,29 @@
 //! encoding traits ([`ToHex`], etc.), the `Dynamic::try_from_*` decoders,
 //! [`dynamic_newtype!`], serde support.
 //!
-//! # `no_std`
+//! # `std`, `alloc` and `no_std`
 //!
-//! `no_std` compatible (`#![no_std]` unless the `std` feature is enabled — verified in CI
-//! by cross-building for `thumbv7em-none-eabihf`). [`Fixed<T>`] works without `alloc`.
-//! Enable `alloc` (default) for [`Dynamic<T>`]. For pure stack / embedded builds, use
-//! `default-features = false`. MSRV: **1.87** (Rust edition 2024).
+//! There is no `no_std` feature. The crate is `#![no_std]` whenever the `std` feature is
+//! off, which it is by default (verified in CI by cross-building for
+//! `thumbv7em-none-eabihf`). Two features decide how much of the standard library it uses:
+//!
+//! | In `Cargo.toml` | Uses | You get |
+//! |---|---|---|
+//! | `default-features = false` | `core` only: no heap, no OS | [`Fixed<T>`] and its decoders |
+//! | nothing (the default, `alloc`) | `core` + `alloc`: a heap, still no OS | adds [`Dynamic<T>`], the string encoders and serde |
+//! | `features = ["std"]` | all of `std` | adds the `std::io` impls |
+//!
+//! `alloc` is the only default feature, so `default-features = false` is how the heap is
+//! turned off. `serde`, `serde-serialize`, `serde-deserialize` and `full` turn `alloc` back
+//! on; `sealed` turns on `std`, which turns on `alloc`. Cargo features only add: if any
+//! crate in a build enables `alloc` or `std` here, it is on for the whole build.
+//!
+//! No wipe gets weaker or stronger with the tier. `alloc` brings `Vec` and `String` into
+//! the crate together with the wiping of their spare capacity. `std` changes nothing that
+//! exists without it; its `io::Write` on `Dynamic<Vec<u8>>` wipes each buffer it outgrows,
+//! which makes it the way to build a secret whose length is not known up front.
+//!
+//! MSRV: **1.87** (Rust edition 2024).
 //!
 //! One caveat: the `rand` feature compiles without `std` or `alloc`, but
 //! [`Fixed::from_random`] relies on `getrandom`, which needs a platform entropy backend.

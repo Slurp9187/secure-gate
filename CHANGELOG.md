@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `dynamic_newtype!`'s `String` and `Vec<u8>` forms gain a hidden conversion trait impl
     under `sealed`, as `fixed_newtype!` has, so the `Dynamic` moves across.
 
+### Documentation
+- README and the crate docs explain the `std` / `alloc` / `no_std` tiers in one table: there
+  is no `no_std` feature, `default-features = false` turns the heap off, which features turn
+  `alloc` back on, and no wipe gets weaker with the tier. The `std` row names what it adds
+  (`io::Write` on `Dynamic<Vec<u8>>` and `SlotWriter`, `Dynamic::as_reader()`).
+- README "Which type?" and "Sealed memory" list every sealed type, with a doctest that seals
+  with each.
+- README and SECURITY.md: "Leaving it is named" is now "Reaching it is named" and lists
+  `with_secret` beside the exits.
+
 ## [0.9.0-rc.18] - 2026-11-12
 
 ### Changed

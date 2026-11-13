@@ -8,8 +8,9 @@ to copy a secret out; a secret nobody can read is useless. So the rule is:
 
 - **The easy path is safe.** The obvious way to hold, decode, encode or compare a secret
   keeps it wrapped, wiped and redacted.
-- **Leaving it is named.** Every way out (`expose_secret`, `into_inner`, `into_zeroizing`,
-  `as_reader`) is a call you can grep for and a reviewer can see.
+- **Reaching it is named.** Every way to the secret, from the scoped `with_secret` to the
+  exits (`expose_secret`, `into_inner`, `into_zeroizing`, `as_reader`), is a call you can
+  grep for and a reviewer can see.
 
 If the friction feels like it is in your way, that is the library working. Don't route
 around it with `.to_vec()`, `*bytes` or `.to_string()`; name the exit instead, or keep the

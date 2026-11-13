@@ -20,8 +20,9 @@ to copy a secret out; a secret nobody can read is useless. So:
 
 - **The easy path is safe.** The obvious way to hold, decode, encode or compare a secret
   keeps it wrapped, wiped and redacted.
-- **Leaving it is named.** Every way out (`expose_secret`, `into_inner`, `into_zeroizing`,
-  `as_reader`) is a call you can grep for and a reviewer can see.
+- **Reaching it is named.** Every way to the secret, from the scoped `with_secret` to the
+  exits (`expose_secret`, `into_inner`, `into_zeroizing`, `as_reader`), is a call you can
+  grep for and a reviewer can see.
 
 Don't route around it with `.to_vec()`, `*bytes` or `.to_string()`; name the exit instead.
 
@@ -29,8 +30,8 @@ Don't route around it with `.to_vec()`, `*bytes` or `.to_string()`; name the exi
 
 ```toml
 [dependencies]
-secure-gate = "0.9.0-rc"                                                        # default: alloc
-# secure-gate = { version = "0.9.0-rc", default-features = false }             # no heap, no_std
+secure-gate = "0.9.0-rc"                                                        # default: heap on (`alloc`)
+# secure-gate = { version = "0.9.0-rc", default-features = false }             # heap off: `Fixed` only
 # secure-gate = { version = "0.9.0-rc", features = ["full"] }                  # batteries included
 ```
 
@@ -105,15 +106,15 @@ your own `rand = "0.10"` dependency; any RNG that can fill a byte slice works.
 | A key or other fixed-size secret | `fixed_newtype!(pub Name, 32, "…")` | On the stack, `no_std`, and a distinct type per role |
 | A password, token or other variable-length secret | `dynamic_newtype!(pub Name, String, "…")` | On the heap (`alloc`); spare capacity is wiped too |
 | A secret with no role to confuse it with | `pub type Name = Fixed<[u8; 32]>;` or `pub type Name = Dynamic<String>;` | Same protection; an alias is interchangeable with its base type |
-| A long-lived key in a process that may be read while it idles | `SealedFixed` / `sealed_fixed_newtype!` (`sealed`) | Held encrypted in RAM, opened for one closure call at a time |
-| A long-lived password or other variable-length secret, likewise | `SealedDynamic` / `sealed_dynamic_newtype!` (`sealed`) | The same, on the heap |
+| A long-lived key in a process that may be read while it idles | `sealed_fixed_newtype!(pub Name, Role, "…")`, or `SealedFixed<32>` when there is no role (`sealed`) | Held encrypted in RAM, opened for one closure call at a time |
+| A long-lived password or other variable-length secret, likewise | `sealed_dynamic_newtype!(pub Name, Role, "…")`, or `SealedDynamic<String>` / `SealedDynamic<Vec<u8>>` when there is no role (`sealed`) | The same, on the heap |
 
 ## Features
 
 | Feature | Adds |
 |---|---|
 | `alloc` _(default)_ | `Dynamic<T>`, including wiping `Vec` / `String` spare capacity |
-| `std` | `std::io::Read` / `Write` for `Dynamic<Vec<u8>>` (implies `alloc`) |
+| `std` | `std::io::Write` for `Dynamic<Vec<u8>>` and `SlotWriter`, and `Dynamic::as_reader()` (`std::io::Read`). Implies `alloc` |
 | `rand` | `from_random()` (system RNG); heap-free for `Fixed`. For an RNG you supply, use `try_new_with(\|b\| rng.try_fill_bytes(b))`, which needs no feature |
 | `ct-eq` | `ConstantTimeEq` via `subtle` |
 | `encoding` | All of `encoding-hex`, `-base32`, `-base64`, `-bech32`; see [Encoding](#encoding) |
@@ -122,7 +123,35 @@ your own `rand = "0.10"` dependency; any RNG that can fill a byte slice works.
 | `sealed` | `SealedFixed`, `SealedDynamic`, `sealed_fixed_newtype!`, `sealed_dynamic_newtype!` and `Prekey` (implies `std`, `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`) |
 | `full` | Everything except `std` and `sealed` |
 
-`no_std` unless `std` is enabled. `Fixed` and its decoders work without an allocator.
+### `std`, `alloc` and `no_std`
+
+There is no `no_std` feature. The crate is `no_std` whenever `std` is off, which it is by
+default, and two features decide how much of the standard library it uses:
+
+| In `Cargo.toml` | Uses | You get |
+|---|---|---|
+| `default-features = false` | `core` only: no heap, no OS | `Fixed` and its decoders |
+| nothing (the default, `alloc`) | `core` + `alloc`: a heap, still no OS | adds `Dynamic`, the string encoders and `serde` |
+| `features = ["std"]` | all of `std` | adds `std::io::Write` on `Dynamic<Vec<u8>>` and `SlotWriter`, and `Dynamic::as_reader()` |
+
+`alloc` is the only default feature, so turning the defaults off is how you turn the heap off.
+List what you still want after it:
+
+```toml
+secure-gate = { version = "0.9.0-rc", default-features = false, features = ["ct-eq", "encoding-hex"] }
+```
+
+- `rand`, `ct-eq`, `cloneable` and the `encoding-*` features work without `alloc`. The
+  encodings then decode into a `Fixed`; producing an encoded string needs `alloc`.
+- `serde`, `serde-serialize`, `serde-deserialize` and `full` turn `alloc` on. `sealed` turns
+  `std` on, and `std` turns `alloc` on.
+- Cargo features only add. If any crate in your build enables `alloc` or `std` on
+  `secure-gate`, it is on for the whole build.
+- No wipe gets weaker or stronger with the tier. `alloc` brings `Vec` and `String` into the
+  crate together with the wiping of their spare capacity. `std` changes nothing that exists
+  without it; its `io::Write` on `Dynamic<Vec<u8>>` wipes each buffer it outgrows, which
+  makes it the way to build a secret whose length is not known up front (see
+  [SECURITY.md](SECURITY.md)).
 
 ## Encoding
 
@@ -146,14 +175,48 @@ locked in RAM between guard pages. Each access costs about 8 µs, so it is for l
 not hot loops. What it covers and what it does not:
 [`sealed`](https://docs.rs/secure-gate/latest/secure_gate/sealed/index.html).
 
+| Sealed type | Seals | Opens as |
+|---|---|---|
+| `SealedFixed<N>` | `Fixed<[u8; N]>` | `&[u8; N]` |
+| `sealed_fixed_newtype!(pub Name, Role, "…")` | a `fixed_newtype!` role, and only that role | `&Role` (`with_role`) or its bytes (`with_secret`) |
+| `SealedDynamic<String>` / `SealedDynamic<Vec<u8>>` | `Dynamic<String>` / `Dynamic<Vec<u8>>` | `&String` / `&Vec<u8>` |
+| `sealed_dynamic_newtype!(pub Name, Role, "…")` | a `dynamic_newtype!` `String` or `Vec<u8>` role, and only that role | `&Role` (`with_role`) or its `&String` / `&Vec<u8>` (`with_secret`) |
+
+All four share one `Prekey`, are opened only through closures (there is no `expose_secret`),
+and give the plain wrapper or role back with `unseal()`. The two dynamic ones change a secret
+in place through `&mut str` / `&mut [u8]`, so its length is fixed while sealed and no
+reallocation can leave a copy behind; that is also why the dynamic macro has no
+`with_role_mut`.
+
 ```rust
 #[cfg(feature = "sealed")]
 {
-    use secure_gate::{Fixed, Prekey, RevealSecret, SealedFixed};
+    use secure_gate::{
+        Dynamic, Fixed, Prekey, RevealSecret, SealedDynamic, SealedFixed, dynamic_newtype,
+        fixed_newtype, sealed_dynamic_newtype, sealed_fixed_newtype,
+    };
 
     let prekey = Prekey::new(); // one per session; check `lock_status()`
+
+    // Fixed size, no role.
     let key = SealedFixed::seal(Fixed::new([7u8; 32]), &prekey);
     key.with_secret(|k| assert_eq!(k[0], 7)); // decrypted for this call only
+
+    // Fixed size, with a role the compiler keeps apart from other 32-byte keys.
+    fixed_newtype!(pub AppKey, 32, "The app key.");
+    sealed_fixed_newtype!(pub SealedAppKey, AppKey, "The app key, sealed while idle.");
+    let app_key = SealedAppKey::seal(AppKey::new([9u8; 32]), &prekey);
+    app_key.with_role(|k: &AppKey| k.with_secret(|b| assert_eq!(b[0], 9)));
+
+    // Variable length, no role.
+    let token = SealedDynamic::seal(Dynamic::<String>::new("hunter2".to_string()), &prekey);
+    token.with_secret(|t| assert_eq!(t.len(), 7));
+
+    // Variable length, with a role.
+    dynamic_newtype!(pub Password, String, "A login password.");
+    sealed_dynamic_newtype!(pub SealedPassword, Password, "A login password, sealed while idle.");
+    let password = SealedPassword::seal(Password::from("hunter2"), &prekey);
+    password.with_role(|p: &Password| p.with_secret(|s| assert_eq!(s.len(), 7)));
 }
 ```
 
