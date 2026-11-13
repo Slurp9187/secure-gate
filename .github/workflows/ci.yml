@@ -199,16 +199,15 @@ jobs:
           # and the rest stay on Ubuntu. What these rows add is the whole runtime suite,
           # `tests/heap_zeroize.rs` (the allocator-level wipe checks) included, on the
           # Windows and macOS allocators, and on ARM64, which is what `macos-latest` is.
-          # No `lint`: clippy and the doctests do not vary by system.
+          # No `lint`: clippy and the doctests do not vary by system. macOS gets one row,
+          # not two: hosted macOS ARM64 runners are scarce, and a job GitHub cannot place
+          # within about fifteen minutes is cancelled, which fails `CI passed`.
           - name: full, Windows
             os: windows-latest
             features: "--features=full"
           - name: all features, Windows
             os: windows-latest
             features: "--all-features"
-          - name: full, macOS
-            os: macos-latest
-            features: "--features=full"
           - name: all features, macOS
             os: macos-latest
             features: "--all-features"
