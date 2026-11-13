@@ -1253,6 +1253,76 @@ fn check_sealed_dynamic_plaintext_zeroed() {
 }
 
 // ---------------------------------------------------------------------------
+// sealed_dynamic_newtype! — the plaintext copies made by a sealed role
+//
+// The role type is a wrapper around `SealedDynamic`, but `with_role` is a path of its own:
+// the decrypted temporary is moved into the role and the role's `Drop` is what wipes it.
+// Same shape as the check above, one gate per step, exactly one plaintext buffer freed in
+// each and it must be zero:
+//
+//   seal        the plain role that was consumed
+//   with_role   the role temporary, on return and when the closure unwinds
+//   unseal      the returned role, dropped in a gate of its own (see above)
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "sealed")]
+fn check_sealed_dynamic_role_plaintext_zeroed() {
+    use secure_gate::{Prekey, RevealSecret, sealed_dynamic_newtype};
+
+    dynamic_newtype!(Blob, Vec<u8>);
+    dynamic_newtype!(Passphrase, String);
+    sealed_dynamic_newtype!(SealedBlob, Blob);
+    sealed_dynamic_newtype!(SealedPassphrase, Passphrase);
+
+    const LEN: usize = 232;
+    let prekey = Prekey::new();
+
+    let plain = Blob::new_with(LEN, |slot| slot.fill(0xD4));
+    let mut sealed = None;
+    let hits = with_proxy_check_counted(LEN, || {
+        sealed = Some(SealedBlob::seal(plain, &prekey));
+    });
+    assert_eq!(
+        hits, 1,
+        "role seal: the consumed plain buffer was not observed"
+    );
+    let sealed = sealed.expect("sealed above");
+
+    let hits = with_proxy_check_counted(LEN, || {
+        sealed.with_role(|r: &Blob| r.with_secret(|v| assert!(v.iter().all(|&b| b == 0xD4))));
+    });
+    assert_eq!(hits, 1, "with_role: the role temporary was not observed");
+
+    let hits = with_proxy_check_counted(LEN, || {
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            sealed.with_role(|_: &Blob| std::panic::resume_unwind(Box::new(())));
+        }));
+        assert!(caught.is_err());
+    });
+    assert_eq!(
+        hits, 1,
+        "with_role panic: the role temporary was not observed"
+    );
+
+    let unsealed: Blob = sealed.unseal();
+    let hits = with_proxy_check_counted(LEN, || drop(unsealed));
+    assert_eq!(
+        hits, 1,
+        "role unseal: the returned buffer was not observed on drop"
+    );
+
+    const TEXT_LEN: usize = 248;
+    let sealed = SealedPassphrase::seal(Passphrase::new("q".repeat(TEXT_LEN)), &prekey);
+    let hits = with_proxy_check_counted(TEXT_LEN, || {
+        sealed.with_role(|r: &Passphrase| r.with_secret(|s| assert!(s.bytes().all(|b| b == b'q'))));
+    });
+    assert_eq!(
+        hits, 1,
+        "String with_role: the role temporary was not observed"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Aggregate test
 // ---------------------------------------------------------------------------
 
@@ -1291,6 +1361,10 @@ fn all_heap_zeroed() {
     // SealedDynamic's plaintext copies: seal, read, mutate, panic, unseal
     #[cfg(feature = "sealed")]
     check_sealed_dynamic_plaintext_zeroed();
+
+    // sealed_dynamic_newtype!'s plaintext copies: seal, with_role, panic, unseal
+    #[cfg(feature = "sealed")]
+    check_sealed_dynamic_role_plaintext_zeroed();
 
     // Dynamic<[u8; N]> — boxed arrays
     check_array_zeroed::<16>();

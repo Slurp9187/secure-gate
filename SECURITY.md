@@ -8,8 +8,9 @@ to copy a secret out; a secret nobody can read is useless. So the rule is:
 
 - **The easy path is safe.** The obvious way to hold, decode, encode or compare a secret
   keeps it wrapped, wiped and redacted.
-- **Leaving it is named.** Every way out (`expose_secret`, `into_inner`, `into_zeroizing`,
-  `as_reader`) is a call you can grep for and a reviewer can see.
+- **Reaching it is named.** Every way to the secret, from the scoped `with_secret` to the
+  exits (`expose_secret`, `into_inner`, `into_zeroizing`, `as_reader`), is a call you can
+  grep for and a reviewer can see.
 
 If the friction feels like it is in your way, that is the library working. Don't route
 around it with `.to_vec()`, `*bytes` or `.to_string()`; name the exit instead, or keep the
@@ -301,9 +302,10 @@ process is irrelevant. The stack is included: a `Fixed` can leave earlier copies
 caveats [above](#if-swap-residue-is-in-your-threat-model). `Fixed` and `Dynamic` never call
 `mlock` or set process flags.
 
-**Opt-in, beside these: the `sealed` feature.** `SealedFixed<N>` and `SealedDynamic` hold a
+**Opt-in, beside these: the `sealed` feature.** `SealedFixed<N>` and `SealedDynamic` (and
+the role types `sealed_fixed_newtype!` and `sealed_dynamic_newtype!` build on them) hold a
 secret as ChaCha20-Poly1305 ciphertext and open it for one `with_secret` /
-`with_secret_mut` call. The sealing key, `SHA-256(salt ‖ pre-key)`, is recomputed on every
+`with_secret_mut` / `with_role` call. The sealing key, `SHA-256(salt ‖ pre-key)`, is recomputed on every
 access and never stored. The pre-key is 16 KiB of random bytes in a `Prekey` that each
 sealed object holds an `Arc` to. Since rc.15 it lives in a mapping of its own between two
 no-access guard pages, read-only once filled (`guarded-block`). When the last reference
@@ -328,6 +330,7 @@ build; after it, neither. That was measured on x86_64 Windows only
 | The plaintext temporary while the closure runs, and copies the closure makes | Not covered. The temporary is wiped, and the stack below overwritten, when the call returns |
 | Registers, and stack beyond the 32 KiB | Not covered |
 | The `Fixed` that `SealedFixed::unseal` returns | An ordinary `Fixed`: returning it can leave a stack copy (§1). Read through `with_secret` / `with_role` instead |
+| Growing a sealed `String` / `Vec<u8>` | Not expressible. `with_secret_mut` hands out `&mut str` / `&mut [u8]`, and `sealed_dynamic_newtype!` has no `with_role_mut`, so nothing can reallocate the plaintext (§2). To change the length, `unseal`, edit and seal again |
 
 **Lock quotas.** On Windows every `VirtualLock` draws on the working-set quota: about
 eleven pre-keys lock by default (Windows 11), and `SetProcessWorkingSetSize` raises it. On

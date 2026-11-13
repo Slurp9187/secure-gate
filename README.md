@@ -20,8 +20,9 @@ to copy a secret out; a secret nobody can read is useless. So:
 
 - **The easy path is safe.** The obvious way to hold, decode, encode or compare a secret
   keeps it wrapped, wiped and redacted.
-- **Leaving it is named.** Every way out (`expose_secret`, `into_inner`, `into_zeroizing`,
-  `as_reader`) is a call you can grep for and a reviewer can see.
+- **Reaching it is named.** Every way to the secret, from the scoped `with_secret` to the
+  exits (`expose_secret`, `into_inner`, `into_zeroizing`, `as_reader`), is a call you can
+  grep for and a reviewer can see.
 
 Don't route around it with `.to_vec()`, `*bytes` or `.to_string()`; name the exit instead.
 
@@ -106,7 +107,7 @@ your own `rand = "0.10"` dependency; any RNG that can fill a byte slice works.
 | A password, token or other variable-length secret | `dynamic_newtype!(pub Name, String, "…")` | On the heap (`alloc`); spare capacity is wiped too |
 | A secret with no role to confuse it with | `pub type Name = Fixed<[u8; 32]>;` or `pub type Name = Dynamic<String>;` | Same protection; an alias is interchangeable with its base type |
 | A long-lived key in a process that may be read while it idles | `sealed_fixed_newtype!(pub Name, Role, "…")`, or `SealedFixed<32>` when there is no role (`sealed`) | Held encrypted in RAM, opened for one closure call at a time |
-| A long-lived password or other variable-length secret, likewise | `SealedDynamic<String>` or `SealedDynamic<Vec<u8>>` (`sealed`) | The same, on the heap; there is no newtype macro for it |
+| A long-lived password or other variable-length secret, likewise | `sealed_dynamic_newtype!(pub Name, Role, "…")`, or `SealedDynamic<String>` / `SealedDynamic<Vec<u8>>` when there is no role (`sealed`) | The same, on the heap |
 
 ## Features
 
@@ -119,7 +120,7 @@ your own `rand = "0.10"` dependency; any RNG that can fill a byte slice works.
 | `encoding` | All of `encoding-hex`, `-base32`, `-base64`, `-bech32`; see [Encoding](#encoding) |
 | `serde` | `serde-deserialize` (1 MiB default limit) and `serde-serialize` (opt-in per type via `SerializableSecret`) |
 | `cloneable` | Opt-in cloning via `CloneableSecret` |
-| `sealed` | `SealedFixed`, `SealedDynamic`, `sealed_fixed_newtype!` and `Prekey` (implies `std`, `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`) |
+| `sealed` | `SealedFixed`, `SealedDynamic`, `sealed_fixed_newtype!`, `sealed_dynamic_newtype!` and `Prekey` (implies `std`, `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`) |
 | `full` | Everything except `std` and `sealed` |
 
 ### `std`, `alloc` and `no_std`
@@ -179,16 +180,20 @@ not hot loops. What it covers and what it does not:
 | `SealedFixed<N>` | `Fixed<[u8; N]>` | `&[u8; N]` |
 | `sealed_fixed_newtype!(pub Name, Role, "…")` | a `fixed_newtype!` role, and only that role | `&Role` (`with_role`) or its bytes (`with_secret`) |
 | `SealedDynamic<String>` / `SealedDynamic<Vec<u8>>` | `Dynamic<String>` / `Dynamic<Vec<u8>>` | `&String` / `&Vec<u8>` |
+| `sealed_dynamic_newtype!(pub Name, Role, "…")` | a `dynamic_newtype!` `String` or `Vec<u8>` role, and only that role | `&Role` (`with_role`) or its `&String` / `&Vec<u8>` (`with_secret`) |
 
-All three share one `Prekey`, are opened only through `with_secret` / `with_secret_mut`
-(there is no `expose_secret`), and give the plain wrapper back with `unseal()`.
+All four share one `Prekey`, are opened only through closures (there is no `expose_secret`),
+and give the plain wrapper or role back with `unseal()`. The two dynamic ones change a secret
+in place through `&mut str` / `&mut [u8]`, so its length is fixed while sealed and no
+reallocation can leave a copy behind; that is also why the dynamic macro has no
+`with_role_mut`.
 
 ```rust
 #[cfg(feature = "sealed")]
 {
     use secure_gate::{
-        Dynamic, Fixed, Prekey, RevealSecret, SealedDynamic, SealedFixed, fixed_newtype,
-        sealed_fixed_newtype,
+        Dynamic, Fixed, Prekey, RevealSecret, SealedDynamic, SealedFixed, dynamic_newtype,
+        fixed_newtype, sealed_dynamic_newtype, sealed_fixed_newtype,
     };
 
     let prekey = Prekey::new(); // one per session; check `lock_status()`
@@ -203,9 +208,15 @@ All three share one `Prekey`, are opened only through `with_secret` / `with_secr
     let app_key = SealedAppKey::seal(AppKey::new([9u8; 32]), &prekey);
     app_key.with_role(|k: &AppKey| k.with_secret(|b| assert_eq!(b[0], 9)));
 
-    // Variable length.
-    let password = SealedDynamic::seal(Dynamic::<String>::new("hunter2".to_string()), &prekey);
-    password.with_secret(|p| assert_eq!(p.len(), 7));
+    // Variable length, no role.
+    let token = SealedDynamic::seal(Dynamic::<String>::new("hunter2".to_string()), &prekey);
+    token.with_secret(|t| assert_eq!(t.len(), 7));
+
+    // Variable length, with a role.
+    dynamic_newtype!(pub Password, String, "A login password.");
+    sealed_dynamic_newtype!(pub SealedPassword, Password, "A login password, sealed while idle.");
+    let password = SealedPassword::seal(Password::from("hunter2"), &prekey);
+    password.with_role(|p: &Password| p.with_secret(|s| assert_eq!(s.len(), 7)));
 }
 ```
 
