@@ -105,7 +105,8 @@ your own `rand = "0.10"` dependency; any RNG that can fill a byte slice works.
 | A key or other fixed-size secret | `fixed_newtype!(pub Name, 32, "…")` | On the stack, `no_std`, and a distinct type per role |
 | A password, token or other variable-length secret | `dynamic_newtype!(pub Name, String, "…")` | On the heap (`alloc`); spare capacity is wiped too |
 | A secret with no role to confuse it with | `pub type Name = Fixed<[u8; 32]>;` or `pub type Name = Dynamic<String>;` | Same protection; an alias is interchangeable with its base type |
-| A long-lived key in a process that may be read while it idles | `SealedFixed` / `sealed_fixed_newtype!` (`sealed`) | Held encrypted in RAM, opened for one closure call at a time |
+| A long-lived key in a process that may be read while it idles | `sealed_fixed_newtype!(pub Name, Role, "…")`, or `SealedFixed<32>` when there is no role (`sealed`) | Held encrypted in RAM, opened for one closure call at a time |
+| A long-lived password or other variable-length secret, likewise | `SealedDynamic<String>` or `SealedDynamic<Vec<u8>>` (`sealed`) | The same, on the heap; there is no newtype macro for it |
 
 ## Features
 
@@ -173,14 +174,38 @@ locked in RAM between guard pages. Each access costs about 8 µs, so it is for l
 not hot loops. What it covers and what it does not:
 [`sealed`](https://docs.rs/secure-gate/latest/secure_gate/sealed/index.html).
 
+| Sealed type | Seals | Opens as |
+|---|---|---|
+| `SealedFixed<N>` | `Fixed<[u8; N]>` | `&[u8; N]` |
+| `sealed_fixed_newtype!(pub Name, Role, "…")` | a `fixed_newtype!` role, and only that role | `&Role` (`with_role`) or its bytes (`with_secret`) |
+| `SealedDynamic<String>` / `SealedDynamic<Vec<u8>>` | `Dynamic<String>` / `Dynamic<Vec<u8>>` | `&String` / `&Vec<u8>` |
+
+All three share one `Prekey`, are opened only through `with_secret` / `with_secret_mut`
+(there is no `expose_secret`), and give the plain wrapper back with `unseal()`.
+
 ```rust
 #[cfg(feature = "sealed")]
 {
-    use secure_gate::{Fixed, Prekey, RevealSecret, SealedFixed};
+    use secure_gate::{
+        Dynamic, Fixed, Prekey, RevealSecret, SealedDynamic, SealedFixed, fixed_newtype,
+        sealed_fixed_newtype,
+    };
 
     let prekey = Prekey::new(); // one per session; check `lock_status()`
+
+    // Fixed size, no role.
     let key = SealedFixed::seal(Fixed::new([7u8; 32]), &prekey);
     key.with_secret(|k| assert_eq!(k[0], 7)); // decrypted for this call only
+
+    // Fixed size, with a role the compiler keeps apart from other 32-byte keys.
+    fixed_newtype!(pub AppKey, 32, "The app key.");
+    sealed_fixed_newtype!(pub SealedAppKey, AppKey, "The app key, sealed while idle.");
+    let app_key = SealedAppKey::seal(AppKey::new([9u8; 32]), &prekey);
+    app_key.with_role(|k: &AppKey| k.with_secret(|b| assert_eq!(b[0], 9)));
+
+    // Variable length.
+    let password = SealedDynamic::seal(Dynamic::<String>::new("hunter2".to_string()), &prekey);
+    password.with_secret(|p| assert_eq!(p.len(), 7));
 }
 ```
 
