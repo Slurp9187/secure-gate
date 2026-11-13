@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.0-rc.19] - Unreleased
+## [0.9.0-rc.19] - 2026-11-13
 
 ### Added
 - **`sealed_dynamic_newtype!`**, the sealed counterpart of a `dynamic_newtype!` role, beside
@@ -34,6 +34,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with each.
 - README and SECURITY.md: "Leaving it is named" is now "Reaching it is named" and lists
   `with_secret` beside the exits.
+
+### CI
+- **The test suite now runs on Windows, macOS (ARM64), Linux ARM64 and 32-bit Linux**, not
+  only Ubuntu x86-64 (#287). Each runs the whole runtime suite with all features, including
+  `tests/heap_zeroize.rs`, so the allocator-level wipe checks now run on the Windows and
+  macOS allocators, on ARM64, and where `usize` is 32 bits. Windows also runs with `full`.
+- The `thumbv7em` (no OS) build check now also builds with `alloc`, alone and with the
+  encodings, `ct-eq`, `cloneable` and `serde`.
 
 ## [0.9.0-rc.18] - 2026-11-12
 
