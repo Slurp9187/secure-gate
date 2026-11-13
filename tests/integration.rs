@@ -10,7 +10,6 @@
 #![allow(clippy::redundant_clone)]
 
 mod common;
-mod encoded_secret_suite;
 mod encoding_suite;
 mod macros_suite;
 mod serde_suite;
