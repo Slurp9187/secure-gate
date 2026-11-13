@@ -301,9 +301,10 @@ process is irrelevant. The stack is included: a `Fixed` can leave earlier copies
 caveats [above](#if-swap-residue-is-in-your-threat-model). `Fixed` and `Dynamic` never call
 `mlock` or set process flags.
 
-**Opt-in, beside these: the `sealed` feature.** `SealedFixed<N>` and `SealedDynamic` hold a
+**Opt-in, beside these: the `sealed` feature.** `SealedFixed<N>` and `SealedDynamic` (and
+the role types `sealed_fixed_newtype!` and `sealed_dynamic_newtype!` build on them) hold a
 secret as ChaCha20-Poly1305 ciphertext and open it for one `with_secret` /
-`with_secret_mut` call. The sealing key, `SHA-256(salt ‖ pre-key)`, is recomputed on every
+`with_secret_mut` / `with_role` call. The sealing key, `SHA-256(salt ‖ pre-key)`, is recomputed on every
 access and never stored. The pre-key is 16 KiB of random bytes in a `Prekey` that each
 sealed object holds an `Arc` to. Since rc.15 it lives in a mapping of its own between two
 no-access guard pages, read-only once filled (`guarded-block`). When the last reference
@@ -328,6 +329,7 @@ build; after it, neither. That was measured on x86_64 Windows only
 | The plaintext temporary while the closure runs, and copies the closure makes | Not covered. The temporary is wiped, and the stack below overwritten, when the call returns |
 | Registers, and stack beyond the 32 KiB | Not covered |
 | The `Fixed` that `SealedFixed::unseal` returns | An ordinary `Fixed`: returning it can leave a stack copy (§1). Read through `with_secret` / `with_role` instead |
+| Growing a sealed `String` / `Vec<u8>` | Not expressible. `with_secret_mut` hands out `&mut str` / `&mut [u8]`, and `sealed_dynamic_newtype!` has no `with_role_mut`, so nothing can reallocate the plaintext (§2). To change the length, `unseal`, edit and seal again |
 
 **Lock quotas.** On Windows every `VirtualLock` draws on the working-set quota: about
 eleven pre-keys lock by default (Windows 11), and `SetProcessWorkingSetSize` raises it. On
@@ -452,7 +454,7 @@ deployment, redact at the logging boundary.
 | `serde-serialize` | Writes the full secret into buffers this crate cannot reach. Opt-in per type via `SerializableSecret`. | Enable sparingly; audit every impl |
 | `encoding`, `encoding-*` | Constant-time hex, Base32 and Base64url via RustCrypto backends; bech32 via `bech32`. Encoders need `alloc`; `Fixed::try_from_*` does not. | Enable per format |
 | `cloneable` | Opt-in cloning via `CloneableSecret`. Each clone is a wrapper and wipes itself. | Use minimally |
-| `sealed` | See §3. Implies `std` and `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`. Every dependency holding key, keystream, MAC or hash state has its `zeroize` feature on. | For long-held keys |
+| `sealed` | See §3. `SealedFixed`, `SealedDynamic`, `sealed_fixed_newtype!`, `sealed_dynamic_newtype!`. Implies `std` and `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`. Every dependency holding key, keystream, MAC or hash state has its `zeroize` feature on. | For long-held keys |
 | `full` | Everything except `std` and `sealed` | Convenient; audit what you use |
 
 ## Other notes

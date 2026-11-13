@@ -156,6 +156,23 @@ impl<T: SealedPayload> SealedDynamic<T> {
         })
     }
 
+    /// Opens into a temporary, hands it to `wrap` (a `dynamic_newtype!` role's constructor)
+    /// and `f` gets the wrapped value; scrubbed like [`with_secret`](Self::with_secret).
+    /// `wrap` moves the `Dynamic`, which is one pointer: the plaintext stays in the one heap
+    /// buffer the temporary owns, and the role's `Drop` wipes it. The plumbing behind
+    /// `sealed_dynamic_newtype!`'s `with_role`; not a public API.
+    #[doc(hidden)]
+    pub fn __with_wrapped<R0, W, F, R>(&self, wrap: W, f: F) -> R
+    where
+        W: FnOnce(Dynamic<T>) -> R0,
+        F: FnOnce(&R0) -> R,
+    {
+        scrubbed(|| {
+            let wrapped = wrap(T::from_plain(self.open()));
+            f(&wrapped)
+        })
+    }
+
     /// Opens the secret back into a plain [`Dynamic`]. Protection from sealing ends here;
     /// the returned wrapper still wipes on drop.
     pub fn unseal(self) -> Dynamic<T> {

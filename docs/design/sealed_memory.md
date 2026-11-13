@@ -32,6 +32,7 @@ pages, survive a refused lock, and avoid a never-wiped `static`. What shipped:
 | `SealedDynamic<T>` | `T` is `Vec<u8>` or `String`; ciphertext `Box<[u8]>`; `with_secret_mut` hands out `&mut [u8]` / `&mut str` | Resolves the open question: fixed length, no growth |
 | Scoped trait | `secure_gate::scoped::RevealScoped`, not at the root; read access only | No |
 | Roles | `sealed_fixed_newtype!(pub SealedAppKey, AppKey, "doc")` | New (EFV seals four `fixed_newtype!` roles) |
+| Dynamic roles | `sealed_dynamic_newtype!(pub SealedPassword, Password, "doc")`, for `String` and `Vec<u8>` roles; `with_role` but no `with_role_mut`, since `&mut Role` could grow the buffer | New (added for symmetry with the fixed macro) |
 | Not offered | `expose_secret`, `RevealSecret`, `Hash`, `Clone`; `Debug` is `[REDACTED]` | `Clone`: **yes**, the analysis below proposed it under `cloneable`; dropped after review, because `Fixed<[u8; N]>` itself is never `Clone` |
 
 ### Why the pre-key is an owner object, not a static
