@@ -4,7 +4,7 @@ All notable changes to this crate are documented in this file. The format follow
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] - 2026-11-14
 
 ### Added
 - FreeBSD: the block is marked `MADV_NOCORE`, FreeBSD's `MADV_DONTDUMP`, so it is left out
