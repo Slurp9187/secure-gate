@@ -25,3 +25,7 @@ zeroize = { version = "1.9", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = { version = "0.2.172", default-features = false }
+
+# The fork test calls `fork`, `_exit` and `waitpid` on every Unix, not only Linux.
+[target.'cfg(unix)'.dev-dependencies]
+libc = { version = "0.2.172", default-features = false }
