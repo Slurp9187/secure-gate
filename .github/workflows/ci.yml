@@ -522,7 +522,7 @@ jobs:
             freebsd-version -ku
             rustc -V
             ulimit -l
-            sysctl vm.max_user_wired vm.stats.vm.v_user_wire_count
+            sysctl vm.max_user_wired
             cargo test --manifest-path guarded-block/Cargo.toml -- --test-threads=1
 
   # ---------------------------------------------------------------------------
