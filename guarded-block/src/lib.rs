@@ -21,8 +21,9 @@
 //! - **Locked.** `VirtualLock` on Windows, `mlock` on Unix, so the block is not written to
 //!   swap. A refused lock is reported by [`GuardedBlock::lock_status`], never fatal. A lock
 //!   does not cover hibernation: the hibernation file captures locked pages too.
-//! - **Not in core dumps (Linux).** `madvise(MADV_DONTDUMP)` on the block, best effort;
-//!   the kernel documents such pages as left out of core dumps.
+//! - **Not in core dumps (Linux, FreeBSD).** `madvise` on the block, best effort:
+//!   `MADV_DONTDUMP` on Linux, `MADV_NOCORE` on FreeBSD. Each kernel documents such pages
+//!   as left out of core dumps.
 //! - **Optionally, no access while idle.** With [`GuardedBlock::new_with_idle_noaccess`] the
 //!   block is readable only while a [`GuardedBlock::with`] call is running (unless the
 //!   system refuses to make it no-access again; see [`GuardedBlock::with`]). On Windows that
@@ -507,7 +508,13 @@ fn dont_dump(ptr: *const u8, len: usize) {
     let _ = unsafe { libc::madvise(ptr.cast_mut().cast(), len, libc::MADV_DONTDUMP) };
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "freebsd")]
+fn dont_dump(ptr: *const u8, len: usize) {
+    // SAFETY: as on Linux; `MADV_NOCORE` is FreeBSD's name for the same advice.
+    let _ = unsafe { libc::madvise(ptr.cast_mut().cast(), len, libc::MADV_NOCORE) };
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
 fn dont_dump(_ptr: *const u8, _len: usize) {}
 
 #[cfg(test)]
@@ -553,7 +560,30 @@ mod tests {
         panic!("block mapping not in smaps")
     }
 
-    #[cfg(not(any(windows, target_os = "linux")))]
+    /// The kernel's flags for the VM map entry holding `addr` (FreeBSD: `kinfo_getvmmap`,
+    /// the data behind `procstat -v`).
+    #[cfg(target_os = "freebsd")]
+    fn vm_flags(addr: usize) -> libc::c_int {
+        let mut count = 0;
+        // SAFETY (test): returns a `malloc`ed array of `count` entries, or null.
+        let entries = unsafe { libc::kinfo_getvmmap(libc::getpid(), &mut count) };
+        assert!(!entries.is_null(), "kinfo_getvmmap failed");
+        // SAFETY (test): `entries` holds `count` initialized entries until freed below.
+        let flags = unsafe { core::slice::from_raw_parts(entries, count as usize) }
+            .iter()
+            .find(|e| e.kve_start as usize <= addr && addr < e.kve_end as usize)
+            .map(|e| e.kve_flags);
+        // SAFETY (test): `entries` came from `malloc` and is not used after this.
+        unsafe { libc::free(entries.cast()) };
+        flags.expect("address not in the process's VM map")
+    }
+
+    #[cfg(target_os = "freebsd")]
+    fn is_locked(b: &GuardedBlock<100>) -> Option<bool> {
+        Some(vm_flags(b.block_ptr() as usize) & libc::KVME_FLAG_USER_WIRED != 0)
+    }
+
+    #[cfg(not(any(windows, target_os = "linux", target_os = "freebsd")))]
     fn is_locked(_: &GuardedBlock<100>) -> Option<bool> {
         None
     }

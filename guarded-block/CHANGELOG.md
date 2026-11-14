@@ -6,6 +6,15 @@ All notable changes to this crate are documented in this file. The format follow
 
 ## [Unreleased]
 
+### Added
+- FreeBSD: the block is marked `MADV_NOCORE`, FreeBSD's `MADV_DONTDUMP`, so it is left out
+  of core dumps there too (best effort, as on Linux). A test reads the flag back from the
+  kernel's VM map (`KVME_FLAG_NOCOREDUMP`).
+- FreeBSD tests read the lock back from the kernel's VM map (`KVME_FLAG_USER_WIRED`) when
+  the block is made, after idle no-access accesses, and after the unlock on drop; and the
+  `fork()` test runs on every Unix. Each was checked to fail with the call it guards
+  removed. FreeBSD runs in CI in a VM.
+
 ### Changed
 - `zeroize` requirement raised from 1.8 to 1.9, in step with secure-gate. zeroize 1.9.x
   declares `rust-version` 1.85, so the MSRV is unchanged.

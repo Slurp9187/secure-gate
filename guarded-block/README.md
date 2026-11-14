@@ -37,7 +37,7 @@ What each part is for:
 - **Locked** (`VirtualLock` / `mlock`), so it is not written to swap. A refused lock is
   reported by `lock_status()`, never fatal. A lock does not cover hibernation: the
   hibernation file captures locked pages too.
-- **Not in core dumps** on Linux (`MADV_DONTDUMP`, best effort).
+- **Not in core dumps** on Linux (`MADV_DONTDUMP`) and FreeBSD (`MADV_NOCORE`), best effort.
 - **Optionally no-access while idle** (`new_with_idle_noaccess`): readable only during a
   `with` call (unless the system refuses the change back to no-access, in which case a later
   call closes it). On Windows that makes another process's `ReadProcessMemory` fail on it,
