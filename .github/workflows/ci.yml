@@ -491,6 +491,41 @@ jobs:
         run: cargo +${{ matrix.sealed_toolchain }} test --features sealed --lib --test sealed --test sealed_lock --test sealed_glob_import
 
   # ---------------------------------------------------------------------------
+  # guarded-block on FreeBSD — the same suite, on a BSD kernel
+  #
+  # The crate promises `mlock` "on Unix", but GitHub has no FreeBSD runners, so this boots
+  # FreeBSD in a VM on an Ubuntu runner (vmactions/freebsd-vm). Stable Rust from `pkg`, not
+  # the MSRV: the question here is the kernel's behavior, which the toolchain does not change.
+  # The Linux-only tests (MADV_DONTDUMP, smaps) are compiled out there. The lock limits are
+  # printed first because a refused lock makes the lock tests skip rather than fail.
+  #
+  # Not in `ci-passed` below, yet: a VM job flakes more than a hosted runner, and the
+  # first runs are to learn what FreeBSD does, not to gate merges. Add it there once it
+  # has run green for a while.
+  # ---------------------------------------------------------------------------
+  guarded-block-freebsd:
+    name: guarded-block – FreeBSD 15.1, stable
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: cargo test (guarded-block) in a FreeBSD VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "15.1"
+          usesh: true
+          copyback: false
+          prepare: pkg install -y rust
+          run: |
+            freebsd-version -ku
+            rustc -V
+            ulimit -l
+            sysctl vm.max_user_wired vm.stats.vm.v_user_wire_count
+            cargo test --manifest-path guarded-block/Cargo.toml -- --test-threads=1
+
+  # ---------------------------------------------------------------------------
   # Feature combinations — every set of up to three features compiles
   #
   # The test matrix above lists hand-picked feature sets. cargo-hack reads the features
