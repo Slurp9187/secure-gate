@@ -21,8 +21,9 @@
 //! - **Locked.** `VirtualLock` on Windows, `mlock` on Unix, so the block is not written to
 //!   swap. A refused lock is reported by [`GuardedBlock::lock_status`], never fatal. A lock
 //!   does not cover hibernation: the hibernation file captures locked pages too.
-//! - **Not in core dumps (Linux).** `madvise(MADV_DONTDUMP)` on the block, best effort;
-//!   the kernel documents such pages as left out of core dumps.
+//! - **Not in core dumps (Linux, FreeBSD).** `madvise` on the block, best effort:
+//!   `MADV_DONTDUMP` on Linux, `MADV_NOCORE` on FreeBSD. Each kernel documents such pages
+//!   as left out of core dumps.
 //! - **Optionally, no access while idle.** With [`GuardedBlock::new_with_idle_noaccess`] the
 //!   block is readable only while a [`GuardedBlock::with`] call is running (unless the
 //!   system refuses to make it no-access again; see [`GuardedBlock::with`]). On Windows that
