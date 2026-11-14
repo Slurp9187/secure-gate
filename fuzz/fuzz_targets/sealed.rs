@@ -9,8 +9,11 @@
 //    `with_secret_mut` / `with_role_mut` that returned, and by none that panicked.
 // 2. Heap residue: every plaintext starts with `CANARY`, and the global allocator below
 //    looks for it in each block the process frees. A hit is a plaintext buffer that went
-//    back to the allocator unwiped: a temporary, a reallocation, an unwind path.
-// 3. Allocation count: an access to a fixed-size sealed value allocates nothing.
+//    back to the allocator unwiped: a temporary, a reallocation, an unwind path. The one
+//    plaintext without the canary is what `SealedFixed::from_random` generates; it is
+//    covered by oracle 3 until the canary is written into it.
+// 3. Allocation count: an access to a fixed-size sealed value allocates nothing, and
+//    neither does `SealedFixed::from_random`.
 //
 // What the oracles do not see: the stack (the 32 KiB scrub is measured elsewhere, see
 // `docs/design/receipts/sealed-stack-residue/`), registers, and a tampered ciphertext,
@@ -573,16 +576,28 @@ impl World {
 
             Op::Random { slot, prekey } => {
                 let prekey = self.prekey(prekey);
-                let sealed = SealedFixed::<32>::from_random(&prekey);
-                let model = sealed.with_secret(|p| {
-                    let mut model = Zeroizing::new(Vec::with_capacity(p.len()));
-                    model.extend_from_slice(p);
-                    model
+                // The random secret has no canary, so the heap oracle cannot see it. It
+                // does not need to: generating and sealing it must not touch the heap at
+                // all. The canary is then written over its first half, so every later
+                // operation on this value is under the heap oracle like any other.
+                let before = ALLOCS.load(Ordering::Relaxed);
+                let mut sealed = SealedFixed::<32>::from_random(&prekey);
+                let random_tail = sealed.with_secret_mut(|p| {
+                    let nonzero = p.iter().any(|&b| b != 0);
+                    p[..CANARY.len()].copy_from_slice(&CANARY);
+                    let mut tail = [0u8; 16];
+                    tail.copy_from_slice(&p[CANARY.len()..]);
+                    (nonzero, tail)
                 });
-                assert!(model.iter().any(|&b| b != 0), "from_random gave all zeros");
+                assert_eq!(
+                    ALLOCS.load(Ordering::Relaxed),
+                    before,
+                    "from_random allocated"
+                );
+                assert!(random_tail.0, "from_random gave all zeros");
                 self.slots[slot as usize % SLOTS] = Some(Slot {
                     obj: Obj::Fixed(sealed),
-                    model,
+                    model: model_of(&random_tail.1),
                 });
             }
 
