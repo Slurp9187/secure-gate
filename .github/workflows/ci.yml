@@ -632,7 +632,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [expose, mut, parsing, encoding, serde, ct_eq]
+        target: [expose, mut, parsing, encoding, serde, ct_eq, sealed]
+        include:
+          # `sealed` is not in the fuzz crate's default features (it brings in `std`, and
+          # the other targets fuzz the `alloc`-only build), so its target names it.
+          - target: sealed
+            features: --features sealed
 
     steps:
       - name: Checkout repository
@@ -653,7 +658,7 @@ jobs:
 
       - name: Fuzz ${{ matrix.target }} for 90 s
         run: |
-          cargo +nightly fuzz run ${{ matrix.target }} -- \
+          cargo +nightly fuzz run ${{ matrix.features }} ${{ matrix.target }} -- \
             -fork=1 \
             -max_total_time=90 \
             -timeout=30

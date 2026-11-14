@@ -31,8 +31,16 @@ jobs:
       fail-fast: false
       matrix:
         ref: [main, "release/0.8"]
-        target: [expose, mut, parsing, encoding, serde, ct_eq]
+        target: [expose, mut, parsing, encoding, serde, ct_eq, sealed]
+        exclude:
+          # `release/0.8` has no `sealed` feature and no such target.
+          - ref: "release/0.8"
+            target: sealed
         include:
+          # `sealed` is not in the fuzz crate's default features (it brings in `std`, and
+          # the other targets fuzz the `alloc`-only build), so its target names it.
+          - target: sealed
+            features: --features sealed
           # Artifact names cannot contain a slash.
           - ref: main
             label: main
@@ -126,7 +134,7 @@ jobs:
 
       - name: Fuzz ${{ matrix.target }} for 15 minutes
         run: |
-          cargo +nightly fuzz run ${{ matrix.target }} fuzz/corpus/${{ matrix.target }} -- $FUZZER_ARGS
+          cargo +nightly fuzz run ${{ matrix.features }} ${{ matrix.target }} fuzz/corpus/${{ matrix.target }} -- $FUZZER_ARGS
           echo "Corpus files after fuzzing: $(find fuzz/corpus/${{ matrix.target }} -type f | wc -l)"
 
       - name: Upload corpus for the next run
