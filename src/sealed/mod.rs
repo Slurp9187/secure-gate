@@ -60,9 +60,11 @@
 //! - A **clean** read of the address space: a debugger, `/proc/<pid>/mem`, an attacker who
 //!   can run code in the process. That read gets pre-key, salt and ciphertext together.
 //! - **Hibernation** files, which capture locked pages too, and **crash dumps** on Windows
-//!   and macOS. On Linux the pre-key is marked `MADV_DONTDUMP`, which the kernel documents as leaving it out of core dumps. On
-//!   Windows a [`Prekey::new_idle_noaccess`] pre-key is absent from a full-memory dump taken
-//!   while it is idle, at the price of its lock.
+//!   and macOS. On Linux the pre-key is marked `MADV_DONTDUMP`, which the kernel documents
+//!   as leaving it out of core dumps. On Windows a [`Prekey::new_idle_noaccess`] pre-key is
+//!   absent from a user-mode full-memory dump (`MiniDumpWithFullMemory`) taken while it is
+//!   idle, at the price of its lock; a kernel or complete memory dump captures physical
+//!   memory whatever the protection.
 //! - Over-reads of the sealed objects themselves: their ciphertext and salt are ordinary
 //!   memory, but useless without the pre-key.
 //! - A failed lock ([`Prekey::lock_status`] says so): the pre-key can then be swapped out
