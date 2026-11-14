@@ -17,15 +17,16 @@ readme = "README.md"
 include = ["/src/**/*.rs", "/CHANGELOG.md", "/README.md", "/LICENSE*"]
 
 # `region` does the system calls (it is already in secure-gate's `sealed` graph), `zeroize`
-# does the wipe, `libc` only `madvise(MADV_DONTDUMP)` on Linux. All three declare
-# `rust-version` at or below 1.85.
+# does the wipe, `libc` only `madvise`: `MADV_DONTDUMP` on Linux, `MADV_NOCORE` on FreeBSD.
+# All three declare `rust-version` at or below 1.85.
 [dependencies]
 region = { version = "4.0.1", default-features = false }
 zeroize = { version = "1.9", default-features = false }
 
-[target.'cfg(target_os = "linux")'.dependencies]
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 libc = { version = "0.2.172", default-features = false }
 
-# The fork test calls `fork`, `_exit` and `waitpid` on every Unix, not only Linux.
+# The fork test calls `fork`, `_exit` and `waitpid` on every Unix, and the FreeBSD tests
+# read the kernel's VM map with `kinfo_getvmmap`.
 [target.'cfg(unix)'.dev-dependencies]
 libc = { version = "0.2.172", default-features = false }

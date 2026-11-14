@@ -209,6 +209,61 @@ fn on_linux_idle_noaccess_keeps_the_lock_across_accesses() {
     assert!(flags.split_whitespace().any(|f| f == "lo"), "{flags}");
 }
 
+/// The kernel's flags for the VM map entry holding `addr` (FreeBSD: `kinfo_getvmmap`, the
+/// data behind `procstat -v`).
+#[cfg(target_os = "freebsd")]
+fn vm_flags(addr: usize) -> libc::c_int {
+    let mut count = 0;
+    // SAFETY (test): returns a `malloc`ed array of `count` entries, or null.
+    let entries = unsafe { libc::kinfo_getvmmap(libc::getpid(), &mut count) };
+    assert!(!entries.is_null(), "kinfo_getvmmap failed");
+    // SAFETY (test): `entries` holds `count` initialized entries until freed below.
+    let flags = unsafe { core::slice::from_raw_parts(entries, count as usize) }
+        .iter()
+        .find(|e| e.kve_start as usize <= addr && addr < e.kve_end as usize)
+        .map(|e| e.kve_flags);
+    // SAFETY (test): `entries` came from `malloc` and is not used after this.
+    unsafe { libc::free(entries.cast()) };
+    flags.expect("address not in the process's VM map")
+}
+
+/// On FreeBSD an idle no-access block keeps its lock through real accesses, read back from
+/// the kernel's VM map rather than from the cached result of the first `mlock`.
+#[cfg(target_os = "freebsd")]
+#[test]
+fn on_freebsd_idle_noaccess_keeps_the_lock_across_accesses() {
+    let b = GuardedBlock::<4096>::new_with_idle_noaccess(|x| x.fill(4)).unwrap();
+    if b.lock_status().is_err() {
+        return; // This host refuses locks at all.
+    }
+    let start = b.layout()[1].start;
+    assert_ne!(
+        vm_flags(start) & libc::KVME_FLAG_USER_WIRED,
+        0,
+        "locked when made"
+    );
+    for _ in 0..3 {
+        assert_eq!(b.with(|x| x[0]), 4);
+    }
+    assert_ne!(
+        vm_flags(start) & libc::KVME_FLAG_USER_WIRED,
+        0,
+        "still locked after accesses"
+    );
+}
+
+#[cfg(target_os = "freebsd")]
+#[test]
+fn the_block_is_excluded_from_core_dumps_on_freebsd() {
+    let b = GuardedBlock::<64>::new_with(|_| {}).unwrap();
+    let flags = vm_flags(b.layout()[1].start);
+    assert_ne!(
+        flags & libc::KVME_FLAG_NOCOREDUMP,
+        0,
+        "kve_flags {flags:#x}"
+    );
+}
+
 /// A `fork()` child does not inherit page locks, and `lock_status` must say so there rather
 /// than repeat the parent's result. The child only calls async-signal-safe functions
 /// (`getpid` inside `lock_status`, `_exit`), since the test harness is multithreaded.
