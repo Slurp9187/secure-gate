@@ -34,7 +34,8 @@
 //!   Windows is the lock: a no-access page leaves the process's working set and cannot stay
 //!   locked, so this mode does not lock there, and [`GuardedBlock::lock_status`] says so.
 //! - **Wiped on drop**, while still locked if the lock was granted, then unlocked and
-//!   unmapped.
+//!   unmapped. Best effort: if the system refuses to make the block writable again, it is
+//!   unmapped unwiped, and the operating system zeroes its pages before reusing them.
 //!
 //! **After `fork()`**, a child has the block's bytes but not its page lock, and
 //! [`GuardedBlock::lock_status`] says so there. The child's copy is its own: the parent's
@@ -389,8 +390,14 @@ impl<const N: usize> GuardedBlock<N> {
     /// `Ok(())` if the block's pages are locked in RAM; otherwise why they are not.
     ///
     /// In a `fork()` child of the process that made the block this is always an error whose
-    /// [`forked`](LockError::forked) is `true`: page locks are not inherited.
+    /// [`forked`](LockError::forked) is `true`: page locks are not inherited. A child is told
+    /// apart by its process ID, so one that has the parent's ID in a new PID namespace (a
+    /// container's PID 1 forking after `unshare(CLONE_NEWPID)`) is not detected and repeats
+    /// the parent's status.
     pub fn lock_status(&self) -> Result<(), LockError> {
+        // A process ID check, not a fork hook: cheap and async-signal-safe (the fork test
+        // calls it in a child). It misses a child that has the parent's ID in a new PID
+        // namespace, which the docs above say.
         if std::process::id() != self.pid {
             return Err(LockError {
                 cause: LockCause::Forked,

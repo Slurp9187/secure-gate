@@ -47,7 +47,8 @@ What each part is for:
   memory whatever the protection. A no-access page cannot stay locked there, so this mode
   does not lock on Windows and `lock_status()` says so. On Linux the lock is kept.
 - **Wiped on drop** (while still locked, if the lock was granted), then unlocked and
-  unmapped.
+  unmapped. Best effort: if the system refuses to make the block writable again, it is
+  unmapped unwiped, and the operating system zeroes its pages before reusing them.
 - **Honest after `fork()`**: a child does not inherit page locks, and `lock_status()` says so
   there. The child has its own copy of the block, which the parent's wipe on drop does not
   reach: it lasts until the child execs or exits. A child of a multithreaded parent must not

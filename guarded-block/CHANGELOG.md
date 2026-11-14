@@ -15,6 +15,10 @@ All notable changes to this crate are documented in this file. The format follow
   memory dump. When `N` is not a whole number of pages, a read past the block's last byte
   gets zeros to the end of the page before it faults. A `fork()` child's copy is not reached
   by the parent's wipe on drop. A lock does not cover hibernation.
+- The wipe on drop is documented as best effort: if the block cannot be made writable again
+  it is unmapped unwiped, and the operating system zeroes its pages before reuse.
+  `lock_status` documents that a `fork()` child is told apart by process ID, so a child
+  with the parent's ID in a new PID namespace is not detected.
 
 ## [0.1.0] - 2026-10-20
 
