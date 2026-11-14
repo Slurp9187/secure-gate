@@ -12,36 +12,45 @@
 //!   the protection changes therefore touch this block's pages and nothing else.
 //! - **Guard pages.** A linear over-read from memory below the block (a C buffer over-read
 //!   in the same process, Heartbleed-style), or an over-run off its end, faults on a guard
-//!   page instead of reading the block.
+//!   page instead of reading the block. The block starts at the bottom of its pages, so when
+//!   `N` is not a whole number of pages a read past its last byte gets the zeros that fill
+//!   the rest of the page before it faults.
 //! - **Read-only while live.** The block is written once, by the closure given to
 //!   [`GuardedBlock::new_with`], and is read-only from then until it drops. A stray write
 //!   faults.
 //! - **Locked.** `VirtualLock` on Windows, `mlock` on Unix, so the block is not written to
-//!   swap. A refused lock is reported by [`GuardedBlock::lock_status`], never fatal.
+//!   swap. A refused lock is reported by [`GuardedBlock::lock_status`], never fatal. A lock
+//!   does not cover hibernation: the hibernation file captures locked pages too.
 //! - **Not in core dumps (Linux).** `madvise(MADV_DONTDUMP)` on the block, best effort;
 //!   the kernel documents such pages as left out of core dumps.
 //! - **Optionally, no access while idle.** With [`GuardedBlock::new_with_idle_noaccess`] the
 //!   block is readable only while a [`GuardedBlock::with`] call is running (unless the
 //!   system refuses to make it no-access again; see [`GuardedBlock::with`]). On Windows that
-//!   keeps it out of other processes' `ReadProcessMemory` and out of full-memory crash
-//!   dumps taken while it is idle; everywhere, an in-process read of its address faults
-//!   while it is idle. Its price on Windows is the lock: a no-access page leaves the
-//!   process's working set and cannot stay locked, so this mode does not lock there, and
-//!   [`GuardedBlock::lock_status`] says so.
+//!   makes another process's `ReadProcessMemory` fail on it, and keeps it out of user-mode
+//!   full-memory dumps (`MiniDumpWithFullMemory`), while it is idle; everywhere, an
+//!   in-process read of its address faults while it is idle. It does not stop a process that
+//!   may change this one's page protection (`VirtualProtectEx`) and then read, and a kernel
+//!   or complete memory dump captures physical memory whatever the protection. Its price on
+//!   Windows is the lock: a no-access page leaves the process's working set and cannot stay
+//!   locked, so this mode does not lock there, and [`GuardedBlock::lock_status`] says so.
 //! - **Wiped on drop**, while still locked if the lock was granted, then unlocked and
-//!   unmapped.
+//!   unmapped. Best effort: if the system refuses to make the block writable again, it is
+//!   unmapped unwiped, and the operating system zeroes its pages before reusing them.
 //!
-//! **After `fork()`**, a child shares the block's bytes but not its page lock, and
-//! [`GuardedBlock::lock_status`] says so there. A child of a *multithreaded* parent must not
-//! use an inherited idle no-access block at all: if another thread was inside
+//! **After `fork()`**, a child has the block's bytes but not its page lock, and
+//! [`GuardedBlock::lock_status`] says so there. The child's copy is its own: the parent's
+//! wipe on drop does not reach it, and it lasts until the child execs or exits. A child of a
+//! *multithreaded* parent must not use an inherited idle no-access block at all: if another
+//! thread was inside
 //! [`GuardedBlock::with`] at the fork, the child inherits its open window (the block stays
 //! readable) or its held mutex (the child's first access deadlocks). POSIX allows such a
 //! child only async-signal-safe calls until it execs anyway.
 //!
 //! What it does not do: hide the block from a debugger, from `/proc/<pid>/mem` (both read
-//! through page protection on Linux), or from code in the same process that changes the
-//! protection back. It does not cover copies of the block's bytes that the caller's closure
-//! makes.
+//! through page protection on Linux), or from code in this process, or in another process
+//! allowed to, that changes the protection back. It does not keep the block out of a
+//! hibernation file or a kernel memory dump, wipe a `fork()` child's copy, or cover copies
+//! of the block's bytes that the caller's closure makes.
 //!
 //! All the `unsafe` code is in this crate; its API is safe.
 //!
@@ -381,8 +390,14 @@ impl<const N: usize> GuardedBlock<N> {
     /// `Ok(())` if the block's pages are locked in RAM; otherwise why they are not.
     ///
     /// In a `fork()` child of the process that made the block this is always an error whose
-    /// [`forked`](LockError::forked) is `true`: page locks are not inherited.
+    /// [`forked`](LockError::forked) is `true`: page locks are not inherited. A child is told
+    /// apart by its process ID, so one that has the parent's ID in a new PID namespace (a
+    /// container's PID 1 forking after `unshare(CLONE_NEWPID)`) is not detected and repeats
+    /// the parent's status.
     pub fn lock_status(&self) -> Result<(), LockError> {
+        // A process ID check, not a fork hook: cheap and async-signal-safe (the fork test
+        // calls it in a child). It misses a child that has the parent's ID in a new PID
+        // namespace, which the docs above say.
         if std::process::id() != self.pid {
             return Err(LockError {
                 cause: LockCause::Forked,

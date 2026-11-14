@@ -30,23 +30,34 @@ What each part is for:
   protection changes touch only this block.
 - **Guard pages**: a linear over-read from memory below it (a C buffer over-read in the same
   process, Heartbleed-style), or an over-run off its end, faults instead of reading it.
+  The block starts at the bottom of its pages, so when `N` is not a whole number of pages a
+  read past its last byte gets the zeros that fill the rest of the page before it faults.
 - **Read-only while live**: written once by the closure given to `new_with`, then read-only
   until it drops.
 - **Locked** (`VirtualLock` / `mlock`), so it is not written to swap. A refused lock is
-  reported by `lock_status()`, never fatal.
+  reported by `lock_status()`, never fatal. A lock does not cover hibernation: the
+  hibernation file captures locked pages too.
 - **Not in core dumps** on Linux (`MADV_DONTDUMP`, best effort).
 - **Optionally no-access while idle** (`new_with_idle_noaccess`): readable only during a
   `with` call (unless the system refuses the change back to no-access, in which case a later
-  call closes it). On Windows that keeps it out of `ReadProcessMemory` and full-memory crash
-  dumps taken while idle, but a no-access page cannot stay locked there, so this mode does
-  not lock on Windows and `lock_status()` says so. On Linux the lock is kept.
+  call closes it). On Windows that makes another process's `ReadProcessMemory` fail on it,
+  and keeps it out of user-mode full-memory dumps (`MiniDumpWithFullMemory`), while idle.
+  It does not stop a process that may change this one's page protection
+  (`VirtualProtectEx`) and then read, and a kernel or complete memory dump captures physical
+  memory whatever the protection. A no-access page cannot stay locked there, so this mode
+  does not lock on Windows and `lock_status()` says so. On Linux the lock is kept.
 - **Wiped on drop** (while still locked, if the lock was granted), then unlocked and
-  unmapped.
+  unmapped. Best effort: if the system refuses to make the block writable again, it is
+  unmapped unwiped, and the operating system zeroes its pages before reusing them.
 - **Honest after `fork()`**: a child does not inherit page locks, and `lock_status()` says so
-  there. A child of a multithreaded parent must not use an inherited idle no-access block.
+  there. The child has its own copy of the block, which the parent's wipe on drop does not
+  reach: it lasts until the child execs or exits. A child of a multithreaded parent must not
+  use an inherited idle no-access block.
 
 What it does not do: hide the block from a debugger, from `/proc/<pid>/mem`, or from code in
-the same process that changes the protection back; or cover copies the caller's closure makes.
+this process, or in another process allowed to, that changes the protection back; keep it
+out of a hibernation file or a kernel memory dump; wipe a `fork()` child's copy; or cover
+copies the caller's closure makes.
 
 Measurements behind these claims (over-reads from live C buffers, lock survival across
 protection changes, crash dumps, per-access cost) are in the secure-gate repository, under

@@ -100,10 +100,12 @@ probe and its raw output are in [`receipts/guarded-prekey/`](receipts/guarded-pr
 
 **Idle no-access, and why it is not the default.** `Prekey::new_idle_noaccess()` also makes
 the pre-key no-access except while a sealing key is derived from it (about 6 µs per access).
-On Windows that keeps it out of other processes' `ReadProcessMemory` and out of a full-memory
-crash dump taken while it is idle: [M] a `MiniDumpWithFullMemory` dump held a marker from the
-pre-key with the heap block and with a readable guarded block, and did not with an idle
-no-access one (2/2 each). But [M] on Windows a no-access page cannot stay locked: with 11
+On Windows that makes another process's `ReadProcessMemory` fail on it and keeps it out of a
+user-mode full-memory dump taken while it is idle: [M] a `MiniDumpWithFullMemory` dump held a
+marker from the pre-key with the heap block and with a readable guarded block, and did not
+with an idle no-access one (2/2 each). It does not stop a process that may change this one's
+page protection (`VirtualProtectEx`) and then read, and a kernel or complete memory dump
+captures physical memory whatever the protection; neither was measured. But [M] on Windows a no-access page cannot stay locked: with 11
 blocks filling the quota, switching them to no-access freed the quota and every later unlock
 failed with error 158 ("segment is already unlocked"), while read-only kept every lock (2/2
 runs each); `QueryWorkingSetEx` shows no-access pages leave the working set at once and come

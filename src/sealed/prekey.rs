@@ -228,9 +228,12 @@ impl Prekey {
     /// that, and [`lock_status`](Self::lock_status) is about the lock only.
     ///
     /// What that adds: while idle, the pre-key cannot be read at its address at all. On
-    /// Windows that keeps it out of other processes' `ReadProcessMemory` and out of a
-    /// full-memory crash dump taken while it is idle, which a locked pre-key does not
-    /// (measured; the repository's `docs/design/sealed_memory.md` has the numbers).
+    /// Windows that makes another process's `ReadProcessMemory` fail on it, and keeps it out
+    /// of a user-mode full-memory dump (`MiniDumpWithFullMemory`) taken while it is idle,
+    /// which a locked pre-key does not (measured; the repository's
+    /// `docs/design/sealed_memory.md` has the numbers). It does not stop a process that may
+    /// change this one's page protection (`VirtualProtectEx`) and then read, and a kernel or
+    /// complete memory dump captures physical memory whatever the protection.
     ///
     /// What it costs:
     ///

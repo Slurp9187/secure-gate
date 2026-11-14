@@ -212,7 +212,8 @@ fn on_linux_idle_noaccess_keeps_the_lock_across_accesses() {
 /// A `fork()` child does not inherit page locks, and `lock_status` must say so there rather
 /// than repeat the parent's result. The child only calls async-signal-safe functions
 /// (`getpid` inside `lock_status`, `_exit`), since the test harness is multithreaded.
-#[cfg(target_os = "linux")]
+/// Every Unix, since `fork` and the process ID check behave the same on each.
+#[cfg(unix)]
 #[test]
 fn after_fork_the_child_reports_the_lock_as_not_inherited() {
     let b = GuardedBlock::<64>::new_with(|x| x.fill(5)).unwrap();
