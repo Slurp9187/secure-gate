@@ -447,6 +447,11 @@ enum Op {
         prekey: u8,
         len: u16,
     },
+    /// `SealedFixed::from_random` into `slot`; the model is whatever it first opens to.
+    Random {
+        slot: u8,
+        prekey: u8,
+    },
     Read {
         slot: u8,
         via: Via,
@@ -564,6 +569,21 @@ impl World {
                     Kind::Password => Obj::Password(Subject::seal_from(&model, &prekey)),
                 };
                 self.slots[slot as usize % SLOTS] = Some(Slot { obj, model });
+            }
+
+            Op::Random { slot, prekey } => {
+                let prekey = self.prekey(prekey);
+                let sealed = SealedFixed::<32>::from_random(&prekey);
+                let model = sealed.with_secret(|p| {
+                    let mut model = Zeroizing::new(Vec::with_capacity(p.len()));
+                    model.extend_from_slice(p);
+                    model
+                });
+                assert!(model.iter().any(|&b| b != 0), "from_random gave all zeros");
+                self.slots[slot as usize % SLOTS] = Some(Slot {
+                    obj: Obj::Fixed(sealed),
+                    model,
+                });
             }
 
             Op::Read { slot, via } => {
@@ -706,12 +726,8 @@ impl World {
                     assert!(s.ct_eq(&twin), "two seals of one plaintext compare unequal");
                     let mut near = Zeroizing::new(Vec::with_capacity(model.len()));
                     near.extend_from_slice(model);
-                    if shorter && !is_fixed(s) {
-                        // The canary is ASCII, so the cut is on a character boundary
-                        // whenever it is taken from a model that is only the canary.
-                        if near.len() != CANARY.len() {
-                            return;
-                        }
+                    if shorter && !is_fixed(s) && near.last().is_some_and(u8::is_ascii) {
+                        // An ASCII last byte is a whole character, so text stays text.
                         let cut = near.len() - 1;
                         near.truncate(cut);
                     } else {
