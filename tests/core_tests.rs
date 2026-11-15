@@ -322,14 +322,14 @@ fn fixed_from_random() {
 
 #[cfg(feature = "rand")]
 #[test]
-fn fixed_from_rng_seeded_deterministic() {
+fn fixed_try_new_with_seeded_rng_deterministic() {
     use rand::rngs::StdRng;
-    use rand::SeedableRng;
+    use rand::{SeedableRng, TryRngCore};
 
     let mut rng_a = StdRng::from_seed([1u8; 32]);
     let mut rng_b = StdRng::from_seed([1u8; 32]);
-    let key_a: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_a).expect("rng fill");
-    let key_b: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng_b).expect("rng fill");
+    let key_a = Fixed::<[u8; 16]>::try_new_with(|b| rng_a.try_fill_bytes(b)).expect("rng fill");
+    let key_b = Fixed::<[u8; 16]>::try_new_with(|b| rng_b.try_fill_bytes(b)).expect("rng fill");
     key_a.with_secret(|a| {
         key_b.with_secret(|b| assert_eq!(a, b, "same seed must yield same bytes"))
     });
@@ -338,14 +338,16 @@ fn fixed_from_rng_seeded_deterministic() {
 #[cfg(feature = "rand")]
 #[cfg(feature = "alloc")]
 #[test]
-fn dynamic_from_rng_seeded() {
+fn dynamic_try_new_with_seeded_rng() {
     use rand::rngs::StdRng;
-    use rand::SeedableRng;
+    use rand::{SeedableRng, TryRngCore};
     use secure_gate::Dynamic;
 
     let mut rng = StdRng::from_seed([9u8; 32]);
-    let a: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).expect("rng fill");
-    let b: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).expect("rng fill");
+    let a: Dynamic<Vec<u8>> =
+        Dynamic::try_new_with(32, |s| rng.try_fill_bytes(s)).expect("rng fill");
+    let b: Dynamic<Vec<u8>> =
+        Dynamic::try_new_with(32, |s| rng.try_fill_bytes(s)).expect("rng fill");
     a.with_secret(|sa| {
         b.with_secret(|sb| assert_ne!(sa, sb, "sequential draws from same RNG should differ"));
     });
@@ -443,9 +445,7 @@ fn fixed_try_new_with_accepts_a_non_byte_array() {
 #[cfg(feature = "rand")]
 struct FailingRng;
 
-// rand 0.9 requires TryRngCore::Error: Debug + Display, so &'static str is not enough.
-// (0.10 renames the trait to TryRng and tightens this to core::error::Error, which
-// needs 1.81 — above this branch's MSRV.)
+// rand 0.10 requires TryRngCore::Error: core::error::Error, so &'static str is not enough.
 #[cfg(feature = "rand")]
 #[derive(Debug)]
 struct RngError;
@@ -461,7 +461,6 @@ impl core::fmt::Display for RngError {
 impl std::error::Error for RngError {}
 
 #[cfg(feature = "rand")]
-// rand 0.9 on this branch: the trait is `TryRngCore`; 0.10 renamed it `TryRng`.
 impl rand::TryRngCore for FailingRng {
     type Error = RngError;
     fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
@@ -476,12 +475,10 @@ impl rand::TryRngCore for FailingRng {
 }
 
 #[cfg(feature = "rand")]
-impl rand::TryCryptoRng for FailingRng {}
-
-#[cfg(feature = "rand")]
 #[test]
-fn fixed_from_rng_error_returns_err() {
-    let result = Fixed::<[u8; 4]>::from_rng(&mut FailingRng);
+fn fixed_try_new_with_failing_rng_returns_err() {
+    use rand::TryRngCore;
+    let result = Fixed::<[u8; 4]>::try_new_with(|b| FailingRng.try_fill_bytes(b));
     assert!(result.is_err());
 }
 
@@ -493,10 +490,14 @@ fn dynamic_vec_new_with_fills_correctly() {
     secret.with_secret(|s| assert_eq!(s.as_slice(), &[10u8, 20, 30]));
 }
 
-// The slot arrives at exactly `len`, every byte zero — callers rely on an untouched
-// tail as real key material, not padding (a 40-bit RC4 key is 5 derived bytes followed
-// by 11 zeros of key-schedule input). A partial fill plus a zero tail pins both halves
-// of that guarantee at once.
+// `dynamic_vec_new_with_empty_closure` used to live here to prove the buffer started
+// empty. That premise is gone under the new signature — `len` is chosen by the caller
+// up front, not discovered by filling, so an empty closure would just assert `new_with(0,
+// ..)` produces nothing. What replaces it is the guarantee real callers actually lean
+// on: the slot arrives at exactly `len` bytes and every one of them is zero, so an
+// untouched tail is genuine key material rather than uninitialized padding. A 40-bit
+// RC4 key is five derived bytes followed by eleven zeros the key schedule consumes as
+// input — this is that shape.
 #[cfg(feature = "alloc")]
 #[test]
 fn dynamic_vec_new_with_partial_fill() {
@@ -510,13 +511,15 @@ fn dynamic_vec_new_with_partial_fill() {
     });
 }
 
-// No slack: capacity equals length. Checked against `len()`, not a repeated literal, so
-// a constructor that returned a larger capacity backing a shorter length would fail
-// this.
 #[cfg(feature = "alloc")]
 #[test]
 fn dynamic_vec_new_with_capacity_equals_len() {
     use secure_gate::Dynamic;
+    // No slack: capacity equals length, so the wrapper never holds a spare block
+    // beyond what the caller asked for. Checked against `len()`, not a repeated
+    // literal, so a constructor that returned capacity 24 backing a shorter length
+    // would fail this. The closure is empty, which makes this the cheapest place to
+    // also pin an all-zero slot at a second size (16 is already covered above).
     let secret = Dynamic::<Vec<u8>>::new_with(24, |_slot| {});
     secret.with_secret(|s| {
         assert_eq!(s.len(), 24);
@@ -537,9 +540,10 @@ fn dynamic_vec_try_new_with_ok_fills_correctly() {
     secret.with_secret(|s| assert_eq!(s.as_slice(), &[10u8, 20, 30]));
 }
 
-// Mirrors `dynamic_vec_new_with_partial_fill` on the fallible path. `try_new_with` is
-// its own body in `src/dynamic.rs` — not a delegation to `new_with` — so the sized,
-// pre-zeroed slot contract needs its own proof here.
+// Mirrors `dynamic_vec_new_with_partial_fill` on the fallible path. `try_new_with` is a
+// separate body in `src/dynamic.rs` — its own `Zeroizing::new(vec![0u8; len])`, not a
+// delegation to `new_with` — so the sized, pre-zeroed slot contract needs its own proof
+// here rather than borrowing the infallible test's coverage.
 #[cfg(feature = "alloc")]
 #[test]
 fn dynamic_vec_try_new_with_partial_fill() {
@@ -553,7 +557,7 @@ fn dynamic_vec_try_new_with_partial_fill() {
         assert_eq!(s.len(), 16);
         assert_eq!(&s[..5], &[1u8, 2, 3, 4, 5]);
         assert_eq!(&s[5..], &[0u8; 11]); // untouched tail: zero, not garbage
-        assert_eq!(s.capacity(), s.len());
+        assert_eq!(s.capacity(), 16);
     });
 }
 
@@ -565,10 +569,15 @@ fn dynamic_vec_try_new_with_err_propagates() {
     #[derive(Debug, PartialEq, Eq)]
     struct ShortRead(usize);
 
+    // The partial write staged below (slot[0] = 0xFF) is wiped before the buffer is
+    // released on the `Err` path — that half is measured in `tests/heap_zeroize.rs`'s
+    // `check_try_new_with_err_zeroed_vec`, the only instrument that can watch the
+    // dealloc and confirm it lands all zeros. This test only has the error value left
+    // to check once the closure returns, so that is all the assertion below covers.
     let result = Dynamic::<Vec<u8>>::try_new_with(4, |slot| {
         // Observed from inside the closure, not after construction: an implementation
-        // that zeroed the slot only after the closure returned would still pass every
-        // other assertion in this file.
+        // that zeroed the slot only after the closure returned would still satisfy
+        // every assertion elsewhere in this file.
         assert!(slot.iter().all(|&b| b == 0), "slot must arrive zeroed");
         slot[0] = 0xFF;
         Err(ShortRead(1))
@@ -580,13 +589,14 @@ fn dynamic_vec_try_new_with_err_propagates() {
 #[cfg(feature = "rand")]
 #[cfg(feature = "alloc")]
 #[test]
-fn dynamic_from_rng_error_returns_err() {
+fn dynamic_try_new_with_failing_rng_returns_err() {
+    use rand::TryRngCore;
     use secure_gate::Dynamic;
-    let result = Dynamic::<Vec<u8>>::from_rng(32, &mut FailingRng);
+    let result = Dynamic::<Vec<u8>>::try_new_with(32, |s| FailingRng.try_fill_bytes(s));
     assert!(result.is_err());
 }
 
-// === len() element-count semantics ===
+// === len() element-count semantics (issue #5) ===
 
 #[cfg(feature = "alloc")]
 #[test]
@@ -666,9 +676,8 @@ fn fixed_storage_accepts_the_fixed_capacity_shapes() {
 /// That asymmetry is why this test exists. The bound is an allow-list, so a missing impl is
 /// indistinguishable to the caller from a deliberate refusal, and the cost of an accidental
 /// omission is not a worse error message — it is a shape that cannot be used at all.
-///
-/// MSRV note: `size_of` is spelled `core::mem::size_of` because it only entered the prelude
-/// in Rust 1.80, and this line's MSRV is 1.70. `main` uses the bare form.
+/// Measured before the impls were added: all eight of these failed `cargo check` while
+/// reporting, verbatim, that `(u8, u8, u8, u8, u8)` "owns a heap allocation".
 #[test]
 fn fixed_storage_covers_the_heap_free_foreign_shapes() {
     use core::mem::MaybeUninit;

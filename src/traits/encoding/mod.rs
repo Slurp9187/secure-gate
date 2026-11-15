@@ -5,7 +5,8 @@
 //! All encoding traits require `alloc`. Every encoder returns
 //! [`EncodedSecret`](crate::EncodedSecret): the encoded form is a second full copy of
 //! the secret, and it stays wiped until it drops.
-//! See the [`decoding`](super::decoding) module for the reverse direction.
+//! For the reverse direction, decode with the `try_from_*` constructors on
+//! [`Fixed`](crate::Fixed) and [`Dynamic`](crate::Dynamic).
 //!
 //! Each encoding trait has its own feature gate:
 //!
@@ -63,17 +64,17 @@ pub enum Case {
 ///
 /// # Why the extra bound exists
 ///
-/// `str` and `String` implement `AsRef<[u8]>`, so an `AsRef<[u8]>`-only blanket made
-/// every string an encoding *input* — even though strings are this crate's decoding
-/// input. Two silent wrong answers followed from that:
+/// `str` and `String` implement `AsRef<[u8]>`, so an `AsRef<[u8]>`-only blanket would
+/// make every string an encoding *input* — even though strings are this crate's decoding
+/// input. Two silent wrong answers follow from that:
 ///
-/// - `encoded.to_hex()` compiled for an [`EncodedSecret`](crate::EncodedSecret), which
-///   derefs to `str`. It hex-encoded the *encoded text*: a 32-byte key came back as 124
-///   hex characters, with no signature or name to suggest anything was wrong.
-/// - `"text".to_hex()` encoded a string's UTF-8 bytes, which is occasionally what
+/// - `encoded.to_hex()` would compile for an [`EncodedSecret`](crate::EncodedSecret),
+///   which derefs to `str`. It hex-encodes the *encoded text*: a 32-byte key comes back
+///   as 124 hex characters, with no signature or name to suggest anything is wrong.
+/// - `"text".to_hex()` would encode a string's UTF-8 bytes, which is occasionally what
 ///   someone means and usually not.
 ///
-/// Both are now compile errors. Write `.as_bytes()` when you did mean the UTF-8.
+/// With the bound, both are compile errors. Write `.as_bytes()` when you did mean the UTF-8.
 ///
 /// # Implementing it
 ///
@@ -137,14 +138,12 @@ impl EncodableBytes for alloc::vec::Vec<u8> {}
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use self::bech32::ToBech32;
 #[cfg(feature = "encoding-bech32")]
-pub use self::bech32::{bech32_code_length, Bech32Sized, Bech32Standard, BECH32_CODE_LENGTH};
+pub use self::bech32::{bech32_code_length, BECH32_CODE_LENGTH};
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 pub use base32::ToBase32;
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
 pub use base64_url::ToBase64Url;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 pub use bech32m::ToBech32m;
-#[cfg(feature = "encoding-bech32")]
-pub use bech32m::{Bech32mSized, Bech32mStandard};
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 pub use hex::ToHex;

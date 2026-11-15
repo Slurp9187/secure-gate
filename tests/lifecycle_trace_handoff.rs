@@ -27,15 +27,9 @@
 //! Where the contract is not observable from safe code, the test says so in a comment
 //! rather than asserting a weaker thing and implying it proves the stronger one.
 //!
-//! Two spellings look dated and are not: this branch's MSRV is 1.70, so
-//! `LocalKey::with(|c| c.borrow_mut())` stands in for `with_borrow_mut` (stable 1.73) and an
-//! explicit `as *const T` cast stands in for `core::ptr::from_ref` (stable 1.76). `main`'s copy
-//! of this file uses the newer APIs; neither changes what is measured, and the MSRV job builds
-//! this file on 1.70, so do not replace them.
-//!
 //! The shapes below cover every `fixed_newtype!` front end plus a plain `type` alias,
 //! because the alias-versus-newtype contrast is the whole point of the nominal types
-//! and belongs next to the behaviour it is contrasted with.
+//! and belongs next to the behavior it is contrasted with.
 
 use core::cell::RefCell;
 use secure_gate::{
@@ -133,7 +127,7 @@ fn every_read_tier_reaches_the_same_storage_and_leaves_it_intact() {
     // exactly that, and the compiler rejects `|bytes| bytes` here — so the address is
     // laundered out as a raw pointer, which carries no lifetime. It is compared and
     // never dereferenced.
-    let scoped: *const [u8; 32] = key.with_secret(|bytes| bytes as *const [u8; 32]);
+    let scoped: *const [u8; 32] = key.with_secret(|s| s as *const _);
     assert!(
         core::ptr::eq(direct, scoped),
         "with_secret must borrow the wrapper's storage, not a copy of it"
@@ -200,7 +194,7 @@ fn the_generic_arm_carries_the_access_model_for_a_non_byte_inner_type() {
     let poly = Poly::new([7i16; 256]);
 
     let direct: *const [i16; 256] = poly.expose_secret();
-    let scoped: *const [i16; 256] = poly.with_secret(|coeffs| coeffs as *const [i16; 256]);
+    let scoped: *const [i16; 256] = poly.with_secret(|s| s as *const _);
     assert!(core::ptr::eq(direct, scoped));
 
     assert_eq!(poly.with_secret(|coeffs| coeffs.len()), 256);
@@ -219,7 +213,7 @@ fn the_generic_arm_carries_the_access_model_for_a_non_byte_inner_type() {
 /// The point is not that five constructors work. It is that the nominal separation is
 /// the *only* difference between them: each one is built from one `SECRET` constant and
 /// each one reads back byte-identically, so anything that later diverges between them
-/// is a real behavioural difference and not an artifact of how they were built.
+/// is a real behavioral difference and not an artifact of how they were built.
 #[test]
 fn nominal_separation_changes_the_type_and_nothing_about_the_contents() {
     let opened = Opened::new(SECRET);
@@ -319,12 +313,12 @@ fn the_readme_rotation_pattern_overwrites_the_old_key_where_it_sits() {
 }
 
 /// Coefficients mutate through the generic arm's slice, in place, without disturbing
-/// their neighbours.
+/// their neighbors.
 ///
 /// The generic arm forwards `RevealSecretMut` the same way the byte arms do, but its
 /// inner type is multi-byte, so an indexing or element-size mistake in the forwarding
 /// would corrupt adjacent coefficients rather than producing an obvious failure. The
-/// untouched-neighbour assertions are what catch that.
+/// untouched-neighbor assertions are what catch that.
 #[test]
 fn generic_arm_coefficients_mutate_in_place_through_the_slice() {
     let mut poly = Poly::new([0i16; 256]);
@@ -647,21 +641,22 @@ fn an_alias_is_interchangeable_with_its_base_while_a_newtype_needs_a_door() {
 /// unexpected `Option` in a future refactor shows up here first.
 #[test]
 fn repr_transparent_keeps_every_shape_the_size_of_its_secret() {
-    use core::mem::size_of;
-
-    assert_eq!(size_of::<K32>(), 32);
-    assert_eq!(size_of::<Opened>(), 32);
-    assert_eq!(size_of::<Inbound>(), 32);
-    assert_eq!(size_of::<Outbound>(), 32);
-    assert_eq!(size_of::<Alias>(), 32);
-    assert_eq!(size_of::<Fixed<[u8; 32]>>(), 32);
+    assert_eq!(core::mem::size_of::<K32>(), 32);
+    assert_eq!(core::mem::size_of::<Opened>(), 32);
+    assert_eq!(core::mem::size_of::<Inbound>(), 32);
+    assert_eq!(core::mem::size_of::<Outbound>(), 32);
+    assert_eq!(core::mem::size_of::<Alias>(), 32);
+    assert_eq!(core::mem::size_of::<Fixed<[u8; 32]>>(), 32);
 
     // 256 coefficients, two bytes each — the generic arm adds nothing either.
-    assert_eq!(size_of::<Poly>(), 512);
-    assert_eq!(size_of::<Fixed<[i16; 256]>>(), 512);
+    assert_eq!(core::mem::size_of::<Poly>(), 512);
+    assert_eq!(core::mem::size_of::<Fixed<[i16; 256]>>(), 512);
 
-    assert_eq!(size_of::<Handoff>(), size_of::<Traced>());
-    assert_eq!(size_of::<Handoff>(), size_of::<u64>());
+    assert_eq!(
+        core::mem::size_of::<Handoff>(),
+        core::mem::size_of::<Traced>()
+    );
+    assert_eq!(core::mem::size_of::<Handoff>(), core::mem::size_of::<u64>());
 }
 
 // ---------------------------------------------------------------------------
@@ -696,9 +691,9 @@ fn debug_stays_redacted_at_every_stage_for_every_shape() {
     );
     let base = opened.into_wrapper();
     assert_eq!(format!("{base:?}"), "[REDACTED]", "after outbound crossing");
-    let relabelled = Opened::from_wrapper(base);
+    let relabeled = Opened::from_wrapper(base);
     assert_eq!(
-        format!("{relabelled:?}"),
+        format!("{relabeled:?}"),
         "[REDACTED]",
         "after a full circuit"
     );
@@ -709,7 +704,7 @@ fn debug_stays_redacted_at_every_stage_for_every_shape() {
     assert_eq!(format!("{:?}", Handoff::new(Traced(1))), "[REDACTED]");
 }
 
-/// The forwarded `Zeroize` reaches the secret through every layer of labelling.
+/// The forwarded `Zeroize` reaches the secret through every layer of labeling.
 ///
 /// `zeroize()` is the one end-of-life step a test can observe directly on a
 /// stack-backed secret, and the macros forward it per newtype, so a missing forward
@@ -792,7 +787,7 @@ fn the_reduced_surface_is_a_label_property_that_intowrapper_reopens() {
     assert_eq!(
         poly.as_wrapper().byte_len(),
         512,
-        "bytes, size_of::<i16>() included"
+        "bytes, core::mem::size_of::<i16>() included"
     );
 
     // The handoff still behaves the same at the end of that step.

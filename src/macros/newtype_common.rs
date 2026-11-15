@@ -1,8 +1,8 @@
 //! Shared machinery for `fixed_newtype!` / `dynamic_newtype!`.
 //!
-//! Ships in 0.9.0; backported to the 0.8 line in 0.8.0-rc.11. Design record:
+//! Ships in 0.9.0. Design record:
 //! [`docs/design/nominal_newtypes.md`](https://github.com/Slurp9187/secure-gate/blob/main/docs/design/nominal_newtypes.md) — a repository file, not part of the
-//! published crate, so this is a link and not a path. It describes `main`.
+//! published crate, so this is a link and not a path.
 
 // ---- cfg relays -------------------------------------------------------------
 // `#[cfg(feature = "...")]` inside an exported macro is evaluated in the CALLER's
@@ -126,11 +126,10 @@ macro_rules! __sg_newtype_base {
 /// arms whose payload implements it unconditionally under the `ct-eq` feature —
 /// `Fixed<[u8; N]>`, `Dynamic<String>`, `Dynamic<Vec<u8>>`.
 ///
-/// Those three shapes have always had `ct_eq` for free as a plain `type` alias.
-/// The newtype — the spelling this crate recommends as the safer of the two —
-/// used to charge an extra `derive: [ConstantTimeEq]` token for it, putting the
-/// cost on the side the documentation steers people toward, for a comparison
-/// whose alternative is a timing leak. Corrected in 0.9.0-rc.11.
+/// Those three shapes have `ct_eq` for free as a plain `type` alias. The newtype —
+/// the spelling this crate recommends as the safer of the two — gets it without an
+/// extra `derive: [ConstantTimeEq]` token too, so the comparison whose alternative is
+/// a timing leak costs nothing on the side the documentation steers people toward.
 ///
 /// Every `generic` arm routes `ConstantTimeEq` through [`__sg_newtype_opt!`]
 /// instead, where it remains a genuine opt-in: an arbitrary inner type may or may
@@ -218,7 +217,7 @@ macro_rules! __sg_newtype_opt {
     //
     //   FromWrapper — INBOUND: `from_wrapper(base) -> Self`. A base-typed value
     //                 becomes this role. Every plain alias of the same base is
-    //                 already that base type, so this is the relabelling path;
+    //                 already that base type, so this is the relabeling path;
     //                 a type that guards a boundary should never take it.
     //   IntoWrapper — OUTBOUND: `as_wrapper`, `as_wrapper_mut`, `into_wrapper`.
     //                 Material leaves this role toward the base type. Needed to

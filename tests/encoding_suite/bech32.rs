@@ -9,22 +9,29 @@ use secure_gate::Fixed;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 use secure_gate::RevealSecret;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-use secure_gate::{FromBech32Str, ToBech32};
+use secure_gate::ToBech32;
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-use secure_gate::{FromBech32mStr, ToBech32m};
+use secure_gate::ToBech32m;
 
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
-fn bech32_unchecked_roundtrip_preserves_hrp() {
+fn bech32_unchecked_decodes_without_validating_the_hrp() {
     let data = b"hello world";
     let encoded = data
         .try_to_bech32("fuzz", secure_gate::Case::Lower)
         .expect("valid bech32")
         .into_inner();
+    // The HRP is public text at the front of the string; what `_unchecked` skips is only
+    // the comparison against an expected value.
+    assert!(encoded.starts_with("fuzz1"));
 
-    let (hrp, decoded) = encoded.try_from_bech32_unchecked().expect("valid bech32");
-    assert_eq!(hrp, "fuzz");
-    assert_eq!(decoded, data);
+    let decoded = Dynamic::<Vec<u8>>::try_from_bech32_unchecked(&encoded).expect("valid bech32");
+    assert_eq!(decoded.expose_secret(), data);
+    // The checked path refuses the same string under a different HRP.
+    assert_eq!(
+        Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "other").unwrap_err(),
+        Bech32Error::UnexpectedHrp
+    );
 }
 
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
@@ -37,7 +44,7 @@ fn bech32_invalid_hrp_encode_fails() {
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn bech32_decode_malformed_fails() {
-    let err = "notabech32string".try_from_bech32("fuzz");
+    let err = Dynamic::<Vec<u8>>::try_from_bech32("notabech32string", "fuzz");
     assert!(err.is_err());
 }
 
@@ -49,10 +56,9 @@ fn bech32_try_from_bech32_accepts_matching_hrp() {
         .try_to_bech32("fuzz", secure_gate::Case::Lower)
         .expect("valid bech32")
         .into_inner();
-    let decoded = encoded
-        .try_from_bech32("fuzz")
-        .expect("expected hrp should match");
-    assert_eq!(decoded, data);
+    let decoded =
+        Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "fuzz").expect("expected hrp should match");
+    assert_eq!(decoded.expose_secret(), data);
 }
 
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
@@ -63,21 +69,26 @@ fn bech32_try_from_bech32_rejects_mismatched_hrp() {
         .try_to_bech32("fuzz", secure_gate::Case::Lower)
         .expect("valid bech32")
         .into_inner();
-    let err = encoded.try_from_bech32("other");
+    let err = Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "other");
     assert!(err.is_err());
 }
 
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
-fn bech32m_roundtrip() {
+fn bech32m_unchecked_decodes_without_validating_the_hrp() {
     let data = b"payload";
     let encoded = data
         .try_to_bech32m("fuzzm", secure_gate::Case::Lower)
         .expect("valid")
         .into_inner();
-    let (hrp, decoded) = encoded.try_from_bech32m_unchecked().expect("valid bech32m");
-    assert_eq!(hrp, "fuzzm");
-    assert_eq!(decoded, data);
+    assert!(encoded.starts_with("fuzzm1"));
+
+    let decoded = Dynamic::<Vec<u8>>::try_from_bech32m_unchecked(&encoded).expect("valid bech32m");
+    assert_eq!(decoded.expose_secret(), data);
+    assert_eq!(
+        Dynamic::<Vec<u8>>::try_from_bech32m(&encoded, "other").unwrap_err(),
+        Bech32Error::UnexpectedHrp
+    );
 }
 
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
@@ -90,7 +101,7 @@ fn bech32m_invalid_hrp_encode_fails() {
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[test]
 fn bech32m_decode_malformed_fails() {
-    let err = "notabech32mstring".try_from_bech32m("fuzzm");
+    let err = Dynamic::<Vec<u8>>::try_from_bech32m("notabech32mstring", "fuzzm");
     assert!(err.is_err());
 }
 
@@ -102,10 +113,9 @@ fn bech32m_try_from_bech32m_accepts_matching_hrp() {
         .try_to_bech32m("fuzz", secure_gate::Case::Lower)
         .expect("valid bech32m")
         .into_inner();
-    let decoded = encoded
-        .try_from_bech32m("fuzz")
-        .expect("expected hrp should match");
-    assert_eq!(decoded, data);
+    let decoded =
+        Dynamic::<Vec<u8>>::try_from_bech32m(&encoded, "fuzz").expect("expected hrp should match");
+    assert_eq!(decoded.expose_secret(), data);
 }
 
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
@@ -116,7 +126,7 @@ fn bech32m_try_from_bech32m_rejects_mismatched_hrp() {
         .try_to_bech32m("fuzz", secure_gate::Case::Lower)
         .expect("valid bech32m")
         .into_inner();
-    let err = encoded.try_from_bech32m("other");
+    let err = Dynamic::<Vec<u8>>::try_from_bech32m(&encoded, "other");
     assert!(err.is_err());
 }
 

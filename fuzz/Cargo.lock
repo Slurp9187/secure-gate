@@ -199,7 +199,7 @@ dependencies = [
 
 [[package]]
 name = "secure-gate"
-version = "0.8.0-rc.12"
+version = "0.8.0"
 dependencies = [
  "base16ct",
  "base32ct",

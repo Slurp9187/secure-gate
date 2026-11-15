@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-11-15
+
+First stable release of the 0.8 line (`release/0.8`, Rust edition 2021, MSRV 1.70). It brings
+the line to the API of 0.9.0, the first stable 0.9 release, except for `sealed`. From this
+release the public API follows semantic versioning within 0.8.x, as the README's Stability
+section describes.
+
+This section carries 0.9.0-rc.13 through 0.9.0. The 0.9 `CHANGELOG.md` on `main` has each
+entry in full; the ones that change what a 0.8 user writes or relies on are below.
+
+### Security
+- **A rejected hex, Base32 or Base64url input no longer leaves the decoded bytes in freed
+  heap.** The backends decode every byte before reporting a bad character, so a valid
+  encoding followed by junk failed with the secret already in a plain `Vec` that was then
+  freed unwiped. The `try_from_hex`, `try_from_base32` and `try_from_base64url` decoders on
+  `Fixed` and `Dynamic` now decode into a buffer this crate allocates inside `Zeroizing`,
+  which is wiped on success, on rejection and on unwind. `tests/heap_zeroize.rs` checks it at
+  the allocator. Protection stops at the input string itself, which is the caller's.
+- **The `base32ct` 0.2 panic guard stays (#200).** `base32ct` 0.2, the newest that builds on
+  Rust 1.70, panics on encoded lengths whose last block is 1, 3 or 6 characters. Every call
+  into it, including the new staging path above, is still gated on the length first.
+- **`SECURITY.md` now qualifies the `zeroizing-alloc` recommendation (#256).** `0.1.0`'s wipe
+  was measured deleted under PGO with LTO; `0.1.1` fixes that but needs Rust 1.82. On an older
+  toolchain use an allocator whose wipe is written as volatile stores, or an OS facility.
+
+### Changed
+- **BREAKING: `from_rng` is removed** from `Fixed`, `Dynamic<Vec<u8>>` and the newtype
+  macros. Fill from your own RNG with `try_new_with(|b| rng.try_fill_bytes(b))`, which wipes
+  the partial write on `Err` and needs no feature. `rand` is now a private dependency.
+- **BREAKING: the `From*Str` decoder traits are removed** (`FromHexStr`, `FromBase32Str`,
+  `FromBase64UrlStr`, `FromBech32Str`, `FromBech32mStr`). Decode straight into the wrapper
+  with `Fixed::try_from_*` / `Dynamic::try_from_*`.
+- **BREAKING: `secure_gate::traits::revealed_secrets` is renamed to
+  `secure_gate::traits::encoded_secret`.** `secure_gate::EncodedSecret` is unchanged.
+- **BREAKING: `Bech32Sized<N>`, `Bech32mSized<N>`, `Bech32Standard` and `Bech32mStandard` are
+  no longer public.** Use the `_sized::<N>` methods, `BECH32_CODE_LENGTH` and
+  `bech32_code_length`.
+- **BREAKING: `derive: [ConstantTimeEq]` is rejected on the shaped newtype arms**, which emit
+  it already. It remains an option on the `generic` arms.
+- **`EncodedSecret::into_zeroizing` documents that its `Debug` can print the value on this
+  line.** `zeroize` made `Zeroizing`'s `Debug` opaque in 1.9.1, which needs Rust 1.85; 0.8
+  resolves 1.8. (0.9 requires 1.9.1.)
+
+### Documentation
+- `README.md` and `SECURITY.md` are the 0.9 versions adapted for this line: "A guardrail,
+  not a vault", the `std` / `alloc` / `no_std` table, the handoff table in "Where protection
+  stops", and a Stability section for 0.8.x.
+
+### Not on this line
+- **`sealed`** (`SealedFixed`, `SealedDynamic`, `Prekey`, `sealed_fixed_newtype!`,
+  `sealed_dynamic_newtype!`, `scoped::RevealScoped`) and the `guarded-block` and
+  `residue-probe` crates: they need Rust 1.85.
+- **Dependency and toolchain changes from 0.9**: `bech32` 0.12, `zeroize` 1.9.1, the `serde`
+  floor `1.0.95` and the move of serde's `derive` to a dev-dependency, `rand` 0.10, MSRV 1.87.
+  This line keeps its own pins; `serde` still enables `derive` here.
+- **`examples/zeroizing_alloc_app.rs` and the `tests/heap_residue*.rs` measurements**: they
+  depend on `zeroizing-alloc` 0.1.1 and `secure-gate-residue-probe`, which need newer Rust.
+- **The CI changes** of 0.9.0-rc.18 and rc.19. This line's CI is now one workflow, `ci.yml`:
+  tests on Rust 1.70 and stable, the DSE assembly check, clippy, rustdoc, rustfmt and a
+  `thumbv7em-none-eabihf` build. Its fuzz, Miri, CodeQL and audit workflows are removed from
+  this branch.
+- **Leaving `src/bin/asm_check.rs` out of the package**, as 0.9.0-rc.18 does: Cargo 1.70
+  refuses to package a manifest whose `[[bin]]` file is excluded.
+
 ## [0.8.0-rc.14] - 2026-09-15
 
 > This one section carries **two** upstream releases — 0.9.0-rc.11 and 0.9.0-rc.12 — because

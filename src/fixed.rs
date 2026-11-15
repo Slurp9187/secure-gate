@@ -104,7 +104,7 @@ use crate::traits::encoding::bech32m::ToBech32m;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{rngs::OsRng, TryCryptoRng, TryRngCore};
+use rand::{rngs::OsRng, TryRngCore};
 use zeroize::Zeroize;
 
 /// Drains a validated Bech32/Bech32m payload into a stack buffer.
@@ -142,6 +142,13 @@ fn drain_bech32_payload<const N: usize>(
 /// on drop. There is no `Deref`, `AsRef`, or `Copy` — every access is explicit
 /// through [`RevealSecret`] or [`RevealSecretMut`].
 ///
+/// **Choose `Fixed` for short-lived secrets passed by reference.** Inline storage means a
+/// `Fixed` can live on the stack, and moving one by value copies its bytes and leaves the
+/// old slot unwiped: drop zeroizes only where the value ends up. Build it in place with
+/// [`new_with`](Self::new_with), pass `&Fixed` rather than `Fixed`, and for a secret held a
+/// long time prefer [`Dynamic`](crate::Dynamic) (one heap address).
+/// `SECURITY.md` §1 has the details.
+///
 /// # Examples
 ///
 /// ```rust
@@ -174,18 +181,19 @@ fn drain_bech32_payload<const N: usize>(
 /// | [`try_from_bech32_unchecked`](Self::try_from_bech32_unchecked) | `encoding-bech32` | Bech32 without HRP check |
 /// | [`try_from_bech32m`](Self::try_from_bech32m) | `encoding-bech32` | HRP-validated Bech32m decoding |
 /// | [`try_from_bech32m_unchecked`](Self::try_from_bech32m_unchecked) | `encoding-bech32` | Bech32m without HRP check |
+/// | The four `_sized::<C>` forms, such as [`try_from_bech32_sized`](Self::try_from_bech32_sized) | `encoding-bech32` | As above, for strings longer than [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) |
 /// | [`from_random()`](Self::from_random) | `rand` | System RNG |
-/// | [`from_rng(rng)`](Self::from_rng) | `rand` | Custom RNG |
 ///
 /// # What `T` may be
 ///
 /// [`Fixed::new`] requires [`FixedStorage`](crate::FixedStorage) on the inner type: a
-/// type that owns no buffer whose capacity can change. This is what makes the documented
-/// claim that `Fixed` has no reallocation surface true rather than aspirational. It used
-/// to be bounded only by `Zeroize`, so `Fixed<Vec<u8>>`, `Fixed<String>` and even
-/// `Fixed<[Vec<u8>; 2]>` compiled and abandoned an unwiped buffer holding the whole
-/// secret on any capacity change. Arrays, the primitives, tuples, `Option` and boxed
-/// slices satisfy the marker already; a custom inner type writes one line. For a
+/// type that owns no heap allocation. This is what makes the documented
+/// claim that `Fixed` has no reallocation surface true rather than aspirational. With
+/// only a `Zeroize` bound, `Fixed<Vec<u8>>`, `Fixed<String>` and even
+/// `Fixed<[Vec<u8>; 2]>` would compile and abandon an unwiped buffer holding the whole
+/// secret on any capacity change. Arrays, the primitives, tuples and `Option` satisfy
+/// the marker already, and nothing heap-owning does (`Box<[T]>` included); a custom inner
+/// type writes one line. For a
 /// growable payload use [`Dynamic`](crate::Dynamic), which documents the residue and
 /// offers one safe growth path.
 ///
@@ -385,10 +393,8 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     /// # let _ = (a, b);
     /// ```
     ///
-    /// Before 0.8.0-rc.13 this method was inherent to `Fixed<[u8; N]>`, where the
-    /// parameter was always a byte array and inference had nothing to resolve. A
-    /// newtype built by [`fixed_newtype!`](crate::fixed_newtype) is unaffected in
-    /// both arms: its generated `new_with` has a concrete parameter type.
+    /// A newtype built by [`fixed_newtype!`](crate::fixed_newtype) needs no annotation
+    /// in either arm: its generated `new_with` has a concrete parameter type.
     ///
     /// # Security rationale
     ///
@@ -478,8 +484,7 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     ///
     /// Elsewhere here `try_` marks a constructor that *parses* untrusted input —
     /// [`try_from_hex`](Self::try_from_hex), [`try_from_base32`](Self::try_from_base32),
-    /// `TryFrom<&[u8]>` — while [`from_rng`](Self::from_rng) is fallible and keeps
-    /// `from_`. This method widens the prefix to its ordinary Rust meaning, the one
+    /// `TryFrom<&[u8]>`. This method widens the prefix to its ordinary Rust meaning, the one
     /// `try_reserve` and `try_lock` carry: **`try_` marks a constructor that can fail**,
     /// whether because it validates input or because the caller's fill can.
     ///
@@ -526,6 +531,23 @@ impl<T: zeroize::Zeroize> Fixed<T> {
     ///
     /// // A short read fails, and yields no secret at all.
     /// assert!(read_key(&mut [7u8; 8].as_slice()).is_err());
+    /// # }
+    /// ```
+    ///
+    /// This is also how to generate from an RNG you supply: a seeded one for reproducible
+    /// tests, a specific provider, a hardware source. Anything that fills a byte slice works,
+    /// whatever crate or `rand` version it comes from, which is why this crate has no
+    /// `from_rng` and names no RNG trait in its API. [`from_random`](Self::from_random)
+    /// covers the system RNG.
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "rand")] {
+    /// use rand::rngs::StdRng;
+    /// use rand::{SeedableRng, TryRngCore};
+    /// use secure_gate::Fixed;
+    ///
+    /// let mut rng = StdRng::from_seed([1u8; 32]);
+    /// let key = Fixed::<[u8; 16]>::try_new_with(|b| rng.try_fill_bytes(b)).expect("rng fill");
     /// # }
     /// ```
     ///
@@ -628,7 +650,10 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// # Errors
     ///
-    /// - [`HexError::InvalidHex`](crate::HexError::InvalidHex) — non-hex characters or odd-length input.
+    /// - [`HexError::InvalidHex`](crate::HexError::InvalidHex) — non-hex characters or odd-length
+    ///   input. Without `alloc` an input that decodes to *more* than `N` bytes also lands here
+    ///   rather than in `InvalidLength`, because the fixed stack buffer cannot hold the overflow
+    ///   to measure it.
     /// - [`HexError::InvalidLength`](crate::HexError::InvalidLength) — decoded byte count does not equal `N`.
     ///
     /// # Examples
@@ -636,12 +661,13 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// ```rust
     /// # #[cfg(feature = "encoding-hex")]
     /// # {
-    /// use secure_gate::{Fixed, RevealSecret, ToHex};
+    /// use secure_gate::{Fixed, RevealSecret};
     ///
     /// // Round-trip: encode then decode.
     /// let original = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
     /// # #[cfg(feature = "alloc")]
     /// # {
+    /// use secure_gate::ToHex;
     /// let hex_str = original.to_hex();
     /// let decoded = Fixed::<[u8; 4]>::try_from_hex(&hex_str).unwrap();
     /// assert_eq!(decoded.expose_secret(), &[0xDE, 0xAD, 0xBE, 0xEF]);
@@ -654,11 +680,8 @@ impl<const N: usize> Fixed<[u8; N]> {
     pub fn try_from_hex(hex: &str) -> Result<Self, crate::error::HexError> {
         #[cfg(feature = "alloc")]
         {
-            use zeroize::Zeroizing;
-            let bytes = Zeroizing::new(
-                base16ct::mixed::decode_vec(hex.as_bytes())
-                    .map_err(|_| crate::error::HexError::InvalidHex)?,
-            );
+            let bytes =
+                crate::decode_staging::hex(hex).map_err(|_| crate::error::HexError::InvalidHex)?;
             if bytes.len() != N {
                 return Err(crate::error::HexError::InvalidLength {
                     expected: N,
@@ -721,12 +744,10 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(feature = "encoding-base32")]
+    /// # #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
     /// # {
     /// use secure_gate::{Fixed, RevealSecret, ToBase32};
     ///
-    /// # #[cfg(feature = "alloc")]
-    /// # {
     /// // Round-trip.
     /// let original = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
     /// let encoded = original.to_base32();
@@ -734,22 +755,12 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// let decoded = Fixed::<[u8; 4]>::try_from_base32(&encoded).unwrap();
     /// assert_eq!(decoded.expose_secret(), &[0xDE, 0xAD, 0xBE, 0xEF]);
     /// # }
-    /// # }
     /// ```
     pub fn try_from_base32(s: &str) -> Result<Self, crate::error::Base32Error> {
         #[cfg(feature = "alloc")]
         {
-            use base32ct::{Base32UpperUnpadded, Encoding};
-            use zeroize::Zeroizing;
-            // base32ct 0.2 panics on impossible trailing-block lengths; see
-            // `traits::decoding::base32::encoded_len_is_decodable`.
-            if !crate::traits::decoding::base32::encoded_len_is_decodable(s.len()) {
-                return Err(crate::error::Base32Error::InvalidBase32);
-            }
-            let bytes = Zeroizing::new(
-                Base32UpperUnpadded::decode_vec(s)
-                    .map_err(|_| crate::error::Base32Error::InvalidBase32)?,
-            );
+            let bytes = crate::decode_staging::base32(s)
+                .map_err(|_| crate::error::Base32Error::InvalidBase32)?;
             if bytes.len() != N {
                 return Err(crate::error::Base32Error::InvalidLength {
                     expected: N,
@@ -763,8 +774,8 @@ impl<const N: usize> Fixed<[u8; N]> {
             use base32ct::{Base32UpperUnpadded, Encoding};
             use zeroize::Zeroizing;
             // base32ct 0.2 panics on impossible trailing-block lengths; see
-            // `traits::decoding::base32::encoded_len_is_decodable`.
-            if !crate::traits::decoding::base32::encoded_len_is_decodable(s.len()) {
+            // `traits::encoding::base32::encoded_len_is_decodable`.
+            if !crate::traits::encoding::base32::encoded_len_is_decodable(s.len()) {
                 return Err(crate::error::Base32Error::InvalidBase32);
             }
             let mut buf = Zeroizing::new([0u8; N]);
@@ -799,35 +810,31 @@ impl<const N: usize> Fixed<[u8; N]> {
     ///
     /// # Errors
     ///
-    /// - [`Base64Error::InvalidBase64`](crate::Base64Error::InvalidBase64) — non-base64 characters or invalid padding.
+    /// - [`Base64Error::InvalidBase64`](crate::Base64Error::InvalidBase64) — non-base64 characters
+    ///   or invalid padding. Without `alloc` an input that decodes to *more* than `N` bytes also
+    ///   lands here rather than in `InvalidLength`, because the fixed stack buffer cannot hold the
+    ///   overflow to measure it.
     /// - [`Base64Error::InvalidLength`](crate::Base64Error::InvalidLength) — decoded byte count does not equal `N`.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// # #[cfg(feature = "encoding-base64")]
+    /// # #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
     /// # {
     /// use secure_gate::{Fixed, RevealSecret, ToBase64Url};
     ///
-    /// # #[cfg(feature = "alloc")]
-    /// # {
     /// // Round-trip.
     /// let original = Fixed::new([0xDE, 0xAD, 0xBE, 0xEF]);
     /// let encoded = original.to_base64url();
     /// let decoded = Fixed::<[u8; 4]>::try_from_base64url(&encoded).unwrap();
     /// assert_eq!(decoded.expose_secret(), &[0xDE, 0xAD, 0xBE, 0xEF]);
     /// # }
-    /// # }
     /// ```
     pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
         #[cfg(feature = "alloc")]
         {
-            use base64ct::{Base64UrlUnpadded, Encoding};
-            use zeroize::Zeroizing;
-            let bytes = Zeroizing::new(
-                Base64UrlUnpadded::decode_vec(s)
-                    .map_err(|_| crate::error::Base64Error::InvalidBase64)?,
-            );
+            let bytes = crate::decode_staging::base64url(s)
+                .map_err(|_| crate::error::Base64Error::InvalidBase64)?;
             if bytes.len() != N {
                 return Err(crate::error::Base64Error::InvalidLength {
                     expected: N,
@@ -883,7 +890,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// `C` is the bech32 *code length* -- the cap on the whole encoded string -- and is
     /// independent of `N`, the decoded byte count this wrapper holds. Pass the `C` the
     /// string was encoded with, or any larger value. See
-    /// [`Bech32Sized`](crate::Bech32Sized) for what `C` above
+    /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) for what `C` above
     /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
     ///
     /// Works without `alloc` -- decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
@@ -960,7 +967,7 @@ impl<const N: usize> Fixed<[u8; N]> {
     /// characters.
     ///
     /// `C` is the bech32m *code length*, independent of `N`, the decoded byte count.
-    /// See [`Bech32mSized`](crate::Bech32mSized) for what `C` above
+    /// See [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) for what `C` above
     /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
     ///
     /// Works without `alloc` -- decodes into a stack-allocated `Zeroizing<[u8; N]>` buffer.
@@ -1118,7 +1125,7 @@ impl<const N: usize> ToBech32m for Fixed<[u8; N]> {
     }
 }
 
-/// Explicit access to immutable [`Fixed<[T; N]>`] contents.
+/// Explicit access to the contents of a [`Fixed<T>`], read-only.
 impl<T: zeroize::Zeroize> RevealSecret for Fixed<T> {
     type Inner = T;
 
@@ -1135,7 +1142,7 @@ impl<T: zeroize::Zeroize> RevealSecret for Fixed<T> {
         &self.inner
     }
 
-    /// Consumes `self` and transfers ownership of the plain `[T; N]`.
+    /// Consumes `self` and transfers ownership of the plain inner value.
     ///
     /// Zero cost — no allocation. The sentinel placed in `self.inner` is
     /// `[T::default(); N]` via [`crate::SentinelValue`] (already zeroed for `u8`),
@@ -1172,7 +1179,7 @@ impl<const N: usize, T: zeroize::Zeroize> crate::SecretLen for Fixed<[T; N]> {
     }
 }
 
-/// Explicit access to mutable [`Fixed<[T; N]>`] contents.
+/// Explicit access to the contents of a [`Fixed<T>`], mutable.
 impl<T: zeroize::Zeroize> RevealSecretMut for Fixed<T> {
     #[inline(always)]
     fn with_secret_mut<F, R>(&mut self, f: F) -> R
@@ -1192,9 +1199,8 @@ impl<T: zeroize::Zeroize> RevealSecretMut for Fixed<T> {
 impl<const N: usize> Fixed<[u8; N]> {
     /// Fills a new `[u8; N]` with cryptographically secure random bytes and wraps it.
     ///
-    /// Uses the system RNG ([`OsRng`](rand::rngs::OsRng)) via [`TryRngCore::try_fill_bytes`](rand::TryRngCore::try_fill_bytes).
-    /// In `rand` 0.9, `OsRng` is a zero-sized handle to the OS generator (not user-seedable). Requires the `rand`
-    /// feature. Heap-free and works in `no_std` / `no_alloc` builds.
+    /// Uses the system RNG ([`OsRng`](rand::rngs::OsRng)). Requires the `rand` feature.
+    /// Heap-free and works in `no_std` / `no_alloc` builds.
     ///
     /// # Panics
     ///
@@ -1220,37 +1226,6 @@ impl<const N: usize> Fixed<[u8; N]> {
                 .try_fill_bytes(arr)
                 .expect("OsRng failure is a program error");
         })
-    }
-
-    /// Fills a new `[u8; N]` from `rng` and wraps it.
-    ///
-    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRngCore`](rand::TryRngCore) — for example,
-    /// a seeded `StdRng` for deterministic tests. Requires the `rand`
-    /// feature. Heap-free.
-    ///
-    /// # Errors
-    ///
-    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRngCore::try_fill_bytes) fails.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # #[cfg(feature = "rand")]
-    /// # {
-    /// use rand::rngs::StdRng;
-    /// use rand::SeedableRng;
-    /// use secure_gate::Fixed;
-    ///
-    /// let mut rng = StdRng::from_seed([1u8; 32]);
-    /// let key: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng).expect("rng fill");
-    /// # }
-    /// ```
-    #[inline]
-    pub fn from_rng<R: TryRngCore + TryCryptoRng>(rng: &mut R) -> Result<Self, R::Error> {
-        // This body was the captured-local workaround `try_new_with` exists to retire:
-        // `new_with` could not report failure, so the error was written to a local and
-        // checked afterwards. Same behaviour, one expression.
-        Self::try_new_with(|arr| rng.try_fill_bytes(arr))
     }
 }
 

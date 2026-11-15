@@ -1,575 +1,231 @@
 # secure-gate
 
-[![Docs.rs](https://docs.rs/secure-gate/badge.svg)](https://docs.rs/secure-gate/0.8.0-rc.14/secure_gate/)
-[![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci-0.8.yml/badge.svg?branch=release%2F0.8)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci-0.8.yml?query=branch%3Arelease%2F0.8)
+[![Crates.io](https://img.shields.io/crates/v/secure-gate.svg)](https://crates.io/crates/secure-gate)
+[![Docs.rs](https://docs.rs/secure-gate/badge.svg?version=0.8.0)](https://docs.rs/secure-gate/0.8.0/secure_gate/)
+[![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg?branch=release%2F0.8)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml?query=branch%3Arelease%2F0.8)
 [![MSRV: 1.70](https://img.shields.io/badge/msrv-1.70-blue)](https://github.com/Slurp9187/secure-gate/blob/release/0.8/Cargo.toml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
-> [!NOTE]
-> **Note:** This is the **MSRV 1.70 line** of secure-gate — the 0.8.x series on `release/0.8`.
-> It targets **Rust Edition 2021** and **MSRV 1.70** for projects that cannot yet move to
-> Rust 1.85+, and carries the **same API as `main`** (0.9.x, Rust 1.85 / edition 2024). The
-> lines split when `rand` 0.10 landed mid-development, and until both reach a stable release
-> every change on `main` is re-derived here — everything except dependency and toolchain
-> bumps, which are never ported. After the stable releases this becomes mostly a maintenance
-> line, with a feature worth having still eligible for backport.
-
-| Aspect  |      **0.8.x**       |     **0.9.x**      |
-| ------- | :------------------: | :----------------: |
-| Edition |         2021         |        2024        |
-| MSRV    |         1.70         |        1.85        |
-| Status  | Lockstep with `main` | Active development |
-| Branch  |    `release/0.8`     |       `main`       |
-
 Secure wrappers for secrets with **explicit access** and **mandatory zeroization** — a `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
 
+> [!NOTE]
+> This is the **0.8 line** (`release/0.8`): Rust edition 2021, **MSRV 1.70**, for projects
+> that cannot yet move to Rust 1.87. It has the API of 0.9 (`main`) without the `sealed`
+> feature, which needs Rust 1.85. On Rust 1.87 or newer, use 0.9.
+
+> [!WARNING]
 > **Security Notice**: This crate has **not undergone independent audit**.
 > Review the code and [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) before production use.
-> No unsafe code — enforced with `#![forbid(unsafe_code)]`.
 
-## Quick Start
+## A guardrail, not a vault
 
-```rust
-use secure_gate::{RevealSecret, RevealSecretMut, dynamic_newtype, fixed_newtype};
+secure-gate stops the ordinary mistakes: a secret printed by `{:?}`, compared with `==`,
+left in freed memory, or handed out as a plain `Vec`. It cannot stop someone who decides
+to copy a secret out; a secret nobody can read is useless. So:
 
-// A secret type is a visibility, a name, a size (or an inner type), and a doc string.
-fixed_newtype!(pub Aes256Key, 32, "AES-256 key. On the stack, exactly 32 bytes.");
-dynamic_newtype!(pub Password, String, "User password. On the heap, length varies with the input.");
+- **The easy path is safe.** The obvious way to hold, decode, encode or compare a secret
+  keeps it wrapped, wiped and redacted.
+- **Reaching it is named.** Every way to the secret, from the scoped `with_secret` to the
+  exits (`expose_secret`, `into_inner`, `into_zeroizing`, `as_reader`), is a call you can
+  grep for and a reviewer can see.
 
-let mut pw: Password = "hunter2".into();
-
-// Generate key material from the system RNG rather than a literal (needs `rand`).
-let mut key: Aes256Key = Aes256Key::from_random();
-
-// Scoped access — preferred; the borrow cannot outlive the closure
-let long_enough = pw.with_secret(|s| s.len() >= 8); // validate in-closure; never log a secret's length
-
-// Mutable scoped access. For Dynamic<String> / Dynamic<Vec<u8>>, prefer
-// capacity-stable mutations or pre-allocate before wrapping; see SECURITY.md.
-let next: Aes256Key = Aes256Key::from_random();
-next.with_secret(|fresh| key.with_secret_mut(|old| old.copy_from_slice(fresh)));
-
-// Direct reference — auditable escape hatch (e.g. FFI, third-party APIs)
-assert_eq!(pw.expose_secret(), "hunter2");
-pw.expose_secret_mut().clear();
-
-#[cfg(all(feature = "encoding-hex", feature = "encoding-bech32"))]
-{
-    use secure_gate::{Case, RevealSecret, ToHex, ToBech32, FromHexStr};
-
-    let key = Aes256Key::new([42u8; 32]);
-
-    // Encode to hex (scoped borrow — no long-lived reference)
-    let hex = key.with_secret(|bytes| bytes.to_hex()); // EncodedSecret
-
-    // Encode to Bech32 (BIP-173) with human-readable prefix "key"
-    let bech32 = key.with_secret(|bytes| {
-        bytes.try_to_bech32("key", Case::Lower).expect("valid bech32")
-    });
-
-    // Round-trip demonstration (decode hex back to bytes)
-    let decoded: Vec<u8> = hex.try_from_hex().expect("valid hex");
-
-    // Optional: assert round-trip (useful in real code / tests)
-    key.with_secret(|original| assert_eq!(decoded, original));
-}
-```
-
-## Core Concepts
-
-`Fixed<T>` (stack-allocated) and `Dynamic<T>` (heap, requires `alloc`) share the same access interface:
-
-- `Debug` output → `[REDACTED]`
-- `.len()` / `.is_empty()` via `SecretLen` — without exposing contents (length itself can still be sensitive)
-- Zeroize on drop (always)
-- Access via `.with_secret(|s| ...)` (preferred) or `.expose_secret()` (auditable escape hatch)
-- Owned extraction via `.into_inner()` → the plain `T`; nothing is copied and protection ends at the call
-- Streaming I/O via `impl Write` and `.as_reader()` for `Dynamic<Vec<u8>>` (requires `std`)
-
-### Preferred: scoped access
-
-```rust
-use secure_gate::{Fixed, RevealSecret, RevealSecretMut};
-
-let mut key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
-
-// Read — closure borrow cannot outlive the call
-let looks_degenerate = key.with_secret(|bytes| bytes.iter().all(|&b| b == bytes[0]));
-assert!(looks_degenerate); // every byte is 0xAB
-
-// Mutate
-key.with_secret_mut(|bytes: &mut [u8; 32]| bytes.copy_from_slice(&[0xCD; 32]));
-```
-
-### RustCrypto in-place cipher ops
-
-`BlockEncrypt`/`BlockDecrypt` take `&mut GenericArray<u8, U16>`, and
-`GenericArray::from_mut_slice` *borrows* rather than copies — so the cipher can run
-inside the wrapper and the plaintext never leaves it:
-
-```rust
-use aes::cipher::{generic_array::GenericArray, BlockDecrypt, KeyInit};
-use aes::Aes128;
-use secure_gate::{Fixed, RevealSecretMut};
-
-let cipher = Aes128::new(GenericArray::from_slice(&[0x42u8; 16]));
-let mut block: Fixed<[u8; 16]> = Fixed::new([0u8; 16]);
-
-block.with_secret_mut(|b| cipher.decrypt_block(GenericArray::from_mut_slice(b)));
-```
-
-Copying out instead — `block.with_secret(|b| aes::Block::from(*b))` — is the footgun:
-the resulting `Block` is an ordinary stack value that nothing wipes on drop. See the
-[`Fixed` rustdoc](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html)
-for both shapes side by side.
-
-### Direct reference — auditable escape hatch
-
-```rust
-// Use only when a long-lived reference is unavoidable (FFI, third-party APIs)
-use secure_gate::{Fixed, RevealSecret};
-let key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
-let raw: &[u8; 32] = key.expose_secret();
-```
-
-### Owned consumption — transfer ownership
-
-```rust
-// When you need to move the secret value out (FFI hand-off, type migration)
-use secure_gate::{Fixed, RevealSecret};
-let key: Fixed<[u8; 32]> = Fixed::new([0xAB; 32]);
-let owned: [u8; 32] = key.into_inner();
-// Protection ends here: `owned` is a plain array and you own its lifetime.
-// Nothing was copied — the bytes were moved out and a sentinel left behind.
-assert_eq!(owned, [0xAB; 32]);
-```
-
-### Named secret types
-
-Two ways to give a secret a name, differing in exactly one respect — whether the compiler can tell two same-shaped secrets apart. If you are choosing for the first time, start with a newtype: it is the safer of the two, and its declaration asks for nothing but a visibility, a name, a size and a doc string — no `Fixed` / `Dynamic` and no `[u8; N]` to spell.
-
-**Newtypes** (`fixed_newtype!`, `dynamic_newtype!`) expand to `struct`s, so two of the same shape are **distinct** types. Reach for these when distinct cryptographic roles share a shape — an encryption key and a MAC key are both `Fixed<[u8; 32]>`, and giving each a plain `type` alias (below) leaves the compiler unable to tell them apart:
-
-```rust
-use secure_gate::fixed_newtype;
-
-fixed_newtype!(pub EncKey, 32, "AES-256 key. Never used for authentication.");
-fixed_newtype!(pub MacKey, 32, "HMAC-SHA256 key. Never used for encryption.");
-
-fn seal(enc: &EncKey, mac: &MacKey) { /* … */ }
-
-// seal(&mac, &enc) does not compile — the roles cannot be swapped by accident.
-```
-
-Both newtype macros also accept `generic T` in place of the byte size `fixed_newtype!` expects or the `String` / `Vec<u8>` `dynamic_newtype!` expects, for a secret whose inner type is neither bytes nor a string — `fixed_newtype!(pub Poly, generic [i16; 256]);` for an ML-KEM secret polynomial on a target with no allocator, where `Fixed` is the only wrapper there is. Every `generic` arm emits scoped access, redacted `Debug`, zeroize on drop, `new`, and on `fixed_newtype!` also `new_with`. What sits on top of that is not one answer but three, and the line between them is how much shape the macro can read off the tokens you wrote.
-
-An **array inner type on `fixed_newtype!`** — `generic [i16; 256]`, `generic [u64; 4]`, `generic [u32; 60]`, element type and length both written out — matches an arm of its own, which additionally emits `SecretLen` and the declaration-site `N = 0` guard the size-literal arm carries. `SecretLen` because `Fixed<[T; N]>` answers both of its questions correctly rather than approximately: `Poly::len()` is 256 elements and `Poly::byte_len()` is 512 bytes, `N * size_of::<T>()` and not an element count dressed up as a size. The guard because the length is a literal at expansion, so `fixed_newtype!(pub Z, generic [i16; 0]);` is an error on the declaring line under `cargo check`, not at the first construction. Both of those follow from the spelling rather than the type, which is also the arm's one remainder: it needs a literal in the length slot, so `generic [i16; KEY_LEN]` is a different token sequence and falls through to the opaque arm below, reduced surface and all, for want of a length the macro can count.
-
-A **true opaque inner type** — a custom `struct` rather than an array spelled out — keeps the reduced surface: no `SecretLen`, and no declaration-site guard, because the macro holds one token and there is no length in it to count. That is a limit on the macro's field of view, not a verdict on the type; `Fixed<T>` may well implement `SecretLen` for it one layer down, and `derive: [IntoWrapper]` reaches that in one greppable call. `dynamic_newtype!`'s generic arm sits here unchanged, for every inner type it takes: only `fixed_newtype!` grew the array arm, because the case that demanded it is `no_std`, where there is no allocator, therefore no `Dynamic`, and `Fixed` is the only wrapper there is.
-
-Encoders stay absent from every `generic` arm on both macros, for two reasons rather than one. Hex over `[i16]` has no defined byte order — and even with an order fixed by fiat, the canonical encoding of these secrets is domain-specific: an ML-KEM secret key is bit-packed 12-bit coefficients, not a 16-bit dump, so an encoder emitted here would round-trip against itself and agree with nothing outside this crate. The RNG constructors are absent for a reason of their own, tracked as [#219](https://github.com/Slurp9187/secure-gate/issues/219): the byte-level fill is perfectly well defined, and that is the trap — uniform bits are not a valid ML-KEM coefficient, a reduced scalar, or a derived round key.
-
-"Neither bytes nor a string" is enforced, not just advised: `dynamic_newtype!(pub X, generic Vec<u8>)` and `generic String` are a compile error at the declaration, because each is the same growable payload as the shaped arm with strictly less API — for `Vec<u8>`, without the `io::Write` impl that is the only growth path wiping the buffer it abandons. Write `Vec<u8>` or `String` and the safe surface comes with it. The same domination check applies to `fixed_newtype!(pub K, generic [u8; 32])`: write `32`. Like the shaped arms, those checks match literal tokens, so an alias or a path-qualified spelling (`alloc::vec::Vec<u8>`) still reaches the reduced arm; macro expansion runs before type resolution, so no macro can close that gap.
-
-Generated newtypes carry the same guarantees as the wrapper (zeroize on drop, redacted `Debug`, access only via `RevealSecret`), are `#[repr(transparent)]` so they cost nothing at runtime, and have no `Deref` — the separation is total, not by-value-only. No `From<Wrapper>` or `Deref` is generated, so an alias-typed value cannot become a newtype through `.into()` and a newtype never coerces back to its base; base-wrapper access is opt-in per newtype and split by direction (`derive: [FromWrapper]` to construct from the base, `derive: [IntoWrapper]` to reach it; `WrapperAccess` is both) and should be audited like `expose_secret()`. In a mixed tree the base type is the pool every plain alias lives in: `FromWrapper` on a boundary type accepts all of them, and `IntoWrapper` on a secret role downgrades it to the least-sensitive alias sharing its base — neither token is the sufficient default more often than it looks.
-
-See [`fixed_newtype!`] and [`dynamic_newtype!`] in the [API docs](https://docs.rs/secure-gate).
-
-**A plain `type` alias** over `Fixed` or `Dynamic` is a name and nothing more: the alias *is* the wrapper, so it carries every guarantee the wrapper carries — zeroize on drop, redacted `Debug`, access only through `RevealSecret` — and it stays interchangeable with its base type. Two aliases over the same underlying type are the **same** nominal type and assignable to each other — use them for readability and audit grep targets. Documentation goes on the alias as an ordinary doc comment, which is also where the doc string the removed `*_alias!` macros took now belongs:
-
-```rust
-use secure_gate::{Dynamic, Fixed};
-
-/// 32-byte AES-256 key.
-pub type Aes256Key = Fixed<[u8; 32]>;
-
-#[cfg(feature = "alloc")]
-/// Variable-length password.
-pub type Password = Dynamic<String>;
-```
-
-A plain `type` alias is the right reach when a value is sensitive enough to want zeroize-on-drop and a redacted `Debug`, but has no role it could be confused *with* — a session blob, a cached token, a nonce store. You get the protection and a self-documenting name, the alias stays interchangeable with its base type so it crosses into APIs you do not own without ceremony, and there is no cross-contamination to prevent because nothing else shares its shape and meaning.
-
-Reach for a newtype the moment two values of the same shape mean different things. That is the case the compiler can help with, and the only one where the extra surface pays for itself.
-
-**Finding those cases in a tree you already have.** The rule is easy to state and hard to apply by eye, because the collapse is only visible in aggregate: `pub type FileId = Dynamic<String>;` reads correctly on its own line, and nothing on that line says another name resolves to the same type. Aliases do not announce their neighbours. This lists every plain alias over a wrapper, groups them by base type, and prints only the groups with more than one member — those are the names the compiler will not keep apart:
-
-```sh
-grep -rhoE '\btype +[A-Za-z0-9_]+ *= *(Fixed|Dynamic)<.*>;' src/ \
- | sed -E 's/type +([A-Za-z0-9_]+) *= *(.+);/\2\t\1/' \
- | sort \
- | awk -F'\t' '{ a[$1] = a[$1] " " $2; n[$1]++ }
-                END { for (b in a) if (n[b] > 1) printf "%-24s %d names:%s\n", b, n[b], a[b] }'
-```
-
-```text
-Dynamic<String>          2 names: FileId PublicId
-Fixed<[u8; 32]>          3 names: AesKey ChaChaKey MacKey
-```
-
-A group is not automatically a defect — three names for one key type may be genuinely interchangeable, which is the case an alias is *for*. It is the list worth reading, and each group asks one question: do these mean different things? Every name for which the answer is yes is a `fixed_newtype!` / `dynamic_newtype!` candidate, and the conversion is one line each.
-
-This matters most right after a migration. Replacing the removed `*_alias!` macros with `type` lines is an identity-preserving rewrite — the macros only ever expanded to exactly those lines — so a tree that migrates cleanly has the same number of real types afterwards as before, and a `FileId` that was interchangeable with a `PublicId` still is. What the removal bought is legibility, not separation; the separation is this second step, and nothing performs it for you.
-
-**Zero-size behavior note**  
-A zero-length `Fixed` cannot be built at all. `Fixed::new` and `Fixed::new_with` each carry a `const` assertion that the value being wrapped has a nonzero size, so `Fixed<[u8; 0]>` — and any other zero-sized inner type — is a compile error at the first construction. The assertion is a post-monomorphization error, which is what makes it cover generic code too. Where it points is worth knowing before you go looking. The error's own span is the assertion inside this crate, not your code; a separate `while instantiating` note is what names the `Fixed::new` call the monomorphization reached. That note does **not** name the instantiation that caused it. Given a generic `fn build<const N: usize>() -> Fixed<[u8; N]>`, calling `build::<0>()` reports against the `Fixed::new` line inside `build`, and neither `build::<0>()` nor its caller appears anywhere in the output. `fixed_newtype!(Name, 0)` additionally fails at the declaration, via a const-eval index-out-of-bounds guard in the macro, so that spelling reports the problem at the line you wrote rather than at the first call. `fixed_newtype!(Name, generic [T; 0])` carries the same guard for the same reason: the length is a literal the macro can count at expansion, whether it arrives as the size argument or inside an array written out.
-
-**Two limits on when it fires, both measured rather than assumed.** First, a post-monomorphization error is raised during codegen, so `cargo check` does not report it, and neither does an editor driven by `cargo check`. Second, and more consequential: it only fires for a codegen root. A non-generic `#[inline]` function in a library is not one, and every method these macros generate carries an inline attribute, `#[inline]` or `#[inline(always)]`. So a library crate that writes `fixed_newtype!(pub Empty, generic [(); 4]);` alongside `#[inline] pub fn empty() -> Empty { Empty::new([(); 4]) }` compiles, tests and publishes with `cargo build`, `cargo build --release` and `cargo test` all green. Note which guard that spelling walks past and how: the length is 4, so the declaration-site guard has nothing to object to, while `()` is zero-sized and so is the array of four of them — leaving the assertion inside `Fixed::new` as the only thing that can see the problem, and only when something instantiates it. The error surfaces only when a downstream crate instantiates it, and the diagnostic points into `secure-gate` and at the dependency's macro invocation — not at the consumer's own call site, and not in the crate that wrote the bug.
-
-**What counts as a codegen root is itself a property of the compiler and the profile, so do not read the `#[inline]` above as the whole condition.** Dropping the attribute does not reliably restore the error. Measured on 1.85: a library exporting a plain, non-generic, non-`inline` `pub fn empty() -> Empty { Empty::new([(); 4]) }` does fail `cargo build` and `cargo test`, and passes `cargo build --release` with exit 0 — rustc's cross-crate-inlining heuristic (1.75 and later) drops a small function from the exported root set in an optimized build, so the release profile has no root to instantiate. The same crate on 1.70 fails in both profiles. The conclusion to carry is about the class, not the spelling: whether a library's own CI sees the error depends on attributes, generics, compiler version and optimization level together, and none of those is a guarantee. Only instantiating the type in a test or binary is.
-
-So state the guarantee precisely: no **value** of a zero-sized `Fixed` can exist at runtime, because nothing can construct one. A binary or a test that builds one fails to compile. What the guard does not do is stop a library from *exporting* an unusable zero-sized API with green CI. Neither limit is a design choice: a condition on a generic parameter has nothing to evaluate until that parameter is known, and nothing on stable Rust moves it earlier. `fixed_newtype!(Name, 0)` and `fixed_newtype!(Name, generic [T; 0])` are the two exceptions that do fire under `cargo check` in the declaring crate, because in both the length is a literal at that point — which is the argument for the macro's own guard earning its keep alongside this one. Be precise about what that guard checks, though: a length, not a size. `generic [(); 4]` above passes it and is zero-sized anyway, which is why the two guards are complementary rather than one of them being redundant.
-
-Naming the type still compiles: `type Empty = Fixed<[u8; 0]>;` is a legal type expression, and no guard placed in the type can make the type itself unnameable. What the assertion removes is every value of it — there is no way to obtain an `Empty` to hold, encode, compare or drop — which is the property that matters, and it holds for a plain `type` alias and a newtype alike because both funnel through the same two constructors.
-
-`Dynamic` has no compile-time equivalent, and the reason is about the payload rather than the wrapper: the emptiness of a `Vec` or a `String` is a runtime property, and an empty `Dynamic<String>` is a legitimate value to hold before validation, so there is nothing for a compile-time check to decide. One honest gap remains, rather than a non-problem: a *statically* zero-sized inner type. `Dynamic<Zst>` constructs where `Fixed<Zst>` is now rejected, so do not reach for a zero-sized inner type expecting to be stopped. A zero-length `Dynamic` then behaves normally rather than failing: `len()` is 0, `Debug` is still `[REDACTED]`, `ct_eq` against another empty is `true`, `to_hex()` returns `""`, and drop is clean. Nothing reports a problem, which is precisely why this is worth stating — the failure is silent and semantic, not a panic you would notice. Validate that the effective length is > 0 in your own tests whenever it comes from configuration.
-
-See also the Best Practices section in [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) for the equivalent guidance.
-
-### Polymorphic / generic code
-
-```rust
-use secure_gate::SecretLen;
-
-// Length is metadata, not contents — but for variable-length secrets it can
-// still be sensitive. Validate against it; don't log it.
-fn require_min_len<S: SecretLen>(secret: &S, min: usize) -> bool {
-    secret.len() >= min
-}
-```
-
-## What You Get
-
-- **Zero-cost safety** — mandatory zeroization on drop; `no_std` / `no_alloc` support.
-- **Audit-first API** — a held secret cannot leak via `Deref`: `Fixed`/`Dynamic` implement none. Access requires explicit `with_secret` scopes or an auditable `expose_secret` escape hatch. `into_inner` hands ownership to the caller and ends protection; encoders return `EncodedSecret`, which *does* deref and stays wiped until it drops — see [Where accident-prevention ends](SECURITY.md#where-accident-prevention-ends).
-- **Named secret types** — `fixed_newtype!(pub Aes256Key, 32, "…")` and `dynamic_newtype!(pub Password, String, "…")` generate `struct`s from a visibility, a name, a size and a doc string, so two secrets of the same shape are distinct types and the compiler rejects a swapped key role at the call site. A plain `type` alias over `Fixed` / `Dynamic` (`pub type Aes256Key = Fixed<[u8; 32]>;`) inherits the same redacted `Debug` and zeroize-on-drop but adds no type: same-shape aliases (e.g. two `Fixed<[u8; 32]>` aliases) are one and the same type, which is what makes an alias the right reach when interchangeability with the base type is the point.
-- **Batteries included** — optional, zero-overhead support for serde, constant-time comparison (`subtle`), and secure encoding (hex, base32, base64url, bech32/m).
-- **No unsafe code** — enforced with `#![forbid(unsafe_code)]`.
+Don't route around it with `.to_vec()`, `*bytes` or `.to_string()`; name the exit instead.
 
 ## Installation
 
-**Default** (`alloc` enabled — `Fixed<T>` + `Dynamic<T>` + full zeroization):
-
 ```toml
 [dependencies]
-secure-gate = "0.8.0-rc"
+secure-gate = "0.8"                                                             # default: heap on (`alloc`)
+# secure-gate = { version = "0.8", default-features = false }                  # heap off: `Fixed` only
+# secure-gate = { version = "0.8", features = ["full"] }                       # batteries included
 ```
 
-**No-heap / embedded** (`Fixed<T>` only — pure stack / `no_std`):
+On Rust 1.87 or newer, use `secure-gate = "0.9"` (the `main` line), which adds `sealed`.
+<!-- Every concrete version in this file equals the version in Cargo.toml; bump them in the
+     same commit. The install lines use the caret form and carry no patch version. -->
 
-```toml
-secure-gate = { version = "0.8.0-rc", default-features = false }
-```
-
-**Batteries-included**:
-
-```toml
-secure-gate = { version = "0.8.0-rc", features = ["full"] }
-```
-
-`"0.8.0-rc"` tracks this line rather than a version: it selects the newest `0.8.0-rc.N`
-today and keeps resolving once `0.8.0` ships, so nothing here moves when the next
-candidate lands. [Branch support](#branch-support) explains why the requirement has to
-spell the candidate out at all, and how to pin exactly when `cargo update` must stay put.
-
-## Encoding & Decoding
-
-`secure-gate` provides symmetric, zero-overhead encoding and decoding for five formats: hex, base32 (RFC 4648 §6), base64url, bech32 (BIP-173), and bech32m (BIP-350). All operations are explicit. Decoding is always fallible; on the encode side only bech32 and bech32m return a `Result`, because they can reject an invalid HRP or an over-long payload — `to_hex`, `to_hex_upper`, `to_base32` and `to_base64url` cannot fail.
-
-### Available traits
-
-| Format               | Encode        | Decode             | Feature            |
-| -------------------- | ------------- | ------------------ | ------------------ |
-| Hex                  | `ToHex`       | `FromHexStr`       | `encoding-hex`     |
-| Base32 (RFC 4648 §6) | `ToBase32`    | `FromBase32Str`    | `encoding-base32`  |
-| Base64URL            | `ToBase64Url` | `FromBase64UrlStr` | `encoding-base64`  |
-| Bech32 (BIP-173)     | `ToBech32`    | `FromBech32Str`    | `encoding-bech32`  |
-| Bech32m (BIP-350)    | `ToBech32m`   | `FromBech32mStr`   | `encoding-bech32`  |
-
-Base32 is here for TOTP/HOTP interop: `otpauth://` key URIs (RFC 6238 / RFC 4226) carry the shared secret as uppercase, unpadded Base32, and Base32 is the densest encoding that fits QR alphanumeric mode.
-
-### Encoding (to string)
-
-The wrapper encoding methods are trait impls, so the trait must be in scope — `use secure_gate::{Case, ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};` — before `key.to_base32()` resolves. Every one of them returns [`EncodedSecret`], which wipes itself on drop and prints `[REDACTED]`. Read it through the deref (`&*encoded` is a `&str`) and call `.into_inner()` only when an API demands an owned `String`.
+## Quick start
 
 ```rust
-use secure_gate::{Case, Fixed, RevealSecret, ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m};
-# fn main() -> Result<(), secure_gate::Bech32Error> {
-let key: Fixed<[u8; 32]> = Fixed::new([0x42u8; 32]);
+use secure_gate::{ConstantTimeEq, Dynamic, RevealSecret, RevealSecretMut, ToHex};
+use secure_gate::{dynamic_newtype, fixed_newtype};
 
-// Direct on the wrapper
-let hex     = key.to_hex();
-let hex_u   = key.to_hex_upper();
-let b32     = key.to_base32();
-let b64     = key.to_base64url();
-let bech32  = key.try_to_bech32("bc", Case::Lower)?;
-let bech32m = key.try_to_bech32m("bc", Case::Lower)?;
+// A secret type is a visibility, a name, a size (or an inner type), and a doc string.
+fixed_newtype!(pub EncKey, 32, "AES-256 key. Never used for authentication.");
+fixed_newtype!(pub MacKey, 32, "HMAC key. Never used for encryption.");
+dynamic_newtype!(pub Password, String, "User password.");
 
-// Every one of these returns an `EncodedSecret`: it wipes itself on drop and its
-// `Debug` is redacted. Call `.into_inner()` when an API needs an owned `String`.
+// A plain alias gives the same protection when there is no role to confuse it with.
+pub type ApiToken = Dynamic<String>;
 
-// Scoped on the inner bytes (preferred when you want `with_secret` in audit sweeps)
-let hex_scoped     = key.with_secret(|s| s.to_hex());
-let b32_scoped     = key.with_secret(|s| s.to_base32());
-let b64_scoped     = key.with_secret(|s| s.to_base64url());
-let bech32_scoped  = key.with_secret(|s| s.try_to_bech32("bc", Case::Lower))?;
-let bech32m_scoped = key.with_secret(|s| s.try_to_bech32m("bc", Case::Lower))?;
+// EncKey and MacKey are different types: a MacKey cannot be passed where an EncKey belongs.
+fn seal(_enc: &EncKey, _mac: &MacKey) {}
 
-# Ok(())
-# }
+let mut key = EncKey::from_random(); // system RNG (`rand`)
+let pw: Password = "hunter2".into();
+let token: ApiToken = "tok_live_123".into();
+seal(&key, &MacKey::from_random());
+
+// Nothing prints by accident (and there is no `Deref`).
+assert_eq!(format!("{key:?}"), "[REDACTED]");
+
+// Scoped access, preferred: the borrow ends with the closure, so return a verdict, not the bytes.
+assert!(!pw.with_secret(|s| s.len() >= 8));
+assert!(token.with_secret(|t| t.starts_with("tok_")));
+
+// The auditable escape hatch, for FFI and third-party APIs.
+assert_eq!(pw.expose_secret(), "hunter2");
+
+// Encode and decode without leaving a wrapper (`encoding-hex`). `hex` wipes itself on drop.
+let hex = key.to_hex();
+let restored = EncKey::try_from_hex(&hex).expect("valid hex");
+
+// Compare in constant time (`ct-eq`). There is no `==` on a secret.
+assert!(key.ct_eq(&restored));
+
+// An RNG you supply fills the key in place; this needs no secure-gate feature.
+// (`StdRng` with a fixed seed is for the example only. Seed a real one from the system.)
+use rand::{SeedableRng, TryRngCore};
+let mut rng = rand::rngs::StdRng::from_seed([7u8; 32]);
+let fresh = EncKey::try_new_with(|bytes| rng.try_fill_bytes(bytes)).expect("rng fill");
+
+// Rotate in place: the old key is overwritten and never leaves the wrapper.
+fresh.with_secret(|new| key.with_secret_mut(|old| old.copy_from_slice(new)));
+assert!(!key.ct_eq(&restored));
+
+// Take the plain value when ownership must transfer. Protection ends at this call.
+let _raw: [u8; 32] = restored.into_inner();
+// Everything still wrapped is zeroized when it drops.
 ```
 
-Every encoder returns [`EncodedSecret`] — `Zeroizing<String>` with a redacted `Debug` and no `Display` — because an encoded secret is a second full copy of the secret and deserves the same wiping as the first. Read it with `&*encoded` (it derefs to `str`), which is what `serde_json` and every database driver want; call `.into_inner()` for an owned `String`, which is the named moment protection ends. The same methods exist on the wrappers (`Fixed` / `Dynamic`) and on the encoding traits (`ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32`, `ToBech32m`).
+The example needs `rand`, `ct-eq` and `encoding-hex`, all in `full`. The custom-RNG lines use
+your own `rand = "0.10"` dependency; any RNG that can fill a byte slice works.
 
-### Direct Constructors (Recommended)
+## Which type?
 
-Both `Fixed<[u8; N]>` and `Dynamic<Vec<u8>>` offer one-shot constructors from strings. Both use panic-safe `Zeroizing`-wrapped decode buffers internally. `Fixed` also supports a no-alloc path that decodes directly into stack storage when `alloc` is disabled.
-
-| Format              | Method                          | Notes                                            |
-| ------------------- | ------------------------------- | ------------------------------------------------ |
-| Hex                 | `try_from_hex(s)`               | `HexError`                                       |
-| Base32              | `try_from_base32(s)`            | `Base32Error` (RFC 4648 §6, uppercase, unpadded) |
-| Base64URL           | `try_from_base64url(s)`         | `Base64Error` (unpadded, URL-safe)               |
-| Bech32 (BIP-173)    | `try_from_bech32(s, hrp)`       | HRP validated; `Bech32Error::UnexpectedHrp`      |
-| Bech32 (unchecked)  | `try_from_bech32_unchecked(s)`  | No HRP; `Bech32Error`                            |
-| Bech32m (BIP-350)   | `try_from_bech32m(s, hrp)`      | HRP validated; `Bech32Error::UnexpectedHrp`      |
-| Bech32m (unchecked) | `try_from_bech32m_unchecked(s)` | No HRP; `Bech32Error`                            |
-
-**Security notes**:
-
-- Prefer HRP-validated constructors to prevent cross-protocol confusion attacks.
-- Use `_unchecked` only when HRP is validated upstream.
-- The decode constructors in this table stage into `Zeroizing` buffers, so a panic between a successful decode and wrapper construction still wipes them. (`Fixed::new` / `Dynamic::new` take an already-built value and have no such buffer.)
-- Encoded output is protected by default: every encoder returns [`EncodedSecret`], wiped on drop. `.into_inner()` is the named point where that ends (see `SECURITY.md`).
-
-## Serde
-
-`serde-deserialize` decodes directly to the inner type. After deserialization completes, temporary buffers for `Dynamic<Vec<u8>>` and `Dynamic<String>` are `Zeroizing`-wrapped — oversized buffers are zeroized even on rejection. The default limit is `MAX_DESERIALIZE_BYTES` (1 MiB); call `Dynamic::deserialize_with_limit` to set a custom ceiling. Serialization requires the `SerializableSecret` marker trait.
-
-> **Note:** `MAX_DESERIALIZE_BYTES` (and `deserialize_with_limit`) is enforced _after_ the upstream deserializer has fully materialized the payload. It is a result-length acceptance bound, not a pre-allocation DoS guard. For untrusted input, enforce size limits at the transport or parser layer upstream.
-
-See [`SerializableSecret`] in the [API docs](https://docs.rs/secure-gate) for the full example.
-
-## Random Generation
-
-```rust
-#[cfg(feature = "rand")]
-{
-    use secure_gate::Fixed;
-    // System RNG — panics if entropy is unavailable (fatal environment error).
-    let key: Fixed<[u8; 32]> = Fixed::from_random();
-}
-
-#[cfg(all(feature = "rand", feature = "alloc"))]
-{
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
-    use secure_gate::{Dynamic, Fixed};
-
-    let mut rng = StdRng::from_seed([0u8; 32]);
-    let _fixed: Fixed<[u8; 16]> = Fixed::from_rng(&mut rng).expect("rng fill");
-    let _buf: Dynamic<Vec<u8>> = Dynamic::from_rng(32, &mut rng).expect("rng fill");
-}
-```
-
-`from_random()` uses the system RNG ([`OsRng`](https://docs.rs/rand/0.9/rand/rngs/struct.OsRng.html)), panics on failure, and is heap-free for `Fixed<T>` (`no_std` / `no_alloc`). `from_rng` fills from any [`TryCryptoRng`](https://docs.rs/rand/0.9/rand/trait.TryCryptoRng.html) + [`TryRngCore`](https://docs.rs/rand/0.9/rand/trait.TryRngCore.html) and returns `Result` (e.g. seeded `StdRng` in tests). `Dynamic::from_random` / `from_rng` require `alloc` (implicit — `Dynamic<T>` itself already requires it). See [`Fixed::from_random`], [`Fixed::from_rng`], [`Dynamic::from_random`], and [`Dynamic::from_rng`] in the [API docs](https://docs.rs/secure-gate).
-
-## Security Model
-
-- **Explicit access only** — all caller-facing access requires `.with_secret()` / `.expose_secret()`; no silent leaks. Internal impls (`Clone`, `Serialize`) access `.inner` directly but require opt-in marker traits.
-- **Zeroize on drop** — always active; inner type must implement `Zeroize`
-- **Timing-safe equality** — `ct-eq` feature (`.ct_eq()`) routes through `expose_secret()`, honoring the explicit-access model
-- **No unsafe code** — enforced with `#![forbid(unsafe_code)]`
-
-For `Dynamic<Vec<_>>` and `Dynamic<String>`, avoid capacity-changing mutations
-after wrapping unless your deployment handles allocator-level residue. Capacity-changing
-means more than growing: `reserve` abandons the old buffer while writing no payload, and
-`shrink_to_fit` / `shrink_to` abandon it while the buffer only ever got smaller, carrying
-the discarded tail with it. The buffer the wrapper holds afterwards is still zeroized on
-drop, spare capacity included, so the exposure is confined to the abandoned buffers — one
-per move, and whether a move happens at all depends on whether the allocator can resize
-the chunk in place. For known-size heap-only key material, prefer `Dynamic<[u8; N]>`
-(boxed array — no realloc surface). `Fixed<T>` has no realloc surface either, and that is
-now enforced rather than assumed: `Fixed::new` requires `FixedStorage` on the inner type, so
-`Fixed<Vec<u8>>` and `fixed_newtype!(pub Name, generic Vec<u8>)` are compile errors instead
-of silent instances of the same weakness. A custom inner type asserts the property in one
-line. See `SECURITY.md` for the realloc threat-model note and operational mitigations.
-
-### Inherent Rust limitations
-
-Three universal in-memory-secret limits apply (same across C, C++, Go, and
-Rust): **stack-move residue** (mitigated by `Fixed::new_with`, pass-by-reference,
-or switching to `Dynamic<T>`), **heap-reallocation residue** (mitigated by
-pre-sizing, `Dynamic<[u8; N]>`, or the
-[`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) global allocator),
-and **swap / core dumps** (OS-level — `mlock`, encrypted swap, disabled core
-dumps).
-
-Read [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) for the full threat model and mitigations, including the dedicated [§ Inherent Rust Limitations](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md#inherent-rust-limitations) section.
-
-## Audit Surface (Secret Materialization)
-
-Encoding and decoding methods are **convenience wrappers** that internally use scoped `with_secret` access — they do **not** bypass the security model, but return the fully materialized encoded value.
-
-They exist because users who call them have already decided to reveal the secret — the wrapper reduces boilerplate and avoids long-lived raw references.
-
-Every encoder returns [`EncodedSecret`] (wrapping `Zeroizing<String>` with a redacted `Debug` and no `Display`), so encoded output is wiped on drop by default.
-
-**Audit every exposure point** by searching your codebase for:
-
-- **Access:** `expose_secret`, `expose_secret_mut`, `with_secret`, `with_secret_mut`
-- **Extract:** `into_inner` (hands the plain secret to the caller; protection ends), `as_reader` (yields a reader over the secret bytes)
-- **Encode:** `to_hex`, `to_hex_upper`, `to_base32`, `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and their `_sized::<N>` forms — all returning `EncodedSecret`
-- **Decode:** `try_from_hex`, `try_from_base32`, `try_from_base64url`, `try_from_bech32*` (including `_unchecked`)
-
-**Best practice**: Prefer scoped methods (`with_secret` / `with_secret_mut`) when possible — they keep exposure minimal.
-
-## What changed in 0.8.0
-
-- **Zeroize is now mandatory** — memory wiping on drop is always enabled with no feature gate.
-- `Fixed<T>` requires `T: Zeroize`; `Dynamic<T>` requires `T: ?Sized + Zeroize`.
-- Removed the old optional `zeroize` feature and related toggles (`insecure`, `secure`, and `std`).
-- Real `impl Drop` now calls `zeroize()` on the inner value — the documented zeroization guarantee is fully enforced.
-- All previous versions (0.1.0–0.7.0-rc.14) were yanked from crates.io.
-- Greatly expanded zeroization test suite with multi-size coverage, spare-capacity checks for both `Vec` and `String`, runtime heap verification via `ProxyAllocator`, and AddressSanitizer integration.
-- **`ExposeSecret` → `RevealSecret` trait rename** — `ExposeSecret` / `ExposeSecretMut` are now `RevealSecret` / `RevealSecretMut`. Method names (`expose_secret`, `with_secret`, etc.) are unchanged; only code that names the trait explicitly needs updating.
-- **`ct-eq-hash` feature removed** — `ConstantTimeEqExt`, `ct_eq_hash`, and `ct_eq_auto` are gone. Use the `ct-eq` feature and `.ct_eq()` instead.
-- **Bech32 / Bech32m constructor API changed** — Primary decode is now `try_from_bech32(s, hrp)` (HRP-validated); unchecked single-arg form is `try_from_bech32_unchecked(s)`. `_expect_hrp` variants renamed to `_with_hrp`.
-- **`ToHex::to_hex_left` removed** — The partial-reveal logging helper was removed; construct redacted output manually if needed.
-- **Every encoder now returns `EncodedSecret`** — the `*_zeroizing` twins are gone, so
-  the short name is the safe one: `to_hex`, `to_hex_upper`, `to_base32`, `to_base64url`,
-  `try_to_bech32`, `try_to_bech32m`. Backported from the 0.9 line (#172).
-- **`into_inner` returns the plain value** — it no longer hands back a wrapper that kept
-  wiping, so **protection ends at that call**. `InnerSecret<T>` is gone. Backported from
-  the 0.9 line (#172).
-- **`encoding-bech32m` folded into `encoding-bech32`** — one feature now covers BIP-173
-  and BIP-350; they are one dependency, one error type, and one code-length knob.
-  Backported from the 0.9 line (#171).
-- **Encoders now require `EncodableBytes`** — the `To*` blankets are
-  `T: AsRef<[u8]> + EncodableBytes`, so string-shaped inputs are rejected.
-  `"text".to_hex()` and re-encoding an `EncodedSecret` no longer compile; say
-  `.as_bytes()` when the UTF-8 really is what you want. Backported from the 0.9 line
-  (#172).
-- **`DecodingError` and `Bech32Error::ConversionFailed` are gone** — the wrapper enum
-  had no producer, and the variant was unreachable (bit-conversion failures surface as
-  `OperationFailed`). Backported from the 0.9 line (#171).
-- **`Dynamic::<Vec<u8>>::new_with` now takes a length** — `new_with(len, |slot| …)`
-  hands the closure a sized, pre-zeroed `&mut [u8]` instead of an empty `Vec` to fill.
-  The old signature handed a zero-capacity `Vec`, so a fill that outgrew it reallocated
-  and abandoned an unwiped copy of the secret on the heap — inside the constructor whose
-  whole purpose was to write the secret where it would live and nowhere else. A slice
-  cannot be grown, so that route is gone rather than discouraged. The zero fill is a
-  **documented guarantee**, not an incidental property: a caller deriving fewer than
-  `len` bytes consumes the remaining zeros as real input (a 40-bit RC4 key is five
-  derived bytes and eleven zeros of key-schedule input, not padding). Backported from
-  the 0.9 line (#233).
-- **`Dynamic::<Vec<u8>>::try_new_with` is new** — the same constructor for a fill that
-  can fail: the closure returns `Result<(), E>` with `E` unbounded, so your own error
-  type passes straight through, and on `Err` the partial write is zeroized before the
-  error returns. Backported from the 0.9 line (#233).
-- **`Dynamic::<String>::new_with` removed, with no replacement** — it carried the
-  identical defect and cannot be fixed the same way, because no sized slot is possible
-  for text: a `String` must hold valid UTF-8 and characters vary in byte width, so a
-  fixed window of `len` bytes is not somewhere arbitrary text can be written. Build the
-  `String` pre-sized yourself — `String::with_capacity(len)`, filled once — and move it
-  in with `Dynamic::new`, which takes that buffer rather than copying it. Backported
-  from the 0.9 line (#233).
-- **New `SlotWriter` type** — an append cursor over a slot (`push_slice`, `push_byte`,
-  `position`, `remaining`, `is_full`), so a multi-part fill is not offset arithmetic
-  written by hand. Overrun panics, and the message names the shortfall; anything left
-  unwritten keeps the slot's zeros. Under `std` it also implements `io::Write`, where
-  `write_all` reports an overrun as `ErrorKind::WriteZero`. Exported at the crate root,
-  available with no features. Backported from the 0.9 line (#233).
-
-## Branch support
-
-| Branch | Version | Rust edition | MSRV | Status |
-|---|---|---|---|---|
-| `main` | 0.9.x | 2024 | 1.85 | Active development |
-| `release/0.8` | 0.8.x | 2021 | 1.70 | Lockstep with `main`; no dependency or toolchain bumps |
-
-**Rust ≥ 1.85**: use `secure-gate = "0.9.0-rc"`.  
-**Rust < 1.85**: use `secure-gate = "0.8.0-rc"`.
-
-Write the release candidate out in full. Both lines are pre-release only — the newest
-stable on crates.io is `0.6.1` — and a caret matches a pre-release only when the
-requirement itself carries one for the same `major.minor.patch`. So `"0.8"` means
-`>=0.8.0, <0.9.0`, `0.8.0-rc.14` sorts *below* `0.8.0`, and nothing satisfies it: `"0.8"`
-and `"0.9"` are not shorthands here, they are resolve failures.
-
-<!-- Every concrete version in this file equals the version in Cargo.toml. There is no
-     staged rule and nothing moves on its own schedule: bump the manifest, bump these in the
-     same commit. Between that commit and the upload they are briefly ahead of crates.io,
-     which is the cost of the simple rule and is measured in minutes. The three install
-     snippets above are the tracking form and carry no version, so they are not part of
-     this. References to a *past* release -- which tag last carried a deleted crate, when a
-     behaviour changed -- are history and never move. -->
-
-`"0.8.0-rc"` is the form that tracks this line rather than a version. `^0.8.0-rc` is
-`>=0.8.0-rc, <0.9.0`, so it selects the newest `0.8.0-rc.N` today and keeps resolving once
-`0.8.0` ships — nothing to update when the next candidate lands. It floats, though, and
-candidates on these lines have carried breaking changes: pin `"=0.8.0-rc.14"` when
-`cargo update` must stay put. The pre-release tag is also matched against exactly one
-`major.minor.patch`, so `"0.8.0-rc"` will not pick up a later `0.8.1-rc.1`.
-
-This line is **not** a maintenance branch yet, and describing it as one was retired: it is
-the **MSRV 1.70 line**, carrying the same API as `main` built for an older compiler. Since
-`v0.8.0-rc.11` it has taken 75 commits, nine of them breaking. Until both lines reach a
-stable release they are finished in parallel, and every change on `main` is re-derived
-here — with one standing exclusion: dependency and toolchain bumps that would break 1.70
-are never ported. After the stable releases this becomes mostly a maintenance line.
-
-## Migrating from secrecy
-
-The `secure-gate-compat` shim crate, which provided drop-in replacements for `secrecy`
-v0.8 and v0.10, has been removed. It was experimental and never published to crates.io.
-If you need it, it is recoverable from git history —
-`git checkout v0.8.0-rc.11 -- secure-gate-compat` restores the last version on this
-branch, along with its migration guide. (`v0.8.0-rc.11` is the last tag on this line
-that carries it; the crate was deleted before `rc.12`.)
+| You have | Use | Why |
+|---|---|---|
+| A key or other fixed-size secret | `fixed_newtype!(pub Name, 32, "…")` | On the stack, `no_std`, and a distinct type per role |
+| A password, token or other variable-length secret | `dynamic_newtype!(pub Name, String, "…")` | On the heap (`alloc`); spare capacity is wiped too |
+| A secret with no role to confuse it with | `pub type Name = Fixed<[u8; 32]>;` or `pub type Name = Dynamic<String>;` | Same protection; an alias is interchangeable with its base type |
 
 ## Features
 
-Common stacks: default (`alloc`), `features = ["full"]`, or `default-features = false` for heap-free `Fixed` only.
+| Feature | Adds |
+|---|---|
+| `alloc` _(default)_ | `Dynamic<T>`, including wiping `Vec` / `String` spare capacity |
+| `std` | `std::io::Write` for `Dynamic<Vec<u8>>` and `SlotWriter`, and `Dynamic::as_reader()` (`std::io::Read`). Implies `alloc` |
+| `rand` | `from_random()` (system RNG); heap-free for `Fixed`. For an RNG you supply, use `try_new_with(\|b\| rng.try_fill_bytes(b))`, which needs no feature |
+| `ct-eq` | `ConstantTimeEq` via `subtle` |
+| `encoding` | All of `encoding-hex`, `-base32`, `-base64`, `-bech32`; see [Encoding](#encoding) |
+| `serde` | `serde-deserialize` (1 MiB default limit) and `serde-serialize` (opt-in per type via `SerializableSecret`) |
+| `cloneable` | Opt-in cloning via `CloneableSecret` |
+| `full` | Everything except `std` |
 
-| Feature             | Description                                                                                                                                                                                                                                               |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alloc` _(default)_ | Heap-allocated `Dynamic<T>` + full zeroization of `Vec`/`String` spare capacity                                                                                                                                                                           |
-| `std`               | Full `std` support (implies `alloc`). Enables `std::io::Read`/`Write` for `Dynamic<Vec<u8>>` via `as_reader()` and direct `Write` impl. Use `default-features = false` for no-heap builds. |
-| `rand`              | `from_random()` (system `OsRng`) and fallible `from_rng()` for any `TryRngCore + TryCryptoRng`; `no_std` compatible for `Fixed<T>` (no heap required). `Dynamic::from_random()` / `from_rng()` require `alloc` (implicit — `Dynamic<T>` itself requires it). |
-| `ct-eq`             | `ConstantTimeEq` — timing-safe comparison via `expose_secret()` (`subtle`)                                                                                                                                                                                |
-| `encoding`          | Meta: all encoding sub-features (hex, base32, base64url, bech32). Encoding traits require `alloc`; `Fixed::try_from_*` decoding is no-alloc.                                                                                                     |
-| `encoding-hex`      | `ToHex` / `FromHexStr` — constant-time via `base16ct`                                                                                                                                                                                                     |
-| `encoding-base32`   | `ToBase32` / `FromBase32Str` — constant-time via `base32ct`; RFC 4648 §6, uppercase and unpadded                                                                                                                                                          |
-| `encoding-base64`   | `ToBase64Url` / `FromBase64UrlStr` — constant-time via `base64ct`                                                                                                                                                                                         |
-| `encoding-bech32`   | BIP-173 (`ToBech32` / `FromBech32Str`) **and** BIP-350 (`ToBech32m` / `FromBech32mStr`). One feature: the two are the same code, one checksum constant apart. `_sized::<N>` on every method sets the code length.                                          |
-| `serde`             | Meta: `serde-deserialize` + `serde-serialize`                                                                                                                                                                                                             |
-| `serde-deserialize` | Direct deserialization; `Zeroizing`-wrapped buffers; 1 MiB default limit (`MAX_DESERIALIZE_BYTES`); use `deserialize_with_limit` for custom ceilings                                                                                                      |
-| `serde-serialize`   | Serialize secrets (requires `SerializableSecret` marker on inner type)                                                                                                                                                                                    |
-| `cloneable`         | `CloneableSecret` opt-in cloning                                                                                                                                                                                                                          |
-| `full`              | All features except `std`                                                                                                                                                                                                                                   |
+### `std`, `alloc` and `no_std`
 
-`no_std` compatible — the crate is `#![no_std]` unless the `std` feature is enabled, verified in CI by cross-building for `thumbv7em-none-eabihf`. `Fixed<T>` with `rand` works heap-free (on bare-metal targets, `getrandom` additionally requires a user-configured platform backend for `from_random`; `from_rng` with a caller-supplied RNG has no such requirement). `Dynamic<T>`, encoding traits, and serde require `alloc`. `Fixed::try_from_*` decoding works without `alloc` using constant-time stack-based decoders. Disabled features have zero overhead.
+There is no `no_std` feature. The crate is `no_std` whenever `std` is off, which it is by
+default, and two features decide how much of the standard library it uses:
 
-## Contributing
+| In `Cargo.toml` | Uses | You get |
+|---|---|---|
+| `default-features = false` | `core` only: no heap, no OS | `Fixed` and its decoders |
+| nothing (the default, `alloc`) | `core` + `alloc`: a heap, still no OS | adds `Dynamic`, the string encoders and `serde` |
+| `features = ["std"]` | all of `std` | adds `std::io::Write` on `Dynamic<Vec<u8>>` and `SlotWriter`, and `Dynamic::as_reader()` |
 
-### MSRV & Lockfile
+`alloc` is the only default feature, so turning the defaults off is how you turn the heap off.
+List what you still want after it:
 
-This crate (`release/0.8`, 0.8.x) enforces MSRV 1.70 (`rust-version = "1.70"` in `Cargo.toml`).
-
-**Important:** Always use the MSRV toolchain to update `Cargo.lock`:
-
-```bash
-cargo +1.70 update
-git add Cargo.lock
-git commit -m "chore: regenerate Cargo.lock with MSRV 1.70"
+```toml
+secure-gate = { version = "0.8", default-features = false, features = ["ct-eq", "encoding-hex"] }
 ```
 
-Do **not** use a newer toolchain (1.80+, nightly) to update the lockfile — it generates version 4 format, which Cargo 1.70 cannot read, breaking the MSRV CI job with:
+- `rand`, `ct-eq`, `cloneable` and the `encoding-*` features work without `alloc`. The
+  encodings then decode into a `Fixed`; producing an encoded string needs `alloc`.
+- `serde`, `serde-serialize`, `serde-deserialize` and `full` turn `alloc` on, and `std`
+  turns `alloc` on.
+- Cargo features only add. If any crate in your build enables `alloc` or `std` on
+  `secure-gate`, it is on for the whole build.
+- No wipe gets weaker or stronger with the tier. `alloc` brings `Vec` and `String` into the
+  crate together with the wiping of their spare capacity. `std` changes nothing that exists
+  without it; its `io::Write` on `Dynamic<Vec<u8>>` wipes each buffer it outgrows, which
+  makes it the way to build a secret whose length is not known up front (see
+  [SECURITY.md](SECURITY.md)).
 
-```text
-lock file version `4` was found, but this version of Cargo does not understand this lock file
-```
+## Encoding
+
+Each format sits behind its own feature; `encoding` turns on all four.
+
+| Format | Encode | Decode into `Fixed` / `Dynamic` | Feature |
+|---|---|---|---|
+| Hex | `ToHex` | `try_from_hex` | `encoding-hex` |
+| Base32 (RFC 4648 §6) | `ToBase32` | `try_from_base32` | `encoding-base32` |
+| Base64url | `ToBase64Url` | `try_from_base64url` | `encoding-base64` |
+| Bech32 (BIP-173) | `ToBech32` | `try_from_bech32(s, hrp)` | `encoding-bech32` |
+| Bech32m (BIP-350) | `ToBech32m` | `try_from_bech32m(s, hrp)` | `encoding-bech32` |
+
+Every encoder returns `EncodedSecret`, which wipes itself on drop and has no `Display`.
+Every decoder is fallible and decodes straight into the wrapper, as in the Quick start.
+
+## Where protection stops
+
+The crate wipes the buffers it owns and stops at a line you can point to. Every handoff is a
+call you can grep for:
+
+| Handoff | What you hold | Protection after it |
+|---|---|---|
+| `with_secret` / `with_secret_mut` | A borrow that ends with the closure | Full. A copy you make inside the closure is yours, and no lint catches it |
+| `expose_secret` / `expose_secret_mut` | A reference for as long as you keep it | The wrapper still wipes; anything you copy from the reference is yours |
+| `into_inner` (also on `EncodedSecret`) | The plain value | None: not wiped, not redacted |
+| `to_hex` and the other encoders | An `EncodedSecret` | Wiped on drop, `Debug` redacted. `.to_string()` or `&*enc` makes a copy nothing tracks |
+| `EncodedSecret::into_zeroizing` | A `Zeroizing<String>` | Wiped on drop, but it derefs to `String`, and on this line its `Debug` can print the value (`zeroize` 1.8) |
+| `as_reader`, serde `Serialize` | Bytes in a buffer you or another library own | None |
+| What you pass in (`"…".into()`, `try_from_hex(&s)`, `From<&[u8]>`) | Your original input | Never wrapped: only the wrapper's copy is wiped |
+
+Beyond the handoffs:
+
+- **No unsafe code** (`#![forbid(unsafe_code)]`).
+- **Not covered:** a process that can be read (a debugger, code running in it),
+  `panic = "abort"` and hard crashes, and `static` secrets.
+- **Inherent limits** no wrapper removes: stack-move residue, heap-reallocation residue, and
+  swap or core dumps. Each has a mitigation in SECURITY.md.
+
+[SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md#where-accident-prevention-ends)
+has the rule that draws the line, the full threat model, and the call sites to audit.
+
+## Stability
+
+From 0.8.0, the public API follows semantic versioning within the 0.8 line: a 0.8.x release
+adds, and does not remove or change. The promise covers the items exported from the crate
+root and from `traits`, the input grammar of the macros, and each feature's name and what it
+enables. Import from the crate root: the deeper module paths under `traits` (such as
+`traits::reveal_secret::RevealSecret`) compile, and are not covered.
+
+- **Features.** `full` stays as listed above. It will not grow to include `std`, so it
+  remains usable on `no_std` targets.
+- **MSRV.** 1.70 for the whole 0.8 line. That is what the line is for.
+- **Traits.** The public traits can be implemented outside this crate, and the newtype macros
+  do so. A method added to one in a 0.8.x release always comes with a default body, so
+  existing implementations keep compiling.
+- **Dependencies in the API.** Only `zeroize` and `serde`, both 1.x, appear in public
+  signatures. `bech32`, `rand`, `subtle` and the other dependencies are private and can be
+  upgraded without a breaking release.
+
+## Going further
+
+- [API docs](https://docs.rs/secure-gate): every type, trait and feature, with examples.
+- [`fixed_newtype!`](https://docs.rs/secure-gate/latest/secure_gate/macro.fixed_newtype.html) and
+  [`dynamic_newtype!`](https://docs.rs/secure-gate/latest/secure_gate/macro.dynamic_newtype.html):
+  `generic T` inner types and opt-in conversions to and from the base wrapper.
+- [`Fixed`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html): running RustCrypto
+  ciphers in place inside the wrapper, and the zero-size compile error.
+- [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md): threat model and measurements.
+- [CHANGELOG.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/CHANGELOG.md): changes per release, including breaking ones.
+
+**Contributing.** MSRV is 1.70, and `rust-toolchain.toml` pins it. Cargo 1.70 does not
+resolve by MSRV, so dependencies whose newer releases need a newer toolchain are pinned in
+`Cargo.toml`, and `Cargo.lock` is committed. What CI
+checks is in [`.github/workflows/`](https://github.com/Slurp9187/secure-gate/tree/release/0.8/.github/workflows).
 
 ## License
 

@@ -57,7 +57,7 @@
 //!
 //! // Every impl is a deliberate security decision — audit all usages.
 //! impl CloneableSecret for SessionKey {}
-//! // Required by `Fixed::new`: asserts this type owns no buffer that can be reallocated.
+//! // Required by `Fixed::new`: asserts this type owns no heap allocation.
 //! impl FixedStorage for SessionKey {}
 //!
 //! let original = Fixed::new(SessionKey([0u8; 32]));
@@ -98,6 +98,26 @@
 //!
 //! This trait is a **marker only** — it has no methods and adds no runtime behavior.
 //! It exists solely to gate the `Clone` impl on wrapper types.
+
+/// Marker trait that opts a secret type into cloning.
+///
+/// No methods — its only purpose is to gate the `Clone` impl on
+/// [`Fixed<T>`](crate::Fixed) and [`Dynamic<T>`](crate::Dynamic). Each clone is
+/// zeroized on drop independently, and each one is another copy of the secret in memory.
+/// Requires the `cloneable` feature.
+///
+/// Implement this on your inner type `T`; `Fixed<T>` and `Dynamic<T>` then gain the
+/// gated `Clone` impl. It is deliberately not implemented for anything by default:
+/// cloning is a risk a crate opts into, one type at a time.
+///
+/// **Coherence note:** Rust's orphan rule prevents downstream crates from implementing
+/// this marker for foreign types such as `String`, `Vec<u8>`, or `[u8; N]` — so
+/// `Dynamic<String>` and `Fixed<[u8; N]>` themselves can never become `Clone`. To opt
+/// a secret into cloning, define a newtype inner type in your crate (deriving
+/// `Zeroize` and `Clone`) and implement the marker on it. This is intentional: it keeps
+/// every cloneable secret type visible in *your* code. The
+/// [module documentation](crate::traits::cloneable_secret) has a worked example.
+///
+/// See also [`SerializableSecret`](crate::SerializableSecret), the other opt-in marker.
 #[cfg(feature = "cloneable")]
-/// Marker trait: inner types that opt in to cloning secret wrappers (requires `cloneable`).
 pub trait CloneableSecret: Clone + zeroize::Zeroize {}

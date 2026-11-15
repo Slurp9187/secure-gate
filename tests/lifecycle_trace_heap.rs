@@ -6,15 +6,6 @@
 //! what the allocator sees happen to that block — whether it is freed, how many bytes were
 //! inspected, and how many of them were still non-zero at the moment of release.
 //!
-//! # Two spellings that look dated and are not
-//!
-//! This branch's MSRV is 1.70, so `std::iter::repeat(x).take(n)` stands in for
-//! `std::iter::repeat_n` (stable 1.82) and an explicit `as *const T` cast stands in for
-//! `std::ptr::from_ref` (stable 1.76); the one place that repeats a `&str` uses
-//! `str::repeat`, which clippy's `manual_str_repeat` requires on this toolchain. All three
-//! are what `main`'s copy of this file spells with the newer API; none changes what is
-//! measured. Do not "modernize" them here — the MSRV job builds this file on 1.70.
-//!
 //! # Why this is a separate test binary
 //!
 //! It installs a `#[global_allocator]`, exactly as `heap_zeroize.rs` does, and for the same reason:
@@ -69,7 +60,10 @@
 //!   because nothing is abandoned: the old bytes are inside the allocation the wrapper still owns
 //!   and still wipes at drop. `check_growth_orphan_*` therefore asserts the block *was* freed
 //!   before reading anything into its contents — not as a formality, but because the abandoned
-//!   buffer it measures does not exist in every run of the same code outside this instrument.
+//!   buffer it measures does not exist in every run of the same code outside this instrument. The
+//!   same caveat and the same `freed`-first ordering apply to
+//!   `check_new_moves_cleanly_but_cannot_undo_a_grown_build`, which measures an orphan produced
+//!   before the wrapper exists at all.
 //! * It sees only blocks this process frees. Bytes already copied into a core dump, into swap, or
 //!   into a caller's own buffer are out of reach, and so is the stack.
 //! * It reads a block after the owner has released it but before `System.dealloc` is told about it,
@@ -373,7 +367,7 @@ fn exact_tok(size: usize) -> Tok {
 
 /// A `Pw` holding `size` ASCII bytes in a buffer of capacity exactly `size`.
 ///
-/// Built outside the wrapper and moved in, because as of 0.8.0-rc.14 there is no other way:
+/// Built outside the wrapper and moved in, because as of 0.9.0-rc.12 there is no other way:
 /// `Dynamic<String>` has no closure constructor and cannot have one — a sized byte slot is not
 /// somewhere arbitrary text can be written, since `String` must hold valid UTF-8 and characters
 /// have variable byte widths. So the exactness this helper's name promises is its own doing,
@@ -512,7 +506,8 @@ fn check_str_and_slice_conversions_copy_then_wipe(size: usize) {
 
     // The source is still the caller's problem. Measured, not assumed: wrapping a copy protects
     // the copy only, and the mitigation is to build into the wrapper (`new_with(len, …)`) or to
-    // move the owned value in (`new`).
+    // move the owned value in (`new`). The second of those is the weaker of the two, and
+    // `check_new_moves_cleanly_but_cannot_undo_a_grown_build` measures exactly how much weaker.
     assert!(
         plaintext.bytes().all(|b| b == b'p'),
         "the conversion mutated the caller's string"
@@ -549,6 +544,93 @@ fn check_str_and_slice_conversions_copy_then_wipe(size: usize) {
     );
 }
 
+/// Pins the limit of the "move it in" advice: `new` copies nothing and the buffer it receives is
+/// wiped at drop, and *none of that reaches a reallocation that happened while the value was being
+/// built*. The residue from one growth before the move is measured here, in the same run that
+/// measures the clean move.
+///
+/// `Dynamic`'s construction table says a move is "necessary but not sufficient: if you *grew* the
+/// value to build it, those reallocations already happened and the copies are already on the heap".
+/// That sentence is the one most likely to be skimmed, because everything visible afterwards looks
+/// right — one allocation for the `Box` header, the same address in and out, zero non-zero bytes at
+/// drop. "Followed the advice, still leaked" is a category a sentence cannot carry on its own, so
+/// it gets a number: `w.nonzero` on the pre-growth block, taken before the wrapper exists.
+///
+/// The contrast with `check_new_with_keeps_the_closures_buffer` is the point of keeping the two
+/// adjacent. `new_with(len, …)` has no such window — the buffer is allocated at its final size and
+/// handed to the closure as a slice, so there is no "before" in which a growth could occur. This is
+/// the measured difference between the recommended constructor and the one that merely avoids a
+/// copy at the boundary.
+fn check_new_moves_cleanly_but_cannot_undo_a_grown_build(size: usize) {
+    // Build the value the way the documentation warns against: an exact capacity, filled, then one
+    // push past it. One growth is enough; a real builder that pushes field by field does this
+    // several times over.
+    let mut grown: Vec<u8> = Vec::with_capacity(size);
+    grown.extend(std::iter::repeat(PAYLOAD).take(size));
+    assert_eq!(
+        grown.capacity(),
+        size,
+        "Vec::with_capacity over-allocated, so the push below would not grow the buffer and this \
+         check would measure nothing"
+    );
+    let orphan = grown.as_ptr();
+
+    let w = watch_block(orphan, || grown.push(PAYLOAD));
+    assert!(
+        w.freed,
+        "the pre-move buffer was not released during the growth: the allocation was resized in \
+         place, so its residue is real but invisible to this instrument"
+    );
+    assert_eq!(
+        w.size, size,
+        "the allocator inspected {} bytes of the {size}-byte orphan",
+        w.size
+    );
+    assert_eq!(
+        w.nonzero, size,
+        "{} of {size} secret bytes were left in the buffer abandoned while the value was being \
+         built; a growth outside the wrapper has nothing to wipe it, so all {size} are expected \
+         here and a zero would mean the standard library started clearing what it frees",
+        w.nonzero
+    );
+
+    // Everything from here on is the caller doing exactly what the docs ask for, and all of it
+    // passes — which is the uncomfortable half of the result.
+    let buffer = grown.as_ptr();
+    let mut tok = None;
+    let allocs = count_allocs(|| tok = Some(Tok::new(grown)));
+    let tok = tok.expect("Tok::new returned");
+
+    assert_eq!(
+        allocs, 1,
+        "Tok::new(Vec<u8>) performed {allocs} allocations; exactly one (the Box<Vec<u8>> header) \
+         means the payload buffer was moved, more than one means it was copied"
+    );
+    assert_eq!(
+        tok.expose_secret().as_ptr(),
+        buffer,
+        "the secret is in a different buffer than the one handed to Tok::new: it was copied, and \
+         the original copy is unprotected"
+    );
+
+    let cap = tok.with_secret(Vec::capacity);
+    let w = watch_block(buffer, move || drop(tok));
+    assert!(w.freed, "the moved-in buffer was never released");
+    assert_eq!(
+        w.size, cap,
+        "the watched block's size is not the buffer's capacity, so this check covered only part \
+         of the allocation"
+    );
+    assert_eq!(
+        w.nonzero, 0,
+        "{} of {} bytes survived the drop of the moved-in buffer",
+        w.nonzero, w.size
+    );
+    // And the block measured at the top is still out there with every byte of the secret in it.
+    // Nothing the wrapper does can reach it: it was freed before the wrapper existed. The only
+    // constructor that closes this window is `new_with(len, …)`, which never opens it.
+}
+
 /// Pins that `new_with` hands the closure the wrapper's own storage — the address the closure
 /// wrote into is the address the wrapper later wipes, with no intervening copy — and that the slot
 /// is exactly `len` bytes, so there is no slack the closure could have grown into.
@@ -560,7 +642,7 @@ fn check_str_and_slice_conversions_copy_then_wipe(size: usize) {
 /// whose buffer is swapped into a `Box` after the fill, and a swap that turned into a copy would
 /// show up here as two different addresses.
 ///
-/// The capacity assertion is the other half, and it is what the pre-0.8.0-rc.14 signature could not
+/// The capacity assertion is the other half, and it is what the pre-0.9.0-rc.12 signature could not
 /// offer: a closure handed a growable `Vec` could reallocate mid-fill and abandon an unwiped copy,
 /// and `capacity == len` afterwards is the observable that says no growth was even expressible.
 ///
@@ -595,7 +677,7 @@ fn check_new_with_keeps_the_closures_buffer(size: usize) {
     assert_eq!(w.nonzero, 0, "{} bytes survived the drop", w.nonzero);
 }
 
-/// Pins that `from_random` and `from_rng` generate straight into the buffer that will be protected:
+/// Pins that `from_random`, and `try_new_with` filled from a caller-supplied RNG, generate straight into the buffer that will be protected:
 /// two allocations, no third buffer, exact capacity, and a wipe at drop.
 ///
 /// A generator that filled a scratch buffer and then copied it would leave the scratch copy
@@ -639,15 +721,21 @@ fn check_random_constructors_fill_the_protected_buffer(len: usize) {
 
     let mut rng = <rand::rngs::StdRng as rand::SeedableRng>::from_seed([7u8; 32]);
     let mut tok = None;
-    let allocs = count_allocs(|| tok = Some(Tok::from_rng(len, &mut rng).expect("rng fill")));
-    let tok = tok.expect("from_rng returned");
+    let allocs = count_allocs(|| {
+        tok = Some(
+            Tok::try_new_with(len, |s| rand::TryRngCore::try_fill_bytes(&mut rng, s))
+                .expect("rng fill"),
+        )
+    });
+    let tok = tok.expect("try_new_with returned");
     assert_eq!(
         allocs, 2,
-        "Tok::from_rng performed {allocs} allocations; expected the same two as from_random"
+        "Tok::try_new_with from a seeded RNG performed {allocs} allocations; expected the same \
+         two as from_random"
     );
     let buffer = tok.expose_secret().as_ptr();
     let w = watch_block(buffer, move || drop(tok));
-    assert!(w.freed, "the from_rng buffer was never released");
+    assert!(w.freed, "the seeded-RNG buffer was never released");
     assert_eq!(w.nonzero, 0, "{} bytes survived the drop", w.nonzero);
 }
 
@@ -898,7 +986,7 @@ fn check_truncating_mutation_wipes_the_abandoned_tail(size: usize) {
 /// # Why the dirty tail is manufactured outside the wrapper now
 ///
 /// It used to be built with `Pw::new_with(|s| { … s.truncate(len) })`, and that spelling is not
-/// merely unavailable since 0.8.0-rc.14 — the shape it produced is *deliberately inexpressible*
+/// merely unavailable since 0.9.0-rc.12 — the shape it produced is *deliberately inexpressible*
 /// through a sized slot, where capacity equals length by construction and a wrapper never holds
 /// slack. That is precisely why this check must not follow the constructor out of the file: a
 /// secret with spare capacity still arrives routinely through `new(owned)`, which moves whatever
@@ -1221,7 +1309,7 @@ fn check_write_growth_wipes_the_orphan(initial: usize, extra: usize) {
 /// pointer matching the pre-call address plus a single allocation (the documented sentinel `Box`).
 /// "The wrapper wipes a sentinel, not the secret" is the payload buffer *not* being released while
 /// the wrapper drops. "Protection ends here" is the last measurement: the returned `Vec` has no
-/// zeroize-on-drop, so its buffer is freed with every byte intact. That is documented behaviour,
+/// zeroize-on-drop, so its buffer is freed with every byte intact. That is documented behavior,
 /// not a leak — tier 3 of the access model hands ownership over — and the positive control at the
 /// end shows protection can be resumed explicitly with `zeroize::Zeroizing`.
 fn check_into_inner_moves_the_buffer_and_ends_protection(size: usize) {
@@ -1324,7 +1412,7 @@ fn check_into_wrapper_drops_the_label_not_the_protection(size: usize) {
 
     let cap = base.with_secret(Vec::capacity);
     let w = watch_block(buffer, move || drop(base));
-    assert!(w.freed, "the unlabelled buffer was never released");
+    assert!(w.freed, "the unlabeled buffer was never released");
     assert_eq!(
         w.size, cap,
         "the watched block's size is not the buffer's capacity, so this check covered only part \
@@ -1340,9 +1428,9 @@ fn check_into_wrapper_drops_the_label_not_the_protection(size: usize) {
 /// Pins the inbound half of the same wall: `from_wrapper` relabels in place, and the borrowing
 /// accessors reach the same buffer without moving or copying it.
 ///
-/// `from_wrapper` is the direction the macro's documentation calls the relabelling path and warns
+/// `from_wrapper` is the direction the macro's documentation calls the relabeling path and warns
 /// against on boundary-guarding types. Whatever the policy, the mechanics must be free and
-/// lossless: a relabelling that reallocated would leave the pre-label buffer unwiped.
+/// lossless: a relabeling that reallocated would leave the pre-label buffer unwiped.
 fn check_from_wrapper_relabels_in_place(size: usize) {
     let base: Dynamic<Vec<u8>> = Dynamic::new(vec![PAYLOAD; size]);
     let buffer = base.expose_secret().as_ptr();
@@ -1382,7 +1470,7 @@ fn check_from_wrapper_relabels_in_place(size: usize) {
 
     let cap = shared.with_secret(Vec::capacity);
     let w = watch_block(buffer, move || drop(shared));
-    assert!(w.freed, "the relabelled buffer was never released");
+    assert!(w.freed, "the relabeled buffer was never released");
     assert_eq!(
         w.size, cap,
         "the watched block's size is not the buffer's capacity, so this check covered only part \
@@ -1412,6 +1500,9 @@ fn newtype_heap_lifecycle_traced() {
     // --- 1. CREATION -------------------------------------------------------
     check_string_new_moves_callers_buffer(1040);
     check_str_and_slice_conversions_copy_then_wipe(1072);
+    // Read with the line above: the conversions leave the source unwiped, and moving instead of
+    // converting does not help if the value was grown into existence first.
+    check_new_moves_cleanly_but_cannot_undo_a_grown_build(1088);
     check_new_with_keeps_the_closures_buffer(1104);
 
     #[cfg(feature = "rand")]

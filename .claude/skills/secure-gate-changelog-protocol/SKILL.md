@@ -219,8 +219,8 @@ local), which means a checker placed here would be visible to a workflow. The
 mechanical obstacle was removed deliberately; the decision stands on the hit
 rate, not on the plumbing.
 
-One real cost remains. The branches carry **separate CI files** — `ci.yml`
-(`branches: [main]`) and `ci-0.8.yml` — and per the backport ledger, CI changes
+One real cost remains. The branches carry **separate CI files** — each has its own
+`ci.yml`, limited to its own branch — and per the backport ledger, CI changes
 must be *re-derived* for 0.8, not copied. Every check is built and maintained
 twice, on two branches that are meant to diverge.
 

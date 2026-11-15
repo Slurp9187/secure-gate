@@ -64,8 +64,23 @@
 //! (key sizes, MAC sizes, and signature sizes are public protocol parameters), so
 //! this is acceptable. **If length itself is sensitive in your threat model, use a
 //! fixed-size type (`[u8; N]` / `Fixed<[u8; N]>`).**
+
+/// Constant-time equality comparison, preventing timing side-channel attacks.
+///
+/// Requires the `ct-eq` feature. Backed by the [`subtle`] crate internally.
+///
+/// `==` is **deliberately not implemented** on [`Fixed`](crate::Fixed) and
+/// [`Dynamic`](crate::Dynamic): always compare secrets with
+/// [`ct_eq`](ConstantTimeEq::ct_eq).
+///
+/// ```rust
+/// use secure_gate::{ConstantTimeEq, Fixed};
+///
+/// let a = Fixed::new([1u8; 32]);
+/// let b = Fixed::new([1u8; 32]);
+/// assert!(a.ct_eq(&b));
+/// ```
 #[cfg(feature = "ct-eq")]
-/// Constant-time equality for secret material (requires `ct-eq`).
 pub trait ConstantTimeEq {
     /// Performs equality comparison in constant time.
     ///
