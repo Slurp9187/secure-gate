@@ -35,7 +35,7 @@ secure-gate = "0.9"                                                             
 # secure-gate = { version = "0.9", features = ["full"] }                       # batteries included
 ```
 
-On Rust older than 1.87, use `secure-gate = "0.8.0-rc"` (the `release/0.8` line, MSRV 1.70).
+On Rust older than 1.87, use `secure-gate = "0.8.0"` (the `release/0.8` line, MSRV 1.70).
 <!-- Every concrete version in this file equals the version in Cargo.toml; bump them in the
      same commit. The install lines use the caret form and carry no patch version. -->
 
