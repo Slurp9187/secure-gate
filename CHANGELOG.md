@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-11-15
+
+First stable release of the 0.9 line. From this release the public API follows semantic
+versioning as described in the README's Stability section. The API is the same as
+0.9.0-rc.19; the changes since then are documentation and tests only.
+
+### Documentation
+- `sealed` docs (`Prekey::new_idle_noaccess`, the `sealed` module): the Windows idle
+  no-access claim is scoped to what was measured (#289). It makes another process's
+  `ReadProcessMemory` fail and keeps the pre-key out of a user-mode full-memory dump
+  (`MiniDumpWithFullMemory`) taken while it is idle. It does not stop a process that may
+  change this one's page protection (`VirtualProtectEx`) and then read, and a kernel or
+  complete memory dump captures physical memory whatever the protection.
+- README install lines now use `"0.9"`, and the note on tracking release candidates is gone.
+
+### Tests
+- New stateful fuzz target for the `sealed` module, including `from_random`, run in the
+  smoke and nightly fuzz jobs (#293).
+
 ## [0.9.0-rc.19] - 2026-11-13
 
 ### Added

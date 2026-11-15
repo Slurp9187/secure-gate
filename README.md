@@ -30,17 +30,14 @@ Don't route around it with `.to_vec()`, `*bytes` or `.to_string()`; name the exi
 
 ```toml
 [dependencies]
-secure-gate = "0.9.0-rc"                                                        # default: heap on (`alloc`)
-# secure-gate = { version = "0.9.0-rc", default-features = false }             # heap off: `Fixed` only
-# secure-gate = { version = "0.9.0-rc", features = ["full"] }                  # batteries included
+secure-gate = "0.9"                                                             # default: heap on (`alloc`)
+# secure-gate = { version = "0.9", default-features = false }                  # heap off: `Fixed` only
+# secure-gate = { version = "0.9", features = ["full"] }                       # batteries included
 ```
 
-A caret requirement matches a pre-release only when it names one: `"0.9"` resolves to
-nothing until 0.9.0 ships, while `"0.9.0-rc"` tracks the newest candidate. Pin
-`"=0.9.0-rc.19"` when `cargo update` must stay put. On Rust older than 1.87, use
-`secure-gate = "0.8.0-rc"` (the `release/0.8` line, MSRV 1.70).
+On Rust older than 1.87, use `secure-gate = "0.8.0-rc"` (the `release/0.8` line, MSRV 1.70).
 <!-- Every concrete version in this file equals the version in Cargo.toml; bump them in the
-     same commit. The install lines use the tracking form and carry no version. -->
+     same commit. The install lines use the caret form and carry no patch version. -->
 
 ## Quick start
 
@@ -138,7 +135,7 @@ default, and two features decide how much of the standard library it uses:
 List what you still want after it:
 
 ```toml
-secure-gate = { version = "0.9.0-rc", default-features = false, features = ["ct-eq", "encoding-hex"] }
+secure-gate = { version = "0.9", default-features = false, features = ["ct-eq", "encoding-hex"] }
 ```
 
 - `rand`, `ct-eq`, `cloneable` and the `encoding-*` features work without `alloc`. The
