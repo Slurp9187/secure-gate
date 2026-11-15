@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.0] - 2026-11-15
+## [0.9.0] - 2026-11-14
 
 First stable release of the 0.9 line. From this release the public API follows semantic
 versioning as described in the README's Stability section. The API is the same as
