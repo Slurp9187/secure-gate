@@ -1,8 +1,8 @@
 name: "CI · 0.8 (MSRV 1.70)"
 
-# The 0.8 line is a courtesy line for Rust 1.70: it keeps a slim CI (tests on its MSRV and
-# on stable, clippy, rustfmt). Fuzzing, Miri, the DSE/asm checks, CodeQL and the audits
-# run from `main`.
+# The 0.8 line is a courtesy line for Rust 1.70: it keeps a slim CI (tests and the DSE check
+# on its MSRV, tests on stable, clippy and rustdoc, rustfmt, an embedded build). Fuzzing,
+# Miri, CodeQL and the audits run from `main`.
 
 on:
   pull_request:
@@ -47,6 +47,12 @@ jobs:
       - name: Compile-fail tests (trybuild)
         run: cargo +1.70 test -p secure-gate --locked --features=full --test compile_fail_tests
 
+      # Builds `src/bin/asm_check.rs` in release with `--emit=asm` and checks that the
+      # volatile zero-stores in `Fixed`'s drop survive optimization. `#[ignore]`d by default
+      # because it runs a release build of its own.
+      - name: DSE check (asm_dse_check)
+        run: cargo +1.70 test -p secure-gate --locked --test asm_dse_check -- --ignored --nocapture
+
   test-stable:
     name: "0.8 · test (stable)"
     runs-on: ubuntu-latest
@@ -71,7 +77,7 @@ jobs:
         run: cargo +stable test -p secure-gate --locked --all-features -- --skip compile_fail --skip serializable_secret_misuse
 
   clippy:
-    name: "0.8 · clippy"
+    name: "0.8 · clippy + rustdoc"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -88,6 +94,38 @@ jobs:
 
       - name: cargo clippy
         run: cargo +1.70 clippy -p secure-gate --locked --all-targets --all-features -- -D warnings
+
+      # On 1.70 on purpose: rustdoc 1.70 has ICEd on intra-doc links through grouped
+      # `pub use` re-exports, which docs.rs (nightly) never hits. `-D warnings` also
+      # catches broken intra-doc links.
+      - name: cargo doc
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo +1.70 doc -p secure-gate --locked --no-deps --all-features
+
+  embedded:
+    name: "0.8 · embedded build"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # A hosted `--no-default-features` build links std anyway; only a target with no
+      # std at all catches std leaking into the library.
+      - name: Install Rust 1.70 + thumbv7em target
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: "1.70"
+          target: thumbv7em-none-eabihf
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo build (no default features)
+        run: cargo +1.70 build -p secure-gate --locked --lib --target thumbv7em-none-eabihf --no-default-features
+
+      - name: cargo build (alloc)
+        run: cargo +1.70 build -p secure-gate --locked --lib --target thumbv7em-none-eabihf --no-default-features --features alloc
 
   fmt:
     name: "0.8 · fmt"
@@ -109,7 +147,7 @@ jobs:
   ci-passed:
     name: "0.8 · CI passed"
     if: always()
-    needs: [test-msrv, test-stable, clippy, fmt]
+    needs: [test-msrv, test-stable, clippy, fmt, embedded]
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any job failed or was cancelled

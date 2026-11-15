@@ -63,8 +63,9 @@ entry in full; the ones that change what a 0.8 user writes or relies on are belo
 - **`examples/zeroizing_alloc_app.rs` and the `tests/heap_residue*.rs` measurements**: they
   depend on `zeroizing-alloc` 0.1.1 and `secure-gate-residue-probe`, which need newer Rust.
 - **The CI changes** of 0.9.0-rc.18 and rc.19. This line's CI is now one workflow, `ci.yml`:
-  tests on Rust 1.70 and stable, clippy and rustfmt. Its fuzz, Miri, DSE, CodeQL and audit
-  workflows are removed from this branch.
+  tests on Rust 1.70 and stable, the DSE assembly check, clippy, rustdoc, rustfmt and a
+  `thumbv7em-none-eabihf` build. Its fuzz, Miri, CodeQL and audit workflows are removed from
+  this branch.
 - **Leaving `src/bin/asm_check.rs` out of the package**, as 0.9.0-rc.18 does: Cargo 1.70
   refuses to package a manifest whose `[[bin]]` file is excluded.
 
