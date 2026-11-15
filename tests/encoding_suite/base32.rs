@@ -1,20 +1,23 @@
 //! encoding_suite/base32.rs — base32 encoding/decoding tests
 
+// `ToBase32` and `Dynamic` need `alloc`; `Fixed::try_from_base32` does not. Every test
+// that encodes, or decodes into `Dynamic`, is gated on `all(encoding-base32, alloc)` so
+// the suite compiles without `alloc` and the literal-string `Fixed` tests run there.
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
-use secure_gate::{fixed_newtype, Dynamic};
+use secure_gate::{fixed_newtype, Dynamic, SecretLen, ToBase32};
 #[cfg(feature = "encoding-base32")]
-use secure_gate::{Fixed, FromBase32Str, RevealSecret, ToBase32};
+use secure_gate::{Fixed, RevealSecret};
 
-#[cfg(feature = "encoding-base32")]
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 #[test]
 fn test_slice_to_base32() {
     let input = b"hello";
     let encoded = input.to_base32().into_inner();
-    let decoded = encoded.try_from_base32().expect("valid base32");
-    assert_eq!(decoded, b"hello");
+    let decoded = Dynamic::<Vec<u8>>::try_from_base32(&encoded).expect("valid base32");
+    assert_eq!(decoded.expose_secret(), b"hello");
 }
 
-#[cfg(feature = "encoding-base32")]
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_base32_roundtrip() {
     let fixed = Fixed::new([7u8; 32]);
@@ -78,13 +81,13 @@ fn fixed_try_from_base32_empty_input() {
     assert!(Fixed::<[u8; 4]>::try_from_base32("").is_err());
 }
 
-#[cfg(feature = "encoding-base32")]
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 #[test]
 fn base32_empty_string_decodes_to_nothing() {
     // The empty string is the canonical encoding of zero bytes. `Fixed` cannot hold a
     // zero-sized secret, so the property is checked where a zero-length result is
-    // representable: the `Vec<u8>` decoder.
-    let decoded: Vec<u8> = "".try_from_base32().expect("empty encodes zero bytes");
+    // representable: `Dynamic<Vec<u8>>`.
+    let decoded = Dynamic::<Vec<u8>>::try_from_base32("").expect("empty encodes zero bytes");
     assert!(decoded.is_empty());
 }
 
@@ -109,7 +112,7 @@ fn fixed_try_from_base32_rejects_lowercase() {
     assert!(Fixed::<[u8; 5]>::try_from_base32("NBSWY3DP").is_ok());
 }
 
-#[cfg(feature = "encoding-base32")]
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_base32_rejects_padding() {
     // The canonical form is unpadded; '=' is not in the alphabet. Each N is the length
@@ -119,8 +122,8 @@ fn fixed_try_from_base32_rejects_padding() {
     assert!(Fixed::<[u8; 1]>::try_from_base32("MY").is_ok());
     assert!(Fixed::<[u8; 2]>::try_from_base32("MZXQ").is_ok());
     // Bare padding is not a zero-length encoding of nothing. Checked through the
-    // `Vec<u8>` decoder because the expected result has length zero.
-    assert!("=".try_from_base32().is_err());
+    // `Dynamic` decoder because the expected result has length zero.
+    assert!(Dynamic::<Vec<u8>>::try_from_base32("=").is_err());
 }
 
 #[cfg(feature = "encoding-base32")]
@@ -130,21 +133,60 @@ fn fixed_try_from_base32_rejects_non_ascii() {
     assert!(Fixed::<[u8; 5]>::try_from_base32("NBSWY3DPé").is_err());
 }
 
-#[cfg(feature = "encoding-base32")]
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_base32_rejects_impossible_lengths() {
     // Lengths of 1, 3 and 6 (mod 8) cannot be produced by the encoder. Each N below is
     // the byte count the string *would* yield if the length rule were not enforced
     // (1 char → 0 bytes, 3 chars → 1 byte, 6 chars → 3 bytes), so these fail on the
     // length rule alone and not on a decoded-length mismatch. The one-character case
-    // goes through the `Vec<u8>` decoder: it would yield zero bytes, which `Fixed`
+    // goes through the `Dynamic` decoder: it would yield zero bytes, which `Fixed`
     // cannot hold, so a length-rule failure is the only outcome it could have.
-    assert!("M".try_from_base32().is_err());
+    assert!(Dynamic::<Vec<u8>>::try_from_base32("M").is_err());
     assert!(Fixed::<[u8; 1]>::try_from_base32("MZX").is_err());
     assert!(Fixed::<[u8; 3]>::try_from_base32("MZXW6Y").is_err());
-    // The neighbouring legal lengths (2, 4, 5, 7, 8 mod 8) are accepted.
+    // The neighboring legal lengths (2, 4, 5, 7, 8 mod 8) are accepted.
     assert!(Fixed::<[u8; 1]>::try_from_base32("MY").is_ok());
     assert!(Fixed::<[u8; 3]>::try_from_base32("MZXW6").is_ok());
+}
+
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
+#[test]
+fn base32_impossible_block_lengths_error_and_never_panic() {
+    // The rule is on `len % 8`, not on the three shortest cases, so walk several
+    // congruence classes. `base32ct` 0.3.0 panicked with an out-of-bounds index on
+    // exactly these lengths (RustCrypto/formats#2242) rather than returning an
+    // error; the `0.3.1` floor in Cargo.toml is what keeps that version out, and
+    // this test is what fails if the floor is ever loosened back to a bare "0.3".
+    for len in [1usize, 3, 6, 9, 11, 14, 17, 19, 22] {
+        assert!(
+            !matches!(len % 8, 0 | 2 | 4 | 5 | 7),
+            "test vector {len} must be an impossible length"
+        );
+        let s = "A".repeat(len);
+        // The alloc path (`Dynamic`), which is the one that reached the panicking
+        // decoder directly.
+        assert!(
+            Dynamic::<Vec<u8>>::try_from_base32(&s).is_err(),
+            "Dynamic must reject impossible length {len} without panicking"
+        );
+        // The no-alloc path writes into a caller-supplied buffer and panicked too,
+        // so disabling `alloc` was never a mitigation.
+        assert!(
+            Fixed::<[u8; 4]>::try_from_base32(&s).is_err(),
+            "Fixed must reject impossible length {len} without panicking"
+        );
+    }
+
+    // The legal trailing blocks must still round-trip, so the check above is not
+    // simply rejecting everything.
+    for len in [2usize, 4, 5, 7, 8] {
+        let s = "A".repeat(len);
+        assert!(
+            Dynamic::<Vec<u8>>::try_from_base32(&s).is_ok(),
+            "Dynamic must accept legal length {len}"
+        );
+    }
 }
 
 #[cfg(feature = "encoding-base32")]
@@ -191,19 +233,15 @@ fn base32_accepts_non_canonical_trailing_bits() {
     // rather than rejecting them, so "MZ" decodes like the canonical "MY". Documented,
     // deliberately not fixed — round-trip properties must therefore start from
     // encoder-produced strings, never from arbitrary valid-looking ones.
-    assert_eq!("MY".try_from_base32().expect("canonical"), vec![0x66]);
-    assert_eq!("MZ".try_from_base32().expect("non-canonical"), vec![0x66]);
-    // Re-encoding normalises back to the canonical spelling.
-    assert_eq!(
-        "MZ".try_from_base32()
-            .expect("non-canonical")
-            .to_base32()
-            .into_inner(),
-        "MY"
-    );
+    let canonical = Dynamic::<Vec<u8>>::try_from_base32("MY").expect("canonical");
+    let lenient = Dynamic::<Vec<u8>>::try_from_base32("MZ").expect("non-canonical");
+    assert_eq!(canonical.expose_secret(), &[0x66]);
+    assert_eq!(lenient.expose_secret(), &[0x66]);
+    // Re-encoding normalizes back to the canonical spelling.
+    assert_eq!(lenient.to_base32().into_inner(), "MY");
 }
 
-#[cfg(feature = "encoding-base32")]
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_base32_totp_seed_size() {
     // A 20-byte TOTP/HOTP shared secret is 32 base32 characters — the `otpauth://` form,
@@ -220,7 +258,7 @@ fn fixed_try_from_base32_totp_seed_size() {
     decoded.with_secret(|d| assert_eq!(d, &[0xAAu8; 20]));
 }
 
-#[cfg(feature = "encoding-base32")]
+#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 #[test]
 fn fixed_try_from_base32_large_n() {
     let data = [0x42u8; 128];
@@ -260,41 +298,4 @@ fn to_base32_is_generic_over_wrappers() {
         s.to_base32()
     }
     assert_eq!(&*export_wrapped(&newtype), "VOV2XKY");
-}
-
-/// Regression guard specific to the 0.8 line.
-///
-/// `base32ct` 0.2 (the newest release that builds on MSRV 1.70) sizes its output
-/// buffer from `decoded_len()` but indexes it from the input remainder, so an
-/// encoded length whose trailing block is 1, 3 or 6 characters writes out of
-/// bounds and panics instead of returning an error. `secure-gate` guards every
-/// delegation to `base32ct`, so these must be ordinary `Err`s — a panic here
-/// would be a denial-of-service path on attacker-supplied input.
-#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
-#[test]
-fn base32_impossible_block_lengths_error_and_never_panic() {
-    use secure_gate::{Dynamic, Fixed};
-
-    // Trailing blocks of 1, 3 and 6 chars are unrepresentable in unpadded Base32.
-    for len in [1usize, 3, 6, 9, 11, 14, 17, 19, 22] {
-        assert!(
-            !matches!(len % 8, 0 | 2 | 4 | 5 | 7),
-            "test vector {len} must be an impossible length"
-        );
-        let s = "A".repeat(len);
-        assert!(
-            Fixed::<[u8; 4]>::try_from_base32(&s).is_err(),
-            "Fixed must reject impossible length {len} without panicking"
-        );
-        assert!(
-            Dynamic::<Vec<u8>>::try_from_base32(&s).is_err(),
-            "Dynamic must reject impossible length {len} without panicking"
-        );
-    }
-
-    // The valid trailing blocks must still decode (or fail on length, not shape).
-    for len in [2usize, 4, 5, 7, 8] {
-        let s = "A".repeat(len);
-        let _ = Dynamic::<Vec<u8>>::try_from_base32(&s);
-    }
 }

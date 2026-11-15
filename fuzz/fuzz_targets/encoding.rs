@@ -23,7 +23,6 @@ use libfuzzer_sys::fuzz_target;
 
 use secure_gate::{
     Dynamic, RevealSecret, Fixed,
-    FromBech32Str,
     ToBech32, ToBech32m, ToBase32, ToBase64Url, ToHex,
 };
 use secure_gate_fuzz::arbitrary::{
@@ -267,16 +266,17 @@ fuzz_target!(|data: &[u8]| {
         let _ = Dynamic::<Vec<u8>>::try_from_bech32_unchecked(&bech32_str);
     }
 
-    // 4d. HRP round-trip: encode with hrp, decode, verify hrp preserved
+    // 4d. HRP round-trip: encode with hrp, decode both with and without checking it
     {
         let encoded = b"hello"
             .try_to_bech32("mykey", secure_gate::Case::Lower)
             .expect("default bech32 encode refused a valid HRP and a 5-byte payload");
-        let (hrp, payload) = (*encoded)
-            .try_from_bech32_unchecked()
-            .expect("valid bech32");
-        assert_eq!(hrp.to_ascii_lowercase(), "mykey");
-        assert_eq!(payload, b"hello");
+        assert!(encoded.starts_with("mykey1"));
+        let checked = Dynamic::<Vec<u8>>::try_from_bech32(&encoded, "mykey").expect("valid bech32");
+        assert_eq!(checked.expose_secret(), b"hello");
+        let unchecked =
+            Dynamic::<Vec<u8>>::try_from_bech32_unchecked(&encoded).expect("valid bech32");
+        assert_eq!(unchecked.expose_secret(), b"hello");
     }
 
     // 4e. Bech32 edge cases

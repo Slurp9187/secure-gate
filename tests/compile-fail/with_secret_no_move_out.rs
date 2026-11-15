@@ -1,13 +1,13 @@
 //! Moving a secret out of a reveal borrow must not compile.
 //!
 //! `with_secret` and `expose_secret` lend `&T`. They constrain *access*, not what the
-//! body does with the bytes: where the inner type is `Copy`, `*p` silently materialises
+//! body does with the bytes: where the inner type is `Copy`, `*p` silently materializes
 //! an owned copy that nothing zeroizes. See "4. Copying the secret out of a reveal
 //! borrow" in SECURITY.md.
 //!
 //! Where the inner type is **not** `Copy`, the borrow checker closes that path for free.
 //! This fixture pins that half of the boundary, because SECURITY.md scopes its claim on
-//! exactly this behaviour and a scoped claim that stops being true is worse than none.
+//! exactly this behavior and a scoped claim that stops being true is worse than none.
 //!
 //! It deliberately says nothing about the copy-*through* forms — `to_vec`, `clone`,
 //! `to_string` — which do compile on these same types. Those are pinned from the other

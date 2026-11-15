@@ -131,21 +131,15 @@ fn encoded_secret_into_zeroizing_carries_the_content() {
         "into_zeroizing copied the buffer instead of moving it"
     );
 
-    // `into_zeroizing` is a *partial* downgrade, and this is the half that is lost:
-    // `Zeroizing<String>` derives `Debug`, so the encoded secret prints in the clear --
-    // emphatically not `[REDACTED]`. The type's own docs promise exactly that. If a
-    // future `zeroize` starts redacting, this assert fails and the claim in
-    // `EncodedSecret::into_zeroizing` needs rewriting; that is the point of pinning it,
-    // not an accident of the dependency version.
-    //
-    // The rendering is deliberately reduced to a bool before the assert, and never
-    // interpolated into the failure message. It is a plaintext copy derived from the
-    // wrapper, and formatting one into a panic is the precise pattern this crate tells
-    // callers to avoid; CodeQL's `rust/cleartext-logging` rule flags it, correctly, even
-    // though the fixture here is the literal `0xDEADBEEF`. Keep it out of the message.
-    let prints_in_clear = format!("{protected:?}").contains(expected);
+    // No assertion on `Zeroizing<String>`'s own `Debug` on this line. It prints the value
+    // with `zeroize` 1.8, which this branch's MSRV of 1.70 resolves, and is opaque from
+    // 1.9.1 (MSRV 1.85), which a newer toolchain may resolve. `into_zeroizing`'s docs say
+    // it can print the secret, which holds for both. The 0.9 line requires 1.9.1 and pins
+    // the opaque form.
+    // Whatever the guard's own `Debug` does, the text is one deref away. That is the
+    // part of `EncodedSecret` the hand-off does lose, and the docs say so.
     assert!(
-        prints_in_clear,
-        "zeroize's Debug no longer prints the value in the clear; fix into_zeroizing's docs"
+        format!("{:?}", &**protected).contains(expected),
+        "deref of Zeroizing<String> no longer reaches the String"
     );
 }

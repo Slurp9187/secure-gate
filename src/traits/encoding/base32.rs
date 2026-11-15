@@ -26,14 +26,14 @@
 //!   or multi-step operations, prefer `with_secret(|b| b.to_base32())` — the borrow
 //!   checker enforces the reference cannot escape the closure.
 //! - **Canonical form only**: uppercase, unpadded. See
-//!   [`FromBase32Str`](crate::FromBase32Str) for what the decoder accepts.
+//!   [`Fixed::try_from_base32`](crate::Fixed::try_from_base32) for what the decoder accepts.
 //!
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "encoding-base32")]
+//! # #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 //! use secure_gate::{Fixed, ToBase32, RevealSecret};
-//! # #[cfg(feature = "encoding-base32")]
+//! # #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 //! {
 //! let secret = Fixed::new([0x42u8; 4]);
 //!
@@ -46,12 +46,35 @@
 //! // Both return an `EncodedSecret`: wiped on drop, `Debug` redacted.
 //! }
 //! ```
+
+/// Rejects encoded lengths that `base32ct` 0.2 cannot decode without panicking.
+///
+/// 0.8 note: unpadded Base32 packs 5 bytes into 8 characters, so the only trailing block
+/// sizes a valid string can have are 0, 2, 4, 5 and 7 characters. `base32ct` 0.2.2 sizes
+/// its output from `decoded_len()` but indexes it from the *input* remainder, so a
+/// remainder of 1, 3 or 6 writes past the end and panics with "index out of bounds"
+/// (`base32ct-0.2.2/src/encoding.rs:105`). Upstream 0.3 rejects those lengths up front,
+/// but 0.3 is edition 2024 / MSRV 1.85 and cannot be used on the 0.8 line, so this crate
+/// performs the check before every call into the decoder.
+///
+/// A panic on attacker-supplied input would be a denial-of-service path in a secrets
+/// crate, so this guard is a correctness requirement, not a nicety. It branches only on
+/// the *encoded length*, which is public metadata already observable from the input
+/// string, never on decoded secret content.
+#[cfg(feature = "encoding-base32")]
+#[must_use]
+pub(crate) const fn encoded_len_is_decodable(len: usize) -> bool {
+    matches!(len % 8, 0 | 2 | 4 | 5 | 7)
+}
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
 use base32ct::{Base32UpperUnpadded, Encoding};
 
 /// Extension trait for encoding byte data as Base32 strings (RFC 4648 §6, uppercase, unpadded).
 ///
-/// *Requires feature `encoding-base32`.*
+/// *Requires features `encoding-base32` and `alloc`.* Every method returns an
+/// [`EncodedSecret`](crate::EncodedSecret). Decode with
+/// [`Fixed::try_from_base32`](crate::Fixed::try_from_base32) or
+/// [`Dynamic::try_from_base32`](crate::Dynamic::try_from_base32).
 ///
 /// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes), and implemented directly on the
 /// byte-shaped wrappers (`Fixed<[u8; N]>`, `Dynamic<Vec<u8>>`). Uses the RFC 4648 §6

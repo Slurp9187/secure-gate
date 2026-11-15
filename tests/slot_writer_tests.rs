@@ -206,7 +206,7 @@ fn zero_length_slot_panics_on_push_byte() {
 
 #[test]
 fn debug_redacts_slot_bytes_but_reports_cursor_state() {
-    // A recognisable, non-zero payload -- if any of these four bytes show up in the
+    // A recognizable, non-zero payload -- if any of these four bytes show up in the
     // formatted output, in either decimal or hex, the Debug impl is leaking the secret.
     let mut buf = [0u8; 6];
     let mut w = SlotWriter::new(&mut buf);

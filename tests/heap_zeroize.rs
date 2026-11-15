@@ -18,7 +18,7 @@
 //!
 //! The *counting* mode is the exception: its counter is thread-local, so allocations made by the
 //! libtest harness thread or any other thread are not attributed to the closure under test. That
-//! removes a source of false failures; it is not a licence to parallelize -- an over-count made
+//! removes a source of false failures; it is not a license to parallelize -- an over-count made
 //! `check_bech32_hrp_mismatch_materializes_nothing` fail once in CI against code that was
 //! byte-identical to the passing runs.
 //!
@@ -29,21 +29,21 @@
 //! formatting, backtrace, TLS) that may occur during unwind.
 //!
 //! The `PANIC_CHECK_*` name is now narrower than the mechanism it gates.
-//! `check_try_new_with_err_zeroed_vec` uses the same recording mode on a path that never
-//! unwinds: the buffer is released by an ordinary early return out of `try_new_with`. What the
-//! mode records is the fate of *one pinned pointer*, whichever way its scope is left. The names
-//! are kept because the allocator hook and this file's prose all refer to them, and a rename
-//! buys nothing that this paragraph does not.
+//! `check_try_new_with_err_zeroed_vec` and its `dynamic_newtype!` sibling use the same
+//! recording mode on a path that never unwinds: the buffer is released by an ordinary early
+//! return out of `try_new_with`. What the mode records is the fate of *one pinned pointer*,
+//! whichever way its scope is left. The names are kept because the allocator hook and this
+//! file's prose all refer to them, and a rename buys nothing that this paragraph does not.
 
 // NOTE ON MIRI: the `not(miri)` gate below compiles this entire file away under `cargo miri
-// test`, which `.github/workflows/fuzz-miri.yml` is the only job to run. The gate is necessary --
+// test`, which `.github/workflows/miri.yml` is the only job to run. The gate is necessary --
 // a `#[global_allocator]` that inspects freed memory is not something Miri can execute -- but it
 // means the thread-local reasoning below is checked by review and by the suite passing on a real
 // allocator, never by Miri. Weigh that when editing the TLS path.
 #![cfg(all(feature = "alloc", not(miri)))]
 #![allow(clippy::undocumented_unsafe_blocks)]
 
-use secure_gate::{Dynamic, RevealSecretMut};
+use secure_gate::{dynamic_newtype, Dynamic, RevealSecretMut};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -59,6 +59,11 @@ static CHECKING: AtomicBool = AtomicBool::new(false);
 /// Written before `CHECKING` is enabled.
 static TARGET_SIZE: AtomicUsize = AtomicUsize::new(0);
 
+/// How many deallocations the asserting gate has inspected (and found zeroed) since
+/// [`with_proxy_check_counted`] last reset it. Lets a check prove it was not vacuous where
+/// the buffer under test has no `capacity()` to assert on from outside.
+static CHECK_HITS: AtomicUsize = AtomicUsize::new(0);
+
 // ---------------------------------------------------------------------------
 // Recording-mode gate — used by the checks that follow one specific buffer to its grave
 //
@@ -66,12 +71,12 @@ static TARGET_SIZE: AtomicUsize = AtomicUsize::new(0);
 // (which would be UB per the allocator contract). Instead it silently records
 // whether the first matching deallocation was fully zeroed, then the test
 // checks the result once the scope that owned the buffer has been left — by an
-// unwind for the three panic checks, by an ordinary `?` for the `try_new_with`
-// error-path check.
+// unwind for the three panic checks, by an ordinary `?` for the two
+// `try_new_with` error-path checks.
 // ---------------------------------------------------------------------------
 
 /// Set to `true` before entering the region under test — a `catch_unwind` for the panic
-/// checks, a plain call for the `Err`-path one; cleared by `dealloc` on first match.
+/// checks, a plain call for the `Err`-path ones; cleared by `dealloc` on first match.
 static PANIC_CHECK_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 /// The exact backing-buffer pointer of the allocation being tracked in recording mode.
@@ -93,11 +98,6 @@ static PANIC_CHECK_ZEROED: AtomicBool = AtomicBool::new(false);
 /// `THREAD_COUNTING` says whether it is *this* thread's.
 static COUNTING: AtomicBool = AtomicBool::new(false);
 
-// This branch cannot use the inline `const` initializers 0.9 uses: those are stable
-// only from 1.79 and the MSRV here is 1.70. Modern clippy asks for them anyway via
-// `missing_const_for_thread_local`, so the ask is declined explicitly. `unknown_lints`
-// is allowed alongside it because 1.70's clippy predates that lint name and would
-// otherwise warn about the allow itself under `-D warnings`.
 thread_local! {
     /// `true` only on the thread currently inside `count_allocs`.
     ///
@@ -110,13 +110,13 @@ thread_local! {
     /// teaches people to re-run it until it is green, which retires it as surely as deleting it.
     ///
     /// Thread-scoping is what introduces a genuine *fail-open* edge, and it is the one the
-    /// `count_allocs` docs guard: a thread spawned inside `f` starts at these defaults, so
-    /// its allocations are silently uncounted. Undercounting is the direction that
+    /// `count_allocs` docs guard: a thread spawned inside `f` starts at these const-initialized
+    /// defaults, so its allocations are silently uncounted. Undercounting is the direction that
     /// hides a regression. Hence the prohibition there on spawning and on nesting.
     ///
-    /// Both cells hold `Copy` types with no destructor, so no TLS destructor is registered and
-    /// there is no state that could be observed torn down from inside `alloc`. (0.9 also
-    /// `const`-initializes them; this branch cannot — see the 0.8 note below.)
+    /// Both cells are `const`-initialized and hold `Copy` types with no destructor, so no TLS
+    /// destructor is registered and there is no lazily-initialized state that could be observed
+    /// torn down from inside `alloc`.
     ///
     /// First touch is a separate question, and the ordering in `count_allocs` is what settles it
     /// rather than any promise about `thread_local!`. On some targets the first access to a
@@ -126,20 +126,10 @@ thread_local! {
     /// `CountGuard::drop` clears them *before* lowering it. By the time `alloc` can reach a TLS
     /// read, this thread's block already exists; and a thread that never counts never touches TLS
     /// from inside the allocator at all. Preserve that ordering if you edit either function.
-    ///
-    /// 0.8 note: 0.9 writes these as an inline `const` block. Those are stable only from
-    /// 1.79, above this branch's MSRV of 1.70. The const form only elides lazy
-    /// initialization -- it is exactly the "promise about `thread_local!`" the paragraph
-    /// above declines to rely on, so its absence changes nothing here. Neither cell is
-    /// `Drop`, so no TLS destructor is registered either way.
-    #[allow(unknown_lints)] // 1.70's clippy predates the lint named below
-    #[allow(clippy::missing_const_for_thread_local)] // `const {}` needs 1.79; MSRV is 1.70
-    static THREAD_COUNTING: Cell<bool> = Cell::new(false);
+    static THREAD_COUNTING: Cell<bool> = const { Cell::new(false) };
 
     /// Number of `alloc` calls observed on this thread while `THREAD_COUNTING` was set.
-    #[allow(unknown_lints)] // 1.70's clippy predates the lint named below
-    #[allow(clippy::missing_const_for_thread_local)] // `const {}` needs 1.79; MSRV is 1.70
-    static THREAD_ALLOC_COUNT: Cell<usize> = Cell::new(0);
+    static THREAD_ALLOC_COUNT: Cell<usize> = const { Cell::new(0) };
 }
 
 // ---------------------------------------------------------------------------
@@ -190,6 +180,7 @@ unsafe impl GlobalAlloc for ProxyAllocator {
                 let b = unsafe { core::ptr::read(ptr.add(i)) };
                 assert_eq!(b, 0, "byte at offset {i} was not zeroed before dealloc");
             }
+            CHECK_HITS.fetch_add(1, Ordering::SeqCst);
         }
 
         // Recording mode: match by exact pointer, not size, to avoid false results
@@ -247,6 +238,20 @@ fn with_proxy_check<F: FnOnce()>(size: usize, f: F) {
     f();
 }
 
+/// [`with_proxy_check`], and returns how many deallocations of exactly `size` bytes the
+/// gate inspected. Every one of them was all-zero, or the allocator would have panicked.
+///
+/// For buffers whose size cannot be asserted from outside (an `EncodedSecret` exposes no
+/// capacity). The existing
+/// checks guard against a vacuous pass with `assert_eq!(capacity, size)`; these assert on
+/// the returned count instead: zero means nothing of that size was freed and the check
+/// observed nothing.
+fn with_proxy_check_counted<F: FnOnce()>(size: usize, f: F) -> usize {
+    CHECK_HITS.store(0, Ordering::SeqCst);
+    with_proxy_check(size, f);
+    CHECK_HITS.load(Ordering::SeqCst)
+}
+
 /// RAII guard that clears the counting gate on drop (normal return or unwind).
 #[cfg(feature = "encoding-bech32")]
 struct CountGuard;
@@ -265,7 +270,7 @@ impl Drop for CountGuard {
 /// Allocations made concurrently by the libtest harness or any other thread are not counted, so a
 /// zero-allocation assertion cannot be broken by unrelated activity. The flip side, and the reason
 /// `f` must stay single-threaded: allocations made by a thread `f` spawns are *also* not counted,
-/// because that thread's cells start at their `false`/`0` defaults. That would undercount,
+/// because that thread's cells start at their const-initialized defaults. That would undercount,
 /// which is the direction that hides a regression. No closure here spawns a thread, and none
 /// should be added.
 ///
@@ -303,9 +308,7 @@ fn count_allocs<F: FnOnce()>(f: F) -> usize {
 
 #[cfg(feature = "encoding-bech32")]
 fn check_bech32_hrp_mismatch_materializes_nothing() {
-    use secure_gate::{
-        bech32_code_length, Bech32Error, Fixed, FromBech32Str, FromBech32mStr, ToBech32, ToBech32m,
-    };
+    use secure_gate::{bech32_code_length, Bech32Error, Fixed, ToBech32, ToBech32m};
 
     const N: usize = bech32_code_length(3, 900);
     let secret = vec![0x5Au8; 900];
@@ -318,16 +321,8 @@ fn check_bech32_hrp_mismatch_materializes_nothing() {
         .expect("encode")
         .into_inner();
 
-    // Every HRP-checked decode path, sized, on both checksums and all three surfaces.
+    // Every HRP-checked decode path, sized, on both checksums and both surfaces.
     let wrong = count_allocs(|| {
-        assert!(matches!(
-            b32.try_from_bech32_sized::<N>("kem"),
-            Err(Bech32Error::UnexpectedHrp)
-        ));
-        assert!(matches!(
-            b32m.try_from_bech32m_sized::<N>("kem"),
-            Err(Bech32Error::UnexpectedHrp)
-        ));
         assert!(matches!(
             Dynamic::<Vec<u8>>::try_from_bech32_sized::<N>(&b32, "kem"),
             Err(Bech32Error::UnexpectedHrp)
@@ -351,15 +346,15 @@ fn check_bech32_hrp_mismatch_materializes_nothing() {
          the payload was materialized before the HRP was compared"
     );
 
-    // Positive control: a correct decode into a Vec must allocate, or the counter
+    // Positive control: a correct decode into a Dynamic must allocate, or the counter
     // above proved nothing.
     let right = count_allocs(|| {
-        let v = b32.try_from_bech32_sized::<N>("age").expect("decode");
-        core::hint::black_box(&v);
+        let d = Dynamic::<Vec<u8>>::try_from_bech32_sized::<N>(&b32, "age").expect("decode");
+        core::hint::black_box(&d);
     });
     assert!(
         right >= 1,
-        "positive control: a successful Vec decode must allocate"
+        "positive control: a successful Dynamic decode must allocate"
     );
 
     // And Fixed decodes onto the stack: zero allocations even on success (the
@@ -418,7 +413,6 @@ fn check_vec_zeroed(size: usize) {
         let mut secret: Dynamic<Vec<u8>> = Dynamic::new(Vec::with_capacity(size));
         secret.with_secret_mut(|v| {
             // Fill exactly N bytes so len == N before shrink_to_fit.
-            // MSRV 1.70: use repeat().take() (repeat_n stabilized in 1.82).
             v.extend(std::iter::repeat(0xBBu8).take(size));
             v.shrink_to_fit();
             // Test realism guard: shrink_to_fit is best-effort; the allocator may
@@ -464,7 +458,6 @@ fn check_write_growth_orphan_zeroed(initial: usize) {
 
     let mut secret: Dynamic<Vec<u8>> = Dynamic::new({
         let mut v = Vec::with_capacity(initial);
-        // MSRV 1.70: use repeat().take() (repeat_n stabilized in 1.82).
         v.extend(std::iter::repeat(0xD7u8).take(initial));
         v.shrink_to_fit();
         assert_eq!(
@@ -504,7 +497,6 @@ fn check_string_zeroed(size: usize) {
         let mut secret: Dynamic<String> = Dynamic::new(String::with_capacity(size));
         secret.with_secret_mut(|s| {
             // Fill exactly `size` ASCII bytes so len == size before shrink_to_fit.
-            // MSRV 1.70: use repeat().take() (repeat_n stabilized in 1.82).
             s.extend(std::iter::repeat('A').take(size));
             s.shrink_to_fit();
             // Test realism guard: same rationale as check_vec_zeroed above.
@@ -530,13 +522,8 @@ fn check_string_zeroed(size: usize) {
 // that all seven constructors using `from_protected_bytes` produce a correctly
 // zeroized result on the happy path.
 //
-// Note: on the error path (invalid input) no `Vec` reaches our code — the `?`
-// propagates before we ever hold bytes, so there is no buffer of ours to zeroize.
-// The decoders' own scratch buffers are a separate matter and outside this crate's
-// control: base16ct/base32ct/base64ct decode into a plain `Vec` and only check the
-// accumulated error flag at the end, so a near-miss input leaves decoded plaintext
-// in a buffer they drop un-zeroized. That is an upstream property, identical across
-// all three formats, and these checks deliberately cover only our own buffers.
+// The error path (invalid input) is covered separately, by `check_decode_rejected_zeroed`
+// below.
 //
 // The decode is performed OUTSIDE the proxy window to avoid false positives
 // from decoder-internal allocations of the same size. Only the final drop of
@@ -758,13 +745,13 @@ fn check_panic_path_bytes_zeroed(size: usize) {
 // zeroization. After the fix, the intermediate buffer is `Zeroizing<Vec<u8>>`
 // for the entire lifetime of the closure, so unwind triggers zeroize → dealloc.
 //
-// The 0.8.0-rc.14 signature change moved the allocation earlier without moving the
+// The 0.9.0-rc.12 signature change moved the allocation earlier without moving the
 // protection. `new_with(len, f)` allocates and zeroes the slot *before* calling `f`, and
-// `f` sees it as a `&mut [u8]` rather than as a `Vec` it fills itself — but the slot still
-// lives inside one `Zeroizing<Vec<u8>>` for the whole call, so the property under test is
-// word-for-word the one above. Only the pin changes shape, from `Vec::as_ptr` to the slot
-// slice's `as_ptr`; both name the same address, and under the new signature that address
-// cannot move mid-closure because there is no growth to reallocate it.
+// `f` sees it as a `&mut [u8]` rather than as a `Vec` it fills itself — but the slot
+// still lives inside one `Zeroizing<Vec<u8>>` for the whole call, so the property under
+// test is word-for-word the one above. Only the pin changes shape, from `Vec::as_ptr` to
+// the slot slice's `as_ptr`; both name the same address, and under the new signature that
+// address cannot move mid-closure because there is no growth to reallocate it.
 //
 // Test shape mirrors `check_panic_path_bytes_zeroed`: poison-fill the slot,
 // pin its backing-buffer pointer in `PANIC_CHECK_PTR`, then panic. The
@@ -946,6 +933,116 @@ fn check_try_new_with_panic_zeroed_vec(size: usize) {
 }
 
 // ---------------------------------------------------------------------------
+// `dynamic_newtype!`'s `Vec<u8>` arm — the `Err`-path wipe survives the forward
+//
+// The macro does not delegate transparently. Its `try_new_with` calls the inner
+// `Dynamic`'s, applies `?`, and re-wraps the `Ok` in `Self` — a second body, in a second
+// file, that can be rewritten to build its own buffer or to take the `Ok` value apart
+// without the inner constructor changing by a character. A macro body only ever runs where
+// someone instantiated it, so it is measured wherever someone instantiated it and watched
+// what happened; that is here or nowhere. tests/lifecycle_trace_heap.rs traces
+// macro-generated newtypes through the heap but never through `try_new_with`, and both
+// `try_new_with` checks above drive the bare `Dynamic`.
+//
+// Cheap because the instrument is already standing. Same recording mode, same pointer pin,
+// the same half-fill and the same 0xC7 poison as `check_try_new_with_err_zeroed_vec` —
+// only the front door changes, which is what makes a difference in the result attributable
+// to the forward rather than to the fill.
+// ---------------------------------------------------------------------------
+
+dynamic_newtype!(
+    pub SlotToken,
+    Vec<u8>,
+    "A Vec<u8>-arm newtype, declared so the macro's own `try_new_with` forward is measured \
+     rather than assumed to inherit the inner constructor's wipe."
+);
+
+fn check_newtype_try_new_with_err_zeroed(size: usize) {
+    /// As in the bare-`Dynamic` check: a caller's own error type implementing nothing.
+    ///
+    /// The macro's forward declares `E` free too, and re-stating it through the generated
+    /// signature is what catches a forward that quietly added a bound while the inner
+    /// constructor kept none.
+    struct CallerGaveUp;
+
+    PANIC_CHECK_PTR.store(0, Ordering::SeqCst);
+    PANIC_CHECK_ZEROED.store(false, Ordering::SeqCst);
+    PANIC_CHECK_ACTIVE.store(true, Ordering::SeqCst);
+
+    let result: Result<SlotToken, CallerGaveUp> =
+        SlotToken::try_new_with(size, |slot: &mut [u8]| {
+            // Half-fill, tail left at the slot's zeros: the only bytes this can catch are the
+            // ones the closure actually wrote.
+            slot[..size / 2].fill(0xC7u8);
+            PANIC_CHECK_PTR.store(slot.as_ptr() as usize, Ordering::SeqCst);
+            Err(CallerGaveUp)
+        });
+
+    PANIC_CHECK_ACTIVE.store(false, Ordering::SeqCst); // defensive cleanup
+    assert!(
+        result.is_err(),
+        "the closure returned Err, so the newtype's try_new_with must not have produced a \
+         SlotToken"
+    );
+    assert!(
+        PANIC_CHECK_ZEROED.load(Ordering::SeqCst),
+        "dynamic_newtype!'s try_new_with forward must release the partially written slot \
+         zeroed, exactly as the Dynamic it wraps does"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Decode error path — a rejected input leaves no decoded bytes behind
+//
+// base16ct, base32ct and base64ct decode in constant time: they write every output byte
+// and report a bad character only at the end. So an input that is a valid encoding
+// followed by junk (a hex key with a CRLF line ending, Base64url with `=` padding) is
+// rejected with the whole decoded secret already written. Through 0.9.0-rc.17 that buffer
+// was the backend's own plain `Vec` (`decode_vec`), dropped unwiped; a 40-byte key was
+// measured coming back from the allocator intact. The crate now allocates the buffer
+// itself, inside `Zeroizing`, and decodes through the slice API (src/decode_staging.rs).
+//
+// The secret is 40 bytes of 0xC4 and the junk tails are sized so each staging buffer has
+// a length of its own (41, 45, 43), clear of the 16/32/64/128 classes used above and of
+// each other. Nothing else in the gate allocates: the errors are heap-free. Both the
+// `Dynamic` and the `Fixed` (alloc) constructors go through the same staging, and both
+// are exercised because they are separate call sites.
+// ---------------------------------------------------------------------------
+
+#[cfg(all(
+    feature = "encoding-hex",
+    feature = "encoding-base32",
+    feature = "encoding-base64"
+))]
+fn check_decode_rejected_zeroed() {
+    use secure_gate::{Fixed, ToBase32, ToBase64Url, ToHex};
+
+    const SECRET: [u8; 40] = [0xC4; 40];
+
+    // Built outside the gate. `into_inner` is deliberate: these are test inputs.
+    let hex = format!("{}\r\n", SECRET.to_hex().into_inner());
+    let base32 = format!("{}!!!!!!!!", SECRET.to_base32().into_inner());
+    let base64 = format!("{}====", SECRET.to_base64url().into_inner());
+    assert_eq!(
+        (hex.len() / 2, base32.len() * 5 / 8, base64.len() * 3 / 4),
+        (41, 45, 43)
+    );
+
+    with_proxy_check(41, || {
+        assert!(Dynamic::<Vec<u8>>::try_from_hex(&hex).is_err());
+        assert!(Fixed::<[u8; 40]>::try_from_hex(&hex).is_err());
+    });
+    with_proxy_check(45, || {
+        assert!(Dynamic::<Vec<u8>>::try_from_base32(&base32).is_err());
+        assert!(Fixed::<[u8; 40]>::try_from_base32(&base32).is_err());
+    });
+    with_proxy_check(43, || {
+        assert!(Dynamic::<Vec<u8>>::try_from_base64url(&base64).is_err());
+        assert!(Fixed::<[u8; 40]>::try_from_base64url(&base64).is_err());
+    });
+}
+
+// ---------------------------------------------------------------------------
 // EncodedSecret::into_zeroizing — the buffer keeps wiping after the hand-off
 //
 // `into_zeroizing` moves the inner `Zeroizing<String>` out of the wrapper. The
@@ -991,13 +1088,95 @@ fn check_into_zeroizing_string_zeroed<const N: usize>() {
 }
 
 // ---------------------------------------------------------------------------
+// Dynamic<[u8]> — the exact-capacity boxed slice
+//
+// The runtime-length shape whose buffer can never grow. Its drop had no allocator-level
+// check: the array, `Vec` and `String` shapes above each have one, and this is a separate
+// `Zeroize` path (`Box<[u8]>`). 72 bytes, clear of every size used above.
+// ---------------------------------------------------------------------------
+
+fn check_boxed_slice_zeroed() {
+    const LEN: usize = 72;
+    let hits = with_proxy_check_counted(LEN, || {
+        let secret: Dynamic<[u8]> = Dynamic::from(vec![0xAAu8; LEN].into_boxed_slice());
+        core::hint::black_box(&secret);
+        drop(secret);
+    });
+    assert_eq!(
+        hits, 1,
+        "expected exactly the one {LEN}-byte slice to be freed"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// EncodedSecret — dropped directly, for every encoder
+//
+// `check_into_zeroizing_string_zeroed` above follows the buffer through `into_zeroizing`,
+// for hex only. This is the ordinary case: an `EncodedSecret` that is simply dropped, from
+// each encoder, since each builds its `String` separately. An encoded secret is a second
+// full copy of the secret, so a buffer freed unwiped here is the secret freed unwiped.
+//
+// The subject is a bare 28-byte array, so the encoded `String` is the only allocation in
+// the gate. The gate matches on allocation size and `EncodedSecret` exposes no capacity,
+// so each check asserts the gate inspected exactly one block: an encoder that allocated
+// more than the text needs would otherwise pass by observing nothing.
+// ---------------------------------------------------------------------------
+
+#[cfg(all(
+    feature = "encoding-hex",
+    feature = "encoding-base32",
+    feature = "encoding-base64",
+    feature = "encoding-bech32"
+))]
+fn check_encoded_secret_drop_zeroed() {
+    use secure_gate::{Case, EncodedSecret, ToBase32, ToBase64Url, ToBech32, ToBech32m, ToHex};
+
+    const SECRET: [u8; 28] = [0xC4; 28];
+
+    fn encode(name: &str) -> EncodedSecret {
+        match name {
+            "hex" => SECRET.to_hex(),
+            "hex upper" => SECRET.to_hex_upper(),
+            "base32" => SECRET.to_base32(),
+            "base64url" => SECRET.to_base64url(),
+            "bech32" => SECRET.try_to_bech32("key", Case::Lower).expect("fits"),
+            "bech32m" => SECRET.try_to_bech32m("key", Case::Lower).expect("fits"),
+            other => unreachable!("{other}"),
+        }
+    }
+
+    for name in [
+        "hex",
+        "hex upper",
+        "base32",
+        "base64url",
+        "bech32",
+        "bech32m",
+    ] {
+        // Encoded once outside the gate, only to learn the length the gate should match.
+        let len = encode(name).len();
+        let hits = with_proxy_check_counted(len, || {
+            let encoded = encode(name);
+            // Positive control: every alphabet here is ASCII, never NUL.
+            assert!(encoded.bytes().all(|b| b != 0), "{name}: nothing to wipe");
+            drop(encoded);
+        });
+        assert_eq!(
+            hits, 1,
+            "{name}: expected exactly one {len}-byte buffer freed (and zeroed)"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Aggregate test
 // ---------------------------------------------------------------------------
 
 /// Verifies `Dynamic<[u8; N]>`, `Dynamic<Vec<u8>>`, `Dynamic<String>`, all
 /// decode paths, all deserialize paths, the panic-path positive control, and both
-/// of `try_new_with`'s failure paths — an `Err` return and a closure unwind — all
-/// zeroize heap memory before deallocation.
+/// of `try_new_with`'s failure paths — an `Err` return and a closure unwind, plus
+/// the `Err` path again through a `dynamic_newtype!` newtype — all zeroize heap
+/// memory before deallocation.
 ///
 /// This stays as one aggregate test by design to avoid parallel test interleaving
 /// with the global ProxyAllocator state.
@@ -1012,6 +1191,18 @@ fn all_heap_zeroed() {
         check_into_zeroizing_string_zeroed::<24>();
         check_into_zeroizing_string_zeroed::<40>();
     }
+
+    // Dynamic<[u8]> — the exact-capacity boxed slice
+    check_boxed_slice_zeroed();
+
+    // EncodedSecret dropped directly, one check per encoder
+    #[cfg(all(
+        feature = "encoding-hex",
+        feature = "encoding-base32",
+        feature = "encoding-base64",
+        feature = "encoding-bech32"
+    ))]
+    check_encoded_secret_drop_zeroed();
 
     // Dynamic<[u8; N]> — boxed arrays
     check_array_zeroed::<16>();
@@ -1064,6 +1255,14 @@ fn all_heap_zeroed() {
         check_decode_bech32m_zeroed(&[0xBBu8; 32]);
     }
 
+    // Decode error path: a rejected input must not leave the decoded bytes in a freed block.
+    #[cfg(all(
+        feature = "encoding-hex",
+        feature = "encoding-base32",
+        feature = "encoding-base64"
+    ))]
+    check_decode_rejected_zeroed();
+
     // Deserialize-path backing-buffer zeroization (deserialize_with_limit fix)
     #[cfg(feature = "serde-deserialize")]
     {
@@ -1088,7 +1287,7 @@ fn all_heap_zeroed() {
     // it is the only place the guarantee can be tested at all: from outside, a
     // constructor that wiped and one that abandoned a half-written secret both just
     // return Err. Guards against "wrap only on success", which would leak partial
-    // plaintext on every malformed input — the routine behaviour of decoders that write
+    // plaintext on every malformed input — the routine behavior of decoders that write
     // into a caller-supplied buffer.
     //
     // 8192 again, though nothing unwinds on this path: the pin is by pointer, so the
@@ -1103,4 +1302,10 @@ fn all_heap_zeroed() {
     // closure leaks the entire partial write, which is the failure shape the fills that
     // rustdoc recommends (a foreign decoder, `read_exact`) can actually produce.
     check_try_new_with_panic_zeroed_vec(8192);
+
+    // And the `Err`-path wipe as seen through `dynamic_newtype!`'s `Vec<u8>` arm, whose
+    // `try_new_with` re-wraps the inner result instead of delegating transparently. That
+    // forward is a separate body in src/macros/dynamic_newtype.rs, and nothing else in the
+    // repo follows a macro-generated newtype's bytes through the fallible constructor.
+    check_newtype_try_new_with_err_zeroed(8192);
 }

@@ -4,6 +4,14 @@
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+// `Cargo.toml` tells docs.rs to build with `--cfg docsrs`. This is what reads it:
+// `doc_cfg` annotates every feature-gated item with the feature that enables it, so
+// the docs people read say "Available on crate feature `encoding-hex`" instead of
+// leaving the reader to infer it. Nightly-only, which is fine — docs.rs builds on
+// nightly, and the only other build that sets `docsrs` is the CI step that exists to
+// catch this gate being renamed. It has been renamed before: `doc_auto_cfg` was the
+// spelling until 1.92 removed it and merged it into `doc_cfg`.
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! Secure wrappers for secrets with **explicit access** and **mandatory zeroization** — a
 //! `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
@@ -35,11 +43,13 @@
 //! # Which type should I use?
 //!
 //! | Type | Allocation | Use case | Feature |
-//! |------|-----------|----------|----------|
+//! |------|-----------|----------|---------|
 //! | [`Fixed<T>`] | Stack | Keys, nonces, tokens — compile-time-known size | Always available |
 //! | [`Dynamic<T>`] | Heap | Passwords, API keys, ciphertexts — variable length | `alloc` (default) |
 //!
-//! Both types share the same [`RevealSecret`] / [`RevealSecretMut`] access API.
+//! `Fixed` and `Dynamic` share the same [`RevealSecret`] / [`RevealSecretMut`] access API.
+//! The sealed types of the 0.9 line (`SealedFixed`, `SealedDynamic`) are not on 0.8: they
+//! need Rust 1.85.
 //!
 //! # Quick start
 //!
@@ -87,27 +97,31 @@
 //! secure_gate (lib.rs)
 //! ├── Fixed<T>              ← always available, stack-allocated
 //! ├── Dynamic<T>            ← requires `alloc`, heap-allocated
+//! ├── SlotWriter            ← cursor a sized `new_with` hands out (alloc)
 //! ├── traits/
 //! │   ├── RevealSecret      ← immutable access (always available)
 //! │   ├── RevealSecretMut   ← mutable access (always available)
-//! │   ├── revealed_secrets/
-//! │   │   └── EncodedSecret     ← zeroizing encoded string wrapper (alloc)
+//! │   ├── SecretLen         ← length metadata (always available)
+//! │   ├── SentinelValue     ← placeholder `into_inner` leaves behind (always available)
+//! │   ├── FixedStorage      ← marker `Fixed::new` requires (always available)
+//! │   ├── EncodedSecret     ← zeroizing encoded string wrapper (alloc)
 //! │   ├── ConstantTimeEq    ← ct-eq feature
 //! │   ├── CloneableSecret   ← cloneable feature
 //! │   ├── SerializableSecret← serde-serialize feature
-//! │   ├── encoding/         ← ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m
-//! │   └── decoding/         ← FromHexStr, FromBase32Str, FromBase64UrlStr, FromBech32Str, FromBech32mStr
+//! │   └── encoding/         ← ToHex, ToBase32, ToBase64Url, ToBech32, ToBech32m,
+//! │                           EncodableBytes
+//! │                           (decoding: the `try_from_*` constructors on Fixed / Dynamic)
 //! ├── macros/               ← fixed_newtype!, dynamic_newtype!
 //! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error
 //! ```
 //!
-//! All public items are re-exported at the crate root. Use `secure_gate::Fixed`,
-//! not `secure_gate::fixed::Fixed`.
+//! Every public item is re-exported at the crate root. Use `secure_gate::Fixed`, not
+//! `secure_gate::fixed::Fixed`.
 //!
 //! # Type taxonomy
 //!
 //! | Category | Types | `Deref` to secret? | Purpose |
-//! |----------|-------|-------------------|----------|
+//! |----------|-------|-------------------|---------|
 //! | **Secret wrappers** | [`Fixed<T>`], [`Dynamic<T>`] | No — use [`RevealSecret`] | Hold live secrets; `Debug` → `[REDACTED]` |
 //! | **Output wrapper** | [`EncodedSecret`] | Yes — yields `&str`; copies you make are yours, the buffer stays the wrapper's | Holds encoded output, wiped on drop |
 //! | **Borrowed slot cursor** | [`SlotWriter`] | No — it writes, it does not read out | Appends into a slot a sized `new_with` handed out; `Debug` → cursor state only, never bytes |
@@ -143,9 +157,10 @@
 //!
 //! - `format!("{:?}", &*encoded)` prints the encoded secret. Redaction lives on the
 //!   wrapper, not on `str`; dereferencing first opts out of it.
-//! - [`EncodedSecret::into_zeroizing`] returns a `Zeroizing<String>`, whose `Debug` is
-//!   **not** redacted. It is a deliberate hand-off to a foreign type, not an equivalent
-//!   wrapper.
+//! - [`EncodedSecret::into_zeroizing`] returns a `Zeroizing<String>`. It keeps the wipe,
+//!   and its `Debug` is opaque (`zeroize` ≥ 1.9.1, which this crate requires), but it
+//!   derefs to `String`. It is a deliberate hand-off to a foreign type, not an
+//!   equivalent wrapper.
 //!
 //! # Import paths
 //!
@@ -153,7 +168,7 @@
 //! // ✅ Correct — always import from the crate root
 //! use secure_gate::{Fixed, RevealSecret};
 //!
-//! // ❌ Wrong — these internal paths compile but are not the public API
+//! // ❌ Wrong — these deeper paths compile, but the stability promise does not cover them
 //! // use secure_gate::traits::reveal_secret::RevealSecret;
 //! // use secure_gate::traits::encoding::hex::ToHex;
 //! ```
@@ -179,19 +194,19 @@
 //! | Feature | Default | Description |
 //! |---------|---------|-------------|
 //! | `alloc` | **yes** | Heap types ([`Dynamic<T>`]), `Vec`/`String` zeroization |
-//! | `std` | no | Full `std` support (implies `alloc`) |
+//! | `std` | no | `std::io::Write` on `Dynamic<Vec<u8>>` and [`SlotWriter`], and `Dynamic::as_reader()` (implies `alloc`) |
 //! | | | **Cryptographic** |
 //! | `ct-eq` | no | [`ConstantTimeEq`] via `subtle` — timing-safe comparison |
-//! | `rand` | no | `from_random()` / `from_rng()` — `no_std` for [`Fixed`] |
+//! | `rand` | no | `from_random()` (system RNG) — `no_std` for [`Fixed`] |
 //! | | | **Serialization** |
 //! | `serde-serialize` | no | Serde `Serialize` (requires [`SerializableSecret`] marker) |
 //! | `serde-deserialize` | no | Serde `Deserialize` with 1 MiB default limit |
 //! | `serde` | no | Both directions |
 //! | | | **Encoding** |
-//! | `encoding-hex` | no | [`ToHex`] / [`FromHexStr`] via `base16ct` (constant-time) |
-//! | `encoding-base32` | no | [`ToBase32`] / [`FromBase32Str`] via `base32ct` (constant-time) |
-//! | `encoding-base64` | no | [`ToBase64Url`] / [`FromBase64UrlStr`] via `base64ct` (constant-time) |
-//! | `encoding-bech32` | no | [`ToBech32`] / [`FromBech32Str`] (BIP-173) **and** [`ToBech32m`] / [`FromBech32mStr`] (BIP-350); `_sized::<N>` for a caller-chosen code length |
+//! | `encoding-hex` | no | [`ToHex`] / `try_from_hex` via `base16ct` (constant-time) |
+//! | `encoding-base32` | no | [`ToBase32`] / `try_from_base32` via `base32ct` (constant-time) |
+//! | `encoding-base64` | no | [`ToBase64Url`] / `try_from_base64url` via `base64ct` (constant-time) |
+//! | `encoding-bech32` | no | [`ToBech32`] / `try_from_bech32` (BIP-173) **and** [`ToBech32m`] / `try_from_bech32m` (BIP-350); `_sized::<N>` for a caller-chosen code length |
 //! | `encoding` | no | All encoding features |
 //! | | | **Meta** |
 //! | `cloneable` | no | [`CloneableSecret`] opt-in cloning |
@@ -211,22 +226,40 @@
 //! - [`FromSliceError`]
 //!
 //! **Not** available without `alloc`: [`Dynamic<T>`], [`EncodedSecret`],
-//! encoding traits ([`ToHex`], etc.), decoding traits ([`FromHexStr`], etc.),
+//! encoding traits ([`ToHex`], etc.), the `Dynamic::try_from_*` decoders,
 //! [`dynamic_newtype!`], serde support.
 //!
-//! # `no_std`
+//! # `std`, `alloc` and `no_std`
 //!
-//! `no_std` compatible (`#![no_std]` unless the `std` feature is enabled — verified in CI
-//! by cross-building for `thumbv7em-none-eabihf`). [`Fixed<T>`] works without `alloc`.
-//! Enable `alloc` (default) for [`Dynamic<T>`]. For pure stack / embedded builds, use
-//! `default-features = false`. MSRV: **1.70** (Rust edition 2021 — the MSRV 1.70 line, same API as `main`).
+//! There is no `no_std` feature. The crate is `#![no_std]` whenever the `std` feature is
+//! off, which it is by default (verified in CI by cross-building for
+//! `thumbv7em-none-eabihf`). Two features decide how much of the standard library it uses:
+//!
+//! | In `Cargo.toml` | Uses | You get |
+//! |---|---|---|
+//! | `default-features = false` | `core` only: no heap, no OS | [`Fixed<T>`] and its decoders |
+//! | nothing (the default, `alloc`) | `core` + `alloc`: a heap, still no OS | adds [`Dynamic<T>`], the string encoders and serde |
+//! | `features = ["std"]` | all of `std` | adds the `std::io` impls |
+//!
+//! `alloc` is the only default feature, so `default-features = false` is how the heap is
+//! turned off. `serde`, `serde-serialize`, `serde-deserialize` and `full` turn `alloc` back
+//! on. Cargo features only add: if any
+//! crate in a build enables `alloc` or `std` here, it is on for the whole build.
+//!
+//! No wipe gets weaker or stronger with the tier. `alloc` brings `Vec` and `String` into
+//! the crate together with the wiping of their spare capacity. `std` changes nothing that
+//! exists without it; its `io::Write` on `Dynamic<Vec<u8>>` wipes each buffer it outgrows,
+//! which makes it the way to build a secret whose length is not known up front.
+//!
+//! MSRV: **1.70** (Rust edition 2021). This is the `release/0.8` line; the 0.9 line needs
+//! Rust 1.87.
 //!
 //! One caveat: the `rand` feature compiles without `std` or `alloc`, but
 //! [`Fixed::from_random`] relies on `getrandom`, which needs a platform entropy backend.
 //! On bare-metal targets you must configure one (see the `getrandom` crate's
 //! "custom backend" documentation); without it, builds enabling `rand` fail at link
-//! time on such targets. [`Fixed::from_rng`] with a caller-supplied RNG has no such
-//! requirement.
+//! time on such targets. Filling from a caller-supplied RNG through
+//! [`Fixed::try_new_with`] has no such requirement, and needs no feature at all.
 //!
 //! # Security
 //!
@@ -234,7 +267,7 @@
 //! enforced with `#![forbid(unsafe_code)]`. Prefer scoped access ([`RevealSecret::with_secret`])
 //! over direct references. Encoders return [`EncodedSecret`], which stays wiped until it
 //! drops; `EncodedSecret::into_inner` is the named call that ends that. See
-//! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md)
+//! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md)
 //! for the full threat model.
 //!
 //! # Inherent Rust Limitations
@@ -256,26 +289,37 @@
 //!   encrypted swap, disabled core dumps).
 //!
 //! Full discussion in
-//! [SECURITY.md § Inherent Rust Limitations](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md#inherent-rust-limitations).
+//! [SECURITY.md § Inherent Rust Limitations](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md#inherent-rust-limitations).
 //!
-//! See the [README](https://github.com/Slurp9187/secure-gate/blob/release/0.8/README.md) and
-//! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/release/0.8/SECURITY.md) for full details.
+//! See the [README](https://github.com/Slurp9187/secure-gate/blob/main/README.md) and
+//! [SECURITY.md](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md) for full details.
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-// Documentation-only. Several doc comments link to `std` items that this crate touches
-// through gated impls (`io::Write` on `Dynamic<Vec<u8>>` and on `SlotWriter`, `io::Read`
-// on `DynamicReader`). Those links are correct and resolve on docs.rs, which builds with
-// `all-features`. They do not resolve under `--features=full`, which this branch's rustdoc
-// job builds and which does *not* enable `std`, because without that feature the name
-// `std` is not in scope at all and rustdoc has nothing to point at. This brings it into
-// scope for doc builds only: it is `cfg(doc)`, so it affects no real build, `no_std` or
-// otherwise, and it makes the links resolve in every feature combination rather than only
-// the one docs.rs happens to use.
+// Documentation-only. Several doc comments link to `std` items this crate touches through
+// gated impls (`io::Write` on `Dynamic<Vec<u8>>` and on `SlotWriter`, `io::Read` on
+// `DynamicReader`). Those links are correct and resolve on docs.rs, which builds with
+// `all-features`, and in CI, whose rustdoc job does the same. They do NOT resolve under
+// `--features=full`, which does not enable `std`: without that feature the name `std` is
+// not in scope at all, so rustdoc has nothing to point at and `-D warnings` turns each one
+// into an error. That is a plain `cargo doc --features full` — something a contributor
+// runs and CI does not. This brings the name into scope for doc builds only: it is
+// `cfg(doc)`, set by rustdoc and nothing else, so no real build is affected, `no_std` or
+// otherwise, and the links resolve in every feature combination rather than only the one
+// docs.rs happens to use.
 #[cfg(doc)]
 extern crate std;
 
+#[cfg(all(
+    feature = "alloc",
+    any(
+        feature = "encoding-hex",
+        feature = "encoding-base32",
+        feature = "encoding-base64"
+    )
+))]
+mod decode_staging;
 #[cfg(feature = "alloc")]
 mod dynamic;
 
@@ -303,8 +347,6 @@ pub mod traits;
 pub mod __private {
     #[cfg(feature = "alloc")]
     pub use alloc::{boxed::Box, string::String, vec::Vec};
-    #[cfg(feature = "rand")]
-    pub use rand::{TryCryptoRng, TryRngCore};
     #[cfg(feature = "serde-deserialize")]
     pub use serde::{Deserialize, Deserializer};
     #[cfg(feature = "serde-serialize")]
@@ -339,11 +381,11 @@ pub use dynamic::DynamicReader;
 /// Append-shaped writing into the fixed slot handed to a sized `new_with`.
 ///
 /// The sized constructors hand out a slot whose length is already decided, which is what
-/// makes growth, and therefore the reallocation hazard, inexpressible. `SlotWriter`
+/// makes growth — and therefore the reallocation hazard — inexpressible. `SlotWriter`
 /// restores the append shape on top of that, so concatenating a wire format does not mean
 /// writing offsets by hand. [`push_slice`](SlotWriter::push_slice) panics on overrun and
-/// leaves the slot untouched; the `std`-gated `std::io::Write` path cannot do that and
-/// stay inside `Write`'s contract, so it truncates and reports the refusal on a later
+/// leaves the slot untouched; the `std`-gated [`Write`](std::io::Write) path cannot do that
+/// and stay inside `Write`'s contract, so it truncates and reports the refusal on a later
 /// call. `Debug` shows the cursor — position, remaining, length — and never the bytes.
 pub use slot_writer::SlotWriter;
 
@@ -376,229 +418,61 @@ pub use dynamic::MAX_DESERIALIZE_BYTES;
 /// ```
 pub use fixed::Fixed;
 
-/// Marker trait that opts a secret type into cloning. No methods — gates the `Clone`
-/// impl on [`Fixed`] and [`Dynamic`]. Each clone is independently zeroized on drop,
-/// but increases the in-memory exposure surface. Requires `cloneable` feature.
-///
-/// Implement this on your inner type `T`; `Fixed<T>` and `Dynamic<T>` then gain the
-/// gated `Clone` impl automatically. **This marker is deliberately not implemented by
-/// default** on `Fixed<T>` or `Dynamic<T>` — cloning is an opt-in risk that must be
-/// explicitly enabled. Without the `cloneable` feature this type does not exist at all.
-///
-///
-/// **Coherence note:** Rust's orphan rule prevents downstream crates from implementing
-/// this marker for foreign types such as `String`, `Vec<u8>`, or `[u8; N]` — so
-/// `Dynamic<String>` and `Fixed<[u8; N]>` themselves can never become `Clone`. To opt
-/// a secret into cloning, define a newtype inner type in your crate (deriving
-/// `Zeroize` and `Clone`) and implement the marker on it. This is intentional: it keeps
-/// every cloneable secret type visible in *your* code. See the trait-level docs for a
-/// worked example.
-/// See also [`SerializableSecret`] (the other opt-in marker trait).
 #[cfg(feature = "cloneable")]
+#[doc(inline)]
 pub use traits::CloneableSecret;
 
-/// Constant-time equality for secrets — prevents timing side-channel attacks.
-///
-/// Provides [`ct_eq()`](ConstantTimeEq::ct_eq) via the `subtle` crate. `==` is
-/// **deliberately not implemented** on [`Fixed`] / [`Dynamic`] — always use `ct_eq`.
-/// Requires `ct-eq` feature.
-///
-/// ```rust
-/// # #[cfg(feature = "ct-eq")]
-/// # {
-/// use secure_gate::{Fixed, ConstantTimeEq};
-///
-/// let a = Fixed::new([1u8; 32]);
-/// let b = Fixed::new([1u8; 32]);
-/// assert!(a.ct_eq(&b));
-/// # }
-/// ```
 #[cfg(feature = "ct-eq")]
+#[doc(inline)]
 pub use traits::ConstantTimeEq;
 
-/// Explicit immutable access to secret contents (3-tier access model).
-///
-/// - **Tier 1** (preferred): [`with_secret()`](RevealSecret::with_secret) — scoped closure,
-///   borrow cannot escape.
-/// - **Tier 2** (escape hatch): [`expose_secret()`](RevealSecret::expose_secret) — direct
-///   `&T` reference for FFI / third-party APIs.
-/// - **Tier 3** (consumption): [`into_inner()`](RevealSecret::into_inner) — transfers
-///   ownership of the plain value; protection ends with the call.
-///
-/// Length metadata lives in the separate [`SecretLen`] trait. See
-/// [`RevealSecretMut`] for the mutable counterpart.
 // Kept as a separate `use` from `SecretLen` on purpose: rustdoc 1.70 (the 0.8
 // line's MSRV toolchain) ICEs resolving intra-doc links on a grouped
 // `pub use a::{B, C};` re-export, and the two lines share this file.
+#[doc(inline)]
 pub use traits::RevealSecret;
 
-/// Length metadata for secrets whose inner type has a meaningful length.
-///
-/// [`len()`](SecretLen::len) / [`byte_len()`](SecretLen::byte_len) /
-/// [`is_empty()`](SecretLen::is_empty) do not expose contents, but length itself
-/// can be sensitive for variable-length secrets — see the trait's Security
-/// section. Implemented for `Fixed<[T; N]>`, `Dynamic<String>`, and
-/// `Dynamic<Vec<T>>`; deliberately not for custom inner types.
+#[doc(inline)]
 pub use traits::SecretLen;
 
-/// Explicit mutable access to secret contents.
-///
-/// Extends [`RevealSecret`]. Prefer [`with_secret_mut()`](RevealSecretMut::with_secret_mut)
-/// (Tier 1) over [`expose_secret_mut()`](RevealSecretMut::expose_secret_mut) (Tier 2).
-/// Implemented by [`Fixed`], [`Dynamic`], and the generated newtypes. [`EncodedSecret`]
-/// implements neither this nor [`RevealSecret`] — it is an output wrapper, not a secret one.
+#[doc(inline)]
 pub use traits::RevealSecretMut;
 
-/// Placeholder values left behind by [`RevealSecret::into_inner`] (Tier 3 access).
-///
-/// When `into_inner` moves the real secret out of a wrapper, it must leave *something*
-/// behind for the wrapper's `Drop` impl to zeroize. `SentinelValue::sentinel_value()`
-/// produces that inert placeholder (an all-default array, empty `String`, or empty
-/// `Vec`). Implemented for `[T; N]` (any `N`, `T: Default`), `String`, and `Vec<T>`.
-///
-/// Implement this for your own inner types to make `into_inner` available on wrappers
-/// around them. A sentinel must never contain secret material.
-///
-/// Leaving it unimplemented is a deliberate position, not a gap: `into_inner` is then
-/// uncallable for that inner type, so a secret with no safe inert placeholder simply
-/// cannot be extracted by ownership transfer. `with_secret` and `expose_secret` still
-/// work. That is the safe default rather than a missing feature.
+#[doc(inline)]
 pub use traits::SentinelValue;
 
-/// Asserts that an inner type owns no buffer whose capacity can change.
-///
-/// Required by [`Fixed::new`], which is what makes `SECURITY.md`'s claim that `Fixed<T>`
-/// "has no realloc surface" true rather than aspirational. Before this bound existed,
-/// `Fixed<Vec<u8>>`, `Fixed<String>` and `fixed_newtype!(pub Name, generic Vec<u8>)` all
-/// compiled, and measured, they abandoned an unwiped buffer holding the whole secret on
-/// any capacity change — the same weakness `Dynamic` documents, minus `Dynamic`'s
-/// safe-growth `std::io::Write` path.
-///
-/// Implemented for the primitives, `[T; N]` for any `N`, tuples up to four elements, and
-/// `Option<T>`. Nothing heap-owning is implemented: `Vec<T>`, `String` and `Box<[T]>` are
-/// all absent, because the residue does not need a capacity change — replacing the whole
-/// value abandons the allocation too, measured at 1024 of 1024 bytes through a
-/// `Fixed<Box<[u8]>>`. For a heap-backed secret use [`Dynamic`], which documents the
-/// residue and offers the one safe growth path.
-///
-/// A custom inner type writes `impl FixedStorage for MyKey {}`. Like [`CloneableSecret`],
-/// the compiler checks that you made the claim, not that it is true — see the trait docs
-/// for the test to apply and for why an assertion is the right trade here.
+#[doc(inline)]
 pub use traits::FixedStorage;
 
-/// Encoded string **output wrapper** for zeroizing encoded output.
-///
-/// This is an **output wrapper** — it exists *only* to keep encoded data zeroized until
-/// it drops. It is **not** a secret wrapper like [`Fixed`]/[`Dynamic`] and does not
-/// accept [`CloneableSecret`] or [`SerializableSecret`] markers.
-///
-/// Returned by every encoding method (`to_hex`, `to_hex_upper`, `to_base32`,
-/// `to_base64url`, `try_to_bech32`, `try_to_bech32m`, and the `_sized::<N>` forms of
-/// the last two — only bech32 and bech32m take a code length).
-/// Wraps `Zeroizing<String>` with `Debug` → `[REDACTED]`. Its one accessor is
-/// `Deref<Target = str>`; there are deliberately no `AsRef` impls, because `Deref`
-/// already opens that door. Deliberately **no** `Display` either: `{}` on this type is
-/// a compile error, so `Debug` redaction cannot mislead a caller into logging the
-/// encoded secret. Write it out with `&*encoded`.
-///
-/// Use [`into_inner()`](EncodedSecret::into_inner) to extract a plain `String`
-/// (ends zeroization) or [`into_zeroizing()`](EncodedSecret::into_zeroizing) to keep
-/// the wiping. `into_zeroizing` is a partial downgrade: zeroize-on-drop survives, the
-/// redacted `Debug` does not, because `zeroize::Zeroizing` derives its own.
-///
-/// Requires `alloc` feature.
 #[cfg(feature = "alloc")]
+#[doc(inline)]
 pub use traits::EncodedSecret;
 
-/// Marker trait that opts a secret type into Serde serialization. No methods — gates the
-/// `Serialize` impl on [`Fixed`] and [`Dynamic`]. Serialization exposes the full secret;
-/// audit every impl. Requires `serde-serialize` feature.
-///
-/// **`Deserialize` does NOT require this marker** — it is gated separately by the
-/// `serde-deserialize` feature with its own impls on the wrapper types directly. This
-/// marker controls `Serialize` only.
-///
-/// Implement this on your inner type `T`; `Fixed<T>` and `Dynamic<T>` then gain the
-/// gated `Serialize` impl automatically. **This marker is deliberately not implemented
-/// by default** on `Fixed<T>` or `Dynamic<T>` — serialization is an opt-in risk that
-/// must be explicitly enabled. Without the `serde-serialize` feature this type does not
-/// exist at all.
-///
-///
-/// **Coherence note:** Rust's orphan rule prevents downstream crates from implementing
-/// this marker for foreign types such as `String`, `Vec<u8>`, or `[u8; N]` — so
-/// `Fixed<[u8; N]>` and `Dynamic<String>` themselves can never become `Serialize`. To
-/// opt a secret into serialization, define a newtype inner type in your crate (deriving
-/// `Zeroize` and `Serialize`) and implement the marker on it. This is intentional: it
-/// keeps every serializable secret type visible in *your* code. See the trait-level
-/// docs for a worked example.
-/// See also [`CloneableSecret`] (the other opt-in marker trait).
 #[cfg(feature = "serde-serialize")]
+#[doc(inline)]
 pub use traits::SerializableSecret;
 
 // Newtype macros (`dynamic_newtype!` needs `alloc`)
 mod macros;
 
-/// Decodes Base32 strings (`&str`) to `Vec<u8>`. Blanket impl for `AsRef<str>`.
-/// Requires `encoding-base32` + `alloc`. See [`ToBase32`] for the encoding counterpart.
 #[cfg(all(feature = "encoding-base32", feature = "alloc"))]
-pub use traits::FromBase32Str;
-
-/// Decodes Base64url strings (`&str`) to `Vec<u8>`. Blanket impl for `AsRef<str>`.
-/// Requires `encoding-base64` + `alloc`. See [`ToBase64Url`] for the encoding counterpart.
-#[cfg(all(feature = "encoding-base64", feature = "alloc"))]
-pub use traits::FromBase64UrlStr;
-
-/// Decodes Bech32 (BIP-173) strings to `Vec<u8>` with HRP validation.
-/// Requires `encoding-bech32` + `alloc`. See [`ToBech32`] for the encoding counterpart.
-#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-pub use traits::FromBech32Str;
-
-/// Decodes Bech32m (BIP-350) strings to `Vec<u8>` with HRP validation.
-/// Requires `encoding-bech32` + `alloc`. See [`ToBech32m`] for the encoding counterpart.
-#[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
-pub use traits::FromBech32mStr;
-
-/// Decodes hex strings (`&str`) to `Vec<u8>`. Blanket impl for `AsRef<str>`.
-/// Requires `encoding-hex` + `alloc`. See [`ToHex`] for the encoding counterpart.
-#[cfg(all(feature = "encoding-hex", feature = "alloc"))]
-pub use traits::FromHexStr;
-
-/// Encodes byte data as Base32 strings (RFC 4648 §6, uppercase, no padding).
-/// Blanket impl for `AsRef<[u8]> + `[`EncodableBytes`]. Returns [`EncodedSecret`].
-/// Requires `encoding-base32` + `alloc`.
-/// See [`FromBase32Str`] for the decoding counterpart.
-#[cfg(all(feature = "encoding-base32", feature = "alloc"))]
+#[doc(inline)]
 pub use traits::ToBase32;
 
-/// Encodes byte data as Base64url strings (RFC 4648, URL-safe, no padding).
-/// Blanket impl for `AsRef<[u8]> + `[`EncodableBytes`]. Returns [`EncodedSecret`].
-/// Requires `encoding-base64` + `alloc`.
-/// See [`FromBase64UrlStr`] for the decoding counterpart.
 #[cfg(all(feature = "encoding-base64", feature = "alloc"))]
+#[doc(inline)]
 pub use traits::ToBase64Url;
 
-/// Encodes byte data as Bech32 (BIP-173) strings. Blanket impl for
-/// `AsRef<[u8]> + `[`EncodableBytes`]; returns `Result<`[`EncodedSecret`]`, _>`.
-/// The plain methods use [`BECH32_CODE_LENGTH`]; `try_to_bech32_sized::<N>` takes the
-/// code length as a parameter. Requires `encoding-bech32` + `alloc`.
-/// See [`FromBech32Str`] for the decoding counterpart.
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+#[doc(inline)]
 pub use traits::ToBech32;
 
-/// Encodes byte data as Bech32m (BIP-350) strings. Blanket impl for
-/// `AsRef<[u8]> + `[`EncodableBytes`]; returns `Result<`[`EncodedSecret`]`, _>`.
-/// The plain methods use [`BECH32_CODE_LENGTH`]; `try_to_bech32m_sized::<N>` takes the
-/// code length as a parameter. Requires `encoding-bech32` + `alloc`.
-/// See [`FromBech32mStr`] for the decoding counterpart.
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
+#[doc(inline)]
 pub use traits::ToBech32m;
 
-/// Opt-in marker for byte-shaped encoding inputs. Every `To*` trait is blanket
-/// implemented for `AsRef<[u8]> + EncodableBytes`; the second bound keeps string-shaped
-/// types out, so an already-encoded value cannot be silently encoded again. Implement it
-/// for your own byte newtype to make it encodable.
 #[cfg(feature = "encoding-bech32")]
+#[doc(inline)]
 pub use traits::Case;
 
 #[cfg(any(
@@ -607,69 +481,18 @@ pub use traits::Case;
     feature = "encoding-base64",
     feature = "encoding-bech32",
 ))]
+#[doc(inline)]
 pub use traits::EncodableBytes;
 
-/// Bech32 (BIP-173) checksum with a caller-chosen code length. `N` caps the length of
-/// the whole encoded string and never enters the checksum. Above [`BECH32_CODE_LENGTH`]
-/// the BCH error-detection guarantee no longer holds - see the type docs.
-// Kept as separate `use` statements on purpose: rustdoc 1.70 (this line's MSRV
-// toolchain) ICEs resolving intra-doc links on a grouped `pub use a::{B, C};`
-// re-export — the same bug already worked around for `SecretLen` above.
 #[cfg(feature = "encoding-bech32")]
-pub use traits::Bech32Sized;
+#[doc(inline)]
+pub use traits::{bech32_code_length, BECH32_CODE_LENGTH};
 
-/// The BIP-173 checksum at the default code length, used by every non-`_sized` method.
-#[cfg(feature = "encoding-bech32")]
-pub use traits::Bech32Standard;
-
-/// Bech32m (BIP-350) checksum with a caller-chosen code length - the bech32m twin of
-/// [`Bech32Sized`], with the same rules and the same guarantee boundary.
-#[cfg(feature = "encoding-bech32")]
-pub use traits::Bech32mSized;
-
-/// The BIP-350 checksum at the default code length, used by every non-`_sized` method.
-#[cfg(feature = "encoding-bech32")]
-pub use traits::Bech32mStandard;
-
-/// The bech32 BCH code length (1023) used by every non-`_sized` method.
-#[cfg(feature = "encoding-bech32")]
-pub use traits::BECH32_CODE_LENGTH;
-
-/// Sizes an `N` for the `_sized` methods from an HRP length and a payload byte count.
-#[cfg(feature = "encoding-bech32")]
-pub use traits::bech32_code_length;
-
-/// Encodes byte data as hexadecimal strings (constant-time via `base16ct`).
-/// Blanket impl for `AsRef<[u8]> + `[`EncodableBytes`]. Provides `to_hex()` and
-/// `to_hex_upper()`, both returning [`EncodedSecret`].
-/// Requires `encoding-hex` + `alloc`.
-/// See [`FromHexStr`] for the decoding counterpart.
 #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
+#[doc(inline)]
 pub use traits::ToHex;
 
-/// Marker trait for types that support secure decoding (`AsRef<str>`). No methods —
-/// nothing bounds on it — the `From*Str` blankets are plain `AsRef<str>`. Retained for
-/// backwards compatibility; the 0.9 line removed it.
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base32",
-    feature = "encoding-base64",
-    feature = "encoding-bech32",
-))]
-pub use traits::SecureDecoding;
-
-/// Vestigial marker for byte-shaped types (`AsRef<[u8]>`). No methods, and nothing
-/// bounds on it — the `To*` blankets are gated by [`EncodableBytes`]. Retained for
-/// backwards compatibility; the 0.9 line removed it.
-#[cfg(any(
-    feature = "encoding-hex",
-    feature = "encoding-base32",
-    feature = "encoding-base64",
-    feature = "encoding-bech32",
-))]
-pub use traits::SecureEncoding;
-
-/// Errors from Bech32 (BIP-173) and Bech32m (BIP-350) decoding.
+/// Errors from Bech32 (BIP-173) and Bech32m (BIP-350) encoding and decoding.
 /// Variant shapes are identical in debug and release builds; no secret material
 /// (payload bytes, HRP strings) is ever carried in an error.
 #[cfg(feature = "encoding-bech32")]

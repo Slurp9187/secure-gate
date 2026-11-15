@@ -22,16 +22,16 @@
 //!   multi-step operations, prefer `with_secret(|b| b.to_hex())` — the borrow checker
 //!   enforces the reference cannot escape the closure.
 //! - **Decoding lives elsewhere**: this module encodes. For the reverse direction and
-//!   its untrusted-input rules see `FromHexStr`; validate hex
+//!   its untrusted-input rules see `Fixed::try_from_hex` / `Dynamic::try_from_hex`; validate hex
 //!   strings upstream before wrapping
 //!   in secrets.
 //!
 //! # Example
 //!
 //! ```rust
-//! # #[cfg(feature = "encoding-hex")]
+//! # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 //! use secure_gate::{Fixed, ToHex, RevealSecret};
-//! # #[cfg(feature = "encoding-hex")]
+//! # #[cfg(all(feature = "encoding-hex", feature = "alloc"))]
 //! {
 //! let secret = Fixed::new([0x0au8, 0x0bu8, 0x0cu8, 0x0du8]);
 //!
@@ -51,7 +51,10 @@ use base16ct;
 
 /// Extension trait for encoding byte data as hexadecimal strings.
 ///
-/// *Requires feature `encoding-hex`.*
+/// *Requires features `encoding-hex` and `alloc`.* Every method returns an
+/// [`EncodedSecret`](crate::EncodedSecret). Decode with
+/// [`Fixed::try_from_hex`](crate::Fixed::try_from_hex) or
+/// [`Dynamic::try_from_hex`](crate::Dynamic::try_from_hex).
 ///
 /// Blanket-implemented for `AsRef<[u8]>` + [`EncodableBytes`](super::EncodableBytes) (byte slices, arrays, `Vec<u8>`),
 /// and implemented directly on the byte-shaped wrappers (`Fixed<[u8; N]>`,

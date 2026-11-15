@@ -20,53 +20,9 @@
 //! - **Panic safety** — all decode constructors use the `from_protected_bytes` pattern:
 //!   a `Zeroizing` wrapper survives OOM panics from `Box::new`.
 //!
-//! # Choosing the inner type for security
-//!
-//! Different inner types have different reallocation-residue profiles:
-//!
-//! | Inner type | Realloc surface | Use case |
-//! |---|---|---|
-//! | `Dynamic<[u8; N]>` (boxed array) | **None** — fixed size | Long-lived known-size keys held on the heap |
-//! | `Dynamic<Vec<u8>>` pre-sized | None *if* you avoid capacity-growing mutations | Variable-length secrets with a known upper bound |
-//! | `Dynamic<Vec<u8>>` growable | **Yes** — each realloc leaves the old buffer unzeroed | Convenient, but see realloc-residue warning below |
-//! | `Dynamic<String>` | Same as `Dynamic<Vec<u8>>` | Passwords, API keys |
-//!
-//! For **long-lived, known-size key material**, prefer `Dynamic<[u8; N]>` —
-//! it combines `Dynamic`'s heap-only property with zero realloc surface.
-//! See `SECURITY.md` § "Inherent Rust Limitations" for the broader discussion.
-//!
-//! # Construction
-//!
-//! | Constructor | Notes |
-//! |---|---|
-//! | [`Dynamic::<Vec<u8>>::new_with(len, f)`](Dynamic::new_with) | **Preferred.** Writes into a sized, pre-zeroed slot inside the wrapper; growth is not expressible |
-//! | [`Dynamic::<Vec<u8>>::try_new_with(len, f)`](Dynamic::try_new_with) | The same, for a fill that can fail; wipes the partial write on `Err` |
-//! | [`Dynamic::new(value)`](Dynamic::new) | **Moves** the buffer in — no copy. Only as safe as how you built the value |
-//! | [`From<&str>`](Dynamic::from) / [`From<&[u8]>`](Dynamic::from) | **Copies**; your source buffer is left unwiped |
-//!
-//! Choosing between them is about where the bytes are written, not convenience:
-//!
-//! - **Length known before the fill** — use `new_with(len, …)`. That is two allocations,
-//!   not one: the slot, of exactly `len` bytes, plus the `Box<Vec<u8>>` header every
-//!   `Dynamic<Vec<u8>>` is built around. `tests/lifecycle_trace_heap.rs` measures
-//!   `from_random(len)` — this constructor with an RNG in the closure — at exactly two,
-//!   and `Dynamic::new(owned)` at exactly one, because a move brings its buffer with it.
-//!   So the recommendation is not about allocation count; it is about the slot's shape.
-//!   Capacity equals length, so the wrapper never holds slack, and the closure is handed a
-//!   slice, so growth is not expressible at all.
-//! - **Length not known** — use `Dynamic::new(Vec::new())` and write through the
-//!   [`std::io::Write`] impl, which grows by hand and **zeroizes each abandoned buffer**
-//!   before releasing it. It is the one growth path here that does. Requires `std`.
-//! - **You already own the value** — `new(owned)` moves the allocation rather than
-//!   copying it, so the buffer you filled becomes the buffer the wrapper protects. That
-//!   is necessary but not sufficient: if you *grew* the value to build it, those
-//!   reallocations already happened and the copies are already on the heap. Build without
-//!   growth — `with_capacity` at the exact final size, or one `resize` — then move it in.
-//!
-//! `Dynamic<String>` has no closure constructor. It cannot: `String` must hold valid
-//! UTF-8 and characters have variable byte widths, so a fixed byte window is not a place
-//! you can write arbitrary text. Build a pre-sized `String` and move it in with
-//! [`Dynamic::new`].
+//! Guidance on choosing the inner type and the constructor, and the reallocation
+//! warning, is on [`Dynamic`] itself; this module is private and its docs are not
+//! rendered.
 //!
 //! # 3-tier access model
 //!
@@ -93,21 +49,6 @@
 //! assert_eq!(owned, "HUNTER2");
 //! # }
 //! ```
-//!
-//! # Warning
-//!
-//! Ensure your profile sets `panic = "unwind"` — `panic = "abort"` skips destructors
-//! and therefore skips zeroization. (`Dynamic` cannot be `static` since it requires
-//! `Box` allocation, so the static-secret warning from `Fixed` does not apply.)
-//!
-//! For `Dynamic<Vec<_>>` and `Dynamic<String>`, capacity-changing mutations can
-//! cause the standard allocator to free the previous buffer without zeroizing it.
-//! Pre-allocate to the maximum size, use capacity-stable mutations, prefer
-//! `Dynamic<[u8; N]>` (no realloc surface) for known-size heap secrets, or use
-//! [`Fixed<T>`](crate::Fixed) for known-size stack secrets. See `SECURITY.md` for
-//! the full threat-model discussion and deployment-level mitigations including
-//! the [`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) global
-//! allocator.
 //!
 //! # See also
 //!
@@ -144,20 +85,7 @@ use crate::traits::encoding::bech32m::ToBech32m;
 use crate::traits::encoding::hex::ToHex;
 
 #[cfg(feature = "rand")]
-use rand::{rngs::OsRng, TryCryptoRng, TryRngCore};
-
-// Dynamic<Vec<u8>> is always alloc-dependent, so the alloc-gated blanket traits
-// are always available when encoding features are enabled for this type.
-#[cfg(feature = "encoding-base32")]
-use crate::traits::decoding::base32::FromBase32Str;
-#[cfg(feature = "encoding-base64")]
-use crate::traits::decoding::base64_url::FromBase64UrlStr;
-#[cfg(feature = "encoding-bech32")]
-use crate::traits::decoding::bech32::FromBech32Str;
-#[cfg(feature = "encoding-bech32")]
-use crate::traits::decoding::bech32m::FromBech32mStr;
-#[cfg(feature = "encoding-hex")]
-use crate::traits::decoding::hex::FromHexStr;
+use rand::{rngs::OsRng, TryRngCore};
 
 /// Zero-cost heap-allocated wrapper for variable-length secrets.
 ///
@@ -182,13 +110,85 @@ use crate::traits::decoding::hex::FromHexStr;
 /// # }
 /// ```
 ///
+/// # Choosing the inner type for security
+///
+/// Different inner types have different reallocation-residue profiles:
+///
+/// | Inner type | Realloc surface | Use case |
+/// |---|---|---|
+/// | `Dynamic<[u8; N]>` (boxed array) | **None** — fixed size | Long-lived known-size keys held on the heap |
+/// | `Dynamic<[u8]>` (boxed slice) | **None** once built — the length is set at construction and cannot change | Secrets whose length is known only at runtime but never changes afterwards |
+/// | `Dynamic<Vec<u8>>` pre-sized | None *if* you avoid capacity-growing mutations | Variable-length secrets with a known upper bound |
+/// | `Dynamic<Vec<u8>>` growable | **Yes** — each realloc leaves the old buffer unzeroed | Convenient, but see realloc-residue warning below |
+/// | `Dynamic<String>` | Same as `Dynamic<Vec<u8>>` | Passwords, API keys |
+///
+/// For **long-lived, known-size key material**, prefer `Dynamic<[u8; N]>` —
+/// it combines `Dynamic`'s heap-only property with zero realloc surface.
+/// See `SECURITY.md` § "Inherent Rust Limitations" for the broader discussion.
+///
+/// When the length is fixed but only known at runtime, `Dynamic<[u8]>` gives the same
+/// guarantee by construction: `with_secret_mut` hands the closure a `&mut [u8]`, which has
+/// no `push`, `extend` or `reserve`, so a reallocation is not expressible rather than merely
+/// discouraged. Two things to know before choosing it:
+///
+/// - **Build the `Vec` at its exact final capacity.** `Dynamic::<[u8]>::new(vec)` converts
+///   through `Box<[u8]>::from(Vec)`, which shrinks a `Vec` with excess capacity into a
+///   newly allocated buffer and frees the old one unwiped. `vec![0u8; len]` is already
+///   exact; a `Vec` that was grown or truncated is not.
+/// - **It is the narrowest `Dynamic` shape.** Scoped access, [`Debug`](core::fmt::Debug)
+///   redaction, zeroize-on-drop and `ct_eq` (with `ct-eq`) work. `SecretLen::len`,
+///   `new_with`, `from_random`, `into_inner`, the encoding traits, serde and `Clone` are
+///   not implemented for it; read the length with `with_secret(|s| s.len())`.
+///
+/// ```
+/// use secure_gate::{Dynamic, RevealSecret, RevealSecretMut};
+///
+/// let len = 32; // known only at runtime
+/// let mut key: Dynamic<[u8]> = Dynamic::new(vec![0u8; len]); // exact capacity: no shrink
+/// key.with_secret_mut(|k: &mut [u8]| k.fill(0x42)); // `&mut [u8]` — cannot grow
+/// assert_eq!(key.with_secret(|k| k.len()), 32);
+/// ```
+///
+/// # Construction
+///
+/// | Constructor | Notes |
+/// |---|---|
+/// | [`Dynamic::<Vec<u8>>::new_with(len, f)`](Dynamic::new_with) | **Preferred.** Writes into a sized, pre-zeroed slot inside the wrapper; growth is not expressible |
+/// | [`Dynamic::<Vec<u8>>::try_new_with(len, f)`](Dynamic::try_new_with) | The same, for a fill that can fail; wipes the partial write on `Err` |
+/// | [`Dynamic::new(value)`](Dynamic::new) | **Moves** the buffer in — no copy. Only as safe as how you built the value |
+/// | [`From<&str>`](Dynamic::from) / [`From<&[u8]>`](Dynamic::from) | **Copies**; your source buffer is left unwiped |
+///
+/// Choosing between them is about where the bytes are written, not convenience:
+///
+/// - **Length known before the fill** — use `new_with(len, …)`. That is two allocations,
+///   not one: the slot, of exactly `len` bytes, plus the `Box<Vec<u8>>` header every
+///   `Dynamic<Vec<u8>>` is built around. `tests/lifecycle_trace_heap.rs` measures
+///   `from_random(len)` — this constructor with an RNG in the closure — at exactly two,
+///   and `Dynamic::new(owned)` at exactly one, because a move brings its buffer with it.
+///   So the recommendation is not about allocation count; it is about the slot's shape.
+///   Capacity equals length, so the wrapper never holds slack, and the closure is handed a
+///   slice, so growth is not expressible at all.
+/// - **Length not known** — use `Dynamic::new(Vec::new())` and write through the
+///   [`std::io::Write`] impl, which grows by hand and **zeroizes each abandoned buffer**
+///   before releasing it. It is the one growth path here that does. Requires `std`.
+/// - **You already own the value** — `new(owned)` moves the allocation rather than
+///   copying it, so the buffer you filled becomes the buffer the wrapper protects. That
+///   is necessary but not sufficient: if you *grew* the value to build it, those
+///   reallocations already happened and the copies are already on the heap. Build without
+///   growth — `with_capacity` at the exact final size, or one `resize` — then move it in.
+///
+/// `Dynamic<String>` has no closure constructor. It cannot: `String` must hold valid
+/// UTF-8 and characters have variable byte widths, so a fixed byte window is not a place
+/// you can write arbitrary text. Build a pre-sized `String` and move it in with
+/// [`Dynamic::new`].
+///
 /// # Constructors for `Dynamic<Vec<u8>>`
 ///
 /// | Constructor | Feature | Notes |
 /// |---|---|---|
 /// | [`new_with(len, f)`](Self::new_with) | — | **Preferred.** Sized, pre-zeroed slot inside the wrapper |
 /// | [`try_new_with(len, f)`](Self::try_new_with) | — | The same, fallible; wipes the partial write on `Err` |
-/// | [`new(value)`](Self::new) | — | **Moves** the buffer in. Accepts `Vec<u8>`, `&[u8]`, `Box<Vec<u8>>` |
+/// | [`new(value)`](Self::new) | — | **Moves** the buffer in. Accepts `Vec<u8>` or `Box<Vec<u8>>`; a `&[u8]` goes through `Dynamic::from`, which copies |
 /// | [`try_from_hex(s)`](Self::try_from_hex) | `encoding-hex` | Constant-time hex decoding |
 /// | [`try_from_base32(s)`](Self::try_from_base32) | `encoding-base32` | Constant-time Base32 decoding |
 /// | [`try_from_base64url(s)`](Self::try_from_base64url) | `encoding-base64` | Constant-time Base64url decoding |
@@ -196,8 +196,23 @@ use crate::traits::decoding::hex::FromHexStr;
 /// | [`try_from_bech32_unchecked(s)`](Self::try_from_bech32_unchecked) | `encoding-bech32` | Bech32 without HRP check |
 /// | [`try_from_bech32m(s, hrp)`](Self::try_from_bech32m) | `encoding-bech32` | HRP-validated Bech32m |
 /// | [`try_from_bech32m_unchecked(s)`](Self::try_from_bech32m_unchecked) | `encoding-bech32` | Bech32m without HRP check |
+/// | The four `_sized::<C>` forms, such as [`try_from_bech32_sized`](Self::try_from_bech32_sized) | `encoding-bech32` | As above, for strings longer than [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) |
 /// | [`from_random(len)`](Self::from_random) | `rand` | System RNG |
-/// | [`from_rng(len, rng)`](Self::from_rng) | `rand` | Custom RNG |
+///
+/// # Warning
+///
+/// Ensure your profile sets `panic = "unwind"` — `panic = "abort"` skips destructors
+/// and therefore skips zeroization. (`Dynamic` cannot be `static` since it requires
+/// `Box` allocation, so the static-secret warning from `Fixed` does not apply.)
+///
+/// For `Dynamic<Vec<_>>` and `Dynamic<String>`, capacity-changing mutations can
+/// cause the standard allocator to free the previous buffer without zeroizing it.
+/// Pre-allocate to the maximum size, use capacity-stable mutations, prefer
+/// `Dynamic<[u8; N]>` (no realloc surface) for known-size heap secrets, or use
+/// [`Fixed<T>`](crate::Fixed) for known-size stack secrets. See `SECURITY.md` for
+/// the full threat-model discussion and deployment-level mitigations including
+/// the [`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) global
+/// allocator.
 ///
 /// # See also
 ///
@@ -211,11 +226,14 @@ pub struct Dynamic<T: ?Sized + zeroize::Zeroize> {
 impl<T: ?Sized + zeroize::Zeroize> Dynamic<T> {
     /// Wraps `value` in a `Box<T>` and returns a `Dynamic<T>`.
     ///
-    /// Accepts any type that implements `Into<Box<T>>` — including owned values,
-    /// `Box<T>`, `String`, `Vec<u8>`, `&str` (via the blanket `From<&str>` impl), etc.
+    /// Accepts any type that implements `Into<Box<T>>`: an owned `T` (a `String`, a
+    /// `Vec<u8>`), which is boxed, or a `Box<T>`, which is moved in as it is. Either way
+    /// the buffer is moved, not copied.
     ///
-    /// Equivalent to `Dynamic::from(value)` — `#[doc(alias = "from")]` is set so both
-    /// names appear in docs.rs search.
+    /// Borrowed input is not accepted here. `&str` and `&[u8]` go through
+    /// [`Dynamic::from`], which copies them and leaves the source unwiped. For the values
+    /// `new` does accept, `Dynamic::from(value)` is the same call; `#[doc(alias = "from")]`
+    /// is set so both names appear in docs.rs search.
     ///
     /// Requires the `alloc` feature (which `Dynamic<T>` itself always requires).
     #[doc(alias = "from")]
@@ -274,9 +292,8 @@ impl From<&[u8]> for Dynamic<Vec<u8>> {
 /// move) and a caller-side buffer whose bytes are provably unchanged once the wrapper is
 /// built and dropped.
 ///
-/// This is the impl a caller now reaches for after `Dynamic::<String>::new_with` was removed
-/// outright in 0.8.0-rc.14 — an `&str` is what's already on hand, so `From<&str>` reads as
-/// the drop-in replacement. It is the **worse** one: whatever plaintext the `&str` borrows
+/// `Dynamic<String>` has no closure constructor, and an `&str` is usually what is on hand,
+/// so this impl reads as the obvious way in. It is the **worse** one: whatever plaintext the `&str` borrows
 /// from — a literal, an owned `String`, a line read off stdin — is untouched by this call and
 /// stays live and unprotected for as long as its own scope does. If you own the `String`,
 /// size it once — `String::with_capacity` at the exact final length — and move it in with
@@ -323,12 +340,13 @@ impl<T: 'static + zeroize::Zeroize> From<T> for Dynamic<T> {
 impl Dynamic<Vec<u8>> {
     /// Decodes a hex string (lowercase, uppercase, or mixed) into `Dynamic<Vec<u8>>`.
     ///
-    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
-    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
+    /// The decode buffer is allocated inside `Zeroizing` before a byte is written to it, so
+    /// it is wiped when the input is rejected as well as on success, and it stays in
+    /// `Zeroizing` until after the `Box` allocation completes (an OOM panic wipes it too).
     pub fn try_from_hex(s: &str) -> Result<Self, crate::error::HexError> {
-        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
-            s.try_from_hex()?,
-        )))
+        let bytes =
+            crate::decode_staging::hex(s).map_err(|_| crate::error::HexError::InvalidHex)?;
+        Ok(Self::from_protected_bytes(bytes))
     }
 }
 
@@ -337,8 +355,9 @@ impl Dynamic<Vec<u8>> {
 impl Dynamic<Vec<u8>> {
     /// Decodes an uppercase, unpadded Base32 (RFC 4648 §6) string into `Dynamic<Vec<u8>>`.
     ///
-    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
-    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
+    /// The decode buffer is allocated inside `Zeroizing` before a byte is written to it, so
+    /// it is wiped when the input is rejected as well as on success, and it stays in
+    /// `Zeroizing` until after the `Box` allocation completes (an OOM panic wipes it too).
     ///
     /// Decoding is strict about the alphabet, case, padding and length, but lenient
     /// about non-canonical trailing bits: unused bits in the final group are ignored
@@ -347,9 +366,9 @@ impl Dynamic<Vec<u8>> {
     /// only encoder-produced strings are canonical. Do not use the decoded value to
     /// decide that two encoded strings were equal.
     pub fn try_from_base32(s: &str) -> Result<Self, crate::error::Base32Error> {
-        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
-            s.try_from_base32()?,
-        )))
+        let bytes = crate::decode_staging::base32(s)
+            .map_err(|_| crate::error::Base32Error::InvalidBase32)?;
+        Ok(Self::from_protected_bytes(bytes))
     }
 }
 
@@ -358,12 +377,13 @@ impl Dynamic<Vec<u8>> {
 impl Dynamic<Vec<u8>> {
     /// Decodes a Base64url (unpadded) string into `Dynamic<Vec<u8>>`.
     ///
-    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
-    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
+    /// The decode buffer is allocated inside `Zeroizing` before a byte is written to it, so
+    /// it is wiped when the input is rejected as well as on success, and it stays in
+    /// `Zeroizing` until after the `Box` allocation completes (an OOM panic wipes it too).
     pub fn try_from_base64url(s: &str) -> Result<Self, crate::error::Base64Error> {
-        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
-            s.try_from_base64url()?,
-        )))
+        let bytes = crate::decode_staging::base64url(s)
+            .map_err(|_| crate::error::Base64Error::InvalidBase64)?;
+        Ok(Self::from_protected_bytes(bytes))
     }
 }
 
@@ -373,8 +393,8 @@ impl Dynamic<Vec<u8>> {
     /// Decodes a Bech32 (BIP-173) string into `Dynamic<Vec<u8>>`, validating the HRP
     /// (case-insensitive).
     ///
-    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
-    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
+    /// The decoded buffer is wrapped in `Zeroizing` as soon as it exists, and stays in it
+    /// until after the `Box` allocation completes, guaranteeing zeroization even on OOM panic.
     ///
     /// HRP comparison is non-constant-time — this is intentional, as the HRP is public
     /// metadata, not secret material.
@@ -387,14 +407,25 @@ impl Dynamic<Vec<u8>> {
     ///
     /// `C` is the bech32 code length: the cap on the whole encoded string. Pass the `C`
     /// the string was encoded with, or any larger value. See
-    /// [`Bech32Sized`](crate::Bech32Sized) for what `C` above
+    /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) for what `C` above
     /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
     pub fn try_from_bech32_sized<const C: usize>(
         s: &str,
         expected_hrp: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
+        let checked = bech32::primitives::decode::CheckedHrpstring::new::<
+            crate::traits::encoding::bech32::Bech32Sized<C>,
+        >(s)
+        .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
+        // Compare the HRP (public metadata, so not constant-time) *before* materializing any
+        // payload byte, so a mismatch never leaves decoded secret material on the heap.
+        if !checked.hrp().as_str().eq_ignore_ascii_case(expected_hrp) {
+            return Err(crate::error::Bech32Error::UnexpectedHrp);
+        }
+        // `byte_iter()` is an ExactSizeIterator: one exact-size allocation, so no reallocation
+        // leaves a stale copy of the payload behind.
         Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
-            s.try_from_bech32_sized::<C>(expected_hrp)?,
+            checked.byte_iter().collect(),
         )))
     }
 
@@ -411,8 +442,13 @@ impl Dynamic<Vec<u8>> {
     pub fn try_from_bech32_unchecked_sized<const C: usize>(
         s: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes) = s.try_from_bech32_unchecked_sized::<C>()?;
-        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(bytes)))
+        let checked = bech32::primitives::decode::CheckedHrpstring::new::<
+            crate::traits::encoding::bech32::Bech32Sized<C>,
+        >(s)
+        .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
+            checked.byte_iter().collect(),
+        )))
     }
 }
 
@@ -422,8 +458,8 @@ impl Dynamic<Vec<u8>> {
     /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>`, validating the HRP
     /// (case-insensitive).
     ///
-    /// The decoded buffer is kept inside a `Zeroizing` wrapper until after the
-    /// `Box` allocation completes, guaranteeing zeroization even on OOM panic.
+    /// The decoded buffer is wrapped in `Zeroizing` as soon as it exists, and stays in it
+    /// until after the `Box` allocation completes, guaranteeing zeroization even on OOM panic.
     pub fn try_from_bech32m(
         s: &str,
         expected_hrp: &str,
@@ -432,14 +468,25 @@ impl Dynamic<Vec<u8>> {
     }
 
     /// Like [`try_from_bech32m`](Self::try_from_bech32m), accepting strings up to `C`
-    /// characters. See [`Bech32mSized`](crate::Bech32mSized) for what `C` above
+    /// characters. See [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) for what `C` above
     /// [`BECH32_CODE_LENGTH`](crate::BECH32_CODE_LENGTH) costs.
     pub fn try_from_bech32m_sized<const C: usize>(
         s: &str,
         expected_hrp: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
+        let checked = bech32::primitives::decode::CheckedHrpstring::new::<
+            crate::traits::encoding::bech32m::Bech32mSized<C>,
+        >(s)
+        .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
+        // Compare the HRP (public metadata, so not constant-time) *before* materializing any
+        // payload byte, so a mismatch never leaves decoded secret material on the heap.
+        if !checked.hrp().as_str().eq_ignore_ascii_case(expected_hrp) {
+            return Err(crate::error::Bech32Error::UnexpectedHrp);
+        }
+        // `byte_iter()` is an ExactSizeIterator: one exact-size allocation, so no reallocation
+        // leaves a stale copy of the payload behind.
         Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
-            s.try_from_bech32m_sized::<C>(expected_hrp)?,
+            checked.byte_iter().collect(),
         )))
     }
 
@@ -455,8 +502,13 @@ impl Dynamic<Vec<u8>> {
     pub fn try_from_bech32m_unchecked_sized<const C: usize>(
         s: &str,
     ) -> Result<Self, crate::error::Bech32Error> {
-        let (_hrp, bytes) = s.try_from_bech32m_unchecked_sized::<C>()?;
-        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(bytes)))
+        let checked = bech32::primitives::decode::CheckedHrpstring::new::<
+            crate::traits::encoding::bech32m::Bech32mSized<C>,
+        >(s)
+        .map_err(|_| crate::error::Bech32Error::OperationFailed)?;
+        Ok(Self::from_protected_bytes(zeroize::Zeroizing::new(
+            checked.byte_iter().collect(),
+        )))
     }
 }
 
@@ -503,14 +555,12 @@ impl Dynamic<Vec<u8>> {
     /// the slot: capacity equals length, so the wrapper never holds slack, and the slot is
     /// a slice, so **growth is not expressible** and the reallocation hazard cannot arise.
     ///
-    /// # Changed in 0.8.0-rc.14 — this took no `len` before
+    /// # Why it takes a length
     ///
-    /// If you are here from `E0061: this function takes 2 arguments but 1 was supplied`,
-    /// this is why. The previous signature handed the closure a **zero-capacity
-    /// `Vec<u8>`**, so filling it reallocated — and a `Vec` reallocation frees the old
-    /// block **without zeroizing it**, abandoning a copy of the secret on the heap that
-    /// nothing would ever wipe. A constructor whose entire purpose was to avoid an
-    /// unprotected copy created one, silently, in the common case of two pushes.
+    /// A closure handed an empty `Vec<u8>` to fill would reallocate as it grew, and a
+    /// `Vec` reallocation frees the old block **without zeroizing it**, abandoning a copy
+    /// of the secret on the heap that nothing would ever wipe. So the closure gets a
+    /// slice of the final size instead.
     ///
     /// Pass the final length and fill the slot:
     ///
@@ -518,7 +568,6 @@ impl Dynamic<Vec<u8>> {
     /// # #[cfg(feature = "alloc")] {
     /// use secure_gate::{Dynamic, RevealSecret};
     ///
-    /// // was: new_with(|v| { v.extend_from_slice(&material); v.resize(16, 0); })
     /// let key = Dynamic::<Vec<u8>>::new_with(16, |slot| {
     ///     slot[..4].copy_from_slice(&[1, 2, 3, 4]);
     /// });
@@ -661,6 +710,21 @@ impl Dynamic<Vec<u8>> {
     /// assert!(read_exact_secret(&mut [7u8; 8].as_slice(), 32).is_err());
     /// # }
     /// ```
+    ///
+    /// This is also how to generate from an RNG you supply. Anything that fills a byte slice
+    /// works, whatever crate or `rand` version it comes from;
+    /// [`from_random`](Self::from_random) covers the system RNG.
+    ///
+    /// ```rust
+    /// # #[cfg(all(feature = "alloc", feature = "rand"))] {
+    /// use rand::rngs::StdRng;
+    /// use rand::{SeedableRng, TryRngCore};
+    /// use secure_gate::Dynamic;
+    ///
+    /// let mut rng = StdRng::from_seed([9u8; 32]);
+    /// let nonce = Dynamic::<Vec<u8>>::try_new_with(24, |b| rng.try_fill_bytes(b)).expect("rng fill");
+    /// # }
+    /// ```
     #[inline(always)]
     pub fn try_new_with<F, E>(len: usize, f: F) -> Result<Self, E>
     where
@@ -676,7 +740,7 @@ impl Dynamic<Vec<u8>> {
     }
 }
 
-// `new_with` was removed here in 0.8.0-rc.14, deliberately and with no replacement.
+// `new_with` was removed here in 0.9.0-rc.12, deliberately and with no replacement.
 //
 // It handed the closure a zero-capacity `String`, so filling it reallocated and each
 // reallocation freed the old buffer unwiped — the same defect the `Vec<u8>` arm had,
@@ -895,8 +959,8 @@ impl<T: ?Sized + zeroize::Zeroize> crate::RevealSecretMut for Dynamic<T> {
 impl Dynamic<alloc::vec::Vec<u8>> {
     /// Fills a new `Vec<u8>` with `len` cryptographically secure random bytes and wraps it.
     ///
-    /// Uses the system RNG ([`OsRng`](rand::rngs::OsRng)) via [`TryRngCore::try_fill_bytes`](rand::TryRngCore::try_fill_bytes).
-    /// Requires the `rand` feature (and `alloc`, which `Dynamic<Vec<u8>>` always needs).
+    /// Uses the system RNG ([`OsRng`](rand::rngs::OsRng)). Requires the `rand` feature (and
+    /// `alloc`, which `Dynamic<Vec<u8>>` always needs).
     ///
     /// # Panics
     ///
@@ -922,60 +986,6 @@ impl Dynamic<alloc::vec::Vec<u8>> {
                 .try_fill_bytes(slot)
                 .expect("OsRng failure is a program error");
         })
-    }
-
-    /// Allocates a `Vec<u8>` of length `len`, fills it from `rng`, and wraps it.
-    ///
-    /// Accepts any [`TryCryptoRng`](rand::TryCryptoRng) + [`TryRngCore`](rand::TryRngCore) — for example,
-    /// a seeded `StdRng` for deterministic tests. Requires the `rand`
-    /// feature and `alloc` (implicit — [`Dynamic<T>`](crate::Dynamic) itself requires it).
-    ///
-    /// # Errors
-    ///
-    /// Returns `R::Error` if [`try_fill_bytes`](rand::TryRngCore::try_fill_bytes) fails.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # #[cfg(all(feature = "alloc", feature = "rand"))]
-    /// # {
-    /// use rand::rngs::StdRng;
-    /// use rand::SeedableRng;
-    /// use secure_gate::Dynamic;
-    ///
-    /// let mut rng = StdRng::from_seed([9u8; 32]);
-    /// let nonce: Dynamic<Vec<u8>> = Dynamic::from_rng(24, &mut rng).expect("rng fill");
-    /// # }
-    /// ```
-    #[inline]
-    pub fn from_rng<R: TryRngCore + TryCryptoRng>(
-        len: usize,
-        rng: &mut R,
-    ) -> Result<Self, R::Error> {
-        // This body was the captured-local workaround `try_new_with` exists to retire:
-        // `new_with` could not report failure, so the error was written to a local and
-        // checked afterwards. One expression now — and one observable behaviour change,
-        // not none.
-        //
-        // The old body was `Vec::new()` followed by `v.resize(len, 0u8)`, and `resize`
-        // grows through `RawVec::grow_amortized`, which floors capacity at
-        // `MIN_NON_ZERO_CAP` — 8 for one-byte elements. So `from_rng(4, ..)` used to return
-        // a buffer of length 4 with capacity 8, while `alloc::vec![0u8; len]` allocates the
-        // exact size and returns capacity 4. That is visible through
-        // `with_secret(Vec::capacity)`, which this crate's tests read directly, and it
-        // tightens the `io::Write` impl's spare-room branch
-        // (`buf.len() > v.capacity() - v.len()`): a short random secret no longer carries
-        // up to four free bytes that could absorb a small write without growing. Holding no
-        // slack is the whole point of the new constructor, so the change stays — it is just
-        // not behaviour-neutral, and any capacity expectation on this line below 8 has to be
-        // re-read against the exact size rather than assumed to have carried over.
-        //
-        // Everything else is unchanged: same `R::Error`, same wipe-on-`Err` (the
-        // `Zeroizing` drops on the way out), same allocation count. The bound stays
-        // `TryRngCore + TryCryptoRng`, as does `rngs::OsRng` in `from_random` above: this
-        // line is pinned to `rand` 0.9, where those are the names. `TryRng` / `SysRng` —
-        // what the 0.9 crate line writes — are rand-0.10-isms and do not compile here.
-        Self::try_new_with(len, |slot| rng.try_fill_bytes(slot))
     }
 }
 
@@ -1233,6 +1243,12 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// for a fill that can fail) writes straight into the wrapper's own pre-zeroed slot,
     /// so there is no separate buffer for a visitor to accumulate into and abandon unwiped.
     ///
+    /// The same holds when deserialization succeeds. A visitor that grows its `Vec<u8>`
+    /// frees each outgrown buffer unwiped before this function ever sees the value:
+    /// measured with `serde_json`, a 1008-byte secret read from a JSON array leaves 5
+    /// freed blocks holding 992 of its bytes. Those buffers are the deserializer's, not
+    /// the wrapper's; see `SECURITY.md`, "Feature Security Implications".
+    ///
     /// **Important:** this limit is enforced *after* the upstream deserializer has fully
     /// materialized the payload. It is a **result-length acceptance bound**, not a
     /// pre-allocation DoS guard. For untrusted input, enforce size limits at the
@@ -1281,6 +1297,11 @@ impl Dynamic<String> {
     /// into. Size a `String` to its exact final length yourself (`String::with_capacity`,
     /// filled without triggering a reallocation) and move it in with
     /// [`Dynamic::new`](Dynamic::new), which moves the buffer rather than copying it.
+    ///
+    /// The same holds when deserialization succeeds: buffers the deserializer grew
+    /// through are its own and are freed unwiped. Whether there are any depends on the
+    /// format and on how the input is read; see `SECURITY.md`, "Feature Security
+    /// Implications".
     ///
     /// **Important:** this limit is enforced *after* the upstream deserializer has fully
     /// materialized the payload. It is a **result-length acceptance bound**, not a

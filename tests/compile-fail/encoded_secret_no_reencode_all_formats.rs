@@ -18,11 +18,12 @@ fn main() {
     // Every trait above is in scope and works for a byte-shaped source. Exercising
     // them here keeps the imports used: a method call that fails to resolve does not
     // count as a use, and CI builds with `-D warnings`, which would turn the resulting
-    // `unused_imports` into an error inside this test's .stderr snapshot.
+    // `unused_imports` into an error inside this test's .stderr snapshot on this
+    // branch's 1.70 toolchain.
     let _ = key.to_base32();
     let _ = key.to_base64url();
-    let _ = key.try_to_bech32("bc");
-    let _ = key.try_to_bech32m("bc");
+    let _ = key.try_to_bech32("bc", secure_gate::Case::Lower);
+    let _ = key.try_to_bech32m("bc", secure_gate::Case::Lower);
 
     // None of these may compile: each would encode the hex text, not the key.
     let _b32 = encoded.to_base32();

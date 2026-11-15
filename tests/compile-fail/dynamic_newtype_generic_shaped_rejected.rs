@@ -3,8 +3,8 @@
 //! Both take a payload the crate already knows how to handle and then withhold
 //! the methods that handle it. The `generic` arm emits only the
 //! shape-independent surface, so `SecretLen`, `From`, `new_with`, the encoders
-//! and -- for `Vec<u8>` under `std` -- the `io::Write` impl that wipes the
-//! buffer it abandons are all absent. Same growable payload, strictly less API.
+//! and — for `Vec<u8>` under `std` — the `io::Write` impl that wipes the buffer
+//! it abandons are all absent. Same growable payload, strictly less API.
 //!
 //! That is the distinction from `dynamic_newtype_alias_rejected.rs`: an alias
 //! is a spelling the macro *cannot see through*, so it falls through to the

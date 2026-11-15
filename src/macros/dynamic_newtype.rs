@@ -1,8 +1,8 @@
 //! `dynamic_newtype!` — nominal newtype over `Dynamic<T>`.
 //!
-//! Ships in 0.9.0; backported to the 0.8 line in 0.8.0-rc.11. Design record:
-//! [`docs/design/nominal_newtypes.md`](https://github.com/Slurp9187/secure-gate/blob/main/docs/design/nominal_newtypes.md) — a repository file, not part of the
-//! published crate, so this is a link and not a path. It describes `main`.
+//! Ships in 0.9.0. Design record:
+//! [`docs/nominal_newtypes.md`](https://github.com/Slurp9187/secure-gate/blob/main/docs/design/nominal_newtypes.md) — a repository file, not part of the
+//! published crate, so this is a link and not a path.
 
 /// Creates a distinct nominal type wrapping [`Dynamic<T>`](crate::Dynamic).
 ///
@@ -30,10 +30,10 @@
 ///
 /// **`ConstantTimeEq` is not an option on the `String` and `Vec<u8>` arms, and
 /// naming it is an error.** Both wrappers implement it whenever the `ct-eq` feature
-/// is on, so a plain `type Name = Dynamic<String>;` always had
-/// [`ct_eq`](crate::ConstantTimeEq::ct_eq) and the newtype — the spelling this crate
-/// recommends as the safer of the two — did not. Since these arms now emit the impl
-/// themselves, a second one from the `derive:` list is `E0119: conflicting
+/// is on, so a plain `type Name = Dynamic<String>;` has
+/// [`ct_eq`](crate::ConstantTimeEq::ct_eq), and the newtype — the spelling this crate
+/// recommends as the safer of the two — should not cost a token more. Since these arms
+/// emit the impl themselves, a second one from the `derive:` list is `E0119: conflicting
 /// implementations` — delete the token. It stays a real opt-in on the `generic` arm,
 /// where the inner type may or may not implement the trait.
 ///
@@ -45,7 +45,7 @@
 ///
 /// That argument is matched as `$doc:literal`, so it accepts a single string
 /// literal and nothing else. `concat!("a ", "b")` is a macro call, not a
-/// literal, and will not match â€” nor will a `const`, or pieces joined together
+/// literal, and will not match — nor will a `const`, or pieces joined together
 /// at compile time.
 ///
 /// **The error you get is misleading.** When the doc argument fails to match,
@@ -55,8 +55,8 @@
 /// failed. If you see that message on a call whose inner type is plainly
 /// `String` or `Vec<u8>`, look at the doc argument first.
 ///
-/// For anything longer than one literal â€” multiple paragraphs, generated text,
-/// `#[doc = ...]` â€” put ordinary attributes before the name instead. The macro
+/// For anything longer than one literal — multiple paragraphs, generated text,
+/// `#[doc = ...]` — put ordinary attributes before the name instead. The macro
 /// accepts `$(#[$attr:meta])*` there, so normal `///` comments work and are the
 /// better style for real prose:
 ///
@@ -103,7 +103,7 @@
 ///
 /// `generic` is **not** a way to get past that error. `generic Vec<u8>` and
 /// `generic String` are themselves a compile error, because each is the same
-/// growable payload as the shaped arm with strictly less API -- for `Vec<u8>`,
+/// growable payload as the shaped arm with strictly less API — for `Vec<u8>`,
 /// no `io::Write`, which is the only growth path that wipes the buffer it
 /// abandons. Delete the word and the safe surface comes with it.
 ///
@@ -111,8 +111,8 @@
 /// not on the type: `generic MyBytes` and `generic alloc::vec::Vec<u8>` are
 /// different token sequences and still land on the reduced arm, carrying a
 /// growable payload with no safe way to grow it. The macro cannot see through
-/// an alias or a path -- that is the same limitation as above, not a separate
-/// one -- and a token deny-list does not become type-level by getting longer.
+/// an alias or a path — that is the same limitation as above, not a separate
+/// one — and a token deny-list does not become type-level by getting longer.
 /// If the inner type is a `String` or a `Vec<u8>` under any spelling, write the
 /// literal token.
 ///
@@ -142,16 +142,17 @@
 /// own `len()`, not the answer. Writing the marker is how you say you know
 /// that.
 ///
-/// It also has no `new_with`, which the `Vec<u8>` arm does get, and the reason is
-/// sharper than it used to be. [`fixed_newtype!`](crate::fixed_newtype)'s generic arm
+/// It also has no `new_with`, which the `Vec<u8>` arm does get.
+/// [`fixed_newtype!`](crate::fixed_newtype)'s generic arm
 /// *does* forward [`Fixed::new_with`](crate::Fixed::new_with), because that constructor
-/// is generic over any `T: SentinelValue` — it hands the closure the inner value itself.
+/// is generic over any `T: FixedStorage + SentinelValue` — it hands the closure the inner value itself.
 /// `Dynamic::new_with` hands a sized **byte slot**, `FnOnce(&mut [u8])`, which is what
 /// makes growth inexpressible and the reallocation hazard impossible. A byte slot is
 /// meaningless for an arbitrary inner type, so there is nothing here to forward. `new`
-/// takes its value by value; build it as close to the call as you can.
+/// takes its value by value — and *moves* the allocation rather than copying it, so
+/// build it pre-sized and as close to the call as you can.
 ///
-/// The `String` arm has no `new_with` either, as of 0.9.0-rc.12, and cannot: a `String`
+/// The `String` arm has no `new_with` either, and cannot: a `String`
 /// must hold valid UTF-8 and characters have variable byte widths, so a fixed byte
 /// window is not somewhere arbitrary text can be written.
 ///
@@ -174,7 +175,7 @@
 /// legitimate value to hold before validation — so there is nothing for a
 /// compile-time check to decide. That leaves one real gap: a statically
 /// zero-sized inner type. `Dynamic<Zst>` for a zero-sized `Zst` constructs
-/// happily, where `Fixed<Zst>` is now rejected. Validate expected lengths in
+/// happily, where `Fixed<Zst>` is rejected. Validate expected lengths in
 /// your own tests, and do not reach for a zero-sized inner type expecting to be
 /// stopped.
 ///
@@ -253,19 +254,19 @@ macro_rules! dynamic_newtype {
     // ---- `generic` applied to a shape that has its own arm: rejected ----
     //
     // `generic Vec<u8>` and `generic String` are strictly dominated spellings,
-    // but not for the same reason -- the two shaped arms no longer offer the
+    // but not for the same reason — the two shaped arms no longer offer the
     // same growth story, so what each `generic` spelling gives up differs too.
     //
     // `generic Vec<u8>` takes a payload this crate already knows how to grow
     // safely and then withholds the method that does it: the `generic` arm
     // emits only `__sg_newtype_base!` plus a constructor, so the shaped arm's
-    // `SecretLen`, `From`, `new_with`, `try_new_with`, encoders, and -- under
-    // `std` -- the `io::Write` impl that wipes the buffer it abandons, are all
+    // `SecretLen`, `From`, `new_with`, `try_new_with`, encoders, and — under
+    // `std` — the `io::Write` impl that wipes the buffer it abandons, are all
     // absent. Same payload, strictly less API, and no reason to write it.
     //
     // `generic String` is dominated for a narrower reason, because there is
     // less for it to withhold: the shaped `String` arm has no `new_with` of
-    // its own, as of 0.9.0-rc.12, and cannot -- a `String` must hold valid
+    // its own, as of 0.9.0-rc.12, and cannot — a `String` must hold valid
     // UTF-8 and characters have variable byte widths, so there is no sized
     // byte slot that arbitrary text can be written into. What the `generic`
     // arm withholds is `SecretLen` and `From<&str>` only. The crate has no
@@ -346,6 +347,7 @@ macro_rules! dynamic_newtype {
             #[inline]
             fn from(s: &str) -> Self { Self(<$crate::Dynamic<$crate::__private::String>>::from(s)) }
         }
+
     };
 
     // ---- Vec<u8> arm ----
@@ -364,6 +366,7 @@ macro_rules! dynamic_newtype {
             #[inline]
             fn from(s: &[u8]) -> Self { Self(<$crate::Dynamic<$crate::__private::Vec<u8>>>::from(s)) }
         }
+
         impl $name {
             /// Writes into a sized, pre-zeroed slot inside the wrapper's own storage.
             /// Growth is not expressible, so no reallocation can abandon the secret.
@@ -389,17 +392,6 @@ macro_rules! dynamic_newtype {
                 /// Generates `len` random bytes from the system RNG.
                 #[inline]
                 pub fn from_random(len: usize) -> Self { Self(<$crate::Dynamic<$crate::__private::Vec<u8>>>::from_random(len)) }
-
-                /// Generates `len` bytes from a caller-supplied CSPRNG.
-                #[inline]
-                pub fn from_rng<R>(len: usize, rng: &mut R) -> ::core::result::Result<Self, R::Error>
-                where
-                    R: $crate::__private::TryRngCore + $crate::__private::TryCryptoRng,
-                {
-                    ::core::result::Result::Ok(Self(
-                        <$crate::Dynamic<$crate::__private::Vec<u8>>>::from_rng(len, rng)?,
-                    ))
-                }
             }
         }
 
@@ -604,7 +596,7 @@ macro_rules! dynamic_newtype {
         $crate::__sg_dynamic_ctor!($name, $inner);
     };
 
-    // ---- catch-all: unrecognised inner type ----
+    // ---- catch-all: unrecognized inner type ----
     //
     // Uses `$($rest:tt)+` rather than `$inner:ty` so it can never itself
     // hard-error on a malformed tail; the message names what was written.
@@ -616,7 +608,7 @@ macro_rules! dynamic_newtype {
              matched as literal tokens, so a type alias (e.g. `type MyStr = String`) \
              or a fully-qualified path (e.g. `alloc::vec::Vec<u8>`) does NOT match \
              them. If what you wrote IS a `String` or a `Vec<u8>` under another \
-             spelling, write the literal token to get the full API for that shape -- \
+             spelling, write the literal token to get the full API for that shape — \
              do NOT reach for `generic` to silence this, because the macro cannot \
              see through a path or an alias either, and you would land on the \
              reduced arm with the growable payload and none of the methods that \

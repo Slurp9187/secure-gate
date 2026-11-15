@@ -6,6 +6,12 @@
 //
 // To regenerate .stderr files after a toolchain upgrade:
 //   TRYBUILD=overwrite cargo test compile_fail
+//
+// The snapshots are pinned to this branch's toolchain, rustc 1.70 (rust-toolchain.toml):
+//   cargo +1.70 test -p secure-gate --all-features --test compile_fail_tests
+// On 1.70, fixed_zero_size.stderr records a src/fixed.rs line number, so moving the
+// `NON_ZERO_SIZED` assertion moves that snapshot. Stable rustc words diagnostics
+// differently, which is why the stable CI jobs skip these tests.
 
 // Compile-fail test: a zero-sized secret cannot be constructed. The guard is a `const`
 // assertion in `Fixed::new`, `Fixed::new_with` and `Fixed::try_new_with` — the three
@@ -194,6 +200,20 @@ fn custom_inner_no_len_compile_fail() {
 fn newtype_derive_clone_rejected_compile_fail() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/newtype_derive_clone_rejected.rs");
+}
+
+// The other route to the same refusal: `#[derive(Clone)]` through the
+// `$(#[$attr:meta])*` slot, which the `derive: [Clone]` guard cannot see because
+// a `:meta` fragment is opaque once captured. The gate always held; what this
+// pins is the explanation, which only exists because `CloneableSecret` carries
+// `#[diagnostic::on_unimplemented]`. Needs the feature: with `cloneable` off the
+// trait does not exist and the error is a bare `Fixed<[u8; 32]>: Clone`.
+#[cfg(feature = "cloneable")]
+#[cfg(not(miri))]
+#[test]
+fn newtype_derive_clone_attr_slot_compile_fail() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/newtype_derive_clone_attr_slot.rs");
 }
 
 #[cfg(not(miri))]
