@@ -18,11 +18,20 @@ R=docs/design/receipts/sealed-stack-residue
 git apply "$R/probe_hooks.patch"
 cp "$R"/probe_*.rs tests/
 
-run() { # $1 = label, rest = cargo test profile flags
+run() { # $1 = label, rest = cargo test profile flags. Prints the probe's "hits=" lines.
   local label=$1; shift
+  local log
+  log=$(mktemp)
   echo "== $label" >&2
-  cargo test -q "$@" --features sealed --test probe_stack --test probe_panic \
-    -- --nocapture --test-threads=1 2>&1 | grep -E 'hits=' | tee /dev/stderr
+  if ! cargo test -q "$@" --features sealed --test probe_stack --test probe_panic \
+    -- --nocapture --test-threads=1 >"$log" 2>&1; then
+    cat "$log" >&2
+    echo "::error::$label: the probe did not build or run (full output above)" >&2
+    rm -f "$log"
+    return 1
+  fi
+  grep -E 'hits=' "$log" | tee /dev/stderr
+  rm -f "$log"
 }
 
 PY=$(command -v python3 || command -v python)
