@@ -30,7 +30,7 @@
 //! there is no `Deref` and no `AsRef`: callers reach the inner secret only via
 //! [`RevealSecret`] / [`RevealSecretMut`], and `Debug` on a wrapper always prints
 //! `[REDACTED]`. [`SlotWriter`], which borrows a wrapper's storage rather than holding it,
-//! prints its cursor instead — position, remaining, length — and never the bytes.
+//! prints `[REDACTED]` too.
 //! Access has two shapes: **borrow** it, or **take** it.
 //! [`with_secret()`](RevealSecret::with_secret) and
 //! [`expose_secret()`](RevealSecret::expose_secret) lend you a reference while the
@@ -151,7 +151,7 @@
 //! |----------|-------|-------------------|---------|
 //! | **Secret wrappers** | [`Fixed<T>`], [`Dynamic<T>`] | No — use [`RevealSecret`] | Hold live secrets; `Debug` → `[REDACTED]` |
 //! | **Output wrapper** | [`EncodedSecret`] | Yes — yields `&str`; copies you make are yours, the buffer stays the wrapper's | Holds encoded output, wiped on drop |
-//! | **Borrowed slot cursor** | [`SlotWriter`] | No — it writes, it does not read out | Appends into a slot a sized `new_with` handed out; `Debug` → cursor state only, never bytes |
+//! | **Borrowed slot cursor** | [`SlotWriter`] | No — it writes, it does not read out | Appends into a slot a sized `new_with` handed out; `Debug` → `[REDACTED]` |
 //! | **Opt-in markers** | [`CloneableSecret`], [`SerializableSecret`] | — (no methods) | Implement on inner type `T` to unlock gated impls |
 //!
 //! `CloneableSecret` and `SerializableSecret` are implemented on the **inner type `T`**,
@@ -445,7 +445,8 @@ pub use dynamic::DynamicReader;
 /// writing offsets by hand. [`push_slice`](SlotWriter::push_slice) panics on overrun and
 /// leaves the slot untouched; the `std`-gated [`Write`](std::io::Write) path cannot do that
 /// and stay inside `Write`'s contract, so it truncates and reports the refusal on a later
-/// call. `Debug` shows the cursor — position, remaining, length — and never the bytes.
+/// call. `Debug` prints `[REDACTED]`; the cursor is read through
+/// [`position`](SlotWriter::position) and [`remaining`](SlotWriter::remaining).
 pub use slot_writer::SlotWriter;
 
 #[cfg(all(feature = "alloc", feature = "serde-deserialize"))]

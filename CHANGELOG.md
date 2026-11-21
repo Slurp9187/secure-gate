@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.1] - Unreleased
 
-Additions and fixes only; nothing public is removed or changed. These come from a
+Additions and fixes only: no public item is removed and no signature changes. One
+`Debug` output changes (`SlotWriter`, under Changed). These come from a
 consistency review of the 0.9.0 API, which looked for places where the `sealed` types differ from the rest of the
 crate without saying so.
 
@@ -29,6 +30,14 @@ crate without saying so.
   key is generated and sealed without existing as a plain role in between.
   `sealed_dynamic_newtype!` deliberately has none: the macro sees only the role's name,
   not whether it holds a `String`, for which random bytes make no sense.
+
+### Changed
+- **`SlotWriter`'s `Debug` prints `[REDACTED]`.** It printed
+  `SlotWriter { position: 6, remaining: 2, len: 8 }`: never a byte, but `len` is the
+  secret's length and `position` how much of it is written, and it was the one `Debug`
+  in the crate that showed a secret's length. Code that needs the cursor reads it by name
+  through `position()`, `remaining()` and `is_full()`, which are unchanged. Nothing stops
+  compiling; a test that compared the old text needs updating.
 
 ### Fixed
 - **With the `sealed` feature on, a role could be entered and left without its derive.**

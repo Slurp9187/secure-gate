@@ -199,49 +199,31 @@ fn zero_length_slot_panics_on_push_byte() {
 // `SlotWriter` borrows the live secret buffer for the duration of `new_with`, so a naive
 // `#[derive(Debug)]` over `slot: &mut [u8]` prints the bytes themselves -- the whole secret,
 // in plaintext, into whatever the caller passes the formatted value to (a log line, a panic
-// message, an assertion failure from a test harness). `Debug` must instead redact the slot
-// while still reporting the cursor state (`pos` / how much is written vs. remaining), since
-// that state is what makes the output useful for debugging a length mismatch without ever
-// being useful for recovering the secret.
+// message, an assertion failure from a test harness). `Debug` prints `[REDACTED]`, as the
+// wrappers do. Through 0.9.0 it also printed the cursor (position, remaining, length); that
+// was the one place in the crate where `Debug` gave away a secret's length, so 0.9.1
+// removed it. The cursor is still read by name.
 
 #[test]
-fn debug_redacts_slot_bytes_but_reports_cursor_state() {
-    // A recognizable, non-zero payload -- if any of these four bytes show up in the
-    // formatted output, in either decimal or hex, the Debug impl is leaking the secret.
+fn debug_is_redacted_and_carries_no_byte_and_no_length() {
     let mut buf = [0u8; 6];
     let mut w = SlotWriter::new(&mut buf);
     w.push_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
+
+    assert_eq!(format!("{w:?}"), "[REDACTED]");
+    assert_eq!(format!("{w:#?}"), "[REDACTED]");
+
+    // Exact equality above already rules out every digit; this states the reason.
+    let out = format!("{w:?}");
+    assert!(
+        !out.chars().any(|c| c.is_ascii_digit()),
+        "Debug output carries a number (a byte, the position or the length): {out}"
+    );
+
+    // The cursor is not gone, only no longer printed unasked.
     assert_eq!(w.position(), 4);
     assert_eq!(w.remaining(), 2);
-
-    let out = format!("{w:?}");
-
-    // Decimal renderings of the four bytes: 0xDE=222, 0xAD=173, 0xBE=190, 0xEF=239.
-    for decimal in ["222", "173", "190", "239"] {
-        assert!(
-            !out.contains(decimal),
-            "Debug output leaks a secret byte as decimal {decimal}: {out}"
-        );
-    }
-    // Hex renderings, upper- and lower-case, with no assumption of a `0x` prefix.
-    for hex in ["de", "DE", "ad", "AD", "be", "BE", "ef", "EF"] {
-        assert!(
-            !out.contains(hex),
-            "Debug output leaks a secret byte as hex {hex}: {out}"
-        );
-    }
-
-    // The cursor state is not secret and must still be legible: 4 bytes written, 2
-    // remaining. These numbers do not collide with any of the excluded byte renderings
-    // above, so their presence here is a positive signal, not a coincidence.
-    assert!(
-        out.contains(&w.position().to_string()),
-        "Debug output should report the position (4): {out}"
-    );
-    assert!(
-        out.contains(&w.remaining().to_string()),
-        "Debug output should report what remains (2): {out}"
-    );
+    assert!(!w.is_full());
 }
 
 // === io::Write (std) ===
