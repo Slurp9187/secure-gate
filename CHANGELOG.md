@@ -31,6 +31,17 @@ crate without saying so.
   `sealed_dynamic_newtype!` deliberately has none: the macro sees only the role's name,
   not whether it holds a `String`, for which random bytes make no sense.
 
+- **`SecretLen` and serde `Deserialize` for `Dynamic<[u8]>`** (#267), the boxed slice that
+  cannot grow. `len()`, `is_empty()` and `byte_len()` work as on `Dynamic<Vec<u8>>`, also
+  for `Dynamic<[T]>`. `Deserialize` and `Dynamic::<[u8]>::deserialize_with_limit` read as
+  the `Vec<u8>` ones do and finish with one copy into a slice of exactly the secret's
+  length. The rest of #267 is **not** here, because it turned out not to be additive: a
+  second `Dynamic::new_with` / `from_random` / `try_from_hex` makes
+  `let k: Dynamic<Vec<u8>> = Dynamic::from_random(32)` ambiguous, and a second `ToHex` impl
+  does the same to `Dynamic::new(vec).to_hex()`. Both stop code that compiles on 0.9.0.
+  They wait for a breaking release. Serde `Serialize` was never missing: it needs
+  `SerializableSecret` on an inner type you own, as it does for `Dynamic<Vec<u8>>`.
+
 ### Changed
 - **`SlotWriter`'s `Debug` prints `[REDACTED]`.** It printed
   `SlotWriter { position: 6, remaining: 2, len: 8 }`: never a byte, but `len` is the
@@ -40,6 +51,24 @@ crate without saying so.
   compiling; a test that compared the old text needs updating.
 
 ### Fixed
+- **Deserializing a `Dynamic` no longer goes through an unprotected copy** (#249).
+  `Dynamic<Vec<u8>>` and `Dynamic<String>` let serde build a plain `Vec<u8>` or `String`
+  and wrapped it afterwards. A byte sequence grew that plain `Vec`, and every buffer it
+  outgrew was freed with the secret in it: a 1008-byte secret from a JSON array left 5
+  freed blocks holding 992 of its bytes. The bytes are now read into a buffer this crate
+  wipes from the first one, growth is done by hand (allocate, copy, wipe the old buffer),
+  and a secret refused partway, for its length or because the input is malformed, is wiped
+  too. Text the deserializer lends is copied once into a buffer of exactly its length;
+  text it gives away is taken over. Generated `dynamic_newtype!` types get this through
+  the wrapper they hold. What is accepted is unchanged: the same serde entry points
+  (`deserialize_seq`, `deserialize_string`) and the same error for an over-long secret.
+  One difference: an over-long byte sequence is now refused at the first byte past the
+  limit instead of after it has all been read, so the limit bounds what this crate
+  allocates. **Where it stops:** at the deserializer. What it buffers before handing a
+  byte or a string over is its own; for text with escapes, `serde_json`'s scratch buffer
+  still grows as a plain `Vec` and is freed unwiped. `tests/heap_zeroize.rs` gates on the
+  outgrown, rejected and cut-short buffers; the growth and take-over checks were each run
+  with the wipe removed and fail.
 - **With the `sealed` feature on, a role could be entered and left without its derive.**
   `fixed_newtype!` and `dynamic_newtype!` promise that a value becomes a role, or stops
   being one, only through `derive: [FromWrapper]` / `[IntoWrapper]`. To let the sealed

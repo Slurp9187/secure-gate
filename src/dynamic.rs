@@ -135,18 +135,27 @@ use rand::{TryRng, rngs::SysRng};
 ///   through `Box<[u8]>::from(Vec)`, which shrinks a `Vec` with excess capacity into a
 ///   newly allocated buffer and frees the old one unwiped. `vec![0u8; len]` is already
 ///   exact; a `Vec` that was grown or truncated is not.
-/// - **It is the narrowest `Dynamic` shape.** Scoped access, [`Debug`](core::fmt::Debug)
-///   redaction, zeroize-on-drop and `ct_eq` (with `ct-eq`) work. `SecretLen::len`,
-///   `new_with`, `from_random`, `into_inner`, the encoding traits, serde and `Clone` are
-///   not implemented for it; read the length with `with_secret(|s| s.len())`.
+/// - **What it has.** Scoped access, [`Debug`](core::fmt::Debug) redaction,
+///   zeroize-on-drop, `ct_eq` (with `ct-eq`), and since 0.9.1
+///   [`SecretLen`](crate::SecretLen) and serde `Deserialize` with the same limit as
+///   `Dynamic<Vec<u8>>`.
+/// - **What it does not have.** `new_with`, `from_random`, the `try_from_*` decoders and
+///   the encoding traits are not implemented for it. They cannot be added in 0.9.x: a
+///   second `Dynamic::from_random` makes `let k: Dynamic<Vec<u8>> = Dynamic::from_random(32)`
+///   ambiguous, and a second `ToHex` impl does the same to `Dynamic::new(vec).to_hex()`,
+///   so code that compiles today would stop compiling. Encode with
+///   `with_secret(|b| b.to_hex())`. `into_inner` and `Clone` are not implemented either.
+///   Serde `Serialize` is unavailable for the reason it is unavailable for
+///   `Dynamic<Vec<u8>>`: the opt-in marker [`SerializableSecret`](crate::SerializableSecret)
+///   goes on an inner type you own, and `[u8]` is not yours to mark.
 ///
 /// ```
-/// use secure_gate::{Dynamic, RevealSecret, RevealSecretMut};
+/// use secure_gate::{Dynamic, RevealSecret, RevealSecretMut, SecretLen};
 ///
 /// let len = 32; // known only at runtime
 /// let mut key: Dynamic<[u8]> = Dynamic::new(vec![0u8; len]); // exact capacity: no shrink
-/// key.with_secret_mut(|k: &mut [u8]| k.fill(0x42)); // `&mut [u8]` — cannot grow
-/// assert_eq!(key.with_secret(|k| k.len()), 32);
+/// key.with_secret_mut(|k: &mut [u8]| k.fill(0x42)); // `&mut [u8]` cannot grow
+/// assert_eq!(key.len(), 32);
 /// ```
 ///
 /// # Construction
@@ -961,6 +970,21 @@ impl<T: ?Sized + zeroize::Zeroize> crate::RevealSecretMut for Dynamic<T> {
     }
 }
 
+#[cfg(feature = "serde-deserialize")]
+impl Dynamic<[u8]> {
+    /// Copies `bytes` into a slice of exactly their length, built inside the wrapper.
+    /// `vec![0u8; len]` has capacity equal to its length, so `into_boxed_slice` keeps the
+    /// allocation instead of copying it. The source stays the caller's to wipe.
+    #[inline(always)]
+    fn copy_of(bytes: &[u8]) -> Self {
+        let mut this = Self {
+            inner: alloc::vec![0u8; bytes.len()].into_boxed_slice(),
+        };
+        this.inner.copy_from_slice(bytes);
+        this
+    }
+}
+
 // Random generation
 #[cfg(feature = "rand")]
 impl Dynamic<alloc::vec::Vec<u8>> {
@@ -1214,16 +1238,16 @@ impl<T: zeroize::Zeroize + crate::SerializableSecret> serde::Serialize for Dynam
 
 // Deserialize
 
-/// Default maximum byte length accepted when deserializing `Dynamic<Vec<u8>>` or
-/// `Dynamic<String>` via the standard `serde::Deserialize` impl (1 MiB).
+/// Default maximum byte length accepted when deserializing `Dynamic<Vec<u8>>`,
+/// `Dynamic<[u8]>` or `Dynamic<String>` via the standard `serde::Deserialize` impl (1 MiB).
 ///
 /// Pass a custom value to [`Dynamic::deserialize_with_limit`] when a different
 /// ceiling is required.
 ///
-/// **Important:** this limit is enforced *after* the upstream deserializer has fully
-/// materialized the payload. It is a **result-length acceptance bound**, not a
-/// pre-allocation DoS guard. For untrusted input, enforce size limits at the
-/// transport or parser layer upstream.
+/// **Important:** the limit bounds what this crate holds: a byte sequence is rejected at
+/// the first byte past it, and text before it is copied. It does not bound what the
+/// deserializer or the transport has already read into memory. For untrusted input,
+/// enforce size limits at the transport or parser layer upstream as well.
 #[cfg(feature = "serde-deserialize")]
 pub const MAX_DESERIALIZE_BYTES: usize = 1_048_576;
 
@@ -1234,49 +1258,34 @@ impl Dynamic<alloc::vec::Vec<u8>> {
     /// The standard [`serde::Deserialize`] impl calls this with [`MAX_DESERIALIZE_BYTES`].
     /// Use this method directly when you need a tighter or looser ceiling.
     ///
-    /// **Zeroization scope.** Once the upstream deserializer returns a complete
-    /// `Vec<u8>`, the value is wrapped in `Zeroizing` and stays protected for the
-    /// rest of this function: oversized buffers are zeroized before the error is
-    /// returned, and an OOM panic in the subsequent `Box` allocation triggers
-    /// zeroization on unwind. **However, this guarantee does *not* extend backwards
-    /// into the deserializer itself.** If the upstream `Vec<u8>` visitor accumulates
-    /// bytes element-by-element (e.g., a JSON sequence) and fails partway through,
-    /// the partial buffer is owned by the visitor and dropped as a plain `Vec<u8>` —
-    /// not zeroized. In the typical untrusted-input threat model the partial bytes
-    /// are attacker-controlled (the malformed payload they sent), so the practical
-    /// disclosure surface is bounded; but if your threat model includes deserialization
-    /// of trusted-but-corruptible secret material, treat the deserialize step as
-    /// outside the zeroization boundary and build in-process instead:
-    /// [`new_with(len, …)`](Dynamic::new_with) (or [`try_new_with`](Dynamic::try_new_with)
-    /// for a fill that can fail) writes straight into the wrapper's own pre-zeroed slot,
-    /// so there is no separate buffer for a visitor to accumulate into and abandon unwiped.
+    /// **Zeroization scope.** The bytes are read straight into a buffer this crate wipes;
+    /// no plain `Vec<u8>` exists in between (since 0.9.1, #249). That buffer is wiped when
+    /// the input is rejected partway, when it exceeds `limit`, and each time it is
+    /// outgrown: growth is done by hand (allocate, copy, wipe the old buffer), because
+    /// `Vec`'s own growth frees the old block as it is. Through 0.9.0 the value was built
+    /// by `Vec<u8>`'s own impl first, which left a 1008-byte secret read from a JSON array
+    /// in 5 freed blocks holding 992 of its bytes; `tests/heap_zeroize.rs` now gates on
+    /// those blocks being zero.
     ///
-    /// The same holds when deserialization succeeds. A visitor that grows its `Vec<u8>`
-    /// frees each outgrown buffer unwiped before this function ever sees the value:
-    /// measured with `serde_json`, a 1008-byte secret read from a JSON array leaves 5
-    /// freed blocks holding 992 of its bytes. Those buffers are the deserializer's, not
-    /// the wrapper's; see `SECURITY.md`, "Feature Security Implications".
+    /// **Where it stops:** at the deserializer. Whatever it buffers before handing a byte
+    /// over is its own, and so is the input it reads from. See `SECURITY.md`, "Feature
+    /// Security Implications".
     ///
-    /// **Important:** this limit is enforced *after* the upstream deserializer has fully
-    /// materialized the payload. It is a **result-length acceptance bound**, not a
-    /// pre-allocation DoS guard. For untrusted input, enforce size limits at the
-    /// transport or parser layer upstream.
+    /// **The limit** is checked as each byte arrives, so this crate never holds more than
+    /// `limit` bytes of an over-long secret, and stops reading at the first byte past it.
+    /// It bounds what this crate allocates, not what the deserializer or the transport
+    /// already has in memory: for untrusted input, cap the size upstream as well.
+    ///
+    /// Accepts what `Vec<u8>` accepts: a sequence of bytes, asked for with
+    /// `deserialize_seq`.
     pub fn deserialize_with_limit<'de, D>(deserializer: D, limit: usize) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let mut buf: zeroize::Zeroizing<alloc::vec::Vec<u8>> =
-            zeroize::Zeroizing::new(serde::Deserialize::deserialize(deserializer)?);
-        if buf.len() > limit {
-            // buf drops here → Zeroizing zeros the oversized buffer before deallocation
-            return Err(serde::de::Error::custom(
-                "deserialized secret exceeds maximum size",
-            ));
-        }
-        // Only fallible allocation; protected stays live across it for panic-safety
-        let mut boxed = Box::<alloc::vec::Vec<u8>>::default();
-        core::mem::swap(&mut *boxed, &mut *buf);
-        Ok(Self::from(boxed))
+        // `deserialize_seq`, as `Vec<u8>`'s own impl asks, so every format accepts and
+        // rejects exactly what it did; only the buffer being filled is different.
+        let buf = deserializer.deserialize_seq(crate::secret_visitor::BytesVisitor { limit })?;
+        Ok(Self::from_protected_bytes(buf))
     }
 }
 
@@ -1287,46 +1296,34 @@ impl Dynamic<String> {
     /// The standard [`serde::Deserialize`] impl calls this with [`MAX_DESERIALIZE_BYTES`].
     /// Use this method directly when you need a tighter or looser ceiling.
     ///
-    /// **Zeroization scope.** Once the upstream deserializer returns a complete
-    /// `String`, the value is wrapped in `Zeroizing` and stays protected for the
-    /// rest of this function: oversized buffers are zeroized before the error is
-    /// returned, and an OOM panic in the subsequent `Box` allocation triggers
-    /// zeroization on unwind. **However, this guarantee does *not* extend backwards
-    /// into the deserializer itself.** If the upstream `String` visitor accumulates
-    /// characters and fails partway through (e.g., on an invalid UTF-8 boundary),
-    /// the partial buffer is owned by the visitor and dropped as a plain `String` —
-    /// not zeroized. In the typical untrusted-input threat model the partial bytes
-    /// are attacker-controlled (the malformed payload they sent), so the practical
-    /// disclosure surface is bounded; but if your threat model includes deserialization
-    /// of trusted-but-corruptible secret material, treat the deserialize step as
-    /// outside the zeroization boundary and build in-process instead. `String` has no
-    /// sized-slot constructor of its own — it must hold valid UTF-8 and characters are
-    /// variable-width, so there is no fixed byte window arbitrary text can be written
-    /// into. Size a `String` to its exact final length yourself (`String::with_capacity`,
-    /// filled without triggering a reallocation) and move it in with
-    /// [`Dynamic::new`](Dynamic::new), which moves the buffer rather than copying it.
+    /// **Zeroization scope.** No plain `String` exists in between (since 0.9.1, #249).
+    /// Text the deserializer lends (`visit_str`) is checked against `limit` and then
+    /// copied once, into a buffer of exactly its length that this crate wipes. Text it
+    /// gives (`visit_string`) is taken over as it is and wiped from then on, on rejection
+    /// too. Through 0.9.0 the value was built by `String`'s own impl first and wrapped
+    /// afterwards.
     ///
-    /// The same holds when deserialization succeeds: buffers the deserializer grew
-    /// through are its own and are freed unwiped. Whether there are any depends on the
-    /// format and on how the input is read; see `SECURITY.md`, "Feature Security
-    /// Implications".
+    /// **Where it stops:** at the deserializer. A string has to be assembled somewhere
+    /// before it can be handed over, and that somewhere is the deserializer's: with
+    /// `serde_json`, a string containing escapes is unescaped into its scratch buffer,
+    /// which grows as a plain `Vec` and is freed unwiped. This crate never holds that
+    /// buffer and cannot wipe it. Text without escapes read from a `&str` is lent straight
+    /// out of the input. See `SECURITY.md`, "Feature Security Implications". Where that
+    /// residue matters, do not deserialize the secret as text: size a `String` to its
+    /// exact final length yourself and move it in with [`Dynamic::new`](Dynamic::new).
     ///
-    /// **Important:** this limit is enforced *after* the upstream deserializer has fully
-    /// materialized the payload. It is a **result-length acceptance bound**, not a
-    /// pre-allocation DoS guard. For untrusted input, enforce size limits at the
-    /// transport or parser layer upstream.
+    /// **The limit** is checked before the text is copied or kept. It bounds what this
+    /// crate holds, not what the deserializer or the transport already has in memory: for
+    /// untrusted input, cap the size upstream as well.
+    ///
+    /// Accepts what `String` accepts, asked for with `deserialize_string`.
     pub fn deserialize_with_limit<'de, D>(deserializer: D, limit: usize) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let buf: zeroize::Zeroizing<alloc::string::String> =
-            zeroize::Zeroizing::new(serde::Deserialize::deserialize(deserializer)?);
-        if buf.len() > limit {
-            // buf drops here → Zeroizing zeros the oversized buffer before deallocation
-            return Err(serde::de::Error::custom(
-                "deserialized secret exceeds maximum size",
-            ));
-        }
+        // `deserialize_string`, as `String`'s own impl asks.
+        let buf =
+            deserializer.deserialize_string(crate::secret_visitor::StringVisitor { limit })?;
         Ok(Self::from_protected_bytes(buf))
     }
 }
@@ -1343,6 +1340,32 @@ impl<'de> serde::Deserialize<'de> for Dynamic<alloc::vec::Vec<u8>> {
 
 #[cfg(feature = "serde-deserialize")]
 impl<'de> serde::Deserialize<'de> for Dynamic<String> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Self::deserialize_with_limit(deserializer, MAX_DESERIALIZE_BYTES)
+    }
+}
+
+#[cfg(feature = "serde-deserialize")]
+impl Dynamic<[u8]> {
+    /// Deserializes into `Dynamic<[u8]>`, rejecting payloads larger than `limit` bytes.
+    ///
+    /// Reads exactly as the `Dynamic<Vec<u8>>` method of the same name does, with the same wiping and the same limit, then copies the bytes once into a
+    /// slice of exactly their length and wipes the buffer they were read into. The
+    /// standard [`serde::Deserialize`] impl calls this with [`MAX_DESERIALIZE_BYTES`].
+    pub fn deserialize_with_limit<'de, D>(deserializer: D, limit: usize) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let buf = deserializer.deserialize_seq(crate::secret_visitor::BytesVisitor { limit })?;
+        Ok(Self::copy_of(&buf))
+    }
+}
+
+#[cfg(feature = "serde-deserialize")]
+impl<'de> serde::Deserialize<'de> for Dynamic<[u8]> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -1388,5 +1411,21 @@ impl<T: zeroize::Zeroize> crate::SecretLen for Dynamic<Vec<T>> {
     #[inline(always)]
     fn byte_len(&self) -> usize {
         self.inner.len() * core::mem::size_of::<T>()
+    }
+}
+
+/// Length of a boxed slice. `byte_len` is the size in bytes, as for `Dynamic<Vec<T>>`.
+impl<T: zeroize::Zeroize> crate::SecretLen for Dynamic<[T]>
+where
+    [T]: zeroize::Zeroize,
+{
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    #[inline(always)]
+    fn byte_len(&self) -> usize {
+        core::mem::size_of_val::<[T]>(&self.inner)
     }
 }

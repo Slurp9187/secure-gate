@@ -679,6 +679,118 @@ fn check_string_deserialized_zeroed(size: usize) {
 }
 
 // ---------------------------------------------------------------------------
+// Dynamic<Vec<u8>> / Dynamic<[u8]> / Dynamic<String> — buffers used WHILE deserializing
+//
+// The two checks above look only at the buffer the finished wrapper drops. Through 0.9.0
+// the value was built by `Vec<u8>`'s own `Deserialize` first: a sequence grew a plain
+// `Vec`, and each outgrown buffer went back to the allocator with the secret in it (#249).
+// Since 0.9.1 the bytes are read into a `Zeroizing` buffer that grows by hand.
+//
+// These run the deserialize INSIDE the gate. `serde_json` reading integers from a `&str`
+// allocates nothing of its own, so every block of the target size freed in the window is
+// one of this crate's. With no size hint the buffer goes 64, 128, 256, 512, 1024.
+// Each check asserts the gate saw the block, so a change in the growth schedule fails
+// here instead of passing by observing nothing.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "serde-deserialize")]
+fn json_array_of(byte: u8, len: usize) -> String {
+    let nums: Vec<String> = (0..len).map(|_| byte.to_string()).collect();
+    format!("[{}]", nums.join(","))
+}
+
+/// Every buffer a 1008-byte secret outgrows on its way in is zero when it is freed.
+#[cfg(feature = "serde-deserialize")]
+fn check_vec_deserialize_growth_zeroed() {
+    let json = json_array_of(0xBB, 1008);
+    for outgrown in [64usize, 128, 256, 512] {
+        let hits = with_proxy_check_counted(outgrown, || {
+            let mut de = serde_json::Deserializer::from_str(&json);
+            let secret =
+                Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, 4096).expect("within limit");
+            core::hint::black_box(&secret);
+            // Dropped inside the gate too, but its buffer is 1024 bytes, not `outgrown`.
+            drop(secret);
+        });
+        assert_eq!(
+            hits, 1,
+            "expected exactly one outgrown {outgrown}-byte buffer to be freed"
+        );
+    }
+}
+
+/// A secret rejected for its length is wiped: the buffers it outgrew and the one it was
+/// in when the limit was reached.
+#[cfg(feature = "serde-deserialize")]
+fn check_vec_deserialize_over_limit_zeroed() {
+    let json = json_array_of(0xBB, 1008);
+    // Limit 200: buffers of 64, 128, then 200 (growth is capped at the limit).
+    for size in [64usize, 128, 200] {
+        let hits = with_proxy_check_counted(size, || {
+            let mut de = serde_json::Deserializer::from_str(&json);
+            let result = Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, 200);
+            assert!(result.is_err(), "1008 bytes must not pass a limit of 200");
+        });
+        assert_eq!(
+            hits, 1,
+            "expected exactly one {size}-byte buffer to be freed"
+        );
+    }
+}
+
+/// A secret the input cuts short is wiped as well: the deserializer fails, and the bytes
+/// read so far are this crate's to clear.
+#[cfg(feature = "serde-deserialize")]
+fn check_vec_deserialize_malformed_zeroed() {
+    let mut json = json_array_of(0xBB, 40);
+    json.pop(); // drop the closing bracket: 40 bytes read, then end of input
+    let hits = with_proxy_check_counted(64, || {
+        let mut de = serde_json::Deserializer::from_str(&json);
+        assert!(Dynamic::<Vec<u8>>::deserialize_with_limit(&mut de, 4096).is_err());
+    });
+    assert_eq!(
+        hits, 1,
+        "expected the one 64-byte partial buffer to be freed"
+    );
+}
+
+/// `Dynamic<[u8]>` reads into the same buffer, then copies once into an exact slice. The
+/// staging buffer (64 bytes for a 40-byte secret) and the slice are both zero when freed.
+#[cfg(feature = "serde-deserialize")]
+fn check_slice_deserialize_zeroed() {
+    let json = json_array_of(0xBB, 40);
+    for size in [64usize, 40] {
+        let hits = with_proxy_check_counted(size, || {
+            let mut de = serde_json::Deserializer::from_str(&json);
+            let secret =
+                Dynamic::<[u8]>::deserialize_with_limit(&mut de, 4096).expect("within limit");
+            core::hint::black_box(&secret);
+            drop(secret);
+        });
+        assert_eq!(
+            hits, 1,
+            "expected exactly one {size}-byte buffer to be freed"
+        );
+    }
+}
+
+/// Text the deserializer gives away (`visit_string`) is taken over, so it is wiped when it
+/// is rejected for its length, where a plain `String` would have been freed as it was.
+#[cfg(feature = "serde-deserialize")]
+fn check_string_deserialize_rejected_owned_zeroed() {
+    use serde::de::value::{Error as ValueError, StringDeserializer};
+    const LEN: usize = 88;
+    let mut owned = String::with_capacity(LEN);
+    owned.push_str(&"S".repeat(LEN));
+    assert_eq!(owned.capacity(), LEN, "proxy check would be skipped");
+    let hits = with_proxy_check_counted(LEN, move || {
+        let de: StringDeserializer<ValueError> = StringDeserializer::new(owned);
+        assert!(Dynamic::<String>::deserialize_with_limit(de, LEN - 1).is_err());
+    });
+    assert_eq!(hits, 1, "expected the one {LEN}-byte string to be freed");
+}
+
+// ---------------------------------------------------------------------------
 // Panic-path positive-control test
 //
 // Verifies that `Zeroizing::drop` actually zeroes the backing buffer when a
@@ -1448,6 +1560,11 @@ fn all_heap_zeroed() {
         check_vec_deserialized_zeroed(32);
         check_string_deserialized_zeroed(16);
         check_string_deserialized_zeroed(32);
+        check_vec_deserialize_growth_zeroed();
+        check_vec_deserialize_over_limit_zeroed();
+        check_vec_deserialize_malformed_zeroed();
+        check_slice_deserialize_zeroed();
+        check_string_deserialize_rejected_owned_zeroed();
     }
 
     // Panic-path positive control: proves Zeroizing zeroes bytes on unwind.

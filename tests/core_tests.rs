@@ -719,3 +719,21 @@ fn fixed_storage_covers_the_heap_free_foreign_shapes() {
         17
     );
 }
+
+/// `SecretLen` on a boxed slice (0.9.1, #267): `len` counts elements, `byte_len` bytes.
+#[cfg(feature = "alloc")]
+#[test]
+fn dynamic_boxed_slice_reports_its_length() {
+    use secure_gate::SecretLen;
+    let bytes: Dynamic<[u8]> = Dynamic::new(vec![7u8; 12]);
+    assert_eq!(bytes.len(), 12);
+    assert_eq!(bytes.byte_len(), 12);
+    assert!(!bytes.is_empty());
+
+    let words: Dynamic<[u32]> = Dynamic::new(vec![7u32; 3]);
+    assert_eq!(words.len(), 3);
+    assert_eq!(words.byte_len(), 12);
+
+    let none: Dynamic<[u8]> = Dynamic::new(Vec::new());
+    assert!(none.is_empty());
+}

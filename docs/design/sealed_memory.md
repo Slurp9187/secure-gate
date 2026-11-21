@@ -316,6 +316,14 @@ unsatisfied, E0277) do not. Additive follow-ups if the shape proves popular, non
   exact capacity the only way to build one and remove the caveat above.
 - Encoding and serde impls, as for `Dynamic<Vec<u8>>`.
 
+**What happened to these (0.9.1, #267).** `SecretLen` and serde `Deserialize` shipped in
+0.9.1. The sized constructors, the decoders and the encoding traits did not, because they
+are not additive after all: a second `Dynamic::from_random` makes
+`let k: Dynamic<Vec<u8>> = Dynamic::from_random(32)` ambiguous (E0034), and a second `ToHex`
+impl does the same to `Dynamic::new(vec).to_hex()` (E0283). Both forms are in this crate's
+own tests. They wait for a breaking release. Serde `Serialize` was never missing: it is
+gated on `SerializableSecret`, which `Vec<u8>` does not have either.
+
 ## Fitting it to `Fixed` and `Dynamic`
 
 ### It has to be a separate type, not a mode

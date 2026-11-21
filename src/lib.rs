@@ -349,6 +349,8 @@ extern crate std;
 mod decode_staging;
 #[cfg(feature = "alloc")]
 mod dynamic;
+#[cfg(all(feature = "alloc", feature = "serde-deserialize"))]
+mod secret_visitor;
 
 mod slot_writer;
 
@@ -450,15 +452,16 @@ pub use dynamic::DynamicReader;
 pub use slot_writer::SlotWriter;
 
 #[cfg(all(feature = "alloc", feature = "serde-deserialize"))]
-/// Default maximum byte length for `Dynamic<Vec<u8>>` / `Dynamic<String>` deserialization (1 MiB).
+/// Default maximum byte length for `Dynamic<Vec<u8>>` / `Dynamic<[u8]>` / `Dynamic<String>`
+/// deserialization (1 MiB).
 ///
-/// The standard `serde::Deserialize` impl for both types rejects payloads exceeding this value.
+/// The standard `serde::Deserialize` impl for each of them rejects payloads exceeding this value.
 /// Pass a custom ceiling to [`Dynamic::deserialize_with_limit`] when a different limit is needed.
 ///
-/// **Important:** this limit is enforced *after* the upstream deserializer has fully
-/// materialized the payload. It is a **result-length acceptance bound**, not a
-/// pre-allocation DoS guard. For untrusted input, enforce size limits at the
-/// transport or parser layer upstream.
+/// **Important:** the limit bounds what this crate holds: a byte sequence is rejected at
+/// the first byte past it, and text before it is copied. It does not bound what the
+/// deserializer or the transport has already read into memory. For untrusted input,
+/// enforce size limits at the transport or parser layer upstream as well.
 pub use dynamic::MAX_DESERIALIZE_BYTES;
 
 /// Stack-allocated secret wrapper with explicit access and automatic zeroization on drop.
