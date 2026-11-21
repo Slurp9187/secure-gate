@@ -169,8 +169,11 @@ Every decoder is fallible and decodes straight into the wrapper, as in the Quick
 ## Sealed memory
 
 With the `sealed` feature, a key is held encrypted while it idles, under a pre-key
-locked in RAM between guard pages. Each access costs about 7–11 µs for a 32-byte key, so it is for long-held keys,
-not hot loops. What it covers and what it does not:
+locked in RAM between guard pages. Each access costs about 7–11 µs for a 32-byte key, so it
+is for long-held keys, not hot loops. `Prekey::new()` keeps the pre-key locked against
+swap. Where Windows crash dumps matter more than swap, `Prekey::new_idle_noaccess()` keeps
+an idle pre-key out of a user-mode dump, but cannot keep it locked there. What it covers
+and what it does not:
 [`sealed`](https://docs.rs/secure-gate/latest/secure_gate/sealed/index.html).
 
 | Sealed type | Seals | Opens as |
