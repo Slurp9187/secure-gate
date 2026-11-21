@@ -83,16 +83,21 @@ against this release. Nothing about what is wiped, or when, changes. MSRV stays 
   other target was. `tools/stack_probe.sh` runs it monthly on Linux and Windows x86_64,
   macOS ARM64 and Linux ARM64 (`.github/workflows/stack-probe.yml`), outside the merge
   checks.
-- README says which versions are yanked and why, and that a patch release may restrict an
-  API to fix a security bug (0.9.1 did). "Zero-overhead" is dropped from the crate
+- README says which versions are yanked and why (0.9.0-rc.6 stays listed while a downstream
+  user is pinned to it), and that a patch release may restrict an API to fix a security
+  bug, with 0.9.1's change to the hidden `__private` role conversions as the example. "Zero-overhead" is dropped from the crate
   description: `Dynamic` boxes its value and the sealed types cost microseconds an access.
 - README names `EncodedSecret`'s `Deref` where it says a held secret has none, gives one
   sealed cost figure (7–11 µs, as SECURITY.md), and no longer calls access inside
-  `with_secret` "full" protection.
+  `with_secret` "full" protection. Its sealed section names the `Prekey` trade-off:
+  `Prekey::new()` stays the default and keeps the pre-key locked against swap;
+  `Prekey::new_idle_noaccess()` keeps an idle pre-key out of a Windows user-mode crash dump
+  but cannot keep it locked there.
 - `SECURITY.md`: vulnerabilities are reported privately only; a supported-versions table;
   a past advisory for the 0.1.0 to 0.7.0-rc.15 zeroize flaw; `guarded-block` uses `unsafe`
   and is outside the no-`unsafe` claim.
-- Releases before 0.9.0 moved to `CHANGELOG-ARCHIVE.md`, unchanged.
+- Releases before 0.9.0 moved to `CHANGELOG-ARCHIVE.md`, unchanged, linked from the top of
+  this file and shipped in the package.
 
 ## [0.9.1] - 2026-11-21
 
