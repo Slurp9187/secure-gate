@@ -261,6 +261,10 @@ under `traits` (such as `traits::reveal_secret::RevealSecret`) compile, and are 
   good. A 0.8.x release is a fix or an addition and never a breaking change, so `"0.8"` in
   a `Cargo.toml` is safe to leave. It has no `sealed` feature. Breaking changes ship only
   as a new minor version on main (0.9 to 0.10).
+- **Yanked versions.** 0.1.0 through 0.7.0-rc.15 were yanked on purpose on 2026-03-16,
+  for the zeroize-on-drop flaw 0.8.0 fixed (`CHANGELOG.md`, 0.8.0-rc.1). The 0.8 and 0.9
+  release candidates are yanked too, replaced by 0.8.0 and 0.9.0, except 0.9.0-rc.6, which
+  is still listed. Use a stable release.
 - **Traits.** The public traits can be implemented outside this crate, and the newtype macros
   do so, except the sealed ones (`DynamicBytes`, `SealedPayload`), which name the shapes this
   crate builds. A method added to an open trait in a patch release always comes with a

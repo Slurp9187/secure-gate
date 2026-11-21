@@ -68,6 +68,15 @@ against this release. Nothing about what is wiped, or when, changes. MSRV stays 
 - `SealedFixed::__with_wrapped`, `__with_wrapped_mut` and `SealedDynamic::__with_wrapped`
   (Migration 4).
 
+### Documentation
+
+- `SECURITY.md` says `EncodedSecret`'s `Deref<Target = str>` is a deliberate handoff point,
+  not a gap to close.
+- `SECURITY.md` says how a sealed value's nonce is chosen: all-zero, because every seal
+  and re-seal draws a fresh 32-byte salt and so a fresh key.
+- `SECURITY.md` says the sealed stack overwrite was measured on x86_64 Windows only.
+- README says which versions are yanked and why.
+
 ## [0.9.1] - 2026-11-21
 
 Additions and fixes only: nothing covered by the stability promise is removed or changes

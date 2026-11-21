@@ -182,6 +182,16 @@ look at what happens to the returned value. Any use of `&*enc` that keeps the by
 tracks. `format!("{}", enc)` does not compile, because `EncodedSecret` has no `Display`.
 Why `Deref` is kept: `docs/design/encoded_secret_deref.md`.
 
+**`EncodedSecret`'s `Deref<Target = str>` is a handoff point on purpose. Do not remove it
+as a fix.** It is the one exception to "no `Deref`" in this crate, and the exception is the
+design. A caller who calls `to_hex` and its siblings has asked for the encoded text, to
+pass to an API that takes `&str` (a driver, `serde_json`, a header). `EncodedSecret` wipes
+the copy the crate made and redacts `Debug`; what the caller does with the `&str` it hands
+out is past the boundary rule above, like a copy made inside `with_secret`. Removing `Deref`
+would break every such call site and close no confidentiality gap: the bytes are reachable
+either way, through `as_str()` if not through `Deref`. Changing it is a design decision for
+the maintainer, not a cleanup.
+
 ## Inherent Rust Limitations
 
 Four limitations follow from a stack, a growable heap, an operating system that pages
@@ -316,7 +326,15 @@ caveats [above](#if-swap-residue-is-in-your-threat-model). `Fixed` and `Dynamic`
 the role types `sealed_fixed_newtype!` and `sealed_dynamic_newtype!` build on them) hold a
 secret as ChaCha20-Poly1305 ciphertext and open it for one `with_secret` /
 `with_secret_mut` / `with_role` call. The sealing key, `SHA-256(salt ‖ pre-key)`, is recomputed on every
-access and never stored. The pre-key is 16 KiB of random bytes in a `Prekey` that each
+access and never stored. The salt is 32 random bytes from the system RNG, drawn afresh for
+every seal, including every re-seal after `with_secret_mut` / `with_role_mut`. The AEAD
+nonce is all-zero, on purpose: a fresh salt means a fresh key, so no key ever encrypts
+twice and a nonce has nothing to separate. A sealed value is never re-encrypted under its
+old salt, and sealed types have no `Clone`, so no two encryptions share a key. A random
+nonce is not missing; a code path that encrypts again without drawing a fresh salt would be
+the bug.
+
+The pre-key is 16 KiB of random bytes in a `Prekey` that each
 sealed object holds an `Arc` to. Since rc.15 it lives in a mapping of its own between two
 no-access guard pages, read-only once filled (`guarded-block`). When the last reference
 drops it is wiped, unlocked and unmapped.
@@ -324,8 +342,10 @@ drops it is wiped, unlocked and unmapped.
 The cipher leaves a copy of the key on the stack, so every seal and open ends by
 overwriting the 32 KiB of stack below the call, on a panic too. A probe found the key 4
 times there before the overwrite in a debug build and a plaintext copy once in a release
-build; after it, neither. That was measured on x86_64 Windows only
-(`docs/design/receipts/sealed-stack-residue/`).
+build; after it, neither. That was measured on x86_64 Windows only, with rustc 1.98.1
+(`docs/design/receipts/sealed-stack-residue/`). Linux, macOS, ARM and 32-bit targets were
+not probed. They use other ChaCha20 backends and other frame layouts, so whether the
+overwrite covers them is not measured.
 
 | Threat | Sealed |
 |---|---|
