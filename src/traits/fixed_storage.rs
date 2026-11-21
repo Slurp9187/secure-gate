@@ -81,7 +81,8 @@
 //! Nothing heap-owning is implemented, deliberately. `Box<[T]>` was and is not: see the
 //! contract above for the measurement that removed it. `Box<[u8; N]>` never arises anyway,
 //! because `zeroize` does not implement `Zeroize` for a `Box` of a sized type. For a
-//! heap-only secret of fixed size, the supported shape is `Dynamic<[u8; N]>`.
+//! secret of fixed size held on the heap, use `Dynamic<[u8]>` built with `new_with`,
+//! `from_random` or a decoder.
 //!
 //! A custom inner type needs one line:
 //!

@@ -66,9 +66,9 @@ still does.
   wiped; `tests/heap_zeroize.rs` gates on both blocks, and fails when the staging buffer is
   freed unwiped.
 - `DynamicBytes`, the sealed trait behind those methods. It cannot be implemented outside
-  this crate and has no methods of its own: the buffer operations it needs are on a
-  supertrait under `__private`, so they are outside the stability promise like the rest
-  of `__private`.
+  this crate and has no methods outside it: the buffer operations it needs are on a
+  private supertrait whose methods take a token only this crate can make, so no outside
+  code can implement them or call them.
 - `SecretLen` for `SealedFixed<N>`, `SealedDynamic<T>`, the sealed macro types,
   `__private::SealedRole` and `__private::SealedDynRole`.
 

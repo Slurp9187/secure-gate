@@ -392,10 +392,6 @@ pub mod __private {
     pub use serde::{Serialize, Serializer};
     pub use zeroize::{Zeroize, ZeroizeOnDrop};
 
-    // The buffer operations behind `DynamicBytes`, kept here so they are not public API.
-    #[cfg(feature = "alloc")]
-    pub use crate::traits::dynamic_bytes::DynamicBytesImpl;
-
     #[cfg(feature = "sealed")]
     pub use alloc::sync::Arc;
 

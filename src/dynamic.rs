@@ -13,7 +13,9 @@
 //! - **`Debug` always prints `[REDACTED]`** — secrets never appear in logs or
 //!   panic messages.
 //! - **Unconditional zeroization on drop** — includes `Vec`/`String` spare capacity.
-//! - **Heap-only** — secret bytes never reside on the stack. Inner value stored in `Box<T>`.
+//! - **Held on the heap** — the inner value is stored in `Box<T>`. `new_with`,
+//!   `try_new_with` and `from_random` write the bytes there directly; `new` and `From`
+//!   take an existing value, passed by value (see the type docs).
 //! - **Opt-in `Clone`** — requires `T: CloneableSecret` and the `cloneable` feature.
 //! - **Opt-in `Serialize`** — requires the `SerializableSecret` marker and the
 //!   `serde-serialize`/`serde-deserialize` features.
@@ -88,7 +90,9 @@ use rand::{TryRng, rngs::SysRng};
 /// or [`RevealSecretMut`](crate::RevealSecretMut).
 ///
 /// This is **not** `Fixed<T>` — it is the heap-allocated alternative for variable-length
-/// secrets. Secret bytes never reside on the stack.
+/// secrets. The wrapper holds its bytes on the heap. [`new`](Self::new) takes an existing
+/// value by value: `Dynamic::new([0u8; 32])` copies the array over the stack, and that
+/// source is not wiped, while `Dynamic::new(Box::new(…))` moves only the box.
 ///
 /// # Examples
 ///
@@ -110,17 +114,18 @@ use rand::{TryRng, rngs::SysRng};
 /// | Inner type | Realloc surface | Use case |
 /// |---|---|---|
 /// | `Dynamic<[u8]>` (boxed slice) | **None** once built — the length is set at construction and cannot change | Known-size keys held on the heap, and secrets whose length is known only at runtime but never changes afterwards |
-/// | `Dynamic<[u8; N]>` (boxed array) | **None** — fixed size | Rarely the right choice: it has no `new_with`, `from_random` or decoders, so it is built from an array passed by value, on the stack |
+/// | `Dynamic<[u8; N]>` (boxed array) | **None** — fixed size | Rarely the right choice: it has no `new_with`, `from_random` or decoders. `new` of an array passes it by value, over the stack; `new` of a `Box` moves the box, which still had to be filled somewhere |
 /// | `Dynamic<Vec<u8>>` pre-sized | None *if* you avoid capacity-growing mutations | Variable-length secrets with a known upper bound |
 /// | `Dynamic<Vec<u8>>` growable | **Yes** — each realloc leaves the old buffer unzeroed | Convenient, but see realloc-residue warning below |
 /// | `Dynamic<String>` | Same as `Dynamic<Vec<u8>>` | Passwords, API keys |
 ///
-/// For **long-lived, known-size key material** on the heap, prefer `Dynamic<[u8]>` built
-/// with `new_with(N, …)`, `from_random(N)` or a decoder: the bytes are written straight
-/// into the heap buffer, and the length cannot change. `Dynamic<[u8; N]>` has no realloc
-/// surface either, but its only constructors take the array by value, so the key passes
-/// over the stack first; if you use it, build `Dynamic::new([0u8; N])` and fill it through
-/// `with_secret_mut`.
+/// For **long-lived, known-size key material** on the heap, prefer `Dynamic<[u8]>`. Built
+/// with `new_with(N, …)` or `from_random(N)`, the bytes are written straight into the heap
+/// buffer; a decoder writes them into a wiped staging buffer and copies them in. Either
+/// way the length cannot change. `Dynamic<[u8; N]>` has no realloc surface either, but
+/// `new` of an array passes it by value, over the stack, and `new` of a `Box` moves a box
+/// that had to be filled first. If you use it, build `Dynamic::new([0u8; N])` and fill it
+/// through `with_secret_mut`.
 /// See `SECURITY.md` § "Inherent Rust Limitations" for the broader discussion.
 ///
 /// When the length is fixed but only known at runtime, `Dynamic<[u8]>` gives the same
@@ -211,7 +216,8 @@ use rand::{TryRng, rngs::SysRng};
 /// For `Dynamic<Vec<_>>` and `Dynamic<String>`, capacity-changing mutations can
 /// cause the standard allocator to free the previous buffer without zeroizing it.
 /// Pre-allocate to the maximum size, use capacity-stable mutations, prefer
-/// `Dynamic<[u8; N]>` (no realloc surface) for known-size heap secrets, or use
+/// `Dynamic<[u8]>` built with `new_with`, `from_random` or a decoder (no realloc
+/// surface) for known-size heap secrets, or use
 /// [`Fixed<T>`](crate::Fixed) for known-size stack secrets. See `SECURITY.md` for
 /// the full threat-model discussion and deployment-level mitigations including
 /// the [`zeroizing-alloc`](https://crates.io/crates/zeroizing-alloc) global
@@ -555,7 +561,7 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
     #[inline(always)]
     fn from_protected_bytes(protected: zeroize::Zeroizing<alloc::vec::Vec<u8>>) -> Self {
         Self {
-            inner: B::__from_protected(protected),
+            inner: B::from_protected(protected, crate::traits::dynamic_bytes::TOKEN),
         }
     }
 
@@ -651,9 +657,9 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
         // Built, zeroed, before a byte of the secret exists; from here on the wrapper's
         // own drop wipes it, on a panic inside `f` too.
         let mut this = Self {
-            inner: B::__zeroed(len),
+            inner: B::zeroed(len, crate::traits::dynamic_bytes::TOKEN),
         };
-        f(this.inner.__bytes_mut());
+        f(this.inner.bytes_mut(crate::traits::dynamic_bytes::TOKEN));
         this
     }
 
@@ -759,12 +765,12 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
         F: FnOnce(&mut [u8]) -> Result<(), E>,
     {
         let mut this = Self {
-            inner: B::__zeroed(len),
+            inner: B::zeroed(len, crate::traits::dynamic_bytes::TOKEN),
         };
         // On the error path `this` is dropped here, so the wrapper wipes whatever the
         // closure wrote before it gave up. That is why the buffer is built before the
         // fill rather than assembled after it.
-        f(this.inner.__bytes_mut())?;
+        f(this.inner.bytes_mut(crate::traits::dynamic_bytes::TOKEN))?;
         Ok(this)
     }
 }
@@ -821,12 +827,16 @@ impl Dynamic<alloc::string::String> {
 impl<B: crate::DynamicBytes + ?Sized> ToHex for Dynamic<B> {
     #[inline]
     fn to_hex(&self) -> crate::EncodedSecret {
-        self.inner.__bytes().to_hex()
+        self.inner
+            .bytes(crate::traits::dynamic_bytes::TOKEN)
+            .to_hex()
     }
 
     #[inline]
     fn to_hex_upper(&self) -> crate::EncodedSecret {
-        self.inner.__bytes().to_hex_upper()
+        self.inner
+            .bytes(crate::traits::dynamic_bytes::TOKEN)
+            .to_hex_upper()
     }
 }
 
@@ -846,7 +856,9 @@ impl<B: crate::DynamicBytes + ?Sized> ToHex for Dynamic<B> {
 impl<B: crate::DynamicBytes + ?Sized> ToBase32 for Dynamic<B> {
     #[inline]
     fn to_base32(&self) -> crate::EncodedSecret {
-        self.inner.__bytes().to_base32()
+        self.inner
+            .bytes(crate::traits::dynamic_bytes::TOKEN)
+            .to_base32()
     }
 }
 
@@ -866,7 +878,9 @@ impl<B: crate::DynamicBytes + ?Sized> ToBase32 for Dynamic<B> {
 impl<B: crate::DynamicBytes + ?Sized> ToBase64Url for Dynamic<B> {
     #[inline]
     fn to_base64url(&self) -> crate::EncodedSecret {
-        self.inner.__bytes().to_base64url()
+        self.inner
+            .bytes(crate::traits::dynamic_bytes::TOKEN)
+            .to_base64url()
     }
 }
 
@@ -881,7 +895,9 @@ impl<B: crate::DynamicBytes + ?Sized> ToBech32 for Dynamic<B> {
         hrp: &str,
         case: crate::Case,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.inner.__bytes().try_to_bech32(hrp, case)
+        self.inner
+            .bytes(crate::traits::dynamic_bytes::TOKEN)
+            .try_to_bech32(hrp, case)
     }
 
     #[inline]
@@ -890,7 +906,9 @@ impl<B: crate::DynamicBytes + ?Sized> ToBech32 for Dynamic<B> {
         hrp: &str,
         case: crate::Case,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.inner.__bytes().try_to_bech32_sized::<C>(hrp, case)
+        self.inner
+            .bytes(crate::traits::dynamic_bytes::TOKEN)
+            .try_to_bech32_sized::<C>(hrp, case)
     }
 }
 
@@ -905,7 +923,9 @@ impl<B: crate::DynamicBytes + ?Sized> ToBech32m for Dynamic<B> {
         hrp: &str,
         case: crate::Case,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.inner.__bytes().try_to_bech32m(hrp, case)
+        self.inner
+            .bytes(crate::traits::dynamic_bytes::TOKEN)
+            .try_to_bech32m(hrp, case)
     }
 
     #[inline]
@@ -914,7 +934,9 @@ impl<B: crate::DynamicBytes + ?Sized> ToBech32m for Dynamic<B> {
         hrp: &str,
         case: crate::Case,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.inner.__bytes().try_to_bech32m_sized::<C>(hrp, case)
+        self.inner
+            .bytes(crate::traits::dynamic_bytes::TOKEN)
+            .try_to_bech32m_sized::<C>(hrp, case)
     }
 }
 
