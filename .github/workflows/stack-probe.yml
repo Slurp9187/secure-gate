@@ -2,9 +2,9 @@ name: Sealed stack probe (monthly)
 
 # Runs the sealed stack-residue probe (tools/stack_probe.sh,
 # docs/design/receipts/sealed-stack-residue/) on four targets: after a sealed access, the
-# sealing key and the plaintext must not be on the stack. A second run with the stack scrub
-# disabled must find the key, or the probe is blind on that target and the clean result
-# means nothing.
+# sealing key and the plaintext must not be on the stack. A first run with the stack scrub
+# disabled must find the key, or the probe is blind there and the job fails. Each target
+# runs the profiles its matrix entry lists.
 #
 # Monthly and on demand, and on a pull request only when it changes the probe itself. Never
 # required for merging, and not part of `CI passed`: the probe reads raw stack and depends
@@ -35,12 +35,19 @@ jobs:
         include:
           - name: Linux x86_64
             os: ubuntu-latest
+            profiles: debug release
           - name: Windows x86_64
             os: windows-latest
+            profiles: debug release
           - name: macOS ARM64
             os: macos-latest
+            profiles: debug release
+          # Debug only. A Linux ARM64 release build leaves no key copy the probe can
+          # reach even with scrub_stack emptied, so the probe cannot measure it there
+          # (SECURITY.md, sealed section). Run there, it would fail every time.
           - name: Linux ARM64
             os: ubuntu-24.04-arm
+            profiles: debug
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -53,6 +60,8 @@ jobs:
 
       - name: Run the probe
         shell: bash
+        env:
+          STACK_PROBE_PROFILES: ${{ matrix.profiles }}
         run: |
           rustc -V
           tools/stack_probe.sh
