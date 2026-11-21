@@ -133,10 +133,6 @@ impl<const N: usize> SealedFixed<N> {
     /// take that `Fixed` out and leave another to be re-sealed, as `with_secret_mut` lets
     /// it copy the bytes out and overwrite them.
     #[doc(hidden)]
-    #[deprecated(
-        since = "0.9.1",
-        note = "not a public API; it is removed in the next breaking release"
-    )]
     #[inline]
     pub fn __with_wrapped<T, W, F, R>(&self, wrap: W, f: F) -> R
     where
@@ -149,10 +145,6 @@ impl<const N: usize> SealedFixed<N> {
     /// As [`__with_wrapped`](Self::__with_wrapped): the 0.9.0 name, kept until the next
     /// breaking release.
     #[doc(hidden)]
-    #[deprecated(
-        since = "0.9.1",
-        note = "not a public API; it is removed in the next breaking release"
-    )]
     #[inline]
     pub fn __with_wrapped_mut<T, W, U, F, R>(&mut self, wrap: W, unwrap: U, f: F) -> R
     where

@@ -178,10 +178,6 @@ impl<T: SealedPayload> SealedDynamic<T> {
     /// opened `Dynamic` for the closure, which reaches nothing that
     /// [`with_secret`](Self::with_secret) does not.
     #[doc(hidden)]
-    #[deprecated(
-        since = "0.9.1",
-        note = "not a public API; it is removed in the next breaking release"
-    )]
     pub fn __with_wrapped<R0, W, F, R>(&self, wrap: W, f: F) -> R
     where
         W: FnOnce(Dynamic<T>) -> R0,

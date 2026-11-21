@@ -446,11 +446,10 @@ fn from_random_seals_without_a_plain_value() {
     blob.with_secret(|v| assert!(v.iter().any(|&x| x != 0)));
 }
 
-/// The deprecated `__with_wrapped_mut` shim reaches what `with_secret_mut` already reaches
+/// The hidden `__with_wrapped_mut` shim reaches what `with_secret_mut` already reaches
 /// on a bare `SealedFixed`: the caller can carry the secret out of the closure and leave
 /// another value sealed in its place. Pins the changelog's claim about the shim.
 #[test]
-#[allow(deprecated)]
 fn with_wrapped_mut_shim_reaches_what_with_secret_mut_reaches() {
     let prekey = Prekey::new();
 
