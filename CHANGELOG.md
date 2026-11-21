@@ -100,7 +100,8 @@ against this release. Nothing about what is wiped, or when, changes. MSRV stays 
   `Prekey::new_idle_noaccess()` keeps an idle pre-key out of a Windows user-mode crash dump
   but cannot keep it locked there.
 - `SECURITY.md`: vulnerabilities are reported privately only; a supported-versions table;
-  a past advisory for the 0.1.0 to 0.7.0-rc.15 zeroize flaw; `guarded-block` uses `unsafe`
+  a past advisory for the zeroize flaw in 0.5.0 through 0.7.0-rc.14 (rc.15 tagged but never
+  published), fixed in 0.8.0-rc.1; `guarded-block` uses `unsafe`
   and is outside the no-`unsafe` claim.
 - Releases before 0.9.0 moved to `CHANGELOG-ARCHIVE.md`, unchanged, linked from the top of
   this file and shipped in the package.

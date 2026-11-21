@@ -574,11 +574,13 @@ Before production use, review the source, the dependency versions, and these tes
 
 ## Past Advisory
 
-**0.1.0 through 0.7.0-rc.15 did not zeroize on drop.** The docs said secrets were wiped
-on drop, but those versions had no `impl Drop`, only the empty `ZeroizeOnDrop` marker, so
-nothing was wiped. It was found and fixed in 0.8.0 (first in 0.8.0-alpha.1, whose entry in
-`CHANGELOG-ARCHIVE.md` has the details), and every affected version was yanked from
-crates.io on 2026-03-16. Since then the wipe is checked by tests rather than by reading the
+**0.5.0 through 0.7.0-rc.14 did not zeroize on drop** (0.7.0-rc.15 was tagged but never
+published). The docs said secrets were wiped on drop, but those versions had no
+`impl Drop`, only the empty `ZeroizeOnDrop` marker, so nothing was wiped. Versions 0.1.0
+to 0.4.3 did wipe on drop, through `secrecy::SecretBox` and `zeroize::Zeroizing`; the flaw
+starts at 0.5.0 (2025-11-22). The first published fix is 0.8.0-rc.1 (2026-03-22); the
+0.8.0-alpha.1 entry in `CHANGELOG-ARCHIVE.md` has the details. Every version before 0.8
+was yanked from crates.io on 2026-03-16. Since then the wipe is checked by tests rather than by reading the
 code: `tests/heap_zeroize.rs` checks freed heap blocks are zero, and
 `tests/asm_dse_check.rs` checks the optimizer keeps the wipe.
 
