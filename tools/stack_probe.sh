@@ -38,8 +38,13 @@ run() { # $1 = label, rest = cargo test profile flags. Prints the probe's "hits=
     rm -f "$log"
     return 1
   fi
-  grep -E 'hits=' "$log" | tee /dev/stderr
+  # Printed to stderr for the log and to stdout for the caller. Not `tee /dev/stderr`:
+  # the Windows runner's bash has no /dev/stderr, and the log then shows no counts.
+  local hits
+  hits=$(grep -E 'hits=' "$log" || true)
   rm -f "$log"
+  printf '%s\n' "$hits" >&2
+  printf '%s\n' "$hits"
 }
 
 PY=$(command -v python3 || command -v python)
@@ -72,6 +77,13 @@ EOF
   fi
 
   on=$(run "as shipped, $profile" "${flags[@]}")
+  # A run that printed no counts proves nothing; never let it pass as clean.
+  for out in "$off" "$on"; do
+    if ! printf '%s\n' "$out" | grep -qE '^with_secret: key hits=[0-9]+'; then
+      echo "::error::$profile: the probe printed no counts, so this run shows nothing"
+      fail=1
+    fi
+  done
   # The control line counts a pattern the probe leaves on purpose; it is not a residue.
   if printf '%s\n' "$on" | grep -v '^control ' | grep -qE 'hits=[1-9]'; then
     echo "::error::$profile: sealing key or plaintext found on the stack after a sealed access"
