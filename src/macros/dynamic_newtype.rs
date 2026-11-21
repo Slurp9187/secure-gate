@@ -354,9 +354,19 @@ macro_rules! dynamic_newtype {
             impl $crate::__private::DynamicRole for $name {
                 type Payload = $crate::__private::String;
                 #[inline(always)]
-                fn into_dynamic(self) -> $crate::Dynamic<Self::Payload> { self.0 }
+                fn into_dynamic(
+                    self,
+                    _: $crate::__private::RoleToken<Self>,
+                ) -> $crate::Dynamic<Self::Payload> {
+                    self.0
+                }
                 #[inline(always)]
-                fn from_dynamic(dynamic: $crate::Dynamic<Self::Payload>) -> Self { Self(dynamic) }
+                fn from_dynamic(
+                    dynamic: $crate::Dynamic<Self::Payload>,
+                    _: $crate::__private::RoleToken<Self>,
+                ) -> Self {
+                    Self(dynamic)
+                }
             }
         }
     };
@@ -384,9 +394,19 @@ macro_rules! dynamic_newtype {
             impl $crate::__private::DynamicRole for $name {
                 type Payload = $crate::__private::Vec<u8>;
                 #[inline(always)]
-                fn into_dynamic(self) -> $crate::Dynamic<Self::Payload> { self.0 }
+                fn into_dynamic(
+                    self,
+                    _: $crate::__private::RoleToken<Self>,
+                ) -> $crate::Dynamic<Self::Payload> {
+                    self.0
+                }
                 #[inline(always)]
-                fn from_dynamic(dynamic: $crate::Dynamic<Self::Payload>) -> Self { Self(dynamic) }
+                fn from_dynamic(
+                    dynamic: $crate::Dynamic<Self::Payload>,
+                    _: $crate::__private::RoleToken<Self>,
+                ) -> Self {
+                    Self(dynamic)
+                }
             }
         }
         impl $name {

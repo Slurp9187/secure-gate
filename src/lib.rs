@@ -389,46 +389,13 @@ pub mod __private {
     #[cfg(feature = "sealed")]
     pub use alloc::sync::Arc;
 
-    /// A `fixed_newtype!` byte role, convertible to and from the `Fixed` it wraps without
-    /// copying the bytes out by hand. Lets `sealed_fixed_newtype!` seal a role directly.
+    // The role plumbing behind the sealed macros. Each conversion takes a token that
+    // only `sealed::role` can make, so none of this is a way around `derive: [FromWrapper]`
+    // / `[IntoWrapper]`; see that module.
     #[cfg(feature = "sealed")]
-    pub trait FixedRole: Sized {
-        /// The wrapped `Fixed<[u8; N]>`.
-        type Fixed: SealableFixed;
-        /// Unwraps the role.
-        fn into_fixed(self) -> Self::Fixed;
-        /// Wraps a `Fixed` as the role.
-        fn from_fixed(fixed: Self::Fixed) -> Self;
-    }
-
-    /// Maps `Fixed<[u8; N]>` to `SealedFixed<N>` without naming `N`.
-    #[cfg(feature = "sealed")]
-    pub trait SealableFixed {
-        /// `SealedFixed<N>`.
-        type Sealed;
-    }
-
-    #[cfg(feature = "sealed")]
-    impl<const N: usize> SealableFixed for crate::Fixed<[u8; N]> {
-        type Sealed = crate::SealedFixed<N>;
-    }
-
-    /// The `SealedFixed<N>` a role seals into.
-    #[cfg(feature = "sealed")]
-    pub type SealedOf<R> = <<R as FixedRole>::Fixed as SealableFixed>::Sealed;
-
-    /// A `dynamic_newtype!` `String` or `Vec<u8>` role, convertible to and from the
-    /// `Dynamic` it wraps by moving the box, never the bytes. Lets `sealed_dynamic_newtype!`
-    /// seal a role directly.
-    #[cfg(feature = "sealed")]
-    pub trait DynamicRole: Sized {
-        /// `String` or `Vec<u8>`.
-        type Payload: crate::sealed::SealedPayload;
-        /// Unwraps the role.
-        fn into_dynamic(self) -> crate::Dynamic<Self::Payload>;
-        /// Wraps a `Dynamic` as the role.
-        fn from_dynamic(dynamic: crate::Dynamic<Self::Payload>) -> Self;
-    }
+    pub use crate::sealed::role::{
+        DynamicRole, FixedRole, RoleToken, SealableFixed, SealedDynRole, SealedOf, SealedRole,
+    };
 }
 
 /// Heap-allocated secret wrapper with explicit access and automatic zeroization on drop.

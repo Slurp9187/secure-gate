@@ -149,6 +149,8 @@
 mod dynamic;
 mod fixed;
 mod prekey;
+#[doc(hidden)]
+pub mod role;
 
 pub use dynamic::{SealedDynamic, SealedPayload};
 pub use fixed::SealedFixed;
@@ -218,6 +220,85 @@ pub use prekey::{LockError, Prekey};
 /// ```compile_fail,E0277
 /// use secure_gate::{Dynamic, Prekey, SealedDynamic};
 /// let _ = SealedDynamic::seal(Dynamic::<Vec<u16>>::new(vec![1]), &Prekey::new());
+/// ```
+///
+/// # The role wall
+///
+/// A sealed role is built on a conversion between the plain role and the `Fixed` or
+/// `Dynamic` inside it. That conversion must not be a way into or out of a role that skips
+/// `derive: [FromWrapper]` / `[IntoWrapper]`. Each case below compiled in 0.9.0.
+///
+/// A bare `Fixed` cannot be turned into a role through the hidden trait:
+///
+/// ```compile_fail,E0061
+/// use secure_gate::{Fixed, fixed_newtype, __private::FixedRole};
+/// fixed_newtype!(pub AppKey, 32);
+/// let _ = <AppKey as FixedRole>::from_fixed(Fixed::new([0u8; 32]));
+/// ```
+///
+/// Nor a role turned back into a bare `Fixed`:
+///
+/// ```compile_fail,E0061
+/// use secure_gate::{Fixed, fixed_newtype, __private::FixedRole};
+/// fixed_newtype!(pub AppKey, 32);
+/// let _ = <AppKey as FixedRole>::into_fixed(AppKey::new([0u8; 32]));
+/// ```
+///
+/// The token the conversion asks for cannot be made outside this crate:
+///
+/// ```compile_fail,E0423
+/// use secure_gate::{Fixed, fixed_newtype, __private::{FixedRole, RoleToken}};
+/// fixed_newtype!(pub AppKey, 32);
+/// let token = RoleToken(core::marker::PhantomData);
+/// let _ = <AppKey as FixedRole>::from_fixed(Fixed::new([0u8; 32]), token);
+/// ```
+///
+/// A token is for one role. A hand-written role cannot spend the token it is given on
+/// someone else's:
+///
+/// ```compile_fail,E0308
+/// use secure_gate::{Fixed, fixed_newtype, __private::{FixedRole, RoleToken}};
+/// fixed_newtype!(pub AppKey, 32);
+/// pub struct Mine(Fixed<[u8; 32]>);
+/// impl FixedRole for Mine {
+///     type Fixed = Fixed<[u8; 32]>;
+///     fn into_fixed(self, _: RoleToken<Self>) -> Self::Fixed { self.0 }
+///     fn from_fixed(fixed: Self::Fixed, token: RoleToken<Self>) -> Self {
+///         let _: AppKey = <AppKey as FixedRole>::from_fixed(Fixed::new([0u8; 32]), token);
+///         Self(fixed)
+///     }
+/// }
+/// ```
+///
+/// The same holds for a `dynamic_newtype!` role:
+///
+/// ```compile_fail,E0061
+/// use secure_gate::{Dynamic, dynamic_newtype, __private::DynamicRole};
+/// dynamic_newtype!(pub Password, String);
+/// let _ = <Password as DynamicRole>::from_dynamic(Dynamic::<String>::new(String::new()));
+/// ```
+///
+/// ```compile_fail,E0061
+/// use secure_gate::{dynamic_newtype, __private::DynamicRole};
+/// dynamic_newtype!(pub Password, String);
+/// let _ = <Password as DynamicRole>::into_dynamic(Password::new("x"));
+/// ```
+///
+/// And the hook that let a caller take a plain `Fixed` out of a sealed value without
+/// consuming it is gone:
+///
+/// ```compile_fail,E0599
+/// use secure_gate::{Fixed, Prekey, SealedFixed};
+/// let s = SealedFixed::seal(Fixed::new([0u8; 32]), &Prekey::new());
+/// let mut out = None;
+/// s.__with_wrapped(|plain| { out = Some(plain); }, |_| ());
+/// ```
+///
+/// ```compile_fail,E0599
+/// use secure_gate::{Dynamic, Prekey, SealedDynamic};
+/// let s = SealedDynamic::seal(Dynamic::<String>::new(String::new()), &Prekey::new());
+/// let mut out = None;
+/// s.__with_wrapped(|plain| { out = Some(plain); }, |_| ());
 /// ```
 #[cfg(doctest)]
 pub struct MisuseDoesNotCompile;

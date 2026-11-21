@@ -484,9 +484,13 @@ macro_rules! fixed_newtype {
             impl $crate::__private::FixedRole for $name {
                 type Fixed = $crate::Fixed<[u8; $size]>;
                 #[inline(always)]
-                fn into_fixed(self) -> Self::Fixed { self.0 }
+                fn into_fixed(self, _: $crate::__private::RoleToken<Self>) -> Self::Fixed {
+                    self.0
+                }
                 #[inline(always)]
-                fn from_fixed(fixed: Self::Fixed) -> Self { Self(fixed) }
+                fn from_fixed(fixed: Self::Fixed, _: $crate::__private::RoleToken<Self>) -> Self {
+                    Self(fixed)
+                }
             }
         }
 

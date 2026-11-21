@@ -82,7 +82,7 @@ macro_rules! sealed_fixed_newtype {
     ($(#[$attr:meta])* $vis:vis $name:ident, $role:ty) => {
         $(#[$attr])*
         #[must_use = "holds secret material; bind it or chain a method call"]
-        $vis struct $name($crate::__private::SealedOf<$role>);
+        $vis struct $name($crate::__private::SealedRole<$role>);
 
         impl $name {
             /// Seals the role's key under `prekey`. The plain key is consumed and wiped.
@@ -91,10 +91,7 @@ macro_rules! sealed_fixed_newtype {
                 secret: $role,
                 prekey: &$crate::__private::Arc<$crate::Prekey>,
             ) -> Self {
-                Self($crate::SealedFixed::seal(
-                    <$role as $crate::__private::FixedRole>::into_fixed(secret),
-                    prekey,
-                ))
+                Self($crate::__private::SealedRole::seal(secret, prekey))
             }
 
             /// Decrypts into a temporary of the role for the length of `f`, then wipes it and
@@ -104,8 +101,7 @@ macro_rules! sealed_fixed_newtype {
             where
                 F: ::core::ops::FnOnce(&$role) -> R,
             {
-                self.0
-                    .__with_wrapped(<$role as $crate::__private::FixedRole>::from_fixed, f)
+                self.0.with_role(f)
             }
 
             /// Decrypts into a temporary of the role, lets `f` change it, then re-seals under
@@ -115,11 +111,7 @@ macro_rules! sealed_fixed_newtype {
             where
                 F: ::core::ops::FnOnce(&mut $role) -> R,
             {
-                self.0.__with_wrapped_mut(
-                    <$role as $crate::__private::FixedRole>::from_fixed,
-                    <$role as $crate::__private::FixedRole>::into_fixed,
-                    f,
-                )
+                self.0.with_role_mut(f)
             }
 
             /// Decrypts into a temporary for the length of `f`, then wipes it.
@@ -145,7 +137,7 @@ macro_rules! sealed_fixed_newtype {
             /// (`SECURITY.md` §1). To read the key, prefer `with_role`, which leaves nothing.
             #[inline(always)]
             pub fn unseal(self) -> $role {
-                <$role as $crate::__private::FixedRole>::from_fixed(self.0.unseal())
+                self.0.unseal()
             }
 
             /// The key's length in bytes.
@@ -184,7 +176,7 @@ macro_rules! sealed_fixed_newtype {
             impl $crate::ConstantTimeEq for $name {
                 #[inline]
                 fn ct_eq(&self, other: &Self) -> bool {
-                    $crate::ConstantTimeEq::ct_eq(&self.0, &other.0)
+                    self.0.ct_eq(&other.0)
                 }
             }
         }

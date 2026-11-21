@@ -7,9 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.1] - Unreleased
 
-Documentation and tests only so far. No public API is added, removed or changed. These
-come from a consistency review of the 0.9.0 API, which looked for places where the `sealed`
-types differ from the rest of the crate without saying so.
+No public API is added, removed or changed. These come from a consistency review of the
+0.9.0 API, which looked for places where the `sealed` types differ from the rest of the
+crate without saying so.
+
+### Fixed
+- **With the `sealed` feature on, a role could be entered and left without its derive.**
+  `fixed_newtype!` and `dynamic_newtype!` promise that a value becomes a role, or stops
+  being one, only through `derive: [FromWrapper]` / `[IntoWrapper]`. To let the sealed
+  macros move a role without copying its bytes, every byte role and every `String` /
+  `Vec<u8>` role also implemented a hidden conversion (`secure_gate::__private::FixedRole`
+  / `DynamicRole`), and that conversion was callable:
+  `<AppKey as FixedRole>::from_fixed(bare_fixed)` compiled with no derive. It was
+  `#[doc(hidden)]` and outside the stability promise, but it was reachable from safe code
+  and no audit search finds it. Each conversion now takes a token for its own role that
+  only this crate's sealing code can make, and the sealed macros hold a hidden wrapper
+  typed by its role, which is built only from that role and gives back only that role.
+  The hidden `__with_wrapped` / `__with_wrapped_mut` methods on `SealedFixed` and
+  `SealedDynamic`, which let a caller take a plain `Fixed` out of a sealed value without
+  consuming it, are no longer public. Eight compile-fail doctests pin each case.
+  - How far it reaches: safe code. `unsafe` code can conjure a token, as it can conjure
+    anything. No secret was exposed by this; it weakened a type-level promise.
+  - The types the sealed macros generate, and every documented method on them, are
+    unchanged. Code that named `secure_gate::__private` directly may stop compiling; that
+    module is not public API.
 
 ### Documentation
 - **The `sealed` length methods are a stated gap.** `SealedFixed`, `SealedDynamic` and the

@@ -115,10 +115,9 @@ impl<const N: usize> SealedFixed<N> {
 
     /// Opens into a temporary, hands it to `wrap` (a `fixed_newtype!` role's constructor)
     /// and `f` gets the wrapped value; scrubbed like [`with_secret`](Self::with_secret).
-    /// The plumbing behind `sealed_fixed_newtype!`'s `with_role`; not a public API.
-    #[doc(hidden)]
+    /// The plumbing behind `sealed_fixed_newtype!`'s `with_role`; crate-private.
     #[inline]
-    pub fn __with_wrapped<T, W, F, R>(&self, wrap: W, f: F) -> R
+    pub(crate) fn with_wrapped<T, W, F, R>(&self, wrap: W, f: F) -> R
     where
         W: FnOnce(Fixed<[u8; N]>) -> T,
         F: FnOnce(&T) -> R,
@@ -139,11 +138,10 @@ impl<const N: usize> SealedFixed<N> {
         f(&wrapped)
     }
 
-    /// As [`__with_wrapped`](Self::__with_wrapped), mutably; `unwrap` gives the `Fixed` back
-    /// to re-seal under a fresh salt. Not a public API.
-    #[doc(hidden)]
+    /// As [`with_wrapped`](Self::with_wrapped), mutably; `unwrap` gives the `Fixed` back
+    /// to re-seal under a fresh salt. Crate-private.
     #[inline]
-    pub fn __with_wrapped_mut<T, W, U, F, R>(&mut self, wrap: W, unwrap: U, f: F) -> R
+    pub(crate) fn with_wrapped_mut<T, W, U, F, R>(&mut self, wrap: W, unwrap: U, f: F) -> R
     where
         W: FnOnce(Fixed<[u8; N]>) -> T,
         U: FnOnce(T) -> Fixed<[u8; N]>,

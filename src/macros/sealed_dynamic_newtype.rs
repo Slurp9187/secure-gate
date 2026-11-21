@@ -103,9 +103,7 @@ macro_rules! sealed_dynamic_newtype {
     ($(#[$attr:meta])* $vis:vis $name:ident, $role:ty) => {
         $(#[$attr])*
         #[must_use = "holds secret material; bind it or chain a method call"]
-        $vis struct $name(
-            $crate::SealedDynamic<<$role as $crate::__private::DynamicRole>::Payload>,
-        );
+        $vis struct $name($crate::__private::SealedDynRole<$role>);
 
         impl $name {
             /// Seals the role's secret under `prekey`. The plain secret is consumed and wiped.
@@ -114,10 +112,7 @@ macro_rules! sealed_dynamic_newtype {
                 secret: $role,
                 prekey: &$crate::__private::Arc<$crate::Prekey>,
             ) -> Self {
-                Self($crate::SealedDynamic::seal(
-                    <$role as $crate::__private::DynamicRole>::into_dynamic(secret),
-                    prekey,
-                ))
+                Self($crate::__private::SealedDynRole::seal(secret, prekey))
             }
 
             /// Decrypts into a temporary of the role for the length of `f`, then wipes it.
@@ -126,8 +121,7 @@ macro_rules! sealed_dynamic_newtype {
             where
                 F: ::core::ops::FnOnce(&$role) -> R,
             {
-                self.0
-                    .__with_wrapped(<$role as $crate::__private::DynamicRole>::from_dynamic, f)
+                self.0.with_role(f)
             }
 
             /// Decrypts into a temporary for the length of `f`, then wipes it.
@@ -157,7 +151,7 @@ macro_rules! sealed_dynamic_newtype {
             /// here; the role still wipes on drop.
             #[inline]
             pub fn unseal(self) -> $role {
-                <$role as $crate::__private::DynamicRole>::from_dynamic(self.0.unseal())
+                self.0.unseal()
             }
 
             /// The secret's length in bytes. Length can itself be sensitive for passwords;
@@ -201,7 +195,7 @@ macro_rules! sealed_dynamic_newtype {
             impl $crate::ConstantTimeEq for $name {
                 #[inline]
                 fn ct_eq(&self, other: &Self) -> bool {
-                    $crate::ConstantTimeEq::ct_eq(&self.0, &other.0)
+                    self.0.ct_eq(&other.0)
                 }
             }
         }

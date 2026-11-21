@@ -160,9 +160,8 @@ impl<T: SealedPayload> SealedDynamic<T> {
     /// and `f` gets the wrapped value; scrubbed like [`with_secret`](Self::with_secret).
     /// `wrap` moves the `Dynamic`, which is one pointer: the plaintext stays in the one heap
     /// buffer the temporary owns, and the role's `Drop` wipes it. The plumbing behind
-    /// `sealed_dynamic_newtype!`'s `with_role`; not a public API.
-    #[doc(hidden)]
-    pub fn __with_wrapped<R0, W, F, R>(&self, wrap: W, f: F) -> R
+    /// `sealed_dynamic_newtype!`'s `with_role`; crate-private.
+    pub(crate) fn with_wrapped<R0, W, F, R>(&self, wrap: W, f: F) -> R
     where
         W: FnOnce(Dynamic<T>) -> R0,
         F: FnOnce(&R0) -> R,
