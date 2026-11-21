@@ -80,7 +80,9 @@ against this release. Nothing about what is wiped, or when, changes. MSRV stays 
   and re-seal draws a fresh 32-byte salt and so a fresh key.
 - The sealed stack overwrite is now measured on x86_64 Linux as well as x86_64 Windows
   (`docs/design/receipts/sealed-stack-residue/runs_linux.txt`); `SECURITY.md` says no
-  other target was.
+  other target was. `tools/stack_probe.sh` runs it monthly on Linux and Windows x86_64,
+  macOS ARM64 and Linux ARM64 (`.github/workflows/stack-probe.yml`), outside the merge
+  checks.
 - README says which versions are yanked and why, and that a patch release may restrict an
   API to fix a security bug (0.9.1 did). "Zero-overhead" is dropped from the crate
   description: `Dynamic` boxes its value and the sealed types cost microseconds an access.

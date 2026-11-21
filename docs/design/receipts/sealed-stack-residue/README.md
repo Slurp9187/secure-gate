@@ -34,6 +34,15 @@ Two controls keep a clean result from meaning "looked in the wrong place":
 - **baseline**: a snapshot after zeroing and before any access. It must read 0, or the probe
   is finding its own copies.
 
+## Monthly run
+
+`tools/stack_probe.sh` runs both probes in debug and release, first with `scrub_stack`
+emptied (the key must be found, or the probe is blind on that target) and then as shipped
+(no key or plaintext may be found). `.github/workflows/stack-probe.yml` runs it on the 3rd
+of every month and on demand, on Linux x86_64, Windows x86_64, macOS ARM64 and Linux ARM64.
+It is not a pull-request check and never gates a merge. A failed scheduled run opens an
+issue, or comments on the open one.
+
 ## Reproducing
 
 From a checkout of the branch, in a scratch copy (`git archive HEAD | tar -x -C <dir>`):
