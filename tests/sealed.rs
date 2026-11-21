@@ -136,6 +136,7 @@ fn debug_reveals_nothing() {
         format!("{d:?}"),
         format!("{k:?}"),
         format!("{prekey:?}"),
+        format!("{:?}", Prekey::new_idle_noaccess()),
     ] {
         assert_eq!(s, "[REDACTED]");
     }
@@ -395,4 +396,52 @@ fn an_idle_noaccess_prekey_seals_and_opens_every_sealed_type() {
             "on Windows idle no-access gives up the lock"
         );
     }
+}
+
+// A dropped `SealedFixed` wipes its ciphertext, tag and salt. The value is dropped in
+// place inside a `ManuallyDrop`, so its storage is still ours to read afterwards. The only
+// bytes that may be non-zero then are the (now dangling) pre-key pointer's.
+#[test]
+fn a_dropped_sealed_fixed_leaves_no_ciphertext() {
+    use std::mem::{ManuallyDrop, size_of};
+
+    type Sealed = SealedFixed<64>;
+    fn nonzero(slot: &ManuallyDrop<Sealed>) -> usize {
+        let ptr = (slot as *const ManuallyDrop<Sealed>).cast::<u8>();
+        // SAFETY: `slot` is live storage of `size_of::<Sealed>()` bytes, read as `u8` and
+        // never again as a `Sealed`. Every byte of it is initialized: `Sealed` is three
+        // byte arrays and one pointer (144 bytes of arrays, a multiple of the pointer's
+        // alignment, so there is no padding).
+        let bytes = unsafe { std::slice::from_raw_parts(ptr, size_of::<Sealed>()) };
+        bytes.iter().filter(|&&b| b != 0).count()
+    }
+
+    let prekey = Prekey::new();
+    let mut slot = ManuallyDrop::new(SealedFixed::seal(Fixed::new([0xA5u8; 64]), &prekey));
+    assert!(
+        nonzero(&slot) > 64,
+        "control: a live sealed value holds ciphertext, tag and salt"
+    );
+    // SAFETY: dropped exactly once, and never used as a `Sealed` again.
+    unsafe { ManuallyDrop::drop(&mut slot) };
+    assert!(
+        nonzero(&slot) <= size_of::<usize>(),
+        "after drop only the pre-key pointer's bytes may remain"
+    );
+}
+
+#[test]
+fn from_random_seals_without_a_plain_value() {
+    let prekey = Prekey::new();
+
+    let a = SealedAppKey::from_random(&prekey);
+    let b = SealedAppKey::from_random(&prekey);
+    assert_eq!(a.len(), 32);
+    let differ = a.with_secret(|x| b.with_secret(|y| x != y));
+    assert!(differ, "two random keys differ");
+    a.with_role(|k: &AppKey| k.with_secret(|bytes| assert_eq!(bytes.len(), 32)));
+
+    let blob = SealedDynamic::<Vec<u8>>::from_random(48, &prekey);
+    assert_eq!(blob.len(), 48);
+    blob.with_secret(|v| assert!(v.iter().any(|&x| x != 0)));
 }

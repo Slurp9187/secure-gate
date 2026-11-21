@@ -14,7 +14,7 @@
 //!   zeroes when the wrapper is dropped, even on error paths.
 //! - **Opt-in `Clone`** — requires `T: CloneableSecret` and the `cloneable` feature.
 //! - **Opt-in `Serialize`** — requires the `SerializableSecret` marker and the
-//!   `serde-serialize`/`serde-deserialize` features.
+//!   `serde-serialize` feature. `Deserialize` (`serde-deserialize`) needs no marker.
 //! - **Avoid move-by-value for long-lived secrets.** Each move of a `Fixed<T>`
 //!   bitwise-copies the bytes to a new location and leaves the original stack
 //!   slot uncleared until a later frame overwrites it. Pass `&Fixed<T>` /

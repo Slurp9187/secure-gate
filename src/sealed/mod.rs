@@ -92,16 +92,70 @@
 //! Not zero-overhead. Each access hashes 16 KiB and runs one AEAD pass; each mutation adds
 //! an RNG call and a second pass. The repository's `sealed_vs_fixed` benchmark measures it.
 //!
+//! # Where the protection stops
+//!
+//! Sealing protects a secret **while it is idle, and only as far as the pre-key is safe**.
+//! Three edges, stated once:
+//!
+//! - **The pre-key.** Ciphertext, salt and tag are ordinary memory, and what keeps them
+//!   closed is the pre-key, which is wiped when its last holder drops. A sealed value also
+//!   wipes its own ciphertext, salt and tag when it is dropped, so a dropped secret leaves
+//!   nothing to open even while other sealed values keep the pre-key alive. That wipe
+//!   reaches the value where it is dropped: a [`SealedFixed`] that was moved leaves
+//!   ciphertext in the stack slots it left (`SECURITY.md` §1), and a `SealedDynamic`'s one
+//!   heap buffer is wiped whole.
+//! - **The closure.** Inside `with_secret`, `with_secret_mut`, `with_role` and
+//!   `with_role_mut` the secret is plaintext. The crate wipes the temporary it made; copies
+//!   the closure makes are the caller's.
+//! - **`unseal`.** It returns an ordinary [`Fixed`](crate::Fixed) or
+//!   [`Dynamic`](crate::Dynamic) (or the plain role). From there the plain wrapper's rules
+//!   apply and sealing protects nothing.
+//!
 //! # Not implemented, on purpose
 //!
-//! - `expose_secret` / [`RevealSecret`](crate::RevealSecret): plaintext must not outlive
-//!   the call. Use [`RevealScoped`](crate::scoped::RevealScoped) for generic scoped access.
-//! - `Hash`: it would feed the plaintext into a hasher whose state is never wiped.
+//! Every item here is a decision, not an omission. If you need one of them, open the secret
+//! with `with_secret` and do it there, where the audit sweep sees it.
+//!
+//! - `expose_secret`, `into_inner` and [`RevealSecret`](crate::RevealSecret): plaintext
+//!   must not outlive the call. Use [`RevealScoped`](crate::scoped::RevealScoped) for
+//!   generic scoped access, and `unseal` to end sealing by name.
+//! - [`RevealSecretMut`](crate::RevealSecretMut): it requires `RevealSecret`. The inherent
+//!   `with_secret_mut` is the mutable access, and re-seals under a fresh salt. For
+//!   [`SealedDynamic`] it hands out `&mut str` / `&mut [u8]`, not `&mut String` /
+//!   `&mut Vec<u8>`, so the buffer cannot grow and abandon an unwiped copy.
+//! - [`SecretLen`](crate::SecretLen): it requires `RevealSecret` too, so the sealed types
+//!   cannot implement it. They have inherent `len()` and `is_empty()` instead, and no
+//!   `byte_len()`. **This is a known gap, not a design goal:** those two calls need no
+//!   `use secure_gate::SecretLen;`, so `grep SecretLen` does not find code that measures a
+//!   sealed secret. Search for `.len()` and `.is_empty()` on sealed values as well. Length
+//!   is sensitive for passwords (see `SecretLen`'s docs).
+//! - `Clone`, with or without `CloneableSecret`: a second copy
+//!   would share the salt. Unseal, clone the plain value if its type allows it, and seal
+//!   again.
+//! - `Hash`, `PartialEq`, `Eq`: `Hash` would feed the plaintext into a hasher whose state
+//!   is never wiped. Compare with `ConstantTimeEq` (the `ct-eq` feature).
 //! - `Debug` beyond `[REDACTED]`: no salt, no tag, no length.
+//! - `Zeroize`: zeroing a live sealed value would leave it unable to open. The sealed
+//!   types do wipe on drop, and are `ZeroizeOnDrop`.
+//! - Serde, the encoders (`ToHex` and the rest), the `try_from_*` decoders, `From`,
+//!   `TryFrom` and `std::io::Write`: each would create or consume plaintext outside a
+//!   scoped call. Decode or deserialize into a plain wrapper and seal that.
+//! - `derive:` options on [`sealed_fixed_newtype!`](crate::sealed_fixed_newtype) and
+//!   [`sealed_dynamic_newtype!`](crate::sealed_dynamic_newtype): a sealed role seals from
+//!   and unseals to its one plain role, and nothing else.
+//! - `with_role_mut` on `sealed_dynamic_newtype!`: it would hand out the growable role.
+//!   `sealed_fixed_newtype!` has it, because a fixed role cannot grow.
+//! - `from_random` on a sealed `String`, and on `sealed_dynamic_newtype!`: random bytes
+//!   are not text, and that macro sees only the role's name, not whether it holds a
+//!   `String` or a `Vec<u8>`. Seal a plain `Role::from_random(len)` instead.
+//!   [`SealedFixed::from_random`], `SealedDynamic::<Vec<u8>>::from_random` and
+//!   `sealed_fixed_newtype!`'s `from_random` exist.
 
 mod dynamic;
 mod fixed;
 mod prekey;
+#[doc(hidden)]
+pub mod role;
 
 pub use dynamic::{SealedDynamic, SealedPayload};
 pub use fixed::SealedFixed;
@@ -171,6 +225,68 @@ pub use prekey::{LockError, Prekey};
 /// ```compile_fail,E0277
 /// use secure_gate::{Dynamic, Prekey, SealedDynamic};
 /// let _ = SealedDynamic::seal(Dynamic::<Vec<u16>>::new(vec![1]), &Prekey::new());
+/// ```
+///
+/// # The role wall
+///
+/// A sealed role is built on a conversion between the plain role and the `Fixed` or
+/// `Dynamic` inside it. That conversion must not be a way into or out of a role that skips
+/// `derive: [FromWrapper]` / `[IntoWrapper]`. Each case below compiled in 0.9.0.
+///
+/// A bare `Fixed` cannot be turned into a role through the hidden trait:
+///
+/// ```compile_fail,E0061
+/// use secure_gate::{Fixed, fixed_newtype, __private::FixedRole};
+/// fixed_newtype!(pub AppKey, 32);
+/// let _ = <AppKey as FixedRole>::from_fixed(Fixed::new([0u8; 32]));
+/// ```
+///
+/// Nor a role turned back into a bare `Fixed`:
+///
+/// ```compile_fail,E0061
+/// use secure_gate::{Fixed, fixed_newtype, __private::FixedRole};
+/// fixed_newtype!(pub AppKey, 32);
+/// let _ = <AppKey as FixedRole>::into_fixed(AppKey::new([0u8; 32]));
+/// ```
+///
+/// The token the conversion asks for cannot be made outside this crate:
+///
+/// ```compile_fail,E0423
+/// use secure_gate::{Fixed, fixed_newtype, __private::{FixedRole, RoleToken}};
+/// fixed_newtype!(pub AppKey, 32);
+/// let token = RoleToken(core::marker::PhantomData);
+/// let _ = <AppKey as FixedRole>::from_fixed(Fixed::new([0u8; 32]), token);
+/// ```
+///
+/// A token is for one role. A hand-written role cannot spend the token it is given on
+/// someone else's:
+///
+/// ```compile_fail,E0308
+/// use secure_gate::{Fixed, fixed_newtype, __private::{FixedRole, RoleToken}};
+/// fixed_newtype!(pub AppKey, 32);
+/// pub struct Mine(Fixed<[u8; 32]>);
+/// impl FixedRole for Mine {
+///     type Fixed = Fixed<[u8; 32]>;
+///     fn into_fixed(self, _: RoleToken<Self>) -> Self::Fixed { self.0 }
+///     fn from_fixed(fixed: Self::Fixed, token: RoleToken<Self>) -> Self {
+///         let _: AppKey = <AppKey as FixedRole>::from_fixed(Fixed::new([0u8; 32]), token);
+///         Self(fixed)
+///     }
+/// }
+/// ```
+///
+/// The same holds for a `dynamic_newtype!` role:
+///
+/// ```compile_fail,E0061
+/// use secure_gate::{Dynamic, dynamic_newtype, __private::DynamicRole};
+/// dynamic_newtype!(pub Password, String);
+/// let _ = <Password as DynamicRole>::from_dynamic(Dynamic::<String>::new(String::new()));
+/// ```
+///
+/// ```compile_fail,E0061
+/// use secure_gate::{dynamic_newtype, __private::DynamicRole};
+/// dynamic_newtype!(pub Password, String);
+/// let _ = <Password as DynamicRole>::into_dynamic(Password::new("x"));
 /// ```
 #[cfg(doctest)]
 pub struct MisuseDoesNotCompile;

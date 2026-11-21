@@ -115,15 +115,52 @@ impl<const N: usize> SealedFixed<N> {
 
     /// Opens into a temporary, hands it to `wrap` (a `fixed_newtype!` role's constructor)
     /// and `f` gets the wrapped value; scrubbed like [`with_secret`](Self::with_secret).
-    /// The plumbing behind `sealed_fixed_newtype!`'s `with_role`; not a public API.
+    /// The plumbing behind `sealed_fixed_newtype!`'s `with_role`; crate-private.
+    #[inline]
+    pub(crate) fn with_wrapped<T, W, F, R>(&self, wrap: W, f: F) -> R
+    where
+        W: FnOnce(Fixed<[u8; N]>) -> T,
+        F: FnOnce(&T) -> R,
+    {
+        scrubbed(|| self.open_wrap_call(wrap, f))
+    }
+
+    /// The 0.9.0 name of the hook behind `sealed_fixed_newtype!`'s `with_role`. Hidden and
+    /// documented as not a public API, but it is a `pub` method on an exported type, and
+    /// 0.9.x removes nothing: it stays until the next breaking release. It lends the
+    /// opened `Fixed` for the closure, which reaches nothing that
+    /// [`with_secret`](Self::with_secret) does not. Its `_mut` sibling lets the closure
+    /// take that `Fixed` out and leave another to be re-sealed, as `with_secret_mut` lets
+    /// it copy the bytes out and overwrite them.
     #[doc(hidden)]
+    #[deprecated(
+        since = "0.9.1",
+        note = "not a public API; it is removed in the next breaking release"
+    )]
     #[inline]
     pub fn __with_wrapped<T, W, F, R>(&self, wrap: W, f: F) -> R
     where
         W: FnOnce(Fixed<[u8; N]>) -> T,
         F: FnOnce(&T) -> R,
     {
-        scrubbed(|| self.open_wrap_call(wrap, f))
+        self.with_wrapped(wrap, f)
+    }
+
+    /// As [`__with_wrapped`](Self::__with_wrapped): the 0.9.0 name, kept until the next
+    /// breaking release.
+    #[doc(hidden)]
+    #[deprecated(
+        since = "0.9.1",
+        note = "not a public API; it is removed in the next breaking release"
+    )]
+    #[inline]
+    pub fn __with_wrapped_mut<T, W, U, F, R>(&mut self, wrap: W, unwrap: U, f: F) -> R
+    where
+        W: FnOnce(Fixed<[u8; N]>) -> T,
+        U: FnOnce(T) -> Fixed<[u8; N]>,
+        F: FnOnce(&mut T) -> R,
+    {
+        self.with_wrapped_mut(wrap, unwrap, f)
     }
 
     // The move into `wrap` copies the plaintext within this frame, which the scrub covers.
@@ -139,11 +176,10 @@ impl<const N: usize> SealedFixed<N> {
         f(&wrapped)
     }
 
-    /// As [`__with_wrapped`](Self::__with_wrapped), mutably; `unwrap` gives the `Fixed` back
-    /// to re-seal under a fresh salt. Not a public API.
-    #[doc(hidden)]
+    /// As [`with_wrapped`](Self::with_wrapped), mutably; `unwrap` gives the `Fixed` back
+    /// to re-seal under a fresh salt. Crate-private.
     #[inline]
-    pub fn __with_wrapped_mut<T, W, U, F, R>(&mut self, wrap: W, unwrap: U, f: F) -> R
+    pub(crate) fn with_wrapped_mut<T, W, U, F, R>(&mut self, wrap: W, unwrap: U, f: F) -> R
     where
         W: FnOnce(Fixed<[u8; N]>) -> T,
         U: FnOnce(T) -> Fixed<[u8; N]>,
@@ -192,6 +228,9 @@ impl<const N: usize> SealedFixed<N> {
     }
 
     /// The secret's length in bytes, `N`.
+    ///
+    /// This is a plain method, not [`SecretLen::len`](crate::SecretLen::len), and needs no
+    /// import. For a fixed-size key the length is already in the type.
     #[inline(always)]
     pub const fn len(&self) -> usize {
         N
@@ -210,6 +249,25 @@ impl<const N: usize> SealedFixed<N> {
         self.prekey.open_in_place(&self.salt, &self.tag, buf);
     }
 }
+
+/// Wipes the ciphertext, tag and salt.
+///
+/// They are not the secret, and they cannot be opened without the pre-key. But while
+/// another sealed value keeps the same pre-key alive, the ciphertext of a dropped one would
+/// still open for anyone who could read both, so a dropped sealed value leaves nothing
+/// behind to open. As with [`Fixed`], this wipes the value where it is dropped: a
+/// `SealedFixed` that was moved leaves its earlier stack slots as they were, holding
+/// ciphertext (`SECURITY.md` §1).
+impl<const N: usize> Drop for SealedFixed<N> {
+    fn drop(&mut self) {
+        use zeroize::Zeroize;
+        self.ct.zeroize();
+        self.tag.zeroize();
+        self.salt.zeroize();
+    }
+}
+
+impl<const N: usize> zeroize::ZeroizeOnDrop for SealedFixed<N> {}
 
 impl<const N: usize> crate::scoped::RevealScoped for SealedFixed<N> {
     type Inner = [u8; N];
@@ -239,6 +297,7 @@ impl<const N: usize> core::fmt::Debug for SealedFixed<N> {
     }
 }
 
+// Inline, not in `tests/`: these read and corrupt the private `ct`, `salt` and `tag` fields.
 #[cfg(test)]
 mod tests {
     use super::*;

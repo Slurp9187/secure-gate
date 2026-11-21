@@ -256,6 +256,10 @@ under `traits` (such as `traits::reveal_secret::RevealSecret`) compile, and are 
   so it remains usable on `no_std` targets.
 - **MSRV.** The minimum supported Rust version rises only in a minor release (0.9 to 0.10),
   never in a patch release.
+- **The 0.8 line.** `release/0.8` exists for Rust older than 1.87 and stays on 0.8.x for
+  good. A 0.8.x release is a fix or an addition and never a breaking change, so `"0.8"` in
+  a `Cargo.toml` is safe to leave. It has no `sealed` feature. Breaking changes ship only
+  as a new minor version on main (0.9 to 0.10).
 - **Traits.** The public traits can be implemented outside this crate, and the newtype macros
   do so. A method added to one in a 0.9.x release always comes with a default body, so
   existing implementations keep compiling.
@@ -276,6 +280,9 @@ under `traits` (such as `traits::reveal_secret::RevealSecret`) compile, and are 
 
 **Contributing.** MSRV is 1.87; regenerate `Cargo.lock` with `cargo +1.87 update`. What CI
 checks is in [`.github/workflows/`](https://github.com/Slurp9187/secure-gate/tree/main/.github/workflows).
+Tests go in `tests/`. A test lives inline in `src/` only when it has to read private state
+(a sealed value's ciphertext, a private checksum type), and its module says so in one line.
+Private state is not exposed through a hidden hook to move a test out.
 
 ## License
 

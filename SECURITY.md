@@ -49,8 +49,8 @@ a buffer, the crate does not follow it. It names the exit, documents the copy, a
 | Spare capacity of a held `Vec` / `String` | Copies made through `expose_secret`, or inside a `with_secret` closure |
 | Staging buffers of the `try_from_*` decoders, on rejection too | The input you pass to a decoder or a `From<&[u8]>` / `From<&str>` conversion |
 | The partial write of a failed `try_new_with` | Buffers a `Vec` / `String` abandoned when *you* changed its capacity (§2) |
-| Buffers the wrapper's own `io::Write` outgrows | Buffers a serde deserializer grew through before handing the value over |
-| The value a deserializer returns, once returned | What serde `Serialize` and `as_reader` write into |
+| Buffers the wrapper's own `io::Write` outgrows | Buffers a serde deserializer fills before it hands a byte or a string over (its scratch buffer, its input) |
+| The buffer a secret is deserialized into, from its first byte: each one it outgrows, and the whole of it on rejection | What serde `Serialize` and `as_reader` write into |
 | `sealed` plaintext temporaries and the pre-key | The stack, registers, swap and core dumps (§1, §3) |
 
 Two reasons for a hard line. The left column is a finite list, and each entry has a test
@@ -107,8 +107,9 @@ obligation reads "must not" and not "cannot".
 - **Side channels other than equality timing.** Cache, power, EM, branch prediction.
 - **Lossy hardware readout of RAM** (cold boot, Rowhammer, Spectre-class) for `Fixed` and
   `Dynamic`, which hold plaintext. The opt-in `sealed` feature narrows this; see §3.
-- **Allocation-based denial of service in deserialization.** `MAX_DESERIALIZE_BYTES` is
-  checked after the deserializer has built the value.
+- **Allocation-based denial of service in deserialization.** `MAX_DESERIALIZE_BYTES`
+  bounds what this crate holds: a byte sequence is refused at the first byte past it. It
+  does not bound what the deserializer or the transport has already read into memory.
 - **Stack and register residue.** Temporaries, FFI boundaries, compiler spills (§1).
 
 ### If swap residue is in your threat model
@@ -155,11 +156,21 @@ Every way a secret is read, moved, encoded or decoded is an explicit call. Searc
 
 ```
 expose_secret  expose_secret_mut  with_secret  with_secret_mut
-into_inner  into_zeroizing  as_reader  as_wrapper_mut
+into_inner  into_zeroizing  as_reader
+from_wrapper  as_wrapper  as_wrapper_mut  into_wrapper
+with_role  with_role_mut  unseal
+SecretLen  byte_len
 to_hex  to_hex_upper  to_base32  to_base64url
 try_to_bech32  try_to_bech32m  try_to_bech32_sized  try_to_bech32m_sized
 try_from_hex  try_from_base32  try_from_base64url  try_from_bech32  try_from_bech32m
 ```
+
+The second and third rows are the newtype and `sealed` surfaces: `from_wrapper` and its
+siblings are where a value enters or leaves a role, `with_role` / `with_role_mut` open a
+sealed role, and `unseal` ends sealing. `SecretLen` is the import that marks code measuring
+a secret. It does **not** mark the sealed types: `SealedFixed`, `SealedDynamic` and the
+sealed role types have plain `len()` and `is_empty()` methods that need no import, so
+search for `.len()` and `.is_empty()` on sealed values by hand (§3).
 
 Also audit every `CloneableSecret`, `SerializableSecret` and `FixedStorage` impl; each is
 an assertion the compiler does not check.
@@ -330,6 +341,8 @@ build; after it, neither. That was measured on x86_64 Windows only
 | The plaintext temporary while the closure runs, and copies the closure makes | Not covered. The temporary is wiped, and the stack below overwritten, when the call returns |
 | Registers, and stack beyond the 32 KiB | Not covered |
 | The `Fixed` that `SealedFixed::unseal` returns | An ordinary `Fixed`: returning it can leave a stack copy (§1). Read through `with_secret` / `with_role` instead |
+| A sealed value after it is **dropped** | Its ciphertext, salt and tag are wiped where it was dropped, so nothing is left to open even while other sealed values keep the pre-key alive. Not covered: stack slots a `SealedFixed` was moved out of, which keep ciphertext (§1) |
+| The **length** of a sealed secret | Readable through plain `len()` / `is_empty()`, with no `SecretLen` import to mark the call (see Audit surfaces). `Debug` does not print it |
 | Growing a sealed `String` / `Vec<u8>` | Not expressible. `with_secret_mut` hands out `&mut str` / `&mut [u8]`, and `sealed_dynamic_newtype!` has no `with_role_mut`, so nothing can reallocate the plaintext (§2). To change the length, `unseal`, edit and seal again |
 
 **Lock quotas.** On Windows every `VirtualLock` draws on the working-set quota: about
@@ -338,8 +351,9 @@ Unix the limit is `RLIMIT_MEMLOCK`; where it is 0 (common in containers) every l
 refused, `lock_status()` says so, and sealing still works.
 
 **Cost.** About 7–11 µs per access for a 32-byte key, and about 32 KiB of free stack.
-Design, numbers and what it deliberately omits (`expose_secret`, `Hash`):
-`docs/design/sealed_memory.md`.
+Design and numbers: `docs/design/sealed_memory.md`. Everything the sealed types
+deliberately do not implement, each with its reason, is listed in the `sealed` module's
+rustdoc under "Not implemented, on purpose".
 
 ### 4. Copying the secret out of a reveal borrow
 
@@ -451,7 +465,7 @@ deployment, redact at the logging boundary.
 | `std` | Adds `as_reader()` (copies into caller-owned buffers) and the wiping `io::Write` on `Dynamic<Vec<u8>>`. Not part of `full`. | Enable when you need unknown-length construction (§2) |
 | `ct-eq` | `.ct_eq()` via `subtle` | Strongly recommended |
 | `rand` | `from_random()` uses the system RNG and panics on failure. A caller-supplied RNG needs no feature: `try_new_with(\|b\| rng.try_fill_bytes(b))`, which wipes on `Err`. | Use `try_new_with` where RNG failure should be handled |
-| `serde-deserialize` | The value the deserializer returns is held in `Zeroizing`, on rejection too. Buffers the deserializer grew through are its own and are freed unwiped: with `serde_json`, a 1008-byte `Dynamic<Vec<u8>>` from a JSON array leaves 5 blocks holding 992 bytes (#249). `Fixed<[u8; N]>` pre-sizes and rejects over-length input before growing, and leaves none. 1 MiB default limit (`MAX_DESERIALIZE_BYTES`, or `deserialize_with_limit`), enforced after materialization. | Trusted sources; cap size at the transport. Where residue matters, fill a `new_with` slot instead |
+| `serde-deserialize` | The secret is read into a buffer this crate wipes, from its first byte: no plain `Vec<u8>` or `String` exists in between, and each buffer a byte sequence outgrows is wiped before it is freed (0.9.1, #249; through 0.9.0 a 1008-byte `Dynamic<Vec<u8>>` from a JSON array left 5 freed blocks holding 992 bytes). Rejected input is wiped too. `Fixed<[u8; N]>` pre-sizes and rejects over-length input before growing. **Stops at the deserializer:** what it buffers before handing a byte or a string over is its own, and for text that includes `serde_json`'s scratch buffer when the string has escapes. 1 MiB default limit (`MAX_DESERIALIZE_BYTES`, or `deserialize_with_limit`), checked as bytes arrive. | Trusted sources; cap size at the transport. Where the deserializer's own residue matters, fill a `new_with` slot instead |
 | `serde-serialize` | Writes the full secret into buffers this crate cannot reach. Opt-in per type via `SerializableSecret`. | Enable sparingly; audit every impl |
 | `encoding`, `encoding-*` | Constant-time hex, Base32 and Base64url via RustCrypto backends; bech32 via `bech32`. Encoders need `alloc`; `Fixed::try_from_*` does not. | Enable per format |
 | `cloneable` | Opt-in cloning via `CloneableSecret`. Each clone is a wrapper and wipes itself. | Use minimally |

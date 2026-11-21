@@ -251,13 +251,22 @@
 /// generated that would undo it by accident. There is no `From<Wrapper>` and
 /// no `Deref`, so a base-typed value cannot flow into a newtype through
 /// `.into()`, and `&Newtype` never coerces to `&Wrapper` at a call site. By
-/// default the only way material enters or leaves is the 3-tier access API —
+/// default, outside the declaring module (below), the only way material enters or
+/// leaves is the 3-tier access API —
 /// a `with_secret` round trip — which is explicit and shows up in the audit
 /// sweep. Base-wrapper access is opt-in, per newtype, and **split by
 /// direction**: `derive: [FromWrapper]` adds `from_wrapper` (a base value
 /// *enters* this role), `derive: [IntoWrapper]` adds `as_wrapper`,
 /// `as_wrapper_mut`, and `into_wrapper` (material *leaves* this role toward
 /// the base type), and `derive: [WrapperAccess]` is shorthand for both.
+///
+/// **Where the wall stops: the declaring module.** The macro emits
+/// `struct Name(Wrapper)` with a private field, and Rust makes a private field visible in
+/// the module that invokes the macro and in every module nested inside it, at any depth.
+/// There, `Name(wrapper)` and `name.0` compile with no derive. Modules outside that
+/// subtree, and every other crate, are held to the derives. Declare roles in a small
+/// module of their own so that set stays small. The
+/// same holds for `dynamic_newtype!`.
 ///
 /// These cross a different wall from `into_inner`. A newtype has two:
 ///
@@ -484,9 +493,13 @@ macro_rules! fixed_newtype {
             impl $crate::__private::FixedRole for $name {
                 type Fixed = $crate::Fixed<[u8; $size]>;
                 #[inline(always)]
-                fn into_fixed(self) -> Self::Fixed { self.0 }
+                fn into_fixed(self, _: $crate::__private::RoleToken<Self>) -> Self::Fixed {
+                    self.0
+                }
                 #[inline(always)]
-                fn from_fixed(fixed: Self::Fixed) -> Self { Self(fixed) }
+                fn from_fixed(fixed: Self::Fixed, _: $crate::__private::RoleToken<Self>) -> Self {
+                    Self(fixed)
+                }
             }
         }
 
@@ -678,7 +691,7 @@ macro_rules! fixed_newtype {
              (`fixed_newtype!(pub K, generic [i16; 256])`). A literal array there \
              also gets `SecretLen` and the declaration-site `N = 0` guard; any other \
              inner type takes the reduced API (RevealSecret, RevealSecretMut, Debug, \
-             Zeroize, `new`, `new_with`) on purpose. `generic [u8; N]` is not one of \
+             Zeroize, `new`, `new_with`, `try_new_with`) on purpose. `generic [u8; N]` is not one of \
              those: write the size literal. \
              If the length or the marker looks right, the problem is in what follows \
              it: a `derive:` list needs brackets, and accepts only Deserialize, \

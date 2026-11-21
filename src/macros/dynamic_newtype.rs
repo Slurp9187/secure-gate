@@ -198,13 +198,21 @@
 /// generated that would undo it by accident. There is no `From<Wrapper>` and
 /// no `Deref`, so a base-typed value cannot flow into a newtype through
 /// `.into()`, and `&Newtype` never coerces to `&Wrapper` at a call site. By
-/// default the only way material enters or leaves is the 3-tier access API —
+/// default, outside the declaring module (below), the only way material enters or
+/// leaves is the 3-tier access API —
 /// a `with_secret` round trip — which is explicit and shows up in the audit
 /// sweep. Base-wrapper access is opt-in, per newtype, and **split by
 /// direction**: `derive: [FromWrapper]` adds `from_wrapper` (a base value
 /// *enters* this role), `derive: [IntoWrapper]` adds `as_wrapper`,
 /// `as_wrapper_mut`, and `into_wrapper` (material *leaves* this role toward
 /// the base type), and `derive: [WrapperAccess]` is shorthand for both.
+///
+/// **Where the wall stops: the declaring module.** The macro emits
+/// `struct Name(Wrapper)` with a private field, and Rust makes a private field visible in
+/// the module that invokes the macro and in every module nested inside it, at any depth.
+/// There, `Name(wrapper)` and `name.0` compile with no derive. Modules outside that
+/// subtree, and every other crate, are held to the derives. Declare roles in a small
+/// module of their own so that set stays small.
 ///
 /// These cross a different wall from `into_inner`. A newtype has two:
 ///
@@ -354,9 +362,19 @@ macro_rules! dynamic_newtype {
             impl $crate::__private::DynamicRole for $name {
                 type Payload = $crate::__private::String;
                 #[inline(always)]
-                fn into_dynamic(self) -> $crate::Dynamic<Self::Payload> { self.0 }
+                fn into_dynamic(
+                    self,
+                    _: $crate::__private::RoleToken<Self>,
+                ) -> $crate::Dynamic<Self::Payload> {
+                    self.0
+                }
                 #[inline(always)]
-                fn from_dynamic(dynamic: $crate::Dynamic<Self::Payload>) -> Self { Self(dynamic) }
+                fn from_dynamic(
+                    dynamic: $crate::Dynamic<Self::Payload>,
+                    _: $crate::__private::RoleToken<Self>,
+                ) -> Self {
+                    Self(dynamic)
+                }
             }
         }
     };
@@ -384,9 +402,19 @@ macro_rules! dynamic_newtype {
             impl $crate::__private::DynamicRole for $name {
                 type Payload = $crate::__private::Vec<u8>;
                 #[inline(always)]
-                fn into_dynamic(self) -> $crate::Dynamic<Self::Payload> { self.0 }
+                fn into_dynamic(
+                    self,
+                    _: $crate::__private::RoleToken<Self>,
+                ) -> $crate::Dynamic<Self::Payload> {
+                    self.0
+                }
                 #[inline(always)]
-                fn from_dynamic(dynamic: $crate::Dynamic<Self::Payload>) -> Self { Self(dynamic) }
+                fn from_dynamic(
+                    dynamic: $crate::Dynamic<Self::Payload>,
+                    _: $crate::__private::RoleToken<Self>,
+                ) -> Self {
+                    Self(dynamic)
+                }
             }
         }
         impl $name {

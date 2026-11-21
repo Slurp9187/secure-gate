@@ -1,4 +1,4 @@
-//! Scoped access shared by plain and sealed secrets. Requires the `sealed` feature.
+//! Scoped access shared by plain and sealed secrets.
 //!
 //! [`RevealScoped`] is the part of [`RevealSecret`] that a sealed type can also offer:
 //! access through a closure, with no reference that outlives it. It is implemented for
@@ -6,7 +6,13 @@
 //! [`SealedFixed`](crate::SealedFixed) and [`SealedDynamic`](crate::SealedDynamic), so
 //! generic code that only reads through a closure can take either.
 //!
+//! The trait needs no feature. A library can accept "plain or sealed" by bounding on it
+//! without enabling `sealed` itself, which would bring in `std` and the cipher crates; only
+//! the caller that actually seals something needs that feature.
+//!
 //! ```rust
+//! # #[cfg(feature = "sealed")]
+//! # {
 //! use secure_gate::scoped::RevealScoped;
 //! use secure_gate::{Fixed, Prekey, SealedFixed};
 //!
@@ -17,6 +23,7 @@
 //! let prekey = Prekey::new();
 //! assert_eq!(first_byte(&Fixed::new([1u8; 32])), 1);
 //! assert_eq!(first_byte(&SealedFixed::seal(Fixed::new([2u8; 32]), &prekey)), 2);
+//! # }
 //! ```
 //!
 //! # Why this trait is not at the crate root
