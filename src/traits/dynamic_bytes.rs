@@ -24,8 +24,8 @@
 //! ```
 //!
 //! The trait is sealed: it is implemented for `Vec<u8>` and `[u8]` and cannot be
-//! implemented outside this crate. Its methods are hidden and act on a plain buffer the
-//! crate builds; they reach nothing inside a `Dynamic`.
+//! implemented outside this crate. It has no methods of its own; the buffer operations
+//! the crate uses live on a supertrait under `__private`, outside the public API.
 
 extern crate alloc;
 use alloc::boxed::Box;
@@ -41,27 +41,35 @@ mod private {
 /// A byte buffer [`Dynamic`](crate::Dynamic) builds in place: `Vec<u8>` or `[u8]`.
 ///
 /// See the [module docs](self) for what it unifies and why a call must name the shape.
-/// Sealed; not implementable outside this crate.
-pub trait DynamicBytes: private::Sealed + zeroize::Zeroize {
+/// Sealed; not implementable outside this crate. It has no methods of its own: what the
+/// generic constructors and encoders need lives on a supertrait under `__private`, which
+/// is not part of the public API.
+pub trait DynamicBytes: private::Sealed + zeroize::Zeroize + DynamicBytesImpl {}
+
+impl DynamicBytes for Vec<u8> {}
+impl DynamicBytes for [u8] {}
+
+/// The buffer operations behind [`DynamicBytes`]. Reached only as
+/// `secure_gate::__private::DynamicBytesImpl`, so it is semver-exempt like the rest of
+/// `__private`. Each method acts on a plain buffer the crate builds and reaches nothing
+/// inside a `Dynamic`.
+#[doc(hidden)]
+pub trait DynamicBytesImpl {
     /// A buffer of exactly `len` zero bytes, built before any secret is written to it.
-    #[doc(hidden)]
     fn __zeroed(len: usize) -> Box<Self>;
 
     /// The buffer's bytes, for filling a buffer `__zeroed` made.
-    #[doc(hidden)]
     fn __bytes_mut(&mut self) -> &mut [u8];
 
     /// The buffer's bytes, for encoding.
-    #[doc(hidden)]
     fn __bytes(&self) -> &[u8];
 
     /// Moves or copies `protected` into a new buffer. `protected` stays wrapped until the
     /// new buffer is built, so a failed allocation still wipes it.
-    #[doc(hidden)]
     fn __from_protected(protected: Zeroizing<Vec<u8>>) -> Box<Self>;
 }
 
-impl DynamicBytes for Vec<u8> {
+impl DynamicBytesImpl for Vec<u8> {
     #[inline(always)]
     fn __zeroed(len: usize) -> Box<Self> {
         Box::new(alloc::vec![0u8; len])
@@ -86,7 +94,7 @@ impl DynamicBytes for Vec<u8> {
     }
 }
 
-impl DynamicBytes for [u8] {
+impl DynamicBytesImpl for [u8] {
     #[inline(always)]
     fn __zeroed(len: usize) -> Box<Self> {
         // `vec![0; len]` has capacity `len`, so turning it into a box does not reallocate.
