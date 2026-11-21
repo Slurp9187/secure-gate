@@ -20,7 +20,8 @@ against this release. Nothing about what is wiped, or when, changes. MSRV stays 
    did not before.
    - Before: `sealed.len()` with no import. Error: E0599, no method named `len`.
    - After: add `use secure_gate::SecretLen;`. The call itself does not change.
-   - Before: `sealed.len()` inside a `const fn`. Error: E0015, a trait method is not const.
+   - Before: `sealed.len()` inside a `const fn`. Error: E0599 as above; once `SecretLen`
+     is imported, E0015, a trait method is not const.
    - After: use the length from the type (`N` for `SealedFixed<N>`), as for `Fixed`.
    - Before: a trait of your own with a `len`, `byte_len` or `is_empty` method, implemented
      for a sealed type and called where `SecretLen` is imported. Error: E0034, multiple

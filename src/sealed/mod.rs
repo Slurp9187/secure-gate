@@ -225,9 +225,9 @@ pub use prekey::{LockError, Prekey};
 /// gone (removed in 0.10.0):
 ///
 /// ```compile_fail,E0599
-/// use secure_gate::{Fixed, Prekey, SealedFixed};
+/// use secure_gate::{Fixed, Prekey, RevealSecret, SealedFixed};
 /// let s = SealedFixed::seal(Fixed::new([0u8; 4]), &Prekey::new());
-/// let _ = s.__with_wrapped(|f| f, |f: &Fixed<[u8; 4]>| f.len());
+/// let _ = s.__with_wrapped(|f| f, |f: &Fixed<[u8; 4]>| f.expose_secret()[0]);
 /// ```
 ///
 /// A sealed value has no plain `len()`: it is measured through
@@ -237,6 +237,16 @@ pub use prekey::{LockError, Prekey};
 /// use secure_gate::{Fixed, Prekey, SealedFixed};
 /// let s = SealedFixed::seal(Fixed::new([0u8; 4]), &Prekey::new());
 /// let _ = s.len();
+/// ```
+///
+/// Nor does the type a sealed macro generates:
+///
+/// ```compile_fail,E0599
+/// use secure_gate::{Prekey, fixed_newtype, sealed_fixed_newtype};
+/// fixed_newtype!(AppKey, 32);
+/// sealed_fixed_newtype!(SealedAppKey, AppKey);
+/// let k = SealedAppKey::seal(AppKey::new([0u8; 32]), &Prekey::new());
+/// let _ = k.len();
 /// ```
 ///
 /// # The role wall

@@ -159,7 +159,7 @@ macro_rules! sealed_fixed_newtype {
         impl $crate::SecretLen for $name {
             #[inline(always)]
             fn len(&self) -> usize {
-                self.0.len()
+                $crate::SecretLen::len(&self.0)
             }
         }
 

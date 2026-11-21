@@ -340,11 +340,12 @@ impl<T: 'static + zeroize::Zeroize> From<T> for Dynamic<T> {
     }
 }
 
-// Hex encoding and decoding for Dynamic<Vec<u8>>.
+// Hex encoding and decoding for Dynamic<Vec<u8>> and Dynamic<[u8]>.
 // Dynamic is always heap-allocated, so no no-alloc split is needed.
 #[cfg(feature = "encoding-hex")]
 impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
-    /// Decodes a hex string (lowercase, uppercase, or mixed) into `Dynamic<Vec<u8>>`.
+    /// Decodes a hex string (lowercase, uppercase, or mixed) into
+    /// `Dynamic<Vec<u8>>` or `Dynamic<[u8]>`, whichever the caller names.
     ///
     /// The decode buffer is allocated inside `Zeroizing` before a byte is written to it, so
     /// it is wiped when the input is rejected as well as on success, and it stays in
@@ -356,10 +357,11 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
     }
 }
 
-// Base32 encoding and decoding for Dynamic<Vec<u8>>.
+// Base32 encoding and decoding for Dynamic<Vec<u8>> and Dynamic<[u8]>.
 #[cfg(feature = "encoding-base32")]
 impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
-    /// Decodes an uppercase, unpadded Base32 (RFC 4648 §6) string into `Dynamic<Vec<u8>>`.
+    /// Decodes an uppercase, unpadded Base32 (RFC 4648 §6) string into
+    /// `Dynamic<Vec<u8>>` or `Dynamic<[u8]>`, whichever the caller names.
     ///
     /// The decode buffer is allocated inside `Zeroizing` before a byte is written to it, so
     /// it is wiped when the input is rejected as well as on success, and it stays in
@@ -378,10 +380,11 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
     }
 }
 
-// Base64url encoding and decoding for Dynamic<Vec<u8>>.
+// Base64url encoding and decoding for Dynamic<Vec<u8>> and Dynamic<[u8]>.
 #[cfg(feature = "encoding-base64")]
 impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
-    /// Decodes a Base64url (unpadded) string into `Dynamic<Vec<u8>>`.
+    /// Decodes a Base64url (unpadded) string into
+    /// `Dynamic<Vec<u8>>` or `Dynamic<[u8]>`, whichever the caller names.
     ///
     /// The decode buffer is allocated inside `Zeroizing` before a byte is written to it, so
     /// it is wiped when the input is rejected as well as on success, and it stays in
@@ -393,11 +396,11 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
     }
 }
 
-// Bech32 (BIP-173) encoding and decoding for Dynamic<Vec<u8>>.
+// Bech32 (BIP-173) encoding and decoding for Dynamic<Vec<u8>> and Dynamic<[u8]>.
 #[cfg(feature = "encoding-bech32")]
 impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
-    /// Decodes a Bech32 (BIP-173) string into `Dynamic<Vec<u8>>`, validating the HRP
-    /// (case-insensitive).
+    /// Decodes a Bech32 (BIP-173) string, validating the HRP (case-insensitive), into
+    /// `Dynamic<Vec<u8>>` or `Dynamic<[u8]>`, whichever the caller names.
     ///
     /// The decoded buffer is wrapped in `Zeroizing` as soon as it exists, and stays in it
     /// until after the `Box` allocation completes, guaranteeing zeroization even on OOM panic.
@@ -435,7 +438,8 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
         )))
     }
 
-    /// Decodes a Bech32 (BIP-173) string into `Dynamic<Vec<u8>>` without validating the HRP.
+    /// Decodes a Bech32 (BIP-173) string without validating the HRP, into
+    /// `Dynamic<Vec<u8>>` or `Dynamic<[u8]>`, whichever the caller names.
     ///
     /// Use [`try_from_bech32`](Self::try_from_bech32) in security-critical code to prevent
     /// cross-protocol confusion attacks.
@@ -458,11 +462,11 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
     }
 }
 
-// Bech32m (BIP-350) encoding and decoding for Dynamic<Vec<u8>>.
+// Bech32m (BIP-350) encoding and decoding for Dynamic<Vec<u8>> and Dynamic<[u8]>.
 #[cfg(feature = "encoding-bech32")]
 impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
-    /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>`, validating the HRP
-    /// (case-insensitive).
+    /// Decodes a Bech32m (BIP-350) string, validating the HRP (case-insensitive), into
+    /// `Dynamic<Vec<u8>>` or `Dynamic<[u8]>`, whichever the caller names.
     ///
     /// The decoded buffer is wrapped in `Zeroizing` as soon as it exists, and stays in it
     /// until after the `Box` allocation completes, guaranteeing zeroization even on OOM panic.
@@ -496,7 +500,8 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
         )))
     }
 
-    /// Decodes a Bech32m (BIP-350) string into `Dynamic<Vec<u8>>` without validating the HRP.
+    /// Decodes a Bech32m (BIP-350) string without validating the HRP, into
+    /// `Dynamic<Vec<u8>>` or `Dynamic<[u8]>`, whichever the caller names.
     ///
     /// Use [`try_from_bech32m`](Self::try_from_bech32m) in security-critical code.
     pub fn try_from_bech32m_unchecked(s: &str) -> Result<Self, crate::error::Bech32Error> {
@@ -518,17 +523,19 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
     }
 }
 
-/// Construction helpers and random generation for `Dynamic<Vec<u8>>`.
+/// Construction helpers for `Dynamic<Vec<u8>>` and `Dynamic<[u8]>`.
 impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
-    /// Transfers `protected` bytes into a freshly boxed `Vec`, keeping
-    /// [`zeroize::Zeroizing`] alive across the only allocation that can panic.
+    /// Moves (`Vec<u8>`) or copies (`[u8]`) `protected` bytes into a freshly boxed buffer,
+    /// keeping [`zeroize::Zeroizing`] alive across the allocation that can panic.
     ///
     /// # Panic safety
     ///
-    /// `Box::new(Vec::new())` is the sole allocation point — just the 24-byte
-    /// `Vec` header, no data buffer. If it panics (OOM), `protected` is still
-    /// in scope and `Zeroizing::drop` zeroes the secret bytes during unwind.
-    /// After the swap, `protected` holds an empty `Vec` (no-op to zeroize) and
+    /// For `Vec<u8>`, the 24-byte header is the only allocation; for `[u8]`, a box of
+    /// exactly the secret's length. Either way `protected` is still in scope while it is
+    /// made, so a panic there wipes the secret bytes during unwind, and for `[u8]` the
+    /// source is wiped when it drops after the copy.
+    ///
+    /// For `Vec<u8>`, after the swap `protected` holds an empty `Vec` (no-op to zeroize) and
     /// `Dynamic::from(boxed)` is an infallible struct-field assignment.
     ///
     /// Note: `Box::new(*protected)` would be cleaner but does not compile —
@@ -988,10 +995,11 @@ impl Dynamic<[u8]> {
 // Random generation
 #[cfg(feature = "rand")]
 impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
-    /// Fills a new `Vec<u8>` with `len` cryptographically secure random bytes and wraps it.
+    /// Fills a new buffer of `len` cryptographically secure random bytes and wraps it, as
+    /// `Dynamic<Vec<u8>>` or `Dynamic<[u8]>`, whichever the caller names.
     ///
     /// Uses the system RNG ([`SysRng`](rand::rngs::SysRng)). Requires the `rand` feature (and
-    /// `alloc`, which `Dynamic<Vec<u8>>` always needs).
+    /// `alloc`, which `Dynamic` always needs).
     ///
     /// # Panics
     ///

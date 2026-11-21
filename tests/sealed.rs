@@ -466,4 +466,11 @@ fn sealed_types_are_measured_through_secret_len() {
     assert_eq!(len_of(&k), (32, 32, false));
     let e = SealedBlob::seal(Blob::new(Vec::new()), &prekey);
     assert_eq!(len_of(&e), (0, 0, true));
+
+    // The hidden wrappers the macros hold answer the same way.
+    use secure_gate::__private::{SealedDynRole, SealedRole};
+    let r = SealedRole::<AppKey>::seal(AppKey::new([0u8; 32]), &prekey);
+    assert_eq!(len_of(&r), (32, 32, false));
+    let dr = SealedDynRole::<Password>::seal(Password::new(String::from("abc")), &prekey);
+    assert_eq!(len_of(&dr), (3, 3, false));
 }
