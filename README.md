@@ -164,14 +164,18 @@ Each format sits behind its own feature; `encoding` turns on all four.
 | Bech32m (BIP-350) | `ToBech32m` | `try_from_bech32m(s, hrp)` | `encoding-bech32` |
 
 Every encoder returns `EncodedSecret`, which wipes itself on drop and has no `Display`.
-Every decoder is fallible and decodes straight into the wrapper, as in the Quick start.
+Every decoder is fallible and decodes into a staging `Zeroizing` buffer, as in the Quick
+start. `Dynamic<Vec<u8>>` takes that buffer over without a copy. `Fixed` and
+`Dynamic<[u8]>` copy the bytes out of it into the wrapper (for `Dynamic<[u8]>`, a box of
+exactly their length), and the staging buffer is wiped.
 
 ## Sealed memory
 
 With the `sealed` feature, a key is held encrypted while it idles, under a pre-key
 locked in RAM between guard pages. Each access costs about 7–11 µs for a 32-byte key, so it
-is for long-held keys, not hot loops. `Prekey::new()` keeps the pre-key locked against
-swap. Where Windows crash dumps matter more than swap, `Prekey::new_idle_noaccess()` keeps
+is for long-held keys, not hot loops. `Prekey::new()` asks to lock the pre-key against
+swap; if the system refuses, sealing still works and `Prekey::lock_status()` returns the
+refusal. Where Windows crash dumps matter more than swap, `Prekey::new_idle_noaccess()` keeps
 an idle pre-key out of a user-mode dump, but cannot keep it locked there. What it covers
 and what it does not:
 [`sealed`](https://docs.rs/secure-gate/latest/secure_gate/sealed/index.html).

@@ -5,15 +5,20 @@
 # It changes the working tree: it applies the probe hooks and copies the probes into
 # tests/. Run it in a CI checkout or a scratch copy, never in a tree you work in.
 #
-# Two runs per profile (debug, release):
-#   1. "scrub off": scrub_stack() emptied. If the probe finds no key here, it cannot see
-#      where the cipher leaves it in that profile on this target, and the clean result
-#      below shows nothing. That profile is reported as inconclusive (a warning), not
-#      as a pass. On Linux ARM64 the release build leaves no key in reach even then.
-#   2. As shipped: every key and plaintext "hits=" count must be 0.
+# Two runs per profile:
+#   1. "scrub off": scrub_stack() emptied. The probe must find the key copy the cipher
+#      leaves, or it cannot see the stack region in that profile on this target, and a
+#      clean result as shipped would show nothing. That fails the run.
+#   2. As shipped: every key and plaintext "hits=" count must be 0, with one exception
+#      below.
 #
-# Fails if a key or plaintext copy is found as shipped, or if neither profile is in reach
-# (the probe would then show nothing at all on this target).
+# The profiles come from STACK_PROBE_PROFILES (default "debug release"). The workflow
+# drops a profile only where it is known to be out of reach (Linux ARM64 release).
+#
+# The one count not gated: the plaintext count on the "unseal, result dropped" line.
+# SealedFixed::unseal returns an ordinary Fixed by value, and a by-value return can
+# leave a stack copy in the caller's frames, which the sealed scrub does not reach and
+# SECURITY.md lists as not covered. The line is still printed; its key count is gated.
 #
 # Usage: tools/stack_probe.sh   (from the repository root)
 set -euo pipefail
@@ -41,18 +46,29 @@ run() { # $1 = label, rest = cargo test profile flags. Prints the probe's "hits=
   # Printed to stderr for the log and to stdout for the caller. Not `tee /dev/stderr`:
   # the Windows runner's bash has no /dev/stderr, and the log then shows no counts.
   local hits
-  hits=$(grep -E 'hits=' "$log" || true)
+  hits=$( (grep -E 'hits=' "$log" || true) | tr -d '\r')
   rm -f "$log"
   printf '%s\n' "$hits" >&2
   printf '%s\n' "$hits"
 }
 
+# The key count of the probe's one `with_secret:` line, or nothing if there is not
+# exactly one such line holding exactly one integer.
+key_hits() {
+  local lines
+  lines=$(printf '%s\n' "$1" | grep -E '^with_secret: ' || true)
+  [ "$(printf '%s' "$lines" | grep -c '')" -eq 1 ] || return 0
+  printf '%s\n' "$lines" | sed -nE 's/^with_secret: key hits=([0-9]+) plaintext hits=[0-9]+$/\1/p'
+}
+
 PY=$(command -v python3 || command -v python)
 fail=0
-reached=0
-for profile in debug release; do
-  flags=()
-  [ "$profile" = release ] && flags=(--release)
+for profile in ${STACK_PROBE_PROFILES:-debug release}; do
+  case $profile in
+    debug) flags=() ;;
+    release) flags=(--release) ;;
+    *) echo "::error::unknown profile '$profile' in STACK_PROBE_PROFILES"; exit 1 ;;
+  esac
 
   cp src/sealed/prekey.rs /tmp/prekey.rs.shipped
   # Empty scrub_stack's body. The match is exact so a rename fails loudly here.
@@ -69,31 +85,24 @@ EOF
   off=$(run "scrub off, $profile" "${flags[@]}")
   cp /tmp/prekey.rs.shipped src/sealed/prekey.rs
 
-  reach=$(printf '%s\n' "$off" | grep -E '^with_secret: ' | sed -E 's/.*key hits=([0-9]+).*/\1/')
+  reach=$(key_hits "$off")
   if [ -z "$reach" ] || [ "$reach" -eq 0 ]; then
-    echo "::warning::$profile: inconclusive. With scrub_stack disabled the probe found no key copy, so it cannot see where the cipher leaves one in this profile on this target"
-  else
-    reached=$((reached + 1))
+    echo "::error::$profile: out of reach. With scrub_stack disabled the probe found no key copy (or no single count), so it cannot see where the cipher leaves one in this profile on this target"
+    fail=1
   fi
 
   on=$(run "as shipped, $profile" "${flags[@]}")
-  # A run that printed no counts proves nothing; never let it pass as clean.
-  for out in "$off" "$on"; do
-    if ! printf '%s\n' "$out" | grep -qE '^with_secret: key hits=[0-9]+'; then
-      echo "::error::$profile: the probe printed no counts, so this run shows nothing"
-      fail=1
-    fi
-  done
+  if [ -z "$(key_hits "$on")" ]; then
+    echo "::error::$profile: as shipped, the probe printed no single with_secret count, so this run shows nothing"
+    fail=1
+  fi
   # The control line counts a pattern the probe leaves on purpose; it is not a residue.
-  if printf '%s\n' "$on" | grep -v '^control ' | grep -qE 'hits=[1-9]'; then
+  # The unseal line's plaintext count is the by-value return described above.
+  if printf '%s\n' "$on" | grep -v '^control ' |
+    sed -E '/unseal, result dropped:/s/ plaintext hits=[0-9]+//' | grep -qE 'hits=[1-9]'; then
     echo "::error::$profile: sealing key or plaintext found on the stack after a sealed access"
     fail=1
   fi
 done
-
-if [ "$reached" -eq 0 ]; then
-  echo "::error::neither profile is in reach on this target, so the probe shows nothing here"
-  fail=1
-fi
 
 exit "$fail"

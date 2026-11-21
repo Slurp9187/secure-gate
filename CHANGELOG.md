@@ -17,8 +17,9 @@ against this release. Nothing about what is wiped, or when, changes. MSRV stays 
 
 ### Migration
 
-1. **Sealed types are measured through `SecretLen`.** `SealedFixed`, `SealedDynamic` and
-   the types `sealed_fixed_newtype!` / `sealed_dynamic_newtype!` generate lose their plain
+1. **Sealed types are measured through `SecretLen`.** `SealedFixed`, `SealedDynamic`, the
+   types `sealed_fixed_newtype!` / `sealed_dynamic_newtype!` generate, and the hidden
+   `__private::SealedRole` / `__private::SealedDynRole` those types hold lose their plain
    `len()` and `is_empty()` and implement `SecretLen` instead, which also gives them
    `byte_len()`. `grep SecretLen` now finds code that measures a sealed secret, which it
    did not before.
@@ -64,11 +65,13 @@ against this release. Nothing about what is wiped, or when, changes. MSRV stays 
   freed unwiped.
 - `DynamicBytes`, the sealed trait behind those methods. It cannot be implemented outside
   this crate.
-- `SecretLen` for `SealedFixed<N>`, `SealedDynamic<T>` and the sealed macro types.
+- `SecretLen` for `SealedFixed<N>`, `SealedDynamic<T>`, the sealed macro types,
+  `__private::SealedRole` and `__private::SealedDynRole`.
 
 ### Removed
 
-- The plain `len()` / `is_empty()` on the sealed types (see Migration 1).
+- The plain `len()` / `is_empty()` on `SealedFixed`, `SealedDynamic`, the sealed macro
+  types, `__private::SealedRole` and `__private::SealedDynRole` (see Migration 1).
 - `SealedFixed::__with_wrapped`, `__with_wrapped_mut` and `SealedDynamic::__with_wrapped`
   (Migration 4).
 
@@ -81,9 +84,10 @@ against this release. Nothing about what is wiped, or when, changes. MSRV stays 
 - The sealed stack overwrite is now measured on x86_64 Linux as well as x86_64 Windows
   (`docs/design/receipts/sealed-stack-residue/runs_linux.txt`). `tools/stack_probe.sh` runs
   it monthly on Linux and Windows x86_64, macOS ARM64 and Linux ARM64
-  (`.github/workflows/stack-probe.yml`), outside the merge checks. Its first run found
-  nothing as shipped on any of the four (`runs_ci.txt`); a Linux ARM64 release build leaves
-  no key in the probe's reach, so only its debug build is measured there. 32-bit is not
+  (`.github/workflows/stack-probe.yml`), outside the merge checks, and fails when a run
+  with the scrub removed cannot see the key. Its first run found nothing as shipped on any
+  of the four (`runs_ci.txt`). A Linux ARM64 release build leaves no key in the probe's
+  reach, so it cannot be measured and only the debug build runs there. 32-bit is not
   probed.
 - README says which versions are yanked and why (0.9.0-rc.6 stays listed while a downstream
   user is pinned to it), and that a patch release may restrict an API to fix a security

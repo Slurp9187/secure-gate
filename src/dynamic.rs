@@ -609,8 +609,8 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
     /// allocation request, and both allocator failure modes are reachable through it. A
     /// `len` above `isize::MAX` panics with `"capacity overflow"` before anything is
     /// allocated. A `len` the allocator cannot satisfy reaches `handle_alloc_error`, which
-    /// **aborts** rather than unwinding: no destructor runs anywhere, so no `Zeroizing` on
-    /// this stack or any frame above it gets the chance to wipe anything.
+    /// **aborts** rather than unwinding: no destructor runs anywhere, so nothing on this
+    /// stack or any frame above it gets the chance to wipe anything.
     ///
     /// `len` is caller-supplied, and the worked example on the fallible sibling is
     /// `try_new_with(len, |slot| r.read_exact(slot))` — precisely the shape where `len`
@@ -630,8 +630,9 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
     /// has acquired an allocation-sized surface where it previously had a comparison, and
     /// needs a bound it may never have written.
     ///
-    /// A panic *inside* `f` is safe: the slot lives in a [`zeroize::Zeroizing`] for the
-    /// whole call, so partially written bytes are wiped during unwinding.
+    /// A panic *inside* `f` is safe: the slot is built zeroed inside the returned
+    /// `Dynamic` before `f` runs, so the `Dynamic`'s own `Drop` wipes partially written
+    /// bytes during unwinding.
     ///
     /// # See also
     ///
@@ -655,9 +656,9 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
     /// [`new_with`](Self::new_with) for a fill that can fail.
     ///
     /// Identical in every respect but the closure's return type. On `Err` the
-    /// partially written slot is **zeroized before the error is returned** — the
-    /// `Zeroizing` holding it is dropped on the way out, so a failed fill leaves
-    /// nothing behind.
+    /// partially written slot is **zeroized before the error is returned**: the slot is
+    /// already inside the `Dynamic` being built, and that `Dynamic` is dropped on the way
+    /// out, so its own `Drop` wipes it and a failed fill leaves nothing behind.
     ///
     /// That is not defensive tidiness. Decoders that write into a caller-supplied
     /// buffer routinely leave real plaintext in it when they fail; `miniz_oxide`'s
@@ -705,14 +706,15 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
     /// reason: the body allocates the slot with the identical `alloc::vec![0u8; len]`. A
     /// `len` above `isize::MAX` panics with `"capacity overflow"`; a `len` the allocator
     /// cannot satisfy reaches `handle_alloc_error`, which aborts without unwinding, so no
-    /// `Zeroizing` anywhere on the stack runs. The `# Errors` section above describes the
+    /// destructor anywhere on the stack runs. The `# Errors` section above describes the
     /// closure's failures only — an oversized `len` never reaches the closure and never
     /// arrives as `Err`, so a caller treating `Result` as the complete failure channel is
     /// wrong about this one. Bound `len` before passing it; the example below takes it
     /// straight from its caller, which in real code means straight from a frame header.
     ///
-    /// A panic *inside* `f` is safe, exactly as in `new_with`: the slot is held in a
-    /// [`zeroize::Zeroizing`] for the whole call and is wiped during unwinding.
+    /// A panic *inside* `f` is safe, exactly as in `new_with`: the slot is inside the
+    /// `Dynamic` being built for the whole call, and that `Dynamic`'s own `Drop` wipes it
+    /// during unwinding.
     ///
     /// # Examples
     ///

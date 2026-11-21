@@ -350,10 +350,19 @@ Linux (rustc 1.87.0; with the overwrite removed the probe found the key there to
 it, nothing), in `docs/design/receipts/sealed-stack-residue/`. A monthly CI run repeats it on
 x86_64 Linux and Windows, macOS ARM64 and Linux ARM64, each time first with the overwrite
 removed, to show the probe can see the key on that target, then as shipped. Its first run
-(rustc 1.100.0, `runs_ci.txt`) found nothing as shipped on any of the four. On Linux ARM64
-the release build left no key copy in reach even with the overwrite removed, so the probe
-shows nothing for that profile either way; the debug build there was in reach. 32-bit
-targets are not probed.
+(rustc 1.100.0, `runs_ci.txt`) found nothing as shipped on any of the four. A run that
+cannot see the key with the overwrite removed fails the job.
+
+**Linux ARM64 release builds cannot be measured.** There the release build leaves no key
+copy the probe can reach even with the overwrite removed, so a clean result would show
+nothing. The monthly run probes only the debug build on Linux ARM64, which is in reach. Nor
+are 32-bit targets probed.
+
+One count the monthly run does not gate: the plaintext copy that `SealedFixed::unseal` can
+leave. `unseal` returns an ordinary `Fixed` by value, and a by-value return can leave a
+stack copy in the caller's frames, out of the overwrite's reach (the `unseal` row below,
+and §1). The probe found that copy once in a Windows release build (rustc 1.98.1,
+`runs_panic.txt`) and not in the first monthly run.
 
 | Threat | Sealed |
 |---|---|
@@ -457,7 +466,10 @@ EncodableBytes`, and `str` is not `EncodableBytes`, so `encoded.to_hex()` and
 `"text".to_hex()` are rejected. Write `.as_bytes()` if the UTF-8 is what you mean.
 
 **Decoders.** Use the format-specific constructors (`try_from_hex` and siblings on `Fixed`
-and `Dynamic`); they put the bytes straight into a wrapper.
+and `Dynamic`); the bytes are decoded into a staging `Zeroizing` buffer and never sit
+anywhere unwiped. `Dynamic<Vec<u8>>` takes that buffer over without a copy. `Fixed` and
+`Dynamic<[u8]>` copy the bytes out of it into the wrapper (for `Dynamic<[u8]>`, a box of
+exactly their length), and the staging buffer is wiped.
 
 - The decode buffer is allocated inside `Zeroizing` before the backend writes to it, so it
   is wiped on success, on rejection and on unwind (#96, #97). Through 0.9.0-rc.17 the hex,

@@ -37,10 +37,13 @@ Two controls keep a clean result from meaning "looked in the wrong place":
 
 ## Monthly run
 
-`tools/stack_probe.sh` runs both probes in debug and release, first with `scrub_stack`
-emptied (the key must be found, or the probe is blind on that target) and then as shipped
-(no key or plaintext may be found). `.github/workflows/stack-probe.yml` runs it on the 3rd
-of every month and on demand, on Linux x86_64, Windows x86_64, macOS ARM64 and Linux ARM64.
+`tools/stack_probe.sh` runs both probes in each profile it is given, first with
+`scrub_stack` emptied (the key must be found, or the probe is blind there and the run
+fails) and then as shipped (no key or plaintext may be found, except the plaintext count on
+the `unseal, result dropped` line: `unseal` returns a `Fixed` by value, whose stack copy the
+scrub cannot reach, as `SECURITY.md` says). `.github/workflows/stack-probe.yml` runs it on
+the 3rd of every month and on demand: debug and release on Linux x86_64, Windows x86_64 and
+macOS ARM64, and debug only on Linux ARM64, whose release build is out of the probe's reach.
 It also runs on a pull request that changes the probe itself, and it never gates a merge. A failed scheduled run opens an
 issue, or comments on the open one.
 
@@ -66,8 +69,8 @@ the "scrub off" run instead: with `scrub_stack` emptied the probe finds the key 
 debug and once in release after `with_secret`, and with it in place it finds nothing. The
 monthly run's first pass (rustc 1.100.0, `runs_ci.txt`) added macOS ARM64 and Linux ARM64:
 nothing as shipped on either. On Linux ARM64 the release build leaves no key copy in reach
-even with the scrub emptied, so that profile is reported as inconclusive and shows nothing;
-its debug build is in reach (17 copies with the scrub off). No 32-bit target is measured.
+even with the scrub emptied, so that profile cannot be measured and the monthly run leaves
+it out; its debug build is in reach (17 copies with the scrub off). No 32-bit target is measured.
 Registers are not inspected. `SealedDynamic` was not probed: its
 plaintext temporary is on the heap in a `Dynamic`, which wipes it, and its accesses end with
 the same `scrub_stack`.
