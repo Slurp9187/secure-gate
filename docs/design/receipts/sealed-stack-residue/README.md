@@ -40,7 +40,7 @@ Two controls keep a clean result from meaning "looked in the wrong place":
 emptied (the key must be found, or the probe is blind on that target) and then as shipped
 (no key or plaintext may be found). `.github/workflows/stack-probe.yml` runs it on the 3rd
 of every month and on demand, on Linux x86_64, Windows x86_64, macOS ARM64 and Linux ARM64.
-It is not a pull-request check and never gates a merge. A failed scheduled run opens an
+It also runs on a pull request that changes the probe itself, and it never gates a merge. A failed scheduled run opens an
 issue, or comments on the open one.
 
 ## Reproducing
