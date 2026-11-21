@@ -32,7 +32,8 @@
 //!   stored in the object. The cipher leaves a copy of it on the stack, so every seal and
 //!   open ends by overwriting the 32 KiB of stack below the call (sequoia's `zero_stack`
 //!   technique), on a panic as well as a normal return, which also removes plaintext a move
-//!   left there. Measured on x86_64 Windows and x86_64 Linux:
+//!   left there. Measured on x86_64 Windows and Linux and on macOS ARM64, and on Linux
+//!   ARM64 in a debug build (its release build leaves no key the probe can reach):
 //!   `docs/design/receipts/sealed-stack-residue/` in the repository.
 //! - Because every seal has its own key, the AEAD nonce is all-zero. Every re-seal after
 //!   [`with_secret_mut`](SealedFixed::with_secret_mut) draws a new salt, so no key ever

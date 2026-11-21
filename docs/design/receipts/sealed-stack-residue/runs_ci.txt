@@ -1,0 +1,321 @@
+Monthly stack probe, first run: GitHub Actions run 44948418672 (pull request #298,
+commit a8f79b2), tools/stack_probe.sh. Each target: scrub_stack emptied ("scrub off"),
+then as shipped, in debug and release. The ::warning:: line is the script's own report.
+Kept from each job log: the rustc version, the script's headings and every 'hits=' line.
+
+######## Stack probe (Linux ARM64) (success)
+rustc 1.100.0 (0ef1bc386 2026-11-09)
+== scrub off, debug
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=17 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=17 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=17 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=1 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=1 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=17 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=1
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=17 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=17 plaintext hits=0
+== as shipped, debug
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=0 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=0 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=0 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=0 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=0 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+== scrub off, release
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=0 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=0 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=0 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=0 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=0 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+::warning::release: inconclusive. With scrub_stack disabled the probe found no key copy, so it cannot see where the cipher leaves one in this profile on this target
+== as shipped, release
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=0 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=0 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=0 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=0 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=0 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+
+######## Stack probe (macOS ARM64) (success)
+rustc 1.100.0 (0ef1bc386 2026-11-09)
+== scrub off, debug
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=17 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=17 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=17 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=17 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=17 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=17 plaintext hits=0
+== as shipped, debug
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=0 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=0 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=0 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=0 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=0 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+== scrub off, release
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=1 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=1 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=1 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=1 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=1 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+== as shipped, release
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=0 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=0 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=0 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=0 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=0 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+
+######## Stack probe (Linux x86_64) (success)
+rustc 1.100.0 (0ef1bc386 2026-11-09)
+== scrub off, debug
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=5 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=3 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=3 plaintext hits=0
+[default hook] unseal, result dropped: key hits=5 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=5 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=5 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=5 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=5 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=5 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=1 plaintext hits=0
+== as shipped, debug
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=0 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=0 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=0 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=0 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=0 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+== scrub off, release
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=1 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=1 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=1 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=1 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=1 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+== as shipped, release
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=0 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=0 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=0 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=0 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=0 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+
+######## Stack probe (Windows x86_64) (success)
+rustc 1.100.0 (0ef1bc386 2026-11-09)
+== scrub off, debug
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=5 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=5 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=5 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=5 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=5 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+== as shipped, debug
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=0 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=0 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=0 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=0 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=0
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=0 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+== scrub off, release
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=1 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=1 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=1 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=1 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=1
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=1 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0
+== as shipped, release
+[default hook] baseline: key hits=0 plaintext hits=0
+[default hook] with_secret, normal return: key hits=0 plaintext hits=0
+[default hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[default hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[default hook] unseal, result dropped: key hits=0 plaintext hits=0
+[default hook] with_secret, tag mismatch panics: key hits=0
+.[silent hook] baseline: key hits=0 plaintext hits=0
+[silent hook] with_secret, normal return: key hits=0 plaintext hits=0
+[silent hook] with_secret, closure panics: key hits=0 plaintext hits=0
+[silent hook] with_secret_mut, closure panics: key hits=0 plaintext hits=0
+[silent hook] unseal, result dropped: key hits=0 plaintext hits=0
+[silent hook] with_secret, tag mismatch panics: key hits=0
+control hits=1
+baseline after wipe: key hits=0 plaintext hits=0
+with_secret: key hits=0 plaintext hits=0
+sealing_key only (SHA-256 into Fixed, dropped): key hits=0
+cipher only (key derived, ChaCha20Poly1305::new, dropped): key hits=0
+with_secret_mut: old key hits=0 new key hits=0 plaintext hits=0

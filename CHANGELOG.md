@@ -79,10 +79,12 @@ against this release. Nothing about what is wiped, or when, changes. MSRV stays 
 - `SECURITY.md` says how a sealed value's nonce is chosen: all-zero, because every seal
   and re-seal draws a fresh 32-byte salt and so a fresh key.
 - The sealed stack overwrite is now measured on x86_64 Linux as well as x86_64 Windows
-  (`docs/design/receipts/sealed-stack-residue/runs_linux.txt`); `SECURITY.md` says no
-  other target was. `tools/stack_probe.sh` runs it monthly on Linux and Windows x86_64,
-  macOS ARM64 and Linux ARM64 (`.github/workflows/stack-probe.yml`), outside the merge
-  checks.
+  (`docs/design/receipts/sealed-stack-residue/runs_linux.txt`). `tools/stack_probe.sh` runs
+  it monthly on Linux and Windows x86_64, macOS ARM64 and Linux ARM64
+  (`.github/workflows/stack-probe.yml`), outside the merge checks. Its first run found
+  nothing as shipped on any of the four (`runs_ci.txt`); a Linux ARM64 release build leaves
+  no key in the probe's reach, so only its debug build is measured there. 32-bit is not
+  probed.
 - README says which versions are yanked and why (0.9.0-rc.6 stays listed while a downstream
   user is pinned to it), and that a patch release may restrict an API to fix a security
   bug, with 0.9.1's change to the hidden `__private` role conversions as the example. "Zero-overhead" is dropped from the crate

@@ -347,9 +347,13 @@ overwriting the 32 KiB of stack below the call, on a panic too. A probe found th
 times there before the overwrite in a debug build and a plaintext copy once in a release
 build; after it, neither. That was measured on x86_64 Windows (rustc 1.98.1) and x86_64
 Linux (rustc 1.87.0; with the overwrite removed the probe found the key there too, and with
-it, nothing), in `docs/design/receipts/sealed-stack-residue/`. macOS, ARM and 32-bit targets
-were not probed. They use other ChaCha20 backends and other frame layouts, so whether the
-overwrite covers them is not measured.
+it, nothing), in `docs/design/receipts/sealed-stack-residue/`. A monthly CI run repeats it on
+x86_64 Linux and Windows, macOS ARM64 and Linux ARM64, each time first with the overwrite
+removed, to show the probe can see the key on that target, then as shipped. Its first run
+(rustc 1.100.0, `runs_ci.txt`) found nothing as shipped on any of the four. On Linux ARM64
+the release build left no key copy in reach even with the overwrite removed, so the probe
+shows nothing for that profile either way; the debug build there was in reach. 32-bit
+targets are not probed.
 
 | Threat | Sealed |
 |---|---|

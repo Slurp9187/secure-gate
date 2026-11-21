@@ -15,6 +15,7 @@ measured with the same probe. This directory holds that probe and its captured o
 | `probe_hooks.patch` | The hooks: `#[doc(hidden)]` methods that derive the key the way an access does, and one that flips a ciphertext byte. Applied to a scratch copy only; never part of the crate. |
 | `runs.txt` | First round: captured stdout, before and after the scrub, debug and release. |
 | `runs_linux.txt` | Both probes on Linux x86_64 (rustc 1.87.0, commit `150e24b`), debug and release: with `scrub_stack` disabled, to show the probe reaches the key there, and as shipped. |
+| `runs_ci.txt` | The monthly run's first pass (GitHub Actions, rustc 1.100.0, commit `a8f79b2`) on Linux x86_64, Windows x86_64, macOS ARM64 and Linux ARM64: scrub off, then as shipped, in debug and release. |
 | `runs_panic.txt` | Second round: the panic probe before (`5805536`) and after `scrubbed()` and in-place `unseal`. Every panic path reads 0 after; `unseal` still reads one plaintext copy in release, the by-value return described in `SECURITY.md` §1. |
 
 ## Method
@@ -59,11 +60,14 @@ other's build of this crate, and the hooks then appear to be missing.
 
 ## What it does not cover
 
-Two targets were measured: x86_64 Windows (rustc 1.98.1) and x86_64 Linux (rustc 1.87.0,
+By hand, two targets were measured: x86_64 Windows (rustc 1.98.1) and x86_64 Linux (rustc 1.87.0,
 `runs_linux.txt`). On Linux the control reads 0 in both profiles, so the reach check there is
 the "scrub off" run instead: with `scrub_stack` emptied the probe finds the key 6 times in
-debug and once in release after `with_secret`, and with it in place it finds nothing. No
-ARM, macOS or 32-bit target was measured; they use other ChaCha20 backends and other frame
-layouts. Registers are not inspected. `SealedDynamic` was not probed: its
+debug and once in release after `with_secret`, and with it in place it finds nothing. The
+monthly run's first pass (rustc 1.100.0, `runs_ci.txt`) added macOS ARM64 and Linux ARM64:
+nothing as shipped on either. On Linux ARM64 the release build leaves no key copy in reach
+even with the scrub emptied, so that profile is reported as inconclusive and shows nothing;
+its debug build is in reach (17 copies with the scrub off). No 32-bit target is measured.
+Registers are not inspected. `SealedDynamic` was not probed: its
 plaintext temporary is on the heap in a `Dynamic`, which wipes it, and its accesses end with
 the same `scrub_stack`.
