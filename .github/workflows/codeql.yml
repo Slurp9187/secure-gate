@@ -18,7 +18,7 @@ on:
     #
     # This fires only from the default branch -- GitHub raises scheduled events
     # nowhere else -- so the copy of this file on `release/0.8` never runs on the
-    # cron, and a scheduled run here analyses `main` only (there is no cross-ref
+    # cron, and a scheduled run here analyzes `main` only (there is no cross-ref
     # checkout: CodeQL results must be attributed to the ref they came from).
     # `release/0.8` is covered by the push and pull_request triggers above, which
     # is why this file has to exist on that branch too.
