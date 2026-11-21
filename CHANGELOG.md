@@ -7,9 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.1] - Unreleased
 
-No public API is added, removed or changed. These come from a consistency review of the
-0.9.0 API, which looked for places where the `sealed` types differ from the rest of the
+Additions and fixes only; nothing public is removed or changed. These come from a
+consistency review of the 0.9.0 API, which looked for places where the `sealed` types differ from the rest of the
 crate without saying so.
+
+### Added
+- **Sealed values wipe themselves on drop.** `SealedFixed` and `SealedDynamic`, and so the
+  types both sealed macros generate, zero their ciphertext, salt and tag when dropped, and
+  are `ZeroizeOnDrop`. The ciphertext is not the secret, but until now a dropped sealed
+  value left it in freed memory, where it would still open for anyone able to read it and
+  the pre-key while another sealed value kept that pre-key alive. How far it reaches: the
+  value where it is dropped. A `SealedDynamic`'s one heap buffer is wiped whole; a
+  `SealedFixed` that was moved leaves ciphertext in the stack slots it left, as a moved
+  `Fixed` leaves plaintext. Both tests were run with the wipe removed and fail.
+- **`secure_gate::scoped::RevealScoped` no longer needs the `sealed` feature.** A library
+  can now accept "plain or sealed" secrets by bounding on the trait without pulling in
+  `std` and the cipher crates. Still not re-exported at the crate root, for the glob-import
+  reason its module docs give.
+- `SealedDynamic::<Vec<u8>>::from_random(len, &prekey)`, and `from_random(&prekey)` on
+  every `sealed_fixed_newtype!` type, beside the existing `SealedFixed::from_random`. The
+  key is generated and sealed without existing as a plain role in between.
+  `sealed_dynamic_newtype!` deliberately has none: the macro sees only the role's name,
+  not whether it holds a `String`, for which random bytes make no sense.
 
 ### Fixed
 - **With the `sealed` feature on, a role could be entered and left without its derive.**
@@ -45,10 +64,11 @@ crate without saying so.
   omissions; it now names every one, each with its reason: `RevealSecretMut`, `SecretLen`,
   `into_inner`, `Clone`, `PartialEq` / `Eq`, `Zeroize` / `ZeroizeOnDrop`, serde, the
   encoders and decoders, `From` / `TryFrom`, `io::Write`, the macros' `derive:` options,
-  `with_role_mut` on `sealed_dynamic_newtype!`, and the missing `from_random` constructors.
-- New "Where the protection stops" section in the `sealed` module, and two rows in
-  `SECURITY.md` §3: a dropped sealed value's ciphertext, salt and tag are not wiped, and
-  are safe only as far as the pre-key is.
+  `with_role_mut` on `sealed_dynamic_newtype!`, and the `from_random` constructors that
+  are deliberately absent.
+- New "Where the protection stops" section in the `sealed` module (the pre-key, the
+  closure, `unseal`), and two rows in `SECURITY.md` §3 on a dropped sealed value and on
+  the length of a sealed secret.
 - `SECURITY.md` audit search list: adds `from_wrapper`, `as_wrapper`, `into_wrapper`,
   `with_role`, `with_role_mut`, `unseal`, `SecretLen` and `byte_len`.
 - `Dynamic::new`: the docs said borrowed input is not accepted. That holds for

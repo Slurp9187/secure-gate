@@ -84,6 +84,13 @@ where
         ))
     }
 
+    /// Generates the key from the system RNG and seals it. A fresh random key is the role
+    /// by construction, so no conversion is involved.
+    #[inline]
+    pub fn from_random(prekey: &Arc<Prekey>) -> Self {
+        Self(SealedFixed::from_random(prekey))
+    }
+
     /// Opens the key as its role for the length of `f`.
     #[inline]
     pub fn with_role<F, T>(&self, f: F) -> T

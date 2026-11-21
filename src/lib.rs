@@ -133,7 +133,7 @@
 //! │                           EncodableBytes
 //! │                           (decoding: the `try_from_*` constructors on Fixed / Dynamic)
 //! ├── sealed/               ← SealedFixed, SealedDynamic, Prekey, LockError (sealed feature)
-//! ├── scoped                ← RevealScoped (sealed feature; not at the root, see below)
+//! ├── scoped                ← RevealScoped (always available; not at the root, see below)
 //! ├── macros/               ← fixed_newtype!, dynamic_newtype!, sealed_fixed_newtype!,
 //! │                           sealed_dynamic_newtype!
 //! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error
@@ -365,7 +365,6 @@ pub mod traits;
 #[cfg(feature = "sealed")]
 pub mod sealed;
 
-#[cfg(feature = "sealed")]
 pub mod scoped;
 
 /// Implementation detail of the `*_newtype!` macros — not a public API.

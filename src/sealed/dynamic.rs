@@ -204,6 +204,35 @@ impl<T: SealedPayload> SealedDynamic<T> {
     }
 }
 
+impl SealedDynamic<Vec<u8>> {
+    /// Generates `len` bytes from the system RNG and seals them.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the system RNG fails, as [`Dynamic::from_random`] does.
+    pub fn from_random(len: usize, prekey: &Arc<Prekey>) -> Self {
+        Self::seal(Dynamic::<Vec<u8>>::from_random(len), prekey)
+    }
+}
+
+/// Wipes the ciphertext, tag and salt.
+///
+/// They are not the secret, and they cannot be opened without the pre-key. But while
+/// another sealed value keeps the same pre-key alive, the ciphertext of a dropped one would
+/// still open for anyone who could read both, so a dropped sealed value leaves nothing
+/// behind to open. The ciphertext is one heap buffer that never moves or reallocates, so
+/// this reaches all of it.
+impl<T: SealedPayload> Drop for SealedDynamic<T> {
+    fn drop(&mut self) {
+        use zeroize::Zeroize;
+        self.ct.zeroize();
+        self.tag.zeroize();
+        self.salt.zeroize();
+    }
+}
+
+impl<T: SealedPayload> zeroize::ZeroizeOnDrop for SealedDynamic<T> {}
+
 impl<T: SealedPayload> crate::scoped::RevealScoped for SealedDynamic<T> {
     type Inner = T;
 

@@ -1179,12 +1179,13 @@ fn check_encoded_secret_drop_zeroed() {
 //   seal             the plain `Dynamic` that was consumed
 //   with_secret      the decrypted temporary
 //   with_secret_mut  the decrypted temporary (the ciphertext is rewritten in place)
-//   unseal           the returned `Dynamic`, dropped in a gate of its own: `unseal` also
-//                    frees the consumed ciphertext buffer, which is the same size
+//   unseal           the consumed ciphertext buffer, wiped by the sealed value's `Drop`;
+//                    then the returned `Dynamic`, dropped in a gate of its own
 //   (panic)          the temporary, when the `with_secret` closure unwinds
+//   drop             the ciphertext buffer of a sealed value that is simply dropped
 //
-// The sealed value itself is dropped outside every gate: its buffer is ciphertext, the
-// same size as the plaintext, and correctly not zero.
+// The ciphertext is not the secret, but a sealed value wipes it on drop all the same: while
+// another sealed value keeps the pre-key alive, a dropped one must leave nothing to open.
 // ---------------------------------------------------------------------------
 
 #[cfg(feature = "sealed")]
@@ -1230,9 +1231,15 @@ fn check_sealed_dynamic_plaintext_zeroed() {
         "with_secret panic: the plaintext temporary was not observed"
     );
 
-    // unseal: the plaintext comes back as an ordinary `Dynamic`. `unseal` itself runs outside
-    // the gate because it frees the ciphertext buffer, which is the same size and not zero.
-    let unsealed = sealed.unseal();
+    // unseal: the plaintext comes back as an ordinary `Dynamic`. `unseal` consumes the
+    // sealed value, whose `Drop` wipes the ciphertext buffer (the same size) before it is
+    // freed.
+    let mut unsealed = None;
+    let hits = with_proxy_check_counted(LEN, || unsealed = Some(sealed.unseal()));
+    assert_eq!(
+        hits, 1,
+        "unseal: the consumed ciphertext buffer was not observed"
+    );
     let hits = with_proxy_check_counted(LEN, || drop(unsealed));
     assert_eq!(
         hits, 1,
@@ -1250,6 +1257,10 @@ fn check_sealed_dynamic_plaintext_zeroed() {
         hits, 1,
         "String with_secret: the plaintext temporary was not observed"
     );
+
+    // Dropping a sealed value wipes its ciphertext buffer.
+    let hits = with_proxy_check_counted(TEXT_LEN, || drop(sealed));
+    assert_eq!(hits, 1, "drop: the ciphertext buffer was not observed");
 }
 
 // ---------------------------------------------------------------------------
@@ -1263,6 +1274,7 @@ fn check_sealed_dynamic_plaintext_zeroed() {
 //   seal        the plain role that was consumed
 //   with_role   the role temporary, on return and when the closure unwinds
 //   unseal      the returned role, dropped in a gate of its own (see above)
+//   drop        the ciphertext buffer of a sealed role that is simply dropped
 // ---------------------------------------------------------------------------
 
 #[cfg(feature = "sealed")]
@@ -1320,6 +1332,10 @@ fn check_sealed_dynamic_role_plaintext_zeroed() {
         hits, 1,
         "String with_role: the role temporary was not observed"
     );
+
+    // Dropping a sealed role wipes its ciphertext buffer.
+    let hits = with_proxy_check_counted(TEXT_LEN, || drop(sealed));
+    assert_eq!(hits, 1, "role drop: the ciphertext buffer was not observed");
 }
 
 // ---------------------------------------------------------------------------

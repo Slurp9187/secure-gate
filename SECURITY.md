@@ -340,7 +340,7 @@ build; after it, neither. That was measured on x86_64 Windows only
 | The plaintext temporary while the closure runs, and copies the closure makes | Not covered. The temporary is wiped, and the stack below overwritten, when the call returns |
 | Registers, and stack beyond the 32 KiB | Not covered |
 | The `Fixed` that `SealedFixed::unseal` returns | An ordinary `Fixed`: returning it can leave a stack copy (§1). Read through `with_secret` / `with_role` instead |
-| A sealed value after it is **dropped** | Its ciphertext, salt and tag are not wiped. They cannot be opened without the pre-key, which is wiped when its last holder drops. While another sealed value keeps that pre-key alive, the dropped ciphertext is as exposed as a live one: to a clean read, and to nothing less |
+| A sealed value after it is **dropped** | Its ciphertext, salt and tag are wiped where it was dropped, so nothing is left to open even while other sealed values keep the pre-key alive. Not covered: stack slots a `SealedFixed` was moved out of, which keep ciphertext (§1) |
 | The **length** of a sealed secret | Readable through plain `len()` / `is_empty()`, with no `SecretLen` import to mark the call (see Audit surfaces). `Debug` does not print it |
 | Growing a sealed `String` / `Vec<u8>` | Not expressible. `with_secret_mut` hands out `&mut str` / `&mut [u8]`, and `sealed_dynamic_newtype!` has no `with_role_mut`, so nothing can reallocate the plaintext (§2). To change the length, `unseal`, edit and seal again |
 

@@ -7,7 +7,8 @@
 /// (`fixed_newtype!(pub AppKey, 32)`). The length is taken from it, so it is never
 /// restated. No derives.
 ///
-/// The generated type has `seal(Role, &Arc<Prekey>)`, `with_role` / `with_role_mut` (the
+/// The generated type has `seal(Role, &Arc<Prekey>)`, `from_random(&Arc<Prekey>)`,
+/// `with_role` / `with_role_mut` (the
 /// closure gets `&Role` / `&mut Role`, for code that takes the role rather than bytes),
 /// `with_secret` / `with_secret_mut` (bytes), `unseal() -> Role`, `len`, `is_empty`, a
 /// redacted `Debug`, and `ConstantTimeEq` under `ct-eq`. Like `SealedFixed`, it has no
@@ -92,6 +93,18 @@ macro_rules! sealed_fixed_newtype {
                 prekey: &$crate::__private::Arc<$crate::Prekey>,
             ) -> Self {
                 Self($crate::__private::SealedRole::seal(secret, prekey))
+            }
+
+            /// Generates the key from the system RNG and seals it, so it never exists as a
+            /// plain role. The same as `Self::seal(Role::from_random(), prekey)` without
+            /// the plain value in between.
+            ///
+            /// # Panics
+            ///
+            /// Panics if the system RNG fails.
+            #[inline]
+            pub fn from_random(prekey: &$crate::__private::Arc<$crate::Prekey>) -> Self {
+                Self($crate::__private::SealedRole::from_random(prekey))
             }
 
             /// Decrypts into a temporary of the role for the length of `f`, then wipes it and

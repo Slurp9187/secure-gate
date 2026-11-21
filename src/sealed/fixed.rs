@@ -212,6 +212,25 @@ impl<const N: usize> SealedFixed<N> {
     }
 }
 
+/// Wipes the ciphertext, tag and salt.
+///
+/// They are not the secret, and they cannot be opened without the pre-key. But while
+/// another sealed value keeps the same pre-key alive, the ciphertext of a dropped one would
+/// still open for anyone who could read both, so a dropped sealed value leaves nothing
+/// behind to open. As with [`Fixed`], this wipes the value where it is dropped: a
+/// `SealedFixed` that was moved leaves its earlier stack slots as they were, holding
+/// ciphertext (`SECURITY.md` §1).
+impl<const N: usize> Drop for SealedFixed<N> {
+    fn drop(&mut self) {
+        use zeroize::Zeroize;
+        self.ct.zeroize();
+        self.tag.zeroize();
+        self.salt.zeroize();
+    }
+}
+
+impl<const N: usize> zeroize::ZeroizeOnDrop for SealedFixed<N> {}
+
 impl<const N: usize> crate::scoped::RevealScoped for SealedFixed<N> {
     type Inner = [u8; N];
 

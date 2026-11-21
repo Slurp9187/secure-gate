@@ -97,11 +97,13 @@
 //! Sealing protects a secret **while it is idle, and only as far as the pre-key is safe**.
 //! Three edges, stated once:
 //!
-//! - **The pre-key.** Ciphertext, salt and tag are ordinary memory and are not wiped when
-//!   a sealed value is dropped. They cannot be opened without the pre-key, which is wiped
-//!   when its last holder drops. While another sealed value keeps the same pre-key alive,
-//!   a dropped value's ciphertext can still be opened by anyone who can read both cleanly,
-//!   which is the clean read listed above.
+//! - **The pre-key.** Ciphertext, salt and tag are ordinary memory, and what keeps them
+//!   closed is the pre-key, which is wiped when its last holder drops. A sealed value also
+//!   wipes its own ciphertext, salt and tag when it is dropped, so a dropped secret leaves
+//!   nothing to open even while other sealed values keep the pre-key alive. That wipe
+//!   reaches the value where it is dropped: a [`SealedFixed`] that was moved leaves
+//!   ciphertext in the stack slots it left (`SECURITY.md` §1), and a `SealedDynamic`'s one
+//!   heap buffer is wiped whole.
 //! - **The closure.** Inside `with_secret`, `with_secret_mut`, `with_role` and
 //!   `with_role_mut` the secret is plaintext. The crate wipes the temporary it made; copies
 //!   the closure makes are the caller's.
@@ -133,8 +135,8 @@
 //! - `Hash`, `PartialEq`, `Eq`: `Hash` would feed the plaintext into a hasher whose state
 //!   is never wiped. Compare with `ConstantTimeEq` (the `ct-eq` feature).
 //! - `Debug` beyond `[REDACTED]`: no salt, no tag, no length.
-//! - `Zeroize`, `ZeroizeOnDrop` and a wiping `Drop`: what is stored is ciphertext; see
-//!   "Where the protection stops".
+//! - `Zeroize`: zeroing a live sealed value would leave it unable to open. The sealed
+//!   types do wipe on drop, and are `ZeroizeOnDrop`.
 //! - Serde, the encoders (`ToHex` and the rest), the `try_from_*` decoders, `From`,
 //!   `TryFrom` and `std::io::Write`: each would create or consume plaintext outside a
 //!   scoped call. Decode or deserialize into a plain wrapper and seal that.
@@ -143,8 +145,11 @@
 //!   and unseals to its one plain role, and nothing else.
 //! - `with_role_mut` on `sealed_dynamic_newtype!`: it would hand out the growable role.
 //!   `sealed_fixed_newtype!` has it, because a fixed role cannot grow.
-//! - `from_random` on [`SealedDynamic`] and on both sealed macros: seal a plain
-//!   `from_random()` value. [`SealedFixed::from_random`] exists.
+//! - `from_random` on a sealed `String`, and on `sealed_dynamic_newtype!`: random bytes
+//!   are not text, and that macro sees only the role's name, not whether it holds a
+//!   `String` or a `Vec<u8>`. Seal a plain `Role::from_random(len)` instead.
+//!   [`SealedFixed::from_random`], `SealedDynamic::<Vec<u8>>::from_random` and
+//!   `sealed_fixed_newtype!`'s `from_random` exist.
 
 mod dynamic;
 mod fixed;
