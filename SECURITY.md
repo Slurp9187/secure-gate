@@ -580,7 +580,8 @@ published). The docs said secrets were wiped on drop, but those versions had no
 to 0.4.3 did wipe on drop, through `secrecy::SecretBox` and `zeroize::Zeroizing`; the flaw
 starts at 0.5.0 (2025-11-22). The first published fix is 0.8.0-rc.1 (2026-03-22); the
 0.8.0-alpha.1 entry in `CHANGELOG-ARCHIVE.md` has the details. Every version before 0.8
-was yanked from crates.io on 2026-03-16. Since then the wipe is checked by tests rather than by reading the
+was yanked from crates.io on 2026-03-16: 0.5.0 onward for this flaw, 0.1.0 to 0.4.3 as
+early, superseded wrappers over `secrecy`. Since then the wipe is checked by tests rather than by reading the
 code: `tests/heap_zeroize.rs` checks freed heap blocks are zero, and
 `tests/asm_dse_check.rs` checks the optimizer keeps the wipe.
 
