@@ -324,6 +324,11 @@ impl does the same to `Dynamic::new(vec).to_hex()` (E0283). Both forms are in th
 own tests. They wait for a breaking release. Serde `Serialize` was never missing: it is
 gated on `SerializableSecret`, which `Vec<u8>` does not have either.
 
+**0.10.0.** The constructors, decoders and encoders shipped, written once over the sealed
+`DynamicBytes` trait (`Vec<u8>` and `[u8]`) instead of twice. A call that names the shape,
+on the binding, a field or a turbofish, compiles for either; only a call that names
+neither stops compiling.
+
 ## Fitting it to `Fixed` and `Dynamic`
 
 ### It has to be a separate type, not a mode

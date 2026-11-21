@@ -209,13 +209,13 @@ impl<R: DynamicRole> SealedDynRole<R> {
     /// The secret's length in bytes.
     #[inline]
     pub fn len(&self) -> usize {
-        self.0.len()
+        crate::SecretLen::len(&self.0)
     }
 
     /// `true` if the secret is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        crate::SecretLen::is_empty(&self.0)
     }
 
     /// Constant-time comparison of the two plaintexts.

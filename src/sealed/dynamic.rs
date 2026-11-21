@@ -172,40 +172,10 @@ impl<T: SealedPayload> SealedDynamic<T> {
         })
     }
 
-    /// The 0.9.0 name of the hook behind `sealed_dynamic_newtype!`'s `with_role`. Hidden and
-    /// documented as not a public API, but it is a `pub` method on an exported type, and
-    /// 0.9.x removes nothing: it stays until the next breaking release. It lends the
-    /// opened `Dynamic` for the closure, which reaches nothing that
-    /// [`with_secret`](Self::with_secret) does not.
-    #[doc(hidden)]
-    pub fn __with_wrapped<R0, W, F, R>(&self, wrap: W, f: F) -> R
-    where
-        W: FnOnce(Dynamic<T>) -> R0,
-        F: FnOnce(&R0) -> R,
-    {
-        self.with_wrapped(wrap, f)
-    }
-
     /// Opens the secret back into a plain [`Dynamic`]. Protection from sealing ends here;
     /// the returned wrapper still wipes on drop.
     pub fn unseal(self) -> Dynamic<T> {
         scrubbed(|| T::from_plain(self.open()))
-    }
-
-    /// The secret's length in bytes. Length can itself be sensitive for passwords; it is
-    /// not printed by `Debug`.
-    ///
-    /// This is a plain method, not [`SecretLen::len`](crate::SecretLen::len): it needs no
-    /// `use secure_gate::SecretLen;`, so searching for that import does not find this call.
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.ct.len()
-    }
-
-    /// `true` if the secret is empty.
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.ct.is_empty()
     }
 
     fn open(&self) -> Dynamic<Vec<u8>> {
@@ -247,6 +217,16 @@ impl<T: SealedPayload> Drop for SealedDynamic<T> {
 
 impl<T: SealedPayload> zeroize::ZeroizeOnDrop for SealedDynamic<T> {}
 
+/// The secret's length in bytes (`Vec<u8>` and `String` alike), read from the ciphertext
+/// without opening it. Length can itself be sensitive for passwords; see
+/// [`SecretLen`](crate::SecretLen). It is not printed by `Debug`.
+impl<T: SealedPayload> crate::SecretLen for SealedDynamic<T> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.ct.len()
+    }
+}
+
 impl<T: SealedPayload> crate::scoped::RevealScoped for SealedDynamic<T> {
     type Inner = T;
 
@@ -264,7 +244,7 @@ impl<T: SealedPayload> crate::scoped::RevealScoped for SealedDynamic<T> {
 #[cfg(feature = "ct-eq")]
 impl<T: SealedPayload> crate::ConstantTimeEq for SealedDynamic<T> {
     fn ct_eq(&self, other: &Self) -> bool {
-        if self.len() != other.len() {
+        if self.ct.len() != other.ct.len() {
             return false;
         }
         self.with_secret(|a| {

@@ -125,36 +125,6 @@ impl<const N: usize> SealedFixed<N> {
         scrubbed(|| self.open_wrap_call(wrap, f))
     }
 
-    /// The 0.9.0 name of the hook behind `sealed_fixed_newtype!`'s `with_role`. Hidden and
-    /// documented as not a public API, but it is a `pub` method on an exported type, and
-    /// 0.9.x removes nothing: it stays until the next breaking release. It lends the
-    /// opened `Fixed` for the closure, which reaches nothing that
-    /// [`with_secret`](Self::with_secret) does not. Its `_mut` sibling lets the closure
-    /// take that `Fixed` out and leave another to be re-sealed, as `with_secret_mut` lets
-    /// it copy the bytes out and overwrite them.
-    #[doc(hidden)]
-    #[inline]
-    pub fn __with_wrapped<T, W, F, R>(&self, wrap: W, f: F) -> R
-    where
-        W: FnOnce(Fixed<[u8; N]>) -> T,
-        F: FnOnce(&T) -> R,
-    {
-        self.with_wrapped(wrap, f)
-    }
-
-    /// As [`__with_wrapped`](Self::__with_wrapped): the 0.9.0 name, kept until the next
-    /// breaking release.
-    #[doc(hidden)]
-    #[inline]
-    pub fn __with_wrapped_mut<T, W, U, F, R>(&mut self, wrap: W, unwrap: U, f: F) -> R
-    where
-        W: FnOnce(Fixed<[u8; N]>) -> T,
-        U: FnOnce(T) -> Fixed<[u8; N]>,
-        F: FnOnce(&mut T) -> R,
-    {
-        self.with_wrapped_mut(wrap, unwrap, f)
-    }
-
     // The move into `wrap` copies the plaintext within this frame, which the scrub covers.
     #[inline(never)]
     fn open_wrap_call<T, W, F, R>(&self, wrap: W, f: F) -> R
@@ -219,22 +189,6 @@ impl<const N: usize> SealedFixed<N> {
         self.open_into(buf);
     }
 
-    /// The secret's length in bytes, `N`.
-    ///
-    /// This is a plain method, not [`SecretLen::len`](crate::SecretLen::len), and needs no
-    /// import. For a fixed-size key the length is already in the type.
-    #[inline(always)]
-    pub const fn len(&self) -> usize {
-        N
-    }
-
-    /// `N == 0`. A zero-length `Fixed` does not compile, so this is `false` for every
-    /// `SealedFixed` that can exist; it is here for symmetry with `len`.
-    #[inline(always)]
-    pub const fn is_empty(&self) -> bool {
-        N == 0
-    }
-
     #[inline(always)]
     fn open_into(&self, buf: &mut [u8; N]) {
         buf.copy_from_slice(&self.ct);
@@ -260,6 +214,14 @@ impl<const N: usize> Drop for SealedFixed<N> {
 }
 
 impl<const N: usize> zeroize::ZeroizeOnDrop for SealedFixed<N> {}
+
+/// `N`, the length already in the type, as for `Fixed<[u8; N]>`.
+impl<const N: usize> crate::SecretLen for SealedFixed<N> {
+    #[inline(always)]
+    fn len(&self) -> usize {
+        N
+    }
+}
 
 impl<const N: usize> crate::scoped::RevealScoped for SealedFixed<N> {
     type Inner = [u8; N];

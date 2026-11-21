@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use secure_gate::{
-    Dynamic, Fixed, Prekey, RevealSecret, SealedDynamic, SealedFixed, dynamic_newtype,
+    Dynamic, Fixed, Prekey, RevealSecret, SealedDynamic, SealedFixed, SecretLen, dynamic_newtype,
     fixed_newtype, sealed_dynamic_newtype, sealed_fixed_newtype,
 };
 
@@ -446,26 +446,24 @@ fn from_random_seals_without_a_plain_value() {
     blob.with_secret(|v| assert!(v.iter().any(|&x| x != 0)));
 }
 
-/// The hidden `__with_wrapped_mut` shim reaches what `with_secret_mut` already reaches
-/// on a bare `SealedFixed`: the caller can carry the secret out of the closure and leave
-/// another value sealed in its place. Pins the changelog's claim about the shim.
+/// Sealed types are measured through `SecretLen` like every other wrapper, so generic code
+/// bounded on it accepts them and `grep SecretLen` finds the call.
 #[test]
-fn with_wrapped_mut_shim_reaches_what_with_secret_mut_reaches() {
+fn sealed_types_are_measured_through_secret_len() {
+    fn len_of<S: SecretLen>(s: &S) -> (usize, usize, bool) {
+        (s.len(), s.byte_len(), s.is_empty())
+    }
     let prekey = Prekey::new();
-
-    let mut via_shim = SealedFixed::seal(Fixed::new([9u8, 8, 7, 6]), &prekey);
-    let taken: Fixed<[u8; 4]> =
-        via_shim.__with_wrapped_mut(|f| f, |f| f, |w| core::mem::replace(w, Fixed::new([0; 4])));
-
-    let mut via_api = SealedFixed::seal(Fixed::new([9u8, 8, 7, 6]), &prekey);
-    let copied = via_api.with_secret_mut(|b| {
-        let out = Fixed::new(*b);
-        *b = [0; 4];
-        out
-    });
-
-    assert_eq!(taken.expose_secret(), &[9, 8, 7, 6]);
-    assert_eq!(copied.expose_secret(), taken.expose_secret());
-    assert_eq!(via_shim.with_secret(|b| *b), [0; 4]);
-    assert_eq!(via_api.with_secret(|b| *b), via_shim.with_secret(|b| *b));
+    assert_eq!(
+        len_of(&SealedFixed::seal(Fixed::new([1u8; 32]), &prekey)),
+        (32, 32, false)
+    );
+    let d = SealedDynamic::seal(Dynamic::<Vec<u8>>::new(vec![1, 2, 3]), &prekey);
+    assert_eq!(len_of(&d), (3, 3, false));
+    let p = SealedPassword::seal(Password::new(String::from("pässwörd")), &prekey);
+    assert_eq!(len_of(&p), ("pässwörd".len(), "pässwörd".len(), false));
+    let k = SealedAppKey::seal(AppKey::new([0u8; 32]), &prekey);
+    assert_eq!(len_of(&k), (32, 32, false));
+    let e = SealedBlob::seal(Blob::new(Vec::new()), &prekey);
+    assert_eq!(len_of(&e), (0, 0, true));
 }

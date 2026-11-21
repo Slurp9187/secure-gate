@@ -419,6 +419,9 @@ pub mod __private {
 #[cfg(feature = "alloc")]
 pub use dynamic::Dynamic;
 
+#[cfg(feature = "alloc")]
+pub use traits::DynamicBytes;
+
 #[cfg(feature = "sealed")]
 #[doc(inline)]
 pub use sealed::SealedFixed;

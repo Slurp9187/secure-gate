@@ -30,9 +30,9 @@ Don't route around it with `.to_vec()`, `*bytes` or `.to_string()`; name the exi
 
 ```toml
 [dependencies]
-secure-gate = "0.9"                                                             # default: heap on (`alloc`)
-# secure-gate = { version = "0.9", default-features = false }                  # heap off: `Fixed` only
-# secure-gate = { version = "0.9", features = ["full"] }                       # batteries included
+secure-gate = "0.10"                                                            # default: heap on (`alloc`)
+# secure-gate = { version = "0.10", default-features = false }                 # heap off: `Fixed` only
+# secure-gate = { version = "0.10", features = ["full"] }                      # batteries included
 ```
 
 On Rust older than 1.87, use `secure-gate = "0.8.0"` (the `release/0.8` line, MSRV 1.70).
@@ -135,7 +135,7 @@ default, and two features decide how much of the standard library it uses:
 List what you still want after it:
 
 ```toml
-secure-gate = { version = "0.9", default-features = false, features = ["ct-eq", "encoding-hex"] }
+secure-gate = { version = "0.10", default-features = false, features = ["ct-eq", "encoding-hex"] }
 ```
 
 - `rand`, `ct-eq`, `cloneable` and the `encoding-*` features work without `alloc`. The
@@ -246,8 +246,9 @@ has the rule that draws the line, the full threat model, and the call sites to a
 
 ## Stability
 
-From 0.9.0, the public API follows semantic versioning within the 0.9 line: a 0.9.x release
-adds, and does not remove or change. The promise covers the items exported from the crate
+The public API follows semantic versioning within each minor line (0.10.x, as 0.9.x
+before it): a patch release adds, and does not remove or change. Breaking changes ship
+only as a new minor version, with a migration list in `CHANGELOG.md`. The promise covers the items exported from the crate
 root and from `traits`, `sealed` and `scoped`, the input grammar of the macros, and each
 feature's name and what it enables. Import from the crate root: the deeper module paths
 under `traits` (such as `traits::reveal_secret::RevealSecret`) compile, and are not covered.
@@ -261,8 +262,9 @@ under `traits` (such as `traits::reveal_secret::RevealSecret`) compile, and are 
   a `Cargo.toml` is safe to leave. It has no `sealed` feature. Breaking changes ship only
   as a new minor version on main (0.9 to 0.10).
 - **Traits.** The public traits can be implemented outside this crate, and the newtype macros
-  do so. A method added to one in a 0.9.x release always comes with a default body, so
-  existing implementations keep compiling.
+  do so, except the sealed ones (`DynamicBytes`, `SealedPayload`), which name the shapes this
+  crate builds. A method added to an open trait in a patch release always comes with a
+  default body, so existing implementations keep compiling.
 - **Dependencies in the API.** Only `zeroize` and `serde`, both 1.x, appear in public
   signatures. `bech32`, `rand`, `subtle` and the other dependencies are private and can be
   upgraded without a breaking release.

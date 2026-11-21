@@ -1220,6 +1220,53 @@ fn check_boxed_slice_zeroed() {
     );
 }
 
+/// `Dynamic<[u8]>` decoded from hex: the decoder's staging buffer and the exact-length
+/// box the bytes are copied into are both freed wiped. Two blocks of the secret's length.
+#[cfg(feature = "encoding-hex")]
+fn check_slice_decode_hex_zeroed() {
+    const LEN: usize = 48;
+    let hex = "c3".repeat(LEN);
+    let hits = with_proxy_check_counted(LEN, || {
+        let secret = Dynamic::<[u8]>::try_from_hex(&hex).expect("valid hex");
+        core::hint::black_box(&secret);
+        drop(secret);
+    });
+    assert_eq!(
+        hits, 2,
+        "expected the {LEN}-byte staging buffer and the {LEN}-byte slice to be freed"
+    );
+}
+
+/// `Dynamic<[u8]>::new_with` fills the wrapper's own exact-length box: one block, wiped.
+fn check_slice_new_with_zeroed() {
+    const LEN: usize = 56;
+    let hits = with_proxy_check_counted(LEN, || {
+        let secret = Dynamic::<[u8]>::new_with(LEN, |b| b.fill(0xD5));
+        core::hint::black_box(&secret);
+        drop(secret);
+    });
+    assert_eq!(
+        hits, 1,
+        "expected exactly the one {LEN}-byte slice to be freed"
+    );
+}
+
+/// `Dynamic<[u8]>::try_new_with` returning `Err` after a partial fill frees the slot wiped.
+fn check_slice_try_new_with_err_zeroed() {
+    const LEN: usize = 60;
+    let hits = with_proxy_check_counted(LEN, || {
+        let r: Result<Dynamic<[u8]>, ()> = Dynamic::try_new_with(LEN, |b| {
+            b[..LEN / 2].fill(0xE7);
+            Err(())
+        });
+        assert!(r.is_err());
+    });
+    assert_eq!(
+        hits, 1,
+        "expected exactly the one {LEN}-byte slot to be freed"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // EncodedSecret — dropped directly, for every encoder
 //
@@ -1566,6 +1613,12 @@ fn all_heap_zeroed() {
         check_slice_deserialize_zeroed();
         check_string_deserialize_rejected_owned_zeroed();
     }
+
+    // Dynamic<[u8]> built by the shared constructors and decoders (#267).
+    #[cfg(feature = "encoding-hex")]
+    check_slice_decode_hex_zeroed();
+    check_slice_new_with_zeroed();
+    check_slice_try_new_with_err_zeroed();
 
     // Panic-path positive control: proves Zeroizing zeroes bytes on unwind.
     // Size 8192 avoids collision with panic-machinery allocations (see comment above).

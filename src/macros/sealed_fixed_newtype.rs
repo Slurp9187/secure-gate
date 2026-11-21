@@ -153,16 +153,13 @@ macro_rules! sealed_fixed_newtype {
                 self.0.unseal()
             }
 
-            /// The key's length in bytes.
-            #[inline(always)]
-            pub const fn len(&self) -> usize {
-                self.0.len()
-            }
+        }
 
-            /// `true` only for a zero-length key, which `fixed_newtype!` rejects.
+        /// The key's length in bytes, already in the type.
+        impl $crate::SecretLen for $name {
             #[inline(always)]
-            pub const fn is_empty(&self) -> bool {
-                self.0.is_empty()
+            fn len(&self) -> usize {
+                self.0.len()
             }
         }
 

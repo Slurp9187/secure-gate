@@ -123,12 +123,6 @@
 //!   `with_secret_mut` is the mutable access, and re-seals under a fresh salt. For
 //!   [`SealedDynamic`] it hands out `&mut str` / `&mut [u8]`, not `&mut String` /
 //!   `&mut Vec<u8>`, so the buffer cannot grow and abandon an unwiped copy.
-//! - [`SecretLen`](crate::SecretLen): it requires `RevealSecret` too, so the sealed types
-//!   cannot implement it. They have inherent `len()` and `is_empty()` instead, and no
-//!   `byte_len()`. **This is a known gap, not a design goal:** those two calls need no
-//!   `use secure_gate::SecretLen;`, so `grep SecretLen` does not find code that measures a
-//!   sealed secret. Search for `.len()` and `.is_empty()` on sealed values as well. Length
-//!   is sensitive for passwords (see `SecretLen`'s docs).
 //! - `Clone`, with or without `CloneableSecret`: a second copy
 //!   would share the salt. Unseal, clone the plain value if its type allows it, and seal
 //!   again.
@@ -225,6 +219,24 @@ pub use prekey::{LockError, Prekey};
 /// ```compile_fail,E0277
 /// use secure_gate::{Dynamic, Prekey, SealedDynamic};
 /// let _ = SealedDynamic::seal(Dynamic::<Vec<u16>>::new(vec![1]), &Prekey::new());
+/// ```
+///
+/// The 0.9.0 hooks the sealed macros used, `__with_wrapped` and `__with_wrapped_mut`, are
+/// gone (removed in 0.10.0):
+///
+/// ```compile_fail,E0599
+/// use secure_gate::{Fixed, Prekey, SealedFixed};
+/// let s = SealedFixed::seal(Fixed::new([0u8; 4]), &Prekey::new());
+/// let _ = s.__with_wrapped(|f| f, |f: &Fixed<[u8; 4]>| f.len());
+/// ```
+///
+/// A sealed value has no plain `len()`: it is measured through
+/// [`SecretLen`](crate::SecretLen), so the import is needed and searchable:
+///
+/// ```compile_fail,E0599
+/// use secure_gate::{Fixed, Prekey, SealedFixed};
+/// let s = SealedFixed::seal(Fixed::new([0u8; 4]), &Prekey::new());
+/// let _ = s.len();
 /// ```
 ///
 /// # The role wall

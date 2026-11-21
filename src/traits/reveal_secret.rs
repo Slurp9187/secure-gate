@@ -335,8 +335,10 @@ pub trait RevealSecret {
 /// Separated from [`RevealSecret`] so the core access trait can be implemented
 /// for **every** inner type — including local user-defined ones (see the
 /// [`CloneableSecret`](crate::CloneableSecret) newtype pattern), which have no
-/// meaningful `len()`. Implemented for `Fixed<[T; N]>`, `Dynamic<String>`, and
-/// `Dynamic<Vec<T>>`.
+/// meaningful `len()`. Implemented for `Fixed<[T; N]>`, `Dynamic<String>`,
+/// `Dynamic<Vec<T>>`, `Dynamic<[T]>`, and, with the `sealed` feature, `SealedFixed<N>`,
+/// `SealedDynamic<T>` and the types the sealed macros generate. It does not require
+/// [`RevealSecret`], since a sealed type has a length but no plain contents to lend.
 ///
 /// # Security
 ///
@@ -360,10 +362,9 @@ pub trait RevealSecret {
 /// `with_secret` audit sweep instead. Neither is prevented; both are greppable.
 /// This is accident-prevention, not a barrier.
 ///
-/// **One place the marker does not reach:** the `sealed` types. They cannot implement
-/// this trait, because it requires [`RevealSecret`], so they carry plain `len()` and
-/// `is_empty()` methods that need no import. Code that measures a `SealedDynamic` or a
-/// sealed role is found by searching for those calls, not for `SecretLen`.
+/// The `sealed` types implement it too (`SealedFixed`, `SealedDynamic` and the sealed
+/// roles), though they do not implement [`RevealSecret`]: measuring a sealed secret
+/// needs the same import, so `grep SecretLen` finds it.
 ///
 /// Constant-time comparison is **not** length-hiding: `ConstantTimeEq` on
 /// variable-length secrets delegates to `subtle`, whose slice comparison
@@ -382,7 +383,7 @@ pub trait RevealSecret {
 /// assert_eq!(key.byte_len(), 32);
 /// assert!(!key.is_empty());
 /// ```
-pub trait SecretLen: RevealSecret {
+pub trait SecretLen {
     /// Returns the number of elements in the secret, matching the underlying
     /// container's `len()` — element count for `Vec<T>` and `[T; N]`, byte
     /// count for `String` (where the element is a byte).

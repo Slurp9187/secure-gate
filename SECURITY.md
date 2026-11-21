@@ -168,9 +168,8 @@ try_from_hex  try_from_base32  try_from_base64url  try_from_bech32  try_from_bec
 The second and third rows are the newtype and `sealed` surfaces: `from_wrapper` and its
 siblings are where a value enters or leaves a role, `with_role` / `with_role_mut` open a
 sealed role, and `unseal` ends sealing. `SecretLen` is the import that marks code measuring
-a secret. It does **not** mark the sealed types: `SealedFixed`, `SealedDynamic` and the
-sealed role types have plain `len()` and `is_empty()` methods that need no import, so
-search for `.len()` and `.is_empty()` on sealed values by hand (§3).
+a secret, the sealed types included: since 0.10.0 `SealedFixed`, `SealedDynamic` and the
+sealed role types are measured through it too.
 
 Also audit every `CloneableSecret`, `SerializableSecret` and `FixedStorage` impl; each is
 an assertion the compiler does not check.
@@ -342,7 +341,7 @@ build; after it, neither. That was measured on x86_64 Windows only
 | Registers, and stack beyond the 32 KiB | Not covered |
 | The `Fixed` that `SealedFixed::unseal` returns | An ordinary `Fixed`: returning it can leave a stack copy (§1). Read through `with_secret` / `with_role` instead |
 | A sealed value after it is **dropped** | Its ciphertext, salt and tag are wiped where it was dropped, so nothing is left to open even while other sealed values keep the pre-key alive. Not covered: stack slots a `SealedFixed` was moved out of, which keep ciphertext (§1) |
-| The **length** of a sealed secret | Readable through plain `len()` / `is_empty()`, with no `SecretLen` import to mark the call (see Audit surfaces). `Debug` does not print it |
+| The **length** of a sealed secret | Readable through `SecretLen`, whose import marks the call (see Audit surfaces). `Debug` does not print it |
 | Growing a sealed `String` / `Vec<u8>` | Not expressible. `with_secret_mut` hands out `&mut str` / `&mut [u8]`, and `sealed_dynamic_newtype!` has no `with_role_mut`, so nothing can reallocate the plaintext (§2). To change the length, `unseal`, edit and seal again |
 
 **Lock quotas.** On Windows every `VirtualLock` draws on the working-set quota: about

@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - Unreleased
+
+A breaking release: four changes, each listed below with the code that stops compiling and
+what to write instead. Every "before" was checked to fail and every "after" to compile
+against this release. Nothing about what is wiped, or when, changes. MSRV stays 1.87.
+
+### Migration
+
+1. **Sealed types are measured through `SecretLen`.** `SealedFixed`, `SealedDynamic` and
+   the types `sealed_fixed_newtype!` / `sealed_dynamic_newtype!` generate lose their plain
+   `len()` and `is_empty()` and implement `SecretLen` instead, which also gives them
+   `byte_len()`. `grep SecretLen` now finds code that measures a sealed secret, which it
+   did not before.
+   - Before: `sealed.len()` with no import. Error: E0599, no method named `len`.
+   - After: add `use secure_gate::SecretLen;`. The call itself does not change.
+   - Before: `sealed.len()` inside a `const fn`. Error: E0015, a trait method is not const.
+   - After: use the length from the type (`N` for `SealedFixed<N>`), as for `Fixed`.
+2. **`SecretLen` no longer requires `RevealSecret`.** That requirement is what kept the
+   sealed types out. An implementation of `SecretLen` written for 0.9 still compiles.
+   - Before: `fn f<T: SecretLen>(t: &T) { t.expose_secret(); }`. Error: E0599, no method
+     named `expose_secret` found for `&T`.
+   - After: name both bounds, `T: SecretLen + RevealSecret`.
+3. **`Dynamic<[u8]>` has the constructors, decoders and encoders of `Dynamic<Vec<u8>>`**
+   (#267). `new_with`, `try_new_with`, `from_random`, every `try_from_*` decoder and the
+   `ToHex`, `ToBase32`, `ToBase64Url`, `ToBech32` and `ToBech32m` impls are now written once,
+   generic over the new sealed trait `DynamicBytes` (`Vec<u8>` and `[u8]`). A call that names
+   the shape, on the binding, a field, a function argument or with a turbofish, compiles as
+   before. A call that names it nowhere has two candidates.
+   - Before: `let k = Dynamic::new_with(32, f);` or `let k = Dynamic::try_from_hex(s)?;` with
+     nothing later fixing the type. Error: E0283, type annotations needed.
+   - After: `let k: Dynamic<Vec<u8>> = ...` or `Dynamic::<Vec<u8>>::new_with(32, f)`.
+   - Before: `Dynamic::new(vec).to_hex()`. Error: E0283, type annotations needed.
+   - After: `Dynamic::<Vec<u8>>::new(vec).to_hex()`.
+4. **The hidden `__with_wrapped` hooks are removed.** `SealedFixed::__with_wrapped`,
+   `SealedFixed::__with_wrapped_mut` and `SealedDynamic::__with_wrapped` were the 0.9.0
+   hooks behind the sealed macros, hidden and documented as not a public API. 0.9.1 kept
+   them unused.
+   - Before: `sealed.__with_wrapped(wrap, f)`. Error: E0599, no method named `__with_wrapped`.
+   - After: `sealed.with_secret(f)` / `with_secret_mut(f)`, or `with_role` on a sealed role.
+
+### Added
+
+- `Dynamic<[u8]>`: `new_with`, `try_new_with`, `from_random`, the `try_from_*` decoders and
+  the encoding traits (#267). Each allocates exactly the length it needs before a byte of
+  the secret is written, so a boxed slice no longer has to be built from a `Vec` of the
+  right capacity. A decoded slice is copied out of the decoder's staging buffer, which is
+  wiped; `tests/heap_zeroize.rs` gates on both blocks, and fails when the staging buffer is
+  freed unwiped.
+- `DynamicBytes`, the sealed trait behind those methods. It cannot be implemented outside
+  this crate.
+- `SecretLen` for `SealedFixed<N>`, `SealedDynamic<T>` and the sealed macro types.
+
+### Removed
+
+- The plain `len()` / `is_empty()` on the sealed types (see Migration 1).
+- `SealedFixed::__with_wrapped`, `__with_wrapped_mut` and `SealedDynamic::__with_wrapped`
+  (Migration 4).
+
 ## [0.9.1] - 2026-11-21
 
 Additions and fixes only: nothing covered by the stability promise is removed or changes

@@ -488,7 +488,7 @@ fn fixed_sized_round_trip_bech32m() {
 fn dynamic_sized_round_trip_for_a_kem_sized_payload() {
     // ML-KEM-1024 ciphertext: 1568 bytes, far past the default code length.
     let ct = vec![0x5Au8; 1568];
-    let secret = Dynamic::new(ct.clone());
+    let secret = Dynamic::<Vec<u8>>::new(ct.clone());
 
     assert_eq!(
         secret
@@ -522,7 +522,7 @@ fn dynamic_sized_round_trip_for_a_kem_sized_payload() {
 #[test]
 fn dynamic_sized_round_trip_bech32m() {
     let ct = vec![0x6Bu8; 1568];
-    let secret = Dynamic::new(ct.clone());
+    let secret = Dynamic::<Vec<u8>>::new(ct.clone());
     const N: usize = bech32_code_length(3, 1568);
     let encoded = secret
         .try_to_bech32m_sized::<N>("kem", secure_gate::Case::Lower)
