@@ -125,6 +125,41 @@ impl<const N: usize> SealedFixed<N> {
         scrubbed(|| self.open_wrap_call(wrap, f))
     }
 
+    /// The 0.9.0 name of the hook behind `sealed_fixed_newtype!`'s `with_role`. Hidden and
+    /// documented as not a public API, but it is a `pub` method on an exported type, and
+    /// 0.9.x removes nothing: it stays until the next breaking release. It gives nothing
+    /// that [`with_secret`](Self::with_secret) does not already give.
+    #[doc(hidden)]
+    #[deprecated(
+        since = "0.9.1",
+        note = "not a public API; it is removed in the next breaking release"
+    )]
+    #[inline]
+    pub fn __with_wrapped<T, W, F, R>(&self, wrap: W, f: F) -> R
+    where
+        W: FnOnce(Fixed<[u8; N]>) -> T,
+        F: FnOnce(&T) -> R,
+    {
+        self.with_wrapped(wrap, f)
+    }
+
+    /// As [`__with_wrapped`](Self::__with_wrapped): the 0.9.0 name, kept until the next
+    /// breaking release.
+    #[doc(hidden)]
+    #[deprecated(
+        since = "0.9.1",
+        note = "not a public API; it is removed in the next breaking release"
+    )]
+    #[inline]
+    pub fn __with_wrapped_mut<T, W, U, F, R>(&mut self, wrap: W, unwrap: U, f: F) -> R
+    where
+        W: FnOnce(Fixed<[u8; N]>) -> T,
+        U: FnOnce(T) -> Fixed<[u8; N]>,
+        F: FnOnce(&mut T) -> R,
+    {
+        self.with_wrapped_mut(wrap, unwrap, f)
+    }
+
     // The move into `wrap` copies the plaintext within this frame, which the scrub covers.
     #[inline(never)]
     fn open_wrap_call<T, W, F, R>(&self, wrap: W, f: F) -> R

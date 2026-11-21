@@ -96,8 +96,8 @@ macro_rules! sealed_fixed_newtype {
             }
 
             /// Generates the key from the system RNG and seals it, so it never exists as a
-            /// plain role. The same as `Self::seal(Role::from_random(), prekey)` without
-            /// the plain value in between.
+            /// plain role. The bytes are generated into a plain `Fixed` inside this call,
+            /// which is wiped when sealing finishes; the caller never holds it.
             ///
             /// # Panics
             ///

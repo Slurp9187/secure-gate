@@ -240,14 +240,58 @@ fn dynamic_vec_deserialize_survives_every_growth_step() {
 }
 
 /// A `size_hint` is a request from the input. A sequence that announces far more than it
-/// holds, or far more than the limit, must neither over-allocate past the limit nor fail.
+/// holds must not make this crate allocate what it announced: the first buffer is capped
+/// (4096 bytes), whatever the hint and however large the limit.
 #[cfg(feature = "serde-deserialize")]
 #[test]
 fn dynamic_vec_deserialize_does_not_trust_the_size_hint() {
     use secure_gate::{Dynamic, RevealSecret};
+    use serde::de::value::{Error as ValueError, SeqAccessDeserializer};
+    use serde::de::{DeserializeSeed, SeqAccess};
+
+    /// Three bytes that claim to be `usize::MAX`.
+    struct Liar(std::vec::IntoIter<u8>);
+    impl<'de> SeqAccess<'de> for Liar {
+        type Error = ValueError;
+        fn next_element_seed<T: DeserializeSeed<'de>>(
+            &mut self,
+            seed: T,
+        ) -> Result<Option<T::Value>, ValueError> {
+            use serde::de::IntoDeserializer;
+            self.0
+                .next()
+                .map(|b| seed.deserialize(b.into_deserializer()))
+                .transpose()
+        }
+        fn size_hint(&self) -> Option<usize> {
+            Some(usize::MAX)
+        }
+    }
+
+    let de = SeqAccessDeserializer::new(Liar(vec![1, 2, 3].into_iter()));
+    let got = Dynamic::<Vec<u8>>::deserialize_with_limit(de, 1_000_000).expect("three bytes");
+    assert_eq!(got.expose_secret(), &[1, 2, 3]);
+    // The wrapper holds the buffer the bytes were read into, so its capacity is what the
+    // hint was allowed to allocate.
+    assert!(
+        got.expose_secret().capacity() <= 4096,
+        "a hostile size hint allocated {} bytes",
+        got.expose_secret().capacity()
+    );
+
+    // And a hint is never allowed past the limit either.
+    let de = SeqAccessDeserializer::new(Liar(vec![1, 2, 3].into_iter()));
+    let got = Dynamic::<Vec<u8>>::deserialize_with_limit(de, 8).expect("three bytes");
+    assert!(got.expose_secret().capacity() <= 8);
+}
+
+/// A truthful hint is honoured up to the limit, and the limit is exact.
+#[cfg(feature = "serde-deserialize")]
+#[test]
+fn dynamic_vec_deserialize_limit_is_exact_for_a_hinted_sequence() {
+    use secure_gate::{Dynamic, RevealSecret};
     use serde::de::value::{Error as ValueError, SeqDeserializer};
 
-    // `SeqDeserializer` over an exact-size iterator reports its true length as the hint.
     let de: SeqDeserializer<_, ValueError> =
         SeqDeserializer::new((0u8..200).collect::<Vec<_>>().into_iter());
     let got = Dynamic::<Vec<u8>>::deserialize_with_limit(de, 200).expect("at the limit");

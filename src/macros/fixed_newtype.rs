@@ -259,6 +259,13 @@
 /// `as_wrapper_mut`, and `into_wrapper` (material *leaves* this role toward
 /// the base type), and `derive: [WrapperAccess]` is shorthand for both.
 ///
+/// **Where the wall stops: the declaring module.** The macro emits
+/// `struct Name(Wrapper)` with a private field, and Rust makes a private field visible in
+/// the module that invokes the macro and in its child modules. There, `Name(wrapper)` and
+/// `name.0` compile with no derive. Every other module, and every other crate, is held to
+/// the derives. Declare roles in a small module of their own so that set stays small. The
+/// same holds for `dynamic_newtype!`.
+///
 /// These cross a different wall from `into_inner`. A newtype has two:
 ///
 /// | Wall | Going in | Going out |

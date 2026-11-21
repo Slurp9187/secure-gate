@@ -172,6 +172,23 @@ impl<T: SealedPayload> SealedDynamic<T> {
         })
     }
 
+    /// The 0.9.0 name of the hook behind `sealed_dynamic_newtype!`'s `with_role`. Hidden and
+    /// documented as not a public API, but it is a `pub` method on an exported type, and
+    /// 0.9.x removes nothing: it stays until the next breaking release. It gives nothing
+    /// that [`with_secret`](Self::with_secret) does not already give.
+    #[doc(hidden)]
+    #[deprecated(
+        since = "0.9.1",
+        note = "not a public API; it is removed in the next breaking release"
+    )]
+    pub fn __with_wrapped<R0, W, F, R>(&self, wrap: W, f: F) -> R
+    where
+        W: FnOnce(Dynamic<T>) -> R0,
+        F: FnOnce(&R0) -> R,
+    {
+        self.with_wrapped(wrap, f)
+    }
+
     /// Opens the secret back into a plain [`Dynamic`]. Protection from sealing ends here;
     /// the returned wrapper still wipes on drop.
     pub fn unseal(self) -> Dynamic<T> {

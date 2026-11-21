@@ -288,22 +288,5 @@ pub use prekey::{LockError, Prekey};
 /// dynamic_newtype!(pub Password, String);
 /// let _ = <Password as DynamicRole>::into_dynamic(Password::new("x"));
 /// ```
-///
-/// And the hook that let a caller take a plain `Fixed` out of a sealed value without
-/// consuming it is gone:
-///
-/// ```compile_fail,E0599
-/// use secure_gate::{Fixed, Prekey, SealedFixed};
-/// let s = SealedFixed::seal(Fixed::new([0u8; 32]), &Prekey::new());
-/// let mut out = None;
-/// s.__with_wrapped(|plain| { out = Some(plain); }, |_| ());
-/// ```
-///
-/// ```compile_fail,E0599
-/// use secure_gate::{Dynamic, Prekey, SealedDynamic};
-/// let s = SealedDynamic::seal(Dynamic::<String>::new(String::new()), &Prekey::new());
-/// let mut out = None;
-/// s.__with_wrapped(|plain| { out = Some(plain); }, |_| ());
-/// ```
 #[cfg(doctest)]
 pub struct MisuseDoesNotCompile;

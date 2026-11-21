@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.1] - Unreleased
 
-Additions and fixes only: no public item is removed and no signature changes. One
-`Debug` output changes (`SlotWriter`, under Changed). These come from a
+Additions and fixes only: nothing covered by the stability promise is removed or changes
+signature. Two things do change. One `Debug` output (`SlotWriter`, under Changed). And
+the hidden role traits in `secure_gate::__private`, which have been marked semver-exempt
+since 0.9.0 and are not for direct use, take an extra argument (under Fixed): code that
+called them directly, instead of through the macros, stops compiling, which is the point
+of the fix. These come from a
 consistency review of the 0.9.0 API, which looked for places where the `sealed` types differ from the rest of the
 crate without saying so.
 
@@ -60,11 +64,14 @@ crate without saying so.
   and a secret refused partway, for its length or because the input is malformed, is wiped
   too. Text the deserializer lends is copied once into a buffer of exactly its length;
   text it gives away is taken over. Generated `dynamic_newtype!` types get this through
-  the wrapper they hold. What is accepted is unchanged: the same serde entry points
-  (`deserialize_seq`, `deserialize_string`) and the same error for an over-long secret.
-  One difference: an over-long byte sequence is now refused at the first byte past the
-  limit instead of after it has all been read, so the limit bounds what this crate
-  allocates. **Where it stops:** at the deserializer. What it buffers before handing a
+  the wrapper they hold. What is accepted and what is refused is unchanged: the same
+  serde entry points (`deserialize_seq`, `deserialize_string`) and the same message for an
+  over-long secret. Two differences in the error, both from refusing an over-long byte
+  sequence at the first byte past the limit instead of after it has all been read: a
+  format that tracks position (`serde_json`) now appends where it stopped, and input that
+  is both too long and malformed further on is refused as too long, where it used to be
+  refused for the malformed part. The limit therefore bounds what this crate allocates.
+  **Where it stops:** at the deserializer. What it buffers before handing a
   byte or a string over is its own; for text with escapes, `serde_json`'s scratch buffer
   still grows as a plain `Vec` and is freed unwiped. `tests/heap_zeroize.rs` gates on the
   outgrown, rejected and cut-short buffers; the growth and take-over checks were each run
@@ -80,11 +87,17 @@ crate without saying so.
   and no audit search finds it. Each conversion now takes a token for its own role that
   only this crate's sealing code can make, and the sealed macros hold a hidden wrapper
   typed by its role, which is built only from that role and gives back only that role.
-  The hidden `__with_wrapped` / `__with_wrapped_mut` methods on `SealedFixed` and
-  `SealedDynamic`, which let a caller take a plain `Fixed` out of a sealed value without
-  consuming it, are no longer public. Eight compile-fail doctests pin each case.
-  - How far it reaches: safe code. `unsafe` code can conjure a token, as it can conjure
-    anything. No secret was exposed by this; it weakened a type-level promise.
+  Six compile-fail doctests pin each case. The hidden `__with_wrapped` /
+  `__with_wrapped_mut` methods on `SealedFixed` and `SealedDynamic` are no longer what the
+  macros call. They are hidden and documented as not a public API, but they are `pub`
+  methods on exported types, so they stay, deprecated, until the next breaking release.
+  They give a caller nothing `with_secret` does not.
+  - How far it reaches: safe code outside the module that declares the role. `unsafe`
+    code can conjure a token, as it can conjure anything. And the macros emit
+    `struct Name(Wrapper)` with a private field, which Rust makes visible in the module
+    that invokes the macro and in its child modules: there, `Name(fixed)` and `name.0`
+    compile with no derive, as they always have. Every other module and every other crate
+    is held to the derives. Declare roles in a module of their own to keep that set small. No secret was exposed by this; it weakened a type-level promise.
   - The types the sealed macros generate, and every documented method on them, are
     unchanged. Code that named `secure_gate::__private` directly may stop compiling; that
     module is not public API.
@@ -100,7 +113,7 @@ crate without saying so.
   it cannot happen in a 0.9.x release.
 - The `sealed` module's "Not implemented, on purpose" list is complete. It named three
   omissions; it now names every one, each with its reason: `RevealSecretMut`, `SecretLen`,
-  `into_inner`, `Clone`, `PartialEq` / `Eq`, `Zeroize` / `ZeroizeOnDrop`, serde, the
+  `into_inner`, `Clone`, `PartialEq` / `Eq`, `Zeroize` (they are `ZeroizeOnDrop`), serde, the
   encoders and decoders, `From` / `TryFrom`, `io::Write`, the macros' `derive:` options,
   `with_role_mut` on `sealed_dynamic_newtype!`, and the `from_random` constructors that
   are deliberately absent.
