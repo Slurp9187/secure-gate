@@ -214,6 +214,38 @@
 /// subtree, and every other crate, are held to the derives. Declare roles in a small
 /// module of their own so that set stays small.
 ///
+/// ```rust
+/// mod roles {
+///     secure_gate::dynamic_newtype!(pub Password, String);
+///     pub mod child {
+///         pub mod grand {
+///             use super::super::Password;
+///             use secure_gate::Dynamic;
+///             pub fn inn(d: Dynamic<String>) -> Password { Password(d) }
+///             pub fn out(p: Password) -> Dynamic<String> { p.0 }
+///         }
+///     }
+/// }
+/// let d = secure_gate::Dynamic::<String>::new("pw".to_string());
+/// let _ = roles::child::grand::out(roles::child::grand::inn(d));
+/// ```
+///
+/// ```rust,compile_fail,E0423
+/// mod roles { secure_gate::dynamic_newtype!(pub Password, String); }
+/// mod sibling {
+///     pub fn inn(d: secure_gate::Dynamic<String>) -> super::roles::Password {
+///         super::roles::Password(d)
+///     }
+/// }
+/// ```
+///
+/// ```rust,compile_fail,E0616
+/// mod roles { secure_gate::dynamic_newtype!(pub Password, String); }
+/// mod sibling {
+///     pub fn out(p: super::roles::Password) -> secure_gate::Dynamic<String> { p.0 }
+/// }
+/// ```
+///
 /// These cross a different wall from `into_inner`. A newtype has two:
 ///
 /// | Wall | Going in | Going out |

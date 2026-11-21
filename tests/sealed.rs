@@ -445,3 +445,28 @@ fn from_random_seals_without_a_plain_value() {
     assert_eq!(blob.len(), 48);
     blob.with_secret(|v| assert!(v.iter().any(|&x| x != 0)));
 }
+
+/// The deprecated `__with_wrapped_mut` shim reaches what `with_secret_mut` already reaches
+/// on a bare `SealedFixed`: the caller can carry the secret out of the closure and leave
+/// another value sealed in its place. Pins the changelog's claim about the shim.
+#[test]
+#[allow(deprecated)]
+fn with_wrapped_mut_shim_reaches_what_with_secret_mut_reaches() {
+    let prekey = Prekey::new();
+
+    let mut via_shim = SealedFixed::seal(Fixed::new([9u8, 8, 7, 6]), &prekey);
+    let taken: Fixed<[u8; 4]> =
+        via_shim.__with_wrapped_mut(|f| f, |f| f, |w| core::mem::replace(w, Fixed::new([0; 4])));
+
+    let mut via_api = SealedFixed::seal(Fixed::new([9u8, 8, 7, 6]), &prekey);
+    let copied = via_api.with_secret_mut(|b| {
+        let out = Fixed::new(*b);
+        *b = [0; 4];
+        out
+    });
+
+    assert_eq!(taken.expose_secret(), &[9, 8, 7, 6]);
+    assert_eq!(copied.expose_secret(), taken.expose_secret());
+    assert_eq!(via_shim.with_secret(|b| *b), [0; 4]);
+    assert_eq!(via_api.with_secret(|b| *b), via_shim.with_secret(|b| *b));
+}

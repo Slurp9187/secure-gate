@@ -268,6 +268,43 @@
 /// module of their own so that set stays small. The
 /// same holds for `dynamic_newtype!`.
 ///
+/// A grandchild of the declaring module builds the role and takes the wrapper back out:
+///
+/// ```rust
+/// mod roles {
+///     secure_gate::fixed_newtype!(pub AppKey, 32);
+///     pub mod child {
+///         pub mod grand {
+///             use super::super::AppKey;
+///             use secure_gate::Fixed;
+///             pub fn inn(f: Fixed<[u8; 32]>) -> AppKey { AppKey(f) }
+///             pub fn out(r: AppKey) -> Fixed<[u8; 32]> { r.0 }
+///         }
+///     }
+/// }
+/// let _ = roles::child::grand::out(roles::child::grand::inn(secure_gate::Fixed::new([7; 32])));
+/// ```
+///
+/// A sibling of the declaring module cannot build it (E0423):
+///
+/// ```rust,compile_fail,E0423
+/// mod roles { secure_gate::fixed_newtype!(pub AppKey, 32); }
+/// mod sibling {
+///     pub fn inn(f: secure_gate::Fixed<[u8; 32]>) -> super::roles::AppKey {
+///         super::roles::AppKey(f)
+///     }
+/// }
+/// ```
+///
+/// nor take the wrapper out (E0616):
+///
+/// ```rust,compile_fail,E0616
+/// mod roles { secure_gate::fixed_newtype!(pub AppKey, 32); }
+/// mod sibling {
+///     pub fn out(r: super::roles::AppKey) -> secure_gate::Fixed<[u8; 32]> { r.0 }
+/// }
+/// ```
+///
 /// These cross a different wall from `into_inner`. A newtype has two:
 ///
 /// | Wall | Going in | Going out |
