@@ -6,7 +6,7 @@ rust-version = "1.87"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Slurp9187/secure-gate"
 
-description = "Secure wrappers for secrets with explicit access and mandatory zeroization — no_std-compatible, zero-overhead library with audit-friendly access patterns."
+description = "Secure wrappers for secrets with explicit access and mandatory zeroization — no_std-compatible, with audit-friendly access patterns."
 documentation = "https://docs.rs/secure-gate"
 keywords = ["crypto", "no-std", "security", "zeroize"]
 categories = ["cryptography", "no-std", "data-structures"]
@@ -20,6 +20,7 @@ include = [
     # Cargo drops the `[[bin]]` target below from the published manifest with the file.
     "!/src/bin/**",
     "/CHANGELOG.md",
+    "/CHANGELOG-ARCHIVE.md",
     "/LICENSE*",
     "/README.md",
     "/SECURITY.md",

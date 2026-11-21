@@ -6,7 +6,7 @@
 [![MSRV: 1.87](https://img.shields.io/badge/msrv-1.87-blue)](https://github.com/Slurp9187/secure-gate/blob/main/Cargo.toml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
-Secure wrappers for secrets with **explicit access** and **mandatory zeroization** — a `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
+Secure wrappers for secrets with **explicit access** and **mandatory zeroization** — a `no_std`-compatible library with audit-friendly access patterns.
 
 > [!WARNING]
 > **Security Notice**: This crate has **not undergone independent audit**.
@@ -61,7 +61,8 @@ let pw: Password = "hunter2".into();
 let token: ApiToken = "tok_live_123".into();
 seal(&key, &MacKey::from_random());
 
-// Nothing prints by accident (and there is no `Deref`).
+// Nothing prints by accident, and a held secret has no `Deref`. (The one `Deref` in the
+// crate is on `EncodedSecret`, the encoded copy you asked for; see Where protection stops.)
 assert_eq!(format!("{key:?}"), "[REDACTED]");
 
 // Scoped access, preferred: the borrow ends with the closure, so return a verdict, not the bytes.
@@ -168,7 +169,7 @@ Every decoder is fallible and decodes straight into the wrapper, as in the Quick
 ## Sealed memory
 
 With the `sealed` feature, a key is held encrypted while it idles, under a pre-key
-locked in RAM between guard pages. Each access costs about 8 µs, so it is for long-held keys,
+locked in RAM between guard pages. Each access costs about 7–11 µs for a 32-byte key, so it is for long-held keys,
 not hot loops. What it covers and what it does not:
 [`sealed`](https://docs.rs/secure-gate/latest/secure_gate/sealed/index.html).
 
@@ -224,18 +225,19 @@ call you can grep for:
 
 | Handoff | What you hold | Protection after it |
 |---|---|---|
-| `with_secret` / `with_secret_mut` | A borrow that ends with the closure | Full. A copy you make inside the closure is yours, and no lint catches it |
+| `with_secret` / `with_secret_mut` | A borrow that ends with the closure | The wrapper still wipes its own copy. A copy you make inside the closure is yours to wipe, and no lint catches it |
 | `expose_secret` / `expose_secret_mut` | A reference for as long as you keep it | The wrapper still wipes; anything you copy from the reference is yours |
 | `into_inner` (also on `EncodedSecret`) | The plain value | None: not wiped, not redacted |
-| `to_hex` and the other encoders | An `EncodedSecret` | Wiped on drop, `Debug` redacted. `.to_string()` or `&*enc` makes a copy nothing tracks |
+| `to_hex` and the other encoders | An `EncodedSecret` | Wiped on drop, `Debug` redacted. It derefs to `str` on purpose, to hand the text to APIs that take `&str`; `.to_string()` or `&*enc` makes a copy nothing tracks |
 | `EncodedSecret::into_zeroizing` | A `Zeroizing<String>` | Wiped on drop, but it derefs to `String` |
 | `as_reader`, serde `Serialize` | Bytes in a buffer you or another library own | None |
 | What you pass in (`"…".into()`, `try_from_hex(&s)`, `From<&[u8]>`) | Your original input | Never wrapped: only the wrapper's copy is wiped |
 
 Beyond the handoffs:
 
-- **No unsafe code** (`#![forbid(unsafe_code)]`). The `sealed` guard pages live in the
-  separate [`guarded-block`](https://crates.io/crates/guarded-block) crate.
+- **No unsafe code** (`#![forbid(unsafe_code)]`) in this crate. The `sealed` guard pages
+  live in the separate [`guarded-block`](https://crates.io/crates/guarded-block) crate,
+  which uses `unsafe` for its operating-system calls and is outside this claim.
 - **Not covered:** a process that can be read (a debugger, code running in it),
   `panic = "abort"` and hard crashes, and `static` secrets.
 - **Inherent limits** no wrapper removes: stack-move residue, heap-reallocation residue, and
@@ -252,6 +254,13 @@ only as a new minor version, with a migration list in `CHANGELOG.md`. The promis
 root and from `traits`, `sealed` and `scoped`, the input grammar of the macros, and each
 feature's name and what it enables. Import from the crate root: the deeper module paths
 under `traits` (such as `traits::reveal_secret::RevealSecret`) compile, and are not covered.
+Nor are items under `secure_gate::__private`, which only the macros use.
+
+**One exception: a security fix.** A patch release may restrict an API that lets code reach
+a secret or skip a documented guarantee, even though that stops some code compiling. The
+changelog says so, with the code that breaks. 0.9.1 is the example: the hidden role
+conversions in `__private` could be called from safe code without `derive: [FromWrapper]`,
+and 0.9.1 made them take a token only the crate can build.
 
 - **Features.** `full` stays as listed above. It will not grow to include `std` or `sealed`,
   so it remains usable on `no_std` targets.
@@ -262,9 +271,9 @@ under `traits` (such as `traits::reveal_secret::RevealSecret`) compile, and are 
   a `Cargo.toml` is safe to leave. It has no `sealed` feature. Breaking changes ship only
   as a new minor version on main (0.9 to 0.10).
 - **Yanked versions.** 0.1.0 through 0.7.0-rc.15 were yanked on purpose on 2026-03-16,
-  for the zeroize-on-drop flaw 0.8.0 fixed (`CHANGELOG.md`, 0.8.0-rc.1). The 0.8 and 0.9
+  for the zeroize-on-drop flaw 0.8.0 fixed (`CHANGELOG-ARCHIVE.md`, 0.8.0-alpha.1). The 0.8 and 0.9
   release candidates are yanked too, replaced by 0.8.0 and 0.9.0, except 0.9.0-rc.6, which
-  is still listed. Use a stable release.
+  is still listed because a downstream user is pinned to it. Use a stable release.
 - **Traits.** The public traits can be implemented outside this crate, and the newtype macros
   do so, except the sealed ones (`DynamicBytes`, `SealedPayload`), which name the shapes this
   crate builds. A method added to an open trait in a patch release always comes with a

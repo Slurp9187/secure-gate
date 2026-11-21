@@ -24,7 +24,9 @@ leaks or an exit has no name. A way out that is already named, or a copy made in
 
 - **No independent audit.** Review the source before production use.
 - **No unsafe code.** `#![forbid(unsafe_code)]` in this crate. The `sealed` pre-key's page
-  protection lives in the separate `guarded-block` crate.
+  protection lives in the separate `guarded-block` crate, which does use `unsafe` for its
+  operating-system calls (mapping, guard pages, locking) and is outside this claim. Audit it
+  with the `sealed` feature.
 - **Explicit access.** `Fixed` and `Dynamic` have no `Deref` or `AsRef`. Reading goes
   through `with_secret` (scoped, preferred) or `expose_secret` (an escape hatch).
 - **Wiped on drop.** The whole allocation, including `Vec` / `String` spare capacity.
@@ -336,7 +338,8 @@ the bug.
 
 The pre-key is 16 KiB of random bytes in a `Prekey` that each
 sealed object holds an `Arc` to. Since rc.15 it lives in a mapping of its own between two
-no-access guard pages, read-only once filled (`guarded-block`). When the last reference
+no-access guard pages, read-only once filled (`guarded-block`, which uses `unsafe` for
+those operating-system calls; this crate's no-`unsafe` rule does not cover it). When the last reference
 drops it is wiped, unlocked and unmapped.
 
 The cipher leaves a copy of the key on the stack, so every seal and open ends by
@@ -538,10 +541,29 @@ Before production use, review the source, the dependency versions, and these tes
 
 ## Vulnerability Reporting
 
-- **Preferred**: GitHub private vulnerability reporting (Repository → Security → Report a vulnerability)
-- **Alternative**: Public issue or draft
+- **How**: GitHub private vulnerability reporting (Repository → Security → Report a
+  vulnerability). Do not open a public issue or pull request for a vulnerability.
 - **Expected response**: Acknowledgment within 48 hours; coordinated disclosure
 - **Public disclosure**: After a fix is released and users have had reasonable time to update
+
+## Supported Versions
+
+| Line | Security fixes |
+|---|---|
+| The latest minor release on `main` (0.10.x once 0.10.0 ships; 0.9.x until then) | Yes |
+| 0.8.x (`release/0.8`, for Rust older than 1.87) | Yes, as 0.8.x patch releases |
+| Earlier minor lines on `main` (0.9.x after 0.10.0 ships) | No: upgrade to the latest minor |
+| Release candidates | No |
+
+## Past Advisory
+
+**0.1.0 through 0.7.0-rc.15 did not zeroize on drop.** The docs said secrets were wiped
+on drop, but those versions had no `impl Drop`, only the empty `ZeroizeOnDrop` marker, so
+nothing was wiped. It was found and fixed in 0.8.0 (first in 0.8.0-alpha.1, whose entry in
+`CHANGELOG-ARCHIVE.md` has the details), and every affected version was yanked from
+crates.io on 2026-03-16. Since then the wipe is checked by tests rather than by reading the
+code: `tests/heap_zeroize.rs` checks freed heap blocks are zero, and
+`tests/asm_dse_check.rs` checks the optimizer keeps the wipe.
 
 ## Disclaimer
 
