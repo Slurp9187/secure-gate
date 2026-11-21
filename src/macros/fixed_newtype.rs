@@ -261,9 +261,9 @@
 ///
 /// **Where the wall stops: the declaring module.** The macro emits
 /// `struct Name(Wrapper)` with a private field, and Rust makes a private field visible in
-/// the module that invokes the macro and in its child modules. There, `Name(wrapper)` and
-/// `name.0` compile with no derive. Every other module, and every other crate, is held to
-/// the derives. Declare roles in a small module of their own so that set stays small. The
+/// the module that invokes the macro and in every module nested inside it, at any depth.
+/// There, `Name(wrapper)` and `name.0` compile with no derive. Modules outside that
+/// subtree, and every other crate, are held to the derives. Declare roles in a small module of their own so that set stays small. The
 /// same holds for `dynamic_newtype!`.
 ///
 /// These cross a different wall from `into_inner`. A newtype has two:

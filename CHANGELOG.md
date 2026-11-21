@@ -66,11 +66,14 @@ crate without saying so.
   text it gives away is taken over. Generated `dynamic_newtype!` types get this through
   the wrapper they hold. What is accepted and what is refused is unchanged: the same
   serde entry points (`deserialize_seq`, `deserialize_string`) and the same message for an
-  over-long secret. Two differences in the error, both from refusing an over-long byte
-  sequence at the first byte past the limit instead of after it has all been read: a
-  format that tracks position (`serde_json`) now appends where it stopped, and input that
-  is both too long and malformed further on is refused as too long, where it used to be
-  refused for the malformed part. The limit therefore bounds what this crate allocates.
+  over-long secret. Two differences in the error. The length is now checked inside the
+  deserializer's call instead of after it returns, so a format that tracks position
+  (`serde_json`) appends where it was to the message, for bytes and for text alike. And
+  an over-long byte sequence is refused at the first byte past the limit instead of
+  after it has all been read, so input that is both too long and malformed further on is
+  refused as too long, where it used to be refused for the malformed part. For a byte
+  sequence the limit therefore bounds what this crate allocates; text is checked once
+  the deserializer hands it over, before this crate copies or keeps it.
   **Where it stops:** at the deserializer. What it buffers before handing a
   byte or a string over is its own; for text with escapes, `serde_json`'s scratch buffer
   still grows as a plain `Vec` and is freed unwiped. `tests/heap_zeroize.rs` gates on the
@@ -95,9 +98,9 @@ crate without saying so.
   - How far it reaches: safe code outside the module that declares the role. `unsafe`
     code can conjure a token, as it can conjure anything. And the macros emit
     `struct Name(Wrapper)` with a private field, which Rust makes visible in the module
-    that invokes the macro and in its child modules: there, `Name(fixed)` and `name.0`
-    compile with no derive, as they always have. Every other module and every other crate
-    is held to the derives. Declare roles in a module of their own to keep that set small. No secret was exposed by this; it weakened a type-level promise.
+    that invokes the macro and in every module nested inside it, at any depth: there,
+    `Name(fixed)` and `name.0` compile with no derive, as they always have. Modules
+    outside that subtree, and every other crate, are held to the derives. Declare roles in a module of their own to keep that set small. No secret was exposed by this; it weakened a type-level promise.
   - The types the sealed macros generate, and every documented method on them, are
     unchanged. Code that named `secure_gate::__private` directly may stop compiling; that
     module is not public API.
