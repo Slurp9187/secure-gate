@@ -14,6 +14,10 @@
 # Usage: tools/stack_probe.sh   (from the repository root)
 set -euo pipefail
 
+# The probe hooks and the emptied scrub leave unused items, and CI sets RUSTFLAGS to
+# `-D warnings`. A warning here is not a finding, so it must not stop the build.
+export RUSTFLAGS=""
+
 R=docs/design/receipts/sealed-stack-residue
 git apply "$R/probe_hooks.patch"
 cp "$R"/probe_*.rs tests/
