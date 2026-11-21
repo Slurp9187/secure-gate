@@ -170,7 +170,8 @@ Two changes, both in safe Rust:
   region.
 
 After both, the same probe found neither, in debug and release (`receipts/sealed-stack-residue/`).
-Measured on x86_64 Windows with rustc 1.98.1 only; registers are not inspected.
+Measured on x86_64 Windows with rustc 1.98.1, and since on x86_64 Linux with rustc 1.87.0
+(`receipts/sealed-stack-residue/runs_linux.txt`); registers are not inspected.
 
 A second round of review found two gaps, both measured with a panic probe that is also in
 the receipts directory:

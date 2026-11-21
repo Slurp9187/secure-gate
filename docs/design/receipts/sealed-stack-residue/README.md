@@ -14,6 +14,7 @@ measured with the same probe. This directory holds that probe and its captured o
 | `probe_panic.rs` | The second-round probe: an access whose closure panics, a `with_secret_mut` whose closure panics, a tag mismatch (one ciphertext byte flipped), and `unseal` with its result dropped. Written by a reviewer of PR #265, with the `unseal` case added. |
 | `probe_hooks.patch` | The hooks: `#[doc(hidden)]` methods that derive the key the way an access does, and one that flips a ciphertext byte. Applied to a scratch copy only; never part of the crate. |
 | `runs.txt` | First round: captured stdout, before and after the scrub, debug and release. |
+| `runs_linux.txt` | Both probes on Linux x86_64 (rustc 1.87.0, commit `150e24b`), debug and release: with `scrub_stack` disabled, to show the probe reaches the key there, and as shipped. |
 | `runs_panic.txt` | Second round: the panic probe before (`5805536`) and after `scrubbed()` and in-place `unseal`. Every panic path reads 0 after; `unseal` still reads one plaintext copy in release, the by-value return described in `SECURITY.md` §1. |
 
 ## Method
@@ -49,7 +50,11 @@ other's build of this crate, and the hooks then appear to be missing.
 
 ## What it does not cover
 
-Only x86_64 Windows, rustc 1.98.1, was measured. Other targets use other ChaCha20 backends
-and other frame layouts. Registers are not inspected. `SealedDynamic` was not probed: its
+Two targets were measured: x86_64 Windows (rustc 1.98.1) and x86_64 Linux (rustc 1.87.0,
+`runs_linux.txt`). On Linux the control reads 0 in both profiles, so the reach check there is
+the "scrub off" run instead: with `scrub_stack` emptied the probe finds the key 6 times in
+debug and once in release after `with_secret`, and with it in place it finds nothing. No
+ARM, macOS or 32-bit target was measured; they use other ChaCha20 backends and other frame
+layouts. Registers are not inspected. `SealedDynamic` was not probed: its
 plaintext temporary is on the heap in a `Dynamic`, which wipes it, and its accesses end with
 the same `scrub_stack`.

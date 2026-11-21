@@ -78,7 +78,9 @@ against this release. Nothing about what is wiped, or when, changes. MSRV stays 
   not a gap to close.
 - `SECURITY.md` says how a sealed value's nonce is chosen: all-zero, because every seal
   and re-seal draws a fresh 32-byte salt and so a fresh key.
-- `SECURITY.md` says the sealed stack overwrite was measured on x86_64 Windows only.
+- The sealed stack overwrite is now measured on x86_64 Linux as well as x86_64 Windows
+  (`docs/design/receipts/sealed-stack-residue/runs_linux.txt`); `SECURITY.md` says no
+  other target was.
 - README says which versions are yanked and why, and that a patch release may restrict an
   API to fix a security bug (0.9.1 did). "Zero-overhead" is dropped from the crate
   description: `Dynamic` boxes its value and the sealed types cost microseconds an access.

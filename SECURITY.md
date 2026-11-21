@@ -345,9 +345,10 @@ drops it is wiped, unlocked and unmapped.
 The cipher leaves a copy of the key on the stack, so every seal and open ends by
 overwriting the 32 KiB of stack below the call, on a panic too. A probe found the key 4
 times there before the overwrite in a debug build and a plaintext copy once in a release
-build; after it, neither. That was measured on x86_64 Windows only, with rustc 1.98.1
-(`docs/design/receipts/sealed-stack-residue/`). Linux, macOS, ARM and 32-bit targets were
-not probed. They use other ChaCha20 backends and other frame layouts, so whether the
+build; after it, neither. That was measured on x86_64 Windows (rustc 1.98.1) and x86_64
+Linux (rustc 1.87.0; with the overwrite removed the probe found the key there too, and with
+it, nothing), in `docs/design/receipts/sealed-stack-residue/`. macOS, ARM and 32-bit targets
+were not probed. They use other ChaCha20 backends and other frame layouts, so whether the
 overwrite covers them is not measured.
 
 | Threat | Sealed |
