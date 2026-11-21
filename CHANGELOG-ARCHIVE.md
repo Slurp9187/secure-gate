@@ -1,9 +1,10 @@
 # Changelog archive
 
-Releases before 0.9.0, moved out of [CHANGELOG.md](CHANGELOG.md) unchanged. Versions
-0.1.0 through 0.7.0-rc.15 did not zeroize on drop; see "Past advisory" in
-[SECURITY.md](SECURITY.md). Text below is as it was written at the time, and references
-in it to "this file" mean the changelog it was written in.
+Releases before 0.9.0, moved out of [CHANGELOG.md](CHANGELOG.md). Versions 0.5.0 through
+0.7.0-rc.14 did not zeroize on drop (0.7.0-rc.15 was tagged but never published; 0.1.0 to
+0.4.3 did wipe); see "Past Advisory" in [SECURITY.md](SECURITY.md). Text below is as it was
+written at the time, apart from notes marked "Correction", and references in it to "this
+file" mean the changelog it was written in.
 
 ## [0.9.0-rc.19] - 2026-11-13
 
@@ -3417,6 +3418,14 @@ secret_a.ct_eq(&secret_b);
   **Fix**: Made `zeroize` mandatory (no feature gate), added `T: Zeroize` bounds to struct definitions, and implemented real `Drop` handlers that call `zeroize()`. Zeroization is now guaranteed.  
   **Migration**: Users wrapping non-zeroizable types must implement `Zeroize` on them. Most crypto types already implement `Zeroize` out of the box.
 - **All previous versions yanked**: 0.1.0 through 0.7.0-rc.15 were permanently yanked from crates.io on 2026-03-16 due to the above flaw.
+
+> **Correction (2026-11-21 UTC).** The range above is wrong. The flaw affects 0.5.0 through
+> 0.7.0-rc.14; 0.7.0-rc.15 was tagged but never published. 0.1.0 to 0.4.3 did wipe on drop,
+> through `secrecy::SecretBox` and `zeroize::Zeroizing`, and were yanked as early,
+> superseded wrappers over `secrecy`, not for this flaw. The first published fix is
+> 0.8.0-rc.1 (this alpha was not published). crates.io records the yanks on 2026-03-17
+> UTC, except 0.6.0, yanked on 2025-12-08 when 0.6.1 replaced it. `SECURITY.md`, Past
+> Advisory, has the corrected record.
 
 ### Breaking Changes
 

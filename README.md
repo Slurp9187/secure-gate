@@ -277,7 +277,8 @@ and 0.9.1 made them take a token only the crate can build.
   good. A 0.8.x release is a fix or an addition and never a breaking change, so `"0.8"` in
   a `Cargo.toml` is safe to leave. It has no `sealed` feature. Breaking changes ship only
   as a new minor version on main (0.9 to 0.10).
-- **Yanked versions.** Every version before 0.8 was yanked on purpose on 2026-03-16. 0.5.0
+- **Yanked versions.** Every version before 0.8 is yanked on purpose, on 2026-03-17 UTC
+  except 0.6.0, yanked on 2025-12-08 when 0.6.1 replaced it. 0.5.0
   through 0.7.0-rc.14 (rc.15 was tagged but never published) did not zeroize on drop,
   fixed in 0.8.0-rc.1 (`SECURITY.md`, Past Advisory). 0.1.0 to 0.4.3 did wipe; they were
   yanked as early wrappers over `secrecy`, superseded by the current design, not for that

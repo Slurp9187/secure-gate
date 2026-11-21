@@ -103,8 +103,9 @@ against this release. Nothing about what is wiped, or when, changes. MSRV stays 
   a past advisory for the zeroize flaw in 0.5.0 through 0.7.0-rc.14 (rc.15 tagged but never
   published), fixed in 0.8.0-rc.1; `guarded-block` uses `unsafe`
   and is outside the no-`unsafe` claim.
-- Releases before 0.9.0 moved to `CHANGELOG-ARCHIVE.md`, unchanged, linked from the top of
-  this file and shipped in the package.
+- Releases before 0.9.0 moved to `CHANGELOG-ARCHIVE.md`, linked from the top of this file
+  and shipped in the package. Their text is unchanged except one marked correction under
+  0.8.0-alpha.1, which named the wrong range of affected versions and yank date.
 
 ## [0.9.1] - 2026-11-21
 
