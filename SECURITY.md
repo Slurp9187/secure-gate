@@ -191,7 +191,8 @@ pass to an API that takes `&str` (a driver, `serde_json`, a header). `EncodedSec
 the copy the crate made and redacts `Debug`; what the caller does with the `&str` it hands
 out is past the boundary rule above, like a copy made inside `with_secret`. Removing `Deref`
 would break every such call site and close no confidentiality gap: the bytes are reachable
-either way, through `as_str()` if not through `Deref`. Changing it is a design decision for
+either way, through any accessor that replaced it (an `as_str()`, say; there is none
+today). Changing it is a design decision for
 the maintainer, not a cleanup.
 
 ## Inherent Rust Limitations
@@ -212,8 +213,9 @@ wipes only the current location.
   takes a value that already existed somewhere.
 - Pass `&Fixed<T>` / `&mut Fixed<T>`, not `Fixed<T>` by value.
 - For a long-lived secret prefer `Dynamic` built with `new_with(len, …)` or a decoder: the
-  buffer is heap-only and has one address. `Dynamic::new(v)` and `into_inner` still pass
-  the value over the stack once.
+  buffer is heap-only and has one address. For a fixed-size key that is `Dynamic<[u8]>`:
+  `Dynamic<[u8; N]>` has no `new_with`, so building one means `Dynamic::new(array)`.
+  `Dynamic::new(v)` and `into_inner` pass the value over the stack once.
 - For address stability, pin at the call site: `core::pin::pin!(Fixed::new_with(…))`.
 
 ### 2. Heap-reallocation residue (`Dynamic<Vec<T>>` / `Dynamic<String>`)
@@ -275,7 +277,8 @@ fill it once, and move it in with `Dynamic::new(s)`. Nothing enforces the pre-si
 
 | You have | Use | Copies left behind |
 | --- | --- | --- |
-| Known-size key material | `Fixed<[u8; N]>`, or `Dynamic<[u8; N]>` for heap-only | None |
+| Known-size key material | `Fixed::<[u8; N]>::new_with`, `from_random` or a decoder | None from building it; returning or passing the `Fixed` by value can leave a stack copy (§1) |
+| Known-size key material, heap only | `Dynamic::<[u8]>::new_with(N, …)`, `from_random(N)` or a decoder | None |
 | Bytes, length known before the fill | `Dynamic::<Vec<u8>>::new_with(len, …)` / `try_new_with` | None |
 | Bytes, length unknown, `std` on | `Dynamic::new(Vec::new())` + the wrapper's `io::Write` | None |
 | Bytes, length unknown, no `std` | Bound the length and use `new_with(bound, …)`, carrying the real length yourself | None. There is no other safe path. |
@@ -508,7 +511,7 @@ deployment, redact at the logging boundary.
 | `serde-serialize` | Writes the full secret into buffers this crate cannot reach. Opt-in per type via `SerializableSecret`. | Enable sparingly; audit every impl |
 | `encoding`, `encoding-*` | Constant-time hex, Base32 and Base64url via RustCrypto backends; bech32 via `bech32`. Encoders need `alloc`; `Fixed::try_from_*` does not. | Enable per format |
 | `cloneable` | Opt-in cloning via `CloneableSecret`. Each clone is a wrapper and wipes itself. | Use minimally |
-| `sealed` | See §3. `SealedFixed`, `SealedDynamic`, `sealed_fixed_newtype!`, `sealed_dynamic_newtype!`. Implies `std` and `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`. Every dependency holding key, keystream, MAC or hash state has its `zeroize` feature on. | For long-held keys |
+| `sealed` | See §3. `SealedFixed`, `SealedDynamic`, `sealed_fixed_newtype!`, `sealed_dynamic_newtype!`. Implies `std` and `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`, and `poly1305` and `ctutils` only to turn on a feature and set a version floor. Every dependency holding key, keystream, MAC or hash state has its `zeroize` feature on. | For long-held keys |
 | `full` | Everything except `std` and `sealed` | Convenient; audit what you use |
 
 ## Other notes
@@ -529,8 +532,9 @@ deployment, redact at the logging boundary.
   into `zeroize::Zeroizing` yourself.
 - **Errors can reveal length.** A wrong decoded length is reported. Length is usually
   public (key sizes); redact where it is not.
-- **Zero overhead.** Wrappers are the size of their contents and add nothing at run time
-  beyond the wipe on drop. `sealed` is the exception (§3).
+- **Cost.** A `Fixed` is the size of its contents; a `Dynamic` is a `Box` of them, with
+  the allocation that implies. Neither adds work at run time beyond the wipe on drop.
+  `sealed` costs more per access (§3).
 
 ## Audit Status
 
@@ -539,7 +543,9 @@ deployment, redact at the logging boundary.
 The crate is small. `zeroize` is the only unconditional dependency; with default features
 `cargo tree` is two lines. Every other dependency arrives with the feature that names it:
 `subtle` (`ct-eq`), `rand` (`rand`), `base16ct`, `base32ct`, `base64ct`,
-`bech32` (encoding), `serde`, and `chacha20poly1305` + `sha2` + `guarded-block` (`sealed`).
+`bech32` (encoding), `serde`, and `chacha20poly1305` + `sha2` + `guarded-block` (`sealed`,
+which also lists `poly1305` and `ctutils` directly, only to turn on `poly1305`'s `zeroize`
+feature and to set `ctutils`' version floor).
 No proc-macro crate is pulled in unless you enable `serde`.
 
 Before production use, review the source, the dependency versions, and these tests:

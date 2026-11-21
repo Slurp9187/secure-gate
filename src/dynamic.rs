@@ -109,14 +109,18 @@ use rand::{TryRng, rngs::SysRng};
 ///
 /// | Inner type | Realloc surface | Use case |
 /// |---|---|---|
-/// | `Dynamic<[u8; N]>` (boxed array) | **None** — fixed size | Long-lived known-size keys held on the heap |
-/// | `Dynamic<[u8]>` (boxed slice) | **None** once built — the length is set at construction and cannot change | Secrets whose length is known only at runtime but never changes afterwards |
+/// | `Dynamic<[u8]>` (boxed slice) | **None** once built — the length is set at construction and cannot change | Known-size keys held on the heap, and secrets whose length is known only at runtime but never changes afterwards |
+/// | `Dynamic<[u8; N]>` (boxed array) | **None** — fixed size | Rarely the right choice: it has no `new_with`, `from_random` or decoders, so it is built from an array passed by value, on the stack |
 /// | `Dynamic<Vec<u8>>` pre-sized | None *if* you avoid capacity-growing mutations | Variable-length secrets with a known upper bound |
 /// | `Dynamic<Vec<u8>>` growable | **Yes** — each realloc leaves the old buffer unzeroed | Convenient, but see realloc-residue warning below |
 /// | `Dynamic<String>` | Same as `Dynamic<Vec<u8>>` | Passwords, API keys |
 ///
-/// For **long-lived, known-size key material**, prefer `Dynamic<[u8; N]>` —
-/// it combines `Dynamic`'s heap-only property with zero realloc surface.
+/// For **long-lived, known-size key material** on the heap, prefer `Dynamic<[u8]>` built
+/// with `new_with(N, …)`, `from_random(N)` or a decoder: the bytes are written straight
+/// into the heap buffer, and the length cannot change. `Dynamic<[u8; N]>` has no realloc
+/// surface either, but its only constructors take the array by value, so the key passes
+/// over the stack first; if you use it, build `Dynamic::new([0u8; N])` and fill it through
+/// `with_secret_mut`.
 /// See `SECURITY.md` § "Inherent Rust Limitations" for the broader discussion.
 ///
 /// When the length is fixed but only known at runtime, `Dynamic<[u8]>` gives the same

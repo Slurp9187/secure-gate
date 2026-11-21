@@ -75,8 +75,9 @@
 //!   the stack below the call overwritten, when the call returns. Copies the closure makes
 //!   are the caller's to wipe.
 //! - Registers, and stack residue beyond the overwritten 32 KiB. The overwrite was measured
-//!   on x86_64 Windows and Linux only; another target's cipher backend or frame layout may
-//!   differ.
+//!   on x86_64 Windows and Linux, macOS ARM64, and Linux ARM64 in debug builds only (its
+//!   release build is out of the probe's reach); another target's cipher backend or frame
+//!   layout may differ, and 32-bit targets were not probed.
 //! - What [`unseal`](SealedFixed::unseal) returns: an ordinary `Fixed`, whose by-value
 //!   return can leave a copy in the caller's frame (`SECURITY.md` §1). Read through
 //!   `with_secret` instead where you can.

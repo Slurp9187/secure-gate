@@ -14,6 +14,8 @@ included, is recorded in the `release/0.8` branch's own changelog.
 A breaking release: four changes, each listed below with the code that stops compiling and
 what to write instead. Every "before" was checked to fail and every "after" to compile
 against this release. Nothing about what is wiped, or when, changes. MSRV stays 1.87.
+Once 0.10.0 ships, 0.9.x gets no more fixes (`SECURITY.md`, Supported Versions); 0.8.x
+still does.
 
 ### Migration
 
@@ -76,6 +78,20 @@ against this release. Nothing about what is wiped, or when, changes. MSRV stays 
   (Migration 4).
 
 ### Documentation
+
+- A known-size key held on the heap is `Dynamic<[u8]>` built with `new_with`, `from_random`
+  or a decoder. `SECURITY.md`, the `Dynamic` docs and the crate docs had recommended
+  `Dynamic<[u8; N]>`, which has no such constructor and is built from an array passed by
+  value. `SECURITY.md`'s construction table no longer says a `Fixed` leaves no copy: one
+  returned or passed by value can (§1). Its "Zero overhead" line now says a `Dynamic` is a
+  `Box`.
+- The crate docs list four inherent limits, as `SECURITY.md` does, give the sealed cost as
+  7–11 µs, and say the encoders on `Dynamic<[u8]>` and the others read the wrapper's own
+  bytes. The sealed module docs name every measured target.
+- README: a row for reallocation through `with_secret_mut`; sealed needs about 32 KiB of
+  stack, and a refused lock fails nothing, so check `lock_status()`; the first example
+  says `"…".into()` leaves the literal unwiped. README and `SECURITY.md` name `poly1305`
+  and `ctutils`, which `sealed` lists only for a feature and a version floor.
 
 - `SECURITY.md` says `EncodedSecret`'s `Deref<Target = str>` is a deliberate handoff point,
   not a gap to close.

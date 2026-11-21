@@ -57,7 +57,7 @@ pub type ApiToken = Dynamic<String>;
 fn seal(_enc: &EncKey, _mac: &MacKey) {}
 
 let mut key = EncKey::from_random(); // system RNG (`rand`)
-let pw: Password = "hunter2".into();
+let pw: Password = "hunter2".into(); // copies the literal; the original is never wiped
 let token: ApiToken = "tok_live_123".into();
 seal(&key, &MacKey::from_random());
 
@@ -118,7 +118,7 @@ your own `rand = "0.10"` dependency; any RNG that can fill a byte slice works.
 | `encoding` | All of `encoding-hex`, `-base32`, `-base64`, `-bech32`; see [Encoding](#encoding) |
 | `serde` | `serde-deserialize` (1 MiB default limit) and `serde-serialize` (opt-in per type via `SerializableSecret`) |
 | `cloneable` | Opt-in cloning via `CloneableSecret` |
-| `sealed` | `SealedFixed`, `SealedDynamic`, `sealed_fixed_newtype!`, `sealed_dynamic_newtype!` and `Prekey` (implies `std`, `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`) |
+| `sealed` | `SealedFixed`, `SealedDynamic`, `sealed_fixed_newtype!`, `sealed_dynamic_newtype!` and `Prekey` (implies `std`, `rand`; adds `chacha20poly1305`, `sha2`, `guarded-block`, and `poly1305` and `ctutils` only to turn on a feature and set a version floor) |
 | `full` | Everything except `std` and `sealed` |
 
 ### `std`, `alloc` and `no_std`
@@ -173,9 +173,10 @@ exactly their length), and the staging buffer is wiped.
 
 With the `sealed` feature, a key is held encrypted while it idles, under a pre-key
 locked in RAM between guard pages. Each access costs about 7–11 µs for a 32-byte key, so it
-is for long-held keys, not hot loops. `Prekey::new()` asks to lock the pre-key against
-swap; if the system refuses, sealing still works and `Prekey::lock_status()` returns the
-refusal. Where Windows crash dumps matter more than swap, `Prekey::new_idle_noaccess()` keeps
+is for long-held keys, not hot loops, and needs about 32 KiB of free stack (mind small
+thread stacks). `Prekey::new()` asks to lock the pre-key against swap; if the system
+refuses, sealing still works and nothing fails, so check `Prekey::lock_status()`, which
+returns the refusal. In containers `RLIMIT_MEMLOCK` is often 0, and every lock is refused. Where Windows crash dumps matter more than swap, `Prekey::new_idle_noaccess()` keeps
 an idle pre-key out of a user-mode dump, but cannot keep it locked there. What it covers
 and what it does not:
 [`sealed`](https://docs.rs/secure-gate/latest/secure_gate/sealed/index.html).
@@ -239,6 +240,7 @@ call you can grep for:
 | `EncodedSecret::into_zeroizing` | A `Zeroizing<String>` | Wiped on drop, but it derefs to `String` |
 | `as_reader`, serde `Serialize` | Bytes in a buffer you or another library own | None |
 | What you pass in (`"…".into()`, `try_from_hex(&s)`, `From<&[u8]>`) | Your original input | Never wrapped: only the wrapper's copy is wiped |
+| Changing a `Dynamic<Vec<u8>>` / `Dynamic<String>`'s capacity through `with_secret_mut` or `expose_secret_mut` (`push`, `reserve`, `write!`, `shrink_to_fit`) | The same wrapper, in a new buffer | Each reallocation frees the old buffer unwiped. Pre-size, write a `Dynamic<Vec<u8>>` through its own `io::Write` (`std`), or use `Dynamic<[u8]>` (SECURITY.md §2) |
 
 Beyond the handoffs:
 
