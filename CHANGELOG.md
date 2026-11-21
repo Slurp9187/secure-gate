@@ -8,7 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.9.1] - Unreleased
 
 Additions and fixes only: nothing covered by the stability promise is removed or changes
-signature. Two things do change. One `Debug` output (`SlotWriter`, under Changed). And
+signature. Three things do change for existing code. One `Debug` output (`SlotWriter`,
+under Changed). Three hidden methods, `SealedFixed::__with_wrapped`, `__with_wrapped_mut`
+and `SealedDynamic::__with_wrapped`, are now deprecated: a caller still compiles and gets
+a warning, which is an error under `-D warnings` (under Fixed). And
 the hidden role traits in `secure_gate::__private`, which have been marked semver-exempt
 since 0.9.0 and are not for direct use, take an extra argument (under Fixed): code that
 called them directly, instead of through the macros, stops compiling, which is the point
@@ -94,7 +97,11 @@ crate without saying so.
   `__with_wrapped_mut` methods on `SealedFixed` and `SealedDynamic` are no longer what the
   macros call. They are hidden and documented as not a public API, but they are `pub`
   methods on exported types, so they stay, deprecated, until the next breaking release.
-  They give a caller nothing `with_secret` does not.
+  What they reach is what `with_secret` and `with_secret_mut` on the same value already
+  reach: `__with_wrapped` lends the opened `Fixed` or `Dynamic` for the closure, and
+  `__with_wrapped_mut` lets the closure take that `Fixed` out and leave another to be
+  re-sealed in its place, as `with_secret_mut` lets it copy the bytes out and overwrite
+  them. Neither exists on a type a sealed macro generates.
   - How far it reaches: safe code outside the module that declares the role. `unsafe`
     code can conjure a token, as it can conjure anything. And the macros emit
     `struct Name(Wrapper)` with a private field, which Rust makes visible in the module

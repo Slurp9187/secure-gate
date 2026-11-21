@@ -127,8 +127,11 @@ impl<const N: usize> SealedFixed<N> {
 
     /// The 0.9.0 name of the hook behind `sealed_fixed_newtype!`'s `with_role`. Hidden and
     /// documented as not a public API, but it is a `pub` method on an exported type, and
-    /// 0.9.x removes nothing: it stays until the next breaking release. It gives nothing
-    /// that [`with_secret`](Self::with_secret) does not already give.
+    /// 0.9.x removes nothing: it stays until the next breaking release. It lends the
+    /// opened `Fixed` for the closure, which reaches nothing that
+    /// [`with_secret`](Self::with_secret) does not. Its `_mut` sibling lets the closure
+    /// take that `Fixed` out and leave another to be re-sealed, as `with_secret_mut` lets
+    /// it copy the bytes out and overwrite them.
     #[doc(hidden)]
     #[deprecated(
         since = "0.9.1",

@@ -174,8 +174,9 @@ impl<T: SealedPayload> SealedDynamic<T> {
 
     /// The 0.9.0 name of the hook behind `sealed_dynamic_newtype!`'s `with_role`. Hidden and
     /// documented as not a public API, but it is a `pub` method on an exported type, and
-    /// 0.9.x removes nothing: it stays until the next breaking release. It gives nothing
-    /// that [`with_secret`](Self::with_secret) does not already give.
+    /// 0.9.x removes nothing: it stays until the next breaking release. It lends the
+    /// opened `Dynamic` for the closure, which reaches nothing that
+    /// [`with_secret`](Self::with_secret) does not.
     #[doc(hidden)]
     #[deprecated(
         since = "0.9.1",
