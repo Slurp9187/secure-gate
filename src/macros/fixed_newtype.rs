@@ -251,7 +251,8 @@
 /// generated that would undo it by accident. There is no `From<Wrapper>` and
 /// no `Deref`, so a base-typed value cannot flow into a newtype through
 /// `.into()`, and `&Newtype` never coerces to `&Wrapper` at a call site. By
-/// default the only way material enters or leaves is the 3-tier access API —
+/// default, outside the declaring module (below), the only way material enters or
+/// leaves is the 3-tier access API —
 /// a `with_secret` round trip — which is explicit and shows up in the audit
 /// sweep. Base-wrapper access is opt-in, per newtype, and **split by
 /// direction**: `derive: [FromWrapper]` adds `from_wrapper` (a base value
@@ -263,7 +264,8 @@
 /// `struct Name(Wrapper)` with a private field, and Rust makes a private field visible in
 /// the module that invokes the macro and in every module nested inside it, at any depth.
 /// There, `Name(wrapper)` and `name.0` compile with no derive. Modules outside that
-/// subtree, and every other crate, are held to the derives. Declare roles in a small module of their own so that set stays small. The
+/// subtree, and every other crate, are held to the derives. Declare roles in a small
+/// module of their own so that set stays small. The
 /// same holds for `dynamic_newtype!`.
 ///
 /// These cross a different wall from `into_inner`. A newtype has two:

@@ -75,8 +75,9 @@ crate without saying so.
   an over-long byte sequence is refused at the first byte past the limit instead of
   after it has all been read, so input that is both too long and malformed further on is
   refused as too long, where it used to be refused for the malformed part. For a byte
-  sequence the limit therefore bounds what this crate allocates; text is checked once
-  the deserializer hands it over, before this crate copies or keeps it.
+  sequence the limit therefore bounds what this crate allocates; text the deserializer lends is
+  checked before it is copied, and text it gives away is taken over first and then
+  checked, so a refused one is wiped.
   **Where it stops:** at the deserializer. What it buffers before handing a
   byte or a string over is its own; for text with escapes, `serde_json`'s scratch buffer
   still grows as a plain `Vec` and is freed unwiped. `tests/heap_zeroize.rs` gates on the
