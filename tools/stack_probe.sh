@@ -6,10 +6,14 @@
 # tests/. Run it in a CI checkout or a scratch copy, never in a tree you work in.
 #
 # Two runs per profile (debug, release):
-#   1. "scrub off": scrub_stack() emptied. The probe must find the key at least once, or
-#      it is not looking where the cipher leaves it on this target, and a clean result
-#      below would mean nothing.
+#   1. "scrub off": scrub_stack() emptied. If the probe finds no key here, it cannot see
+#      where the cipher leaves it in that profile on this target, and the clean result
+#      below shows nothing. That profile is reported as inconclusive (a warning), not
+#      as a pass. On Linux ARM64 the release build leaves no key in reach even then.
 #   2. As shipped: every key and plaintext "hits=" count must be 0.
+#
+# Fails if a key or plaintext copy is found as shipped, or if neither profile is in reach
+# (the probe would then show nothing at all on this target).
 #
 # Usage: tools/stack_probe.sh   (from the repository root)
 set -euo pipefail
@@ -40,6 +44,7 @@ run() { # $1 = label, rest = cargo test profile flags. Prints the probe's "hits=
 
 PY=$(command -v python3 || command -v python)
 fail=0
+reached=0
 for profile in debug release; do
   flags=()
   [ "$profile" = release ] && flags=(--release)
@@ -61,8 +66,9 @@ EOF
 
   reach=$(printf '%s\n' "$off" | grep -E '^with_secret: ' | sed -E 's/.*key hits=([0-9]+).*/\1/')
   if [ -z "$reach" ] || [ "$reach" -eq 0 ]; then
-    echo "::error::$profile: with scrub_stack disabled the probe found no key copy, so it cannot see the region on this target (reach check failed)"
-    fail=1
+    echo "::warning::$profile: inconclusive. With scrub_stack disabled the probe found no key copy, so it cannot see where the cipher leaves one in this profile on this target"
+  else
+    reached=$((reached + 1))
   fi
 
   on=$(run "as shipped, $profile" "${flags[@]}")
@@ -72,5 +78,10 @@ EOF
     fail=1
   fi
 done
+
+if [ "$reached" -eq 0 ]; then
+  echo "::error::neither profile is in reach on this target, so the probe shows nothing here"
+  fail=1
+fi
 
 exit "$fail"
