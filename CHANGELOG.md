@@ -22,6 +22,10 @@ against this release. Nothing about what is wiped, or when, changes. MSRV stays 
    - After: add `use secure_gate::SecretLen;`. The call itself does not change.
    - Before: `sealed.len()` inside a `const fn`. Error: E0015, a trait method is not const.
    - After: use the length from the type (`N` for `SealedFixed<N>`), as for `Fixed`.
+   - Before: a trait of your own with a `len`, `byte_len` or `is_empty` method, implemented
+     for a sealed type and called where `SecretLen` is imported. Error: E0034, multiple
+     applicable items. (This crate's own sealed fuzz target hit it.)
+   - After: rename your method, or call it as `YourTrait::len(&s)`.
 2. **`SecretLen` no longer requires `RevealSecret`.** That requirement is what kept the
    sealed types out. An implementation of `SecretLen` written for 0.9 still compiles.
    - Before: `fn f<T: SecretLen>(t: &T) { t.expose_secret(); }`. Error: E0599, no method
