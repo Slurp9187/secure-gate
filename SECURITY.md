@@ -24,7 +24,9 @@ leaks or an exit has no name. A way out that is already named, or a copy made in
 
 - **No independent audit.** Review the source before production use.
 - **No unsafe code.** `#![forbid(unsafe_code)]` in this crate. The `sealed` pre-key's page
-  protection lives in the separate `guarded-block` crate.
+  protection lives in the separate `guarded-block` crate, which does use `unsafe` for its
+  operating-system calls (mapping, guard pages, locking) and is outside this claim. Audit it
+  with the `sealed` feature.
 - **Explicit access.** `Fixed` and `Dynamic` have no `Deref` or `AsRef`. Reading goes
   through `with_secret` (scoped, preferred) or `expose_secret` (an escape hatch).
 - **Wiped on drop.** The whole allocation, including `Vec` / `String` spare capacity.
@@ -168,9 +170,8 @@ try_from_hex  try_from_base32  try_from_base64url  try_from_bech32  try_from_bec
 The second and third rows are the newtype and `sealed` surfaces: `from_wrapper` and its
 siblings are where a value enters or leaves a role, `with_role` / `with_role_mut` open a
 sealed role, and `unseal` ends sealing. `SecretLen` is the import that marks code measuring
-a secret. It does **not** mark the sealed types: `SealedFixed`, `SealedDynamic` and the
-sealed role types have plain `len()` and `is_empty()` methods that need no import, so
-search for `.len()` and `.is_empty()` on sealed values by hand (§3).
+a secret, the sealed types included: since 0.10.0 `SealedFixed`, `SealedDynamic` and the
+sealed role types are measured through it too.
 
 Also audit every `CloneableSecret`, `SerializableSecret` and `FixedStorage` impl; each is
 an assertion the compiler does not check.
@@ -182,6 +183,16 @@ look at what happens to the returned value. Any use of `&*enc` that keeps the by
 (`String::from`, `format!("{}", &*enc)`, a `json!` field) is a copy the crate no longer
 tracks. `format!("{}", enc)` does not compile, because `EncodedSecret` has no `Display`.
 Why `Deref` is kept: `docs/design/encoded_secret_deref.md`.
+
+**`EncodedSecret`'s `Deref<Target = str>` is a handoff point on purpose. Do not remove it
+as a fix.** It is the one exception to "no `Deref`" in this crate, and the exception is the
+design. A caller who calls `to_hex` and its siblings has asked for the encoded text, to
+pass to an API that takes `&str` (a driver, `serde_json`, a header). `EncodedSecret` wipes
+the copy the crate made and redacts `Debug`; what the caller does with the `&str` it hands
+out is past the boundary rule above, like a copy made inside `with_secret`. Removing `Deref`
+would break every such call site and close no confidentiality gap: the bytes are reachable
+either way, through `as_str()` if not through `Deref`. Changing it is a design decision for
+the maintainer, not a cleanup.
 
 ## Inherent Rust Limitations
 
@@ -317,16 +328,41 @@ caveats [above](#if-swap-residue-is-in-your-threat-model). `Fixed` and `Dynamic`
 the role types `sealed_fixed_newtype!` and `sealed_dynamic_newtype!` build on them) hold a
 secret as ChaCha20-Poly1305 ciphertext and open it for one `with_secret` /
 `with_secret_mut` / `with_role` call. The sealing key, `SHA-256(salt ‖ pre-key)`, is recomputed on every
-access and never stored. The pre-key is 16 KiB of random bytes in a `Prekey` that each
+access and never stored. The salt is 32 random bytes from the system RNG, drawn afresh for
+every seal, including every re-seal after `with_secret_mut` / `with_role_mut`. The AEAD
+nonce is all-zero, on purpose: a fresh salt means a fresh key, so no key ever encrypts
+twice and a nonce has nothing to separate. A sealed value is never re-encrypted under its
+old salt, and sealed types have no `Clone`, so no two encryptions share a key. A random
+nonce is not missing; a code path that encrypts again without drawing a fresh salt would be
+the bug.
+
+The pre-key is 16 KiB of random bytes in a `Prekey` that each
 sealed object holds an `Arc` to. Since rc.15 it lives in a mapping of its own between two
-no-access guard pages, read-only once filled (`guarded-block`). When the last reference
+no-access guard pages, read-only once filled (`guarded-block`, which uses `unsafe` for
+those operating-system calls; this crate's no-`unsafe` rule does not cover it). When the last reference
 drops it is wiped, unlocked and unmapped.
 
 The cipher leaves a copy of the key on the stack, so every seal and open ends by
 overwriting the 32 KiB of stack below the call, on a panic too. A probe found the key 4
 times there before the overwrite in a debug build and a plaintext copy once in a release
-build; after it, neither. That was measured on x86_64 Windows only
-(`docs/design/receipts/sealed-stack-residue/`).
+build; after it, neither. That was measured on x86_64 Windows (rustc 1.98.1) and x86_64
+Linux (rustc 1.87.0; with the overwrite removed the probe found the key there too, and with
+it, nothing), in `docs/design/receipts/sealed-stack-residue/`. A monthly CI run repeats it on
+x86_64 Linux and Windows, macOS ARM64 and Linux ARM64, each time first with the overwrite
+removed, to show the probe can see the key on that target, then as shipped. Its first run
+(rustc 1.100.0, `runs_ci.txt`) found nothing as shipped on any of the four. A run that
+cannot see the key with the overwrite removed fails the job.
+
+**Linux ARM64 release builds cannot be measured.** There the release build leaves no key
+copy the probe can reach even with the overwrite removed, so a clean result would show
+nothing. The monthly run probes only the debug build on Linux ARM64, which is in reach. Nor
+are 32-bit targets probed.
+
+One count the monthly run does not gate: the plaintext copy that `SealedFixed::unseal` can
+leave. `unseal` returns an ordinary `Fixed` by value, and a by-value return can leave a
+stack copy in the caller's frames, out of the overwrite's reach (the `unseal` row below,
+and §1). The probe found that copy once in a Windows release build (rustc 1.98.1,
+`runs_panic.txt`) and not in the first monthly run.
 
 | Threat | Sealed |
 |---|---|
@@ -342,7 +378,7 @@ build; after it, neither. That was measured on x86_64 Windows only
 | Registers, and stack beyond the 32 KiB | Not covered |
 | The `Fixed` that `SealedFixed::unseal` returns | An ordinary `Fixed`: returning it can leave a stack copy (§1). Read through `with_secret` / `with_role` instead |
 | A sealed value after it is **dropped** | Its ciphertext, salt and tag are wiped where it was dropped, so nothing is left to open even while other sealed values keep the pre-key alive. Not covered: stack slots a `SealedFixed` was moved out of, which keep ciphertext (§1) |
-| The **length** of a sealed secret | Readable through plain `len()` / `is_empty()`, with no `SecretLen` import to mark the call (see Audit surfaces). `Debug` does not print it |
+| The **length** of a sealed secret | Readable through `SecretLen`, whose import marks the call (see Audit surfaces). `Debug` does not print it |
 | Growing a sealed `String` / `Vec<u8>` | Not expressible. `with_secret_mut` hands out `&mut str` / `&mut [u8]`, and `sealed_dynamic_newtype!` has no `with_role_mut`, so nothing can reallocate the plaintext (§2). To change the length, `unseal`, edit and seal again |
 
 **Lock quotas.** On Windows every `VirtualLock` draws on the working-set quota: about
@@ -430,7 +466,10 @@ EncodableBytes`, and `str` is not `EncodableBytes`, so `encoded.to_hex()` and
 `"text".to_hex()` are rejected. Write `.as_bytes()` if the UTF-8 is what you mean.
 
 **Decoders.** Use the format-specific constructors (`try_from_hex` and siblings on `Fixed`
-and `Dynamic`); they put the bytes straight into a wrapper.
+and `Dynamic`); the bytes are decoded into a staging `Zeroizing` buffer and never sit
+anywhere unwiped. `Dynamic<Vec<u8>>` takes that buffer over without a copy. `Fixed` and
+`Dynamic<[u8]>` copy the bytes out of it into the wrapper (for `Dynamic<[u8]>`, a box of
+exactly their length), and the staging buffer is wiped.
 
 - The decode buffer is allocated inside `Zeroizing` before the backend writes to it, so it
   is wiped on success, on rejection and on unwind (#96, #97). Through 0.9.0-rc.17 the hex,
@@ -519,10 +558,34 @@ Before production use, review the source, the dependency versions, and these tes
 
 ## Vulnerability Reporting
 
-- **Preferred**: GitHub private vulnerability reporting (Repository → Security → Report a vulnerability)
-- **Alternative**: Public issue or draft
+- **How**: GitHub private vulnerability reporting (Repository → Security → Report a
+  vulnerability). Do not open a public issue or pull request for a vulnerability.
 - **Expected response**: Acknowledgment within 48 hours; coordinated disclosure
 - **Public disclosure**: After a fix is released and users have had reasonable time to update
+
+## Supported Versions
+
+| Line | Security fixes |
+|---|---|
+| The latest minor release on `main` (0.10.x once 0.10.0 ships; 0.9.x until then) | Yes |
+| 0.8.x (`release/0.8`, for Rust older than 1.87) | Yes, as 0.8.x patch releases |
+| Earlier minor lines on `main` (0.9.x after 0.10.0 ships) | No: upgrade to the latest minor |
+| Release candidates | No |
+
+## Past Advisory
+
+**0.5.0 through 0.7.0-rc.14 did not zeroize on drop** (0.7.0-rc.15 was tagged but never
+published). The docs said secrets were wiped on drop, but those versions had no
+`impl Drop`, only the empty `ZeroizeOnDrop` marker, so nothing was wiped. Versions 0.1.0
+to 0.4.3 did wipe on drop, through `secrecy::SecretBox` and `zeroize::Zeroizing`; the flaw
+starts at 0.5.0 (2025-11-22). The first published fix is 0.8.0-rc.1 (2026-03-22); the
+0.8.0-alpha.1 entry in `CHANGELOG-ARCHIVE.md` has the details, with a correction note for
+its version range. Every version before 0.8 is yanked from crates.io: 0.5.0 onward for this
+flaw, 0.1.0 to 0.4.3 as early, superseded wrappers over `secrecy`. All were yanked on
+2026-03-17 UTC except 0.6.0, yanked on 2025-12-08 when 0.6.1 replaced it (crates.io
+records each version's last update). Since then the wipe is checked by tests rather than
+by reading the code: `tests/heap_zeroize.rs` checks freed heap blocks are zero, and
+`tests/asm_dse_check.rs` checks the optimizer keeps the wipe.
 
 ## Disclaimer
 

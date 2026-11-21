@@ -14,7 +14,7 @@
 //! | Trait                  | Purpose                                      | Requires Feature         | Notes                                                                 |
 //! |------------------------|----------------------------------------------|--------------------------|-----------------------------------------------------------------------|
 //! | [`RevealSecret`]       | Read-only scoped / direct access             | Always available         | Preferred: `with_secret` (scoped); escape hatch: `expose_secret`      |
-//! | [`SecretLen`]          | Length metadata (`len`, `byte_len`, …)       | Always available         | Only for `[T; N]`, `String`, `Vec<T>`; does not expose contents, but length can itself be sensitive — see trait docs |
+//! | [`SecretLen`]          | Length metadata (`len`, `byte_len`, …)       | Always available         | For `[T; N]`, `String`, `Vec<T>`, `[T]` and the sealed types; does not expose contents, but length can itself be sensitive — see trait docs |
 //! | [`RevealSecretMut`]    | Mutable scoped / direct access               | Always available         | Same preference: `with_secret_mut` over `expose_secret_mut`           |
 //! | [`SentinelValue`]      | Inert placeholder left by `into_inner`       | Always available         | Implemented for `[T; N]` (any `N`), `String`, `Vec<T>`                |
 //! | [`FixedStorage`]       | Asserts the inner type cannot reallocate     | Always available         | Required by `Fixed::new`. Implemented for primitives, `[T; N]`, tuples, `Option<T>` and a few `core` wrappers; a custom inner type writes one line. `Vec`, `String` and `Box` deliberately excluded |
@@ -52,6 +52,11 @@ pub mod encoded_secret;
 
 #[cfg(feature = "alloc")]
 pub use encoded_secret::EncodedSecret;
+
+#[cfg(feature = "alloc")]
+pub mod dynamic_bytes;
+#[cfg(feature = "alloc")]
+pub use dynamic_bytes::DynamicBytes;
 
 pub mod reveal_secret;
 pub use reveal_secret::{RevealSecret, SecretLen};

@@ -170,7 +170,11 @@ Two changes, both in safe Rust:
   region.
 
 After both, the same probe found neither, in debug and release (`receipts/sealed-stack-residue/`).
-Measured on x86_64 Windows with rustc 1.98.1 only; registers are not inspected.
+Measured on x86_64 Windows with rustc 1.98.1, and since on x86_64 Linux with rustc 1.87.0
+(`receipts/sealed-stack-residue/runs_linux.txt`). A monthly CI run repeats it on x86_64 Linux
+and Windows, macOS ARM64 and Linux ARM64 (`runs_ci.txt`, rustc 1.100.0); on Linux ARM64 a
+release build leaves no key in the probe's reach even without the scrub, so it cannot be
+measured and only the debug build runs there. Registers are not inspected.
 
 A second round of review found two gaps, both measured with a panic probe that is also in
 the receipts directory:
@@ -323,6 +327,11 @@ are not additive after all: a second `Dynamic::from_random` makes
 impl does the same to `Dynamic::new(vec).to_hex()` (E0283). Both forms are in this crate's
 own tests. They wait for a breaking release. Serde `Serialize` was never missing: it is
 gated on `SerializableSecret`, which `Vec<u8>` does not have either.
+
+**0.10.0.** The constructors, decoders and encoders shipped, written once over the sealed
+`DynamicBytes` trait (`Vec<u8>` and `[u8]`) instead of twice. A call that names the shape,
+on the binding, a field or a turbofish, compiles for either; only a call that names
+neither stops compiling.
 
 ## Fitting it to `Fixed` and `Dynamic`
 

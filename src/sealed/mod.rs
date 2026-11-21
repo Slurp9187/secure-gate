@@ -32,7 +32,8 @@
 //!   stored in the object. The cipher leaves a copy of it on the stack, so every seal and
 //!   open ends by overwriting the 32 KiB of stack below the call (sequoia's `zero_stack`
 //!   technique), on a panic as well as a normal return, which also removes plaintext a move
-//!   left there. Measured on x86_64 Windows:
+//!   left there. Measured on x86_64 Windows and Linux and on macOS ARM64, and on Linux
+//!   ARM64 in a debug build (its release build leaves no key the probe can reach):
 //!   `docs/design/receipts/sealed-stack-residue/` in the repository.
 //! - Because every seal has its own key, the AEAD nonce is all-zero. Every re-seal after
 //!   [`with_secret_mut`](SealedFixed::with_secret_mut) draws a new salt, so no key ever
@@ -74,7 +75,8 @@
 //!   the stack below the call overwritten, when the call returns. Copies the closure makes
 //!   are the caller's to wipe.
 //! - Registers, and stack residue beyond the overwritten 32 KiB. The overwrite was measured
-//!   on one target; another target's cipher backend or frame layout may differ.
+//!   on x86_64 Windows and Linux only; another target's cipher backend or frame layout may
+//!   differ.
 //! - What [`unseal`](SealedFixed::unseal) returns: an ordinary `Fixed`, whose by-value
 //!   return can leave a copy in the caller's frame (`SECURITY.md` §1). Read through
 //!   `with_secret` instead where you can.
@@ -123,12 +125,6 @@
 //!   `with_secret_mut` is the mutable access, and re-seals under a fresh salt. For
 //!   [`SealedDynamic`] it hands out `&mut str` / `&mut [u8]`, not `&mut String` /
 //!   `&mut Vec<u8>`, so the buffer cannot grow and abandon an unwiped copy.
-//! - [`SecretLen`](crate::SecretLen): it requires `RevealSecret` too, so the sealed types
-//!   cannot implement it. They have inherent `len()` and `is_empty()` instead, and no
-//!   `byte_len()`. **This is a known gap, not a design goal:** those two calls need no
-//!   `use secure_gate::SecretLen;`, so `grep SecretLen` does not find code that measures a
-//!   sealed secret. Search for `.len()` and `.is_empty()` on sealed values as well. Length
-//!   is sensitive for passwords (see `SecretLen`'s docs).
 //! - `Clone`, with or without `CloneableSecret`: a second copy
 //!   would share the salt. Unseal, clone the plain value if its type allows it, and seal
 //!   again.
@@ -225,6 +221,34 @@ pub use prekey::{LockError, Prekey};
 /// ```compile_fail,E0277
 /// use secure_gate::{Dynamic, Prekey, SealedDynamic};
 /// let _ = SealedDynamic::seal(Dynamic::<Vec<u16>>::new(vec![1]), &Prekey::new());
+/// ```
+///
+/// The 0.9.0 hooks the sealed macros used, `__with_wrapped` and `__with_wrapped_mut`, are
+/// gone (removed in 0.10.0):
+///
+/// ```compile_fail,E0599
+/// use secure_gate::{Fixed, Prekey, RevealSecret, SealedFixed};
+/// let s = SealedFixed::seal(Fixed::new([0u8; 4]), &Prekey::new());
+/// let _ = s.__with_wrapped(|f| f, |f: &Fixed<[u8; 4]>| f.expose_secret()[0]);
+/// ```
+///
+/// A sealed value has no plain `len()`: it is measured through
+/// [`SecretLen`](crate::SecretLen), so the import is needed and searchable:
+///
+/// ```compile_fail,E0599
+/// use secure_gate::{Fixed, Prekey, SealedFixed};
+/// let s = SealedFixed::seal(Fixed::new([0u8; 4]), &Prekey::new());
+/// let _ = s.len();
+/// ```
+///
+/// Nor does the type a sealed macro generates:
+///
+/// ```compile_fail,E0599
+/// use secure_gate::{Prekey, fixed_newtype, sealed_fixed_newtype};
+/// fixed_newtype!(AppKey, 32);
+/// sealed_fixed_newtype!(SealedAppKey, AppKey);
+/// let k = SealedAppKey::seal(AppKey::new([0u8; 32]), &Prekey::new());
+/// let _ = k.len();
 /// ```
 ///
 /// # The role wall

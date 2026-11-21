@@ -1,0 +1,90 @@
+name: Sealed stack probe (monthly)
+
+# Runs the sealed stack-residue probe (tools/stack_probe.sh,
+# docs/design/receipts/sealed-stack-residue/) on four targets: after a sealed access, the
+# sealing key and the plaintext must not be on the stack. A first run with the stack scrub
+# disabled must find the key, or the probe is blind there and the job fails. Each target
+# runs the profiles its matrix entry lists.
+#
+# Monthly and on demand, and on a pull request only when it changes the probe itself. Never
+# required for merging, and not part of `CI passed`: the probe reads raw stack and depends
+# on frame layout, so a compiler release can move what it sees without any change here. A
+# failed scheduled run opens (or comments on) one issue.
+
+on:
+  schedule:
+    - cron: "0 6 3 * *" # the 3rd of every month, 06:00 UTC
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - tools/stack_probe.sh
+      - .github/workflows/stack-probe.yml
+      - docs/design/receipts/sealed-stack-residue/**
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Stack probe (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-latest
+            profiles: debug release
+          - name: Windows x86_64
+            os: windows-latest
+            profiles: debug release
+          - name: macOS ARM64
+            os: macos-latest
+            profiles: debug release
+          # Debug only. A Linux ARM64 release build leaves no key copy the probe can
+          # reach even with scrub_stack emptied, so the probe cannot measure it there
+          # (SECURITY.md, sealed section). Run there, it would fail every time.
+          - name: Linux ARM64
+            os: ubuntu-24.04-arm
+            profiles: debug
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          cache: false
+
+      - name: Run the probe
+        shell: bash
+        env:
+          STACK_PROBE_PROFILES: ${{ matrix.profiles }}
+        run: |
+          rustc -V
+          tools/stack_probe.sh
+
+  report:
+    name: Open an issue on failure
+    needs: probe
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Monthly sealed stack probe failed"
+          n=$(gh issue list -R "$REPO" --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          body="The scheduled stack probe failed: $RUN_URL. See docs/design/receipts/sealed-stack-residue/README.md for what each check means. A reach-check failure means the probe could not see the stack region on that target; a residue failure means the sealing key or plaintext was found after a sealed access."
+          if [ -n "$n" ]; then
+            gh issue comment "$n" -R "$REPO" --body "$body"
+          else
+            gh issue create -R "$REPO" --title "$title" --body "$body"
+          fi

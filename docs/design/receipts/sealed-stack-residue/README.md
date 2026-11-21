@@ -14,6 +14,8 @@ measured with the same probe. This directory holds that probe and its captured o
 | `probe_panic.rs` | The second-round probe: an access whose closure panics, a `with_secret_mut` whose closure panics, a tag mismatch (one ciphertext byte flipped), and `unseal` with its result dropped. Written by a reviewer of PR #265, with the `unseal` case added. |
 | `probe_hooks.patch` | The hooks: `#[doc(hidden)]` methods that derive the key the way an access does, and one that flips a ciphertext byte. Applied to a scratch copy only; never part of the crate. |
 | `runs.txt` | First round: captured stdout, before and after the scrub, debug and release. |
+| `runs_linux.txt` | Both probes on Linux x86_64 (rustc 1.87.0, commit `150e24b`), debug and release: with `scrub_stack` disabled, to show the probe reaches the key there, and as shipped. |
+| `runs_ci.txt` | The monthly run's first pass (GitHub Actions, rustc 1.100.0, commit `a8f79b2`) on Linux x86_64, Windows x86_64, macOS ARM64 and Linux ARM64: scrub off, then as shipped, in debug and release. |
 | `runs_panic.txt` | Second round: the panic probe before (`5805536`) and after `scrubbed()` and in-place `unseal`. Every panic path reads 0 after; `unseal` still reads one plaintext copy in release, the by-value return described in `SECURITY.md` §1. |
 
 ## Method
@@ -33,6 +35,18 @@ Two controls keep a clean result from meaning "looked in the wrong place":
 - **baseline**: a snapshot after zeroing and before any access. It must read 0, or the probe
   is finding its own copies.
 
+## Monthly run
+
+`tools/stack_probe.sh` runs both probes in each profile it is given, first with
+`scrub_stack` emptied (the key must be found, or the probe is blind there and the run
+fails) and then as shipped (no key or plaintext may be found, except the plaintext count on
+the `unseal, result dropped` line: `unseal` returns a `Fixed` by value, whose stack copy the
+scrub cannot reach, as `SECURITY.md` says). `.github/workflows/stack-probe.yml` runs it on
+the 3rd of every month and on demand: debug and release on Linux x86_64, Windows x86_64 and
+macOS ARM64, and debug only on Linux ARM64, whose release build is out of the probe's reach.
+It also runs on a pull request that changes the probe itself, and it never gates a merge. A failed scheduled run opens an
+issue, or comments on the open one.
+
 ## Reproducing
 
 From a checkout of the branch, in a scratch copy (`git archive HEAD | tar -x -C <dir>`):
@@ -49,7 +63,14 @@ other's build of this crate, and the hooks then appear to be missing.
 
 ## What it does not cover
 
-Only x86_64 Windows, rustc 1.98.1, was measured. Other targets use other ChaCha20 backends
-and other frame layouts. Registers are not inspected. `SealedDynamic` was not probed: its
+By hand, two targets were measured: x86_64 Windows (rustc 1.98.1) and x86_64 Linux (rustc 1.87.0,
+`runs_linux.txt`). On Linux the control reads 0 in both profiles, so the reach check there is
+the "scrub off" run instead: with `scrub_stack` emptied the probe finds the key 6 times in
+debug and once in release after `with_secret`, and with it in place it finds nothing. The
+monthly run's first pass (rustc 1.100.0, `runs_ci.txt`) added macOS ARM64 and Linux ARM64:
+nothing as shipped on either. On Linux ARM64 the release build leaves no key copy in reach
+even with the scrub emptied, so that profile cannot be measured and the monthly run leaves
+it out; its debug build is in reach (17 copies with the scrub off). No 32-bit target is measured.
+Registers are not inspected. `SealedDynamic` was not probed: its
 plaintext temporary is on the heap in a `Dynamic`, which wipes it, and its accesses end with
 the same `scrub_stack`.

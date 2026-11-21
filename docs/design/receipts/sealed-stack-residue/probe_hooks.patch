@@ -1,7 +1,7 @@
---- a/src/sealed/fixed.rs	2026-10-18 21:23:16.450829300 -0700
-+++ b/src/sealed/fixed.rs	2026-10-18 21:23:53.644934400 -0700
-@@ -207,6 +207,15 @@
-         N == 0
+--- a/src/sealed/fixed.rs
++++ b/src/sealed/fixed.rs
+@@ -184,6 +184,15 @@
+         plain
      }
  
 +    #[doc(hidden)]
@@ -13,12 +13,12 @@
 +    #[doc(hidden)]
 +    pub fn __probe_flip(&mut self) { self.ct[0] ^= 1; }
 +
-     #[inline(always)]
-     fn open_into(&self, buf: &mut [u8; N]) {
-         buf.copy_from_slice(&self.ct);
---- a/src/sealed/prekey.rs	2026-10-18 21:20:53.949136300 -0700
-+++ b/src/sealed/prekey.rs	2026-10-18 21:23:53.503271300 -0700
-@@ -179,6 +179,15 @@
+     #[inline(never)]
+     fn open_into_out_of_line(&self, buf: &mut [u8; N]) {
+         self.open_into(buf);
+--- a/src/sealed/prekey.rs
++++ b/src/sealed/prekey.rs
+@@ -306,6 +306,15 @@
          })
      }
  
@@ -29,7 +29,7 @@
 +    #[inline(never)]
 +    pub fn __probe_cipher_only(&self, salt: &[u8; SALT_LEN]) { let c = self.cipher(salt); core::hint::black_box(&c); }
 +    #[doc(hidden)]
-+    pub fn __probe_key(&self, salt: &[u8; SALT_LEN]) -> [u8; 32] { self.sealing_key(salt).with_secret(|k| *k) }
++    pub fn __probe_key(&self, salt: &[u8; SALT_LEN]) -> [u8; 32] { use crate::RevealSecret; self.sealing_key(salt).with_secret(|k| *k) }
 +
      #[inline]
      fn cipher(&self, salt: &[u8; SALT_LEN]) -> ChaCha20Poly1305 {

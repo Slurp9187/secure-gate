@@ -35,7 +35,8 @@ use zeroize::Zeroizing;
 use secure_gate::scoped::RevealScoped;
 use secure_gate::{
     ConstantTimeEq, Dynamic, Fixed, Prekey, RevealSecret, RevealSecretMut, SealedDynamic,
-    SealedFixed, dynamic_newtype, fixed_newtype, sealed_dynamic_newtype, sealed_fixed_newtype,
+    SealedFixed, SecretLen, dynamic_newtype, fixed_newtype, sealed_dynamic_newtype,
+    sealed_fixed_newtype,
 };
 
 fixed_newtype!(Key, 32);
@@ -202,7 +203,7 @@ trait Subject: Sized + ConstantTimeEq + core::fmt::Debug {
     /// Unseals, shows the plaintext to `check`, and seals the unsealed value again under
     /// `prekey` if there is one.
     fn unseal_then(self, prekey: Option<&Arc<Prekey>>, check: impl FnOnce(&[u8])) -> Option<Self>;
-    fn byte_len(&self) -> usize;
+    fn subject_len(&self) -> usize;
 }
 
 impl Subject for SealedFixed<32> {
@@ -229,7 +230,7 @@ impl Subject for SealedFixed<32> {
         RevealSecret::with_secret(&plain, |p| check(p));
         prekey.map(|pk| Self::seal(plain, pk))
     }
-    fn byte_len(&self) -> usize {
+    fn subject_len(&self) -> usize {
         assert!(!self.is_empty());
         self.len()
     }
@@ -263,7 +264,7 @@ impl Subject for SealedKey {
         RevealSecret::with_secret(&plain, |p| check(p));
         prekey.map(|pk| Self::seal(plain, pk))
     }
-    fn byte_len(&self) -> usize {
+    fn subject_len(&self) -> usize {
         assert!(!self.is_empty());
         self.len()
     }
@@ -305,7 +306,7 @@ macro_rules! dynamic_subject {
                 RevealSecret::with_secret(&plain, |p| check(p.bytes()));
                 prekey.map(|pk| Self::seal(plain, pk))
             }
-            fn byte_len(&self) -> usize {
+            fn subject_len(&self) -> usize {
                 assert_eq!(self.is_empty(), self.len() == 0);
                 self.len()
             }
@@ -611,7 +612,7 @@ impl World {
                     if is_fixed(s) {
                         assert_eq!(ALLOCS.load(Ordering::Relaxed), before, "a fixed read allocated");
                     }
-                    assert_eq!(s.byte_len(), model.len());
+                    assert_eq!(s.subject_len(), model.len());
                     assert_eq!(format!("{s:?}"), "[REDACTED]");
                 });
             }

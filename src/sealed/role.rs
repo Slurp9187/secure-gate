@@ -138,18 +138,6 @@ where
         R::from_fixed(self.0.unseal(), RoleToken::new())
     }
 
-    /// The key's length in bytes.
-    #[inline(always)]
-    pub const fn len(&self) -> usize {
-        N
-    }
-
-    /// `true` only for a zero-length key, which `fixed_newtype!` rejects.
-    #[inline(always)]
-    pub const fn is_empty(&self) -> bool {
-        N == 0
-    }
-
     /// Constant-time comparison of the two plaintexts.
     #[cfg(feature = "ct-eq")]
     #[inline]
@@ -206,22 +194,29 @@ impl<R: DynamicRole> SealedDynRole<R> {
         R::from_dynamic(self.0.unseal(), RoleToken::new())
     }
 
-    /// The secret's length in bytes.
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// `true` if the secret is empty.
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
     /// Constant-time comparison of the two plaintexts.
     #[cfg(feature = "ct-eq")]
     #[inline]
     pub fn ct_eq(&self, other: &Self) -> bool {
         crate::ConstantTimeEq::ct_eq(&self.0, &other.0)
+    }
+}
+
+/// `N`, as for the `SealedFixed` inside.
+impl<R, const N: usize> crate::SecretLen for SealedRole<R>
+where
+    R: FixedRole<Fixed = Fixed<[u8; N]>>,
+{
+    #[inline(always)]
+    fn len(&self) -> usize {
+        N
+    }
+}
+
+/// The secret's length in bytes, as for the `SealedDynamic` inside.
+impl<R: DynamicRole> crate::SecretLen for SealedDynRole<R> {
+    #[inline]
+    fn len(&self) -> usize {
+        crate::SecretLen::len(&self.0)
     }
 }

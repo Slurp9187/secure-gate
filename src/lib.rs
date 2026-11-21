@@ -23,7 +23,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! Secure wrappers for secrets with **explicit access** and **mandatory zeroization** — a
-//! `no_std`-compatible, zero-overhead library with audit-friendly access patterns.
+//! `no_std`-compatible library with audit-friendly access patterns.
 //!
 //! Secrets are **automatically zeroized on drop** (the inner type must implement
 //! [`Zeroize`](zeroize::Zeroize)). While a secret is held in [`Fixed`] or [`Dynamic`],
@@ -418,6 +418,9 @@ pub mod __private {
 /// ```
 #[cfg(feature = "alloc")]
 pub use dynamic::Dynamic;
+
+#[cfg(feature = "alloc")]
+pub use traits::DynamicBytes;
 
 #[cfg(feature = "sealed")]
 #[doc(inline)]
