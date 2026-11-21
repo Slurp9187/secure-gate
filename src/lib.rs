@@ -4,6 +4,15 @@
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+// Intra-doc links to feature-gated items (`ToHex`, `from_random`, `RevealScoped`, …) only
+// resolve when the feature is on. docs.rs and CI's rustdoc job build with every feature,
+// and there a broken link is still an error. In any narrower build the same links would
+// be reported by the dozen for no fault in the docs, so the lint is off unless every
+// feature is enabled. The links then render as plain code text.
+#![cfg_attr(
+    not(all(feature = "full", feature = "std", feature = "sealed")),
+    allow(rustdoc::broken_intra_doc_links)
+)]
 // `Cargo.toml` tells docs.rs to build with `--cfg docsrs`. This is what reads it:
 // `doc_cfg` annotates every feature-gated item with the feature that enables it, so
 // the docs people read say "Available on crate feature `encoding-hex`" instead of

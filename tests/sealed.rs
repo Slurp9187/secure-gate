@@ -136,6 +136,7 @@ fn debug_reveals_nothing() {
         format!("{d:?}"),
         format!("{k:?}"),
         format!("{prekey:?}"),
+        format!("{:?}", Prekey::new_idle_noaccess()),
     ] {
         assert_eq!(s, "[REDACTED]");
     }

@@ -418,6 +418,8 @@ impl core::fmt::Debug for Prekey {
     }
 }
 
+// Inline, not in `tests/`: these call the private key derivation, read the mapping's page
+// protections, and make a derivation fail on demand.
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -610,12 +612,5 @@ pub(crate) mod tests {
         }));
         assert!(result.is_err());
         assert_eq!(buf, [0u8; 8]);
-    }
-
-    #[test]
-    fn debug_is_redacted() {
-        let _q = quota();
-        assert_eq!(format!("{:?}", Prekey::new()), "[REDACTED]");
-        assert_eq!(format!("{:?}", Prekey::new_idle_noaccess()), "[REDACTED]");
     }
 }

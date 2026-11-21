@@ -155,11 +155,21 @@ Every way a secret is read, moved, encoded or decoded is an explicit call. Searc
 
 ```
 expose_secret  expose_secret_mut  with_secret  with_secret_mut
-into_inner  into_zeroizing  as_reader  as_wrapper_mut
+into_inner  into_zeroizing  as_reader
+from_wrapper  as_wrapper  as_wrapper_mut  into_wrapper
+with_role  with_role_mut  unseal
+SecretLen  byte_len
 to_hex  to_hex_upper  to_base32  to_base64url
 try_to_bech32  try_to_bech32m  try_to_bech32_sized  try_to_bech32m_sized
 try_from_hex  try_from_base32  try_from_base64url  try_from_bech32  try_from_bech32m
 ```
+
+The second and third rows are the newtype and `sealed` surfaces: `from_wrapper` and its
+siblings are where a value enters or leaves a role, `with_role` / `with_role_mut` open a
+sealed role, and `unseal` ends sealing. `SecretLen` is the import that marks code measuring
+a secret. It does **not** mark the sealed types: `SealedFixed`, `SealedDynamic` and the
+sealed role types have plain `len()` and `is_empty()` methods that need no import, so
+search for `.len()` and `.is_empty()` on sealed values by hand (§3).
 
 Also audit every `CloneableSecret`, `SerializableSecret` and `FixedStorage` impl; each is
 an assertion the compiler does not check.
@@ -330,6 +340,8 @@ build; after it, neither. That was measured on x86_64 Windows only
 | The plaintext temporary while the closure runs, and copies the closure makes | Not covered. The temporary is wiped, and the stack below overwritten, when the call returns |
 | Registers, and stack beyond the 32 KiB | Not covered |
 | The `Fixed` that `SealedFixed::unseal` returns | An ordinary `Fixed`: returning it can leave a stack copy (§1). Read through `with_secret` / `with_role` instead |
+| A sealed value after it is **dropped** | Its ciphertext, salt and tag are not wiped. They cannot be opened without the pre-key, which is wiped when its last holder drops. While another sealed value keeps that pre-key alive, the dropped ciphertext is as exposed as a live one: to a clean read, and to nothing less |
+| The **length** of a sealed secret | Readable through plain `len()` / `is_empty()`, with no `SecretLen` import to mark the call (see Audit surfaces). `Debug` does not print it |
 | Growing a sealed `String` / `Vec<u8>` | Not expressible. `with_secret_mut` hands out `&mut str` / `&mut [u8]`, and `sealed_dynamic_newtype!` has no `with_role_mut`, so nothing can reallocate the plaintext (§2). To change the length, `unseal`, edit and seal again |
 
 **Lock quotas.** On Windows every `VirtualLock` draws on the working-set quota: about
@@ -338,8 +350,9 @@ Unix the limit is `RLIMIT_MEMLOCK`; where it is 0 (common in containers) every l
 refused, `lock_status()` says so, and sealing still works.
 
 **Cost.** About 7–11 µs per access for a 32-byte key, and about 32 KiB of free stack.
-Design, numbers and what it deliberately omits (`expose_secret`, `Hash`):
-`docs/design/sealed_memory.md`.
+Design and numbers: `docs/design/sealed_memory.md`. Everything the sealed types
+deliberately do not implement, each with its reason, is listed in the `sealed` module's
+rustdoc under "Not implemented, on purpose".
 
 ### 4. Copying the secret out of a reveal borrow
 

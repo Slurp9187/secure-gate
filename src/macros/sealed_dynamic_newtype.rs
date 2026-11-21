@@ -162,6 +162,10 @@ macro_rules! sealed_dynamic_newtype {
 
             /// The secret's length in bytes. Length can itself be sensitive for passwords;
             /// it is not printed by `Debug`.
+            ///
+            /// A plain method, not `SecretLen::len`: it needs no
+            /// `use secure_gate::SecretLen;`, so searching for that import does not find
+            /// this call.
             #[inline]
             pub fn len(&self) -> usize {
                 self.0.len()

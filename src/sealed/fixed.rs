@@ -192,6 +192,9 @@ impl<const N: usize> SealedFixed<N> {
     }
 
     /// The secret's length in bytes, `N`.
+    ///
+    /// This is a plain method, not [`SecretLen::len`](crate::SecretLen::len), and needs no
+    /// import. For a fixed-size key the length is already in the type.
     #[inline(always)]
     pub const fn len(&self) -> usize {
         N
@@ -239,6 +242,7 @@ impl<const N: usize> core::fmt::Debug for SealedFixed<N> {
     }
 }
 
+// Inline, not in `tests/`: these read and corrupt the private `ct`, `salt` and `tag` fields.
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -92,12 +92,59 @@
 //! Not zero-overhead. Each access hashes 16 KiB and runs one AEAD pass; each mutation adds
 //! an RNG call and a second pass. The repository's `sealed_vs_fixed` benchmark measures it.
 //!
+//! # Where the protection stops
+//!
+//! Sealing protects a secret **while it is idle, and only as far as the pre-key is safe**.
+//! Three edges, stated once:
+//!
+//! - **The pre-key.** Ciphertext, salt and tag are ordinary memory and are not wiped when
+//!   a sealed value is dropped. They cannot be opened without the pre-key, which is wiped
+//!   when its last holder drops. While another sealed value keeps the same pre-key alive,
+//!   a dropped value's ciphertext can still be opened by anyone who can read both cleanly,
+//!   which is the clean read listed above.
+//! - **The closure.** Inside `with_secret`, `with_secret_mut`, `with_role` and
+//!   `with_role_mut` the secret is plaintext. The crate wipes the temporary it made; copies
+//!   the closure makes are the caller's.
+//! - **`unseal`.** It returns an ordinary [`Fixed`](crate::Fixed) or
+//!   [`Dynamic`](crate::Dynamic) (or the plain role). From there the plain wrapper's rules
+//!   apply and sealing protects nothing.
+//!
 //! # Not implemented, on purpose
 //!
-//! - `expose_secret` / [`RevealSecret`](crate::RevealSecret): plaintext must not outlive
-//!   the call. Use [`RevealScoped`](crate::scoped::RevealScoped) for generic scoped access.
-//! - `Hash`: it would feed the plaintext into a hasher whose state is never wiped.
+//! Every item here is a decision, not an omission. If you need one of them, open the secret
+//! with `with_secret` and do it there, where the audit sweep sees it.
+//!
+//! - `expose_secret`, `into_inner` and [`RevealSecret`](crate::RevealSecret): plaintext
+//!   must not outlive the call. Use [`RevealScoped`](crate::scoped::RevealScoped) for
+//!   generic scoped access, and `unseal` to end sealing by name.
+//! - [`RevealSecretMut`](crate::RevealSecretMut): it requires `RevealSecret`. The inherent
+//!   `with_secret_mut` is the mutable access, and re-seals under a fresh salt. For
+//!   [`SealedDynamic`] it hands out `&mut str` / `&mut [u8]`, not `&mut String` /
+//!   `&mut Vec<u8>`, so the buffer cannot grow and abandon an unwiped copy.
+//! - [`SecretLen`](crate::SecretLen): it requires `RevealSecret` too, so the sealed types
+//!   cannot implement it. They have inherent `len()` and `is_empty()` instead, and no
+//!   `byte_len()`. **This is a known gap, not a design goal:** those two calls need no
+//!   `use secure_gate::SecretLen;`, so `grep SecretLen` does not find code that measures a
+//!   sealed secret. Search for `.len()` and `.is_empty()` on sealed values as well. Length
+//!   is sensitive for passwords (see `SecretLen`'s docs).
+//! - `Clone`, with or without `CloneableSecret`: a second copy
+//!   would share the salt. Unseal, clone the plain value if its type allows it, and seal
+//!   again.
+//! - `Hash`, `PartialEq`, `Eq`: `Hash` would feed the plaintext into a hasher whose state
+//!   is never wiped. Compare with `ConstantTimeEq` (the `ct-eq` feature).
 //! - `Debug` beyond `[REDACTED]`: no salt, no tag, no length.
+//! - `Zeroize`, `ZeroizeOnDrop` and a wiping `Drop`: what is stored is ciphertext; see
+//!   "Where the protection stops".
+//! - Serde, the encoders (`ToHex` and the rest), the `try_from_*` decoders, `From`,
+//!   `TryFrom` and `std::io::Write`: each would create or consume plaintext outside a
+//!   scoped call. Decode or deserialize into a plain wrapper and seal that.
+//! - `derive:` options on [`sealed_fixed_newtype!`](crate::sealed_fixed_newtype) and
+//!   [`sealed_dynamic_newtype!`](crate::sealed_dynamic_newtype): a sealed role seals from
+//!   and unseals to its one plain role, and nothing else.
+//! - `with_role_mut` on `sealed_dynamic_newtype!`: it would hand out the growable role.
+//!   `sealed_fixed_newtype!` has it, because a fixed role cannot grow.
+//! - `from_random` on [`SealedDynamic`] and on both sealed macros: seal a plain
+//!   `from_random()` value. [`SealedFixed::from_random`] exists.
 
 mod dynamic;
 mod fixed;

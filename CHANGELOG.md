@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - Unreleased
+
+Documentation and tests only so far. No public API is added, removed or changed. These
+come from a consistency review of the 0.9.0 API, which looked for places where the `sealed`
+types differ from the rest of the crate without saying so.
+
+### Documentation
+- **The `sealed` length methods are a stated gap.** `SealedFixed`, `SealedDynamic` and the
+  types `sealed_fixed_newtype!` and `sealed_dynamic_newtype!` generate have plain `len()`
+  and `is_empty()` methods, because `SecretLen` requires `RevealSecret` and a sealed type
+  cannot implement that. Those calls need no `use secure_gate::SecretLen;`, so searching
+  for the import does not find code that measures a sealed secret. This has been so since
+  `sealed` first shipped and was not written down. It now is: on `SecretLen`, on each of
+  the methods, in the `sealed` module and in `SECURITY.md`. Fixing it removes methods, so
+  it cannot happen in a 0.9.x release.
+- The `sealed` module's "Not implemented, on purpose" list is complete. It named three
+  omissions; it now names every one, each with its reason: `RevealSecretMut`, `SecretLen`,
+  `into_inner`, `Clone`, `PartialEq` / `Eq`, `Zeroize` / `ZeroizeOnDrop`, serde, the
+  encoders and decoders, `From` / `TryFrom`, `io::Write`, the macros' `derive:` options,
+  `with_role_mut` on `sealed_dynamic_newtype!`, and the missing `from_random` constructors.
+- New "Where the protection stops" section in the `sealed` module, and two rows in
+  `SECURITY.md` §3: a dropped sealed value's ciphertext, salt and tag are not wiped, and
+  are safe only as far as the pre-key is.
+- `SECURITY.md` audit search list: adds `from_wrapper`, `as_wrapper`, `into_wrapper`,
+  `with_role`, `with_role_mut`, `unseal`, `SecretLen` and `byte_len`.
+- `Dynamic::new`: the docs said borrowed input is not accepted. That holds for
+  `Dynamic<String>` and `Dynamic<Vec<u8>>`. `Dynamic::<str>::new("...")` and
+  `Dynamic::<[u8]>::new(&bytes[..])` compile, copy the bytes and leave the source unwiped;
+  the docs now say so.
+- README Stability: the `release/0.8` line stays on 0.8.x and never takes a breaking
+  change. README Contributing: where tests live.
+- `Fixed` module docs: `Serialize` needs `serde-serialize` only. The `fixed_newtype!`
+  catch-all error now lists `try_new_with` in the reduced API.
+- Broken intra-doc links are reported only when every feature is enabled, which is how
+  docs.rs and CI build. A narrower `cargo doc` used to report about a hundred links to
+  feature-gated items; it is now clean.
+
+### Tests
+- Each inline test module says in one line why it is not in `tests/`. The pre-key `Debug`
+  check moved to `tests/sealed.rs`, since it reads nothing private.
+
 ## [0.9.0] - 2026-11-14
 
 First stable release of the 0.9 line. From this release the public API follows semantic

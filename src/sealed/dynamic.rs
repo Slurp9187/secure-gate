@@ -181,6 +181,9 @@ impl<T: SealedPayload> SealedDynamic<T> {
 
     /// The secret's length in bytes. Length can itself be sensitive for passwords; it is
     /// not printed by `Debug`.
+    ///
+    /// This is a plain method, not [`SecretLen::len`](crate::SecretLen::len): it needs no
+    /// `use secure_gate::SecretLen;`, so searching for that import does not find this call.
     #[inline]
     pub fn len(&self) -> usize {
         self.ct.len()
@@ -235,6 +238,7 @@ impl<T: SealedPayload> core::fmt::Debug for SealedDynamic<T> {
     }
 }
 
+// Inline, not in `tests/`: these read and corrupt the private `ct`, `salt` and `tag` fields.
 #[cfg(test)]
 mod tests {
     use super::*;

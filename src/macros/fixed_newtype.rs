@@ -678,7 +678,7 @@ macro_rules! fixed_newtype {
              (`fixed_newtype!(pub K, generic [i16; 256])`). A literal array there \
              also gets `SecretLen` and the declaration-site `N = 0` guard; any other \
              inner type takes the reduced API (RevealSecret, RevealSecretMut, Debug, \
-             Zeroize, `new`, `new_with`) on purpose. `generic [u8; N]` is not one of \
+             Zeroize, `new`, `new_with`, `try_new_with`) on purpose. `generic [u8; N]` is not one of \
              those: write the size literal. \
              If the length or the marker looks right, the problem is in what follows \
              it: a `derive:` list needs brackets, and accepts only Deserialize, \

@@ -230,10 +230,17 @@ impl<T: ?Sized + zeroize::Zeroize> Dynamic<T> {
     /// `Vec<u8>`), which is boxed, or a `Box<T>`, which is moved in as it is. Either way
     /// the buffer is moved, not copied.
     ///
-    /// Borrowed input is not accepted here. `&str` and `&[u8]` go through
-    /// [`Dynamic::from`], which copies them and leaves the source unwiped. For the values
-    /// `new` does accept, `Dynamic::from(value)` is the same call; `#[doc(alias = "from")]`
-    /// is set so both names appear in docs.rs search.
+    /// For `Dynamic<String>` and `Dynamic<Vec<u8>>`, borrowed input is not accepted here.
+    /// `&str` and `&[u8]` go through [`Dynamic::from`], which copies them and leaves the
+    /// source unwiped. For the values `new` does accept, `Dynamic::from(value)` is the same
+    /// call; `#[doc(alias = "from")]` is set so both names appear in docs.rs search.
+    ///
+    /// **The unsized shapes are the exception.** `Box<str>` implements `From<&str>` and
+    /// `Box<[u8]>` implements `From<&[u8]>`, so `Dynamic::<str>::new("...")` and
+    /// `Dynamic::<[u8]>::new(&bytes[..])` compile. Both **copy** the borrowed bytes into a
+    /// new allocation and leave the source unwiped, exactly as `Dynamic::from(&str)` does.
+    /// An owned `String` or `Vec` given to either is moved, but is first shrunk to its
+    /// length: if it had spare capacity, that reallocates and frees the old buffer unwiped.
     ///
     /// Requires the `alloc` feature (which `Dynamic<T>` itself always requires).
     #[doc(alias = "from")]
