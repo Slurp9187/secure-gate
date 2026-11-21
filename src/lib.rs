@@ -4,6 +4,15 @@
 // Forbid unsafe code unconditionally
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+// Intra-doc links to feature-gated items (`ToHex`, `from_random`, `RevealScoped`, …) only
+// resolve when the feature is on. docs.rs and CI's rustdoc job build with every feature,
+// and there a broken link is still an error. In any narrower build the same links would
+// be reported by the dozen for no fault in the docs, so the lint is off unless every
+// feature is enabled. The links then render as plain code text.
+#![cfg_attr(
+    not(all(feature = "full", feature = "std", feature = "sealed")),
+    allow(rustdoc::broken_intra_doc_links)
+)]
 // `Cargo.toml` tells docs.rs to build with `--cfg docsrs`. This is what reads it:
 // `doc_cfg` annotates every feature-gated item with the feature that enables it, so
 // the docs people read say "Available on crate feature `encoding-hex`" instead of
@@ -21,7 +30,7 @@
 //! there is no `Deref` and no `AsRef`: callers reach the inner secret only via
 //! [`RevealSecret`] / [`RevealSecretMut`], and `Debug` on a wrapper always prints
 //! `[REDACTED]`. [`SlotWriter`], which borrows a wrapper's storage rather than holding it,
-//! prints its cursor instead — position, remaining, length — and never the bytes.
+//! prints `[REDACTED]` too.
 //! Access has two shapes: **borrow** it, or **take** it.
 //! [`with_secret()`](RevealSecret::with_secret) and
 //! [`expose_secret()`](RevealSecret::expose_secret) lend you a reference while the
@@ -124,7 +133,7 @@
 //! │                           EncodableBytes
 //! │                           (decoding: the `try_from_*` constructors on Fixed / Dynamic)
 //! ├── sealed/               ← SealedFixed, SealedDynamic, Prekey, LockError (sealed feature)
-//! ├── scoped                ← RevealScoped (sealed feature; not at the root, see below)
+//! ├── scoped                ← RevealScoped (always available; not at the root, see below)
 //! ├── macros/               ← fixed_newtype!, dynamic_newtype!, sealed_fixed_newtype!,
 //! │                           sealed_dynamic_newtype!
 //! └── error                 ← FromSliceError, HexError, Base32Error, Base64Error, Bech32Error
@@ -142,7 +151,7 @@
 //! |----------|-------|-------------------|---------|
 //! | **Secret wrappers** | [`Fixed<T>`], [`Dynamic<T>`] | No — use [`RevealSecret`] | Hold live secrets; `Debug` → `[REDACTED]` |
 //! | **Output wrapper** | [`EncodedSecret`] | Yes — yields `&str`; copies you make are yours, the buffer stays the wrapper's | Holds encoded output, wiped on drop |
-//! | **Borrowed slot cursor** | [`SlotWriter`] | No — it writes, it does not read out | Appends into a slot a sized `new_with` handed out; `Debug` → cursor state only, never bytes |
+//! | **Borrowed slot cursor** | [`SlotWriter`] | No — it writes, it does not read out | Appends into a slot a sized `new_with` handed out; `Debug` → `[REDACTED]` |
 //! | **Opt-in markers** | [`CloneableSecret`], [`SerializableSecret`] | — (no methods) | Implement on inner type `T` to unlock gated impls |
 //!
 //! `CloneableSecret` and `SerializableSecret` are implemented on the **inner type `T`**,
@@ -340,6 +349,8 @@ extern crate std;
 mod decode_staging;
 #[cfg(feature = "alloc")]
 mod dynamic;
+#[cfg(all(feature = "alloc", feature = "serde-deserialize"))]
+mod secret_visitor;
 
 mod slot_writer;
 
@@ -356,7 +367,6 @@ pub mod traits;
 #[cfg(feature = "sealed")]
 pub mod sealed;
 
-#[cfg(feature = "sealed")]
 pub mod scoped;
 
 /// Implementation detail of the `*_newtype!` macros — not a public API.
@@ -380,46 +390,13 @@ pub mod __private {
     #[cfg(feature = "sealed")]
     pub use alloc::sync::Arc;
 
-    /// A `fixed_newtype!` byte role, convertible to and from the `Fixed` it wraps without
-    /// copying the bytes out by hand. Lets `sealed_fixed_newtype!` seal a role directly.
+    // The role plumbing behind the sealed macros. Each conversion takes a token that
+    // only `sealed::role` can make, so none of this is a way around `derive: [FromWrapper]`
+    // / `[IntoWrapper]`; see that module.
     #[cfg(feature = "sealed")]
-    pub trait FixedRole: Sized {
-        /// The wrapped `Fixed<[u8; N]>`.
-        type Fixed: SealableFixed;
-        /// Unwraps the role.
-        fn into_fixed(self) -> Self::Fixed;
-        /// Wraps a `Fixed` as the role.
-        fn from_fixed(fixed: Self::Fixed) -> Self;
-    }
-
-    /// Maps `Fixed<[u8; N]>` to `SealedFixed<N>` without naming `N`.
-    #[cfg(feature = "sealed")]
-    pub trait SealableFixed {
-        /// `SealedFixed<N>`.
-        type Sealed;
-    }
-
-    #[cfg(feature = "sealed")]
-    impl<const N: usize> SealableFixed for crate::Fixed<[u8; N]> {
-        type Sealed = crate::SealedFixed<N>;
-    }
-
-    /// The `SealedFixed<N>` a role seals into.
-    #[cfg(feature = "sealed")]
-    pub type SealedOf<R> = <<R as FixedRole>::Fixed as SealableFixed>::Sealed;
-
-    /// A `dynamic_newtype!` `String` or `Vec<u8>` role, convertible to and from the
-    /// `Dynamic` it wraps by moving the box, never the bytes. Lets `sealed_dynamic_newtype!`
-    /// seal a role directly.
-    #[cfg(feature = "sealed")]
-    pub trait DynamicRole: Sized {
-        /// `String` or `Vec<u8>`.
-        type Payload: crate::sealed::SealedPayload;
-        /// Unwraps the role.
-        fn into_dynamic(self) -> crate::Dynamic<Self::Payload>;
-        /// Wraps a `Dynamic` as the role.
-        fn from_dynamic(dynamic: crate::Dynamic<Self::Payload>) -> Self;
-    }
+    pub use crate::sealed::role::{
+        DynamicRole, FixedRole, RoleToken, SealableFixed, SealedDynRole, SealedOf, SealedRole,
+    };
 }
 
 /// Heap-allocated secret wrapper with explicit access and automatic zeroization on drop.
@@ -470,19 +447,21 @@ pub use dynamic::DynamicReader;
 /// writing offsets by hand. [`push_slice`](SlotWriter::push_slice) panics on overrun and
 /// leaves the slot untouched; the `std`-gated [`Write`](std::io::Write) path cannot do that
 /// and stay inside `Write`'s contract, so it truncates and reports the refusal on a later
-/// call. `Debug` shows the cursor — position, remaining, length — and never the bytes.
+/// call. `Debug` prints `[REDACTED]`; the cursor is read through
+/// [`position`](SlotWriter::position) and [`remaining`](SlotWriter::remaining).
 pub use slot_writer::SlotWriter;
 
 #[cfg(all(feature = "alloc", feature = "serde-deserialize"))]
-/// Default maximum byte length for `Dynamic<Vec<u8>>` / `Dynamic<String>` deserialization (1 MiB).
+/// Default maximum byte length for `Dynamic<Vec<u8>>` / `Dynamic<[u8]>` / `Dynamic<String>`
+/// deserialization (1 MiB).
 ///
-/// The standard `serde::Deserialize` impl for both types rejects payloads exceeding this value.
+/// The standard `serde::Deserialize` impl for each of them rejects payloads exceeding this value.
 /// Pass a custom ceiling to [`Dynamic::deserialize_with_limit`] when a different limit is needed.
 ///
-/// **Important:** this limit is enforced *after* the upstream deserializer has fully
-/// materialized the payload. It is a **result-length acceptance bound**, not a
-/// pre-allocation DoS guard. For untrusted input, enforce size limits at the
-/// transport or parser layer upstream.
+/// **Important:** the limit bounds what this crate holds: a byte sequence is rejected at
+/// the first byte past it, and text before it is copied. It does not bound what the
+/// deserializer or the transport has already read into memory. For untrusted input,
+/// enforce size limits at the transport or parser layer upstream as well.
 pub use dynamic::MAX_DESERIALIZE_BYTES;
 
 /// Stack-allocated secret wrapper with explicit access and automatic zeroization on drop.

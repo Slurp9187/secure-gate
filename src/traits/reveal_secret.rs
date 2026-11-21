@@ -360,6 +360,11 @@ pub trait RevealSecret {
 /// `with_secret` audit sweep instead. Neither is prevented; both are greppable.
 /// This is accident-prevention, not a barrier.
 ///
+/// **One place the marker does not reach:** the `sealed` types. They cannot implement
+/// this trait, because it requires [`RevealSecret`], so they carry plain `len()` and
+/// `is_empty()` methods that need no import. Code that measures a `SealedDynamic` or a
+/// sealed role is found by searching for those calls, not for `SecretLen`.
+///
 /// Constant-time comparison is **not** length-hiding: `ConstantTimeEq` on
 /// variable-length secrets delegates to `subtle`, whose slice comparison
 /// short-circuits when lengths differ, so length *inequality* is observable

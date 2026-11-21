@@ -117,10 +117,10 @@
 /// the slot before wrapping it, or write it to [`is_full`](Self::is_full) so that no byte
 /// of the old contents survives.
 ///
-/// # `Debug` shows the cursor, never the slot
+/// # `Debug` is redacted
 ///
-/// `{:?}` prints `position`, `remaining` and `len`, and no byte of the slot — see the
-/// `Debug` impl below for the exact rendering and for why it is hand-written.
+/// `{:?}` prints `[REDACTED]`: no byte of the slot, and not its length or the position
+/// either. See the `Debug` impl below for why it is hand-written.
 pub struct SlotWriter<'a> {
     slot: &'a mut [u8],
     pos: usize,
@@ -212,7 +212,8 @@ impl<'a> SlotWriter<'a> {
     }
 }
 
-/// Prints cursor state — `position`, `remaining`, `len` — and never a byte of the slot.
+/// Prints `[REDACTED]`, as [`Fixed`](crate::Fixed), [`Dynamic`](crate::Dynamic) and
+/// [`EncodedSecret`](crate::EncodedSecret) do: no byte of the slot, and no number.
 ///
 /// Hand-written rather than derived, and the difference is not cosmetic. The one data
 /// field here is `slot: &'a mut [u8]`, so a derived `Debug` printed the borrowed bytes
@@ -221,16 +222,15 @@ impl<'a> SlotWriter<'a> {
 /// material, in decimal, in whatever log line the `{:?}` went to. A `SlotWriter` is alive
 /// exactly while the slot holds that material, and the case this type is built for, a
 /// wire format whose offsets are hard to get right, is precisely the case where someone
-/// reaches for `dbg!`. Every other secret-bearing type in the crate hand-writes `Debug`
-/// for the same reason; [`Fixed`](crate::Fixed), [`Dynamic`](crate::Dynamic) and
-/// [`EncodedSecret`](crate::EncodedSecret) print a flat `[REDACTED]`.
+/// reaches for `dbg!`.
 ///
-/// This one prints the cursor rather than `[REDACTED]` because the cursor is the thing
-/// worth seeing when an offset is wrong, and it is not secret material: `len` is the slot
-/// length the caller chose and passed to the constructor, and `position` counts the bytes
-/// that caller wrote. None of the three numbers depends on the *value* of any byte,
-/// written or unwritten — which is what makes the output safe to put in a log and safe
-/// to rely on.
+/// Through 0.9.0 this printed the cursor: `position`, `remaining` and `len`. No byte was
+/// ever shown, but `len` is the secret's length and `position` is how much of it has
+/// been written, and every other type in the crate keeps a secret's length out of
+/// `Debug`. Since 0.9.1 the numbers are gone from `Debug` too. When an offset is wrong,
+/// ask for them by name: [`position`](SlotWriter::position),
+/// [`remaining`](SlotWriter::remaining) and [`is_full`](SlotWriter::is_full) are
+/// unchanged, and a call to one of them is a line a reviewer can search for.
 ///
 /// ```rust
 /// use secure_gate::{Fixed, SlotWriter};
@@ -239,19 +239,15 @@ impl<'a> SlotWriter<'a> {
 ///     let mut w = SlotWriter::new(slot);
 ///     w.push_slice(&[0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE]);
 ///
-///     let shown = format!("{:?}", w);
-///     assert_eq!(shown, "SlotWriter { position: 6, remaining: 2, len: 8 }");
-///     assert!(!shown.contains("222"), "0xDE is 222, which the derived impl printed");
+///     assert_eq!(format!("{:?}", w), "[REDACTED]");
+///     // The cursor is still there when asked for by name.
+///     assert_eq!((w.position(), w.remaining()), (6, 2));
 /// });
 /// assert_eq!(format!("{:?}", secret), "[REDACTED]");
 /// ```
 impl core::fmt::Debug for SlotWriter<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("SlotWriter")
-            .field("position", &self.pos)
-            .field("remaining", &self.remaining())
-            .field("len", &self.slot.len())
-            .finish()
+        f.write_str("[REDACTED]")
     }
 }
 

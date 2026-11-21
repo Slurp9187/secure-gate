@@ -517,6 +517,8 @@ fn dont_dump(ptr: *const u8, len: usize) {
 #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
 fn dont_dump(_ptr: *const u8, _len: usize) {}
 
+// Inline, not in `tests/`: these call the private `wipe` and `release` and read the block
+// through its raw pointer.
 #[cfg(test)]
 mod tests {
     use super::*;

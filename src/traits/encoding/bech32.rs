@@ -319,6 +319,7 @@ impl<T: AsRef<[u8]> + super::EncodableBytes + ?Sized> ToBech32 for T {
     }
 }
 
+// Inline, not in `tests/`: these check the private `Bech32Sized` checksum type.
 #[cfg(all(feature = "encoding-bech32", feature = "alloc"))]
 #[cfg(test)]
 mod tests {

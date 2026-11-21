@@ -160,9 +160,8 @@ impl<T: SealedPayload> SealedDynamic<T> {
     /// and `f` gets the wrapped value; scrubbed like [`with_secret`](Self::with_secret).
     /// `wrap` moves the `Dynamic`, which is one pointer: the plaintext stays in the one heap
     /// buffer the temporary owns, and the role's `Drop` wipes it. The plumbing behind
-    /// `sealed_dynamic_newtype!`'s `with_role`; not a public API.
-    #[doc(hidden)]
-    pub fn __with_wrapped<R0, W, F, R>(&self, wrap: W, f: F) -> R
+    /// `sealed_dynamic_newtype!`'s `with_role`; crate-private.
+    pub(crate) fn with_wrapped<R0, W, F, R>(&self, wrap: W, f: F) -> R
     where
         W: FnOnce(Dynamic<T>) -> R0,
         F: FnOnce(&R0) -> R,
@@ -173,6 +172,20 @@ impl<T: SealedPayload> SealedDynamic<T> {
         })
     }
 
+    /// The 0.9.0 name of the hook behind `sealed_dynamic_newtype!`'s `with_role`. Hidden and
+    /// documented as not a public API, but it is a `pub` method on an exported type, and
+    /// 0.9.x removes nothing: it stays until the next breaking release. It lends the
+    /// opened `Dynamic` for the closure, which reaches nothing that
+    /// [`with_secret`](Self::with_secret) does not.
+    #[doc(hidden)]
+    pub fn __with_wrapped<R0, W, F, R>(&self, wrap: W, f: F) -> R
+    where
+        W: FnOnce(Dynamic<T>) -> R0,
+        F: FnOnce(&R0) -> R,
+    {
+        self.with_wrapped(wrap, f)
+    }
+
     /// Opens the secret back into a plain [`Dynamic`]. Protection from sealing ends here;
     /// the returned wrapper still wipes on drop.
     pub fn unseal(self) -> Dynamic<T> {
@@ -181,6 +194,9 @@ impl<T: SealedPayload> SealedDynamic<T> {
 
     /// The secret's length in bytes. Length can itself be sensitive for passwords; it is
     /// not printed by `Debug`.
+    ///
+    /// This is a plain method, not [`SecretLen::len`](crate::SecretLen::len): it needs no
+    /// `use secure_gate::SecretLen;`, so searching for that import does not find this call.
     #[inline]
     pub fn len(&self) -> usize {
         self.ct.len()
@@ -201,6 +217,35 @@ impl<T: SealedPayload> SealedDynamic<T> {
         self.prekey.open_in_place(&self.salt, &self.tag, buf);
     }
 }
+
+impl SealedDynamic<Vec<u8>> {
+    /// Generates `len` bytes from the system RNG and seals them.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the system RNG fails, as [`Dynamic::from_random`] does.
+    pub fn from_random(len: usize, prekey: &Arc<Prekey>) -> Self {
+        Self::seal(Dynamic::<Vec<u8>>::from_random(len), prekey)
+    }
+}
+
+/// Wipes the ciphertext, tag and salt.
+///
+/// They are not the secret, and they cannot be opened without the pre-key. But while
+/// another sealed value keeps the same pre-key alive, the ciphertext of a dropped one would
+/// still open for anyone who could read both, so a dropped sealed value leaves nothing
+/// behind to open. The ciphertext is one heap buffer that never moves or reallocates, so
+/// this reaches all of it.
+impl<T: SealedPayload> Drop for SealedDynamic<T> {
+    fn drop(&mut self) {
+        use zeroize::Zeroize;
+        self.ct.zeroize();
+        self.tag.zeroize();
+        self.salt.zeroize();
+    }
+}
+
+impl<T: SealedPayload> zeroize::ZeroizeOnDrop for SealedDynamic<T> {}
 
 impl<T: SealedPayload> crate::scoped::RevealScoped for SealedDynamic<T> {
     type Inner = T;
@@ -235,6 +280,7 @@ impl<T: SealedPayload> core::fmt::Debug for SealedDynamic<T> {
     }
 }
 
+// Inline, not in `tests/`: these read and corrupt the private `ct`, `salt` and `tag` fields.
 #[cfg(test)]
 mod tests {
     use super::*;
