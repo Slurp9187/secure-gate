@@ -15,7 +15,7 @@
 // 3. Allocation count: an access to a fixed-size sealed value allocates nothing, and
 //    neither does `SealedFixed::from_random`.
 //
-// What the oracles do not see: the stack (the 32 KiB scrub is measured elsewhere, see
+// What the oracles do not see: the stack (the scrub is measured elsewhere, see
 // `docs/design/receipts/sealed-stack-residue/`), registers, and a tampered ciphertext,
 // which the public API cannot produce (unit tests in `src/sealed/` cover it).
 //

@@ -47,7 +47,7 @@ base16ct = { version = "1", optional = true, default-features = false }
 # only add `Zeroize` impls for arrays this graph never holds key material in (chacha20poly1305
 # wipes its key itself). No other dependency has a `zeroize` feature.
 chacha20poly1305 = { version = "0.11", optional = true, default-features = false, features = ["zeroize"] }
-guarded-block = { version = "0.1.0", path = "guarded-block", optional = true }
+guarded-block = { version = "0.1.2", path = "guarded-block", optional = true }
 sha2 = { version = "0.11", optional = true, default-features = false, features = ["zeroize"] }
 # Not used directly: turns on poly1305's own `zeroize` feature, which chacha20poly1305's does
 # not. Without it the `Poly1305` instance that computes each seal's tag (holding the one-time
@@ -139,7 +139,7 @@ secure-gate-residue-probe = { path = "residue-probe" }
 # Reads page protections back in the `sealed` unit tests (`region::query`), to check the
 # pre-key's guard pages and read-only block. Tests only; the library reaches `region` through
 # `guarded-block`.
-region = { version = "4.0.1", default-features = false }
+region = { version = "4.0.2", default-features = false }
 
 [package.metadata.docs.rs]
 all-features = true

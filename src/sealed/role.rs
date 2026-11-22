@@ -38,6 +38,9 @@ pub trait FixedRole: Sized {
     type Fixed: SealableFixed;
     /// Unwraps the role.
     fn into_fixed(self, token: RoleToken<Self>) -> Self::Fixed;
+    /// Borrows the wrapped `Fixed`, so sealing reads the key where it lies and the role's
+    /// own drop wipes it there.
+    fn as_fixed(&self, token: RoleToken<Self>) -> &Self::Fixed;
     /// Wraps a `Fixed` as the role.
     fn from_fixed(fixed: Self::Fixed, token: RoleToken<Self>) -> Self;
 }
@@ -75,11 +78,12 @@ impl<R, const N: usize> SealedRole<R>
 where
     R: FixedRole<Fixed = Fixed<[u8; N]>>,
 {
-    /// Seals `secret`.
+    /// Seals `secret`, read in place: `secret` is then dropped where it lies, which wipes it.
+    /// Moving its `Fixed` out first would leave an unwiped copy where the role was.
     #[inline]
     pub fn seal(secret: R, prekey: &Arc<Prekey>) -> Self {
-        Self(SealedFixed::seal(
-            secret.into_fixed(RoleToken::new()),
+        Self(SealedFixed::seal_borrowed(
+            secret.as_fixed(RoleToken::new()),
             prekey,
         ))
     }

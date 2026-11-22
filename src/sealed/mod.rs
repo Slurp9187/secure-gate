@@ -30,9 +30,11 @@
 //! - Every seal draws a random 32-byte salt. The sealing key is `SHA-256(salt ‖ pre-key)`,
 //!   recomputed on every access and wiped as soon as the cipher is keyed. It is never
 //!   stored in the object. The cipher leaves a copy of it on the stack, so every seal and
-//!   open ends by overwriting the 32 KiB of stack below the call (sequoia's `zero_stack`
-//!   technique), on a panic as well as a normal return, which also removes plaintext a move
-//!   left there. Measured on x86_64 Windows and Linux and on macOS ARM64, and on Linux
+//!   open ends by overwriting the stack below the call (sequoia's `zero_stack` technique),
+//!   on a panic as well as a normal return, which also removes plaintext a move left there.
+//!   That is 32 KiB, and for a [`SealedFixed<N>`](SealedFixed) whose plaintext sits on the
+//!   stack, more as `N` grows: about 3·N in a release build and 10·N in a debug build, once
+//!   that passes 32 KiB. Measured on x86_64 Windows and Linux and on macOS ARM64, and on Linux
 //!   ARM64 in a debug build (its release build leaves no key the probe can reach):
 //!   `docs/design/receipts/sealed-stack-residue/` in the repository.
 //! - Because every seal has its own key, the AEAD nonce is all-zero. Every re-seal after
@@ -74,7 +76,7 @@
 //!   ([`SealedFixed`]) or the heap ([`SealedDynamic`]) and is not locked; it is wiped, and
 //!   the stack below the call overwritten, when the call returns. Copies the closure makes
 //!   are the caller's to wipe.
-//! - Registers, and stack residue beyond the overwritten 32 KiB. The overwrite was measured
+//! - Registers, and stack residue beyond the overwritten region. The overwrite was measured
 //!   on x86_64 Windows and Linux, macOS ARM64, and Linux ARM64 in debug builds only (its
 //!   release build is out of the probe's reach); another target's cipher backend or frame
 //!   layout may differ, and 32-bit targets were not probed.
@@ -88,7 +90,8 @@
 //! # Cost
 //!
 //! Each access needs about 32 KiB of free stack for the scrub, on top of the cipher's own
-//! frames: mind small custom thread stacks. Measured on x86_64 Windows: an access on a
+//! frames: mind small custom thread stacks. A `SealedFixed<N>` with `N` above about 10 KiB
+//! (3 KiB in a debug build) needs about 3·N (10·N in a debug build) instead. Measured on x86_64 Windows: an access on a
 //! 64 KiB thread stack completes in a release build and overflows in a debug build; 96 KiB
 //! completes in both.
 //!
@@ -151,8 +154,8 @@
 mod dynamic;
 mod fixed;
 mod prekey;
-#[doc(hidden)]
-pub mod role;
+// Crate-private: its items are reached only through `__private`, which re-exports them.
+pub(crate) mod role;
 
 pub use dynamic::{SealedDynamic, SealedPayload};
 pub use fixed::SealedFixed;
@@ -274,6 +277,15 @@ pub use prekey::{LockError, Prekey};
 /// let _ = <AppKey as FixedRole>::into_fixed(AppKey::new([0u8; 32]));
 /// ```
 ///
+/// Nor a role's `Fixed` borrowed through it:
+///
+/// ```compile_fail,E0061
+/// use secure_gate::{fixed_newtype, __private::FixedRole};
+/// fixed_newtype!(pub AppKey, 32);
+/// let k = AppKey::new([0u8; 32]);
+/// let _ = <AppKey as FixedRole>::as_fixed(&k);
+/// ```
+///
 /// The token the conversion asks for cannot be made outside this crate:
 ///
 /// ```compile_fail,E0423
@@ -293,11 +305,20 @@ pub use prekey::{LockError, Prekey};
 /// impl FixedRole for Mine {
 ///     type Fixed = Fixed<[u8; 32]>;
 ///     fn into_fixed(self, _: RoleToken<Self>) -> Self::Fixed { self.0 }
+///     fn as_fixed(&self, _: RoleToken<Self>) -> &Self::Fixed { &self.0 }
 ///     fn from_fixed(fixed: Self::Fixed, token: RoleToken<Self>) -> Self {
 ///         let _: AppKey = <AppKey as FixedRole>::from_fixed(Fixed::new([0u8; 32]), token);
 ///         Self(fixed)
 ///     }
 /// }
+/// ```
+///
+/// The plumbing has one path in, `__private`. The module that holds it is not public:
+///
+/// ```compile_fail,E0603
+/// use secure_gate::{Prekey, fixed_newtype};
+/// fixed_newtype!(pub AppKey, 32);
+/// let _ = secure_gate::sealed::role::SealedRole::<AppKey>::seal(AppKey::new([0u8; 32]), &Prekey::new());
 /// ```
 ///
 /// The same holds for a `dynamic_newtype!` role:

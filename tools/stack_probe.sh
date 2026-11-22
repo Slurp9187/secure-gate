@@ -7,8 +7,9 @@
 #
 # Two runs per profile:
 #   1. "scrub off": scrub_stack() emptied. The probe must find the key copy the cipher
-#      leaves, or it cannot see the stack region in that profile on this target, and a
-#      clean result as shipped would show nothing. That fails the run.
+#      leaves, and the large-key probe the plaintext a role access leaves, or it cannot
+#      see the stack region in that profile on this target, and a clean result as shipped
+#      would show nothing. That fails the run.
 #   2. As shipped: every key and plaintext "hits=" count must be 0, with one exception
 #      below.
 #
@@ -36,7 +37,7 @@ run() { # $1 = label, rest = cargo test profile flags. Prints the probe's "hits=
   local log
   log=$(mktemp)
   echo "== $label" >&2
-  if ! cargo test -q "$@" --features sealed --test probe_stack --test probe_panic \
+  if ! cargo test -q "$@" --features sealed --test probe_stack --test probe_panic --test probe_large \
     -- --nocapture --test-threads=1 >"$log" 2>&1; then
     cat "$log" >&2
     echo "::error::$label: the probe did not build or run (full output above)" >&2
@@ -71,16 +72,19 @@ for profile in ${STACK_PROBE_PROFILES:-debug release}; do
   esac
 
   cp src/sealed/prekey.rs /tmp/prekey.rs.shipped
-  # Empty scrub_stack's body. The match is exact so a rename fails loudly here.
+  # Empty scrub_frames's body, which does all of scrub_stack's writing. The match is exact so a rename fails loudly here.
   "$PY" - <<'EOF'
 p = "src/sealed/prekey.rs"
 s = open(p).read()
 body = """    let mut area = [0u64; SCRUB_LEN / 8];
     area.zeroize();
+    if frames > 1 {
+        scrub_frames(frames - 1);
+    }
     core::hint::black_box(&area);"""
 if s.count(body) != 1:
-    raise SystemExit("stack_probe: scrub_stack body not found; update this script")
-open(p, "w").write(s.replace(body, "    // stack_probe: scrub disabled"))
+    raise SystemExit("stack_probe: scrub_frames body not found; update this script")
+open(p, "w").write(s.replace(body, "    // stack_probe: scrub disabled\n    let _ = frames;"))
 EOF
   off=$(run "scrub off, $profile" "${flags[@]}")
   cp /tmp/prekey.rs.shipped src/sealed/prekey.rs
@@ -88,6 +92,14 @@ EOF
   reach=$(key_hits "$off")
   if [ -z "$reach" ] || [ "$reach" -eq 0 ]; then
     echo "::error::$profile: out of reach. With scrub_stack disabled the probe found no key copy (or no single count), so it cannot see where the cipher leaves one in this profile on this target"
+    fail=1
+  fi
+
+  # The large-key probe must see the copies a role access leaves, too, or its clean
+  # result as shipped would show nothing.
+  large=$(printf '%s\n' "$off" | sed -nE 's/^large with_role: plaintext hits=([0-9]+)$/\1/p')
+  if [ -z "$large" ] || [ "$large" -eq 0 ]; then
+    echo "::error::$profile: out of reach. With scrub_stack disabled the large-key probe found no plaintext after with_role, so it cannot see that region in this profile on this target"
     fail=1
   fi
 
