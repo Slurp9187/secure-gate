@@ -9,6 +9,13 @@ Releases before 0.9.0 (the 0.9 release candidates, the 0.8 release candidates an
 earlier version) are in [CHANGELOG-ARCHIVE.md](CHANGELOG-ARCHIVE.md). The 0.8 line, 0.8.0
 included, is recorded in the `release/0.8` branch's own changelog.
 
+## [Unreleased]
+
+### Documentation
+
+- `SECURITY.md` and `README.md` name the RustSec advisory for the zeroize-on-drop flaw in
+  0.5.0 through 0.7.0-rc.14: RUSTSEC-2026-0590.
+
 ## [0.10.0] - 2026-11-22
 
 A breaking release: five changes, each listed below with the code that stops compiling and

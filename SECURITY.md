@@ -600,6 +600,10 @@ records each version's last update). Since then the wipe is checked by tests rat
 by reading the code: `tests/heap_zeroize.rs` checks freed heap blocks are zero, and
 `tests/asm_dse_check.rs` checks the optimizer keeps the wipe.
 
+The RustSec advisory is
+[RUSTSEC-2026-0590](https://rustsec.org/advisories/RUSTSEC-2026-0590.html), so
+`cargo audit` and `cargo deny` report the affected versions.
+
 ## Disclaimer
 
 This document reflects design intent and observed properties as of the current release.
