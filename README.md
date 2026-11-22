@@ -174,7 +174,7 @@ exactly their length), and the staging buffer is wiped.
 With the `sealed` feature, a key is held encrypted while it idles, under a pre-key
 locked in RAM between guard pages. Each access costs about 7–11 µs for a 32-byte key, so it
 is for long-held keys, not hot loops, and needs about 32 KiB of free stack (mind small
-thread stacks). `Prekey::new()` asks to lock the pre-key against swap; if the system
+thread stacks; a fixed key above about 10 KiB needs about three times its size). `Prekey::new()` asks to lock the pre-key against swap; if the system
 refuses, sealing still works and nothing fails, so check `Prekey::lock_status()`, which
 returns the refusal. In containers `RLIMIT_MEMLOCK` is often 0, and every lock is refused. Where Windows crash dumps matter more than swap, `Prekey::new_idle_noaccess()` keeps
 an idle pre-key out of a user-mode dump, but cannot keep it locked there. What it covers

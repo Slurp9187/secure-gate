@@ -43,9 +43,19 @@ pub struct SealedFixed<const N: usize> {
 impl<const N: usize> SealedFixed<N> {
     /// Seals `secret` under `prekey`. The plain wrapper is consumed and wiped on drop.
     pub fn seal(secret: Fixed<[u8; N]>, prekey: &Arc<Prekey>) -> Self {
+        Self::seal_borrowed(&secret, prekey)
+    }
+
+    /// As [`seal`](Self::seal), reading the secret where it lies; the caller's wrapper
+    /// wipes it there when dropped. The plumbing behind `sealed_fixed_newtype!`'s `seal`,
+    /// which seals a role this way instead of moving its `Fixed` out (a move out leaves an
+    /// unwiped copy where the role was). Crate-private.
+    pub(crate) fn seal_borrowed(secret: &Fixed<[u8; N]>, prekey: &Arc<Prekey>) -> Self {
         let salt = Prekey::fresh_salt();
         let mut ct = [0u8; N];
-        let tag = scrubbed(|| secret.with_secret(|plain| prekey.seal_into(&salt, plain, &mut ct)));
+        let tag = scrubbed(N, || {
+            secret.with_secret(|plain| prekey.seal_into(&salt, plain, &mut ct))
+        });
         Self {
             ct,
             tag,
@@ -69,7 +79,7 @@ impl<const N: usize> SealedFixed<N> {
     where
         F: FnOnce(&[u8; N]) -> R,
     {
-        scrubbed(|| self.open_and_call(f))
+        scrubbed(N, || self.open_and_call(f))
     }
 
     // The plaintext temporary lives in this frame, below the caller's, so the
@@ -95,7 +105,7 @@ impl<const N: usize> SealedFixed<N> {
     where
         F: FnOnce(&mut [u8; N]) -> R,
     {
-        scrubbed(|| self.open_mutate_reseal(f))
+        scrubbed(N, || self.open_mutate_reseal(f))
     }
 
     // As `open_and_call`: the temporary lives in this frame so the scrub reaches it.
@@ -122,10 +132,11 @@ impl<const N: usize> SealedFixed<N> {
         W: FnOnce(Fixed<[u8; N]>) -> T,
         F: FnOnce(&T) -> R,
     {
-        scrubbed(|| self.open_wrap_call(wrap, f))
+        scrubbed(N, || self.open_wrap_call(wrap, f))
     }
 
-    // The move into `wrap` copies the plaintext within this frame, which the scrub covers.
+    // The move into `wrap` copies the plaintext within this frame and the role's, which the
+    // scrub covers: it reaches further below the call the larger `N` is.
     #[inline(never)]
     fn open_wrap_call<T, W, F, R>(&self, wrap: W, f: F) -> R
     where
@@ -147,7 +158,7 @@ impl<const N: usize> SealedFixed<N> {
         U: FnOnce(T) -> Fixed<[u8; N]>,
         F: FnOnce(&mut T) -> R,
     {
-        scrubbed(|| self.open_wrap_mutate_reseal(wrap, unwrap, f))
+        scrubbed(N, || self.open_wrap_mutate_reseal(wrap, unwrap, f))
     }
 
     #[inline(never)]
@@ -180,7 +191,9 @@ impl<const N: usize> SealedFixed<N> {
     #[inline(always)]
     pub fn unseal(self) -> Fixed<[u8; N]> {
         let mut plain = Fixed::new([0u8; N]);
-        scrubbed(|| plain.with_secret_mut(|buf| self.open_into_out_of_line(buf)));
+        scrubbed(N, || {
+            plain.with_secret_mut(|buf| self.open_into_out_of_line(buf))
+        });
         plain
     }
 

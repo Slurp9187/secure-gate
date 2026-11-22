@@ -375,36 +375,61 @@ impl Prekey {
     }
 }
 
-/// Size of the stack region [`scrub_stack`] overwrites.
+/// Size of one frame of the stack scrub, and the least it overwrites.
 const SCRUB_LEN: usize = 32 * 1024;
 
-/// Overwrites the stack region below its caller with zeros.
+/// Extra stack, per byte of secret the access keeps on the stack, that [`scrub_stack`]
+/// overwrites beyond the first [`SCRUB_LEN`].
+///
+/// A `SealedFixed<N>` access holds its plaintext on the stack, and each by-value move of it
+/// can leave a copy deeper down, so the region to overwrite grows with `N`. Measured on
+/// x86_64 Linux (rustc 1.87) with the scrub off, the deepest copy of the key or plaintext
+/// lay about 2·N below the call in a release build (`with_role`, `with_role_mut`) and about
+/// 9·N in a debug build (`with_role_mut`), plus a few KiB. Rounding down to whole frames
+/// leaves the first frame to cover the remainder, which it did at every size measured.
+const SCRUB_PER_SECRET_BYTE: usize = if cfg!(debug_assertions) { 10 } else { 3 };
+
+/// Overwrites the stack region below its caller with zeros: [`SCRUB_LEN`] bytes, and more
+/// for a large `secret_len` (the bytes of secret the access kept on the stack; 0 for a
+/// secret on the heap). About 32 KiB for a key of a few KiB, and about 3·N in a release
+/// build (10·N in a debug build) for a `SealedFixed<N>` above that.
 ///
 /// The ChaCha20 backend leaves its state block (constant, then the 32-byte sealing key) on
 /// the stack after a pass, and moves can leave a copy of a temporary plaintext. Neither is
 /// reachable for a wipe. Called at the end of every seal and open, from the frame that made
-/// the calls, this function's frame lies over the region those calls used and zeroes it.
-/// The technique is sequoia's `zero_stack`; `[u64]` keeps the volatile writes word-sized.
+/// the calls, this function's frames lie over the region those calls used and zero it. The
+/// technique is sequoia's `zero_stack`, repeated one frame below another for a large secret;
+/// `[u64]` keeps the volatile writes word-sized.
 ///
-/// Best effort: it covers what the calls left in `SCRUB_LEN` bytes below the caller, not
+/// Best effort: it covers what the calls left in that region below the caller, not
 /// registers, and not copies a closure parks elsewhere.
+#[inline]
+pub(crate) fn scrub_stack(secret_len: usize) {
+    scrub_frames(1 + secret_len.saturating_mul(SCRUB_PER_SECRET_BYTE) / SCRUB_LEN);
+}
+
+/// One [`SCRUB_LEN`] frame zeroed, then `frames - 1` more below it. The `black_box` after
+/// the recursive call keeps this frame alive across it, so the next one lies below.
 #[inline(never)]
-pub(crate) fn scrub_stack() {
+fn scrub_frames(frames: usize) {
     let mut area = [0u64; SCRUB_LEN / 8];
     area.zeroize();
+    if frames > 1 {
+        scrub_frames(frames - 1);
+    }
     core::hint::black_box(&area);
 }
 
-/// Runs `f`, then [`scrub_stack`], on every exit: a panic from `f` (the caller's closure, or
-/// a tag mismatch) is caught, the stack scrubbed, and the panic resumed. Without this an
-/// unwind skips the scrub and leaves the cipher's copy of the sealing key behind. A `Drop`
-/// guard is not a substitute: on Windows, unwinding runs cleanup below the frames that
-/// threw, so the guard's scrub would not lie over them. Under `panic = "abort"` there is
-/// no unwind to survive.
+/// Runs `f`, then [`scrub_stack`] for `secret_len`, on every exit: a panic from `f` (the
+/// caller's closure, or a tag mismatch) is caught, the stack scrubbed, and the panic
+/// resumed. Without this an unwind skips the scrub and leaves the cipher's copy of the
+/// sealing key behind. A `Drop` guard is not a substitute: on Windows, unwinding runs
+/// cleanup below the frames that threw, so the guard's scrub would not lie over them. Under
+/// `panic = "abort"` there is no unwind to survive.
 #[inline(always)]
-pub(crate) fn scrubbed<R>(f: impl FnOnce() -> R) -> R {
+pub(crate) fn scrubbed<R>(secret_len: usize, f: impl FnOnce() -> R) -> R {
     let result = std::panic::catch_unwind(core::panic::AssertUnwindSafe(f));
-    scrub_stack();
+    scrub_stack(secret_len);
     match result {
         Ok(value) => value,
         Err(payload) => std::panic::resume_unwind(payload),

@@ -110,7 +110,7 @@ impl<T: SealedPayload> SealedDynamic<T> {
         // plaintext copy is wiped as it unwinds instead of going back to the allocator.
         let mut buf =
             zeroize::Zeroizing::new(secret.with_secret(|plain| Box::<[u8]>::from(plain.bytes())));
-        let tag = scrubbed(|| prekey.seal_in_place(&salt, &mut buf));
+        let tag = scrubbed(0, || prekey.seal_in_place(&salt, &mut buf));
         let ct = core::mem::take(&mut *buf);
         Self {
             ct,
@@ -126,7 +126,7 @@ impl<T: SealedPayload> SealedDynamic<T> {
     where
         F: FnOnce(&T) -> R,
     {
-        scrubbed(|| {
+        scrubbed(0, || {
             let plain = T::from_plain(self.open());
             plain.with_secret(f)
         })
@@ -145,7 +145,7 @@ impl<T: SealedPayload> SealedDynamic<T> {
     where
         F: FnOnce(&mut T::Mut) -> R,
     {
-        scrubbed(|| {
+        scrubbed(0, || {
             let mut plain = self.open();
             let result =
                 crate::RevealSecretMut::with_secret_mut(&mut plain, |buf| f(T::view_mut(buf)));
@@ -166,7 +166,7 @@ impl<T: SealedPayload> SealedDynamic<T> {
         W: FnOnce(Dynamic<T>) -> R0,
         F: FnOnce(&R0) -> R,
     {
-        scrubbed(|| {
+        scrubbed(0, || {
             let wrapped = wrap(T::from_plain(self.open()));
             f(&wrapped)
         })
@@ -175,7 +175,7 @@ impl<T: SealedPayload> SealedDynamic<T> {
     /// Opens the secret back into a plain [`Dynamic`]. Protection from sealing ends here;
     /// the returned wrapper still wipes on drop.
     pub fn unseal(self) -> Dynamic<T> {
-        scrubbed(|| T::from_plain(self.open()))
+        scrubbed(0, || T::from_plain(self.open()))
     }
 
     fn open(&self) -> Dynamic<Vec<u8>> {

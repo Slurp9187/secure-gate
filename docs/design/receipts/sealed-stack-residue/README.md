@@ -12,6 +12,7 @@ measured with the same probe. This directory holds that probe and its captured o
 |---|---|
 | `probe_stack.rs` | The probe, an integration test. It reads the stack with `unsafe` volatile reads and needs hooks that expose the sealing key, so it is kept here rather than in `tests/`. |
 | `probe_panic.rs` | The second-round probe: an access whose closure panics, a `with_secret_mut` whose closure panics, a tag mismatch (one ciphertext byte flipped), and `unseal` with its result dropped. Written by a reviewer of PR #265, with the `unseal` case added. |
+| `probe_large.rs` | Large keys (0.10.0): `with_secret`, `with_secret_mut`, `with_role` and `with_role_mut` on a 40,000-byte key, past where a single 32 KiB overwrite stops covering it. With the scrub off it must find the plaintext a role access leaves, or the run fails. |
 | `probe_hooks.patch` | The hooks: `#[doc(hidden)]` methods that derive the key the way an access does, and one that flips a ciphertext byte. Applied to a scratch copy only; never part of the crate. |
 | `runs.txt` | First round: captured stdout, before and after the scrub, debug and release. |
 | `runs_linux.txt` | Both probes on Linux x86_64 (rustc 1.87.0, commit `150e24b`), debug and release: with `scrub_stack` disabled, to show the probe reaches the key there, and as shipped. |
@@ -54,7 +55,7 @@ From a checkout of the branch, in a scratch copy (`git archive HEAD | tar -x -C 
 ```text
 git apply docs/design/receipts/sealed-stack-residue/probe_hooks.patch
 cp docs/design/receipts/sealed-stack-residue/probe_*.rs tests/
-cargo test --release --features sealed --test probe_stack --test probe_panic -- --nocapture --test-threads=1
+cargo test --release --features sealed --test probe_stack --test probe_panic --test probe_large -- --nocapture --test-threads=1
 ```
 
 The "before" rows come from commit `de02d62` (`runs.txt`) and `5805536` (`runs_panic.txt`).

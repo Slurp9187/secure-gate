@@ -540,6 +540,10 @@ macro_rules! fixed_newtype {
                 fn from_fixed(fixed: Self::Fixed, _: $crate::__private::RoleToken<Self>) -> Self {
                     Self(fixed)
                 }
+                #[inline(always)]
+                fn as_fixed(&self, _: $crate::__private::RoleToken<Self>) -> &Self::Fixed {
+                    &self.0
+                }
             }
         }
 

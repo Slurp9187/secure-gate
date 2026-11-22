@@ -349,7 +349,10 @@ those operating-system calls; this crate's no-`unsafe` rule does not cover it). 
 drops it is wiped, unlocked and unmapped.
 
 The cipher leaves a copy of the key on the stack, so every seal and open ends by
-overwriting the 32 KiB of stack below the call, on a panic too. A probe found the key 4
+overwriting the stack below the call, on a panic too: 32 KiB, and for a `SealedFixed<N>`,
+whose plaintext and its moves sit on the stack, about 3·N in a release build and 10·N in a
+debug build once that is more. (A fixed 32 KiB, before 0.10.0, left the key or plaintext
+behind for keys above about 16 KiB.) A probe found the key 4
 times there before the overwrite in a debug build and a plaintext copy once in a release
 build; after it, neither. That was measured on x86_64 Windows (rustc 1.98.1) and x86_64
 Linux (rustc 1.87.0; with the overwrite removed the probe found the key there too, and with
@@ -381,7 +384,7 @@ and §1). The probe found that copy once in a Windows release build (rustc 1.98.
 | **Crash dump** (Windows, macOS) | Not covered with `Prekey::new()`. On Windows, `Prekey::new_idle_noaccess()` keeps an idle pre-key out of a dump (measured) but cannot also keep it locked |
 | Clean read of process memory | Not covered |
 | The plaintext temporary while the closure runs, and copies the closure makes | Not covered. The temporary is wiped, and the stack below overwritten, when the call returns |
-| Registers, and stack beyond the 32 KiB | Not covered |
+| Registers, and stack beyond the overwritten region | Not covered |
 | The `Fixed` that `SealedFixed::unseal` returns | An ordinary `Fixed`: returning it can leave a stack copy (§1). Read through `with_secret` / `with_role` instead |
 | A sealed value after it is **dropped** | Its ciphertext, salt and tag are wiped where it was dropped, so nothing is left to open even while other sealed values keep the pre-key alive. Not covered: stack slots a `SealedFixed` was moved out of, which keep ciphertext (§1) |
 | The **length** of a sealed secret | Readable through `SecretLen`, whose import marks the call (see Audit surfaces). `Debug` does not print it |
@@ -392,7 +395,8 @@ eleven pre-keys lock by default (Windows 11), and `SetProcessWorkingSetSize` rai
 Unix the limit is `RLIMIT_MEMLOCK`; where it is 0 (common in containers) every lock is
 refused, `lock_status()` says so, and sealing still works.
 
-**Cost.** About 7–11 µs per access for a 32-byte key, and about 32 KiB of free stack.
+**Cost.** About 7–11 µs per access for a 32-byte key, and about 32 KiB of free stack; for a
+`SealedFixed<N>` above about 10 KiB, about 3·N (10·N in a debug build).
 Design and numbers: `docs/design/sealed_memory.md`. Everything the sealed types
 deliberately do not implement, each with its reason, is listed in the `sealed` module's
 rustdoc under "Not implemented, on purpose".
