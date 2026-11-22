@@ -2,8 +2,9 @@
 
 A fixed-size secret block in a memory mapping of its own, between two no-access guard pages,
 read-only and locked in RAM while it lives. A safe API over
-[`region`](https://crates.io/crates/region)'s page protection; all the `unsafe` is in this
-crate.
+[`region`](https://crates.io/crates/region)'s page protection: this crate holds the
+`unsafe` code, `region` makes the map, protect and lock calls, and this crate calls
+`madvise` itself on Linux and FreeBSD.
 
 ```text
 [ guard: no access ][ block: N bytes, rounded up to whole pages ][ guard: no access ]
@@ -45,7 +46,8 @@ What each part is for:
   It does not stop a process that may change this one's page protection
   (`VirtualProtectEx`) and then read, and a kernel or complete memory dump captures physical
   memory whatever the protection. A no-access page cannot stay locked there, so this mode
-  does not lock on Windows and `lock_status()` says so. On Linux the lock is kept.
+  does not lock on Windows and `lock_status()` says so. On Linux and FreeBSD the lock is
+  kept, read back from the kernel by the tests; on macOS no test reads it back yet.
 - **Wiped on drop** (while still locked, if the lock was granted), then unlocked and
   unmapped. Best effort: if the system refuses to make the block writable again, it is
   unmapped unwiped, and the operating system zeroes its pages before reusing them.
@@ -57,7 +59,9 @@ What each part is for:
 What it does not do: hide the block from a debugger, from `/proc/<pid>/mem`, or from code in
 this process, or in another process allowed to, that changes the protection back; keep it
 out of a hibernation file or a kernel memory dump; wipe a `fork()` child's copy; or cover
-copies the caller's closure makes.
+copies the caller's closure makes. It wipes only on drop, so a block that never drops (one
+passed to `mem::forget` or kept in a `static`, or alive at `process::exit` or an abort) is
+never wiped.
 
 Measurements behind these claims (over-reads from live C buffers, lock survival across
 protection changes, crash dumps, per-access cost) are in the secure-gate repository, under

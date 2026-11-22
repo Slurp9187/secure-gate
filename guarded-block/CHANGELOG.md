@@ -4,6 +4,22 @@ All notable changes to this crate are documented in this file. The format follow
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-11-22
+
+### Added
+- `a_fork_child_can_drop_an_inherited_block`, on every Unix: a child's drop unlocks pages it
+  never locked, and no system in CI refuses that.
+
+### Changed
+- `GuardedBlock`'s lock field is declared before its mapping, so field drop order also
+  unlocks before it unmaps. No behavior change: `Drop` already did both in that order.
+- Lock file moved to `region` 4.0.2 (documentation changes only). The requirement stays
+  4.0.1.
+- Documentation: `region` makes the map, protect and lock calls, and this crate calls
+  `madvise` itself; a block that never drops (`mem::forget`, a `static`, `process::exit`,
+  an abort) is never wiped; idle no-access keeps the lock on Linux and FreeBSD, measured,
+  and on macOS no test reads it back yet. One safety comment corrected.
+
 ## [0.1.1] - 2026-11-14
 
 ### Added

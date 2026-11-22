@@ -476,7 +476,7 @@ checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
 
 [[package]]
 name = "guarded-block"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "libc",
  "region",
@@ -833,9 +833,9 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "region"
-version = "4.0.1"
+version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bc10200af9f8297cb52df7e0e1db8d9ad3e8782981d69b25eedf858f5455ca2"
+checksum = "2b10e978c1a7aa9afdb6335ae83434a3fc887728389816733488623e4c63f1c5"
 dependencies = [
  "bitflags",
  "libc",
