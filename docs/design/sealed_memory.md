@@ -162,8 +162,8 @@ temporary out of `Fixed::new_with`, and opening in place (below) is what removed
 
 Two changes, both in safe Rust:
 
-- Every seal and open ends with `scrub_stack()`: an `#[inline(never)]` function whose 32 KiB
-  frame lies over the region the cipher and hash just used, zeroized with `[u64]` volatile
+- Every seal and open ends with `scrub_stack()`, which calls `scrub_frames`: an
+  `#[inline(never)]` function whose 32 KiB frame lies over the region the cipher and hash just used, zeroized with `[u64]` volatile
   writes. It is sequoia's `zero_stack`, without the `memsec` call. Since 0.10.0 it repeats
   that frame one below another for a large `SealedFixed<N>` (about 3·N in a release build,
   10·N in debug), whose plaintext and its moves reach further down than 32 KiB: measured

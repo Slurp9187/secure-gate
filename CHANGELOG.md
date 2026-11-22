@@ -11,7 +11,7 @@ included, is recorded in the `release/0.8` branch's own changelog.
 
 ## [0.10.0] - 2026-11-22
 
-A breaking release: four changes, each listed below with the code that stops compiling and
+A breaking release: five changes, each listed below with the code that stops compiling and
 what to write instead. Every "before" was checked to fail and every "after" to compile
 against this release. Three fixes to the sealed types, under Fixed, make the stack
 overwrite after an access reach further for a large key. MSRV stays 1.87.
@@ -57,6 +57,14 @@ still does.
    them unused.
    - Before: `sealed.__with_wrapped(wrap, f)`. Error: E0599, no method named `__with_wrapped`.
    - After: `sealed.with_secret(f)` / `with_secret_mut(f)`, or `with_role` on a sealed role.
+5. **The hidden `secure_gate::sealed::role` path is gone.** 0.9.1 had the sealed-role
+   plumbing (`SealedRole`, `SealedDynRole`, `RoleToken`, `FixedRole`, `DynamicRole`,
+   `SealableFixed`, `SealedOf`) under that hidden module as well as under `__private`; it
+   is now only under `__private`, which is not a public API. See Fixed.
+   - Before: `use secure_gate::sealed::role::SealedRole;`. Error: E0603, module `role` is
+     private.
+   - After: hold the type `sealed_fixed_newtype!` / `sealed_dynamic_newtype!` generates
+     (`SealedAppKey::seal(key, &prekey)`), which wraps the same thing.
 
 ### Added
 
@@ -86,9 +94,9 @@ still does.
   move of it can leave a copy deeper down. Measured on x86_64 Linux before this fix:
   `with_secret` on a `SealedFixed<40000>` left one copy of the sealing key, and `with_role`
   on a 20,000-byte `sealed_fixed_newtype!` role left about 7 KiB of plaintext. Keys of a few
-  KiB were not affected. The overwrite is now 32 KiB plus about 3·N in a release build
-  (10·N in a debug build) once that passes 32 KiB, so an access to a large key needs that
-  much free stack. A large-key case in the stack probe (`probe_large.rs`, run by
+  KiB were not affected. The overwrite is now about 3·N in a release build (10·N in a debug
+  build) once that passes 32 KiB, and 32 KiB below that, so an access to a large key needs
+  that much free stack. A large-key case in the stack probe (`probe_large.rs`, run by
   `tools/stack_probe.sh`) reads 0 for the key and the plaintext after `with_secret`,
   `with_secret_mut`, `with_role` and `with_role_mut` at N = 40,000, in debug and release.
 - **Sealing a `sealed_fixed_newtype!` role no longer leaves a copy of the key on the stack
@@ -100,8 +108,8 @@ still does.
   conversions.
 - **The role plumbing has one path in.** `src/sealed/role.rs` says its items are reached
   only through `__private`, but the module was also `secure_gate::sealed::role`, a hidden
-  but public path. It is crate-private now, and a doctest checks the path does not compile.
-  The path was added after 0.9.1 and was never in a published version.
+  but public path, and 0.9.1 shipped it. It is crate-private now (Migration 5), and a
+  doctest checks the path does not compile.
 
 ### Removed
 
