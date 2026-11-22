@@ -303,9 +303,10 @@ fn after_fork_the_child_reports_the_lock_as_not_inherited() {
 }
 
 /// A `fork()` child that drops an inherited block wipes and unmaps its own copy without
-/// panicking. The lock was not inherited, so `release` must not try to unlock it: on some
-/// systems that `munlock` fails, and `region` panics on the failure in debug builds. The
-/// child's work is `mprotect`, plain stores, `getpid` and `munmap`, all async-signal-safe.
+/// panicking. The child never held the lock, so its drop unlocks pages that are not locked;
+/// `region` panics on a failed unlock in debug builds, and this checks that no system here
+/// fails it (Linux, macOS and FreeBSD all accept it). The child's work is `mprotect`, plain
+/// stores, `munlock` and `munmap`, all async-signal-safe.
 #[cfg(unix)]
 #[test]
 fn a_fork_child_can_drop_an_inherited_block() {
