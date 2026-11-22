@@ -209,12 +209,15 @@ bytes and leaves the old stack slot as it was until something overwrites it. Zer
 wipes only the current location.
 
 - Build with [`Fixed::new_with`](https://docs.rs/secure-gate/latest/secure_gate/struct.Fixed.html#method.new_with),
-  which writes straight into the wrapper. The decoders and `from_random` do. `Fixed::new(v)`
-  takes a value that already existed somewhere.
+  which writes straight into the wrapper; `from_random` does too. A decoder writes into a
+  wiped staging buffer and copies out of it into the wrapper. `Fixed::new(v)` takes a value
+  that already existed somewhere.
 - Pass `&Fixed<T>` / `&mut Fixed<T>`, not `Fixed<T>` by value.
 - For a long-lived secret prefer `Dynamic` built with `new_with(len, …)` or a decoder: the
   buffer is heap-only and has one address. For a fixed-size key that is `Dynamic<[u8]>`:
-  `Dynamic<[u8; N]>` has no `new_with`, so building one means `Dynamic::new(array)`.
+  `Dynamic<[u8; N]>` has no `new_with`, so building one means `Dynamic::new` of an array,
+  which passes it over the stack and leaves the source unwiped, or of a `Box`, which moves
+  only the box but the box had to be filled first.
   `Dynamic::new(v)` and `into_inner` pass the value over the stack once.
 - For address stability, pin at the call site: `core::pin::pin!(Fixed::new_with(…))`.
 

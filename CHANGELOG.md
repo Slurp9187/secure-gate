@@ -67,8 +67,8 @@ still does.
   freed unwiped.
 - `DynamicBytes`, the sealed trait behind those methods. It cannot be implemented outside
   this crate and has no methods outside it: the buffer operations it needs are on a
-  private supertrait whose methods take a token only this crate can make, so no outside
-  code can implement them or call them.
+  crate-private supertrait, so outside code can neither implement them nor call them,
+  even through a `DynamicBytes` bound.
 - `SecretLen` for `SealedFixed<N>`, `SealedDynamic<T>`, the sealed macro types,
   `__private::SealedRole` and `__private::SealedDynRole`.
 

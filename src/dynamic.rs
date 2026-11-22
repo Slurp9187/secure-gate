@@ -561,7 +561,7 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
     #[inline(always)]
     fn from_protected_bytes(protected: zeroize::Zeroizing<alloc::vec::Vec<u8>>) -> Self {
         Self {
-            inner: B::from_protected(protected, crate::traits::dynamic_bytes::TOKEN),
+            inner: B::from_protected(protected),
         }
     }
 
@@ -657,9 +657,9 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
         // Built, zeroed, before a byte of the secret exists; from here on the wrapper's
         // own drop wipes it, on a panic inside `f` too.
         let mut this = Self {
-            inner: B::zeroed(len, crate::traits::dynamic_bytes::TOKEN),
+            inner: B::zeroed(len),
         };
-        f(this.inner.bytes_mut(crate::traits::dynamic_bytes::TOKEN));
+        f(this.inner.bytes_mut());
         this
     }
 
@@ -765,12 +765,12 @@ impl<B: crate::DynamicBytes + ?Sized> Dynamic<B> {
         F: FnOnce(&mut [u8]) -> Result<(), E>,
     {
         let mut this = Self {
-            inner: B::zeroed(len, crate::traits::dynamic_bytes::TOKEN),
+            inner: B::zeroed(len),
         };
         // On the error path `this` is dropped here, so the wrapper wipes whatever the
         // closure wrote before it gave up. That is why the buffer is built before the
         // fill rather than assembled after it.
-        f(this.inner.bytes_mut(crate::traits::dynamic_bytes::TOKEN))?;
+        f(this.inner.bytes_mut())?;
         Ok(this)
     }
 }
@@ -827,16 +827,12 @@ impl Dynamic<alloc::string::String> {
 impl<B: crate::DynamicBytes + ?Sized> ToHex for Dynamic<B> {
     #[inline]
     fn to_hex(&self) -> crate::EncodedSecret {
-        self.inner
-            .bytes(crate::traits::dynamic_bytes::TOKEN)
-            .to_hex()
+        self.inner.bytes().to_hex()
     }
 
     #[inline]
     fn to_hex_upper(&self) -> crate::EncodedSecret {
-        self.inner
-            .bytes(crate::traits::dynamic_bytes::TOKEN)
-            .to_hex_upper()
+        self.inner.bytes().to_hex_upper()
     }
 }
 
@@ -856,9 +852,7 @@ impl<B: crate::DynamicBytes + ?Sized> ToHex for Dynamic<B> {
 impl<B: crate::DynamicBytes + ?Sized> ToBase32 for Dynamic<B> {
     #[inline]
     fn to_base32(&self) -> crate::EncodedSecret {
-        self.inner
-            .bytes(crate::traits::dynamic_bytes::TOKEN)
-            .to_base32()
+        self.inner.bytes().to_base32()
     }
 }
 
@@ -878,9 +872,7 @@ impl<B: crate::DynamicBytes + ?Sized> ToBase32 for Dynamic<B> {
 impl<B: crate::DynamicBytes + ?Sized> ToBase64Url for Dynamic<B> {
     #[inline]
     fn to_base64url(&self) -> crate::EncodedSecret {
-        self.inner
-            .bytes(crate::traits::dynamic_bytes::TOKEN)
-            .to_base64url()
+        self.inner.bytes().to_base64url()
     }
 }
 
@@ -895,9 +887,7 @@ impl<B: crate::DynamicBytes + ?Sized> ToBech32 for Dynamic<B> {
         hrp: &str,
         case: crate::Case,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.inner
-            .bytes(crate::traits::dynamic_bytes::TOKEN)
-            .try_to_bech32(hrp, case)
+        self.inner.bytes().try_to_bech32(hrp, case)
     }
 
     #[inline]
@@ -906,9 +896,7 @@ impl<B: crate::DynamicBytes + ?Sized> ToBech32 for Dynamic<B> {
         hrp: &str,
         case: crate::Case,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.inner
-            .bytes(crate::traits::dynamic_bytes::TOKEN)
-            .try_to_bech32_sized::<C>(hrp, case)
+        self.inner.bytes().try_to_bech32_sized::<C>(hrp, case)
     }
 }
 
@@ -923,9 +911,7 @@ impl<B: crate::DynamicBytes + ?Sized> ToBech32m for Dynamic<B> {
         hrp: &str,
         case: crate::Case,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.inner
-            .bytes(crate::traits::dynamic_bytes::TOKEN)
-            .try_to_bech32m(hrp, case)
+        self.inner.bytes().try_to_bech32m(hrp, case)
     }
 
     #[inline]
@@ -934,9 +920,7 @@ impl<B: crate::DynamicBytes + ?Sized> ToBech32m for Dynamic<B> {
         hrp: &str,
         case: crate::Case,
     ) -> Result<crate::EncodedSecret, crate::error::Bech32Error> {
-        self.inner
-            .bytes(crate::traits::dynamic_bytes::TOKEN)
-            .try_to_bech32m_sized::<C>(hrp, case)
+        self.inner.bytes().try_to_bech32m_sized::<C>(hrp, case)
     }
 }
 

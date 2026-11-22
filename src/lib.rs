@@ -407,9 +407,10 @@ pub mod __private {
 /// Heap-allocated secret wrapper with explicit access and automatic zeroization on drop.
 ///
 /// Variable-length secrets (passwords, API keys, ciphertexts). Inner type must implement
-/// `Zeroize`. The wrapper holds its bytes on the heap; `new_with`, `from_random` and the
-/// decoders write them there directly, while [`Dynamic::new`] takes a value that already
-/// existed, passed by value. Requires `alloc`.
+/// `Zeroize`. The wrapper holds its bytes on the heap. `new_with` and `from_random` write
+/// them there directly; a decoder writes them into a wiped staging buffer, which
+/// `Dynamic<Vec<u8>>` takes over and `Dynamic<[u8]>` copies out of. [`Dynamic::new`]
+/// takes a value that already existed, passed by value. Requires `alloc`.
 ///
 /// See [`Fixed<T>`] for the stack-allocated alternative.
 ///

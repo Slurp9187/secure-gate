@@ -25,16 +25,24 @@
 //!
 //! The trait is sealed: it is implemented for `Vec<u8>` and `[u8]` and cannot be
 //! implemented outside this crate. Outside this crate it has no methods: the buffer
-//! operations the crate uses are on a private supertrait, and each takes a token only
-//! this crate can build. Neither the token nor the supertrait can be named outside it:
+//! operations the crate uses are on a crate-private supertrait. Outside code cannot name
+//! that trait, so it cannot implement it, and the compiler refuses its methods even
+//! through a `DynamicBytes` bound. No value a caller builds, with or without `unsafe`,
+//! changes that, since privacy is checked before anything runs:
 //!
-//! ```rust,compile_fail,E0603
-//! fn make() -> secure_gate::traits::dynamic_bytes::Token { todo!() }
+//! ```rust,compile_fail,E0624
+//! fn read<B: secure_gate::DynamicBytes + ?Sized>(b: &B) -> &[u8] { b.bytes() }
 //! ```
 //!
 //! ```rust,compile_fail,E0603
 //! struct Mine;
 //! impl secure_gate::traits::dynamic_bytes::Ops for Mine {}
+//! ```
+//!
+//! ```rust,compile_fail,E0277
+//! struct Mine;
+//! impl zeroize::Zeroize for Mine { fn zeroize(&mut self) {} }
+//! impl secure_gate::DynamicBytes for Mine {}
 //! ```
 
 extern crate alloc;
@@ -42,67 +50,56 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use zeroize::Zeroizing;
 
-mod private {
-    use super::{Box, Vec, Zeroizing};
+/// The buffer operations behind [`DynamicBytes`]. Crate-private, so outside code can
+/// neither implement nor call them; see the [module docs](self).
+pub(crate) trait Ops {
+    /// A buffer of exactly `len` zero bytes, built before any secret is written to it.
+    fn zeroed(len: usize) -> Box<Self>;
 
-    /// Proof that a call comes from inside this crate. Outside code can neither name nor
-    /// build it, so the operations below cannot be called from outside, not even through
-    /// a `DynamicBytes` bound, which does bring them into scope.
-    pub struct Token(());
+    /// The buffer's bytes, for filling a buffer `zeroed` made.
+    fn bytes_mut(&mut self) -> &mut [u8];
 
-    /// The only value of [`Token`].
-    pub(crate) const TOKEN: Token = Token(());
+    /// The buffer's bytes, for encoding.
+    #[allow(dead_code, reason = "used only by the encoding features")]
+    fn bytes(&self) -> &[u8];
 
-    /// The buffer operations behind [`DynamicBytes`](super::DynamicBytes). Sealed: the
-    /// trait cannot be named outside this crate, so it cannot be implemented there, and
-    /// every method takes a [`Token`], so none can be called there.
-    pub trait Ops {
-        /// A buffer of exactly `len` zero bytes, built before any secret is written to it.
-        fn zeroed(len: usize, _: Token) -> Box<Self>;
-
-        /// The buffer's bytes, for filling a buffer `zeroed` made.
-        fn bytes_mut(&mut self, _: Token) -> &mut [u8];
-
-        /// The buffer's bytes, for encoding.
-        fn bytes(&self, _: Token) -> &[u8];
-
-        /// Moves or copies `protected` into a new buffer. `protected` stays wrapped until
-        /// the new buffer is built, so a failed allocation still wipes it.
-        fn from_protected(protected: Zeroizing<Vec<u8>>, _: Token) -> Box<Self>;
-    }
+    /// Moves or copies `protected` into a new buffer. `protected` stays wrapped until
+    /// the new buffer is built, so a failed allocation still wipes it.
+    #[allow(dead_code, reason = "used only by the decoding features")]
+    fn from_protected(protected: Zeroizing<Vec<u8>>) -> Box<Self>;
 }
-
-pub(crate) use private::{Ops, TOKEN};
 
 /// A byte buffer [`Dynamic`](crate::Dynamic) builds in place: `Vec<u8>` or `[u8]`.
 ///
 /// See the [module docs](self) for what it unifies and why a call must name the shape.
 /// Sealed; not implementable outside this crate. It has no methods outside this crate:
-/// the buffer operations it needs are on a private supertrait, and each takes a token
-/// only this crate can build.
-pub trait DynamicBytes: private::Ops + zeroize::Zeroize {}
+/// the buffer operations it needs are on a crate-private supertrait.
+// A public trait with a crate-private supertrait is what seals it and keeps the methods
+// uncallable outside the crate; the lint only notes that the bound names a private trait.
+#[allow(private_bounds)]
+pub trait DynamicBytes: Ops + zeroize::Zeroize {}
 
 impl DynamicBytes for Vec<u8> {}
 impl DynamicBytes for [u8] {}
 
 impl Ops for Vec<u8> {
     #[inline(always)]
-    fn zeroed(len: usize, _: private::Token) -> Box<Self> {
+    fn zeroed(len: usize) -> Box<Self> {
         Box::new(alloc::vec![0u8; len])
     }
 
     #[inline(always)]
-    fn bytes_mut(&mut self, _: private::Token) -> &mut [u8] {
+    fn bytes_mut(&mut self) -> &mut [u8] {
         self
     }
 
     #[inline(always)]
-    fn bytes(&self, _: private::Token) -> &[u8] {
+    fn bytes(&self) -> &[u8] {
         self
     }
 
     #[inline(always)]
-    fn from_protected(mut protected: Zeroizing<Vec<u8>>, _: private::Token) -> Box<Self> {
+    fn from_protected(mut protected: Zeroizing<Vec<u8>>) -> Box<Self> {
         // The 24-byte header is the only allocation; `protected` stays live across it.
         let mut boxed = Box::<Vec<u8>>::default();
         core::mem::swap(&mut *boxed, &mut *protected);
@@ -112,27 +109,27 @@ impl Ops for Vec<u8> {
 
 impl Ops for [u8] {
     #[inline(always)]
-    fn zeroed(len: usize, _: private::Token) -> Box<Self> {
+    fn zeroed(len: usize) -> Box<Self> {
         // `vec![0; len]` has capacity `len`, so turning it into a box does not reallocate.
         alloc::vec![0u8; len].into_boxed_slice()
     }
 
     #[inline(always)]
-    fn bytes_mut(&mut self, _: private::Token) -> &mut [u8] {
+    fn bytes_mut(&mut self) -> &mut [u8] {
         self
     }
 
     #[inline(always)]
-    fn bytes(&self, _: private::Token) -> &[u8] {
+    fn bytes(&self) -> &[u8] {
         self
     }
 
     #[inline(always)]
-    fn from_protected(protected: Zeroizing<Vec<u8>>, _: private::Token) -> Box<Self> {
+    fn from_protected(protected: Zeroizing<Vec<u8>>) -> Box<Self> {
         // Copied into a box of exactly its length; `protected` may have spare capacity,
         // and shrinking it in place could reallocate and free its buffer unwiped. It is
         // wiped when it drops at the end of this call.
-        let mut boxed = Self::zeroed(protected.len(), TOKEN);
+        let mut boxed = Self::zeroed(protected.len());
         boxed.copy_from_slice(&protected);
         boxed
     }
