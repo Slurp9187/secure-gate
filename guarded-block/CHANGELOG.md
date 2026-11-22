@@ -4,6 +4,11 @@ All notable changes to this crate are documented in this file. The format follow
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- README: crates.io, docs.rs, CI, MSRV and license badges, as on secure-gate's README.
+
 ## [0.1.2] - 2026-11-22
 
 ### Added
