@@ -51,9 +51,13 @@
 //! through page protection on Linux), or from code in this process, or in another process
 //! allowed to, that changes the protection back. It does not keep the block out of a
 //! hibernation file or a kernel memory dump, wipe a `fork()` child's copy, or cover copies
-//! of the block's bytes that the caller's closure makes.
+//! of the block's bytes that the caller's closure makes. It wipes only when the block
+//! drops, so a block that never drops is never wiped: one passed to `mem::forget` or kept
+//! in a `static`, or one alive when the process calls `process::exit` or aborts (including
+//! a panic under `panic = "abort"`).
 //!
-//! All the `unsafe` code is in this crate; its API is safe.
+//! The API is safe. The `unsafe` code that uses it is in this crate, and the system calls
+//! themselves are made by [`region`], which this crate depends on.
 //!
 //! ```
 //! use guarded_block::GuardedBlock;
@@ -221,13 +225,15 @@ fn os_code(err: &region::Error) -> Option<i32> {
 /// `Send` and `Sync`: after construction the block is only read, and in idle no-access
 /// mode every protection change happens under a mutex.
 pub struct GuardedBlock<const N: usize> {
+    /// The page lock, if granted. Declared before `map` so that, should `release` ever
+    /// leave it in place, field drop order still unlocks before it unmaps.
+    lock: Option<region::LockGuard>,
     /// The whole mapping: guard page, block pages, guard page. Unmapped when this drops.
     map: region::Allocation,
     /// The page size, which is also the block's offset into the mapping.
     page: usize,
     /// `N` rounded up to whole pages: the span that is locked and protected.
     block_len: usize,
-    lock: Option<region::LockGuard>,
     lock_error: Option<LockError>,
     /// The process that made the block and holds its lock; a `fork()` child does not.
     pid: u32,
@@ -270,8 +276,10 @@ impl<const N: usize> GuardedBlock<N> {
     /// On Windows this mode does not lock the block: a no-access page leaves the working set
     /// and its lock is dropped, so the block may be written to the pagefile while idle.
     /// [`lock_status`](Self::lock_status) then returns an error whose
-    /// [`idle_noaccess`](LockError::idle_noaccess) is `true`. On Linux the lock survives the
-    /// protection change and is kept. Each access costs a few microseconds more, more with
+    /// [`idle_noaccess`](LockError::idle_noaccess) is `true`. On Linux and FreeBSD the lock
+    /// survives the protection change and is kept; the tests read it back from the kernel.
+    /// On macOS `lock_status` reports what the first `mlock` returned, and no test reads the
+    /// lock back there yet. Each access costs a few microseconds more, more with
     /// many busy threads. On Linux that is the two protection changes, each of which
     /// interrupts every CPU running one of the process's threads; on Windows most of it is
     /// faulting the block's pages back into the working set, which a no-access page leaves.
@@ -303,10 +311,10 @@ impl<const N: usize> GuardedBlock<N> {
         let map = region::alloc(total, Protection::READ_WRITE)
             .map_err(|e| MapError::new(MapStep::Map, &e))?;
         let mut this = Self {
+            lock: None,
             map,
             page,
             block_len,
-            lock: None,
             lock_error: None,
             pid: std::process::id(),
             open: idle.then(|| Mutex::new(0)),
@@ -367,7 +375,8 @@ impl<const N: usize> GuardedBlock<N> {
     /// mappings). Panics from `f` propagate.
     pub fn with<R>(&self, f: impl FnOnce(&[u8; N]) -> R) -> R {
         let _window = self.open_window();
-        // SAFETY: the block is inside the mapping, page-aligned, initialized by `fill`, and
+        // SAFETY: the block is inside the mapping, page-aligned, initialized (the new mapping
+        // is zero-filled, then `fill` may write it), and
         // readable: `READ` for the block's whole life outside idle no-access mode, and in
         // that mode for as long as `_window` is alive. Nothing writes it until `Drop`.
         f(unsafe { &*self.block_ptr().cast::<[u8; N]>() })
@@ -472,6 +481,8 @@ impl<const N: usize> GuardedBlock<N> {
         // SAFETY: the block is `READ_WRITE`, inside the mapping, and exclusively ours.
         unsafe { core::slice::from_raw_parts_mut(self.block_ptr().cast_mut(), self.block_len) }
             .zeroize();
+        #[cfg(test)]
+        tests::WIPES.with(|n| n.set(n.get() + 1));
         true
     }
 }
@@ -522,6 +533,25 @@ fn dont_dump(_ptr: *const u8, _len: usize) {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
+
+    std::thread_local! {
+        /// Successful wipes on this thread. Lets a test see that `Drop` wipes, since the
+        /// mapping is gone by the time a dropped block could be read back.
+        pub(super) static WIPES: Cell<usize> = const { Cell::new(0) };
+    }
+
+    /// Dropping a block wipes it, in both modes. Deleting `release` from `Drop`, or the
+    /// wipe from `release`, fails this; `release_wipes_then_unlocks` checks the bytes.
+    #[test]
+    fn drop_wipes_the_block() {
+        for idle in [false, true] {
+            let b = GuardedBlock::<100>::create(|x| x.fill(0xA5), idle).unwrap();
+            let before = WIPES.with(Cell::get);
+            drop(b);
+            assert_eq!(WIPES.with(Cell::get), before + 1, "idle = {idle}");
+        }
+    }
 
     /// Whether the block's first page is locked, asked of the operating system.
     #[cfg(windows)]
