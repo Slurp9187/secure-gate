@@ -301,3 +301,37 @@ fn after_fork_the_child_reports_the_lock_as_not_inherited() {
         "the parent's own status is unchanged"
     );
 }
+
+/// A `fork()` child that drops an inherited block wipes and unmaps its own copy without
+/// panicking. The child never held the lock, so its drop unlocks pages that are not locked;
+/// `region` panics on a failed unlock in debug builds, and this checks that no system here
+/// fails it (Linux, macOS and FreeBSD all accept it). The child's work is plain stores
+/// and the `mprotect`, `munlock` and `munmap` system calls: no locks and no allocation.
+#[cfg(unix)]
+#[test]
+fn a_fork_child_can_drop_an_inherited_block() {
+    for idle in [false, true] {
+        let b = if idle {
+            GuardedBlock::<64>::new_with_idle_noaccess(|x| x.fill(6))
+        } else {
+            GuardedBlock::<64>::new_with(|x| x.fill(6))
+        }
+        .unwrap();
+        // SAFETY (test): the child only drops the block and calls `_exit`.
+        let pid = unsafe { libc::fork() };
+        assert!(pid >= 0, "fork failed");
+        if pid == 0 {
+            drop(b);
+            // SAFETY (test): ends the child without running the parent's destructors.
+            unsafe { libc::_exit(0) };
+        }
+        let mut status = 0;
+        // SAFETY (test): waits for the child created above.
+        assert_eq!(unsafe { libc::waitpid(pid, &mut status, 0) }, pid);
+        assert!(
+            libc::WIFEXITED(status) && libc::WEXITSTATUS(status) == 0,
+            "child did not exit cleanly (idle = {idle}, status {status:#x})"
+        );
+        assert_eq!(b.with(|x| x[0]), 6, "the parent's block is untouched");
+    }
+}
