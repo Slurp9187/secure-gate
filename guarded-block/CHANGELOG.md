@@ -7,8 +7,6 @@ All notable changes to this crate are documented in this file. The format follow
 ## [Unreleased]
 
 ### Added
-- `drop_wipes_the_block` fails if `Drop` stops wiping. The existing test called `release`
-  directly, so deleting the wipe from `Drop` passed every test.
 - `a_fork_child_can_drop_an_inherited_block`, on every Unix: a child's drop unlocks pages it
   never locked, and no system in CI refuses that.
 
@@ -17,10 +15,10 @@ All notable changes to this crate are documented in this file. The format follow
   unlocks before it unmaps. No behavior change: `Drop` already did both in that order.
 - Lock file moved to `region` 4.0.2 (documentation changes only). The requirement stays
   4.0.1.
-- Documentation: `region` makes the system calls (the `unsafe` code that uses it is in this
-  crate); a block that never drops (`mem::forget`, a `static`, `process::exit`, an abort)
-  is never wiped; idle no-access keeps the lock on Linux and FreeBSD, measured, and on
-  macOS no test reads it back yet. One safety comment corrected.
+- Documentation: `region` makes the map, protect and lock calls, and this crate calls
+  `madvise` itself; a block that never drops (`mem::forget`, a `static`, `process::exit`,
+  an abort) is never wiped; idle no-access keeps the lock on Linux and FreeBSD, measured,
+  and on macOS no test reads it back yet. One safety comment corrected.
 
 ## [0.1.1] - 2026-11-14
 

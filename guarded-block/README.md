@@ -3,7 +3,8 @@
 A fixed-size secret block in a memory mapping of its own, between two no-access guard pages,
 read-only and locked in RAM while it lives. A safe API over
 [`region`](https://crates.io/crates/region)'s page protection: this crate holds the
-`unsafe` code, and `region` makes the system calls.
+`unsafe` code, `region` makes the map, protect and lock calls, and this crate calls
+`madvise` itself on Linux and FreeBSD.
 
 ```text
 [ guard: no access ][ block: N bytes, rounded up to whole pages ][ guard: no access ]

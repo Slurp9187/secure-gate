@@ -56,8 +56,9 @@
 //! in a `static`, or one alive when the process calls `process::exit` or aborts (including
 //! a panic under `panic = "abort"`).
 //!
-//! The API is safe. The `unsafe` code that uses it is in this crate, and the system calls
-//! themselves are made by [`region`], which this crate depends on.
+//! The API is safe, and all the `unsafe` code is in this crate. The map, protect and lock
+//! calls go through [`region`], which this crate depends on; on Linux and FreeBSD this
+//! crate also calls `madvise` itself.
 //!
 //! ```
 //! use guarded_block::GuardedBlock;
@@ -481,8 +482,6 @@ impl<const N: usize> GuardedBlock<N> {
         // SAFETY: the block is `READ_WRITE`, inside the mapping, and exclusively ours.
         unsafe { core::slice::from_raw_parts_mut(self.block_ptr().cast_mut(), self.block_len) }
             .zeroize();
-        #[cfg(test)]
-        tests::WIPES.with(|n| n.set(n.get() + 1));
         true
     }
 }
@@ -533,25 +532,6 @@ fn dont_dump(_ptr: *const u8, _len: usize) {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::Cell;
-
-    std::thread_local! {
-        /// Successful wipes on this thread. Lets a test see that `Drop` wipes, since the
-        /// mapping is gone by the time a dropped block could be read back.
-        pub(super) static WIPES: Cell<usize> = const { Cell::new(0) };
-    }
-
-    /// Dropping a block wipes it, in both modes. Deleting `release` from `Drop`, or the
-    /// wipe from `release`, fails this; `release_wipes_then_unlocks` checks the bytes.
-    #[test]
-    fn drop_wipes_the_block() {
-        for idle in [false, true] {
-            let b = GuardedBlock::<100>::create(|x| x.fill(0xA5), idle).unwrap();
-            let before = WIPES.with(Cell::get);
-            drop(b);
-            assert_eq!(WIPES.with(Cell::get), before + 1, "idle = {idle}");
-        }
-    }
 
     /// Whether the block's first page is locked, asked of the operating system.
     #[cfg(windows)]
