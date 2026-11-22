@@ -73,6 +73,12 @@ still does.
 - `SecretLen` for `SealedFixed<N>`, `SealedDynamic<T>`, the sealed macro types,
   `__private::SealedRole` and `__private::SealedDynRole`.
 
+### Changed
+
+- `sealed` requires `guarded-block` 0.1.2 (was 0.1.0), and the `sealed` unit tests
+  require `region` 4.0.2 (was 4.0.1), as `guarded-block` does. Neither changes behavior:
+  `guarded-block` 0.1.2 and `region` 4.0.2 change tests, field order and documentation.
+
 ### Fixed
 
 - **The stack overwrite after a sealed access now grows with the key.** It was a fixed
