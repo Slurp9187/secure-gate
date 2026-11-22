@@ -1,5 +1,11 @@
 # guarded-block
 
+[![Crates.io](https://img.shields.io/crates/v/guarded-block.svg)](https://crates.io/crates/guarded-block)
+[![Docs.rs](https://docs.rs/guarded-block/badge.svg)](https://docs.rs/guarded-block)
+[![CI](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Slurp9187/secure-gate/actions/workflows/ci.yml)
+[![MSRV: 1.85](https://img.shields.io/badge/msrv-1.85-blue)](https://github.com/Slurp9187/secure-gate/blob/main/guarded-block/Cargo.toml)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/Slurp9187/secure-gate/tree/main/guarded-block)
+
 A fixed-size secret block in a memory mapping of its own, between two no-access guard pages,
 read-only and locked in RAM while it lives. A safe API over
 [`region`](https://crates.io/crates/region)'s page protection: this crate holds the
