@@ -66,7 +66,7 @@
 //!
 //! `Fixed` and `Dynamic` share the same [`RevealSecret`] / [`RevealSecretMut`] access API.
 //! The sealed types are opened only through scoped `with_secret` calls (no `expose_secret`),
-//! cost about 8 µs per access, and are for keys held across a session, not hot loops; their
+//! cost about 7–11 µs per access for a 32-byte key, and are for keys held across a session, not hot loops; their
 //! module has the threat model and the measurements.
 //!
 //! (The row above is a real intra-doc link where `sealed` is enabled, as on docs.rs, and
@@ -211,8 +211,8 @@
 //!
 //! Both levels are impls of the **same** trait ([`ToHex`], [`ToBase32`], [`ToBase64Url`],
 //! [`ToBech32`], [`ToBech32m`]): a blanket impl covers the raw bytes inside
-//! `with_secret`, and per-wrapper impls on `Fixed<[u8; N]>` / `Dynamic<Vec<u8>>`
-//! delegate through `with_secret` internally. One trait also means one bound:
+//! `with_secret`, and per-wrapper impls on `Fixed<[u8; N]>`, `Dynamic<Vec<u8>>` and
+//! `Dynamic<[u8]>` encode the wrapper's own bytes directly. One trait also means one bound:
 //! `fn fingerprint<S: ToHex>(s: &S)` accepts wrappers and forwarding newtypes
 //! alike.
 //!
@@ -299,21 +299,26 @@
 //!
 //! # Inherent Rust Limitations
 //!
-//! Three universal limits apply to any in-memory secret library in Rust (and in
+//! Four universal limits apply to any in-memory secret library in Rust (and in
 //! C, C++, and Go) — `secure-gate` documents them honestly rather than
-//! overclaiming:
+//! overclaiming. The first three are residue the machine leaves; the fourth is a copy
+//! your own code makes:
 //!
 //! - **Stack-move residue**: moving a [`Fixed<T>`] by value leaves the prior stack
 //!   slot uncleared until a later frame overwrites it. Prefer
 //!   [`Fixed::new_with`](Fixed::new_with), pass by reference, or use
 //!   [`Dynamic<T>`] for long-lived secrets.
 //! - **Heap-reallocation residue**: `Vec` / `String` realloc frees the old buffer
-//!   unzeroed. Pre-size, use `Dynamic<[u8; N]>` (boxed array — no realloc surface),
-//!   or install a zero-on-dealloc global allocator such as `zeroizing-alloc` at
-//!   the binary level.
+//!   unzeroed, including a `Dynamic<Vec<u8>>` or `Dynamic<String>` grown through
+//!   `with_secret_mut` / `expose_secret_mut`. Pre-size, use `Dynamic<[u8]>` built with
+//!   `new_with` (its length cannot change, so there is no realloc surface), or install a
+//!   zero-on-dealloc global allocator such as `zeroizing-alloc` at the binary level.
 //! - **Swap / core dumps**: process memory paged to disk or written on crash is
 //!   outside any in-process library's reach. Use OS facilities (`mlock`,
 //!   encrypted swap, disabled core dumps).
+//! - **Copies made inside an access**: a `with_secret` closure, or code holding an
+//!   `expose_secret` reference, can copy the secret into a buffer the wrapper does not
+//!   own (`.to_vec()`, `format!`). That copy is the caller's to wipe; no lint catches it.
 //!
 //! Full discussion in
 //! [SECURITY.md § Inherent Rust Limitations](https://github.com/Slurp9187/secure-gate/blob/main/SECURITY.md#inherent-rust-limitations).
@@ -402,7 +407,10 @@ pub mod __private {
 /// Heap-allocated secret wrapper with explicit access and automatic zeroization on drop.
 ///
 /// Variable-length secrets (passwords, API keys, ciphertexts). Inner type must implement
-/// `Zeroize`. Secret bytes live on the heap only — never on the stack. Requires `alloc`.
+/// `Zeroize`. The wrapper holds its bytes on the heap. `new_with` and `from_random` write
+/// them there directly; a decoder writes them into a wiped staging buffer, which
+/// `Dynamic<Vec<u8>>` takes over and `Dynamic<[u8]>` copies out of. [`Dynamic::new`]
+/// takes a value that already existed, passed by value. Requires `alloc`.
 ///
 /// See [`Fixed<T>`] for the stack-allocated alternative.
 ///

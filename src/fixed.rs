@@ -19,8 +19,9 @@
 //!   bitwise-copies the bytes to a new location and leaves the original stack
 //!   slot uncleared until a later frame overwrites it. Pass `&Fixed<T>` /
 //!   `&mut Fixed<T>` by reference, keep the wrapper short-scope, or use
-//!   [`Dynamic<T>`](crate::Dynamic) for long-lived material (heap-only — no
-//!   stack residue surface). See `SECURITY.md` § "Inherent Rust Limitations".
+//!   [`Dynamic<T>`](crate::Dynamic) for long-lived material, built with `new_with`,
+//!   `from_random` or a decoder so the bytes start on the heap (`Dynamic::new` of a
+//!   value still passes it over the stack). See `SECURITY.md` § "Inherent Rust Limitations".
 //!
 //! # Construction
 //!

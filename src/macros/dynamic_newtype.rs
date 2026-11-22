@@ -230,13 +230,15 @@
 /// let _ = roles::child::grand::out(roles::child::grand::inn(d));
 /// ```
 ///
-/// ```rust,compile_fail,E0423
+/// ```rust,compile_fail
+/// // The constructor is private: E0423 on stable, E0603 on nightly, so no code is pinned.
 /// mod roles { secure_gate::dynamic_newtype!(pub Password, String); }
 /// mod sibling {
 ///     pub fn inn(d: secure_gate::Dynamic<String>) -> super::roles::Password {
 ///         super::roles::Password(d)
 ///     }
 /// }
+/// fn main() {}
 /// ```
 ///
 /// ```rust,compile_fail,E0616
@@ -244,6 +246,7 @@
 /// mod sibling {
 ///     pub fn out(p: super::roles::Password) -> secure_gate::Dynamic<String> { p.0 }
 /// }
+/// fn main() {}
 /// ```
 ///
 /// These cross a different wall from `into_inner`. A newtype has two:

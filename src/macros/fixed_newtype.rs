@@ -287,13 +287,15 @@
 ///
 /// A sibling of the declaring module cannot build it (E0423):
 ///
-/// ```rust,compile_fail,E0423
+/// ```rust,compile_fail
+/// // The constructor is private: E0423 on stable, E0603 on nightly, so no code is pinned.
 /// mod roles { secure_gate::fixed_newtype!(pub AppKey, 32); }
 /// mod sibling {
 ///     pub fn inn(f: secure_gate::Fixed<[u8; 32]>) -> super::roles::AppKey {
 ///         super::roles::AppKey(f)
 ///     }
 /// }
+/// fn main() {}
 /// ```
 ///
 /// nor take the wrapper out (E0616):
@@ -303,6 +305,7 @@
 /// mod sibling {
 ///     pub fn out(r: super::roles::AppKey) -> secure_gate::Fixed<[u8; 32]> { r.0 }
 /// }
+/// fn main() {}
 /// ```
 ///
 /// These cross a different wall from `into_inner`. A newtype has two:

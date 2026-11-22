@@ -305,14 +305,15 @@ this crate, only one needed anything:
 
 | Sequoia technique | Status here |
 |---|---|
-| Exact-size `Box<[u8]>` that cannot grow, so it can never reallocate | **Already expressible**, now documented. `Dynamic<[u8; N]>` was already recommended for compile-time lengths; `Dynamic<[u8]>` is the runtime-length equivalent — `with_secret_mut` hands out `&mut [u8]`, so growth does not compile. The `Dynamic` module docs gained a table row, the one construction caveat (`Box<[u8]>::from(Vec)` shrinks a `Vec` with spare capacity into a new buffer and frees the old one unwiped, so build it at exact capacity), and a doctest. |
+| Exact-size `Box<[u8]>` that cannot grow, so it can never reallocate | **Already expressible**, now documented. `Dynamic<[u8; N]>` was then recommended for compile-time lengths (since 0.10.0 the docs point to `Dynamic<[u8]>` with `new_with` instead, because `Dynamic<[u8; N]>` is built from an array passed by value); `Dynamic<[u8]>` is the runtime-length equivalent — `with_secret_mut` hands out `&mut [u8]`, so growth does not compile. The `Dynamic` module docs gained a table row, the one construction caveat (`Box<[u8]>::from(Vec)` shrinks a `Vec` with spare capacity into a new buffer and frees the old one unwiped, so build it at exact capacity), and a doctest. |
 | Zero the source `Vec`'s whole capacity after copying out of it | **Not needed.** Sequoia copies out of the caller's `Vec`, leaving a second plaintext copy to clean up. `Dynamic::new` *moves* the `Vec` in, so the caller's buffer is the one the wrapper holds, and drop already zeroizes its full capacity. Becomes relevant only if a constructor that copies out of an owned `Vec` is ever added. |
 | Byte-by-byte copy instead of `memcpy` | **Not adoptable.** Compiles back to `memcpy` (above). A copy that provably leaves nothing in registers or on the stack needs `asm!` or volatile writes, i.e. `unsafe`, which `#![forbid(unsafe_code)]` rules out. The crate's existing answer — avoid the copy: move-in construction, and `new_with` writing into the wrapper's own storage — is the stronger one. |
 
 `Dynamic<[u8]>` is the narrowest `Dynamic` shape. Verified against the crate: construction via
 `new` / `From<Box<[u8]>>`, `with_secret`, `with_secret_mut`, `Debug` redaction and `ct_eq`
 work; `SecretLen::len` (E0599), `new_with` (E0599) and `into_inner` (`[u8]: SentinelValue`
-unsatisfied, E0277) do not. Additive follow-ups if the shape proves popular, none needed for
+unsatisfied, E0277) did not (as of 0.9; `SecretLen` and `new_with` exist since 0.9.1 and
+0.10.0, below). Additive follow-ups if the shape proves popular, none needed for
 0.9 stable:
 
 - `impl<T: Zeroize> SecretLen for Dynamic<[T]>`, mirroring the `Dynamic<Vec<T>>` impl.

@@ -640,8 +640,9 @@ fn fixed_u8_len_unchanged() {
 /// `tests/compile-fail/fixed_reallocating_inner.rs`; this comment is the rationale, since a
 /// future reader will otherwise be tempted to add the impl back.
 ///
-/// For a heap-backed secret of fixed size the supported shape is `Dynamic<[u8; N]>`, which
-/// allocates once and is wiped on drop.
+/// `Dynamic<[u8; N]>` allocates once and is wiped on drop, as this test checks. It is built
+/// from an array passed by value, though, so for a fixed-size heap secret the docs point to
+/// `Dynamic<[u8]>` built with `new_with`, `from_random` or a decoder instead.
 #[cfg(feature = "alloc")]
 #[test]
 fn dynamic_boxed_array_is_the_heap_fixed_size_shape() {
