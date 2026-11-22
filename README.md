@@ -283,9 +283,9 @@ and 0.9.1 made them take a token only the crate can build.
 - **Yanked versions.** Every version before 0.8 is yanked on purpose, on 2026-03-17 UTC
   except 0.6.0, yanked on 2025-12-08 when 0.6.1 replaced it. 0.5.0
   through 0.7.0-rc.14 (rc.15 was tagged but never published) did not zeroize on drop,
-  fixed in 0.8.0-rc.1 (`SECURITY.md`, Past Advisory). 0.1.0 to 0.4.3 did wipe; they were
-  yanked as early wrappers over `secrecy`, superseded by the current design, not for that
-  flaw. The 0.8 and 0.9
+  fixed in 0.8.0-rc.1 (RUSTSEC-2026-0590; `SECURITY.md`, Past Advisory). 0.1.0 to 0.4.3
+  did wipe; they were yanked as early wrappers over `secrecy`, superseded by the current
+  design, not for that flaw. The 0.8 and 0.9
   release candidates are yanked too, replaced by 0.8.0 and 0.9.0, except 0.9.0-rc.6, which
   is still listed because a downstream user is pinned to it. Use a stable release.
 - **Traits.** The public traits can be implemented outside this crate, and the newtype macros
